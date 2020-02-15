@@ -3,6 +3,8 @@
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
 import Control.Applicative ( Alternative(..) )
+import Control.Monad.Trans.Maybe ( MaybeT(..) )
+import Control.Monad.Trans.Class ( MonadTrans(lift) )
 import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
@@ -56,7 +58,10 @@ parse dflags fpath bs = case unP (go False []) initState of
       (b, _) <- getInput
       if not (atEnd b)
         then do
-          (newToks, inPrag') <- parseCppLine <|> parsePlainTok inPrag <|> unknownLine
+          mtok <- runMaybeT (parseCppLine <|> parsePlainTok inPrag)
+          (newToks, inPrag') <- case mtok of
+            Nothing -> unknownLine
+            Just a -> pure a
           go inPrag' (newToks ++ toks)
         else
           pure toks
@@ -72,23 +77,23 @@ parse dflags fpath bs = case unP (go False []) initState of
             andThen _ = wrappedLexer
 
     -- | Try to parse a CPP line (can fail)
-    parseCppLine :: P ([T.Token], Bool)
-    parseCppLine = do
+    parseCppLine :: MaybeT P ([T.Token], Bool)
+    parseCppLine = MaybeT $ do
       (b, l) <- getInput
       case tryCppLine l b of
         Just (cppBStr, l', b')
              -> let cppTok = T.Token { tkType = TkCpp
                                      , tkValue = cppBStr
                                      , tkSpan = mkRealSrcSpan l l' }
-                in setInput (b', l') *> pure ([cppTok], False)
-        _    -> empty
+                in setInput (b', l') *> pure (Just ([cppTok], False))
+        _    -> return Nothing
 
     -- | Try to parse a regular old token (can fail)
-    parsePlainTok :: Bool -> P ([T.Token], Bool)  -- return list is only ever 0-2 elements
+    parsePlainTok :: Bool -> MaybeT P ([T.Token], Bool)  -- return list is only ever 0-2 elements
     parsePlainTok inPrag = do
-      (bInit, lInit) <- getInput
-      L sp tok <- Lexer.lexer False return
-      (bEnd, _) <- getInput
+      (bInit, lInit) <- lift getInput
+      L sp tok <- tryP (Lexer.lexer False return)
+      (bEnd, _) <- lift getInput
       case sp of
         UnhelpfulSpan _ -> pure ([], False) -- pretend the token never existed
         RealSrcSpan rsp -> do
@@ -101,24 +106,24 @@ parse dflags fpath bs = case unP (go False []) initState of
 
             -- Update internal line + file position if this is a LINE pragma
             ITline_prag _ -> tryOrElse (bEnd, inPragDef) $ do
-              L _ (ITinteger (IL { il_value = line })) <- wrappedLexer
-              L _ (ITstring _ file)                    <- wrappedLexer
-              L spF ITclose_prag                       <- wrappedLexer
+              L _ (ITinteger (IL { il_value = line })) <- tryP wrappedLexer
+              L _ (ITstring _ file)                    <- tryP wrappedLexer
+              L spF ITclose_prag                       <- tryP wrappedLexer
 
               let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
-              (bEnd'', _) <- getInput
-              setInput (bEnd'', newLoc)
+              (bEnd'', _) <- lift getInput
+              lift $ setInput (bEnd'', newLoc)
 
               pure (bEnd'', False)
 
             -- Update internal column position if this is a COLUMN pragma
             ITcolumn_prag _ -> tryOrElse (bEnd, inPragDef) $ do
-              L _ (ITinteger (IL { il_value = col }))  <- wrappedLexer
-              L spF ITclose_prag                       <- wrappedLexer
+              L _ (ITinteger (IL { il_value = col }))  <- tryP wrappedLexer
+              L spF ITclose_prag                       <- tryP wrappedLexer
 
               let newLoc = mkRealSrcLoc (srcSpanFile spF) (srcSpanEndLine spF) (fromIntegral col)
-              (bEnd'', _) <- getInput
-              setInput (bEnd'', newLoc)
+              (bEnd'', _) <- lift getInput
+              lift $ setInput (bEnd'', newLoc)
 
               pure (bEnd'', False)
 
@@ -154,15 +159,12 @@ getInput = P $ \p@PState { buffer = buf, loc = srcLoc } -> POk p (buf, srcLoc)
 setInput :: (StringBuffer, RealSrcLoc) -> P ()
 setInput (buf, srcLoc) = P $ \p -> POk (p { buffer = buf, loc = srcLoc }) ()
 
+tryP :: P a -> MaybeT P a
+tryP (P f) = MaybeT $ P $ \s -> case f s of
+  POk s' a -> POk s' (Just a)
+  PFailed _ -> POk s Nothing
 
--- | Orphan instance that adds backtracking to 'P'
-instance Alternative P where
-  empty = addFatalError noSrcSpan (text "Alterative.empty")
-  P x <|> P y = P $ \s -> case x s of { p@POk{} -> p
-                                      ; _ -> y s }
-
--- | Try a parser. If it fails, backtrack and return the pure value.
-tryOrElse :: a -> P a -> P a
+tryOrElse :: Alternative f => a -> f a -> f a
 tryOrElse x p = p <|> pure x
 
 -- | Classify given tokens as appropriate Haskell token type.
