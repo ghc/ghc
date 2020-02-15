@@ -7,6 +7,8 @@
 -- Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -- ---------------------------------------------------------------------------
 
+{-# OPTIONS -pgmF utils/happy.sh -F #-}
+
 {
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
