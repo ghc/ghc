@@ -143,4 +143,7 @@ data Extension
    | ImportQualifiedPost
    | CUSKs
    | StandaloneKindSignatures
-   deriving (Eq, Enum, Show, Generic, Bounded)
+   deriving (Eq, Ord, Enum, Show, Generic, Bounded)
+   -- 'Ord' and 'Bounded' are provided for GHC API users (see
+   -- https://gitlab.haskell.org/ghc/ghc/merge_requests/2707 and
+   -- https://gitlab.haskell.org/ghc/ghc/merge_requests/826).
