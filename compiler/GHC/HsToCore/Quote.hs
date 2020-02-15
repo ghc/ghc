@@ -2123,7 +2123,7 @@ wrapGenSyms binds body@(MkC b)
   = do  { var_ty <- lookupType nameTyConName
         ; go var_ty binds }
   where
-    (_, [elt_ty]) = tcSplitAppTys (exprType b)
+    (_, elt_ty) = tcSplitAppTy (exprType b)
         -- b :: m a, so we can get the type 'a' by looking at the
         -- argument type. NB: this relies on Q being a data/newtype,
         -- not a type synonym
