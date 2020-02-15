@@ -142,7 +142,7 @@ state 61 contains 47 shift/reduce conflicts.
     *** btype -> tyapps .
         tyapps -> tyapps . tyapp
 
-    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '[:' '(' '(#' '`' TYPEAPP
+    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '(' '(#' '`' TYPEAPP
       SIMPLEQUOTE VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
       STRING INTEGER TH_ID_SPLICE '$(' TH_QUASIQUOTE TH_QQUASIQUOTE
       and all the special ids.
@@ -561,8 +561,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  vccurly        { L _ ITvccurly } -- virtual close curly (from layout)
  '['            { L _ ITobrack }
  ']'            { L _ ITcbrack }
- '[:'           { L _ ITopabrack }
- ':]'           { L _ ITcpabrack }
  '('            { L _ IToparen }
  ')'            { L _ ITcparen }
  '(#'           { L _ IToubxparen }
