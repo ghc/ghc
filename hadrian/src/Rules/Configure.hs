@@ -33,7 +33,8 @@ configureRules = do
             -- We cannot use windowsHost here due to a cyclic dependency.
             when windowsHost $ do
                 putBuild "| Checking for Windows tarballs..."
-                quietly $ cmd ["bash", "mk/get-win32-tarballs.sh", "download", System.arch]
+                pythonPath <- builderPath Python
+                quietly $ cmd [pythonPath, "mk/get-win32-tarballs.py", "download", System.arch]
             let srcs    = map (<.> "in") outs
                 context = vanillaContext Stage0 compiler
             need srcs
