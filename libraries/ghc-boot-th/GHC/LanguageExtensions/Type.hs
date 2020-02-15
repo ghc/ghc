@@ -143,4 +143,4 @@ data Extension
    | ImportQualifiedPost
    | CUSKs
    | StandaloneKindSignatures
-   deriving (Eq, Enum, Show, Generic, Bounded)
+   deriving (Eq, Ord, Enum, Show, Generic, Bounded)
