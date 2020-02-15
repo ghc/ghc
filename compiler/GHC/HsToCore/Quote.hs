@@ -4,6 +4,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -1147,7 +1151,7 @@ rep_complete_sig (L _ cls) mty loc
 --                      Types
 -------------------------------------------------------
 
-addSimpleTyVarBinds :: [Name]                -- the binders to be added
+addSimpleTyVarBinds :: TypeName a => [Name]                -- the binders to be added
                     -> MetaM (Core (M a))   -- action in the ext env
                     -> MetaM (Core (M a))
 addSimpleTyVarBinds names thing_inside
@@ -1155,7 +1159,7 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
-addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
+addHsTyVarBinds :: TypeName a => [LHsTyVarBndr GhcRn]  -- the binders to be added
                 -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))  -- action in the ext env
                 -> MetaM (Core (M a))
 addHsTyVarBinds exp_tvs thing_inside
@@ -1168,7 +1172,8 @@ addHsTyVarBinds exp_tvs thing_inside
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
+addTyVarBinds :: TypeName a
+              => LHsQTyVars GhcRn                    -- the binders to be added
               -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))  -- action in the ext env
               -> MetaM (Core (M a))
 -- gensym a list of type variables and enter them into the meta environment;
@@ -1182,7 +1187,7 @@ addTyVarBinds (HsQTvs { hsq_ext = imp_tvs
     thing_inside
 addTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
 
-addTyClTyVarBinds :: LHsQTyVars GhcRn
+addTyClTyVarBinds :: TypeName a => LHsQTyVars GhcRn
                   -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))
                   -> MetaM (Core (M a))
 
@@ -2112,27 +2117,39 @@ lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
 lookupType tc_name = do { tc <- lift $ dsLookupTyCon tc_name ;
                           return (mkTyConApp tc []) }
 
-wrapGenSyms :: [GenSymBind]
+class TypeName a where
+  typeName :: Name
+
+instance TypeName TH.Dec where typeName = decTyConName
+instance TypeName TH.Exp where typeName = expTyConName
+instance TypeName TH.Pat where typeName = patTyConName
+instance TypeName TH.Body where typeName = bodyTyConName
+instance TypeName TH.Clause where typeName = clauseTyConName
+instance TypeName TH.Match where typeName = matchTyConName
+instance TypeName TH.Type where typeName = typeTyConName
+instance TypeName TH.Con where typeName = conTyConName
+instance TypeName TH.TySynEqn where typeName = tySynEqnTyConName
+instance TypeName [TH.Dec] where typeName = decsTyConName
+
+wrapGenSyms :: forall a . TypeName a => [GenSymBind]
             -> Core (M a) -> MetaM (Core (M a))
 -- wrapGenSyms [(nm1,id1), (nm2,id2)] y
 --      --> bindQ (gensym nm1) (\ id1 ->
 --          bindQ (gensym nm2 (\ id2 ->
 --          y))
 
-wrapGenSyms binds body@(MkC b)
+wrapGenSyms binds body
   = do  { var_ty <- lookupType nameTyConName
         ; go var_ty binds }
   where
-    (_, [elt_ty]) = tcSplitAppTys (exprType b)
-        -- b :: m a, so we can get the type 'a' by looking at the
-        -- argument type. NB: this relies on Q being a data/newtype,
-        -- not a type synonym
+    elt_name = typeName @a
 
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
            ; lit_str    <- lift $ nameLit name
            ; gensym_app <- repGensym lit_str
+           ; elt_ty <- lookupType elt_name
            ; repBindM var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
 

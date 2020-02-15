@@ -158,6 +158,7 @@ templateHaskellNames = [
     ruleBndrTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
     overlapTyConName, derivClauseTyConName, derivStrategyTyConName,
+    bodyTyConName,
 
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
@@ -189,7 +190,8 @@ quoteClassName = thCls (fsLit "Quote") quoteClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
-    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName :: Name
+    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
+    bodyTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -574,6 +576,7 @@ derivClauseTyConName   = thTc (fsLit "DerivClause")   derivClauseTyConKey
 kindTyConName          = thTc (fsLit "Kind")          kindTyConKey
 tyVarBndrTyConName      = thTc (fsLit "TyVarBndr")     tyVarBndrTyConKey
 derivStrategyTyConName = thTc (fsLit "DerivStrategy") derivStrategyTyConKey
+bodyTyConName          = thTc (fsLit "Body") bodyTyConKey
 
 -- quasiquoting
 quoteExpName, quotePatName, quoteDecName, quoteTypeName :: Name
@@ -641,7 +644,8 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
     roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey,
-    overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey
+    overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey,
+    bodyTyConKey
       :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
@@ -675,6 +679,7 @@ overlapTyConKey         = mkPreludeTyConUnique 233
 derivClauseTyConKey    = mkPreludeTyConUnique 234
 derivStrategyTyConKey  = mkPreludeTyConUnique 235
 decsTyConKey            = mkPreludeTyConUnique 236
+bodyTyConKey            = mkPreludeTyConUnique 237
 
 {- *********************************************************************
 *                                                                      *
