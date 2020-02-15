@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 -- A Parser monad with access to the 'DynFlags'.
 --
@@ -12,12 +10,12 @@
 module GHC.Cmm.Monad (
     PD(..)
   , liftP
+  , failMsgPD
   ) where
 
 import GhcPrelude
 
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 
 import DynFlags
 import Lexer
@@ -33,15 +31,12 @@ instance Applicative PD where
 
 instance Monad PD where
   (>>=) = thenPD
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
-
-instance MonadFail.MonadFail PD where
-  fail = failPD
 
 liftP :: P a -> PD a
 liftP (P f) = PD $ \_ s -> f s
+
+failMsgPD :: String -> PD a
+failMsgPD = liftP . failMsgP
 
 returnPD :: a -> PD a
 returnPD = liftP . return
@@ -51,9 +46,6 @@ thenPD :: PD a -> (a -> PD b) -> PD b
         case m d s of
                 POk s1 a         -> unPD (k a) d s1
                 PFailed s1 -> PFailed s1
-
-failPD :: String -> PD a
-failPD = liftP . fail
 
 instance HasDynFlags PD where
    getDynFlags = PD $ \d s -> POk s d
