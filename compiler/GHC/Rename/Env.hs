@@ -65,7 +65,7 @@ import DataCon
 import TyCon
 import ErrUtils         ( MsgDoc )
 import PrelNames        ( rOOT_MAIN )
-import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..))
+import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
 import SrcLoc
 import Outputable
 import UniqSet          ( uniqSetAny )
@@ -298,8 +298,13 @@ lookupExactOcc_either name
                     ATyCon tc                 -> Just tc
                     AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
                     _                         -> Nothing
-  , isTupleTyCon tycon
-  = do { checkTupSize (tyConArity tycon)
+  , Just tupleSort <- tyConTuple_maybe tycon
+  = do { let tupArity = case tupleSort of
+               -- Unboxed tuples have twice as many arguments because of the
+               -- 'RuntimeRep's (#17837)
+               UnboxedTuple -> tyConArity tycon `div` 2
+               _ -> tyConArity tycon
+       ; checkTupSize tupArity
        ; return (Right name) }
 
   | isExternalName name
