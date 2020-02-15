@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS -pgmF utils/happy.sh -F #-}
+
 {- -----------------------------------------------------------------------------
 Note [Syntax of .cmm files]
 
@@ -261,7 +263,6 @@ import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
 
-#include "HsVersions.h"
 }
 
 %expect 0

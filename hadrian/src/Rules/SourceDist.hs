@@ -136,11 +136,7 @@ prepareTree dest = do
 
     -- (stage, package, input file, output file)
     alexHappyFiles =
-        [ (Stage0, compiler,      "GHC/Cmm/Parser.y", "GHC/Cmm/Parser.hs")
-        , (Stage0, compiler,      "GHC/Cmm/Lexer.x",  "GHC/Cmm/Lexer.hs")
-        , (Stage0, compiler,      "parser/Parser.y",  "Parser.hs")
-        , (Stage0, compiler,      "parser/Lexer.x",   "Lexer.hs")
-        , (Stage0, hpcBin,        "HpcParser.y",      "HpcParser.hs")
+        [ (Stage0, hpcBin,        "HpcParser.y",      "HpcParser.hs")
         , (Stage0, genprimopcode, "Parser.y",         "Parser.hs")
         , (Stage0, genprimopcode, "Lexer.x",          "Lexer.hs")
         ]
