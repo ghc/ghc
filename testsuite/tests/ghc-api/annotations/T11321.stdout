@@ -42,7 +42,8 @@
 ((Test11321.hs:17:11-18,AnnCloseP), [Test11321.hs:17:18]),
 ((Test11321.hs:17:11-18,AnnOpenP), [Test11321.hs:17:11]),
 ((Test11321.hs:17:20-27,AnnCloseP), [Test11321.hs:17:27]),
-((Test11321.hs:17:20-27,AnnOpenP), [Test11321.hs:17:20]),
-((<no location info>,AnnEofPos), [Test11321.hs:18:1])
+((Test11321.hs:17:20-27,AnnOpenP), [Test11321.hs:17:20])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test11321.hs" 18 1

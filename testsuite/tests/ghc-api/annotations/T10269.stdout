@@ -18,7 +18,8 @@
 ((Test10269.hs:4:1-26,AnnFunId), [Test10269.hs:4:4-6]),
 ((Test10269.hs:4:1-26,AnnOpenP), [Test10269.hs:4:1]),
 ((Test10269.hs:4:1-26,AnnSemi), [Test10269.hs:5:1]),
-((Test10269.hs:4:2-8,AnnVal), [Test10269.hs:4:4-6]),
-((<no location info>,AnnEofPos), [Test10269.hs:5:1])
+((Test10269.hs:4:2-8,AnnVal), [Test10269.hs:4:4-6])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10269.hs" 5 1

@@ -43,13 +43,16 @@ testOneFile libdir fileName = do
                         return (pm_annotations p)
 
         let anns = p
-            (l,_) = fst $ head $ Map.toList (fst anns)
-            annModule = (getAnnotation anns l AnnModule)
-            annLet    = (getAnnotation anns l AnnLet)
+            ann_items = apiAnnItems anns
+            ann_eof = apiAnnEofPos anns
+            (l,_) = fst $ head $ Map.toList ann_items
+            annModule = getAnnotation anns l AnnModule
+            annLet    = getAnnotation anns l AnnLet
 
-        putStrLn (intercalate "\n" [showAnns anns,pp annModule,pp annLet,pp l])
+        putStrLn (intercalate "\n" [showAnns ann_items,pp annModule,pp annLet,pp l,
+                                    "EOF: " ++ show ann_eof])
 
-showAnns (anns,_) = "[\n" ++ (intercalate "\n"
+showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)
               -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
    $ Map.toList anns)
