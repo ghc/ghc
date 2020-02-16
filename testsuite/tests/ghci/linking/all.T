@@ -53,3 +53,8 @@ test('T15729',
      [extra_files(['T15729.hs', 'T15729.c']),
       unless(doing_ghci, skip)],
      makefile_test, ['T15729'])
+
+test('T11531',
+     [extra_files(['T11531.hs', 'ffi.cpp', 'ffi.h']),
+      unless(doing_ghci, skip)],
+     makefile_test, ['T11531'])

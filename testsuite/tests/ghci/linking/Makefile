@@ -139,3 +139,8 @@ T14708:
 T15729:
 	"$(TEST_HC)" -fPIC -c T15729.c -o bss.o
 	echo "main" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) bss.o T15729.hs
+
+.PHONY: T11531
+T11531:
+	$(CXX) -fPIC -c ffi.cpp -o ffi.o
+	- echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) ffi.o T11531.hs 2>&1 |  sed -e '/undefined symbol:/d' 1>&2
