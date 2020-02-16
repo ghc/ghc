@@ -175,6 +175,10 @@ NativeCode *native_objects = NULL;     /* initially empty */
    but are waiting to be actually freed via checkUnload() */
 NativeCode *unloaded_native_objects = NULL; /* initially empty */
 
+/* List of objects that are waiting to be freed after being checked by
+ * CheckUnload() */
+NativeCode *to_free_native_objects = NULL; /* initially empty */
+
 #if defined(THREADED_RTS)
 /* This protects all the Linker's global state except unloaded_objects
  * and unloaded_native_objects */
@@ -188,6 +192,13 @@ Mutex linker_mutex;
  * operations proceed concurrently with the GC.
  */
 Mutex linker_unloaded_mutex;
+/*
+ * This protects native code that we want to free from freeNativeCode.
+ * We want a separate mutex here so that we are able to queue up freeNativeCode_
+ * calls while a long dlopen is taking place, and then free them after
+ * unlocking the mutex.
+ */
+Mutex free_native_code_mutex;
 #endif
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
@@ -446,6 +457,7 @@ initLinker_ (int retain_cafs)
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
     initMutex(&linker_unloaded_mutex);
+    initMutex(&free_native_code_mutex);
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     initMutex(&dl_mutex);
 #endif
@@ -2039,6 +2051,65 @@ static HsInt unloadNativeObj_ELF (void *handle)
 
 #define UNUSED(x) (void)(x)
 
+HsInt unloadNativeObj (void *handle)
+{
+#if defined(OBJFORMAT_ELF)
+    ACQUIRE_LOCK(&linker_mutex);
+    HsInt r = unloadNativeObj_ELF(handle);
+    RELEASE_LOCK(&linker_mutex);
+    return r;
+#else
+   UNUSED(handle);
+   barf("unloadNativeObj: not implemented on this platform");
+#endif
+}
+
+static void freeNativeCode_ ( NativeCode *nc )
+{
+  ASSERT_LOCK_HELD(&dl_mutex);
+#if defined(OBJFORMAT_ELF)
+  freeNativeCode_ELF(nc);
+#else
+  UNUSED(nc);
+  // no op
+  return;
+#endif
+}
+
+static void tryFreeNativeCode ( void )
+{
+  NativeCode *nc, *next;
+
+  while (true) {
+    ACQUIRE_LOCK(&free_native_code_mutex);
+    nc = to_free_native_objects;
+    to_free_native_objects = NULL;
+    RELEASE_LOCK(&free_native_code_mutex);
+    if (nc == NULL) {
+        return;
+    }
+  #if defined(THREADED_RTS)
+    if (TRY_ACQUIRE_LOCK(&dl_mutex) != 0) {
+        IF_DEBUG(linker, debugBelch("Unable to acquire dl lock, not pruning"
+                                    "native objs."));
+        ACQUIRE_LOCK(&free_native_code_mutex);
+        // re-add this to the list
+        nc->next = to_free_native_objects;
+        to_free_native_objects = nc;
+        RELEASE_LOCK(&free_native_code_mutex);
+        return;
+    }
+  #endif
+
+    while (nc) {
+        next = nc->next;
+        freeNativeCode_(nc);
+        nc = next;
+    }
+    RELEASE_LOCK(&dl_mutex);
+  }
+}
+
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
 #if defined(OBJFORMAT_ELF)
@@ -2052,6 +2123,11 @@ void * loadNativeObj (pathchar *path, char **errmsg)
    initProfiling2();
 #endif
 
+   // If we are calling loadNativeObj a lot we may build up a queue of objects
+   // to clean up, so do that here at the very least to prevent the caller of
+   // this to grow memory unboundedly.
+   tryFreeNativeCode();
+
 #else
    UNUSED(path);
    UNUSED(errmsg);
@@ -2061,26 +2137,9 @@ void * loadNativeObj (pathchar *path, char **errmsg)
 
 void freeNativeCode (NativeCode *nc)
 {
-#if defined(OBJFORMAT_ELF)
-  ACQUIRE_LOCK(&dl_mutex);
-  freeNativeCode_ELF(nc);
-  RELEASE_LOCK(&dl_mutex);
-#else
-  UNUSED(nc);
-  // no op
-  return;
-#endif
-}
-
-HsInt unloadNativeObj (void *handle)
-{
-#if defined(OBJFORMAT_ELF)
-    ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadNativeObj_ELF(handle);
-    RELEASE_LOCK(&linker_mutex);
-    return r;
-#else
-   UNUSED(handle);
-   barf("unloadNativeObj: not implemented on this platform");
-#endif
+    ACQUIRE_LOCK(&free_native_code_mutex);
+    nc->next = to_free_native_objects;
+    to_free_native_objects = nc;
+    RELEASE_LOCK(&free_native_code_mutex);
+    tryFreeNativeCode();
 }
