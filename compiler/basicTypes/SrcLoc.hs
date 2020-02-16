@@ -83,7 +83,7 @@ module SrcLoc (
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost,
-        spans, isSubspanOf, sortLocated,
+        spans, isSubspanOf, isRealSubspanOf, sortLocated,
 
         liftL
     ) where
@@ -180,7 +180,7 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 ************************************************************************
 -}
 
-sortLocated :: [Located a] -> [Located a]
+sortLocated :: Ord l => [GenLocated l a] -> [GenLocated l a]
 sortLocated things = sortBy (comparing getLoc) things
 
 instance Outputable RealSrcLoc where
@@ -596,10 +596,17 @@ spans (RealSrcSpan span) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcS
 isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other
             -> SrcSpan -- ^ The span it may be enclosed by
             -> Bool
-isSubspanOf src parent
-    | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
-    | otherwise = srcSpanStart parent <= srcSpanStart src &&
-                  srcSpanEnd parent   >= srcSpanEnd src
+isSubspanOf (RealSrcSpan src) (RealSrcSpan parent) = isRealSubspanOf src parent
+isSubspanOf _ _ = False
+
+-- | Determines whether a span is enclosed by another one
+isRealSubspanOf :: RealSrcSpan -- ^ The span that may be enclosed by the other
+                -> RealSrcSpan -- ^ The span it may be enclosed by
+                -> Bool
+isRealSubspanOf src parent
+    | srcSpanFile parent /= srcSpanFile src = False
+    | otherwise = realSrcSpanStart parent <= realSrcSpanStart src &&
+                  realSrcSpanEnd parent   >= realSrcSpanEnd src
 
 liftL :: Monad m => (a -> m b) -> GenLocated l a -> m (GenLocated l b)
 liftL f (L loc a) = do

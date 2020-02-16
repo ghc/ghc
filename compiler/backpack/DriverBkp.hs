@@ -23,6 +23,7 @@ import GhcPrelude
 -- In a separate module because it hooks into the parser.
 import BkpSyn
 
+import ApiAnnotation
 import GHC hiding (Failed, Succeeded)
 import Packages
 import Parser
@@ -702,7 +703,7 @@ summariseRequirement pn mod_name = do
                         hsmodHaddockModHeader = Nothing
                     }),
                 hpm_src_files = [],
-                hpm_annotations = (Map.empty, Map.empty)
+                hpm_annotations = ApiAnns Map.empty Nothing Map.empty []
             }),
         ms_hspp_file = "", -- none, it came inline
         ms_hspp_opts = dflags,
@@ -812,7 +813,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
                     hpm_src_files = [], -- TODO if we preprocessed it
-                    hpm_annotations = (Map.empty, Map.empty) -- BOGUS
+                    hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
                 }),
             ms_hs_date = time,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
