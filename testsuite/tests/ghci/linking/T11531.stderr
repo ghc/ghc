@@ -1,0 +1,11 @@
+
+GHC.Runtime.Linker.dynLoadObjs: Loading temp shared object failed
+During interactive linking, GHCi couldn't find the following symbol:
+This may be due to you not asking GHCi to load extra object files,
+archives or DLLs needed by your current session.  Restart GHCi, specifying
+the missing library using the -L/path/to/object/dir and -lmissinglibname
+flags, or simply by naming the relevant files on the GHCi command line.
+Alternatively, this link failure might indicate a bug in GHCi.
+If you suspect the latter, please report this as a GHC bug:
+  https://www.haskell.org/ghc/reportabug
+
