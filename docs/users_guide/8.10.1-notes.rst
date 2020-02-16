@@ -243,6 +243,21 @@ Runtime system
   configure ``EventLogWriters``, allowing eventlog data to fed to sinks other
   than ``.eventlog`` files.
 
+- A new ``+RTS`` flag ``--disable-delayed-os-memory-return`` was added to make
+  for accurate resident memory usage of the program as shown in memory
+  usage reporting tools (e.g. the ``RSS`` column in ``top`` and ``htop``).
+
+  This makes it easier to check the real memory usage of Haskell programs.
+
+  Using this new flag is expected to make the program slightly slower.
+
+  Without this flag, the (Linux) RTS returns unused memory "lazily" to the OS.
+  This has making the memory available to other processes while also allowing
+  the RTS to re-use the memory very efficiently (without zeroing pages) in case
+  it needs it again, but common tools will incorrectly show such memory as
+  occupied by the RTS (because they do not process the ``LazyFree`` field in
+  ``/proc/PID/smaps``).
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
