@@ -25,7 +25,7 @@ main = do
         testOneFile libdir "AnnotationTuple"
 
 testOneFile libdir fileName = do
-       ((anns,cs),p) <- runGhc (Just libdir) $ do
+       p <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName fileName
@@ -38,14 +38,15 @@ testOneFile libdir fileName = do
                         t <- typecheckModule p
                         d <- desugarModule t
                         l <- loadModule d
-                        let ts=typecheckedSource l
-                            r =renamedSource l
-                        return (pm_annotations p,p)
+                        return p
 
+       let anns = pm_annotations p
+           ann_items = apiAnnItems anns
+           ann_eof = apiAnnEofPos anns
        let tupArgs = gq (pm_parsed_source p)
 
        putStrLn (pp tupArgs)
-       putStrLn (intercalate "\n" [showAnns anns])
+       putStrLn (intercalate "\n" [showAnns ann_items, "EOF: " ++ show ann_eof])
 
     where
      gq ast = everything (++) ([] `mkQ` doLHsTupArg) ast

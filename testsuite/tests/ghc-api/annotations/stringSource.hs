@@ -30,7 +30,7 @@ main = do
         testOneFile libdir fileName
 
 testOneFile libdir fileName = do
-       ((anns,cs),p) <- runGhc (Just libdir) $ do
+       p <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName fileName
@@ -40,7 +40,7 @@ testOneFile libdir fileName = do
                         load LoadAllTargets
                         modSum <- getModSummary mn
                         p <- parseModule modSum
-                        return (pm_annotations p,p)
+                        return p
 
        let tupArgs = gq (pm_parsed_source p)
 

@@ -10,8 +10,6 @@ import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
 
-import qualified Data.Map        as Map
-
 usage :: String
 usage = unlines
     [ "usage: check-ppr (libdir) (file)"
@@ -93,9 +91,7 @@ getPragmas anns = pragmaStr
     tokComment (L _ (AnnLineComment  s)) = s
     tokComment _ = ""
 
-    comments = case Map.lookup noSrcSpan (snd anns) of
-      Nothing -> []
-      Just cl -> map tokComment $ sortLocated cl
+    comments = map tokComment $ sortLocated $ apiAnnRogueComments anns
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
     pragmaStr = intercalate "\n" pragmas
 

@@ -13,7 +13,8 @@
 ((load-main.hs:1:1,AnnWhere), [load-main.hs:1:13-17]),
 ((load-main.hs:4:1-23,AnnEqual), [load-main.hs:4:6]),
 ((load-main.hs:4:1-23,AnnFunId), [load-main.hs:4:1-4]),
-((load-main.hs:4:1-23,AnnSemi), [load-main.hs:5:1]),
-((<no location info>,AnnEofPos), [load-main.hs:5:1])
+((load-main.hs:4:1-23,AnnSemi), [load-main.hs:5:1])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "load-main.hs" 5 1

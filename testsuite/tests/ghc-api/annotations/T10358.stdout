@@ -33,7 +33,8 @@
 ((Test10358.hs:6:12-16,AnnVal), [Test10358.hs:6:15]),
 ((Test10358.hs:7:7-17,AnnEqual), [Test10358.hs:7:10]),
 ((Test10358.hs:7:7-17,AnnFunId), [Test10358.hs:7:7-8]),
-((Test10358.hs:7:12-17,AnnVal), [Test10358.hs:7:14]),
-((<no location info>,AnnEofPos), [Test10358.hs:9:1])
+((Test10358.hs:7:12-17,AnnVal), [Test10358.hs:7:14])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10358.hs" 9 1

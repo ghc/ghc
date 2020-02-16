@@ -21,7 +21,8 @@
 ((Test10307.hs:6:3-34,AnnType), [Test10307.hs:6:3-6]),
 ((Test10307.hs:6:8-34,AnnEqual), [Test10307.hs:6:31]),
 ((Test10307.hs:6:33-34,AnnCloseP), [Test10307.hs:6:34]),
-((Test10307.hs:6:33-34,AnnOpenP), [Test10307.hs:6:33]),
-((<no location info>,AnnEofPos), [Test10307.hs:7:1])
+((Test10307.hs:6:33-34,AnnOpenP), [Test10307.hs:6:33])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10307.hs" 7 1

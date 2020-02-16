@@ -6,10 +6,12 @@ import GHC
 import DynFlags
 import Outputable
 import ApiAnnotation
+import SrcLoc
 import System.Environment( getArgs )
 import System.Exit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Maybe( isJust )
 
 main::IO()
 main = do
@@ -24,7 +26,7 @@ testOneFile libdir fileName = do
              case ml_hs_file $ ms_location m of
                Nothing -> False
                Just fn -> fn == fileName
-       ((anns,_cs),p) <- runGhc (Just libdir) $ do
+       (anns,p) <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
                         addTarget Target { targetId = TargetFile fileName Nothing
@@ -42,8 +44,10 @@ testOneFile libdir fileName = do
 
        let sspans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
+           ann_items = apiAnnItems anns
+
            exploded = [((kw,ss),[anchor])
-                      | ((anchor,kw),sss) <- Map.toList anns,ss <- sss]
+                      | ((anchor,kw),sss) <- Map.toList ann_items,ss <- sss]
 
            exploded' = Map.toList $ Map.fromListWith (++) exploded
 
@@ -51,41 +55,41 @@ testOneFile libdir fileName = do
                                -> not (any (\a -> Set.member a sspans) anchors))
                               exploded'
 
-           problems'' = filter (\((a,_),_) -> a /= AnnEofPos) problems'
-
            -- Check that every annotation location in 'vs' appears after
            -- the start of the enclosing span 's'
-           comesBefore ((s,k),vs) = not $ all ok vs
-             where
-               ok v = (k == AnnEofPos) || (srcSpanStart s <= srcSpanStart v)
+           comesBefore ((s,_),vs) = not $ all ok vs
+             where ok v = realSrcSpanStart s <= realSrcSpanStart v
 
-           precedingProblems = filter comesBefore $ Map.toList anns
+           precedingProblems = filter comesBefore $ Map.toList ann_items
 
        putStrLn "---Unattached Annotation Problems (should be empty list)---"
-       putStrLn (intercalate "\n" [pp $ Map.fromList $ map fst problems''])
+       putStrLn (intercalate "\n" [pp $ Map.fromList $ map fst problems'])
        putStrLn "---Ann before enclosing span problem (should be empty list)---"
        putStrLn (showAnnsList precedingProblems)
        putStrLn "---Annotations-----------------------"
        putStrLn "-- SrcSpan the annotation is attached to, AnnKeywordId,"
        putStrLn "--    list of locations the keyword item appears in"
-       -- putStrLn (intercalate "\n" [showAnns anns])
-       putStrLn (showAnns anns)
-       if null problems'' && null precedingProblems
+       -- putStrLn (intercalate "\n" [showAnns ann_items])
+       putStrLn (showAnns ann_items)
+       putStrLn "---Eof Position (should be Just)-----"
+       putStrLn (show (apiAnnEofPos anns))
+       if null problems' && null precedingProblems && isJust (apiAnnEofPos anns)
           then exitSuccess
           else exitFailure
 
     where
-      getAllSrcSpans :: (Data t) => t -> [SrcSpan]
+      getAllSrcSpans :: (Data t) => t -> [RealSrcSpan]
       getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
         where
-          getSrcSpan :: SrcSpan -> [SrcSpan]
-          getSrcSpan ss = [ss]
+          getSrcSpan :: SrcSpan -> [RealSrcSpan]
+          getSrcSpan (RealSrcSpan ss) = [ss]
+          getSrcSpan (UnhelpfulSpan _) = []
 
 
-showAnns :: Map.Map ApiAnnKey [SrcSpan] -> String
+showAnns :: Map.Map ApiAnnKey [RealSrcSpan] -> String
 showAnns anns = showAnnsList $ Map.toList anns
 
-showAnnsList :: [(ApiAnnKey, [SrcSpan])] -> String
+showAnnsList :: [(ApiAnnKey, [RealSrcSpan])] -> String
 showAnnsList annsList = "[\n" ++ (intercalate ",\n"
    $ map (\((s,k),v)
               -> ("((" ++ pp s ++ "," ++ show k ++"), " ++ pp v ++ ")"))

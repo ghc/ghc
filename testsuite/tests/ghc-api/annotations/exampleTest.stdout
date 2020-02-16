@@ -81,7 +81,8 @@
 ((AnnotationTuple.hs:22:9-25,AnnLarrow), [AnnotationTuple.hs:22:16-17]),
 ((AnnotationTuple.hs:23:9-24,AnnLarrow), [AnnotationTuple.hs:23:16-17]),
 ((AnnotationTuple.hs:26:1-10,AnnDcolon), [AnnotationTuple.hs:26:5-6]),
-((AnnotationTuple.hs:26:1-14,AnnEqual), [AnnotationTuple.hs:26:12]),
-((<no location info>,AnnEofPos), [AnnotationTuple.hs:32:1])
+((AnnotationTuple.hs:26:1-14,AnnEqual), [AnnotationTuple.hs:26:12])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "AnnotationTuple.hs" 32 1

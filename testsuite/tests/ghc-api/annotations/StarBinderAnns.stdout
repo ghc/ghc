@@ -31,6 +31,8 @@
 ((StarBinderAnns.hs:6:29-31,AnnOpenP), [StarBinderAnns.hs:6:29]),
 ((StarBinderAnns.hs:6:29-48,AnnCloseP), [StarBinderAnns.hs:6:31]),
 ((StarBinderAnns.hs:6:29-48,AnnEqual), [StarBinderAnns.hs:6:37]),
-((StarBinderAnns.hs:6:29-48,AnnOpenP), [StarBinderAnns.hs:6:29]),
-((<no location info>,AnnEofPos), [StarBinderAnns.hs:7:1])
+((StarBinderAnns.hs:6:29-48,AnnOpenP), [StarBinderAnns.hs:6:29])
 ]
+
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "StarBinderAnns.hs" 7 1

@@ -78,10 +78,9 @@
 (AK AnnotationLet.hs:15:36-40 AnnCloseP = [AnnotationLet.hs:15:40])
 
 (AK AnnotationLet.hs:15:36-40 AnnOpenP = [AnnotationLet.hs:15:36])
-
-(AK <no location info> AnnEofPos = [AnnotationLet.hs:18:1])
 ]
 
 [AnnotationLet.hs:2:1-6]
 []
 AnnotationLet.hs:1:1
+EOF: Just SrcSpanPoint "./AnnotationLet.hs" 18 1

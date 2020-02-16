@@ -36,7 +36,8 @@
 ((Test10598.hs:18:1-34,AnnDeriving), [Test10598.hs:18:1-8]),
 ((Test10598.hs:18:1-34,AnnInstance), [Test10598.hs:18:18-25]),
 ((Test10598.hs:18:1-34,AnnSemi), [Test10598.hs:19:1]),
-((Test10598.hs:18:10-16,AnnNewtype), [Test10598.hs:18:10-16]),
-((<no location info>,AnnEofPos), [Test10598.hs:19:1])
+((Test10598.hs:18:10-16,AnnNewtype), [Test10598.hs:18:10-16])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10598.hs" 19 1

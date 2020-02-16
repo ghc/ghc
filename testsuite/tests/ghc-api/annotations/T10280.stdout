@@ -21,7 +21,8 @@
 ((Test10280.hs:4:36-44,AnnVal), [Test10280.hs:4:42]),
 ((Test10280.hs:4:37,AnnComma), [Test10280.hs:4:37]),
 ((Test10280.hs:4:38-39,AnnCloseP), [Test10280.hs:4:39]),
-((Test10280.hs:4:38-39,AnnOpenP), [Test10280.hs:4:38]),
-((<no location info>,AnnEofPos), [Test10280.hs:5:1])
+((Test10280.hs:4:38-39,AnnOpenP), [Test10280.hs:4:38])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10280.hs" 5 1
