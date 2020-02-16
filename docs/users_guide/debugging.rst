@@ -521,12 +521,6 @@ These flags dump various phases of GHC's C-\\- pipeline.
     Each CFG is dumped in dot format graph making it easy
     to visualize them.
 
-.. ghc-flag:: -ddump-srts
-    :shortdesc: Dump the Static Reference Tables computed for the program's bindings.
-    :type: dynamic
-
-    Dumps the static reference tables computed for CAFfy bindings.
-
 LLVM code generator
 ~~~~~~~~~~~~~~~~~~~~~~
 
