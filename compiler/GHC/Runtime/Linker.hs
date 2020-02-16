@@ -187,7 +187,7 @@ getHValue hsc_env name = do
               m <- lookupClosure hsc_env (unpackFS sym_to_find)
               case m of
                 Just hvref -> mkFinalizedHValue hsc_env hvref
-                Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE"
+                Nothing -> linkFail "GHC.Runtime.Linker.getHValue"
                              (unpackFS sym_to_find)
 
 linkDependencies :: HscEnv -> PersistentLinkerState
@@ -472,7 +472,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
                  Nothing -> maybePutStrLn dflags "done"
                  Just mm -> preloadFailed mm framework_paths lib_spec
               return pls
-      else panic "preloadLib Framework"
+      else throwGhcExceptionIO (ProgramError "preloadLib Framework")
 
   where
     dflags = hsc_dflags hsc_env
@@ -964,7 +964,9 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
     m <- loadDLL hsc_env soFile
     case m of
         Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-        Just err -> panic ("Loading temp shared object failed: " ++ err)
+        Just err -> linkFail msg err
+  where
+    msg = "GHC.Runtime.Linker.dynLoadObjs: Loading temp shared object failed"
 
 rmDupLinkables :: [Linkable]    -- Already loaded
                -> [Linkable]    -- New linkables

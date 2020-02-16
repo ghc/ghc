@@ -43,6 +43,12 @@ test('T3333',
              expect_broken(3333))],
      makefile_test, ['T3333'])
 
+test('T11531',
+     [extra_files(['T11531.hs', 'T11531.c', 'T11531.h']),
+      unless(doing_ghci, skip),
+      unless(opsys('linux'), skip)],
+     makefile_test, ['T11531'])
+
 test('T14708',
      [extra_files(['T14708.hs', 'add.c']),
       unless(doing_ghci, skip),
