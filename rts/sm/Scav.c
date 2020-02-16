@@ -66,8 +66,7 @@
 #include "sm/NonMovingScav.h"
 
 static void scavenge_large_bitmap (StgPtr p,
-                                   StgLargeBitmap *large_bitmap,
-                                   StgWord size );
+                                   StgLargeBitmap *large_bitmap);
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 # define evacuate(a) evacuate1(a)
@@ -314,10 +313,12 @@ scavenge_arg_block (const StgFunInfoTable *fun_info, StgClosure **args)
         size = BITMAP_SIZE(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-        scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
-        p += size;
+    {
+        StgLargeBitmap *large_bitmap = GET_FUN_LARGE_BITMAP(fun_info);
+        scavenge_large_bitmap(p, large_bitmap);
+        p += large_bitmap->size;
         break;
+    }
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
         size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
@@ -344,11 +345,13 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
+        ASSERT(GET_FUN_LARGE_BITMAP(fun_info)->size == size);
+        scavenge_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info));
         p += size;
         break;
     case ARG_BCO:
-        scavenge_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size);
+        ASSERT(BCO_BITMAP(fun)->size == size);
+        scavenge_large_bitmap((StgPtr)payload, BCO_BITMAP(fun));
         p += size;
         break;
     default:
@@ -1805,9 +1808,9 @@ scavenge_static(void)
    -------------------------------------------------------------------------- */
 
 static void
-scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
+scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap )
 {
-    walk_large_bitmap(do_evacuate, (StgClosure **) p, large_bitmap, size, NULL);
+    walk_large_bitmap(do_evacuate, (StgClosure **) p, large_bitmap, NULL);
 }
 
 
@@ -1930,28 +1933,23 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         continue;
 
     case RET_BCO: {
-        StgBCO *bco;
-        StgWord size;
-
         p++;
         evacuate((StgClosure **)p);
-        bco = (StgBCO *)*p;
+        StgBCO *bco = (StgBCO *)*p;
         p++;
-        size = BCO_BITMAP_SIZE(bco);
-        scavenge_large_bitmap(p, BCO_BITMAP(bco), size);
-        p += size;
+        StgLargeBitmap *bitmap = BCO_BITMAP(bco);
+        scavenge_large_bitmap(p, bitmap);
+        p += bitmap->size;
         continue;
     }
 
       // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
     case RET_BIG:
     {
-        StgWord size;
-
-        size = GET_LARGE_BITMAP(&info->i)->size;
         p++;
-        scavenge_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
-        p += size;
+        StgLargeBitmap *bitmap = GET_LARGE_BITMAP(&info->i);
+        scavenge_large_bitmap(p, bitmap);
+        p += bitmap->size;
         // and don't forget to follow the SRT
         goto follow_srt;
     }
