@@ -2851,9 +2851,9 @@ data PV_Context =
 data PV_Accum =
   PV_Accum
     { pv_messages :: DynFlags -> Messages
-    , pv_annotations :: [(ApiAnnKey,[SrcSpan])]
-    , pv_comment_q :: [Located AnnotationComment]
-    , pv_annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
+    , pv_annotations :: [(ApiAnnKey,[RealSrcSpan])]
+    , pv_comment_q :: [RealLocated AnnotationComment]
+    , pv_annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
     }
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
@@ -2918,7 +2918,7 @@ instance MonadP PV where
     PV $ \ctx acc ->
       let b = ext `xtest` pExtsBitmap (pv_options ctx) in
       PV_Ok acc $! b
-  addAnnotation l a v =
+  addAnnotation (RealSrcSpan l) a (RealSrcSpan v) =
     PV $ \_ acc ->
       let
         (comment_q', new_ann_comments) = allocateComments l (pv_comment_q acc)
@@ -2930,6 +2930,7 @@ instance MonadP PV where
           , pv_annotations_comments = annotations_comments' }
       in
         PV_Ok acc' ()
+  addAnnotation _ _ _ = return ()
 
 {- Note [Parser-Validator]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

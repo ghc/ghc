@@ -29,7 +29,7 @@ main = do
         exitSuccess
 
 testOneFile libdir fileName = do
-       ((anns,cs),p) <- runGhc (Just libdir) $ do
+       p <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName fileName
@@ -42,25 +42,27 @@ testOneFile libdir fileName = do
                         t <- typecheckModule p
                         d <- desugarModule t
                         l <- loadModule d
-                        let ts=typecheckedSource l
-                            r =renamedSource l
-                        return (pm_annotations p,p)
+                        return p
 
+       let anns = pm_annotations p
+           ann_items = apiAnnItems anns
+           ann_eof = apiAnnEofPos anns
        let spans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
        putStrLn (pp spans)
        putStrLn "--------------------------------"
-       putStrLn (intercalate "\n" [showAnns anns])
+       putStrLn (intercalate "\n" [showAnns ann_items,"EOF: " ++ show ann_eof])
 
     where
-      getAnnSrcSpans :: ApiAnns -> [(SrcSpan,(ApiAnnKey,[SrcSpan]))]
-      getAnnSrcSpans (anns,_) = map (\a@((ss,_),_) -> (ss,a)) $ Map.toList anns
+      getAnnSrcSpans :: ApiAnns -> [(RealSrcSpan,(ApiAnnKey,[RealSrcSpan]))]
+      getAnnSrcSpans anns = map (\a@((ss,_),_) -> (ss,a)) $ Map.toList (apiAnnItems anns)
 
-      getAllSrcSpans :: (Data t) => t -> [SrcSpan]
+      getAllSrcSpans :: (Data t) => t -> [RealSrcSpan]
       getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
         where
-          getSrcSpan :: SrcSpan -> [SrcSpan]
-          getSrcSpan ss = [ss]
+          getSrcSpan :: SrcSpan -> [RealSrcSpan]
+          getSrcSpan (RealSrcSpan ss) = [ss]
+          getSrcSpan (UnhelpfulSpan _) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)
