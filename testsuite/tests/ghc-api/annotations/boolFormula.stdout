@@ -146,7 +146,8 @@
 ((TestBoolFormula.hs:35:5-20,AnnFunId), [TestBoolFormula.hs:35:5-8]),
 ((TestBoolFormula.hs:35:5-20,AnnSemi), [TestBoolFormula.hs:36:5]),
 ((TestBoolFormula.hs:36:5-19,AnnEqual), [TestBoolFormula.hs:36:9]),
-((TestBoolFormula.hs:36:5-19,AnnFunId), [TestBoolFormula.hs:36:5-7]),
-((<no location info>,AnnEofPos), [TestBoolFormula.hs:37:1])
+((TestBoolFormula.hs:36:5-19,AnnFunId), [TestBoolFormula.hs:36:5-7])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "TestBoolFormula.hs" 37 1

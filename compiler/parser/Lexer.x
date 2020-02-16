@@ -2124,9 +2124,10 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in ApiAnnotation.hs
-        annotations :: [(ApiAnnKey,[SrcSpan])],
-        comment_q :: [Located AnnotationComment],
-        annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
+        annotations :: [(ApiAnnKey,[RealSrcSpan])],
+        eof_pos :: Maybe RealSrcSpan,
+        comment_q :: [RealLocated AnnotationComment],
+        annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2203,6 +2204,9 @@ getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
 addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
+
+setEofPos :: RealSrcSpan -> P ()
+setEofPos span = P $ \s -> POk s{ eof_pos = Just span } ()
 
 setLastToken :: RealSrcSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
@@ -2599,6 +2603,7 @@ mkPStatePure options buf loc =
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
       annotations = [],
+      eof_pos = Nothing,
       comment_q = [],
       annotations_comments = []
     }
@@ -2678,9 +2683,10 @@ instance MonadP P where
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnotation l a v = do
+  addAnnotation (RealSrcSpan l) a (RealSrcSpan v) = do
     addAnnotationOnly l a v
     allocateCommentsP l
+  addAnnotation _ _ _ = return ()
 
 addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
 addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
@@ -2817,16 +2823,12 @@ lexer queueComments cont = do
   (L span tok) <- lexTokenFun
   --trace ("token: " ++ show tok) $ do
 
-  case tok of
-    ITeof -> addAnnotationOnly noSrcSpan AnnEofPos (RealSrcSpan span)
-    _ -> return ()
-
   if (queueComments && isDocComment tok)
-    then queueComment (L (RealSrcSpan span) tok)
+    then queueComment (L span tok)
     else return ()
 
   if (queueComments && isComment tok)
-    then queueComment (L (RealSrcSpan span) tok) >> lexer queueComments cont
+    then queueComment (L span tok) >> lexer queueComments cont
     else cont (L (RealSrcSpan span) tok)
 
 -- Use this instead of 'lexer' in Parser.y to dump the tokens for debugging.
@@ -3063,6 +3065,7 @@ lexToken = do
   case alexScanUser exts inp sc of
     AlexEOF -> do
         let span = mkRealSrcSpan loc1 loc1
+        setEofPos span
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
@@ -3211,7 +3214,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --   function, and then it can be discharged using the 'ams' function.
 data AddAnn = AddAnn AnnKeywordId SrcSpan
 
-addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
   annotations = ((l,a), [v]) : annotations s
   } ()
@@ -3231,14 +3234,14 @@ mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
     lo = mkSrcSpan (srcSpanStart s)         (mkSrcLoc f sl (sc+1))
     lc = mkSrcSpan (mkSrcLoc f el (ec - 1)) (srcSpanEnd s)
 
-queueComment :: Located Token -> P()
+queueComment :: RealLocated Token -> P()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
 
 -- | Go through the @comment_q@ in @PState@ and remove all comments
 -- that belong within the given span
-allocateCommentsP :: SrcSpan -> P ()
+allocateCommentsP :: RealSrcSpan -> P ()
 allocateCommentsP ss = P $ \s ->
   let (comment_q', newAnns) = allocateComments ss (comment_q s) in
     POk s {
@@ -3247,13 +3250,13 @@ allocateCommentsP ss = P $ \s ->
      } ()
 
 allocateComments
-  :: SrcSpan
-  -> [Located AnnotationComment]
-  -> ([Located AnnotationComment], [(SrcSpan,[Located AnnotationComment])])
+  :: RealSrcSpan
+  -> [RealLocated AnnotationComment]
+  -> ([RealLocated AnnotationComment], [(RealSrcSpan,[RealLocated AnnotationComment])])
 allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) comment_q
-    (middle,after) = break (\(L l _) -> not (isSubspanOf l ss)) rest
+    (before,rest)  = break (\(L l _) -> isRealSubspanOf l ss) comment_q
+    (middle,after) = break (\(L l _) -> not (isRealSubspanOf l ss)) rest
     comment_q' = before ++ after
     newAnns = if null middle then []
                              else [(ss,middle)]
@@ -3261,7 +3264,7 @@ allocateComments ss comment_q =
     (comment_q', newAnns)
 
 
-commentToAnnotation :: Located Token -> Located AnnotationComment
+commentToAnnotation :: RealLocated Token -> RealLocated AnnotationComment
 commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)
 commentToAnnotation (L l (ITdocCommentPrev s))  = L l (AnnDocCommentPrev s)
 commentToAnnotation (L l (ITdocCommentNamed s)) = L l (AnnDocCommentNamed s)
