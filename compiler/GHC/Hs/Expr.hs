@@ -1009,12 +1009,13 @@ ppr_expr (HsLamCase _ matches)
   = sep [ sep [text "\\case"],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ [_] }))
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of {")],
-          nest 2 (pprMatches matches) <+> char '}']
-ppr_expr (HsCase _ expr matches)
+ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
-          nest 2 (pprMatches matches) ]
+          pp_alts ]
+  where
+    pp_alts | null alts = text "{}"
+            | otherwise = nest 2 (pprMatches matches)
+ppr_expr (HsCase _ _ (XMatchGroup nec)) = noExtCon nec
 
 ppr_expr (HsIf _ _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],

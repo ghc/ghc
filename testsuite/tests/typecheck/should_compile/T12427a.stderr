@@ -7,7 +7,7 @@ T12427a.hs:17:29: error:
         at T12427a.hs:17:1-29
     • In the expression: v
       In a case alternative: T1 _ v -> v
-      In the expression: case y of { T1 _ v -> v }
+      In the expression: case y of T1 _ v -> v
     • Relevant bindings include
         h11 :: T -> p (bound at T12427a.hs:17:1)
 

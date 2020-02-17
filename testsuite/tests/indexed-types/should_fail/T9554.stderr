@@ -21,4 +21,4 @@ T9554.hs:13:17: error:
     • In the first argument of ‘foo’, namely ‘Proxy’
       In the expression: foo Proxy
       In the expression:
-        case foo Proxy of { Proxy -> putStrLn "Made it!" }
+        case foo Proxy of Proxy -> putStrLn "Made it!"

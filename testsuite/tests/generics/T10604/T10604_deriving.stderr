@@ -93,52 +93,52 @@ Derived class instances:
            GHC.Generics.Generic (T10604_deriving.Wrap2 @k a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Wrap2 g1
-               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)) })
+               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
-            -> T10604_deriving.Wrap2 g1 }
+            -> T10604_deriving.Wrap2 g1
   
   instance GHC.Generics.Generic1
              @(k -> *) (T10604_deriving.Wrap2 @k) where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Wrap2 g1
                -> GHC.Generics.M1
                     (GHC.Generics.M1
                        ((GHC.Base..)
-                          GHC.Generics.Comp1 (GHC.Base.fmap GHC.Generics.Rec1) g1)) })
+                          GHC.Generics.Comp1 (GHC.Base.fmap GHC.Generics.Rec1) g1)))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           (GHC.Generics.M1 (GHC.Generics.M1 g1))
             -> T10604_deriving.Wrap2
                  ((GHC.Base..)
-                    (GHC.Base.fmap GHC.Generics.unRec1) GHC.Generics.unComp1 g1) }
+                    (GHC.Base.fmap GHC.Generics.unRec1) GHC.Generics.unComp1 g1)
   
   instance GHC.Generics.Generic (T10604_deriving.Wrap a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Wrap g1
-               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)) })
+               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
-            -> T10604_deriving.Wrap g1 }
+            -> T10604_deriving.Wrap g1
   
   instance GHC.Generics.Generic1 @(* -> *) T10604_deriving.Wrap where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Wrap g1
-               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.Rec1 g1)) })
+               -> GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.Rec1 g1)))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           (GHC.Generics.M1 (GHC.Generics.M1 g1))
-            -> T10604_deriving.Wrap (GHC.Generics.unRec1 g1) }
+            -> T10604_deriving.Wrap (GHC.Generics.unRec1 g1)
   
   instance GHC.Base.Functor (T10604_deriving.Proxy @(*)) where
     GHC.Base.fmap _ = GHC.Prim.coerce
@@ -147,31 +147,31 @@ Derived class instances:
            GHC.Generics.Generic (T10604_deriving.Proxy @k a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
-             T10604_deriving.Proxy -> GHC.Generics.M1 GHC.Generics.U1 })
+          (case x of
+             T10604_deriving.Proxy -> GHC.Generics.M1 GHC.Generics.U1)
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
-          (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy }
+      = case x of
+          (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy
   
   instance GHC.Generics.Generic1 @k (T10604_deriving.Proxy @k) where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
-             T10604_deriving.Proxy -> GHC.Generics.M1 GHC.Generics.U1 })
+          (case x of
+             T10604_deriving.Proxy -> GHC.Generics.M1 GHC.Generics.U1)
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
-          (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy }
+      = case x of
+          (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy
   
   instance GHC.Generics.Generic (T10604_deriving.Empty a) where
     GHC.Generics.from x
-      = GHC.Generics.M1 (case x of { x -> case x of })
-    GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
+      = GHC.Generics.M1 (case x of x -> case x of {})
+    GHC.Generics.to (GHC.Generics.M1 x) = case x of x -> case x of {}
   
   instance GHC.Generics.Generic1
              @GHC.Types.Bool T10604_deriving.Empty where
     GHC.Generics.from1 x
-      = GHC.Generics.M1 (case x of { x -> case x of })
-    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }
+      = GHC.Generics.M1 (case x of x -> case x of {})
+    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of x -> case x of {}
   
 
 Derived type family instances:

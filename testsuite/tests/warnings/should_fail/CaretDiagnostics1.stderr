@@ -11,7 +11,7 @@ CaretDiagnostics1.hs:(5,3)-(7,16): error:
             = do 10000000000000000000000000000000000000 + 2 + (3 :: Int)
                  pure ("this is not an IO" + ())
             where
-                _ = case id of { "γηξ" -> () '0' }
+                _ = case id of "γηξ" -> () '0'
   |
 5 |   10000000000000000000000000000000000000 +
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
@@ -29,7 +29,7 @@ CaretDiagnostics1.hs:8:3-45: error:
             = do 10000000000000000000000000000000000000 + 2 + (3 :: Int)
                  pure ("this is not an IO" + ())
             where
-                _ = case id of { "γηξ" -> () '0' }
+                _ = case id of "γηξ" -> () '0'
   |
 8 |   pure ("this is not an IO" + (            ))
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ CaretDiagnostics1.hs:13:7-11: error:
     • Couldn't match expected type ‘a1 -> a1’ with actual type ‘[Char]’
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'
-      In the expression: case id of { "γηξ" -> () '0' }
+      In the expression: case id of "γηξ" -> () '0'
    |
 13 |       "γηξ" -> (
    |       ^^^^^

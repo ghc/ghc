@@ -3,7 +3,7 @@ hole_constraints_nested.hs:12:16: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In the expression: _
       In a case alternative: EqOrd -> _
-      In the expression: case d2 of { EqOrd -> _ }
+      In the expression: case d2 of EqOrd -> _
     • Relevant bindings include
         d2 :: EqOrd a (bound at hole_constraints_nested.hs:9:6)
         d1 :: a :~: b (bound at hole_constraints_nested.hs:9:3)

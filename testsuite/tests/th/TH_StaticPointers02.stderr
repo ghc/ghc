@@ -2,11 +2,11 @@
 TH_StaticPointers02.hs:11:34: error:
     • static forms cannot be used in splices: static 'a'
     • In the untyped splice:
-        $(case staticKey (static 'a') of {
+        $(case staticKey (static 'a') of
             Fingerprint w0 w1
               -> let
                    w0i = ...
                    w1i = ...
                  in
                    [| fmap (\ p -> deRefStaticPtr p :: Char) $ unsafeLookupStaticPtr
-                        $ Fingerprint (fromIntegral w0i) (fromIntegral w1i) |] })
+                        $ Fingerprint (fromIntegral w0i) (fromIntegral w1i) |])
