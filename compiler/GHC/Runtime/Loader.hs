@@ -24,7 +24,7 @@ import GhcPrelude
 import DynFlags
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
-import GHC.Runtime.Interpreter ( wormhole )
+import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
@@ -206,7 +206,7 @@ getHValueSafely hsc_env val_name expected_type = do
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name >>= wormhole dflags
+                hval <- withInterp hsc_env $ \interp -> getHValue hsc_env val_name >>= wormhole interp
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing

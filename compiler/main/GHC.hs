@@ -486,7 +486,7 @@ withCleanupSession ghc = ghc `gfinally` cleanup
       liftIO $ do
           cleanTempFiles dflags
           cleanTempDirs dflags
-          stopIServ hsc_env -- shut down the IServ
+          stopInterp hsc_env -- shut down the IServ
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
