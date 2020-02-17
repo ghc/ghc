@@ -795,7 +795,7 @@ zonkExpr env (HsTcBracketOut x wrap body bs)
     zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
                                            return (PendingTcSplice n e')
 
-zonkExpr env (HsSpliceE _ (HsSplicedT s)) =
+zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
   runTopSplice s >>= zonkExpr env
 
 zonkExpr _ (HsSpliceE x s) = WARN( True, ppr s ) -- Should not happen
