@@ -31,9 +31,9 @@ T14846.hs:39:12: error:
         cls0 :: Struct cls -> Constraint
         cls1 :: k4 -> Constraint
     • In the expression: struct :: AStruct (Structured a cls)
-      In the expression: case struct :: AStruct (Structured a cls) of
+      In the expression: case struct :: AStruct (Structured a cls) of {}
       In an equation for ‘i’:
-          i = case struct :: AStruct (Structured a cls) of
+          i = case struct :: AStruct (Structured a cls) of {}
     • Relevant bindings include
         i :: Hom riki a a (bound at T14846.hs:39:3)
 
