@@ -172,8 +172,12 @@ ffi-lib-dir       = @FFILibDir@
 libdw-include-dir   = @LibdwIncludeDir@
 libdw-lib-dir       = @LibdwLibDir@
 
+libnuma-include-dir   = @LibNumaIncludeDir@
+libnuma-lib-dir       = @LibNumaLibDir@
+
 # Optional Dependencies:
 #=======================
 
 with-libdw = @UseLibdw@
+with-libnuma = @UseLibNuma@
 have-lib-mingw-ex = @HaveLibMingwEx@
