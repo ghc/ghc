@@ -1062,6 +1062,9 @@ lookupInfoOccRn :: RdrName -> RnM [Name]
 -- It finds all the GREs that RdrName could mean, not complaining
 -- about ambiguity, but rather returning them all
 -- C.f. #9881
+-- lookupInfoOccRn is also used in situations where we check for
+-- at least one definition of the RdrName, not complaining about
+-- multiple definitions. (See #17832)
 lookupInfoOccRn rdr_name =
   lookupExactOrOrig rdr_name (:[]) $
     do { rdr_env <- getGlobalRdrEnv
