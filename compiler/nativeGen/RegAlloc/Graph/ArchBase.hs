@@ -21,11 +21,13 @@ module RegAlloc.Graph.ArchBase (
         bound,
         squeese
 ) where
+
 import GhcPrelude
 
 import UniqSet
 import UniqFM
 import Unique
+import MonadUtils (concatMapM)
 
 
 -- Some basic register classes.
@@ -152,7 +154,7 @@ squeese regsOfClass regAlias classN countCs
 
 -- | powerset (for lists)
 powersetL :: [a] -> [[a]]
-powersetL       = map concat . mapM (\x -> [[],[x]])
+powersetL       = concatMapM (\x -> [[],[x]])
 
 
 -- | powersetLS (list of sets)

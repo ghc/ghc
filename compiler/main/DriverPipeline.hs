@@ -1534,7 +1534,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
               then map SysTools.Option $ words llvmOpts
               else []
 
-    defaultOptions = map SysTools.Option . concat . fmap words . snd
+    defaultOptions = map SysTools.Option . concatMap words . snd
                    $ unzip (llvmOptions dflags)
 
 
@@ -1948,7 +1948,7 @@ linkStaticLib dflags o_files dep_packages = do
   (when output_exists) $ removeFile full_output_fn
 
   pkg_cfgs <- getPreloadPackagesAnd dflags dep_packages
-  archives <- concat <$> mapM (collectArchives dflags) pkg_cfgs
+  archives <- concatMapM (collectArchives dflags) pkg_cfgs
 
   ar <- foldl mappend
         <$> (Archive <$> mapM loadObj modules)
