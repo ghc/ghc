@@ -33,23 +33,23 @@ Derived class instances:
   
   instance GHC.Classes.Ord T14682.Foo where
     GHC.Classes.compare a b
-      = case a of {
+      = case a of
           T14682.Foo a1 a2
-            -> case b of {
+            -> case b of
                  T14682.Foo b1 b2
                    -> case (GHC.Classes.compare a1 b1) of
                         GHC.Types.LT -> GHC.Types.LT
                         GHC.Types.EQ -> (a2 `GHC.Classes.compare` b2)
-                        GHC.Types.GT -> GHC.Types.GT } }
+                        GHC.Types.GT -> GHC.Types.GT
     (GHC.Classes.<) a b
-      = case a of {
+      = case a of
           T14682.Foo a1 a2
-            -> case b of {
+            -> case b of
                  T14682.Foo b1 b2
                    -> case (GHC.Classes.compare a1 b1) of
                         GHC.Types.LT -> GHC.Types.True
                         GHC.Types.EQ -> (a2 GHC.Classes.< b2)
-                        GHC.Types.GT -> GHC.Types.False } }
+                        GHC.Types.GT -> GHC.Types.False
     (GHC.Classes.<=) a b = GHC.Classes.not ((GHC.Classes.<) b a)
     (GHC.Classes.>) a b = (GHC.Classes.<) b a
     (GHC.Classes.>=) a b = GHC.Classes.not ((GHC.Classes.<) a b)

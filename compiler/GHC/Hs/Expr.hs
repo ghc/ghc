@@ -1009,10 +1009,13 @@ ppr_expr (HsLamCase _ matches)
   = sep [ sep [text "\\case"],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ [_] }))
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of {")],
-          nest 2 (pprMatches matches) <+> char '}']
-ppr_expr (HsCase _ expr matches)
+ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
+  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+          pp_alts ]
+  where
+    pp_alts | null alts = text "{}"
+            | otherwise = nest 2 (pprMatches matches)
+ppr_expr (HsCase _ expr matches) -- For XMatchGroup
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
