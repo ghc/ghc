@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T17852:
+	$(RM) -f T17852.o T17852.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-worker-wrapper -dsuppress-uniques -dsuppress-idinfo T17852.hs 2> /dev/null | grep -F '$$wf ::'
+	# Expecting both absent arguments to be dropped in the worker
+
 T17409:
 	$(RM) -f T17409.o T17409.hi
 	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -dverbose-core2core -dsuppress-uniques T17409.hs 2> /dev/null | grep '\<id\>'
