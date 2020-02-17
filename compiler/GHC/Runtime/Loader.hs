@@ -25,6 +25,7 @@ import GHC.Driver.Session
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
 import GHC.Runtime.Interpreter ( wormhole )
+import GHC.Runtime.Interpreter.Types
 import SrcLoc           ( noSrcSpan )
 import GHC.Driver.Finder           ( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
@@ -52,8 +53,8 @@ import Outputable
 import Exception
 import GHC.Driver.Hooks
 
-import Control.Monad     ( when, unless )
-import Data.Maybe        ( mapMaybe )
+import Control.Monad     ( unless )
+import Data.Maybe        ( mapMaybe, fromMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
 
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
@@ -103,12 +104,11 @@ loadFrontendPlugin hsc_env mod_name = do
 
 -- #14335
 checkExternalInterpreter :: HscEnv -> IO ()
-checkExternalInterpreter hsc_env =
-    when (gopt Opt_ExternalInterpreter dflags) $
-      throwCmdLineError $ showSDoc dflags $
-        text "Plugins require -fno-external-interpreter"
-  where
-    dflags = hsc_dflags hsc_env
+checkExternalInterpreter hsc_env
+  | Just (ExternalInterp _) <- hsc_interp hsc_env
+  = throwIO (InstallationError "Plugins require -fno-external-interpreter")
+  | otherwise
+  = pure ()
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
@@ -206,7 +206,7 @@ getHValueSafely hsc_env val_name expected_type = do
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name >>= wormhole dflags
+                hval <- getHValue hsc_env val_name >>= wormhole (fromMaybe InternalInterp (hsc_interp hsc_env))
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing

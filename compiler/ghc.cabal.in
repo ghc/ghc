@@ -659,3 +659,4 @@ Library
             GHC.Runtime.Linker
             GHC.Runtime.Heap.Inspect
             GHC.Runtime.Interpreter
+            GHC.Runtime.Interpreter.Types

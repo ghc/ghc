@@ -37,6 +37,7 @@ import GHC.Runtime.Debugger
 
 -- The GHC interface
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import GHC.Driver.Session as DynFlags
@@ -53,7 +54,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
-                  hsc_dynLinker )
+                  hsc_dynLinker, hsc_interp )
 import Module
 import Name
 import GHC.Driver.Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -1559,14 +1560,15 @@ changeDirectory dir = do
   GHC.workingDirectoryChanged
   dir' <- expandPath dir
   liftIO $ setCurrentDirectory dir'
-  dflags <- getDynFlags
   -- With -fexternal-interpreter, we have to change the directory of the subprocess too.
   -- (this gives consistent behaviour with and without -fexternal-interpreter)
-  when (gopt Opt_ExternalInterpreter dflags) $ do
-    hsc_env <- GHC.getSession
-    fhv <- compileGHCiExpr $
-      "System.Directory.setCurrentDirectory " ++ show dir'
-    liftIO $ evalIO hsc_env fhv
+  hsc_env <- GHC.getSession
+  case hsc_interp hsc_env of
+    Just (ExternalInterp {}) -> do
+      fhv <- compileGHCiExpr $
+        "System.Directory.setCurrentDirectory " ++ show dir'
+      liftIO $ evalIO hsc_env fhv
+    _ -> pure ()
 
 trySuccess :: GHC.GhcMonad m => m SuccessFlag -> m SuccessFlag
 trySuccess act =
