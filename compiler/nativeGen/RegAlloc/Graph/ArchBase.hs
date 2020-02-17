@@ -152,7 +152,7 @@ squeese regsOfClass regAlias classN countCs
 
 -- | powerset (for lists)
 powersetL :: [a] -> [[a]]
-powersetL       = map concat . mapM (\x -> [[],[x]])
+powersetL       = concatMapM (\x -> [[],[x]])
 
 
 -- | powersetLS (list of sets)

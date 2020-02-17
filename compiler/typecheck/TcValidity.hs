@@ -2838,7 +2838,7 @@ fvType (CastTy ty _)         = fvType ty
 fvType (CoercionTy {})       = []
 
 fvTypes :: [Type] -> [TyVar]
-fvTypes tys                = concat (map fvType tys)
+fvTypes tys                = concatMap fvType tys
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
