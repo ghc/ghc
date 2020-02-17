@@ -980,7 +980,6 @@ tcPatToExpr name args pat = go pat
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
-    go1 (SplicePat _ (HsSplicedT{})) = panic "Invalid splice variety"
 
     -- The following patterns are not invertible.
     go1 p@(BangPat {})                       = notInvertible p -- #14112
@@ -993,7 +992,7 @@ tcPatToExpr name args pat = go pat
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
-    go1 p@(SplicePat _ (XSplice {}))         = notInvertible p
+    go1   (SplicePat _ (XSplice nec))        = noExtCon nec
 
     notInvertible p = Left (not_invertible_msg p)
 
