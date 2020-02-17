@@ -176,7 +176,7 @@ tcRnExports explicit_mod exports
                  Just main_fun
                      | is_main_mod -> mkUnqual varName (fsLit main_fun)
                  _                 -> main_RDR_Unqual
-        ; has_main <- lookupGlobalOccRn_maybe default_main >>= return . isJust
+        ; has_main <- (not . null) <$> lookupInfoOccRn default_main
         -- If the module has no explicit header, and it has a main function,
         -- then we add a header like "module Main(main) where ..." (#13839)
         -- See Note [Modules without a module header]
