@@ -170,8 +170,14 @@ packageArgs = do
 
 gmpPackageArgs :: Args
 gmpPackageArgs = do
+    librariesGmp <- getSetting GmpLibDir
+    includesGmp <- getSetting GmpIncludeDir
+    inTree <- getFlag GmpInTree
     gmpBuildPath <- expr gmpBuildPath
-    let includeGmp = "-I" ++ gmpBuildPath -/- "include"
+    let includeGmp
+          | inTree    = "-I" ++ gmpBuildPath -/- "include"
+          | otherwise = includesGmp
+
     package integerGmp ? mconcat
           [ builder Cc ? arg includeGmp
 
