@@ -171,14 +171,27 @@ packageArgs = do
 
 gmpPackageArgs :: Args
 gmpPackageArgs = do
+    -- These are only used for non-in-tree builds.
+    librariesGmp <- getSetting GmpLibDir
+    includesGmp <- getSetting GmpIncludeDir
+
+    -- Windows is always built with inplace GMP until we have dynamic
+    -- linking working.
+    inTreeFlag <- getFlag GmpInTree
+    let inTree = inTreeFlag || windowsHost
+
     package integerGmp ? mconcat
           [ builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            -- Windows is always built with inplace GMP until we have dynamic
-            -- linking working.
-            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
+            [ inTree ? arg "--configure-option=--with-intree-gmp"
             , flag GmpFrameworkPref ?
               arg "--configure-option=--with-gmp-framework-preferred"
+
+              -- Ensure that the integer-gmp package registration includes
+              -- knowledge of the system gmp's library and include directories.
+            , notM (flag GmpInTree) ? mconcat
+              [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
+              , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
+              ]
             ]
           ]
 
