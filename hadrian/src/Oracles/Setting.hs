@@ -56,6 +56,8 @@ data Setting = BuildArch
              | IconvLibDir
              | LibdwIncludeDir
              | LibdwLibDir
+             | LibnumaIncludeDir
+             | LibnumaLibDir
              | LlvmTarget
              | ProjectGitCommitId
              | ProjectName
@@ -145,6 +147,8 @@ setting key = lookupValueOrError configFile $ case key of
     IconvLibDir        -> "iconv-lib-dir"
     LibdwIncludeDir    -> "libdw-include-dir"
     LibdwLibDir        -> "libdw-lib-dir"
+    LibnumaIncludeDir  -> "libnuma-include-dir"
+    LibnumaLibDir      -> "libnuma-lib-dir"
     LlvmTarget         -> "llvm-target"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
