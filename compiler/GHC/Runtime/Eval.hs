@@ -1158,7 +1158,7 @@ findMatchingInstances ty = do
   ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
   let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
 
-  concat <$> mapM (\cls -> do
+  concatMapM (\cls -> do
     let (matches, _, _) = lookupInstEnv True ies cls [ty]
     return matches) allClasses
 

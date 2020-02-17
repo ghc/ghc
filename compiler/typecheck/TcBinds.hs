@@ -301,7 +301,7 @@ tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs binds sigs
   = do  { checkTc (null binds) badBootDeclErr
-        ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
+        ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where

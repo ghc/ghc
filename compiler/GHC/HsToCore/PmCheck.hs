@@ -59,6 +59,7 @@ import Type
 import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
+import MonadUtils (concatMapM)
 
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)
@@ -625,7 +626,7 @@ translateMatch _ _ (L _ (XMatch _)) = panic "translateMatch"
 translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
 translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
   -- _loc apparently points to the match separator that comes after the guards..
-  mkGrdTreeRhs loc_sdoc . concat <$> mapM (translateGuard fam_insts . unLoc) gs
+  mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs
     where
       loc_sdoc
         | null gs   = L match_loc (sep (map ppr pats))
