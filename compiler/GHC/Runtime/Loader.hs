@@ -24,9 +24,10 @@ import GhcPrelude
 import GHC.Driver.Session
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
-import GHC.Runtime.Interpreter ( wormhole )
+import GHC.Runtime.Interpreter ( wormhole, withInterp )
+import GHC.Runtime.Interpreter.Types
 import SrcLoc           ( noSrcSpan )
-import GHC.Driver.Finder           ( findPluginModule, cannotFindModule )
+import GHC.Driver.Finder( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load   ( loadPluginInterface )
 import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
@@ -52,7 +53,7 @@ import Outputable
 import Exception
 import GHC.Driver.Hooks
 
-import Control.Monad     ( when, unless )
+import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
 
@@ -103,12 +104,11 @@ loadFrontendPlugin hsc_env mod_name = do
 
 -- #14335
 checkExternalInterpreter :: HscEnv -> IO ()
-checkExternalInterpreter hsc_env =
-    when (gopt Opt_ExternalInterpreter dflags) $
-      throwCmdLineError $ showSDoc dflags $
-        text "Plugins require -fno-external-interpreter"
-  where
-    dflags = hsc_dflags hsc_env
+checkExternalInterpreter hsc_env
+  | Just (ExternalInterp _) <- hsc_interp hsc_env
+  = throwIO (InstallationError "Plugins require -fno-external-interpreter")
+  | otherwise
+  = pure ()
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
@@ -206,7 +206,7 @@ getHValueSafely hsc_env val_name expected_type = do
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name >>= wormhole dflags
+                hval <- withInterp hsc_env $ \interp -> getHValue hsc_env val_name >>= wormhole interp
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
