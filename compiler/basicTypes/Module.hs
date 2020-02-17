@@ -268,6 +268,10 @@ data ModLocation
                 -- yet.  Always of form foo.hi, even if there is an
                 -- hi-boot file (we add the -boot suffix later)
 
+        ml_hi_tc_file   :: FilePath,
+                -- Same as the above, but for the simplified iface file which
+                -- just contains the type checking info.
+
         ml_obj_file  :: FilePath,
                 -- Where the .o file is, whether or not it exists yet.
                 -- (might not exist either because the module hasn't
