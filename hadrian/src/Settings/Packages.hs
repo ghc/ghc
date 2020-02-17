@@ -16,12 +16,10 @@ packageArgs = do
     path         <- getBuildPath
     intLib       <- getIntegerPackage
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpBuildPath <- expr gmpBuildPath
-    let includeGmp = "-I" ++ gmpBuildPath -/- "include"
         -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
-        cross = flag CrossCompiling
+    let cross = flag CrossCompiling
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -147,18 +145,7 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------ integerGmp ------------------------------
-        , package integerGmp ? mconcat
-          [ builder Cc ? arg includeGmp
-
-          , builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            -- Windows is always built with inplace GMP until we have dynamic
-            -- linking working.
-            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
-            , arg ("--configure-option=CFLAGS=" ++ includeGmp)
-            , arg ("--gcc-options="             ++ includeGmp) ] ]
+        , gmpPackageArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -180,6 +167,26 @@ packageArgs = do
         , package text ?
           builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
           pure ["+integer-simple", "-bytestring-builder"] ]
+
+gmpPackageArgs :: Args
+gmpPackageArgs = do
+    gmpBuildPath <- expr gmpBuildPath
+    let includeGmp = "-I" ++ gmpBuildPath -/- "include"
+    package integerGmp ? mconcat
+          [ builder Cc ? arg includeGmp
+
+          , builder (Cabal Setup) ? mconcat
+            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+            -- Windows is always built with inplace GMP until we have dynamic
+            -- linking working.
+            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
+            , flag GmpFrameworkPref ?
+              arg "--configure-option=--with-gmp-framework-preferred"
+            , arg ("--extra-lib-dirs=" ++ librariesGmp)
+            , arg ("--configure-option=CFLAGS=" ++ includeGmp)
+            , arg ("--gcc-options="             ++ includeGmp)
+            ]
+          ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
