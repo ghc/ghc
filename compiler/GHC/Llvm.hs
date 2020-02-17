@@ -9,7 +9,7 @@
 -- (EHC) project (<http://www.cs.uu.nl/wiki/Ehc/WebHome>).
 --
 
-module Llvm (
+module GHC.Llvm (
 
         -- * Modules, Functions and Blocks
         LlvmModule(..),
@@ -57,8 +57,8 @@ module Llvm (
 
     ) where
 
-import Llvm.AbsSyn
-import Llvm.MetaData
-import Llvm.PpLlvm
-import Llvm.Types
+import GHC.Llvm.Syntax
+import GHC.Llvm.MetaData
+import GHC.Llvm.Ppr
+import GHC.Llvm.Types
 

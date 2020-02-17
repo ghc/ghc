@@ -1,10 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Llvm.MetaData where
+module GHC.Llvm.MetaData where
 
 import GhcPrelude
 
-import Llvm.Types
+import GHC.Llvm.Types
 import Outputable
 
 -- The LLVM Metadata System.

@@ -165,7 +165,6 @@ Library
         cmm
         coreSyn
         iface
-        llvmGen
         main
         nativeGen
         parser
@@ -212,18 +211,18 @@ Library
         Predicate
         Lexeme
         Literal
-        Llvm
-        Llvm.AbsSyn
-        Llvm.MetaData
-        Llvm.PpLlvm
-        Llvm.Types
-        LlvmCodeGen
-        LlvmCodeGen.Base
-        LlvmCodeGen.CodeGen
-        LlvmCodeGen.Data
-        LlvmCodeGen.Ppr
-        LlvmCodeGen.Regs
-        LlvmMangler
+        GHC.Llvm
+        GHC.Llvm.Syntax
+        GHC.Llvm.MetaData
+        GHC.Llvm.Ppr
+        GHC.Llvm.Types
+        GHC.CmmToLlvm
+        GHC.CmmToLlvm.Base
+        GHC.CmmToLlvm.CodeGen
+        GHC.CmmToLlvm.Data
+        GHC.CmmToLlvm.Ppr
+        GHC.CmmToLlvm.Regs
+        GHC.CmmToLlvm.Mangler
         MkId
         Module
         Name
