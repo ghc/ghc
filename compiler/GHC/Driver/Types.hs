@@ -22,7 +22,6 @@ module GHC.Driver.Types (
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
-        IServ(..),
 
         -- * ModuleGraph
         ModuleGraph, emptyMG, mkModuleGraph, extendMG, mapMG,
@@ -157,8 +156,7 @@ import GhcPrelude
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval.Types ( Resume )
-import GHCi.Message         ( Pipe )
-import GHCi.RemoteTypes
+import GHC.Runtime.Interpreter.Types (Interp)
 import GHC.ForeignSrcLang
 
 import UniqFM
@@ -221,8 +219,6 @@ import Data.IORef
 import Data.Time
 import Exception
 import System.FilePath
-import Control.Concurrent
-import System.Process   ( ProcessHandle )
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
@@ -473,9 +469,8 @@ data HscEnv
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
                 -- 'TcRnTypes.TcGblEnv'.  See also Note [hsc_type_env_var hack]
 
-        , hsc_iserv :: MVar (Maybe IServ)
-                -- ^ interactive server process.  Created the first
-                -- time it is needed.
+        , hsc_interp :: Maybe Interp
+                -- ^ runtime interpreter (if any) to use for TH and GHCi.
 
         , hsc_dynLinker :: DynLinker
                 -- ^ dynamic linker.
@@ -523,14 +518,6 @@ data HscEnv
 -- This is all a massive hack because arguably checkOldIface
 -- should not populate the EPS. But that's a refactor for
 -- another day.
-
-
-data IServ = IServ
-  { iservPipe :: Pipe
-  , iservProcess :: ProcessHandle
-  , iservLookupSymbolCache :: IORef (UniqFM (Ptr ()))
-  , iservPendingFrees :: [HValueRef]
-  }
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
