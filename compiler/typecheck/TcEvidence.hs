@@ -362,7 +362,6 @@ isErasableHsWrapper = go
   where
     go WpHole                  = True
     go (WpCompose wrap1 wrap2) = go wrap1 && go wrap2
-    -- not so sure about WpFun. But it eta-expands, so...
     go WpFun{}                 = False
     go WpCast{}                = True
     go WpEvLam{}               = False -- case in point

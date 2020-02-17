@@ -350,25 +350,6 @@ rnImplicitBndrs bind_free_tvs
 rnHsType is here because we call it from loadInstDecl, and I didn't
 want a gratuitous knot.
 
-Note [Context quantification]
------------------------------
-Variables in type signatures are implicitly quantified
-when (1) they are in a type signature not beginning
-with "forall" or (2) in any qualified type T => R.
-We are phasing out (2) since it leads to inconsistencies
-(#4426):
-
-data A = A (a -> a)           is an error
-data A = A (Eq a => a -> a)   binds "a"
-data A = A (Eq a => a -> b)   binds "a" and "b"
-data A = A (() => a -> b)     binds "a" and "b"
-f :: forall a. a -> b         is an error
-f :: forall a. () => a -> b   is an error
-f :: forall a. a -> (() => b) binds "a" and "b"
-
-This situation is now considered to be an error. See rnHsTyKi for case
-HsForAllTy Qualified.
-
 Note [QualTy in kinds]
 ~~~~~~~~~~~~~~~~~~~~~~
 I was wondering whether QualTy could occur only at TypeLevel.  But no,
