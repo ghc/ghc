@@ -719,7 +719,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
         sccs = stronglyConnCompG g2
 
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
-        getOutEdges instrs = concat $ map jumpDestsOfInstr instrs
+        getOutEdges instrs = concatMap jumpDestsOfInstr instrs
 
         -- This is truly ugly, but I don't see a good alternative.
         -- Digraph just has the wrong API.  We want to identify nodes

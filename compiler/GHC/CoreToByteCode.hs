@@ -1116,7 +1116,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
           binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
-          rel_slots = nub $ map fromIntegral $ concat (map spread binds)
+          rel_slots = nub $ map fromIntegral $ concatMap spread binds
           spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
                               | otherwise                      = []
                 where rel_offset = trunc16W $ bytesToWords dflags (d - offset)

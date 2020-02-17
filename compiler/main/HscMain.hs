@@ -1271,12 +1271,12 @@ markUnsafeInfer tcg_env whyUnsafe = do
                                     (vcat $ pprErrMsgBagWithLoc whyUnsafe) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
-    badFlags df   = concat $ map (badFlag df) unsafeFlagsForInfer
+    badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
     badFlag df (str,loc,on,_)
         | on df     = [mkLocMessage SevOutput (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
-    badInsts insts = concat $ map badInst insts
+    badInsts insts = concatMap badInst insts
 
     checkOverlap (NoOverlap _) = False
     checkOverlap _             = True

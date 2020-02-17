@@ -256,7 +256,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do ie_avails <- accumExports do_litem rdr_items
-       let final_exports = nubAvails (concat (map snd ie_avails)) -- Combine families
+       let final_exports = nubAvails (concatMap snd ie_avails) -- Combine families
        return (Just ie_avails, final_exports)
   where
     do_litem :: ExportAccum -> LIE GhcPs

@@ -324,7 +324,7 @@ selectColor colors graph u
         -- the prefs of our neighbors
         colors_neighbor_prefs
                         = mkUniqSet
-                        $ concat $ map nodePreference nsConflicts
+                        $ concatMap nodePreference nsConflicts
 
         -- colors that are still valid for us
         colors_ok_ex    = minusUniqSet colors_avail (nodeExclusions node)

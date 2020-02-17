@@ -751,9 +751,7 @@ loadDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
 loadDecls ignore_prags ver_decls
-   = do { thingss <- mapM (loadDecl ignore_prags) ver_decls
-        ; return (concat thingss)
-        }
+   = concatMapM (loadDecl ignore_prags) ver_decls
 
 loadDecl :: Bool                    -- Don't load pragmas into the decl pool
           -> (Fingerprint, IfaceDecl)
