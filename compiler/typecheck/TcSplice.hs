@@ -7,6 +7,7 @@ TcSplice: Template Haskell splices
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -58,6 +59,7 @@ import Control.Monad
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
@@ -770,12 +772,11 @@ runAnnotation target expr = do
 
 convertAnnotationWrapper :: ForeignHValue -> TcM (Either MsgDoc Serialized)
 convertAnnotationWrapper fhv = do
-  dflags <- getDynFlags
-  if gopt Opt_ExternalInterpreter dflags
-    then do
-      Right <$> runTH THAnnWrapper fhv
-    else do
-      annotation_wrapper <- liftIO $ wormhole dflags fhv
+  hsc_env <- getTopEnv
+  withInterp hsc_env $ \case
+    ExternalInterp _ -> Right <$> runTH THAnnWrapper fhv
+    InternalInterp   -> do
+      annotation_wrapper <- liftIO $ wormhole InternalInterp fhv
       return $ Right $
         case unsafeCoerce# annotation_wrapper of
            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
@@ -805,13 +806,16 @@ runQuasi act = TH.runQ act
 
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
-  dflags <- getDynFlags
   let withForeignRefs [] f = f []
       withForeignRefs (x : xs) f = withForeignRef x $ \r ->
         withForeignRefs xs $ \rs -> f (r : rs)
-  if gopt Opt_ExternalInterpreter dflags then do
-    hsc_env <- env_top <$> getEnv
-    withIServ hsc_env $ \i -> do
+  hsc_env <- getTopEnv
+  withInterp hsc_env $ \case
+    InternalInterp -> do
+      qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
+      runQuasi $ sequence_ qs
+
+    ExternalInterp i -> withIServ_ i $ \iserv -> do
       tcg <- getGblEnv
       th_state <- readTcRef (tcg_th_remote_state tcg)
       case th_state of
@@ -819,12 +823,9 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
         Just fhv -> do
           liftIO $ withForeignRef fhv $ \st ->
             withForeignRefs finRefs $ \qrefs ->
-              writeIServ i (putMessage (RunModFinalizers st qrefs))
-          () <- runRemoteTH i []
-          readQResult i
-  else do
-    qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
-    runQuasi $ sequence_ qs
+              writeIServ iserv (putMessage (RunModFinalizers st qrefs))
+          () <- runRemoteTH iserv []
+          readQResult iserv
 
 runQResult
   :: (a -> String)
@@ -1159,7 +1160,7 @@ instance TH.Quasi TcM where
       addModFinalizerRef fref
 
   qAddCorePlugin plugin = do
-      hsc_env <- env_top <$> getEnv
+      hsc_env <- getTopEnv
       r <- liftIO $ findHomeModule hsc_env (mkModuleName plugin)
       let err = hang
             (text "addCorePlugin: invalid plugin module "
@@ -1225,19 +1226,19 @@ runTHDec = runTH THDec
 
 runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
 runTH ty fhv = do
-  hsc_env <- env_top <$> getEnv
-  dflags <- getDynFlags
-  if not (gopt Opt_ExternalInterpreter dflags)
-    then do
+  hsc_env <- getTopEnv
+  withInterp hsc_env $ \case
+    InternalInterp -> do
        -- Run it in the local TcM
-      hv <- liftIO $ wormhole dflags fhv
+      hv <- liftIO $ wormhole InternalInterp fhv
       r <- runQuasi (unsafeCoerce# hv :: TH.Q a)
       return r
-    else
+
+    ExternalInterp iserv ->
       -- Run it on the server.  For an overview of how TH works with
       -- Remote GHCi, see Note [Remote Template Haskell] in
       -- libraries/ghci/GHCi/TH.hs.
-      withIServ hsc_env $ \i -> do
+      withIServ_ iserv $ \i -> do
         rstate <- getTHState i
         loc <- TH.qLocation
         liftIO $
@@ -1252,7 +1253,7 @@ runTH ty fhv = do
 -- | communicate with a remotely-running TH computation until it finishes.
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
-  :: IServ
+  :: IServInstance
   -> [Messages]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
@@ -1281,7 +1282,7 @@ runRemoteTH iserv recovers = do
       runRemoteTH iserv recovers
 
 -- | Read a value of type QResult from the iserv
-readQResult :: Binary a => IServ -> TcM a
+readQResult :: Binary a => IServInstance -> TcM a
 readQResult i = do
   qr <- liftIO $ readIServ i get
   case qr of
@@ -1330,14 +1331,14 @@ Back in GHC, when we receive:
 --
 -- The TH state is stored in tcg_th_remote_state in the TcGblEnv.
 --
-getTHState :: IServ -> TcM (ForeignRef (IORef QState))
+getTHState :: IServInstance -> TcM (ForeignRef (IORef QState))
 getTHState i = do
   tcg <- getGblEnv
   th_state <- readTcRef (tcg_th_remote_state tcg)
   case th_state of
     Just rhv -> return rhv
     Nothing -> do
-      hsc_env <- env_top <$> getEnv
+      hsc_env <- getTopEnv
       fhv <- liftIO $ mkFinalizedHValue hsc_env =<< iservCall i StartTH
       writeTcRef (tcg_th_remote_state tcg) (Just fhv)
       return fhv
@@ -1366,7 +1367,7 @@ handleTHMessage msg = case msg of
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
   AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do
-    hsc_env <- env_top <$> getEnv
+    hsc_env <- getTopEnv
     wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
   AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs

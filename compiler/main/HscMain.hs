@@ -90,6 +90,7 @@ import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
 import Id
 import GHC.Runtime.Interpreter ( addSptEntry )
+import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes ( ForeignHValue )
 import GHC.CoreToByteCode ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
@@ -197,7 +198,36 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
-    iserv_mvar <- newMVar Nothing
+
+    -- Interpreter
+    interp  <- if gopt Opt_ExternalInterpreter dflags
+      then do
+           let
+             prog = pgm_i dflags ++ flavour
+             flavour
+               | WayProf `elem` ways dflags = "-prof"
+               | WayDyn `elem` ways dflags  = "-dyn"
+               | otherwise                  = ""
+             msg = text "Starting " <> text prog
+           tr <- if verbosity dflags >= 3
+                  then return (logInfo dflags (defaultDumpStyle dflags) msg)
+                  else return (pure ())
+           let
+            conf = IServConfig
+              { iservConfProgram = prog
+              , iservConfOpts    = getOpts dflags opt_i
+              , iservConfHook    = createIservProcessHook (hooks dflags)
+              , iservConfTrace   = tr
+              }
+           s <- newMVar (IServPending conf)
+           return (Just (ExternalInterp (IServ s)))
+      else
+#if defined(HAVE_INTERNAL_INTERPRETER)
+        return (Just InternalInterp)
+#else
+        return Nothing
+#endif
+
     emptyDynLinker <- uninitializedLinker
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
@@ -208,7 +238,7 @@ newHscEnv dflags = do
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
                   ,  hsc_type_env_var = Nothing
-                  ,  hsc_iserv        = iserv_mvar
+                  ,  hsc_interp       = interp
                   ,  hsc_dynLinker    = emptyDynLinker
                   }
 

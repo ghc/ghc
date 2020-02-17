@@ -1213,8 +1213,9 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
 compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
-   dflags <- getDynFlags
-   liftIO $ wormhole dflags fhv
+   withSession $ \hsc_env ->
+      withInterp hsc_env $ \interp ->
+         liftIO $ wormhole interp fhv
 
 -- | Compile an expression, run it and return the result as a Dynamic.
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
