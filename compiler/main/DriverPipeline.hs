@@ -57,7 +57,7 @@ import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
-import LlvmCodeGen      ( llvmFixupAsm, llvmVersionList )
+import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
 import TcRnTypes

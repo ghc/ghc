@@ -9,7 +9,7 @@
 -- Contains functions useful through out the code generator.
 --
 
-module LlvmCodeGen.Base (
+module GHC.CmmToLlvm.Base (
 
         LlvmCmmDecl, LlvmBasicBlock,
         LiveGlobalRegs,
@@ -43,8 +43,8 @@ module LlvmCodeGen.Base (
 
 import GhcPrelude
 
-import Llvm
-import LlvmCodeGen.Regs
+import GHC.Llvm
+import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs )

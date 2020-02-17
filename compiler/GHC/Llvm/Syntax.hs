@@ -2,12 +2,12 @@
 -- | The LLVM abstract syntax.
 --
 
-module Llvm.AbsSyn where
+module GHC.Llvm.Syntax where
 
 import GhcPrelude
 
-import Llvm.MetaData
-import Llvm.Types
+import GHC.Llvm.MetaData
+import GHC.Llvm.Types
 
 import Unique
 

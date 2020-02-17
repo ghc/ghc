@@ -9,7 +9,7 @@
 -- instructions require 32-byte alignment.
 --
 
-module LlvmMangler ( llvmFixupAsm ) where
+module GHC.CmmToLlvm.Mangler ( llvmFixupAsm ) where
 
 import GhcPrelude
 

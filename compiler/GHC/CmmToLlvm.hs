@@ -3,19 +3,25 @@
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
 --
-module LlvmCodeGen ( LlvmVersion, llvmVersionList, llvmCodeGen, llvmFixupAsm ) where
+module GHC.CmmToLlvm
+   ( LlvmVersion
+   , llvmVersionList
+   , llvmCodeGen
+   , llvmFixupAsm
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import Llvm
-import LlvmCodeGen.Base
-import LlvmCodeGen.CodeGen
-import LlvmCodeGen.Data
-import LlvmCodeGen.Ppr
-import LlvmCodeGen.Regs
-import LlvmMangler
+import GHC.Llvm
+import GHC.CmmToLlvm.Base
+import GHC.CmmToLlvm.CodeGen
+import GHC.CmmToLlvm.Data
+import GHC.CmmToLlvm.Ppr
+import GHC.CmmToLlvm.Regs
+import GHC.CmmToLlvm.Mangler
 
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm

@@ -3,7 +3,7 @@
 -- | Handle conversion of CmmData to LLVM code.
 --
 
-module LlvmCodeGen.Data (
+module GHC.CmmToLlvm.Data (
         genLlvmData, genData
     ) where
 
@@ -11,8 +11,8 @@ module LlvmCodeGen.Data (
 
 import GhcPrelude
 
-import Llvm
-import LlvmCodeGen.Base
+import GHC.Llvm
+import GHC.CmmToLlvm.Base
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
