@@ -641,7 +641,7 @@ tcTopSplice expr res_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
-       ; return (HsSpliceE noExtField (HsSplicedT delayed_splice))
+       ; return (HsSpliceE noExtField (XSplice (HsSplicedT delayed_splice)))
 
        }
 

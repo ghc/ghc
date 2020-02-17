@@ -2382,15 +2382,17 @@ data HsSplice id
         (XSpliced id)
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
-   | HsSplicedT
-      DelayedSplice
    | XSplice (XXSplice id)  -- Note [Trees that Grow] extension point
+
+newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
 
 type instance XTypedSplice   (GhcPass _) = NoExtField
 type instance XUntypedSplice (GhcPass _) = NoExtField
 type instance XQuasiQuote    (GhcPass _) = NoExtField
 type instance XSpliced       (GhcPass _) = NoExtField
-type instance XXSplice       (GhcPass _) = NoExtCon
+type instance XXSplice       GhcPs       = NoExtCon
+type instance XXSplice       GhcRn       = NoExtCon
+type instance XXSplice       GhcTc       = HsSplicedT
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -2552,7 +2554,7 @@ ppr_splice_decl :: (OutputableBndrId p)
 ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
-pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
+pprSplice :: forall p. (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
 pprSplice (HsTypedSplice _ DollarSplice n e)
   = ppr_splice (text "$$") n e empty
 pprSplice (HsTypedSplice _ BareSplice _ _ )
@@ -2563,8 +2565,11 @@ pprSplice (HsUntypedSplice _ BareSplice n e)
   = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing
-pprSplice (HsSplicedT {})               = text "Unevaluated typed splice"
-pprSplice (XSplice x)                   = ppr x
+pprSplice (XSplice x)                   = case ghcPass @p of
+                                            GhcPs -> noExtCon x
+                                            GhcRn -> noExtCon x
+                                            GhcTc -> case x of
+                                                       HsSplicedT _ -> text "Unevaluated typed splice"
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
 ppr_quasi n quoter quote = whenPprDebug (brackets (ppr n)) <>
