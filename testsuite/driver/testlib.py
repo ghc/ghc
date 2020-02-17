@@ -2221,7 +2221,7 @@ def normalise_asm( s: str ) -> str:
     return '\n'.join(out)
 
 def safe_print(s: str) -> None:
-    s2 = s.encode(sys.stdout.encoding, errors='replace')
+    s2 = s.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
     print(s2)
 
 def if_verbose( n: int, s: str ) -> None:
