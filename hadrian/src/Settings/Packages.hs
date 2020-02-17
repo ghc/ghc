@@ -146,16 +146,7 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------ integerGmp ------------------------------
-        , package integerGmp ? mconcat
-          [ builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            -- Windows is always built with inplace GMP until we have dynamic
-            -- linking working.
-            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
-            ]
-          ]
+        , gmpPackageArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -177,6 +168,19 @@ packageArgs = do
         , package text ?
           builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
           pure ["+integer-simple", "-bytestring-builder"] ]
+
+gmpPackageArgs :: Args
+gmpPackageArgs = do
+    package integerGmp ? mconcat
+          [ builder (Cabal Setup) ? mconcat
+            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+            -- Windows is always built with inplace GMP until we have dynamic
+            -- linking working.
+            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
+            , flag GmpFrameworkPref ?
+              arg "--configure-option=--with-gmp-framework-preferred"
+            ]
+          ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
