@@ -327,7 +327,6 @@ data LHsQTyVars pass   -- See Note [HsType binders]
 
            , hsq_explicit :: [LHsTyVarBndr pass]
                 -- Explicit variables, written by the user
-                -- See Note [HsForAllTy tyvar binders]
     }
   | XLHsQTyVars (XXLHsQTyVars pass)
 
@@ -761,29 +760,6 @@ data HsTyLit
 
 
 {-
-Note [HsForAllTy tyvar binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-After parsing:
-  * Implicit => empty
-    Explicit => the variables the user wrote
-
-After renaming
-  * Implicit => the *type* variables free in the type
-    Explicit => the variables the user wrote (renamed)
-
-Qualified currently behaves exactly as Implicit,
-but it is deprecated to use it for implicit quantification.
-In this case, GHC 7.10 gives a warning; see
-Note [Context quantification] in GHC.Rename.Types, and #4426.
-In GHC 8.0, Qualified will no longer bind variables
-and this will become an error.
-
-The kind variables bound in the hsq_implicit field come both
-  a) from the kind signatures on the kind vars (eg k1)
-  b) from the scope of the forall (eg k2)
-Example:   f :: forall (a::k1) b. T a (b::k2)
-
-
 Note [Unit tuples]
 ~~~~~~~~~~~~~~~~~~
 Consider the type
