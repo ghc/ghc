@@ -4,10 +4,14 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,
+
+        IfacePhase(..),
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
@@ -75,10 +79,26 @@ import TysWiredIn ( constraintKindTyConName )
 import Util (seqList)
 
 import Control.Monad
-import System.IO.Unsafe
 import Control.DeepSeq
+import Data.Proxy
+import System.IO.Unsafe
 
 infixl 3 &&&
+
+{-
+************************************************************************
+*                                                                      *
+                    Interface TTG
+*                                                                      *
+************************************************************************
+-}
+
+
+data IfacePhase
+  = ModIfaceTc
+  | ModIfaceCore
+  -- ^ Partial interface built based on output of core pipeline.
+  | ModIfaceFinal
 
 {-
 ************************************************************************
@@ -111,11 +131,21 @@ putIfaceTopBndr bh name =
           --pprTrace "putIfaceTopBndr" (ppr name) $
           put_binding_name bh name
 
-data IfaceDecl
+
+type family IfaceIdInfoF (phase :: IfacePhase) :: * -> * where
+  -- never any info
+  IfaceIdInfoF 'ModIfaceTc = Proxy
+  -- Optional, e.g. skipped when writing interface file without -O
+  IfaceIdInfoF 'ModIfaceCore = Maybe
+  IfaceIdInfoF 'ModIfaceFinal = Maybe
+
+type IfaceIdInfo' phase = IfaceIdInfoF phase (IfaceIdInfo phase)
+
+data IfaceDecl  (phase :: IfacePhase)
   = IfaceId { ifName      :: IfaceTopBndr,
               ifType      :: IfaceType,
-              ifIdDetails :: IfaceIdDetails,
-              ifIdInfo    :: IfaceIdInfo }
+              ifIdDetails :: IfaceIdDetails phase,
+              ifIdInfo    :: IfaceIdInfo' phase }
 
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
                 ifBinders    :: [IfaceTyConBinder],
@@ -149,7 +179,7 @@ data IfaceDecl
                  ifRoles   :: [Role],                   -- Roles
                  ifBinders :: [IfaceTyConBinder],
                  ifFDs     :: [FunDep IfLclName],       -- Functional dependencies
-                 ifBody    :: IfaceClassBody            -- Methods, superclasses, ATs
+                 ifBody    :: IfaceClassBody phase      -- Methods, superclasses, ATs
     }
 
   | IfaceAxiom { ifName       :: IfaceTopBndr,        -- Axiom name
@@ -173,13 +203,13 @@ data IfaceDecl
                   ifFieldLabels   :: [FieldLabel] }
 
 -- See also 'ClassBody'
-data IfaceClassBody
+data IfaceClassBody phase
   -- Abstract classes don't specify their body; they only occur in @hs-boot@ and
   -- @hsig@ files.
   = IfAbstractClass
   | IfConcreteClass {
      ifClassCtxt :: IfaceContext,             -- Super classes
-     ifATs       :: [IfaceAT],                -- Associated type families
+     ifATs       :: [IfaceAT phase],          -- Associated type families
      ifSigs      :: [IfaceClassOp],           -- Method signatures
      ifMinDef    :: BooleanFormula IfLclName  -- Minimal complete definition
     }
@@ -210,9 +240,10 @@ data IfaceClassOp
                  -- and the default method, are *not* quantified
                  -- over the class variables
 
-data IfaceAT = IfaceAT  -- See Class.ClassATItem
-                  IfaceDecl          -- The associated type declaration
-                  (Maybe IfaceType)  -- Default associated type instance, if any
+data IfaceAT phase
+  = IfaceAT  -- See Class.ClassATItem
+    (IfaceDecl phase)  -- The associated type declaration
+    (Maybe IfaceType)  -- Default associated type instance, if any
 
 
 -- This is just like CoAxBranch
@@ -299,14 +330,14 @@ data IfaceFamInst
                  , ifFamInstOrph     :: IsOrphan             -- Just like IfaceClsInst
                  }
 
-data IfaceRule
+data IfaceRule phase
   = IfaceRule {
         ifRuleName   :: RuleName,
         ifActivation :: Activation,
         ifRuleBndrs  :: [IfaceBndr],    -- Tyvars and term vars
         ifRuleHead   :: IfExtName,      -- Head of lhs
-        ifRuleArgs   :: [IfaceExpr],    -- Args of LHS
-        ifRuleRhs    :: IfaceExpr,
+        ifRuleArgs   :: [IfaceExpr phase],    -- Args of LHS
+        ifRuleRhs    :: IfaceExpr phase,
         ifRuleAuto   :: Bool,
         ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
@@ -338,36 +369,39 @@ instance Outputable IfaceCompleteMatch where
 --   * The version comparison sees that new (=NoInfo) differs from old (=HasInfo *)
 --      and so gives a new version.
 
-data IfaceIdInfo
-  = NoInfo                      -- When writing interface file without -O
-  | HasInfo [IfaceInfoItem]     -- Has info, and here it is
+newtype IfaceIdInfo phase = IfaceIdInfo [IfaceInfoItem phase]
 
-data IfaceInfoItem
+data IfaceInfoItem phase
   = HsArity         Arity
   | HsStrictness    StrictSig
   | HsCpr           CprSig
   | HsInline        InlinePragma
-  | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
-                    IfaceUnfolding   -- See Note [Expose recursive functions]
+  | HsUnfold
+      Bool
+      -- ^ True <=> isStrongLoopBreaker is true
+      -- See Note [Expose recursive functions]
+      (IfaceUnfolding phase)
   | HsNoCafRefs
   | HsLevity                         -- Present <=> never levity polymorphic
 
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
 
-data IfaceUnfolding
-  = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
-                                -- Possibly could eliminate the Bool here, the information
-                                -- is also in the InlinePragma.
+data IfaceUnfolding phase
+  = IfCoreUnfold Bool (IfaceExpr phase)
+    -- ^ True <=> INLINABLE, False <=> regular unfolding
+    -- Possibly could eliminate the Bool here, the information
+    -- is also in the InlinePragma.
 
-  | IfCompulsory IfaceExpr      -- Only used for default methods, in fact
+  | IfCompulsory (IfaceExpr phase)
+    -- ^ Only used for default methods, in fact
 
   | IfInlineRule Arity          -- INLINE pragmas
                  Bool           -- OK to inline even if *un*-saturated
                  Bool           -- OK to inline even if context is boring
-                 IfaceExpr
+                 (IfaceExpr phase)
 
-  | IfDFunUnfold [IfaceBndr] [IfaceExpr]
+  | IfDFunUnfold [IfaceBndr] [IfaceExpr phase]
 
 
 -- We only serialise the IdDetails of top-level Ids, and even then
@@ -375,9 +409,9 @@ data IfaceUnfolding
 -- implicit ones are needed here, because they are not put it
 -- interface files
 
-data IfaceIdDetails
+data IfaceIdDetails phase
   = IfVanillaId
-  | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
+  | IfRecSelId (Either IfaceTyCon (IfaceDecl phase)) Bool
   | IfDFunId
 
 {-
@@ -398,7 +432,7 @@ visibleIfConDecls IfAbstractTyCon  = []
 visibleIfConDecls (IfDataTyCon cs) = cs
 visibleIfConDecls (IfNewTyCon c)   = [c]
 
-ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
+ifaceDeclImplicitBndrs :: IfaceDecl phase -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
@@ -466,7 +500,7 @@ ifaceConDeclImplicitBndrs (IfCon {
        -- different fingerprint!  So we calculate the fingerprint of
        -- each binder by combining the fingerprint of the whole
        -- declaration with the name of the binder. (#5614, #7215)
-ifaceDeclFingerprints :: Fingerprint -> IfaceDecl -> [(OccName,Fingerprint)]
+ifaceDeclFingerprints :: Fingerprint -> IfaceDecl phase -> [(OccName,Fingerprint)]
 ifaceDeclFingerprints hash decl
   = (getOccName decl, hash) :
     [ (occ, computeFingerprint' (hash,occ))
@@ -484,21 +518,21 @@ ifaceDeclFingerprints hash decl
 ************************************************************************
 -}
 
-data IfaceExpr
+data IfaceExpr phase
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
-  | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
-  | IfaceLam    IfaceLamBndr IfaceExpr
-  | IfaceApp    IfaceExpr IfaceExpr
-  | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
-  | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
-  | IfaceLet    IfaceBinding  IfaceExpr
-  | IfaceCast   IfaceExpr IfaceCoercion
+  | IfaceTuple  TupleSort [IfaceExpr phase]   -- Saturated; type arguments omitted
+  | IfaceLam    IfaceLamBndr (IfaceExpr phase)
+  | IfaceApp    (IfaceExpr phase) (IfaceExpr phase)
+  | IfaceCase   (IfaceExpr phase) IfLclName [IfaceAlt phase]
+  | IfaceECase  (IfaceExpr phase) IfaceType     -- See Note [Empty case alternatives]
+  | IfaceLet    (IfaceBinding phase)  (IfaceExpr phase)
+  | IfaceCast   (IfaceExpr phase) IfaceCoercion
   | IfaceLit    Literal
   | IfaceFCall  ForeignCall IfaceType
-  | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
+  | IfaceTick   IfaceTickish (IfaceExpr phase)    -- from Tick tickish E
 
 data IfaceTickish
   = IfaceHpcTick Module Int                -- from HpcTick x
@@ -506,7 +540,7 @@ data IfaceTickish
   | IfaceSource  RealSrcSpan String        -- from SourceNote
   -- no breakpoints: we never export these into interface files
 
-type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
+type IfaceAlt phase = (IfaceConAlt, [IfLclName], IfaceExpr phase)
         -- Note: IfLclName, not IfaceBndr (and same with the case binder)
         -- We reconstruct the kind/type of the thing from the context
         -- thus saving bulk in interface files
@@ -515,14 +549,14 @@ data IfaceConAlt = IfaceDefault
                  | IfaceDataAlt IfExtName
                  | IfaceLitAlt Literal
 
-data IfaceBinding
-  = IfaceNonRec IfaceLetBndr IfaceExpr
-  | IfaceRec    [(IfaceLetBndr, IfaceExpr)]
+data IfaceBinding phase
+  = IfaceNonRec (IfaceLetBndr phase) (IfaceExpr phase)
+  | IfaceRec    [(IfaceLetBndr phase, IfaceExpr phase)]
 
 -- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
 -- It's used for *non-top-level* let/rec binders
 -- See Note [IdInfo on nested let-bindings]
-data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
+data IfaceLetBndr phase = IfLetBndr IfLclName IfaceType (IfaceIdInfo' phase) IfaceJoinInfo
 
 data IfaceJoinInfo = IfaceNotJoinPoint
                    | IfaceJoinPoint JoinArity
@@ -632,13 +666,13 @@ instance NamedThing IfaceConDecl where
 instance HasOccName IfaceConDecl where
   occName = getOccName
 
-instance NamedThing IfaceDecl where
+instance NamedThing (IfaceDecl phase) where
   getName = ifName
 
-instance HasOccName IfaceDecl where
+instance HasOccName (IfaceDecl phase) where
   occName = getOccName
 
-instance Outputable IfaceDecl where
+instance Outputable (IfaceDecl phase) where
   ppr = pprIfaceDecl showToIface
 
 {-
@@ -744,7 +778,7 @@ constraintIfaceKind :: IfaceKind
 constraintIfaceKind =
   IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
 
-pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
+pprIfaceDecl :: ShowSub -> IfaceDecl phase -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
@@ -863,7 +897,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
 
-      maybeShowAssoc :: IfaceAT -> Maybe SDoc
+      maybeShowAssoc :: IfaceAT phase  -> Maybe SDoc
       maybeShowAssoc asc@(IfaceAT d _)
         | showSub ss d = Just $ pprIfaceAT ss asc
         | otherwise    = Nothing
@@ -1037,10 +1071,10 @@ pprIfaceClassOp ss (IfaceClassOp n ty dm)
      <+> dcolon
      <+> pprIfaceSigmaType ShowForAllWhen ty
 
-instance Outputable IfaceAT where
+instance Outputable (IfaceAT phase) where
    ppr = pprIfaceAT showToIface
 
-pprIfaceAT :: ShowSub -> IfaceAT -> SDoc
+pprIfaceAT :: ShowSub -> IfaceAT phase -> SDoc
 pprIfaceAT ss (IfaceAT d mb_def)
   = vcat [ pprIfaceDecl ss d
          , case mb_def of
@@ -1377,7 +1411,7 @@ instance Outputable IfaceConAlt where
     ppr (IfaceDataAlt d)  = ppr d
 
 ------------------
-instance Outputable IfaceIdDetails where
+instance Outputable (IfaceIdDetails phase) where
   ppr IfVanillaId       = Outputable.empty
   ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
                           <+> if b
@@ -1386,9 +1420,8 @@ instance Outputable IfaceIdDetails where
   ppr IfDFunId          = text "DFunId"
 
 instance Outputable IfaceIdInfo where
-  ppr NoInfo       = Outputable.empty
-  ppr (HasInfo is) = text "{-" <+> pprWithCommas ppr is
-                     <+> text "-}"
+  ppr (IfaceIdInfo is) = text "{-" <+> pprWithCommas ppr is
+                         <+> text "-}"
 
 instance Outputable IfaceInfoItem where
   ppr (HsUnfold lb unf)     = text "Unfolding"
@@ -1432,7 +1465,7 @@ recorded textually rather than by its fingerprint when
 fingerprinting the instance, so DFuns are not dependencies.
 -}
 
-freeNamesIfDecl :: IfaceDecl -> NameSet
+freeNamesIfDecl :: IfaceDecl phase -> NameSet
 freeNamesIfDecl (IfaceId { ifType = t, ifIdDetails = d, ifIdInfo = i})
   = freeNamesIfType t &&&
     freeNamesIfIdInfo i &&&
@@ -1485,7 +1518,7 @@ freeNamesIfDecl (IfacePatSyn { ifPatMatcher = (matcher, _)
     freeNamesIfType pat_ty &&&
     mkNameSet (map flSelector lbls)
 
-freeNamesIfClassBody :: IfaceClassBody -> NameSet
+freeNamesIfClassBody :: IfaceClassBody phase -> NameSet
 freeNamesIfClassBody IfAbstractClass
   = emptyNameSet
 freeNamesIfClassBody (IfConcreteClass{ ifClassCtxt = ctxt, ifATs = ats, ifSigs = sigs })
@@ -1503,7 +1536,7 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
     freeNamesIfAppArgs lhs &&&
     freeNamesIfType rhs
 
-freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
+freeNamesIfIdDetails :: IfaceIdDetails phase -> NameSet
 freeNamesIfIdDetails (IfRecSelId tc _) =
   either freeNamesIfTc freeNamesIfDecl tc
 freeNamesIfIdDetails _                 = emptyNameSet
@@ -1521,7 +1554,7 @@ freeNamesIfFamFlav IfaceBuiltInSynFamTyCon             = emptyNameSet
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType
 
-freeNamesIfAT :: IfaceAT -> NameSet
+freeNamesIfAT :: IfaceAT phase -> NameSet
 freeNamesIfAT (IfaceAT decl mb_def)
   = freeNamesIfDecl decl &&&
     case mb_def of
@@ -1650,9 +1683,11 @@ freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
 freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
 freeNamesIfIdBndr (_fs,k) = freeNamesIfKind k
 
-freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
-freeNamesIfIdInfo NoInfo      = emptyNameSet
-freeNamesIfIdInfo (HasInfo i) = fnList freeNamesItem i
+freeNamesIfIdInfo :: Maybe IfaceIdInfo -> NameSet
+freeNamesIfIdInfo = maybe emptyNameSet freeNamesIfIdInfo'
+
+freeNamesIfIdInfo' :: IfaceIdInfo -> NameSet
+freeNamesIfIdInfo' (IfaceIdInfo i) = fnList freeNamesItem i
 
 freeNamesItem :: IfaceInfoItem -> NameSet
 freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
@@ -1768,7 +1803,7 @@ details.
 
 -}
 
-instance Binary IfaceDecl where
+instance Binary (IfaceDecl phase) where
     put_ bh (IfaceId name ty details idinfo) = do
         putByte bh 0
         putIfaceTopBndr bh name
@@ -1992,7 +2027,7 @@ instance Binary IfaceClassOp where
         def <- get bh
         return (IfaceClassOp n ty def)
 
-instance Binary IfaceAT where
+instance Binary (IfaceAT phase) where
     put_ bh (IfaceAT dec defs) = do
         put_ bh dec
         put_ bh defs
@@ -2143,7 +2178,7 @@ instance Binary IfaceAnnotation where
         a2 <- get bh
         return (IfaceAnnotation a1 a2)
 
-instance Binary IfaceIdDetails where
+instance Binary (IfaceIdDetails phase) where
     put_ bh IfVanillaId      = putByte bh 0
     put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
     put_ bh IfDFunId         = putByte bh 2
@@ -2155,14 +2190,9 @@ instance Binary IfaceIdDetails where
             _ -> return IfDFunId
 
 instance Binary IfaceIdInfo where
-    put_ bh NoInfo      = putByte bh 0
-    put_ bh (HasInfo i) = putByte bh 1 >> lazyPut bh i -- NB lazyPut
+    put_ bh (IfaceIdInfo i) = lazyPut bh i -- NB lazyPut
 
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return NoInfo
-            _ -> liftM HasInfo $ lazyGet bh    -- NB lazyGet
+    get bh = fmap IfaceIdInfo $ lazyGet bh    -- NB lazyGet
 
 instance Binary IfaceInfoItem where
     put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
@@ -2433,7 +2463,7 @@ instance Binary IfaceCompleteMatch where
 ************************************************************************
 -}
 
-instance NFData IfaceDecl where
+instance NFData (IfaceDecl phase) where
   rnf = \case
     IfaceId f1 f2 f3 f4 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
@@ -2465,12 +2495,12 @@ instance NFData IfaceAxBranch where
   rnf (IfaceAxBranch f1 f2 f3 f4 f5 f6 f7) =
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq` rnf f7
 
-instance NFData IfaceClassBody where
+instance NFData (IfaceClassBody phase) where
   rnf = \case
     IfAbstractClass -> ()
     IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
 
-instance NFData IfaceAT where
+instance NFData (IfaceAT phase) where
   rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2
 
 instance NFData IfaceClassOp where
@@ -2498,7 +2528,7 @@ instance NFData IfaceSrcBang where
 instance NFData IfaceBang where
   rnf x = x `seq` ()
 
-instance NFData IfaceIdDetails where
+instance NFData (IfaceIdDetails phase) where
   rnf = \case
     IfVanillaId -> ()
     IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
@@ -2506,9 +2536,7 @@ instance NFData IfaceIdDetails where
     IfDFunId -> ()
 
 instance NFData IfaceIdInfo where
-  rnf = \case
-    NoInfo -> ()
-    HasInfo f1 -> rnf f1
+  rnf (IfaceIdInfo fi) = rnf fi
 
 instance NFData IfaceInfoItem where
   rnf = \case

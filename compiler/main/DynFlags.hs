@@ -594,6 +594,7 @@ data GeneralFlag
    | Opt_OmitInterfacePragmas
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
+   | Opt_WriteHiTc -- generate .hi-tc files
    | Opt_WriteHie -- generate .hie files
 
    -- profiling opts
@@ -1057,6 +1058,7 @@ data DynFlags = DynFlags {
   objectDir             :: Maybe String,
   dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
+  hiTcDir               :: Maybe String,
   hieDir                :: Maybe String,
   stubDir               :: Maybe String,
   dumpDir               :: Maybe String,
@@ -1064,6 +1066,7 @@ data DynFlags = DynFlags {
   objectSuf             :: String,
   hcSuf                 :: String,
   hiSuf                 :: String,
+  hiTcSuf               :: String,
   hieSuf                :: String,
 
   canGenerateDynamicToo :: IORef Bool,
@@ -1073,6 +1076,7 @@ data DynFlags = DynFlags {
   outputFile            :: Maybe String,
   dynOutputFile         :: Maybe String,
   outputHi              :: Maybe String,
+  outputHiTc            :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
   -- | This is set by 'DriverPipeline.runPipeline' based on where
@@ -2003,6 +2007,7 @@ defaultDynFlags mySettings llvmConfig =
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
         hiDir                   = Nothing,
+        hiTcDir                 = Nothing,
         hieDir                  = Nothing,
         stubDir                 = Nothing,
         dumpDir                 = Nothing,
@@ -2010,6 +2015,7 @@ defaultDynFlags mySettings llvmConfig =
         objectSuf               = phaseInputExt StopLn,
         hcSuf                   = phaseInputExt HCc,
         hiSuf                   = "hi",
+        hiTcSuf                 = "hi-tc",
         hieSuf                  = "hie",
 
         canGenerateDynamicToo   = panic "defaultDynFlags: No canGenerateDynamicToo",
@@ -2026,6 +2032,7 @@ defaultDynFlags mySettings llvmConfig =
         outputFile              = Nothing,
         dynOutputFile           = Nothing,
         outputHi                = Nothing,
+        outputHiTc              = Nothing,
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,

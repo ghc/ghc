@@ -984,19 +984,14 @@ data ModIfaceBackend = ModIfaceBackend
     -- name, if it has one.
   }
 
-data ModIfacePhase
-  = ModIfaceCore
-  -- ^ Partial interface built based on output of core pipeline.
-  | ModIfaceFinal
-
 -- | Selects a IfaceDecl representation.
 -- For fully instantiated interfaces we also maintain
 -- a fingerprint, which is used for recompilation checks.
-type family IfaceDeclExts (phase :: ModIfacePhase) where
+type family IfaceDeclExts (phase :: IfacePhase) where
   IfaceDeclExts 'ModIfaceCore = IfaceDecl
   IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
 
-type family IfaceBackendExts (phase :: ModIfacePhase) where
+type family IfaceBackendExts (phase :: IfacePhase) where
   IfaceBackendExts 'ModIfaceCore = ()
   IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
 
@@ -1011,7 +1006,7 @@ type family IfaceBackendExts (phase :: ModIfacePhase) where
 -- except that we explicitly make the 'mi_decls' and a few other fields empty;
 -- as when reading we consolidate the declarations etc. into a number of indexed
 -- maps and environments in the 'ExternalPackageState'.
-data ModIface_ (phase :: ModIfacePhase)
+data ModIface_ (phase :: IfacePhase)
   = ModIface {
         mi_module     :: !Module,             -- ^ Name of the module we are for
         mi_sig_of     :: !(Maybe Module),     -- ^ Are we a sig of another mod?
@@ -3292,7 +3287,7 @@ phaseForeignLanguage phase = case phase of
 
 -- Take care, this instance only forces to the degree necessary to
 -- avoid major space leaks.
-instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
+instance (NFData (IfaceBackendExts (phase :: IfacePhase)), NFData (IfaceDeclExts (phase :: IfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
                 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
