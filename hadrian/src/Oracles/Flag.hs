@@ -21,6 +21,7 @@ data Flag = ArSupportsAtFile
           | LeadingUnderscore
           | SolarisBrokenShld
           | WithLibdw
+          | WithLibnuma
           | HaveLibMingwEx
           | UseSystemFfi
 
@@ -39,6 +40,7 @@ flag f = do
             LeadingUnderscore  -> "leading-underscore"
             SolarisBrokenShld  -> "solaris-broken-shld"
             WithLibdw          -> "with-libdw"
+            WithLibnuma        -> "with-libnuma"
             HaveLibMingwEx     -> "have-lib-mingw-ex"
             UseSystemFfi       -> "use-system-ffi"
     value <- lookupValueOrError configFile key
