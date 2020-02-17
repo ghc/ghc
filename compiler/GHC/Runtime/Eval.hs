@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation,
-    RecordWildCards, BangPatterns #-}
+{-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -51,6 +51,7 @@ import GhcPrelude
 import GHC.Runtime.Eval.Types
 
 import GHC.Runtime.Interpreter as GHCi
+import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Driver.Monad
@@ -278,24 +279,25 @@ withVirtualCWD m = do
 
     -- a virtual CWD is only necessary when we're running interpreted code in
     -- the same process as the compiler.
-  if gopt Opt_ExternalInterpreter (hsc_dflags hsc_env) then m else do
+  case hsc_interp hsc_env of
+    Just (ExternalInterp _) -> m
+    _ -> do
+      let ic = hsc_IC hsc_env
+      let set_cwd = do
+            dir <- liftIO $ getCurrentDirectory
+            case ic_cwd ic of
+               Just dir -> liftIO $ setCurrentDirectory dir
+               Nothing  -> return ()
+            return dir
 
-  let ic = hsc_IC hsc_env
-  let set_cwd = do
-        dir <- liftIO $ getCurrentDirectory
-        case ic_cwd ic of
-           Just dir -> liftIO $ setCurrentDirectory dir
-           Nothing  -> return ()
-        return dir
+          reset_cwd orig_dir = do
+            virt_dir <- liftIO $ getCurrentDirectory
+            hsc_env <- getSession
+            let old_IC = hsc_IC hsc_env
+            setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
+            liftIO $ setCurrentDirectory orig_dir
 
-      reset_cwd orig_dir = do
-        virt_dir <- liftIO $ getCurrentDirectory
-        hsc_env <- getSession
-        let old_IC = hsc_IC hsc_env
-        setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
-        liftIO $ setCurrentDirectory orig_dir
-
-  gbracket set_cwd reset_cwd $ \_ -> m
+      gbracket set_cwd reset_cwd $ \_ -> m
 
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
@@ -1213,8 +1215,9 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
 compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
-   dflags <- getDynFlags
-   liftIO $ wormhole dflags fhv
+   hsc_env <- getSession
+   liftIO $ withInterp hsc_env $ \interp ->
+      wormhole interp fhv
 
 -- | Compile an expression, run it and return the result as a Dynamic.
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
@@ -1249,12 +1252,14 @@ moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
 -- RTTI primitives
 
 obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
-obtainTermFromVal hsc_env bound force ty x
-  | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env)
-  = throwIO (InstallationError
-      "this operation requires -fno-external-interpreter")
-  | otherwise
-  = cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
+#if defined(HAVE_INTERNAL_INTERPRETER)
+obtainTermFromVal hsc_env bound force ty x = withInterp hsc_env $ \case
+  InternalInterp   -> cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
+#else
+obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
+#endif
+  ExternalInterp _ -> throwIO (InstallationError
+                        "this operation requires -fno-external-interpreter")
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do

@@ -299,11 +299,13 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 
 import GHC.Core.Ppr.TyThing  ( pprFamInst )
 import GHC.Driver.Main
 import GHC.Driver.Make
+import GHC.Driver.Hooks
 import GHC.Driver.Pipeline   ( compileOne' )
 import GHC.Driver.Monad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
@@ -373,6 +375,8 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
+import Control.Concurrent
+import Control.Applicative ((<|>))
 
 import Maybes
 import System.IO.Error  ( isDoesNotExistError )
@@ -486,7 +490,7 @@ withCleanupSession ghc = ghc `gfinally` cleanup
       liftIO $ do
           cleanTempFiles dflags
           cleanTempDirs dflags
-          stopIServ hsc_env -- shut down the IServ
+          stopInterp hsc_env -- shut down the IServ
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
@@ -594,8 +598,42 @@ setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags'' <- liftIO $ interpretPackageEnv dflags'
   (dflags''', preload) <- liftIO $ initPackages dflags''
+
+  -- Interpreter
+  interp  <- if gopt Opt_ExternalInterpreter dflags
+    then do
+         let
+           prog = pgm_i dflags ++ flavour
+           flavour
+             | WayProf `elem` ways dflags = "-prof"
+             | WayDyn `elem` ways dflags  = "-dyn"
+             | otherwise                  = ""
+           msg = text "Starting " <> text prog
+         tr <- if verbosity dflags >= 3
+                then return (logInfo dflags (defaultDumpStyle dflags) msg)
+                else return (pure ())
+         let
+          conf = IServConfig
+            { iservConfProgram = prog
+            , iservConfOpts    = getOpts dflags opt_i
+            , iservConfHook    = createIservProcessHook (hooks dflags)
+            , iservConfTrace   = tr
+            }
+         s <- liftIO $ newMVar (IServPending conf)
+         return (Just (ExternalInterp (IServ s)))
+    else
+#if defined(HAVE_INTERNAL_INTERPRETER)
+      return (Just InternalInterp)
+#else
+      return Nothing
+#endif
+
   modifySession $ \h -> h{ hsc_dflags = dflags'''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' } }
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
+                         , hsc_interp = hsc_interp h <|> interp
+                           -- we only update the interpreter if there wasn't
+                           -- already one set up
+                         }
   invalidateModSummaryCache
   return preload
 

@@ -19,6 +19,7 @@ import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
 import GHCi.FFI
 import GHCi.RemoteTypes
 import BasicTypes
@@ -991,9 +992,10 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
   | otherwise
   = do
      dflags <- getDynFlags
+     hsc_env <- getHscEnv
      let
         profiling
-          | gopt Opt_ExternalInterpreter dflags = gopt Opt_SccProfilingOn dflags
+          | Just (ExternalInterp _) <- hsc_interp hsc_env = gopt Opt_SccProfilingOn dflags
           | otherwise = rtsIsProfiled
 
         -- Top of stack is the return itbl, as usual.
