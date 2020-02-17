@@ -3,7 +3,7 @@
 -- ----------------------------------------------------------------------------
 -- | Pretty print helpers for the LLVM Code generator.
 --
-module LlvmCodeGen.Ppr (
+module GHC.CmmToLlvm.Ppr (
         pprLlvmCmmDecl, pprLlvmData, infoSection
     ) where
 
@@ -11,9 +11,9 @@ module LlvmCodeGen.Ppr (
 
 import GhcPrelude
 
-import Llvm
-import LlvmCodeGen.Base
-import LlvmCodeGen.Data
+import GHC.Llvm
+import GHC.CmmToLlvm.Base
+import GHC.CmmToLlvm.Data
 
 import GHC.Cmm.CLabel
 import GHC.Cmm

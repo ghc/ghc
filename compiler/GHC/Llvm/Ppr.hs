@@ -4,7 +4,7 @@
 -- | Pretty print LLVM IR Code.
 --
 
-module Llvm.PpLlvm (
+module GHC.Llvm.Ppr (
 
     -- * Top level LLVM objects.
     ppLlvmModule,
@@ -27,9 +27,9 @@ module Llvm.PpLlvm (
 
 import GhcPrelude
 
-import Llvm.AbsSyn
-import Llvm.MetaData
-import Llvm.Types
+import GHC.Llvm.Syntax
+import GHC.Llvm.MetaData
+import GHC.Llvm.Types
 
 import Data.List ( intersperse )
 import Outputable

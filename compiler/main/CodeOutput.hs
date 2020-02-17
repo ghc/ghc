@@ -13,7 +13,7 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 import GhcPrelude
 
 import AsmCodeGen       ( nativeCodeGen )
-import LlvmCodeGen      ( llvmCodeGen )
+import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import UniqSupply       ( mkSplitUniqSupply )
 
