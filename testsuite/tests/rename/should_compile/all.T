@@ -172,4 +172,5 @@ test('T15957', normal, compile, ['-Werror -Wredundant-record-wildcards -Wunused-
 test('T17244A', normal, compile, ['-Wno-error=compat-unqualified-imports'])
 test('T17244B', normal, compile, [''])
 test('T17244C', normal, compile, [''])
+test('T17832', [], multimod_compile, ['T17832M1', 'T17832M2'])
 test('T17837', normal, compile, [''])

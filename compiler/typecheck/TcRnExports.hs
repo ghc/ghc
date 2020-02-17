@@ -176,9 +176,10 @@ tcRnExports explicit_mod exports
                  Just main_fun
                      | is_main_mod -> mkUnqual varName (fsLit main_fun)
                  _                 -> main_RDR_Unqual
-        ; has_main <- lookupGlobalOccRn_maybe default_main >>= return . isJust
-        -- If the module has no explicit header, and it has a main function,
-        -- then we add a header like "module Main(main) where ..." (#13839)
+        ; has_main <- (not . null) <$> lookupInfoOccRn default_main -- #17832
+        -- If a module has no explicit header, and it has one or more main
+        -- functions in scope, then add a header like
+        -- "module Main(main) where ..."                               #13839
         -- See Note [Modules without a module header]
         ; let real_exports
                  | explicit_mod = exports
@@ -451,12 +452,16 @@ The Haskell 2010 report says in section 5.1:
 For modules without a module header, this is implemented the
 following way:
 
-If the module has a main function:
-   Then create a module header and export the main function.
+If the module has a main function in scope:
+   Then create a module header and export the main function,
+   as if a module header like ‘module Main(main) where...’ would exist.
    This has the effect to mark the main function and all top level
    functions called directly or indirectly via main as 'used',
    and later on, unused top-level functions can be reported correctly.
    There is no distinction between GHC and GHCi.
+If the module has several main functions in scope:
+   Then generate a header as above. The ambiguity is reported later in
+   module  `TcRnDriver.hs` function `check_main`.
 If the module has NO main function:
    Then export all top-level functions. This marks all top level
    functions as 'used'.
