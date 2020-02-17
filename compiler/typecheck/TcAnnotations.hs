@@ -5,7 +5,6 @@
 \section[TcAnnotations]{Typechecking annotations}
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -24,17 +23,17 @@ import Annotations
 import TcRnMonad
 import SrcLoc
 import Outputable
+import GHC.Driver.Types
 
--- Some platforms don't support the external interpreter, and
--- compilation on those platforms shouldn't fail just due to
--- annotations
-#if !defined(HAVE_INTERNAL_INTERPRETER)
+-- Some platforms don't support the interpreter, and compilation on those
+-- platforms shouldn't fail just due to annotations
 tcAnnotations :: [LAnnDecl GhcRn] -> TcM [Annotation]
 tcAnnotations anns = do
-  dflags <- getDynFlags
-  case gopt Opt_ExternalInterpreter dflags of
-    True  -> tcAnnotations' anns
-    False -> warnAnns anns
+  hsc_env <- getTopEnv
+  case hsc_interp hsc_env of
+    Just _  -> mapM tcAnnotation anns
+    Nothing -> warnAnns anns
+
 warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
 --- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
@@ -43,13 +42,6 @@ warnAnns anns@(L loc _ : _)
              (text "Ignoring ANN annotation" <> plural anns <> comma
              <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
        ; return [] }
-#else
-tcAnnotations :: [LAnnDecl GhcRn] -> TcM [Annotation]
-tcAnnotations = tcAnnotations'
-#endif
-
-tcAnnotations' :: [LAnnDecl GhcRn] -> TcM [Annotation]
-tcAnnotations' anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl GhcRn -> TcM Annotation
 tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do

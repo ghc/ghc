@@ -1,4 +1,6 @@
 {-# LANGUAGE RecordWildCards, ScopedTypeVariables, BangPatterns, CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 --
 -- | Interacting with the interpreter, whether it is running on an
@@ -38,7 +40,8 @@ module GHC.Runtime.Interpreter
   , findSystemLibrary
 
   -- * Lower-level API using messages
-  , iservCmd, Message(..), withIServ, stopIServ
+  , iservCmd, Message(..), withIServ, withIServ_
+  , withInterp, stopInterp
   , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
   , freeHValueRefs
@@ -50,6 +53,7 @@ module GHC.Runtime.Interpreter
 
 import GhcPrelude
 
+import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
@@ -62,13 +66,10 @@ import GHC.Driver.Types
 import UniqFM
 import Panic
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
 import Exception
 import BasicTypes
 import FastString
 import Util
-import GHC.Driver.Hooks
 
 import Control.Concurrent
 import Control.Monad
@@ -157,11 +158,6 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
-#if !defined(HAVE_INTERNAL_INTERPRETER)
-needExtInt :: IO a
-needExtInt = throwIO
-  (InstallationError "this operation requires -fexternal-interpreter")
-#endif
 
 -- | Run a command in the interpreter's context.  With
 -- @-fexternal-interpreter@, the command is serialized and sent to an
@@ -169,23 +165,28 @@ needExtInt = throwIO
 -- @Binary@ constraint).  With @-fno-external-interpreter@ we execute
 -- the command directly here.
 iservCmd :: Binary a => HscEnv -> Message a -> IO a
-iservCmd hsc_env@HscEnv{..} msg
- | gopt Opt_ExternalInterpreter hsc_dflags =
-     withIServ hsc_env $ \iserv ->
-       uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
-         iservCall iserv msg
- | otherwise = -- Just run it directly
+iservCmd hsc_env msg = withInterp hsc_env $ \case
 #if defined(HAVE_INTERNAL_INTERPRETER)
-   run msg
-#else
-   needExtInt
+  InternalInterp     -> run msg -- Just run it directly
 #endif
+  (ExternalInterp i) -> withIServ_ i $ \iserv ->
+    uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
+      iservCall iserv msg
+
+
+-- | Execute an action with the interpreter
+--
+-- Fails if no target code interpreter is available
+withInterp :: HscEnv -> (Interp -> IO a) -> IO a
+withInterp hsc_env action = case hsc_interp hsc_env of
+   Nothing -> throwIO (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
+   Just i  -> action i
 
 -- Note [uninterruptibleMask_ and iservCmd]
 --
 -- If we receive an async exception, such as ^C, while communicating
 -- with the iserv process then we will be out-of-sync and not be able
--- to recoever.  Thus we use uninterruptibleMask_ during
+-- to recover.  Thus we use uninterruptibleMask_ during
 -- communication.  A ^C will be delivered to the iserv process (because
 -- signals get sent to the whole process group) which will interrupt
 -- the running computation and return an EvalException result.
@@ -194,24 +195,37 @@ iservCmd hsc_env@HscEnv{..} msg
 -- Overloaded because this is used from TcM as well as IO.
 withIServ
   :: (MonadIO m, ExceptionMonad m)
-  => HscEnv -> (IServ -> m a) -> m a
-withIServ HscEnv{..} action =
+  => IServ -> (IServInstance -> m (IServInstance, a)) -> m a
+withIServ (IServ mIServState) action = do
   gmask $ \restore -> do
-    m <- liftIO $ takeMVar hsc_iserv
-      -- start the iserv process if we haven't done so yet
-    iserv <- maybe (liftIO $ startIServ hsc_dflags) return m
-               `gonException` (liftIO $ putMVar hsc_iserv Nothing)
+    state <- liftIO $ takeMVar mIServState
+
+    iserv <- case state of
+      -- start the external iserv process if we haven't done so yet
+      IServPending conf ->
+         liftIO (spawnIServ conf)
+           `gonException` (liftIO $ putMVar mIServState state)
+
+      IServRunning inst -> return inst
+
+
+    let iserv'  = iserv{ iservPendingFrees = [] }
+
+    (iserv'',a) <- (do
       -- free any ForeignHValues that have been garbage collected.
-    let iserv' = iserv{ iservPendingFrees = [] }
-    a <- (do
       liftIO $ when (not (null (iservPendingFrees iserv))) $
         iservCall iserv (FreeHValueRefs (iservPendingFrees iserv))
-        -- run the inner action
-      restore $ action iserv)
-          `gonException` (liftIO $ putMVar hsc_iserv (Just iserv'))
-    liftIO $ putMVar hsc_iserv (Just iserv')
+      -- run the inner action
+      restore $ action iserv')
+          `gonException` (liftIO $ putMVar mIServState (IServRunning iserv'))
+    liftIO $ putMVar mIServState (IServRunning iserv'')
     return a
 
+withIServ_
+  :: (MonadIO m, ExceptionMonad m)
+  => IServ -> (IServInstance -> m a) -> m a
+withIServ_ iserv action = withIServ iserv $ \inst ->
+   (inst,) <$> action inst
 
 -- -----------------------------------------------------------------------------
 -- Wrappers around messages
@@ -371,41 +385,45 @@ initObjLinker :: HscEnv -> IO ()
 initObjLinker hsc_env = iservCmd hsc_env InitLinker
 
 lookupSymbol :: HscEnv -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbol hsc_env@HscEnv{..} str
- | gopt Opt_ExternalInterpreter hsc_dflags =
-     -- Profiling of GHCi showed a lot of time and allocation spent
-     -- making cross-process LookupSymbol calls, so I added a GHC-side
-     -- cache which sped things up quite a lot.  We have to be careful
-     -- to purge this cache when unloading code though.
-     withIServ hsc_env $ \iserv@IServ{..} -> do
-       cache <- readIORef iservLookupSymbolCache
-       case lookupUFM cache str of
-         Just p -> return (Just p)
-         Nothing -> do
-           m <- uninterruptibleMask_ $
-                    iservCall iserv (LookupSymbol (unpackFS str))
-           case m of
-             Nothing -> return Nothing
-             Just r -> do
-               let p = fromRemotePtr r
-               writeIORef iservLookupSymbolCache $! addToUFM cache str p
-               return (Just p)
- | otherwise =
+lookupSymbol hsc_env str = withInterp hsc_env $ \case
 #if defined(HAVE_INTERNAL_INTERPRETER)
-   fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
-#else
-   needExtInt
+  InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #endif
+
+  ExternalInterp i -> withIServ i $ \iserv -> do
+    -- Profiling of GHCi showed a lot of time and allocation spent
+    -- making cross-process LookupSymbol calls, so I added a GHC-side
+    -- cache which sped things up quite a lot.  We have to be careful
+    -- to purge this cache when unloading code though.
+    let cache = iservLookupSymbolCache iserv
+    case lookupUFM cache str of
+      Just p -> return (iserv, Just p)
+      Nothing -> do
+        m <- uninterruptibleMask_ $
+                 iservCall iserv (LookupSymbol (unpackFS str))
+        case m of
+          Nothing -> return (iserv, Nothing)
+          Just r -> do
+            let p      = fromRemotePtr r
+                cache' = addToUFM cache str p
+                iserv' = iserv {iservLookupSymbolCache = cache'}
+            return (iserv', Just p)
 
 lookupClosure :: HscEnv -> String -> IO (Maybe HValueRef)
 lookupClosure hsc_env str =
   iservCmd hsc_env (LookupClosure str)
 
 purgeLookupSymbolCache :: HscEnv -> IO ()
-purgeLookupSymbolCache hsc_env@HscEnv{..} =
- when (gopt Opt_ExternalInterpreter hsc_dflags) $
-   withIServ hsc_env $ \IServ{..} ->
-     writeIORef iservLookupSymbolCache emptyUFM
+purgeLookupSymbolCache hsc_env = case hsc_interp hsc_env of
+  Nothing             -> pure ()
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  Just InternalInterp -> pure ()
+#endif
+  Just (ExternalInterp (IServ mstate)) ->
+    modifyMVar_ mstate $ \state -> pure $ case state of
+      IServPending {}    -> state
+      IServRunning iserv -> IServRunning
+        (iserv { iservLookupSymbolCache = emptyUFM })
 
 
 -- | loadDLL loads a dynamic library using the OS's native linker
@@ -460,74 +478,70 @@ findSystemLibrary hsc_env str = iservCmd hsc_env (FindSystemLibrary str)
 -- Raw calls and messages
 
 -- | Send a 'Message' and receive the response from the iserv process
-iservCall :: Binary a => IServ -> Message a -> IO a
-iservCall iserv@IServ{..} msg =
-  remoteCall iservPipe msg
+iservCall :: Binary a => IServInstance -> Message a -> IO a
+iservCall iserv msg =
+  remoteCall (iservPipe iserv) msg
     `catch` \(e :: SomeException) -> handleIServFailure iserv e
 
 -- | Read a value from the iserv process
-readIServ :: IServ -> Get a -> IO a
-readIServ iserv@IServ{..} get =
-  readPipe iservPipe get
+readIServ :: IServInstance -> Get a -> IO a
+readIServ iserv get =
+  readPipe (iservPipe iserv) get
     `catch` \(e :: SomeException) -> handleIServFailure iserv e
 
 -- | Send a value to the iserv process
-writeIServ :: IServ -> Put -> IO ()
-writeIServ iserv@IServ{..} put =
-  writePipe iservPipe put
+writeIServ :: IServInstance -> Put -> IO ()
+writeIServ iserv put =
+  writePipe (iservPipe iserv) put
     `catch` \(e :: SomeException) -> handleIServFailure iserv e
 
-handleIServFailure :: IServ -> SomeException -> IO a
-handleIServFailure IServ{..} e = do
-  ex <- getProcessExitCode iservProcess
+handleIServFailure :: IServInstance -> SomeException -> IO a
+handleIServFailure iserv e = do
+  let proc = iservProcess iserv
+  ex <- getProcessExitCode proc
   case ex of
     Just (ExitFailure n) ->
-      throw (InstallationError ("ghc-iserv terminated (" ++ show n ++ ")"))
+      throwIO (InstallationError ("ghc-iserv terminated (" ++ show n ++ ")"))
     _ -> do
-      terminateProcess iservProcess
-      _ <- waitForProcess iservProcess
+      terminateProcess proc
+      _ <- waitForProcess proc
       throw e
 
--- -----------------------------------------------------------------------------
--- Starting and stopping the iserv process
-
-startIServ :: DynFlags -> IO IServ
-startIServ dflags = do
-  let flavour
-        | WayProf `elem` ways dflags = "-prof"
-        | WayDyn `elem` ways dflags = "-dyn"
-        | otherwise = ""
-      prog = pgm_i dflags ++ flavour
-      opts = getOpts dflags opt_i
-  debugTraceMsg dflags 3 $ text "Starting " <> text prog
-  let createProc = lookupHook createIservProcessHook
-                              (\cp -> do { (_,_,_,ph) <- createProcess cp
-                                         ; return ph })
-                              dflags
-  (ph, rh, wh) <- runWithPipes createProc prog opts
+-- | Spawn an external interpreter
+spawnIServ :: IServConfig -> IO IServInstance
+spawnIServ conf = do
+  iservConfTrace conf
+  let createProc = fromMaybe (\cp -> do { (_,_,_,ph) <- createProcess cp
+                                        ; return ph })
+                             (iservConfHook conf)
+  (ph, rh, wh) <- runWithPipes createProc (iservConfProgram conf)
+                                          (iservConfOpts    conf)
   lo_ref <- newIORef Nothing
-  cache_ref <- newIORef emptyUFM
-  return $ IServ
-    { iservPipe = Pipe { pipeRead = rh
-                       , pipeWrite = wh
-                       , pipeLeftovers = lo_ref }
-    , iservProcess = ph
-    , iservLookupSymbolCache = cache_ref
-    , iservPendingFrees = []
+  return $ IServInstance
+    { iservPipe              = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
+    , iservProcess           = ph
+    , iservLookupSymbolCache = emptyUFM
+    , iservPendingFrees      = []
+    , iservConfig            = conf
     }
 
-stopIServ :: HscEnv -> IO ()
-stopIServ HscEnv{..} =
-  gmask $ \_restore -> do
-    m <- takeMVar hsc_iserv
-    maybe (return ()) stop m
-    putMVar hsc_iserv Nothing
- where
-  stop iserv = do
-    ex <- getProcessExitCode (iservProcess iserv)
-    if isJust ex
-       then return ()
-       else iservCall iserv Shutdown
+-- | Stop the interpreter
+stopInterp :: HscEnv -> IO ()
+stopInterp hsc_env = case hsc_interp hsc_env of
+  Nothing             -> pure ()
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  Just InternalInterp -> pure ()
+#endif
+  Just (ExternalInterp (IServ mstate)) ->
+    gmask $ \_restore -> modifyMVar_ mstate $ \state -> do
+      case state of
+        IServPending {} -> pure state -- already stopped
+        IServRunning i  -> do
+          ex <- getProcessExitCode (iservProcess i)
+          if isJust ex
+             then pure ()
+             else iservCall i Shutdown
+          pure (IServPending (iservConfig i))
 
 runWithPipes :: (CreateProcess -> IO ProcessHandle)
              -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
@@ -609,20 +623,23 @@ principle it would probably be ok, but it seems less hairy this way.
 -- | Creates a 'ForeignRef' that will automatically release the
 -- 'RemoteRef' when it is no longer referenced.
 mkFinalizedHValue :: HscEnv -> RemoteRef a -> IO (ForeignRef a)
-mkFinalizedHValue HscEnv{..} rref = mkForeignRef rref free
- where
-  !external = gopt Opt_ExternalInterpreter hsc_dflags
-  hvref = toHValueRef rref
+mkFinalizedHValue hsc_env rref = do
+   let hvref = toHValueRef rref
 
-  free :: IO ()
-  free
-    | not external = freeRemoteRef hvref
-    | otherwise =
-      modifyMVar_ hsc_iserv $ \mb_iserv ->
-        case mb_iserv of
-          Nothing -> return Nothing -- already shut down
-          Just iserv@IServ{..} ->
-            return (Just iserv{iservPendingFrees = hvref : iservPendingFrees})
+   free <- case hsc_interp hsc_env of
+     Nothing                         -> return (pure ())
+#if defined(HAVE_INTERNAL_INTERPRETER)
+     Just InternalInterp             -> return (freeRemoteRef hvref)
+#endif
+     Just (ExternalInterp (IServ i)) -> return $ modifyMVar_ i $ \state ->
+       case state of
+         IServPending {}   -> pure state -- already shut down
+         IServRunning inst -> do
+            let !inst' = inst {iservPendingFrees = hvref:iservPendingFrees inst}
+            pure (IServRunning inst')
+
+   mkForeignRef rref free
+
 
 freeHValueRefs :: HscEnv -> [HValueRef] -> IO ()
 freeHValueRefs _ [] = return ()
@@ -631,25 +648,19 @@ freeHValueRefs hsc_env refs = iservCmd hsc_env (FreeHValueRefs refs)
 -- | Convert a 'ForeignRef' to the value it references directly.  This
 -- only works when the interpreter is running in the same process as
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
-wormhole :: DynFlags -> ForeignRef a -> IO a
-wormhole dflags r = wormholeRef dflags (unsafeForeignRefToRemoteRef r)
+wormhole :: Interp -> ForeignRef a -> IO a
+wormhole interp r = wormholeRef interp (unsafeForeignRefToRemoteRef r)
 
 -- | Convert an 'RemoteRef' to the value it references directly.  This
 -- only works when the interpreter is running in the same process as
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
-wormholeRef :: DynFlags -> RemoteRef a -> IO a
-wormholeRef dflags _r
-  | gopt Opt_ExternalInterpreter dflags
+wormholeRef :: Interp -> RemoteRef a -> IO a
+#if defined(HAVE_INTERNAL_INTERPRETER)
+wormholeRef InternalInterp     _r = localRef _r
+#endif
+wormholeRef (ExternalInterp _) _r
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  | otherwise
-  = localRef _r
-#else
-  | otherwise
-  = throwIO (InstallationError
-      "can't wormhole a value in a stage1 compiler")
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
