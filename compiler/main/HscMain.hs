@@ -770,14 +770,13 @@ hscIncrementalCompileFrontend always_do_basic_recompilation_check m_tc_result
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
+        --
+        -- We generate a simple interface for sake of downstream typechecking.
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
           (iface, mb_old_iface_hash, details) <- liftIO $
             hscSimpleIface hsc_env tc_result mb_old_hash
 
-          -- We generate a simple interface for sake of downstream typechecking if
-          -- it wouldn't be made already in the next step
-          when (ms_hsc_src mod_summary /= HsSrcFile || ms_mod mod_summary == gHC_PRIM) $ do
-            liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location mod_summary)
+          liftIO $ hscMaybeWriteIfaceTc dflags iface mb_old_iface_hash (ms_location mod_summary)
 
           let status = case ms_hsc_src mod_summary of
                 HsBootFile -> HscFrontendStatus_UpdateBoot iface details
@@ -877,6 +876,18 @@ hscMaybeWriteIface dflags iface old_iface location = do
 
     when (write_interface || force_write_interface) $
           hscWriteIface dflags iface no_change location
+
+hscMaybeWriteIfaceTc :: DynFlags -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIfaceTc dflags iface old_iface location = do
+    let force_write_interface = gopt Opt_WriteHiTc dflags
+        write_interface = case hscTarget dflags of
+                            HscNothing      -> False
+                            HscInterpreted  -> False
+                            _               -> True
+        no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
+
+    when (write_interface || force_write_interface) $
+          hscWriteIfaceTc dflags iface no_change location
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1400,6 +1411,33 @@ hscWriteIface dflags iface no_change mod_location = do
       = let with_hi = replaceExtension baseName suffix
         in  addBootSuffix_maybe (mi_boot iface) with_hi
 
+hscWriteIfaceTc :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
+hscWriteIfaceTc dflags iface no_change mod_location = do
+    -- mod_location only contains the base name, so we rebuild the
+    -- correct file extension from the dynflags.
+    let ifaceBaseFile = ml_hi_tc_file mod_location
+    unless no_change $
+        let ifaceFile = buildIfName ifaceBaseFile (hiTcSuf dflags)
+        in  {-# SCC "writeIface" #-}
+            writeIfaceFile dflags ifaceFile iface
+    whenGeneratingDynamicToo dflags $ do
+        -- TODO: We should do a no_change check for the dynamic
+        --       interface file too
+        -- When we generate iface files after core
+        let dynDflags = dynamicTooMkDynamicDynFlags dflags
+            -- dynDflags will have set hiSuf correctly.
+            dynIfaceFile = buildIfName ifaceBaseFile (hiTcSuf dynDflags)
+
+        writeIfaceFile dynDflags dynIfaceFile iface
+  where
+    buildIfName :: String -> String -> String
+    buildIfName baseName suffix
+      | Just name <- outputHiTc dflags
+      = name
+      | otherwise
+      = let with_hi_tc = replaceExtension baseName suffix
+        in  addBootSuffix_maybe (mi_boot iface) with_hi_tc
+
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], NameSet)
@@ -1532,6 +1570,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
+                          ml_hi_tc_file = panic "hscCompileCmmFile: no hi-tc file",
                           ml_obj_file = panic "hscCompileCmmFile: no obj file",
                           ml_hie_file = panic "hscCompileCmmFile: no hie file"}
 
@@ -1724,6 +1763,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     -- We use a basically null location for iNTERACTIVE
     let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
                                       ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
+                                      ml_hi_tc_file = panic "hsDeclsWithLocation:ml_hi_tc_file",
                                       ml_obj_file  = panic "hsDeclsWithLocation:ml_obj_file",
                                       ml_hie_file  = panic "hsDeclsWithLocation:ml_hie_file" }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv

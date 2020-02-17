@@ -482,14 +482,18 @@ mkHomeModLocation2 :: DynFlags
 mkHomeModLocation2 dflags mod src_basename ext = do
    let mod_basename = moduleNameSlashes mod
 
-       obj_fn = mkObjPath  dflags src_basename mod_basename
-       hi_fn  = mkHiPath   dflags src_basename mod_basename
-       hie_fn = mkHiePath  dflags src_basename mod_basename
+       obj_fn   = mkObjPath  dflags src_basename mod_basename
+       hi_fn    = mkHiPath   dflags src_basename mod_basename
+       hi_tc_fn = mkHiTcPath dflags src_basename mod_basename
+       hie_fn   = mkHiePath  dflags src_basename mod_basename
 
-   return (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
-                        ml_hi_file   = hi_fn,
-                        ml_obj_file  = obj_fn,
-                        ml_hie_file  = hie_fn })
+   return $ ModLocation
+     { ml_hs_file    = Just (src_basename <.> ext)
+     , ml_hi_file    = hi_fn
+     , ml_hi_tc_file = hi_tc_fn
+     , ml_obj_file   = obj_fn
+     , ml_hie_file   = hie_fn
+     }
 
 mkHomeModHiOnlyLocation :: DynFlags
                         -> ModuleName
@@ -504,17 +508,18 @@ mkHiOnlyModLocation :: DynFlags -> Suffix -> FilePath -> String
                     -> IO ModLocation
 mkHiOnlyModLocation dflags hisuf path basename
  = do let full_basename = path </> basename
-          obj_fn = mkObjPath  dflags full_basename basename
-          hie_fn = mkHiePath  dflags full_basename basename
-      return ModLocation{    ml_hs_file   = Nothing,
-                             ml_hi_file   = full_basename <.> hisuf,
-                                -- Remove the .hi-boot suffix from
-                                -- hi_file, if it had one.  We always
-                                -- want the name of the real .hi file
-                                -- in the ml_hi_file field.
-                             ml_obj_file  = obj_fn,
-                             ml_hie_file  = hie_fn
-                  }
+          obj_fn   = mkObjPath  dflags full_basename basename
+          hi_tc_fn = mkHiTcPath dflags full_basename basename
+          hie_fn   = mkHiePath  dflags full_basename basename
+      return $ ModLocation
+        { ml_hs_file    = Nothing
+        , ml_hi_file    = full_basename <.> hisuf
+        , ml_hi_tc_file = hi_tc_fn
+          -- Remove the .hi-boot suffix from hi_file, if it had one. We always
+          -- want the name of the real .hi file in the ml_hi_file field.
+        , ml_obj_file   = obj_fn
+        , ml_hie_file   = hie_fn
+        }
 
 -- | Constructs the filename of a .o file for a given source file.
 -- Does /not/ check whether the .o file exists
@@ -546,6 +551,21 @@ mkHiPath dflags basename mod_basename = hi_basename <.> hisuf
 
                 hi_basename | Just dir <- hidir = dir </> mod_basename
                             | otherwise         = basename
+
+-- | Constructs the filename of a .hiTc file for a given source file.
+-- Does /not/ check whether the .hiTc file exists
+mkHiTcPath
+  :: DynFlags
+  -> FilePath           -- the filename of the source file, minus the extension
+  -> String             -- the module name with dots replaced by slashes
+  -> FilePath
+mkHiTcPath dflags basename mod_basename = hiTc_basename <.> hiTc_suf
+ where
+                hiTc_dir = hiTcDir dflags
+                hiTc_suf = hiTcSuf dflags
+
+                hiTc_basename | Just dir <- hiTc_dir = dir </> mod_basename
+                              | otherwise            = basename
 
 -- | Constructs the filename of a .hie file for a given source file.
 -- Does /not/ check whether the .hie file exists
