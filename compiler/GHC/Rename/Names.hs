@@ -34,7 +34,7 @@ module GHC.Rename.Names (
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import TyCoPpr
 import GHC.Hs
 import TcEnv
@@ -50,7 +50,7 @@ import NameEnv
 import NameSet
 import Avail
 import FieldLabel
-import HscTypes
+import GHC.Driver.Types
 import RdrName
 import RdrHsSyn        ( setRdrNameSpace )
 import Outputable
@@ -86,7 +86,7 @@ import System.IO
 Note [Tracking Trust Transitively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we import a package as well as checking that the direct imports are safe
-according to the rules outlined in the Note [HscMain . Safe Haskell Trust Check]
+according to the rules outlined in the Note [Safe Haskell Trust Check] in GHC.Driver.Main
 we must also check that these rules hold transitively for all dependent modules
 and packages. Doing this without caching any trust information would be very
 slow as we would need to touch all packages and interface files a module depends
@@ -111,7 +111,7 @@ the plusImportAvails function that is a union operation for the ImportAvails
 type. This gives us in an ImportAvails structure all packages required to be
 trusted for the module we are currently compiling. Checking that these packages
 are still trusted (and that direct imports are trusted) is done in
-HscMain.checkSafeImports.
+GHC.Driver.Main.checkSafeImports.
 
 See the note below, [Trust Own Package] for a corner case in this method and
 how its handled.
@@ -543,7 +543,7 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also: Note [Interactively-bound Ids in GHCi] in HscTypes
+See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
           Note [Looking up Exact RdrNames] in GHC.Rename.Env
 
 Consider a Template Haskell declaration quotation like this:

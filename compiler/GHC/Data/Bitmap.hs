@@ -18,7 +18,7 @@ module GHC.Data.Bitmap (
 import GhcPrelude
 
 import GHC.Runtime.Heap.Layout
-import DynFlags
+import GHC.Driver.Session
 import Util
 
 import Data.Bits

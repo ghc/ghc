@@ -15,8 +15,8 @@ module SysTools.ExtraObj (
 
 import AsmUtils
 import ErrUtils
-import DynFlags
-import Packages
+import GHC.Driver.Session
+import GHC.Driver.Packages
 import GHC.Platform
 import Outputable
 import SrcLoc           ( noSrcSpan )

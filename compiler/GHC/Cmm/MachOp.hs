@@ -32,7 +32,7 @@ import GhcPrelude
 
 import GHC.Cmm.Type
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 
 -----------------------------------------------------------------------------
 --              MachOp

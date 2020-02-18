@@ -12,7 +12,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm (Convention(..))
 import GHC.Cmm.Ppr () -- For Outputable instances
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform
 import Outputable
 

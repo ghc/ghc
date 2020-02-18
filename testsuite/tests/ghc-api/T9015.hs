@@ -1,9 +1,9 @@
 module Main where
 
 import GHC
-import DynFlags
+import GHC.Driver.Session
 import System.Environment
-import GhcMonad
+import GHC.Driver.Monad
 
 testStrings = [
     "import Data.Maybe"

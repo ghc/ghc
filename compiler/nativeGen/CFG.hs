@@ -78,7 +78,7 @@ import Outputable
 --import OrdList
 --import GHC.Cmm.DebugBlock.Trace
 import GHC.Cmm.Ppr () -- For Outputable instances
-import qualified DynFlags as D
+import qualified GHC.Driver.Session as D
 
 import Data.List (sort, nub, partition)
 import Data.STRef.Strict

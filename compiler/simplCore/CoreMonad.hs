@@ -52,9 +52,9 @@ module CoreMonad (
 import GhcPrelude hiding ( read )
 
 import CoreSyn
-import HscTypes
+import GHC.Driver.Types
 import Module
-import DynFlags
+import GHC.Driver.Session
 import BasicTypes       ( CompilerPhase(..) )
 import Annotations
 

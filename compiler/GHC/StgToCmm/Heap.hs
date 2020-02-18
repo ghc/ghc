@@ -45,7 +45,7 @@ import CostCentre
 import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Id ( Id )
 import Module
-import DynFlags
+import GHC.Driver.Session
 import FastString( mkFastString, fsLit )
 import Panic( sorry )
 

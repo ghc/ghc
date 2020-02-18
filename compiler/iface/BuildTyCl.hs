@@ -38,7 +38,7 @@ import Id
 import TcType
 
 import SrcLoc( SrcSpan, noSrcSpan )
-import DynFlags
+import GHC.Driver.Session
 import TcRnMonad
 import UniqSupply
 import Util

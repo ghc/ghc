@@ -96,8 +96,8 @@ import Name
 import NameSet
 import NameEnv
 import VarEnv
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import SrcLoc
 import BasicTypes hiding( SuccessFlag(..) )
 import Module

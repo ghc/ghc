@@ -11,7 +11,7 @@
 -- by --make and GHCi.
 --
 -- -----------------------------------------------------------------------------
-module GhcMake(
+module GHC.Driver.Make (
         depanal, depanalE, depanalPartial,
         load, load', LoadHowMuch(..),
 
@@ -37,18 +37,18 @@ import GhcPrelude
 
 import qualified GHC.Runtime.Linker as Linker
 
-import DriverPhases
-import DriverPipeline
-import DynFlags
+import GHC.Driver.Phases
+import GHC.Driver.Pipeline
+import GHC.Driver.Session
 import ErrUtils
-import Finder
-import GhcMonad
+import GHC.Driver.Finder
+import GHC.Driver.Monad
 import HeaderInfo
-import HscTypes
+import GHC.Driver.Types
 import Module
 import GHC.IfaceToCore  ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
-import HscMain
+import GHC.Driver.Main
 
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import BasicTypes
@@ -65,7 +65,7 @@ import StringBuffer
 import UniqFM
 import UniqDSet
 import TcBackpack
-import Packages
+import GHC.Driver.Packages
 import UniqSet
 import Util
 import qualified GHC.LanguageExtensions as LangExt
@@ -675,7 +675,7 @@ guessOutputFile = modifySession $ \env ->
 #if defined(mingw32_HOST_OS)
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
-          -- not be added by DriverPipeline.exeFileName.  See #2248
+          -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
           name' <- fmap (<.> "exe") name
 #else
           name' <- name
@@ -808,7 +808,7 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
 
     - Note that even if an object is stable, we may end up recompiling
       if the interface is out of date because an *external* interface
-      has changed.  The current code in GhcMake handles this case
+      has changed.  The current code in GHC.Driver.Make handles this case
       fairly poorly, so be careful.
 -}
 

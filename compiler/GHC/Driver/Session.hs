@@ -19,7 +19,7 @@
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module DynFlags (
+module GHC.Driver.Session (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
@@ -252,15 +252,15 @@ import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
-import {-# SOURCE #-} Plugins
-import {-# SOURCE #-} Hooks
+import {-# SOURCE #-} GHC.Driver.Plugins
+import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState, PackageDatabase)
-import DriverPhases     ( Phase(..), phaseInputExt )
+import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase)
+import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import Config
 import CliOption
-import CmdLineParser hiding (WarnReason(..))
-import qualified CmdLineParser as Cmd
+import GHC.Driver.CmdLine hiding (WarnReason(..))
+import qualified GHC.Driver.CmdLine as Cmd
 import Constants
 import GhcNameVersion
 import Panic
@@ -1073,11 +1073,11 @@ data DynFlags = DynFlags {
   outputHi              :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
-  -- | This is set by 'DriverPipeline.runPipeline' based on where
+  -- | This is set by 'GHC.Driver.Pipeline.runPipeline' based on where
   --    its output is going.
   dumpPrefix            :: Maybe FilePath,
 
-  -- | Override the 'dumpPrefix' set by 'DriverPipeline.runPipeline'.
+  -- | Override the 'dumpPrefix' set by 'GHC.Driver.Pipeline.runPipeline'.
   --    Set by @-ddump-file-prefix@
   dumpPrefixForce       :: Maybe FilePath,
 
@@ -2897,7 +2897,7 @@ safeFlagCheck cmdl dflags =
                     "-fpackage-trust ignored;" ++
                     " must be specified with a Safe Haskell flag"]
 
-    -- Have we inferred Unsafe? See Note [HscMain . Safe Haskell Inference]
+    -- Have we inferred Unsafe? See Note [GHC.Driver.Main . Safe Haskell Inference]
     safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
 
 

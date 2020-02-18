@@ -87,7 +87,7 @@ import TyCon
 import Unique
 import Outputable
 import TysPrim
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Maybes
 import ListSetOps       ( minusList )

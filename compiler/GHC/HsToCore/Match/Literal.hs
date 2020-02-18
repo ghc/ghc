@@ -50,7 +50,7 @@ import SrcLoc
 import Data.Ratio
 import Outputable
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import Util
 import FastString
 import qualified GHC.LanguageExtensions as LangExt

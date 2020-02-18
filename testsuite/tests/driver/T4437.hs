@@ -8,7 +8,7 @@ module Main (main) where
 
 import Control.Monad
 import Data.List ( (\\) )
-import DynFlags
+import GHC.Driver.Session
 import Language.Haskell.Extension
 
 main :: IO ()

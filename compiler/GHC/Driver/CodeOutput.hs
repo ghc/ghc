@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module CodeOutput( codeOutput, outputForeignStubs ) where
+module GHC.Driver.CodeOutput ( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
 
@@ -17,13 +17,13 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import UniqSupply       ( mkSplitUniqSupply )
 
-import Finder           ( mkStubPaths )
-import GHC.CmmToC             ( writeC )
-import GHC.Cmm.Lint          ( cmmLint )
-import Packages
+import GHC.Driver.Finder    ( mkStubPaths )
+import GHC.CmmToC           ( writeC )
+import GHC.Cmm.Lint         ( cmmLint )
+import GHC.Driver.Packages
 import GHC.Cmm              ( RawCmmGroup )
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import Stream           ( Stream )
 import qualified Stream
 import FileCleanup

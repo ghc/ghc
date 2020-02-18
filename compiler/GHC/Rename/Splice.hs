@@ -40,11 +40,11 @@ import {-# SOURCE #-} GHC.Rename.Expr   ( rnLExpr )
 import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
 import TcEnv            ( tcMetaTy )
-import Hooks
+import GHC.Driver.Hooks
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 

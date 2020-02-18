@@ -11,8 +11,8 @@ module FlagChecker (
 import GhcPrelude
 
 import Binary
-import DynFlags
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Types
 import Module
 import Name
 import Fingerprint

@@ -4,8 +4,8 @@
 -- kinds of parse errors occur in modules.
 
 import GHC
-import GhcMake
-import DynFlags
+import GHC.Driver.Make
+import GHC.Driver.Session
 import Outputable
 import Exception (ExceptionMonad, ghandle)
 import Bag

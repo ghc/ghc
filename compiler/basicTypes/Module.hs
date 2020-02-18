@@ -169,8 +169,8 @@ import qualified Data.Set as Set
 import qualified FiniteMap as Map
 import System.FilePath
 
-import {-# SOURCE #-} DynFlags (DynFlags)
-import {-# SOURCE #-} Packages (componentIdString, improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId)
+import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
+import {-# SOURCE #-} GHC.Driver.Packages (componentIdString, improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -53,10 +53,10 @@ import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
 import GHCi.Message
 import GHCi.RemoteTypes
-import GhcMonad
-import HscMain
+import GHC.Driver.Monad
+import GHC.Driver.Main
 import GHC.Hs
-import HscTypes
+import GHC.Driver.Types
 import InstEnv
 import GHC.Iface.Env   ( newInteractiveBinder )
 import FamInstEnv      ( FamInst )
@@ -77,7 +77,7 @@ import RdrName
 import VarEnv
 import GHC.ByteCode.Types
 import GHC.Runtime.Linker as Linker
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import UniqSupply
 import MonadUtils

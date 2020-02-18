@@ -48,10 +48,10 @@ import qualified Prelude
 import GHC.Hs
 
 -- compiler/main
-import DriverPhases     ( HscSource(..) )
-import HscTypes         ( IsBootInterface, WarningTxt(..) )
-import DynFlags
-import BkpSyn
+import GHC.Driver.Phases     ( HscSource(..) )
+import GHC.Driver.Types         ( IsBootInterface, WarningTxt(..) )
+import GHC.Driver.Session
+import GHC.Driver.Backpack.Syntax
 import UnitInfo
 
 -- compiler/utils

@@ -23,7 +23,7 @@ module HeaderInfo ( getImports
 import GhcPrelude
 
 import GHC.Platform
-import HscTypes
+import GHC.Driver.Types
 import Parser           ( parseHeader )
 import Lexer
 import FastString
@@ -32,7 +32,7 @@ import Module
 import PrelNames
 import StringBuffer
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import Util
 import Outputable

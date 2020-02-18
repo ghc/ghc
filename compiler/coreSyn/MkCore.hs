@@ -62,7 +62,7 @@ import Var      ( EvVar, setTyVarUnique )
 import CoreSyn
 import CoreUtils        ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
 import Literal
-import HscTypes
+import GHC.Driver.Types
 
 import TysWiredIn
 import PrelNames
@@ -81,7 +81,7 @@ import FastString
 import UniqSupply
 import BasicTypes
 import Util
-import DynFlags
+import GHC.Driver.Session
 import Data.List
 
 import Data.Char        ( ord )

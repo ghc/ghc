@@ -30,10 +30,10 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 
-import HscTypes
+import GHC.Driver.Types
 import CostCentre
 import Id
 import IdInfo

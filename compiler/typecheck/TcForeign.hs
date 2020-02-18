@@ -55,12 +55,12 @@ import DataCon
 import TyCon
 import TcType
 import PrelNames
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import SrcLoc
 import Bag
-import Hooks
+import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

@@ -36,7 +36,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
 import GHC.Rename.Env

@@ -160,7 +160,6 @@ Library
 
     hs-source-dirs:
         .
-        backpack
         basicTypes
         cmm
         coreSyn
@@ -189,9 +188,9 @@ Library
         GHC.Iface.Ext.Ast
         Ar
         FileCleanup
-        DriverBkp
-        BkpSyn
-        NameShape
+        GHC.Driver.Backpack
+        GHC.Driver.Backpack.Syntax
+        GHC.Types.Name.Shape
         GHC.Iface.Rename
         Avail
         AsmUtils
@@ -204,8 +203,8 @@ Library
         GHC.Cmm.DebugBlock
         Exception
         FieldLabel
-        GhcMonad
-        Hooks
+        GHC.Driver.Monad
+        GHC.Driver.Hooks
         Id
         IdInfo
         Predicate
@@ -363,32 +362,32 @@ Library
         GHC.IfaceToCore
         FlagChecker
         Annotations
-        CmdLineParser
-        CodeOutput
+        GHC.Driver.CmdLine
+        GHC.Driver.CodeOutput
         Config
         Constants
-        DriverMkDepend
-        DriverPhases
-        PipelineMonad
-        DriverPipeline
-        DynFlags
+        GHC.Driver.MakeFile
+        GHC.Driver.Phases
+        GHC.Driver.Pipeline.Monad
+        GHC.Driver.Pipeline
+        GHC.Driver.Session
         ErrUtils
-        Finder
+        GHC.Driver.Finder
         GHC
-        GhcMake
-        GhcPlugins
+        GHC.Driver.Make
+        GHC.Plugins
         GhcPrelude
         HeaderInfo
-        HscMain
+        GHC.Driver.Main
         HscStats
-        HscTypes
+        GHC.Driver.Types
         GHC.Runtime.Eval
         GHC.Runtime.Eval.Types
         GHC.Runtime.Loader
         UnitInfo
-        Packages
+        GHC.Driver.Packages
         PlatformConstants
-        Plugins
+        GHC.Driver.Plugins
         TcPluginM
         PprTyThing
         Settings

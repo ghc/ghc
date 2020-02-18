@@ -63,8 +63,8 @@ import GHC.Rename.Expr
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn )
 import TysWiredIn ( unitTy, mkListTy )
-import Plugins
-import DynFlags
+import GHC.Driver.Plugins
+import GHC.Driver.Session
 import GHC.Hs
 import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
 import GHC.Iface.Type   ( ShowForAllFlag(..) )
@@ -118,7 +118,7 @@ import NameSet
 import Avail
 import TyCon
 import SrcLoc
-import HscTypes
+import GHC.Driver.Types
 import ListSetOps
 import Outputable
 import ConLike
@@ -1983,7 +1983,7 @@ tcRnStmt hsc_env rdr_stmt
     traceTc "tcs 1" empty ;
     this_mod <- getModule ;
     global_ids <- mapM (externaliseAndTidyId this_mod) zonked_ids ;
-        -- Note [Interactively-bound Ids in GHCi] in HscTypes
+        -- Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
 
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
@@ -2054,7 +2054,7 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 --
 -- By 'lift' and 'environment we mean that the code is changed to
 -- execute properly in an IO monad. See Note [Interactively-bound Ids
--- in GHCi] in HscTypes for more details. We do this lifting by trying
+-- in GHCi] in GHC.Driver.Types for more details. We do this lifting by trying
 -- different ways ('plans') of lifting the code into the IO monad and
 -- type checking each plan until one succeeds.
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)

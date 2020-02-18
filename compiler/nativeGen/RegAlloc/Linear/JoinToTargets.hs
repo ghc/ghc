@@ -22,7 +22,7 @@ import Reg
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import Digraph
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Unique
 import UniqFM

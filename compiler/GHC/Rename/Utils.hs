@@ -37,7 +37,7 @@ import GhcPrelude
 
 import GHC.Hs
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import TcEnv
 import TcRnMonad
 import Name
@@ -49,7 +49,7 @@ import Outputable
 import Util
 import BasicTypes       ( TopLevelFlag(..) )
 import ListSetOps       ( removeDups )
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Control.Monad
 import Data.List

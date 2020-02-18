@@ -23,7 +23,7 @@ import Format
 import Reg
 
 import GHC.Platform.Regs
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Platform

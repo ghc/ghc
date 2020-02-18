@@ -75,7 +75,7 @@ import Module
 
 import Outputable
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 
 

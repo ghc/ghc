@@ -26,7 +26,7 @@ import GhcPrelude
 
 import BasicTypes
 import CostCentre ( isCurrentCCS, dontCareCCS )
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Id
 import Name
