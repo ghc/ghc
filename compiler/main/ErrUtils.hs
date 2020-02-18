@@ -83,7 +83,7 @@ import Data.List
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Maybe       ( fromMaybe )
-import Data.Ord
+import Data.Function
 import Data.Time
 import Debug.Trace
 import Control.Monad
@@ -408,12 +408,10 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
     mkLocMessage sev s (formatErrDoc dflags doc)
 
 sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
-sortMsgBag dflags = maybeLimit . sortBy (maybeFlip cmp) . bagToList
-  where maybeFlip :: (a -> a -> b) -> (a -> a -> b)
-        maybeFlip
-          | fromMaybe False (fmap reverseErrors dflags) = flip
-          | otherwise                                   = id
-        cmp = comparing errMsgSpan
+sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
+  where cmp
+          | fromMaybe False (fmap reverseErrors dflags) = SrcLoc.rightmost_smallest
+          | otherwise                                   = SrcLoc.leftmost_smallest
         maybeLimit = case join (fmap maxErrors dflags) of
           Nothing        -> id
           Just err_limit -> take err_limit

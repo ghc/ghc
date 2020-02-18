@@ -310,10 +310,13 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- We want to keep only one for each original module; preferably one with an
   -- explicit import list (for no particularly good reason)
   pick :: [ImportedModsVal] -> Maybe ImportedModsVal
-  pick = listToMaybe . sortBy (compare `on` prefer) . filter select
+  pick = listToMaybe . sortBy cmp . filter select
     where select imv = case mod_name of Just name -> imv_name imv == name
                                         Nothing   -> not (imv_qualified imv)
-          prefer imv = (imv_is_hiding imv, imv_span imv)
+          cmp a b =
+            (compare `on` imv_is_hiding) a b
+              `thenCmp`
+            (SrcLoc.leftmost_smallest `on` imv_span) a b
 
   -- Which of these would export a 'foo'
   -- (all of these are restricted imports, because if they were not, we

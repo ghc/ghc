@@ -82,8 +82,10 @@ module SrcLoc (
 
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
-        leftmost_smallest, leftmost_largest, rightmost,
+        leftmost_smallest, leftmost_largest, rightmost_smallest,
         spans, isSubspanOf, isRealSubspanOf, sortLocated,
+        sortRealLocated,
+        lookupSrcLoc, lookupSrcSpan,
 
         liftL
     ) where
@@ -99,7 +101,8 @@ import Control.DeepSeq
 import Data.Bits
 import Data.Data
 import Data.List (sortBy, intercalate)
-import Data.Ord
+import Data.Function (on)
+import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -125,7 +128,7 @@ data RealSrcLoc
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString     -- Just a general indication
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show)
 
 {-
 ************************************************************************
@@ -180,8 +183,19 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 ************************************************************************
 -}
 
-sortLocated :: Ord l => [GenLocated l a] -> [GenLocated l a]
-sortLocated things = sortBy (comparing getLoc) things
+sortLocated :: [Located a] -> [Located a]
+sortLocated = sortBy (leftmost_smallest `on` getLoc)
+
+sortRealLocated :: [RealLocated a] -> [RealLocated a]
+sortRealLocated = sortBy (compare `on` getLoc)
+
+lookupSrcLoc :: SrcLoc -> Map.Map RealSrcLoc a -> Maybe a
+lookupSrcLoc (RealSrcLoc l) = Map.lookup l
+lookupSrcLoc (UnhelpfulLoc _) = const Nothing
+
+lookupSrcSpan :: SrcSpan -> Map.Map RealSrcSpan a -> Maybe a
+lookupSrcSpan (RealSrcSpan l) = Map.lookup l
+lookupSrcSpan (UnhelpfulSpan _) = const Nothing
 
 instance Outputable RealSrcLoc where
     ppr (SrcLoc src_path src_line src_col)
@@ -254,8 +268,8 @@ data SrcSpan =
   | UnhelpfulSpan !FastString   -- Just a general indication
                                 -- also used to indicate an empty span
 
-  deriving (Eq, Ord, Show) -- Show is used by Lexer.x, because we
-                           -- derive Show for Token
+  deriving (Eq, Show) -- Show is used by Lexer.x, because we
+                      -- derive Show for Token
 
 instance ToJson SrcSpan where
   json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
@@ -578,13 +592,20 @@ instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
 ************************************************************************
 -}
 
--- | Alternative strategies for ordering 'SrcSpan's
-leftmost_smallest, leftmost_largest, rightmost :: SrcSpan -> SrcSpan -> Ordering
-rightmost            = flip compare
-leftmost_smallest    = compare
-leftmost_largest a b = (srcSpanStart a `compare` srcSpanStart b)
-                                `thenCmp`
-                       (srcSpanEnd b `compare` srcSpanEnd a)
+-- | Strategies for ordering 'SrcSpan's
+leftmost_smallest, leftmost_largest, rightmost_smallest :: SrcSpan -> SrcSpan -> Ordering
+rightmost_smallest = compareSrcSpanBy (flip compare)
+leftmost_smallest = compareSrcSpanBy compare
+leftmost_largest = compareSrcSpanBy $ \a b ->
+  (realSrcSpanStart a `compare` realSrcSpanStart b)
+    `thenCmp`
+  (realSrcSpanEnd b `compare` realSrcSpanEnd a)
+
+compareSrcSpanBy :: (RealSrcSpan -> RealSrcSpan -> Ordering) -> SrcSpan -> SrcSpan -> Ordering
+compareSrcSpanBy cmp (RealSrcSpan a)   (RealSrcSpan b)   = cmp a b
+compareSrcSpanBy _   (RealSrcSpan _)   (UnhelpfulSpan _) = LT
+compareSrcSpanBy _   (UnhelpfulSpan _) (RealSrcSpan _)   = GT
+compareSrcSpanBy _   (UnhelpfulSpan _) (UnhelpfulSpan _) = EQ
 
 -- | Determines whether a span encloses a given line and column index
 spans :: SrcSpan -> (Int, Int) -> Bool

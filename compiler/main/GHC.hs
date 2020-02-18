@@ -260,7 +260,7 @@ module GHC (
 
         -- *** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
-        leftmost_smallest, leftmost_largest, rightmost,
+        leftmost_smallest, leftmost_largest, rightmost_smallest,
         spans, isSubspanOf,
 
         -- * Exceptions

@@ -426,7 +426,7 @@ dupNamesErr get_loc names
   where
     locs      = map get_loc (NE.toList names)
     big_loc   = foldr1 combineSrcSpans locs
-    locations = text "Bound at:" <+> vcat (map ppr (sort locs))
+    locations = text "Bound at:" <+> vcat (map ppr (sortBy SrcLoc.leftmost_smallest locs))
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name

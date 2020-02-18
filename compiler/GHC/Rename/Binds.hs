@@ -64,7 +64,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable      ( toList )
-import Data.List          ( partition, sort )
+import Data.List          ( partition, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
@@ -1296,7 +1296,7 @@ dupSigDeclErr pairs@((L loc name, sig) :| _)
   = addErrAt loc $
     vcat [ text "Duplicate" <+> what_it_is
            <> text "s for" <+> quotes (ppr name)
-         , text "at" <+> vcat (map ppr $ sort
+         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest
                                        $ map (getLoc . fst)
                                        $ toList pairs)
          ]
@@ -1332,6 +1332,6 @@ dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)
   = addErrAt loc $
     vcat [ text "Multiple minimal complete definitions"
-         , text "at" <+> vcat (map ppr $ sort $ map getLoc sigs)
+         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest $ map getLoc sigs)
          , text "Combine alternative minimal complete definitions with `|'" ]
 dupMinimalSigErr [] = panic "dupMinimalSigErr"
