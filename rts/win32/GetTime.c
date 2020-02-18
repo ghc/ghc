@@ -35,7 +35,7 @@ getProcessTimes(Time *user, Time *elapsed)
 }
 
 Time
-getMyThreadCPUTime(void)
+getCurrentThreadCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
 

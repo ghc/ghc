@@ -58,7 +58,7 @@ static Time getClockTime(clockid_t clock)
 }
 #endif
 
-Time getMyThreadCPUTime(void)
+Time getCurrentThreadCPUTime(void)
 {
 #if defined(HAVE_CLOCK_GETTIME)          &&  \
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
