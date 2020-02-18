@@ -284,6 +284,10 @@ static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
 STATIC_INLINE StgPtr
 scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
 {
+    // Bitmap may have more bits than `size` when scavenging PAP payloads. See
+    // comments around StgPAP.
+    ASSERT(BITMAP_SIZE(bitmap) >= size);
+
     while (size > 0) {
         if ((bitmap & 1) == 0) {
             evacuate((StgClosure **)p);

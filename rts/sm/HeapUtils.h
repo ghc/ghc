@@ -17,6 +17,10 @@ walk_large_bitmap(walk_closures_cb *cb,
                   StgWord size,
                   void *user)
 {
+    // Bitmap may have more bits than `size` when scavenging PAP payloads. See
+    // comments around StgPAP.
+    ASSERT(large_bitmap->size >= size);
+
     uint32_t b = 0;
 
     for (uint32_t i = 0; i < size; b++) {
