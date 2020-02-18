@@ -11,7 +11,7 @@ module LiberateCase ( liberateCase ) where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn
 import CoreUnfold       ( couldBeSmallEnoughToInline )
 import TysWiredIn       ( unitDataConId )

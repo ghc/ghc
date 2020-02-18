@@ -1,6 +1,6 @@
 -- The plugins datatype is stored in DynFlags, so it needs to be
 -- exposed without importing all of its implementation.
-module Plugins where
+module GHC.Driver.Plugins where
 
 import GhcPrelude ()
 

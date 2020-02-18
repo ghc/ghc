@@ -45,7 +45,7 @@ import TysWiredIn
 import BasicTypes
 import Literal
 import PrelNames
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Util
 

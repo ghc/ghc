@@ -15,7 +15,7 @@ module DmdAnal ( dmdAnalProgram ) where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import WwLib            ( findTypeShape )
 import Demand   -- All of it
 import CoreSyn

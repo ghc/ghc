@@ -50,7 +50,7 @@ import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
@@ -71,7 +71,7 @@ import Outputable
 import UniqSet          ( uniqSetAny )
 import Util
 import Maybes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Control.Monad
 import ListSetOps       ( minusList )

@@ -48,8 +48,8 @@ $(foreach n,1 2 3, \
 $(foreach n,1 2 3, \
     $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/Config.hs) \
     $(eval compiler/stage$n/build/PlatformConstants.o : $(includes_GHCCONSTANTS_HASKELL_TYPE)) \
-    $(eval compiler/stage$n/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
-    $(eval compiler/stage$n/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
+    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
+    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
   )
 endif
 
@@ -252,9 +252,9 @@ ifeq "$(GhcProfiled)" "YES"
 # parts of the compiler of interest, and then add further cost centres
 # as necessary.  Turn on -fprof-auto for individual modules like this:
 
-# compiler/main/DriverPipeline_HC_OPTS += -fprof-auto
-compiler/main/GhcMake_HC_OPTS        += -fprof-auto
-compiler/main/GHC_HC_OPTS            += -fprof-auto
+# compiler/GHC/Driver/Pipeline_HC_OPTS += -fprof-auto
+compiler/GHC/Driver/Make_HC_OPTS     += -fprof-auto
+compiler/GHC_HC_OPTS                 += -fprof-auto
 
 # or alternatively add {-# OPTIONS_GHC -fprof-auto #-} to the top of
 # modules you're interested in.

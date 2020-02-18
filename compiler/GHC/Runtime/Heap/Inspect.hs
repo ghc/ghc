@@ -29,7 +29,7 @@ import GhcPrelude
 
 import GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
-import HscTypes
+import GHC.Driver.Types
 
 import DataCon
 import Type
@@ -54,7 +54,7 @@ import BasicTypes       ( Boxity(..) )
 import TysPrim
 import PrelNames
 import TysWiredIn
-import DynFlags
+import GHC.Driver.Session
 import Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap

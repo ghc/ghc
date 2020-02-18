@@ -1,4 +1,4 @@
-module Hooks where
+module GHC.Driver.Hooks where
 
 import GhcPrelude ()
 

@@ -126,7 +126,7 @@ import FastString
 import Outputable
 import Util
 
-import DynFlags
+import GHC.Driver.Session
 
 -- Turgid imports for showTypeCategory
 import PrelNames

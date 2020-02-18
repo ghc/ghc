@@ -4,7 +4,7 @@ module CoreUnfold (
 
 import GhcPrelude
 import CoreSyn
-import DynFlags
+import GHC.Driver.Session
 
 mkInlineUnfolding :: CoreExpr -> Unfolding
 

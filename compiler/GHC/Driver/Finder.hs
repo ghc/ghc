@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module Finder (
+module GHC.Driver.Finder (
     flushFinderCaches,
     FindResult(..),
     findImportedModule,
@@ -36,12 +36,12 @@ module Finder (
 import GhcPrelude
 
 import Module
-import HscTypes
-import Packages
+import GHC.Driver.Types
+import GHC.Driver.Packages
 import FastString
 import Util
 import PrelNames        ( gHC_PRIM )
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Maybes           ( expectJust )
 

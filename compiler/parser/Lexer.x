@@ -102,7 +102,7 @@ import Util             ( readRational, readHexRational )
 
 -- compiler/main
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session as DynFlags
 
 -- compiler/basicTypes
 import SrcLoc

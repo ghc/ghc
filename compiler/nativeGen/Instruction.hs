@@ -21,7 +21,7 @@ import Reg
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Platform
 

@@ -8,23 +8,24 @@
 --
 -----------------------------------------------------------------------------
 
-module DriverMkDepend (
-        doMkDependHS
-  ) where
+module GHC.Driver.MakeFile
+   ( doMkDependHS
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import qualified GHC
-import GhcMonad
-import DynFlags
+import GHC.Driver.Monad
+import GHC.Driver.Session
 import Util
-import HscTypes
+import GHC.Driver.Types
 import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )
-import Finder
+import GHC.Driver.Finder
 import Outputable
 import Panic
 import SrcLoc

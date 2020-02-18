@@ -2,7 +2,7 @@
 
 module T16104_Plugin (plugin) where
 
-import GhcPlugins
+import GHC.Plugins
 import Data.Bits
 
 plugin :: Plugin

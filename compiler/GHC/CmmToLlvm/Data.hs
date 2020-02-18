@@ -17,7 +17,7 @@ import GHC.CmmToLlvm.Base
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform
 
 import FastString

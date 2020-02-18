@@ -43,7 +43,7 @@ import TcRnMonad
 
 import ForeignCall      ( CCallTarget(..) )
 import Module
-import HscTypes         ( Warnings(..), plusWarns )
+import GHC.Driver.Types         ( Warnings(..), plusWarns )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
@@ -58,9 +58,9 @@ import Bag
 import BasicTypes       ( pprRuleName, TypeOrKind(..) )
 import FastString
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
-import HscTypes         ( HscEnv, hsc_dflags )
+import GHC.Driver.Types         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq )

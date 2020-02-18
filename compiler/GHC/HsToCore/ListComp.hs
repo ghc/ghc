@@ -26,7 +26,7 @@ import MkCore
 import GHC.HsToCore.Monad          -- the monadery used in the desugarer
 import GHC.HsToCore.Utils
 
-import DynFlags
+import GHC.Driver.Session
 import CoreUtils
 import Id
 import Type

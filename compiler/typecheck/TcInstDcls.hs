@@ -59,7 +59,7 @@ import VarEnv
 import VarSet
 import Bag
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import FastString
 import Id

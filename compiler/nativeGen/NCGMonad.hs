@@ -58,7 +58,7 @@ import FastString       ( FastString )
 import UniqFM
 import UniqSupply
 import Unique           ( Unique )
-import DynFlags
+import GHC.Driver.Session
 import Module
 
 import Control.Monad    ( ap )

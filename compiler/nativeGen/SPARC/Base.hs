@@ -20,7 +20,7 @@ where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import Panic
 
 import Data.Int

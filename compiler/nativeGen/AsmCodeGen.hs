@@ -84,7 +84,7 @@ import GHC.Cmm.CLabel
 
 import UniqFM
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import Util
 
 import BasicTypes       ( Alignment )

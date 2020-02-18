@@ -77,7 +77,7 @@ import Name( isInternalName )
 import Outputable
 import SrcLoc
 import Util
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
 

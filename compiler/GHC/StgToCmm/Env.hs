@@ -36,7 +36,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
-import DynFlags
+import GHC.Driver.Session
 import Id
 import GHC.Cmm.Graph
 import Name
