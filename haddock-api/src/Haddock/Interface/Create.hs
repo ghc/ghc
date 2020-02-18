@@ -45,11 +45,11 @@ import qualified Module
 import qualified SrcLoc
 import ConLike (ConLike(..))
 import GHC
-import HscTypes
+import GHC.Driver.Types
 import Name
 import NameSet
 import NameEnv
-import Packages   ( lookupModuleInAllPackages, PackageName(..) )
+import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
 import RdrName
 import TcRnTypes

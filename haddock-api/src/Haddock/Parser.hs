@@ -16,7 +16,7 @@ module Haddock.Parser ( parseParas
 import qualified Documentation.Haddock.Parser as P
 import Documentation.Haddock.Types
 
-import DynFlags     ( DynFlags )
+import GHC.Driver.Session ( DynFlags )
 import FastString   ( fsLit )
 import Lexer        ( mkPState, unP, ParseResult(POk) )
 import Parser       ( parseIdentifier )

@@ -25,7 +25,7 @@ import Control.Monad
 import Data.List
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
-import DynFlags (languageExtensions)
+import GHC.Driver.Session (languageExtensions)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC
 import Haddock.Interface.ParseModuleHeader

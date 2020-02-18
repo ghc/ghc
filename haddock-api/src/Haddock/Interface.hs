@@ -52,9 +52,9 @@ import Text.Printf
 
 import Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
 import Digraph
-import DynFlags hiding (verbosity)
+import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
-import HscTypes
+import GHC.Driver.Types
 import FastString (unpackFS)
 import TcRnTypes (tcg_rdr_env)
 import Name (nameIsFromExternalPackage, nameOccName)

@@ -4,8 +4,8 @@ module Haddock.Backends.Hyperlinker.ParserSpec (main, spec) where
 import Test.Hspec
 import Test.QuickCheck
 
-import GHC           ( runGhc, getSessionDynFlags )
-import DynFlags      ( DynFlags )
+import GHC                ( runGhc, getSessionDynFlags )
+import GHC.Driver.Session ( DynFlags )
 import Control.Monad.IO.Class
 
 import Data.String     ( fromString )

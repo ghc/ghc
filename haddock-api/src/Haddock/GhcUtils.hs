@@ -29,10 +29,10 @@ import Outputable ( Outputable, panic, showPpr )
 import Name
 import NameSet
 import Module
-import HscTypes
+import GHC.Driver.Types
 import GHC
 import Class
-import DynFlags
+import GHC.Driver.Session
 import SrcLoc    ( advanceSrcLoc )
 import Var       ( VarBndr(..), TyVarBinder, tyVarKind, updateTyVarKind,
                    isInvisibleArgFlag )

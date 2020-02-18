@@ -16,8 +16,8 @@ import Haddock.Types ( MDoc )
 
 import GHC           ( Name )
 import Module        ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
-import DynFlags      ( DynFlags )
-import Packages      ( lookupUnit, sourcePackageIdString )
+import GHC.Driver.Session  ( DynFlags )
+import GHC.Driver.Packages ( lookupUnit, sourcePackageIdString )
 
 import qualified Control.Applicative as A
 

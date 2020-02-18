@@ -28,7 +28,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Class
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn (isOrphan)
 import ErrUtils
 import FamInstEnv

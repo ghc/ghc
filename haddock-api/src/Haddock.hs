@@ -67,9 +67,9 @@ import System.FilePath ((</>))
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import Config
-import DynFlags hiding (projectVersion, verbosity)
+import GHC.Driver.Session hiding (projectVersion, verbosity)
 import ErrUtils
-import Packages
+import GHC.Driver.Packages
 import Panic (handleGhcException)
 import Module
 import FastString

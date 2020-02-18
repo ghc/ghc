@@ -10,7 +10,7 @@ import Data.List           ( isPrefixOf, isSuffixOf )
 import qualified Data.ByteString as BS
 
 import BasicTypes          ( IntegralLit(..) )
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils            ( emptyMessages, pprLocErrMsg )
 import FastString          ( mkFastString )
 import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)

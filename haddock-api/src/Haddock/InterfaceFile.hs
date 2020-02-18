@@ -36,8 +36,8 @@ import Binary
 import FastMutInt
 import FastString
 import GHC hiding (NoLink)
-import GhcMonad (withSession)
-import HscTypes
+import GHC.Driver.Monad (withSession)
+import GHC.Driver.Types
 import NameCache
 import GHC.Iface.Env
 import Name

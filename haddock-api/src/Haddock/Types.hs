@@ -39,7 +39,7 @@ import Documentation.Haddock.Types
 import BasicTypes (Fixity(..), PromotionFlag(..))
 
 import GHC
-import DynFlags (Language)
+import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import OccName
 import Outputable
