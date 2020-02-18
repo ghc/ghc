@@ -77,8 +77,7 @@ Time getCurrentThreadCPUTime(void)
         stg_exit(EXIT_FAILURE);
     }
 #else
-    // TODO: How to fallback here?
-    return getProcessCPUTime();
+#error No known means of finding current thread's CPU time
 #endif
 }
 
