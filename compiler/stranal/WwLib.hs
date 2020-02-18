@@ -580,7 +580,7 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   = return (False, [arg],  nop_fn, nop_fn)
 
   | isAbsDmd dmd
-  , Just work_fn <- mk_absent_let dflags arg
+  , Just work_fn <- mk_absent_let dflags fam_envs arg
      -- Absent case.  We can't always handle absence for arbitrary
      -- unlifted types, so we need to choose just the cases we can
      -- (that's what mk_absent_let does)
@@ -1153,8 +1153,8 @@ So absentError is only used for lifted types.
 -- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
 -- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
 -- found (currently only happens for bindings of 'VecRep' representation).
-mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
-mk_absent_let dflags arg
+mk_absent_let :: DynFlags -> FamInstEnvs -> Id -> Maybe (CoreExpr -> CoreExpr)
+mk_absent_let dflags fam_envs arg
   -- The lifted case: Bind 'absentError'
   -- See Note [Absent errors]
   | not (isUnliftedType arg_ty)
@@ -1165,11 +1165,11 @@ mk_absent_let dflags arg
   = Just (Let (NonRec arg unlifted_rhs))
   -- The monomorphic unlifted cases: Bind to some literal, if possible
   -- See Note [Absent errors]
-  | Just tc <- tyConAppTyCon_maybe arg_ty
+  | Just tc <- tyConAppTyCon_maybe nty
   , Just lit <- absentLiteralOf tc
-  = Just (Let (NonRec arg (Lit lit)))
-  | arg_ty `eqType` voidPrimTy
-  = Just (Let (NonRec arg (Var voidPrimId)))
+  = Just (Let (NonRec arg (Lit lit `mkCast` mkSymCo co)))
+  | nty `eqType` voidPrimTy
+  = Just (Let (NonRec arg (Var voidPrimId `mkCast` mkSymCo co)))
   | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
@@ -1179,6 +1179,8 @@ mk_absent_let dflags arg
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
     arg_ty       = idType arg
+    (co, nty)    = topNormaliseType_maybe fam_envs arg_ty
+                   `orElse` (mkRepReflCo arg_ty, arg_ty)
     abs_rhs      = mkAbsentErrorApp arg_ty msg
     msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
                           (ppr arg <+> ppr (idType arg))
