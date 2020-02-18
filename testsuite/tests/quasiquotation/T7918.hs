@@ -2,7 +2,7 @@
 module Main (main) where
 
 import GHC
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import MonadUtils
 import NameSet

@@ -7,7 +7,7 @@ module GHC.Iface.Ext.Utils where
 import GhcPrelude
 
 import CoreMap
-import DynFlags                   ( DynFlags )
+import GHC.Driver.Session                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import GHC.Iface.Type
 import Name hiding (varName)

@@ -57,7 +57,7 @@ import RegClass
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 

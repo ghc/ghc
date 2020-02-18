@@ -1,7 +1,7 @@
 module Main where
 
 import System.IO
-import DynFlags
+import GHC.Driver.Session
 import GHC
 import Exception
 import Module

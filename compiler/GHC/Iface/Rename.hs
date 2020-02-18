@@ -21,7 +21,7 @@ import GhcPrelude
 
 import SrcLoc
 import Outputable
-import HscTypes
+import GHC.Driver.Types
 import Module
 import UniqFM
 import Avail
@@ -38,13 +38,13 @@ import BasicTypes
 
 -- a bit vexing
 import {-# SOURCE #-} GHC.Iface.Load
-import DynFlags
+import GHC.Driver.Session
 
 import qualified Data.Traversable as T
 
 import Bag
 import Data.IORef
-import NameShape
+import GHC.Types.Name.Shape
 import GHC.Iface.Env
 
 tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a

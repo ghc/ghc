@@ -43,7 +43,7 @@ import GhcPrelude
 import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import FastString
 

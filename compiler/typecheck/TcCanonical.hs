@@ -36,7 +36,7 @@ import VarEnv( mkInScopeSet )
 import VarSet( delVarSetList )
 import OccName ( OccName )
 import Outputable
-import DynFlags( DynFlags )
+import GHC.Driver.Session( DynFlags )
 import NameSet
 import RdrName
 import GHC.Hs.Types( HsIPName(..) )

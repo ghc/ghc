@@ -27,7 +27,7 @@ import SizedSeq
 
 import GHC.Runtime.Interpreter
 import GHC.ByteCode.Types
-import HscTypes
+import GHC.Driver.Types
 import Name
 import NameEnv
 import PrimOp

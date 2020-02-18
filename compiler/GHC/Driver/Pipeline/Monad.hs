@@ -3,7 +3,7 @@
 -- | The CompPipeline monad and associated ops
 --
 -- Defined in separate module so that it can safely be imported from Hooks
-module PipelineMonad (
+module GHC.Driver.Pipeline.Monad (
     CompPipeline(..), evalP
   , PhasePlus(..)
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
@@ -15,9 +15,9 @@ import GhcPrelude
 
 import MonadUtils
 import Outputable
-import DynFlags
-import DriverPhases
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Phases
+import GHC.Driver.Types
 import Module
 import FileCleanup (TempFileLifetime)
 

@@ -73,7 +73,7 @@ import Digraph
 import Util
 import Unique
 import UniqSupply (MonadUnique(..))
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Types.RepType

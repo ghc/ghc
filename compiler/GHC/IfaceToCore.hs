@@ -38,7 +38,7 @@ import Coercion
 import CoAxiom
 import TyCoRep    -- needs to build types & coercions in a knot
 import TyCoSubst ( substTyCoVars )
-import HscTypes
+import GHC.Driver.Types
 import Annotations
 import InstEnv
 import FamInstEnv
@@ -70,7 +70,7 @@ import UniqSupply
 import Outputable
 import Maybes
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import Util
 import FastString
 import BasicTypes hiding ( SuccessFlag(..) )
@@ -128,14 +128,14 @@ a Name for another entity defined in A.hi.  How do we get the
     internal TyCons to MATCH the ones that we just constructed
     during typechecking: the knot is thus tied through if_rec_types.
 
-    2) retypecheckLoop in GhcMake: We are retypechecking a
+    2) retypecheckLoop in GHC.Driver.Make: We are retypechecking a
     mutually recursive cluster of hi files, in order to ensure
     that all of the references refer to each other correctly.
     In this case, the knot is tied through the HPT passed in,
     which contains all of the interfaces we are in the process
     of typechecking.
 
-    3) genModDetails in HscMain: We are typechecking an
+    3) genModDetails in GHC.Driver.Main: We are typechecking an
     old interface to generate the ModDetails.  In this case,
     we do the same thing as (2) and pass in an HPT with
     the HomeModInfo being generated to tie knots.

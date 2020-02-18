@@ -1,4 +1,4 @@
-module DynFlags where
+module GHC.Driver.Session where
 
 import GhcPrelude
 import GHC.Platform

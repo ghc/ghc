@@ -113,7 +113,7 @@ import UniqSupply
 import Outputable
 import FastString
 import PrelNames hiding ( wildCardName )
-import DynFlags
+import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes

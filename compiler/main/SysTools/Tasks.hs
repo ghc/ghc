@@ -10,8 +10,8 @@ module SysTools.Tasks where
 
 import Exception
 import ErrUtils
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import Util

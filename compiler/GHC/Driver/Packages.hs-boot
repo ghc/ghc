@@ -1,6 +1,6 @@
-module Packages where
+module GHC.Driver.Packages where
 import GhcPrelude
-import {-# SOURCE #-} DynFlags(DynFlags)
+import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} Module(ComponentId, UnitId, InstalledUnitId)
 data PackageState
 data UnitInfoMap

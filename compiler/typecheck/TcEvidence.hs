@@ -64,7 +64,7 @@ import TyCon
 import DataCon( DataCon, dataConWrapId )
 import Class( Class )
 import PrelNames
-import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
+import GHC.Driver.Session   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
 import VarSet
 import Predicate

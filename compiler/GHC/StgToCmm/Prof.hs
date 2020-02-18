@@ -36,7 +36,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import CostCentre
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Module
 import Outputable

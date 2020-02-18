@@ -69,12 +69,12 @@ import Type
 import Coercion
 import ConLike
 import DataCon
-import HscTypes
+import GHC.Driver.Types
 import Name
 import NameEnv
 import Var
 import VarEnv
-import DynFlags
+import GHC.Driver.Session
 import Literal
 import BasicTypes
 import Maybes

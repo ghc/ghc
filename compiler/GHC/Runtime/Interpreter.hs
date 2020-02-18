@@ -58,17 +58,17 @@ import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import Fingerprint
-import HscTypes
+import GHC.Driver.Types
 import UniqFM
 import Panic
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import Outputable
 import Exception
 import BasicTypes
 import FastString
 import Util
-import Hooks
+import GHC.Driver.Hooks
 
 import Control.Concurrent
 import Control.Monad

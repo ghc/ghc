@@ -43,7 +43,7 @@ import Module
 import Name
 import RdrName
 import qualified GHC.LanguageExtensions as LangExt
-import DynFlags
+import GHC.Driver.Session
 
 import SrcLoc
 import FastString

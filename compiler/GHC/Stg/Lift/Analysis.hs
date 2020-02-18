@@ -24,7 +24,7 @@ import GhcPrelude
 
 import BasicTypes
 import Demand
-import DynFlags
+import GHC.Driver.Session
 import Id
 import GHC.Runtime.Heap.Layout ( WordOff )
 import GHC.Stg.Syntax

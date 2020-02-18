@@ -1,7 +1,7 @@
 module TcRnDriver where
 
 import GhcPrelude
-import DynFlags (DynFlags)
+import GHC.Driver.Session (DynFlags)
 import Type (TyThing)
 import TcRnTypes (TcM)
 import Outputable (SDoc)

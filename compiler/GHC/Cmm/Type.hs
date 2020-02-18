@@ -31,7 +31,7 @@ where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 

@@ -59,7 +59,7 @@ import Unique
 import BasicTypes
 import Outputable
 import Bag
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ForeignCall
 import Util
@@ -69,7 +69,7 @@ import TcEvidence
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Class
-import HscTypes ( MonadThings )
+import GHC.Driver.Types ( MonadThings )
 import DataCon
 import Var
 import GHC.HsToCore.Binds

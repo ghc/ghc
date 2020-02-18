@@ -2,7 +2,7 @@
 module Hooks.Plugin (plugin) where
 
 import BasicTypes
-import GhcPlugins
+import GHC.Plugins
 import GHC.Hs.Expr
 import GHC.Hs.Extension
 import GHC.Hs.Lit

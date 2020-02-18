@@ -104,7 +104,7 @@ import GhcPrelude
 
 import Util
 import Unique
-import DynFlags
+import GHC.Driver.Session
 import UniqFM
 import UniqSet
 import FastString

@@ -31,7 +31,7 @@ import GHC.Cmm.Switch (SwitchTargets)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ForeignCall
 import OrdList

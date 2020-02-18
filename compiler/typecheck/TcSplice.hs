@@ -38,7 +38,7 @@ import GhcPrelude
 
 import GHC.Hs
 import Annotations
-import Finder
+import GHC.Driver.Finder
 import Name
 import TcRnMonad
 import TcType
@@ -58,12 +58,12 @@ import Control.Monad
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import HscMain
+import GHC.Driver.Main
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import GHC.ThToHs
 import GHC.Rename.Expr
 import GHC.Rename.Env
@@ -86,7 +86,7 @@ import NameEnv
 import PrelNames
 import TysWiredIn
 import OccName
-import Hooks
+import GHC.Driver.Hooks
 import Var
 import Module
 import GHC.Iface.Load
@@ -111,11 +111,11 @@ import Data.Maybe
 import FastString
 import BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
-import DynFlags
+import GHC.Driver.Session
 import Panic
 import Lexeme
 import qualified EnumSet
-import Plugins
+import GHC.Driver.Plugins
 import Bag
 
 import qualified Language.Haskell.TH as TH
@@ -915,7 +915,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; src_span <- getSrcSpanM
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $
-                         HscMain.hscCompileCoreExpr hsc_env src_span ds_expr
+                         GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
             Right hval -> do

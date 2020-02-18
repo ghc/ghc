@@ -80,7 +80,7 @@ import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import GHC.Platform.Regs
 

@@ -118,7 +118,7 @@ import GhcPrelude
 import IdInfo
 import BasicTypes
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
-import Packages
+import GHC.Driver.Packages
 import Module
 import Name
 import Unique
@@ -126,7 +126,7 @@ import PrimOp
 import CostCentre
 import Outputable
 import FastString
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform
 import UniqSet
 import Util

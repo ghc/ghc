@@ -41,7 +41,7 @@ import Outputable
 import MonadUtils
 import FastString
 import Util
-import DynFlags
+import GHC.Driver.Session
 import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )

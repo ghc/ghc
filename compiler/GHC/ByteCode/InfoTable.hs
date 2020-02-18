@@ -13,8 +13,8 @@ import GhcPrelude
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
-import DynFlags
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Types
 import Name             ( Name, getName )
 import NameEnv
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
