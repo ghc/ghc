@@ -170,7 +170,7 @@ else
         if [ $no_clean -eq 0 ]; then
             rm -rf hadrian/.stack-work
         fi
-        hadrian/build.stack.sh --help > /dev/null
+        hadrian/build-stack --help > /dev/null
         cd hadrian
         hadrian_cmd=$(stack exec -- which hadrian)
     fi

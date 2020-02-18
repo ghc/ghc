@@ -38,7 +38,7 @@ but are much simpler and may also be more robust.
 
 The `stack build` and `stack exec hadrian` commands can be replaced by an
 invocation of Hadrian's Stack-based build script:
-`build.stack.bat -j --flavour=quickest`. Use this script if you plan to work on
+`build-stack.bat -j --flavour=quickest`. Use this script if you plan to work on
 Hadrian and/or rebuild GHC often.
 
 ## Prerequisites

@@ -426,7 +426,7 @@ that takes an (optional) argument, `--complete-setting=<some string>`, and
 prints on stdout all the setting keys that have the given string as a prefix.
 
 There is a `hadrian/completion.sh` script that makes use of this rule to
-install Bash completions for `hadrian/build` and `hadrian/build.cabal.sh`.
+install Bash completions for `hadrian/build` and `hadrian/build-cabal`.
 You can try it out by doing:
 
 ``` sh

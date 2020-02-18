@@ -200,7 +200,7 @@ lint-release-changelogs:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     - export TOP=$(pwd)
     - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
@@ -210,7 +210,7 @@ lint-release-changelogs:
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
       .gitlab/test-metrics.sh pull
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
+    - hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
     - |
       # Push git notes.
       .gitlab/test-metrics.sh push
@@ -387,11 +387,11 @@ validate-x86_64-darwin:
     - cabal update
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     - export TOP=$(pwd)
     - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc
+    - hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
   artifacts:
@@ -816,10 +816,10 @@ validate-x86_64-linux-fedora27:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     - bash -c "export TOP=$(pwd); cd _build/bindist/ghc-*/ && PATH=$TOP/toolchain/bin:$PATH ./configure --prefix=$TOP/_build/install && make install && cd ../../../"
-    - bash -c "export TOP=$(pwd); PATH=$TOP/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc"
+    - bash -c "export TOP=$(pwd); PATH=$TOP/toolchain/bin:$PATH hadrian/build-cabal --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc"
   tags:
     - x86_64-windows
   artifacts:
