@@ -101,6 +101,7 @@ for further change information.
     libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
     libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``haskeline`` library
     libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
     compiler/ghc.cabal:                      The compiler itself
     libraries/ghci/ghci.cabal:               The REPL interface
