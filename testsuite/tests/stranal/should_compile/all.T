@@ -46,6 +46,8 @@ test('T13077a', normal, compile, [''])
 #   The idea is to check that both $wmutVar and $warray
 #   don't mention MutVar# and Array# anymore.
 test('T15627',  [ grep_errmsg(r'(wmutVar|warray).*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
+# Absent bindings of unlifted newtypes are WW’ed away.
+test('T17852',  [ grep_errmsg(r'\\$wf ::') ], compile, ['-ddump-worker-wrapper -dsuppress-idinfo'])
 
 test('T16029', normal, makefile_test, [])
 test('T10069',  [ grep_errmsg(r'(wc1).*Int#$') ], compile, ['-dppr-cols=200 -ddump-simpl'])
