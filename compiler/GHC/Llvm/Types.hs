@@ -14,7 +14,7 @@ import Data.Char
 import Data.Int
 import Numeric
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import Unique

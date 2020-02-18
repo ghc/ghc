@@ -44,7 +44,7 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.Types
 import GHC.Rename.Pat
-import DynFlags
+import GHC.Driver.Session
 import PrelNames
 
 import BasicTypes

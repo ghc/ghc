@@ -43,7 +43,7 @@ import GhcPrelude
 import GHC.Cmm.Expr
 
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 
 import Data.Maybe
 import Numeric ( fromRat )

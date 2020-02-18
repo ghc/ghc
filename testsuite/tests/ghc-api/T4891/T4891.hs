@@ -7,7 +7,7 @@ import Data.Array
 import DataCon
 import GHC
 import GHC.Exts.Heap
-import HscTypes
+import GHC.Driver.Types
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect
 import TcEnv
@@ -21,7 +21,7 @@ import Control.Monad
 import Data.Maybe
 import Bag
 import Outputable
-import GhcMonad
+import GHC.Driver.Monad
 import X
 
 import System.Environment

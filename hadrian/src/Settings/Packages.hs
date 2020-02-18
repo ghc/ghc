@@ -45,13 +45,13 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ inputs ["**/GHC.hs", "**/GhcMake.hs"] ? arg "-fprof-auto"
+            [ inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
               pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
-            , inputs ["**/HsInstances.hs", "**/DynFlags.hs"] ? stage0 ?
+            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat

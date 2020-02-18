@@ -23,9 +23,9 @@ import GHC.Cmm.Sink
 import GHC.Cmm.Dataflow.Collections
 
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
-import HscTypes
+import GHC.Driver.Types
 import Control.Monad
 import Outputable
 import GHC.Platform

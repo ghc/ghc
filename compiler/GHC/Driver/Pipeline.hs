@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module DriverPipeline (
+module GHC.Driver.Pipeline (
         -- Run a series of compilation steps in a pipeline, for a
         -- collection of source files.
    oneShot, compileFile,
@@ -38,19 +38,19 @@ module DriverPipeline (
 
 import GhcPrelude
 
-import PipelineMonad
-import Packages
+import GHC.Driver.Pipeline.Monad
+import GHC.Driver.Packages
 import HeaderInfo
-import DriverPhases
+import GHC.Driver.Phases
 import SysTools
 import SysTools.ExtraObj
-import HscMain
-import Finder
-import HscTypes hiding ( Hsc )
+import GHC.Driver.Main
+import GHC.Driver.Finder
+import GHC.Driver.Types hiding ( Hsc )
 import Outputable
 import Module
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import Panic
 import Util
 import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
@@ -62,7 +62,7 @@ import MonadUtils
 import GHC.Platform
 import TcRnTypes
 import ToolSettings
-import Hooks
+import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
 import Ar
@@ -2120,9 +2120,9 @@ enabled in the toolchain:
 
 We must enable bigobj output in a few places:
 
- * When merging object files (DriverPipeline.joinObjectFiles)
+ * When merging object files (GHC.Driver.Pipeline.joinObjectFiles)
 
- * When assembling (DriverPipeline.runPhase (RealPhase As ...))
+ * When assembling (GHC.Driver.Pipeline.runPhase (RealPhase As ...))
 
 Unfortunately the big object format is not supported on 32-bit targets so
 none of this can be used in that case.

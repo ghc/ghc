@@ -65,7 +65,7 @@ import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon, tupleTyConName )
 import {-# SOURCE #-} Type       ( isRuntimeRepTy )
 
-import DynFlags
+import GHC.Driver.Session
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import Var

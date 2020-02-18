@@ -29,7 +29,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Ppr
 
 import BufWrite
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform ( platformArch, Arch(..) )
 import ErrUtils
 import FastString

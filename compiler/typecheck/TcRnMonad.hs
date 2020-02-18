@@ -152,7 +152,7 @@ import TcEvidence
 import TcOrigin
 
 import GHC.Hs hiding (LIE)
-import HscTypes
+import GHC.Driver.Types
 import Module
 import RdrName
 import Name
@@ -173,7 +173,7 @@ import NameSet
 import Bag
 import Outputable
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Panic
 import Util

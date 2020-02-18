@@ -1,7 +1,7 @@
 {-
 (c) The University of Glasgow, 2006
 
-\section[HscTypes]{Types for the per-module compiler}
+\section[GHC.Driver.Types]{Types for the per-module compiler}
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
@@ -16,7 +16,7 @@
 {-# LANGUAGE DataKinds #-}
 
 -- | Types for the per-module compiler
-module HscTypes (
+module GHC.Driver.Types (
         -- * compilation state
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
@@ -45,7 +45,7 @@ module HscTypes (
         SourceModified(..), isTemplateHaskellOrQQNonBoot,
 
         -- * Information about the module being compiled
-        -- (re-exported from DriverPhases)
+        -- (re-exported from GHC.Driver.Phases)
         HscSource(..), isHsBootOrSig, isHsigFile, hscSourceString,
 
 
@@ -187,13 +187,13 @@ import DataCon
 import PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import TysWiredIn
-import Packages hiding  ( Version(..) )
-import CmdLineParser
-import DynFlags
+import GHC.Driver.Packages hiding  ( Version(..) )
+import GHC.Driver.CmdLine
+import GHC.Driver.Session
 import GHC.Runtime.Linker.Types      ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
-import DriverPhases     ( Phase, HscSource(..), hscSourceString
+import GHC.Driver.Phases     ( Phase, HscSource(..), hscSourceString
                         , isHsBootOrSig, isHsigFile )
-import qualified DriverPhases as Phase
+import qualified GHC.Driver.Phases as Phase
 import BasicTypes
 import GHC.Iface.Syntax
 import Maybes
@@ -304,7 +304,7 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 -- -----------------------------------------------------------------------------
 -- Source Errors
 
--- When the compiler (HscMain) discovers errors, it throws an
+-- When the compiler (GHC.Driver.Main) discovers errors, it throws an
 -- exception in the IO monad.
 
 mkSrcErr :: ErrorMessages -> SourceError
@@ -393,7 +393,7 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
-shouldPrintWarning :: DynFlags -> CmdLineParser.WarnReason -> Bool
+shouldPrintWarning :: DynFlags -> GHC.Driver.CmdLine.WarnReason -> Bool
 shouldPrintWarning dflags ReasonDeprecatedFlag
   = wopt Opt_WarnDeprecatedFlags dflags
 shouldPrintWarning dflags ReasonUnrecognisedFlag
@@ -679,7 +679,7 @@ data HomeModInfo
         -- After a complete compilation ('GHC.load'), all 'hm_linkable' fields
         -- in the 'HomePackageTable' will be @Just@.
         --
-        -- When re-linking a module ('HscMain.HscNoRecomp'), we construct the
+        -- When re-linking a module ('GHC.Driver.Main.HscNoRecomp'), we construct the
         -- 'HomeModInfo' by building a new 'ModDetails' from the old
         -- 'ModIface' (only).
     }

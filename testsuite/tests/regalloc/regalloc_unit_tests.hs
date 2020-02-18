@@ -23,7 +23,7 @@ module Main where
 import qualified RegAlloc.Graph.Stats as Color
 import qualified RegAlloc.Linear.Base as Linear
 import qualified X86.Instr
-import HscMain
+import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import AsmCodeGen
 import GHC.Cmm.Info.Build
@@ -34,10 +34,10 @@ import GHC.Cmm
 import Module
 import GHC.Cmm.DebugBlock
 import GHC
-import GhcMonad
+import GHC.Driver.Monad
 import UniqFM
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import Outputable
 import BasicTypes

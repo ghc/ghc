@@ -13,8 +13,8 @@ module GHC.HsToCore.Usage (
 
 import GhcPrelude
 
-import DynFlags
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Types
 import TcRnTypes
 import Name
 import NameSet
@@ -25,8 +25,8 @@ import UniqSet
 import UniqFM
 import Fingerprint
 import Maybes
-import Packages
-import Finder
+import GHC.Driver.Packages
+import GHC.Driver.Finder
 
 import Control.Monad (filterM)
 import Data.List

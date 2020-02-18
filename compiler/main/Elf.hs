@@ -18,7 +18,7 @@ import GhcPrelude
 
 import AsmUtils
 import Exception
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import Maybes     (MaybeT(..),runMaybeT)
 import Util       (charToC)

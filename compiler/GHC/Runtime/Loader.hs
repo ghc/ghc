@@ -21,12 +21,12 @@ module GHC.Runtime.Loader (
     ) where
 
 import GhcPrelude
-import DynFlags
+import GHC.Driver.Session
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
 import GHC.Runtime.Interpreter ( wormhole )
 import SrcLoc           ( noSrcSpan )
-import Finder           ( findPluginModule, cannotFindModule )
+import GHC.Driver.Finder           ( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load   ( loadPluginInterface )
 import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
@@ -34,10 +34,10 @@ import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , gre_name, mkRdrQual )
 import OccName          ( OccName, mkVarOcc )
 import GHC.Rename.Names ( gresFromAvails )
-import Plugins
+import GHC.Driver.Plugins
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
-import HscTypes
+import GHC.Driver.Types
 import GHCi.RemoteTypes ( HValue )
 import Type             ( Type, eqType, mkTyConTy )
 import TyCoPpr          ( pprTyThingCategory )
@@ -50,7 +50,7 @@ import FastString
 import ErrUtils
 import Outputable
 import Exception
-import Hooks
+import GHC.Driver.Hooks
 
 import Control.Monad     ( when, unless )
 import Data.Maybe        ( mapMaybe )

@@ -20,8 +20,8 @@ module GHC.HsToCore (
 import GhcPrelude
 
 import GHC.HsToCore.Usage
-import DynFlags
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Types
 import GHC.Hs
 import TcRnTypes
 import TcRnMonad  ( finalSafeMode, fixSafeInstances )
@@ -66,7 +66,7 @@ import GHC.HsToCore.Docs
 import Data.List
 import Data.IORef
 import Control.Monad( when )
-import Plugins ( LoadedPlugin(..) )
+import GHC.Driver.Plugins ( LoadedPlugin(..) )
 
 {-
 ************************************************************************

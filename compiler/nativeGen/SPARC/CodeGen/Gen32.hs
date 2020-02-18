@@ -26,7 +26,7 @@ import Reg
 import GHC.Cmm
 
 import Control.Monad (liftM)
-import DynFlags
+import GHC.Driver.Session
 import OrdList
 import Outputable
 

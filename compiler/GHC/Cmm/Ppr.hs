@@ -45,7 +45,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Cmm.Ppr.Decl

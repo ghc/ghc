@@ -12,8 +12,8 @@ import CoreSyn
 import MkCore
 import Literal ( Literal(..) )
 import TcEvidence
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import Name
 import Module
 import CoreUtils

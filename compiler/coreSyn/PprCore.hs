@@ -30,7 +30,7 @@ import DataCon
 import TyCon
 import TyCoPpr
 import Coercion
-import DynFlags
+import GHC.Driver.Session
 import BasicTypes
 import Maybes
 import Util

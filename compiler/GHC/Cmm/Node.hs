@@ -31,7 +31,7 @@ import GhcPrelude hiding (succ)
 import GHC.Platform.Regs
 import GHC.Cmm.Expr
 import GHC.Cmm.Switch
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ForeignCall
 import Outputable

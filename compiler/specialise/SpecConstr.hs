@@ -30,7 +30,7 @@ import CoreUnfold       ( couldBeSmallEnoughToInline )
 import CoreFVs          ( exprsFreeVarsList )
 import CoreMonad
 import Literal          ( litIsLifted )
-import HscTypes         ( ModGuts(..) )
+import GHC.Driver.Types         ( ModGuts(..) )
 import WwLib            ( isWorkerSmallEnough, mkWorkerArgs )
 import DataCon
 import Coercion         hiding( substCo )
@@ -44,7 +44,7 @@ import VarEnv
 import VarSet
 import Name
 import BasicTypes
-import DynFlags         ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+import GHC.Driver.Session         ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                         , gopt, hasPprDebug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand

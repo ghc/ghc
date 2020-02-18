@@ -38,7 +38,7 @@ import GHC.Hs.Binds
 -- others:
 import TcEvidence
 import CoreSyn
-import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
+import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
 import NameSet
 import BasicTypes

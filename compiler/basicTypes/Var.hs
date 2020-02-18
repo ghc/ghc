@@ -102,7 +102,7 @@ import Unique ( Uniquable, Unique, getKey, getUnique
               , mkUniqueGrimily, nonDetCmpUnique )
 import Util
 import Binary
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 
 import Data.Data

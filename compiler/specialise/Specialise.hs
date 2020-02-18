@@ -39,9 +39,9 @@ import MkId             ( voidArgId, voidPrimId )
 import Maybes           ( mapMaybe, isJust )
 import MonadUtils       ( foldlM )
 import BasicTypes
-import HscTypes
+import GHC.Driver.Types
 import Bag
-import DynFlags
+import GHC.Driver.Session
 import Util
 import Outputable
 import FastString

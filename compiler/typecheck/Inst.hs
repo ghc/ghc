@@ -59,7 +59,7 @@ import Type
 import TyCoRep
 import TyCoPpr     ( debugPprType )
 import TcType
-import HscTypes
+import GHC.Driver.Types
 import Class( Class )
 import MkId( mkDictFunId )
 import CoreSyn( Expr(..) )  -- For the Coercion constructor
@@ -70,7 +70,7 @@ import DataCon
 import VarEnv
 import PrelNames
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import Util
 import Outputable
 import BasicTypes ( TypeOrKind(..) )

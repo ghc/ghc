@@ -1,7 +1,7 @@
 -- | This is the syntax for bkp files which are parsed in 'ghc --backpack'
 -- mode.  This syntax is used purely for testing purposes.
 
-module BkpSyn (
+module GHC.Driver.Backpack.Syntax (
     -- * Backpack abstract syntax
     HsUnitId(..),
     LHsUnitId,
@@ -18,7 +18,7 @@ module BkpSyn (
 
 import GhcPrelude
 
-import DriverPhases
+import GHC.Driver.Phases
 import GHC.Hs
 import SrcLoc
 import Outputable

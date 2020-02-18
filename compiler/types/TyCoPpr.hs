@@ -49,7 +49,7 @@ import GHC.Iface.Type
 import VarSet
 import VarEnv
 
-import DynFlags   ( gopt_set,
+import GHC.Driver.Session   ( gopt_set,
                     GeneralFlag(Opt_PrintExplicitKinds, Opt_PrintExplicitRuntimeReps) )
 import Outputable
 import BasicTypes ( PprPrec(..), topPrec, sigPrec, opPrec

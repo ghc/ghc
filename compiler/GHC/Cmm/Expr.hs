@@ -36,7 +36,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
-import DynFlags
+import GHC.Driver.Session
 import Outputable (panic)
 import Unique
 

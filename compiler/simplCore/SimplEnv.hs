@@ -57,7 +57,7 @@ import VarSet
 import OrdList
 import Id
 import MkCore                   ( mkWildValBinder )
-import DynFlags                 ( DynFlags )
+import GHC.Driver.Session                 ( DynFlags )
 import TysWiredIn
 import qualified Type
 import Type hiding              ( substTy, substTyVar, substTyVarBndr )

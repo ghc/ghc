@@ -61,7 +61,7 @@ import VarSet
 import Var         ( VarBndr(..), mkTyVar )
 import FV
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import Util
 import ListSetOps
 import SrcLoc
