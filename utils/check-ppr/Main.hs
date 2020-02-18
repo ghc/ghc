@@ -91,7 +91,7 @@ getPragmas anns = pragmaStr
     tokComment (L _ (AnnLineComment  s)) = s
     tokComment _ = ""
 
-    comments = map tokComment $ sortLocated $ apiAnnRogueComments anns
+    comments = map tokComment $ sortRealLocated $ apiAnnRogueComments anns
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
     pragmaStr = intercalate "\n" pragmas
 
