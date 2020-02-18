@@ -306,14 +306,14 @@ stat_startGCSync (gc_thread *gct)
 void
 stat_startNonmovingGc ()
 {
-    start_nonmoving_gc_cpu = getMyThreadCPUTime();
+    start_nonmoving_gc_cpu = getCurrentThreadCPUTime();
     start_nonmoving_gc_elapsed = getProcessCPUTime();
 }
 
 void
 stat_endNonmovingGc ()
 {
-    Time cpu = getMyThreadCPUTime();
+    Time cpu = getCurrentThreadCPUTime();
     Time elapsed = getProcessCPUTime();
     stats.gc.nonmoving_gc_elapsed_ns = elapsed - start_nonmoving_gc_elapsed;
     stats.nonmoving_gc_elapsed_ns += stats.gc.nonmoving_gc_elapsed_ns;
@@ -371,7 +371,7 @@ stat_startGCWorker (Capability *cap STG_UNUSED, gc_thread *gct)
         rtsConfig.gcDoneHook != NULL;
 
     if (stats_enabled || RtsFlags.ProfFlags.doHeapProfile) {
-        gct->gc_start_cpu = getMyThreadCPUTime();
+        gct->gc_start_cpu = getCurrentThreadCPUTime();
     }
 }
 
@@ -383,7 +383,7 @@ stat_endGCWorker (Capability *cap STG_UNUSED, gc_thread *gct)
         rtsConfig.gcDoneHook != NULL;
 
     if (stats_enabled || RtsFlags.ProfFlags.doHeapProfile) {
-        gct->gc_end_cpu = getMyThreadCPUTime();
+        gct->gc_end_cpu = getCurrentThreadCPUTime();
     }
 }
 
@@ -399,7 +399,7 @@ stat_startGC (Capability *cap, gc_thread *gct)
         rtsConfig.gcDoneHook != NULL;
 
     if (stats_enabled || RtsFlags.ProfFlags.doHeapProfile) {
-        gct->gc_start_cpu = getMyThreadCPUTime();
+        gct->gc_start_cpu = getCurrentThreadCPUTime();
     }
 
     gct->gc_start_elapsed = getProcessElapsedTime();
