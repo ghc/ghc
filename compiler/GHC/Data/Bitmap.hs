@@ -10,16 +10,15 @@
 
 module GHC.Data.Bitmap (
         Bitmap, mkBitmap,
-        intsToBitmap, intsToReverseBitmap,
+        intsToReverseBitmap,
         mAX_SMALL_BITMAP_SIZE,
-        seqBitmap,
   ) where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Runtime.Heap.Layout
 import GHC.Driver.Session
-import Util
 
 import Data.Bits
 
@@ -42,31 +41,6 @@ chunkToBitmap dflags chunk =
   where
     oneAt :: Int -> StgWord
     oneAt i = toStgWord dflags 1 `shiftL` i
-
--- | Make a bitmap where the slots specified are the /ones/ in the bitmap.
--- eg. @[0,1,3], size 4 ==> 0xb@.
---
--- The list of @Int@s /must/ be already sorted.
-intsToBitmap :: DynFlags
-             -> Int        -- ^ size in bits
-             -> [Int]      -- ^ sorted indices of ones
-             -> Bitmap
-intsToBitmap dflags size = go 0
-  where
-    word_sz = wORD_SIZE_IN_BITS dflags
-    oneAt :: Int -> StgWord
-    oneAt i = toStgWord dflags 1 `shiftL` i
-
-    -- It is important that we maintain strictness here.
-    -- See Note [Strictness when building Bitmaps].
-    go :: Int -> [Int] -> Bitmap
-    go !pos slots
-      | size <= pos = []
-      | otherwise =
-        (foldl' (.|.) (toStgWord dflags 0) (map (\i->oneAt (i - pos)) these)) :
-          go (pos + word_sz) rest
-      where
-        (these,rest) = span (< (pos + word_sz)) slots
 
 -- | Make a bitmap where the slots specified are the /zeros/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
@@ -101,7 +75,7 @@ intsToReverseBitmap dflags size = go 0
 {-
 
 Note [Strictness when building Bitmaps]
-========================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One of the places where @Bitmap@ is used is in in building Static Reference
 Tables (SRTs) (in @GHC.Cmm.Info.Build.procpointSRT@). In #7450 it was noticed
@@ -125,10 +99,7 @@ large.  This value represents the largest size of bitmap that can be
 packed into a single word.
 -}
 mAX_SMALL_BITMAP_SIZE :: DynFlags -> Int
-mAX_SMALL_BITMAP_SIZE dflags
- | wORD_SIZE dflags == 4 = 27
- | otherwise             = 58
-
-seqBitmap :: Bitmap -> a -> a
-seqBitmap = seqList
-
+mAX_SMALL_BITMAP_SIZE dflags =
+    case platformWordSize (targetPlatform dflags) of
+      PW4 -> 27 -- On 32-bit: 5 bits for size, 27 bits for bitmap
+      PW8 -> 58 -- On 64-bit: 6 bits for size, 58 bits for bitmap
