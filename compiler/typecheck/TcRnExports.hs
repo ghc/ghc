@@ -849,6 +849,8 @@ exportClashErr global_env occ name1 name2 ie1 ie2
         = fromMaybe (pprPanic "exportClashErr" (ppr name))
                     (lookupGRE_Name_OccName global_env name occ)
     get_loc name = greSrcSpan (get_gre name)
-    (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
-                                   then (name1, ie1, name2, ie2)
-                                   else (name2, ie2, name1, ie1)
+    (name1', ie1', name2', ie2') =
+      case SrcLoc.leftmost_smallest (get_loc name1) (get_loc name2) of
+        LT -> (name1, ie1, name2, ie2)
+        GT -> (name2, ie2, name1, ie1)
+        EQ -> panic "exportClashErr: clashing exports have idential location"

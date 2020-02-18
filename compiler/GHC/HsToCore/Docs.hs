@@ -23,7 +23,6 @@ import TcRnTypes
 
 import Control.Applicative
 import Data.Bifunctor (first)
-import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
@@ -76,7 +75,7 @@ mkMaps instances decls =
              -> ( [(Name, HsDocString)]
                 , [(Name, Map Int (HsDocString))]
                 )
-    mappings (L l decl, docStrs) =
+    mappings (L (RealSrcSpan l) decl, docStrs) =
            (dm, am)
       where
         doc = concatDocs docStrs
@@ -92,17 +91,19 @@ mkMaps instances decls =
         subNs = [ n | (n, _, _) <- subs ]
         dm = [(n, d) | (n, Just d) <- zip ns (repeat doc) ++ zip subNs subDocs]
         am = [(n, args) | n <- ns] ++ zip subNs subArgs
+    mappings (L (UnhelpfulSpan _) _, _) = ([], [])
 
-    instanceMap :: Map SrcSpan Name
-    instanceMap = M.fromList [(getSrcSpan n, n) | n <- instances]
+    instanceMap :: Map RealSrcSpan Name
+    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l <- [getSrcSpan n] ]
 
-    names :: SrcSpan -> HsDecl GhcRn -> [Name]
-    names l (InstD _ d) = maybeToList (M.lookup loc instanceMap) -- See
-                                                                 -- Note [1].
-      where loc = case d of
-              TyFamInstD _ _ -> l -- The CoAx's loc is the whole line, but only
-                                  -- for TFs
-              _ -> getInstLoc d
+    names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
+    names l (InstD _ d) = maybeToList $ -- See Note [1].
+      case d of
+              TyFamInstD _ _ -> M.lookup l instanceMap
+                -- The CoAx's loc is the whole line, but only
+                -- for TFs
+              _ -> lookupSrcSpan (getInstLoc d) instanceMap
+
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
     names _ decl = getMainDeclBinder decl
 
@@ -160,7 +161,7 @@ getInstLoc = \case
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
 -- family of a type class.
-subordinates :: Map SrcSpan Name
+subordinates :: Map RealSrcSpan Name
              -> HsDecl GhcRn
              -> [(Name, [(HsDocString)], Map Int (HsDocString))]
 subordinates instMap decl = case decl of
@@ -168,7 +169,7 @@ subordinates instMap decl = case decl of
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
       FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
-    [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
+    [ (n, [], M.empty) | Just n <- [lookupSrcSpan l instMap] ] ++ dataSubs defn
 
   InstD _ (DataFamInstD _ (DataFamInstDecl (HsIB { hsib_body = d })))
     -> dataSubs (feqn_rhs d)
@@ -197,7 +198,7 @@ subordinates instMap decl = case decl of
                   | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
                                 concatMap (unLoc . deriv_clause_tys . unLoc) $
                                 unLoc $ dd_derivs dd
-                  , Just instName <- [M.lookup l instMap] ]
+                  , Just instName <- [lookupSrcSpan l instMap] ]
 
         extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
         extract_deriv_ty (L l ty) =
@@ -233,7 +234,7 @@ isValD _ = False
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
 classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
+classDecls class_ = filterDecls . collectDocs . sortLocated $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs (DocD noExtField) class_
@@ -277,7 +278,7 @@ typeDocs = go 0
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
+topDecls = filterClasses . filterDecls . collectDocs . sortLocated . ungroup
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
@@ -297,10 +298,6 @@ ungroup group_ =
     valbinds (XValBindsLR (NValBinds binds _)) =
       concatMap bagToList . snd . unzip $ binds
     valbinds ValBinds{} = error "expected XValBindsLR"
-
--- | Sort by source location
-sortByLoc :: [Located a] -> [Located a]
-sortByLoc = sortOn getLoc
 
 -- | Collect docs and attach them to the right declarations.
 --
