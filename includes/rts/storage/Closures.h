@@ -104,6 +104,12 @@ typedef struct {
     StgClosure *selectee;
 } StgSelector;
 
+/*
+   PAP payload contains pointers and non-pointers interleaved and we only have
+   one info table for PAPs (stg_PAP_info). To visit pointers in a PAP payload we
+   use the `fun`s bitmap. For a PAP with n_args arguments the first n_args bits
+   in the fun's bitmap tell us which payload locations contain pointers.
+*/
 typedef struct {
     StgHeader   header;
     StgHalfWord arity;          /* zero if it is an AP */
