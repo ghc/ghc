@@ -55,7 +55,7 @@ type DocMap a      = Map Name (MDoc a)
 type ArgMap a      = Map Name (Map Int (MDoc a))
 type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl GhcRn]
-type InstMap       = Map SrcSpan Name
+type InstMap       = Map RealSrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 

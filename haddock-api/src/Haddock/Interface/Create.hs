@@ -377,9 +377,8 @@ mkMaps dflags pkgName gre instances decls = do
                         , [(Name, Map Int (MDoc Name))]
                         , [(Name,  [LHsDecl GhcRn])]
                         )
-    mappings (ldecl, docStrs) = do
-      let L l decl = ldecl
-          declDoc :: [HsDocString] -> Map Int HsDocString
+    mappings (ldecl@(L (RealSrcSpan l) decl), docStrs) = do
+      let declDoc :: [HsDocString] -> Map Int HsDocString
                   -> ErrMsgM (Maybe (MDoc Name), Map Int (MDoc Name))
           declDoc strs m = do
             doc' <- processDocStrings dflags pkgName gre strs
@@ -407,12 +406,13 @@ mkMaps dflags pkgName gre instances decls = do
         seqList subDocs `seq`
         seqList subArgs `seq`
         pure (dm, am, cm)
+    mappings (L (UnhelpfulSpan _) _, _) = pure ([], [], [])
 
-    instanceMap :: Map SrcSpan Name
-    instanceMap = M.fromList [ (getSrcSpan n, n) | n <- instances ]
+    instanceMap :: Map RealSrcSpan Name
+    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l <- [getSrcSpan n] ]
 
-    names :: SrcSpan -> HsDecl GhcRn -> [Name]
-    names _ (InstD _ d) = maybeToList (M.lookup loc instanceMap) -- See note [2].
+    names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
+    names _ (InstD _ d) = maybeToList (SrcLoc.lookupSrcSpan loc instanceMap) -- See note [2].
       where loc = case d of
               -- The CoAx's loc is the whole line, but only for TFs. The
               -- workaround is to dig into the family instance declaration and
@@ -446,7 +446,7 @@ subordinates instMap decl = case decl of
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
       FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
-    [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
+    [ (n, [], M.empty) | Just n <- [SrcLoc.lookupSrcSpan l instMap] ] ++ dataSubs defn
 
   InstD _ (DataFamInstD _ (DataFamInstDecl (HsIB { hsib_body = d })))
     -> dataSubs (feqn_rhs d)
@@ -471,7 +471,7 @@ subordinates instMap decl = case decl of
                   | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
                                 concatMap (unLoc . deriv_clause_tys . unLoc) $
                                 unLoc $ dd_derivs dd
-                  , Just instName <- [M.lookup l instMap] ]
+                  , Just instName <- [SrcLoc.lookupSrcSpan l instMap] ]
 
         extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
         extract_deriv_ty (L l ty) =
@@ -523,7 +523,7 @@ typeDocs = go 0
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
 classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
+classDecls class_ = filterDecls . collectDocs . SrcLoc.sortLocated $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs (DocD noExtField) class_
@@ -536,7 +536,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
 topDecls =
-  filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
+  filterClasses . filterDecls . collectDocs . SrcLoc.sortLocated . ungroup
 
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
@@ -569,12 +569,6 @@ ungroup group_ =
 -- using the given constructor
 mkDecls :: (a -> [Located b]) -> (b -> c) -> a -> [Located c]
 mkDecls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
-
-
--- | Sort by source location
-sortByLoc :: [Located a] -> [Located a]
-sortByLoc = sortBy (comparing getLoc)
-
 
 --------------------------------------------------------------------------------
 -- Filtering of declarations
@@ -1196,7 +1190,7 @@ mkVisibleNames (_, _, _, instMap) exports opts
       where subs    = map fst (expItemSubDocs e)
             patsyns = concatMap (getMainDeclBinder . fst) (expItemPats e)
             name = case unLoc $ expItemDecl e of
-              InstD _ d -> maybeToList $ M.lookup (getInstLoc d) instMap
+              InstD _ d -> maybeToList $ SrcLoc.lookupSrcSpan (getInstLoc d) instMap
               decl      -> getMainDeclBinder decl
     exportName ExportNoDecl {} = [] -- we don't count these as visible, since
                                     -- we don't want links to go to them.
