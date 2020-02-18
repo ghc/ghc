@@ -26,6 +26,16 @@
 #include <share.h>
 #include <errno.h>
 
+/* Duplicate a string, but in wide form. The caller is responsible for freeing
+   the result. */
+static wchar_t* FS(to_wide) (const char *path) {
+  size_t len = mbstowcs (NULL, path, 0);
+  wchar_t *w_path = malloc (sizeof (wchar_t) * (len + 1));
+  mbstowcs (w_path, path, len);
+  w_path[len] = L'\0';
+  return w_path;
+}
+
 /* This function converts Windows paths between namespaces. More specifically
    It converts an explorer style path into a NT or Win32 namespace.
    This has several caveats but they are caveats that are native to Windows and
@@ -363,15 +373,8 @@ FILE *FS(fwopen) (const wchar_t* filename, const wchar_t* mode)
 
 FILE *FS(fopen) (const char* filename, const char* mode)
 {
-  size_t len = mbstowcs (NULL, filename, 0);
-  wchar_t *w_filename = malloc (sizeof (wchar_t) * (len + 1));
-  mbstowcs (w_filename, filename, len);
-  w_filename[len] = L'\0';
-
-  len = mbstowcs (NULL, mode, 0);
-  wchar_t *w_mode = malloc (sizeof (wchar_t) * (len + 1));
-  mbstowcs (w_mode, mode, len);
-  w_mode[len] = L'\0';
+  wchar_t * const w_filename = FS(to_wide) (filename);
+  wchar_t * const w_mode = FS(to_wide) (mode);
 
   FILE *result = FS(fwopen) (w_filename, w_mode);
   free (w_filename);
@@ -382,11 +385,7 @@ FILE *FS(fopen) (const char* filename, const char* mode)
 
 int FS(sopen) (const char* filename, int oflag, int shflag, int pmode)
 {
-  size_t len = mbstowcs (NULL, filename, 0);
-  wchar_t *w_filename = malloc (sizeof (wchar_t) * (len + 1));
-  mbstowcs (w_filename, filename, len);
-  w_filename[len] = L'\0';
-
+  wchar_t * const w_filename = FS(to_wide) (filename);
   int result = FS(swopen) (w_filename, oflag, shflag, pmode);
   free (w_filename);
 
@@ -395,11 +394,7 @@ int FS(sopen) (const char* filename, int oflag, int shflag, int pmode)
 
 int FS(_stat) (const char *path, struct _stat *buffer)
 {
-  size_t len = mbstowcs (NULL, path, 0);
-  wchar_t *w_path = malloc (sizeof (wchar_t) * (len + 1));
-  mbstowcs (w_path, path, len);
-  w_path[len] = L'\0';
-
+  wchar_t * const w_path = FS(to_wide) (path);
   int result = FS(_wstat) (w_path, buffer);
   free (w_path);
 
@@ -408,11 +403,7 @@ int FS(_stat) (const char *path, struct _stat *buffer)
 
 int FS(_stat64) (const char *path, struct __stat64 *buffer)
 {
-  size_t len = mbstowcs (NULL, path, 0);
-  wchar_t *w_path = malloc (sizeof (wchar_t) * (len + 1));
-  mbstowcs (w_path, path, len);
-  w_path[len] = L'\0';
-
+  wchar_t * const w_path = FS(to_wide) (path);
   int result = FS(_wstat64) (w_path, buffer);
   free (w_path);
 
@@ -421,7 +412,7 @@ int FS(_stat64) (const char *path, struct __stat64 *buffer)
 
 static __time64_t ftToPosix(FILETIME ft)
 {
-  /* takes the last modified date.  */
+  // takes the last modified date
   LARGE_INTEGER date, adjust;
   date.HighPart = ft.dwHighDateTime;
   date.LowPart = ft.dwLowDateTime;
@@ -520,6 +511,79 @@ int FS(_wstat64) (const wchar_t *path, struct __stat64 *buffer)
   return result;
 }
 
+int FS(_wrename) (const wchar_t *from, const wchar_t *to)
+{
+  wchar_t* const _from = FS(create_device_name) (from);
+  if (!_from)
+    return -1;
+
+  wchar_t* const _to = FS(create_device_name) (to);
+  if (!_to)
+    {
+      free (_from);
+      return -1;
+    }
+
+  if (MoveFileW(_from, _to) == 0) {
+    free (_from);
+    free (_to);
+    return setErrNoFromWin32Error ();
+  }
+
+
+  free (_from);
+  free (_to);
+  return 0;
+}
+
+int FS(rename) (const char *from, const char *to)
+{
+  wchar_t * const w_from = FS(to_wide) (from);
+  wchar_t * const w_to = FS(to_wide) (to);
+  int result = FS(_wrename) (w_from, w_to);
+  free(w_from);
+  free(w_to);
+
+  return result;
+}
+
+int FS(unlink) (const char *filename)
+{
+  return FS(_unlink) (filename);
+}
+
+int FS(_unlink) (const char *filename)
+{
+  wchar_t * const w_filename = FS(to_wide) (filename);
+  int result = FS(_wunlink) (w_filename);
+  free(w_filename);
+
+  return result;
+}
+
+int FS(_wunlink) (const wchar_t *filename)
+{
+  wchar_t* const _filename = FS(create_device_name) (filename);
+  if (!_filename)
+    return -1;
+
+  if (DeleteFileW(_filename) == 0) {
+    free (_filename);
+    return setErrNoFromWin32Error ();
+  }
+
+
+  free (_filename);
+  return 0;
+}
+int FS(remove) (const char *path)
+{
+  return FS(_unlink) (path);
+}
+int FS(_wremove) (const wchar_t *path)
+{
+  return FS(_wunlink) (path);
+}
 #else
 FILE *FS(fopen) (const char* filename, const char* mode)
 {
