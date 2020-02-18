@@ -9,10 +9,11 @@ Please take a few moments to verify that your commits fulfill the following:
  * [ ] have added source comments describing your change. For larger changes you
    likely should add a [Note][notes] and cross-reference it from the relevant
    places.
- * [ ] add a [testcase to the
-   testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
+ * [ ] add a [testcase to the testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
  * [ ] if your MR affects library interfaces (e.g. changes `base`) please add
    the ~"user facing" label.
+ * [ ] updates the users guide if applicable
+ * [ ] mentions new features in the release notes for the next release
 
 If you have any questions don't hesitate to open your merge request and inquire
 in a comment. If your patch isn't quite done yet please do add prefix your MR
