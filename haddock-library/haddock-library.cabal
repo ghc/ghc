@@ -17,6 +17,8 @@ maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <ale
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
+tested-with:          GHC==8.10.*, GHC==8.8.1, GHC==8.6.5
+
 extra-source-files:
   CHANGES.md
 
