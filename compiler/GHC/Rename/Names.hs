@@ -71,6 +71,7 @@ import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
+import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
 
@@ -1395,7 +1396,7 @@ findImportUsage imports used_gres
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
-        used_gres = Map.lookup (srcSpanEnd loc) import_usage
+        used_gres = lookupSrcLoc (srcSpanEnd loc) import_usage
                                -- srcSpanEnd: see Note [The ImportMap]
                     `orElse` []
 
@@ -1459,7 +1460,7 @@ It's just a cheap hack; we could equally well use the Span too.
 The [GlobalRdrElt] are the things imported from that decl.
 -}
 
-type ImportMap = Map SrcLoc [GlobalRdrElt]  -- See [The ImportMap]
+type ImportMap = Map RealSrcLoc [GlobalRdrElt]  -- See [The ImportMap]
      -- If loc :-> gres, then
      --   'loc' = the end loc of the bestImport of each GRE in 'gres'
 
@@ -1470,12 +1471,13 @@ mkImportMap :: [GlobalRdrElt] -> ImportMap
 mkImportMap gres
   = foldr add_one Map.empty gres
   where
-    add_one gre@(GRE { gre_imp = imp_specs }) imp_map
-       = Map.insertWith add decl_loc [gre] imp_map
+    add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
+      case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
+                              -- For srcSpanEnd see Note [The ImportMap]
+       RealSrcLoc decl_loc -> Map.insertWith add decl_loc [gre] imp_map
+       UnhelpfulLoc _ -> imp_map
        where
           best_imp_spec = bestImport imp_specs
-          decl_loc      = srcSpanEnd (is_dloc (is_decl best_imp_spec))
-                        -- For srcSpanEnd see Note [The ImportMap]
           add _ gres = gre : gres
 
 warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Name)
@@ -1780,7 +1782,9 @@ addDupDeclErr gres@(gre : _)
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
     name = gre_name gre
-    sorted_names = sortWith nameSrcLoc (map gre_name gres)
+    sorted_names =
+      sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
+             (map gre_name gres)
 
 
 

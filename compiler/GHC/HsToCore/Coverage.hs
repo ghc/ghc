@@ -53,8 +53,8 @@ import Trace.Hpc.Mix
 import Trace.Hpc.Util
 
 import qualified Data.ByteString as BS
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -91,9 +91,11 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
                       , exports      = exports
                       , inlines      = emptyVarSet
                       , inScope      = emptyVarSet
-                      , blackList    = Map.fromList
-                                          [ (getSrcSpan (tyConName tyCon),())
-                                          | tyCon <- tyCons ]
+                      , blackList    = Set.fromList $
+                                       mapMaybe (\tyCon -> case getSrcSpan (tyConName tyCon) of
+                                                             RealSrcSpan l -> Just l
+                                                             UnhelpfulSpan _ -> Nothing)
+                                                tyCons
                       , density      = mkDensity tickish dflags
                       , this_mod     = mod
                       , tickishType  = tickish
@@ -1034,7 +1036,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , inlines      :: VarSet
                         , declPath     :: [String]
                         , inScope      :: VarSet
-                        , blackList    :: Map SrcSpan ()
+                        , blackList    :: Set RealSrcSpan
                         , this_mod     :: Module
                         , tickishType  :: TickishType
                         }
@@ -1167,10 +1169,8 @@ bindLocals new_ids (TM m)
   where occs = [ nameOccName (idName id) | id <- new_ids ]
 
 isBlackListed :: SrcSpan -> TM Bool
-isBlackListed pos = TM $ \ env st ->
-              case Map.lookup pos (blackList env) of
-                Nothing -> (False,noFVs,st)
-                Just () -> (True,noFVs,st)
+isBlackListed (RealSrcSpan pos) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
+isBlackListed (UnhelpfulSpan _) = return False
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations

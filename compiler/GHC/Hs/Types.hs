@@ -1345,7 +1345,6 @@ data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
   | XFieldOcc
       (XXFieldOcc pass)
 deriving instance Eq  (XCFieldOcc (GhcPass p)) => Eq  (FieldOcc (GhcPass p))
-deriving instance Ord (XCFieldOcc (GhcPass p)) => Ord (FieldOcc (GhcPass p))
 
 type instance XCFieldOcc GhcPs = NoExtField
 type instance XCFieldOcc GhcRn = Name

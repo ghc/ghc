@@ -76,7 +76,9 @@ import Outputable
 import BasicTypes ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.List ( sortBy )
 import Control.Monad( unless )
+import Data.Function ( on )
 
 {-
 ************************************************************************
@@ -844,7 +846,7 @@ addClsInstsErr herald ispecs
   = setSrcSpan (getSrcSpan (head sorted)) $
     addErr (hang herald 2 (pprInstances sorted))
  where
-   sorted = sortWith getSrcLoc ispecs
-   -- The sortWith just arranges that instances are displayed in order
+   sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
+   -- The sortBy just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users

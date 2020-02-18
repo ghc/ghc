@@ -32,6 +32,7 @@ import SrcLoc
 import UniqSupply                 ( takeUniqFromSupply )
 import Unique
 import UniqFM
+import Util
 
 import qualified Data.Array as A
 import Data.IORef
@@ -56,8 +57,10 @@ data HieName
   deriving (Eq)
 
 instance Ord HieName where
-  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b,c) (d,e,f)
-  compare (LocalName a b) (LocalName c d) = compare (a,b) (c,d)
+  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` SrcLoc.leftmost_smallest c f
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
+  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` SrcLoc.leftmost_smallest b d
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
   compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
     -- Not actually non deterministic as it is a KnownKey
   compare ExternalName{} _ = LT

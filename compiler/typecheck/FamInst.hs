@@ -44,7 +44,9 @@ import VarSet
 import FV
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad
+import Data.List ( sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.Function ( on )
 
 import qualified GHC.LanguageExtensions  as LangExt
 
@@ -1032,7 +1034,7 @@ reportConflictInstErr _ []
   = return ()  -- No conflicts
 reportConflictInstErr fam_inst (match1 : _)
   | FamInstMatch { fim_instance = conf_inst } <- match1
-  , let sorted  = sortWith getSpan [fam_inst, conf_inst]
+  , let sorted  = sortBy (SrcLoc.leftmost_smallest `on` getSpan) [fam_inst, conf_inst]
         fi1     = head sorted
         span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
   = setSrcSpan span $ addErr $
@@ -1041,8 +1043,8 @@ reportConflictInstErr fam_inst (match1 : _)
                | fi <- sorted
                , let ax = famInstAxiom fi ])
  where
-   getSpan = getSrcLoc . famInstAxiom
-   -- The sortWith just arranges that instances are displayed in order
+   getSpan = getSrcSpan . famInstAxiom
+   -- The sortBy just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
 

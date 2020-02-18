@@ -46,7 +46,7 @@ import BooleanFormula (LBooleanFormula)
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
-import Data.Ord
+import Data.Function
 
 {-
 ************************************************************************
@@ -667,7 +667,7 @@ pprLHsBindsForUser binds sigs
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
             [(loc, ppr bind) | L loc bind <- bagToList binds]
 
-    sort_by_loc decls = sortBy (comparing fst) decls
+    sort_by_loc decls = sortBy (SrcLoc.leftmost_smallest `on` fst) decls
 
 pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 -- Print a bunch of declarations

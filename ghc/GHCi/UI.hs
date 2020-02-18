@@ -1325,8 +1325,9 @@ printTypeOfNames names
  = mapM_ (printTypeOfName ) $ sortBy compareNames names
 
 compareNames :: Name -> Name -> Ordering
-n1 `compareNames` n2 = compareWith n1 `compare` compareWith n2
-    where compareWith n = (getOccString n, getSrcSpan n)
+n1 `compareNames` n2 =
+  (compare `on` getOccString) n1 n2 `thenCmp`
+  (SrcLoc.leftmost_smallest `on` getSrcSpan) n1 n2
 
 printTypeOfName :: GHC.GhcMonad m => Name -> m ()
 printTypeOfName n
@@ -2406,7 +2407,7 @@ browseModule bang modl exports_only = do
                 -- has a good source location, then they all should.
                 loc_sort ns
                       | n:_ <- ns, isGoodSrcSpan (nameSrcSpan n)
-                      = sortBy (compare `on` nameSrcSpan) ns
+                      = sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan) ns
                       | otherwise
                       = occ_sort ns
 

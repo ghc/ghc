@@ -7,6 +7,7 @@ import Outputable
 import MonadUtils
 import NameSet
 import Var
+import SrcLoc
 
 import Data.Data
 
@@ -14,7 +15,7 @@ import System.Environment
 import Control.Monad
 import Control.Monad.Trans.State
 import Data.List (sortBy)
-import Data.Ord
+import Data.Function
 import Prelude hiding (traverse)
 
 type Traverse a = State (SrcSpan, [(Name, SrcSpan)]) a
@@ -71,7 +72,7 @@ test7918 = do
 
   typecheckedB <- getModSummary (mkModuleName "T7918B") >>= parseModule >>= typecheckModule
   let (_loc, ids) = execState (traverse (tm_typechecked_source typecheckedB)) (noSrcSpan, [])
-  liftIO . forM_ (sortBy (comparing snd) (reverse ids)) $ putStrLn . showSDoc dynFlags . ppr
+  liftIO . forM_ (sortBy (SrcLoc.leftmost_smallest `on` snd) (reverse ids)) $ putStrLn . showSDoc dynFlags . ppr
 
 main :: IO ()
 main = do

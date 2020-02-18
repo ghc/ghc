@@ -1128,7 +1128,7 @@ shadowName env name
 -- It's quite elaborate so that we can give accurate unused-name warnings.
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
                             is_item :: ImpItemSpec }
-                deriving( Eq, Ord, Data )
+                deriving( Eq, Data )
 
 -- | Import Declaration Specification
 --
@@ -1145,7 +1145,7 @@ data ImpDeclSpec
         is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_qual     :: Bool,       -- ^ Was this import qualified?
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
-    } deriving Data
+    } deriving (Eq, Data)
 
 -- | Import Item Specification
 --
@@ -1166,26 +1166,7 @@ data ImpItemSpec
         --
         -- Here the constructors of @T@ are not named explicitly;
         -- only @T@ is named explicitly.
-  deriving Data
-
-instance Eq ImpDeclSpec where
-  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
-
-instance Ord ImpDeclSpec where
-   compare is1 is2 = (is_mod is1 `compare` is_mod is2) `thenCmp`
-                     (is_dloc is1 `compare` is_dloc is2)
-
-instance Eq ImpItemSpec where
-  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
-
-instance Ord ImpItemSpec where
-   compare is1 is2 =
-    case (is1, is2) of
-      (ImpAll, ImpAll) -> EQ
-      (ImpAll, _)      -> GT
-      (_, ImpAll)      -> LT
-      (ImpSome _ l1, ImpSome _ l2) -> l1 `compare` l2
-
+  deriving (Eq, Data)
 
 bestImport :: [ImportSpec] -> ImportSpec
 -- See Note [Choosing the best import declaration]
@@ -1203,7 +1184,7 @@ bestImport iss
          (ImpSpec { is_item = item2, is_decl = d2 })
       = (is_qual d1 `compare` is_qual d2) `thenCmp`
         (best_item item1 item2)           `thenCmp`
-        (is_dloc d1 `compare` is_dloc d2)
+        SrcLoc.leftmost_smallest (is_dloc d1) (is_dloc d2)
 
     best_item :: ImpItemSpec -> ImpItemSpec -> Ordering
     best_item ImpAll ImpAll = EQ
