@@ -28,7 +28,7 @@ import GhcPrelude
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
 import BasicTypes ( Origin(..) )
-import DynFlags
+import GHC.Driver.Session
 import GHC.Hs
 import TcHsSyn
 import TcEvidence

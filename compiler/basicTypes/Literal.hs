@@ -61,7 +61,7 @@ import FastString
 import BasicTypes
 import Binary
 import Constants
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform
 import UniqFM
 import Util

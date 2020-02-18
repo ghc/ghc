@@ -25,7 +25,7 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
-import DynFlags (gopt, GeneralFlag(..), DynFlags, backendMaintainsCfg)
+import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, backendMaintainsCfg)
 import UniqFM
 import Util
 import Unique

@@ -72,7 +72,7 @@ import UniqSupply
 import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import FastString
 import ListSetOps

@@ -21,7 +21,7 @@ import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
 import TcType
-import HscTypes ( lookupId )
+import GHC.Driver.Types ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
 import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
@@ -34,7 +34,7 @@ import TyCon
 import DataCon
 import Module
 import GHC.Hs
-import DynFlags
+import GHC.Driver.Session
 import Bag
 import Var ( VarBndr(..) )
 import CoreMap

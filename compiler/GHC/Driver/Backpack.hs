@@ -14,42 +14,42 @@
 -- it builds and doesn't serialize out the database contents.
 -- But it's still handy for constructing tests.
 
-module DriverBkp (doBackpack) where
+module GHC.Driver.Backpack (doBackpack) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 -- In a separate module because it hooks into the parser.
-import BkpSyn
+import GHC.Driver.Backpack.Syntax
 
 import ApiAnnotation
 import GHC hiding (Failed, Succeeded)
-import Packages
+import GHC.Driver.Packages
 import Parser
 import Lexer
-import GhcMonad
-import DynFlags
+import GHC.Driver.Monad
+import GHC.Driver.Session
 import TcRnMonad
 import TcRnDriver
 import Module
-import HscTypes
+import GHC.Driver.Types
 import StringBuffer
 import FastString
 import ErrUtils
 import SrcLoc
-import HscMain
+import GHC.Driver.Main
 import UniqFM
 import UniqDFM
 import Outputable
 import Maybes
 import HeaderInfo
 import GHC.Iface.Utils
-import GhcMake
+import GHC.Driver.Make
 import UniqDSet
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
-import Finder
+import GHC.Driver.Finder
 import Util
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -75,7 +75,7 @@ doBackpack [src_filename] = do
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
-    -- Cribbed from: preprocessFile / DriverPipeline
+    -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
     -- TODO: Preprocessing not implemented
@@ -264,7 +264,7 @@ buildUnit session cid insts lunit = do
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
     -- we have to defer until we've typechecked our local signature.
-    -- TODO: work this into GhcMake!!
+    -- TODO: work this into GHC.Driver.Make!!
     forM_ (zip [1..] deps0) $ \(i, dep) ->
         case session of
             TcSession -> return ()
@@ -629,14 +629,14 @@ convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsUn
 ************************************************************************
 -}
 
--- | This is our version of GhcMake.downsweep, but with a few modifications:
+-- | This is our version of GHC.Driver.Make.downsweep, but with a few modifications:
 --
 --  1. Every module is required to be mentioned, so we don't do any funny
 --     business with targets or recursively grabbing dependencies.  (We
 --     could support this in principle).
 --  2. We support inline modules, whose summary we have to synthesize ourself.
 --
--- We don't bother trying to support GhcMake for now, it's more trouble
+-- We don't bother trying to support GHC.Driver.Make for now, it's more trouble
 -- than it's worth for inline modules.
 hsunitModuleGraph :: DynFlags -> HsUnit HsComponentId -> BkpM ModuleGraph
 hsunitModuleGraph dflags unit = do
@@ -747,7 +747,7 @@ hsModuleToModSummary pn hsc_src modname
     let imps = hsmodImports (unLoc hsmod)
         loc  = getLoc hsmod
     hsc_env <- getSession
-    -- Sort of the same deal as in DriverPipeline's getLocation
+    -- Sort of the same deal as in GHC.Driver.Pipeline's getLocation
     -- Use the PACKAGE NAME to find the location
     let PackageName unit_fs = pn
         dflags = hsc_dflags hsc_env
@@ -768,7 +768,7 @@ hsModuleToModSummary pn hsc_src modname
     let location = case hsc_src of
                         HsBootFile -> addBootSuffixLocnOut location0
                         _ -> location0
-    -- This duplicates a pile of logic in GhcMake
+    -- This duplicates a pile of logic in GHC.Driver.Make
     env <- getBkpEnv
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)

@@ -16,7 +16,7 @@ import GhcPrelude
 import GHC.Llvm
 
 import GHC.Cmm.Expr
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable ( panic )
 import Unique

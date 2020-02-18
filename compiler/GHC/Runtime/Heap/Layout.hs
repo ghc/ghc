@@ -47,7 +47,7 @@ module GHC.Runtime.Heap.Layout (
 import GhcPrelude
 
 import BasicTypes( ConTagZ )
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import FastString

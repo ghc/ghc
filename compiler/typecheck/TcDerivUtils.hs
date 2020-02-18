@@ -29,9 +29,9 @@ import Bag
 import BasicTypes
 import Class
 import DataCon
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
-import HscTypes (lookupFixity, mi_fix)
+import GHC.Driver.Types (lookupFixity, mi_fix)
 import GHC.Hs
 import Inst
 import InstEnv

@@ -12,9 +12,9 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn
-import HscTypes
+import GHC.Driver.Types
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
@@ -52,7 +52,7 @@ import WorkWrap         ( wwTopBinds )
 import SrcLoc
 import Util
 import Module
-import Plugins          ( withPlugins, installCoreToDos )
+import GHC.Driver.Plugins          ( withPlugins, installCoreToDos )
 import GHC.Runtime.Loader  -- ( initializePlugins )
 
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )

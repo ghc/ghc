@@ -44,7 +44,7 @@ import MkCore( rEC_SEL_ERROR_ID )
 import GHC.Hs
 import Class
 import Type
-import HscTypes
+import GHC.Driver.Types
 import TyCon
 import ConLike
 import DataCon

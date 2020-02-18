@@ -57,7 +57,7 @@ import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
 import BasicTypes
-import DynFlags         ( DynFlags )
+import GHC.Driver.Session         ( DynFlags )
 import Outputable
 import FastString
 import Maybes

@@ -130,7 +130,7 @@ import Maybes
 import Util
 import ApiAnnotation
 import Data.List
-import DynFlags ( WarningFlag(..), DynFlags )
+import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import ErrUtils ( Messages )
 
 import Control.Monad

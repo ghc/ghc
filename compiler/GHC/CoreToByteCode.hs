@@ -22,7 +22,7 @@ import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHCi.RemoteTypes
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import Name
@@ -30,7 +30,7 @@ import MkId
 import Id
 import Var             ( updateVarType )
 import ForeignCall
-import HscTypes
+import GHC.Driver.Types
 import CoreUtils
 import CoreSyn
 import PprCore

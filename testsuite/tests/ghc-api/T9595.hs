@@ -1,11 +1,11 @@
 module Main where
 
 import GHC
-import Packages
-import GhcMonad
+import GHC.Driver.Packages
+import GHC.Driver.Monad
 import Outputable
 import System.Environment
-import DynFlags
+import GHC.Driver.Session
 import Module
 
 main =

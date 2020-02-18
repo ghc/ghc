@@ -50,7 +50,7 @@ import Name
 import Fingerprint
 import Encoding
 
-import DynFlags
+import GHC.Driver.Session
 import PrelInfo
 import FamInst
 import FamInstEnv

@@ -12,7 +12,7 @@ module SysTools.Process where
 
 import Exception
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import Panic

@@ -54,7 +54,7 @@ import GHC.Cmm.Dataflow.Graph
 -- The rest:
 import OrdList
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Bits

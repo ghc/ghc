@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 
 -- | Package manipulation
-module Packages (
+module GHC.Driver.Packages (
         module UnitInfo,
 
         -- * Reading the package config, and processing cmdline args
@@ -70,7 +70,7 @@ import GhcPrelude
 
 import GHC.PackageDb
 import UnitInfo
-import DynFlags
+import GHC.Driver.Session
 import Name             ( Name, nameModule_maybe )
 import UniqFM
 import UniqDFM

@@ -2,7 +2,7 @@ module Main where
 
 import BasicTypes
 import GHC
-import GhcMonad
+import GHC.Driver.Monad
 import Outputable
 import GHC.Types.RepType
 import TysPrim

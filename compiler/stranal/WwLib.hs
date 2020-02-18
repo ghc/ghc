@@ -42,7 +42,7 @@ import Unique
 import Maybes
 import Util
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ListSetOps
 

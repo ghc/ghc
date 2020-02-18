@@ -11,7 +11,7 @@ import GhcPrelude
 
 import VarSet
 import VarEnv
-import DynFlags ( DynFlags )
+import GHC.Driver.Session ( DynFlags )
 
 import BasicTypes
 import CoreSyn

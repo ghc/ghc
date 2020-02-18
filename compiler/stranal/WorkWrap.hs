@@ -20,7 +20,7 @@ import IdInfo
 import Type
 import UniqSupply
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import Demand
 import Cpr
 import WwLib

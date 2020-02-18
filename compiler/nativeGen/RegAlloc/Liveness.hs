@@ -49,7 +49,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import Digraph
-import DynFlags
+import GHC.Driver.Session
 import MonadUtils
 import Outputable
 import GHC.Platform

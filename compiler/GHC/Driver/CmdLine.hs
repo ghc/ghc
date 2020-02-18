@@ -11,7 +11,7 @@
 --
 -------------------------------------------------------------------------------
 
-module CmdLineParser
+module GHC.Driver.CmdLine
     (
       processArgs, OptKind(..), GhcFlagMode(..),
       CmdLineP(..), getCmdLineState, putCmdLineState,

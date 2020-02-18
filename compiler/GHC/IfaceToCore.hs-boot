@@ -9,7 +9,7 @@ import TcRnTypes   ( IfL )
 import InstEnv     ( ClsInst )
 import FamInstEnv  ( FamInst )
 import CoreSyn     ( CoreRule )
-import HscTypes    ( CompleteMatch )
+import GHC.Driver.Types    ( CompleteMatch )
 import Annotations ( Annotation )
 
 tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing

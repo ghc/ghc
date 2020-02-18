@@ -14,7 +14,7 @@ import SPARC.Regs
 import SPARC.Base
 import SPARC.Imm
 
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 
 -- | Get an AddrMode relative to the address in sp.

@@ -38,7 +38,7 @@ import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
 import CoreSyn
 import DataCon
-import DynFlags         ( mAX_PTR_TAG )
+import GHC.Driver.Session         ( mAX_PTR_TAG )
 import ForeignCall
 import Id
 import PrimOp

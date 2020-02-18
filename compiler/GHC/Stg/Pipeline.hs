@@ -25,7 +25,7 @@ import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
 import Module           ( Module )
 
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import UniqSupply
 import Outputable

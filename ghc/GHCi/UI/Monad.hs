@@ -37,13 +37,13 @@ module GHCi.UI.Monad (
 
 import GHCi.UI.Info (ModInfo)
 import qualified GHC
-import GhcMonad         hiding (liftIO)
+import GHC.Driver.Monad hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import OccName
-import DynFlags
+import GHC.Driver.Session
 import FastString
-import HscTypes
+import GHC.Driver.Types
 import SrcLoc
 import Module
 import RdrName (mkOrig)

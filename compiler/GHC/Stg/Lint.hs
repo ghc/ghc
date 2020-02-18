@@ -41,7 +41,7 @@ import GhcPrelude
 
 import GHC.Stg.Syntax
 
-import DynFlags
+import GHC.Driver.Session
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel )
 import CostCentre       ( isCurrentCCS )

@@ -30,7 +30,7 @@ import Type             ( Type, mkLamTypes )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import CoreMonad
 import Outputable
 import FastString

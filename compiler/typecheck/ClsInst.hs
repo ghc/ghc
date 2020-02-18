@@ -39,7 +39,7 @@ import VarEnv ( VarEnv )
 import DataCon
 import TyCon
 import Class
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Util( splitAtList, fstOf3 )
 import Data.Maybe

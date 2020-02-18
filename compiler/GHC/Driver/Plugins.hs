@@ -5,7 +5,7 @@
 -- several areas of the compiler. See the 'Plugin' type. These plugins
 -- include type-checker plugins, source plugins, and core-to-core plugins.
 
-module Plugins (
+module GHC.Driver.Plugins (
       -- * Plugins
       Plugin(..)
     , defaultPlugin
@@ -54,10 +54,10 @@ import qualified TcRnTypes
 import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import TcHoleFitTypes ( HoleFitPluginR )
 import GHC.Hs
-import DynFlags
-import HscTypes
-import GhcMonad
-import DriverPhases
+import GHC.Driver.Session
+import GHC.Driver.Types
+import GHC.Driver.Monad
+import GHC.Driver.Phases
 import Module ( ModuleName, Module(moduleName))
 import Fingerprint
 import Data.List (sort)
@@ -104,7 +104,7 @@ data Plugin = Plugin {
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
                             -> Hsc HsParsedModule
     -- ^ Modify the module when it is parsed. This is called by
-    -- HscMain when the parsing is successful.
+    -- GHC.Driver.Main when the parsing is successful.
   , renamedResultAction :: [CommandLineOption] -> TcGblEnv
                                 -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
     -- ^ Modify each group after it is renamed. This is called after each

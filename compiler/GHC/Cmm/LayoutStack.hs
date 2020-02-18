@@ -29,7 +29,7 @@ import Maybes
 import UniqFM
 import Util
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable hiding ( isEmpty )
 import qualified Data.Set as Set

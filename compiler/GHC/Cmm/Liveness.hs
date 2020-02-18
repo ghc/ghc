@@ -14,7 +14,7 @@ where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances

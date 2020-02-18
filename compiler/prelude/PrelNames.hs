@@ -1505,7 +1505,7 @@ srcLocDataConName
 
 -- plugins
 pLUGINS :: Module
-pLUGINS = mkThisGhcModule (fsLit "Plugins")
+pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
 pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 frontendPluginTyConName :: Name

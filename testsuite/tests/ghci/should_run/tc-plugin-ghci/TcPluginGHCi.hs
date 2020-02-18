@@ -1,7 +1,7 @@
 module TcPluginGHCi where
 
 import TcRnMonad ( TcPlugin(..), TcPluginResult(..) )
-import Plugins ( defaultPlugin, Plugin(..), CommandLineOption )
+import GHC.Driver.Plugins ( defaultPlugin, Plugin(..), CommandLineOption )
 import Debug.Trace
 
 plugin :: Plugin

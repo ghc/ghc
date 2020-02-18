@@ -64,7 +64,7 @@ import GHC.IfaceToCore
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import Bag
 import BasicTypes ( Origin )
 import DataCon
@@ -79,7 +79,7 @@ import Type
 import UniqSupply
 import Name
 import NameEnv
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import FastString
 import UniqFM ( lookupWithDefaultUFM )

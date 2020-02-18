@@ -403,10 +403,10 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
--- See Note [Implicit TyThings] in HscTypes
+-- See Note [Implicit TyThings] in GHC.Driver.Types
 
 -- N.B. the set of names returned here *must* match the set of
--- TyThings returned by HscTypes.implicitTyThings, in the sense that
+-- TyThings returned by GHC.Driver.Types.implicitTyThings, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
 -- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
@@ -1741,7 +1741,7 @@ not happen.   Here's the one that bit me:
      data DynFlags = DF ... PackageState ...
 
    module Packages where
-     import DynFlags
+     import GHC.Driver.Session
      data PackageState = PS ...
      lookupModule (df :: DynFlags)
         = case df of

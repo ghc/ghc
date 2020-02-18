@@ -129,7 +129,7 @@ module TcSMonad (
 
 import GhcPrelude
 
-import HscTypes
+import GHC.Driver.Types
 
 import qualified Inst as TcM
 import InstEnv
@@ -143,7 +143,7 @@ import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
-import DynFlags
+import GHC.Driver.Session
 import Type
 import Coercion
 import Unify

@@ -60,7 +60,7 @@ module Demand (
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Var ( Var )
 import VarEnv

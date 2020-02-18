@@ -9,12 +9,12 @@ module FileCleanup
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import Outputable
 import Util
 import Exception
-import DriverPhases
+import GHC.Driver.Phases
 
 import Control.Monad
 import Data.List

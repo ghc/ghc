@@ -5,32 +5,34 @@
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
-module Hooks ( Hooks
-             , emptyHooks
-             , lookupHook
-             , getHooked
-               -- the hooks:
-             , dsForeignsHook
-             , tcForeignImportsHook
-             , tcForeignExportsHook
-             , hscFrontendHook
-             , hscCompileCoreExprHook
-             , ghcPrimIfaceHook
-             , runPhaseHook
-             , runMetaHook
-             , linkHook
-             , runRnSpliceHook
-             , getValueSafelyHook
-             , createIservProcessHook
-             , stgToCmmHook
-             , cmmToRawCmmHook
-             ) where
+module GHC.Driver.Hooks
+   ( Hooks
+   , emptyHooks
+   , lookupHook
+   , getHooked
+     -- the hooks:
+   , dsForeignsHook
+   , tcForeignImportsHook
+   , tcForeignExportsHook
+   , hscFrontendHook
+   , hscCompileCoreExprHook
+   , ghcPrimIfaceHook
+   , runPhaseHook
+   , runMetaHook
+   , linkHook
+   , runRnSpliceHook
+   , getValueSafelyHook
+   , createIservProcessHook
+   , stgToCmmHook
+   , cmmToRawCmmHook
+   )
+where
 
 import GhcPrelude
 
-import DynFlags
-import PipelineMonad
-import HscTypes
+import GHC.Driver.Session
+import GHC.Driver.Pipeline.Monad
+import GHC.Driver.Types
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr

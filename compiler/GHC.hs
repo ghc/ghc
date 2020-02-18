@@ -288,7 +288,7 @@ module GHC (
 {-
  ToDo:
 
-  * inline bits of HscMain here to simplify layering: hscTcExpr, hscStmt.
+  * inline bits of GHC.Driver.Main here to simplify layering: hscTcExpr, hscStmt.
 -}
 
 #include "HsVersions.h"
@@ -302,15 +302,15 @@ import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 
 import PprTyThing       ( pprFamInst )
-import HscMain
-import GhcMake
-import DriverPipeline   ( compileOne' )
-import GhcMonad
+import GHC.Driver.Main
+import GHC.Driver.Make
+import GHC.Driver.Pipeline   ( compileOne' )
+import GHC.Driver.Monad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load   ( loadSysInterface )
 import TcRnTypes
 import Predicate
-import Packages
+import GHC.Driver.Packages
 import NameSet
 import RdrName
 import GHC.Hs
@@ -329,11 +329,11 @@ import FamInstEnv ( FamInst )
 import SrcLoc
 import CoreSyn
 import GHC.Iface.Tidy
-import DriverPhases     ( Phase(..), isHaskellSrcFilename )
-import Finder
-import HscTypes
-import CmdLineParser
-import DynFlags hiding (WarnReason(..))
+import GHC.Driver.Phases     ( Phase(..), isHaskellSrcFilename )
+import GHC.Driver.Finder
+import GHC.Driver.Types
+import GHC.Driver.CmdLine
+import GHC.Driver.Session hiding (WarnReason(..))
 import SysTools
 import SysTools.BaseDir
 import Annotations
@@ -1364,7 +1364,7 @@ getModuleSourceAndFlags mod = do
 -- | Return module source as token stream, including comments.
 --
 -- The module must be in the module graph and its source must be available.
--- Throws a 'HscTypes.SourceError' on parse error.
+-- Throws a 'GHC.Driver.Types.SourceError' on parse error.
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod

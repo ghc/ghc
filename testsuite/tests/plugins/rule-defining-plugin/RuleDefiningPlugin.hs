@@ -1,6 +1,6 @@
 module RuleDefiningPlugin where
 
-import GhcPlugins
+import GHC.Plugins
 
 {-# RULES "unsound" forall x. show x = "SHOWED" #-}
 

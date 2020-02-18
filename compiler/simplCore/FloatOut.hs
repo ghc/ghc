@@ -18,7 +18,7 @@ import MkCore
 import CoreArity        ( etaExpand )
 import CoreMonad        ( FloatOutSwitches(..) )
 
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Id               ( Id, idArity, idType, isBottomingId,
                           isJoinId, isJoinId_maybe )

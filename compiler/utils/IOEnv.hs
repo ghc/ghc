@@ -33,7 +33,7 @@ module IOEnv (
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import Exception
 import Module
 import Panic

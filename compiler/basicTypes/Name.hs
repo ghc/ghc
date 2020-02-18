@@ -272,7 +272,7 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 -- each give rise to a fresh module (Ghci1, Ghci2, etc), but they all come
 -- from the magic 'interactive' package; and all the details are kept in the
 -- TcLclEnv, TcGblEnv, NOT in the HPT or EPT.
--- See Note [The interactive package] in HscTypes
+-- See Note [The interactive package] in GHC.Driver.Types
 
 nameIsLocalOrFrom from name
   | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod
@@ -587,7 +587,7 @@ pprSystem sty uniq occ
 
 pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
--- See Note [Printing original names] in HscTypes
+-- See Note [Printing original names] in GHC.Driver.Types
 pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
     case qualName sty mod occ of              -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope

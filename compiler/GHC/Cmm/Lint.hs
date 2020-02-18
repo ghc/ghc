@@ -23,7 +23,7 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
 import GHC.Cmm.Ppr () -- For Outputable instances
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 
 import Control.Monad (ap)
 

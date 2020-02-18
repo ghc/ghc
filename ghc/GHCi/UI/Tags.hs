@@ -30,7 +30,7 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Ord
-import DriverPhases
+import GHC.Driver.Phases
 import Panic
 import Prelude
 import System.Directory

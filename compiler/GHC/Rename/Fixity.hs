@@ -21,7 +21,7 @@ import GhcPrelude
 import GHC.Iface.Load
 import GHC.Hs
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import TcRnMonad
 import Name
 import NameEnv

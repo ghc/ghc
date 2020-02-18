@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Common where
 
-import GhcPlugins
+import GHC.Plugins
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install options todos = do

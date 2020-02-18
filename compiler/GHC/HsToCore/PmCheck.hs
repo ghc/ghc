@@ -30,7 +30,7 @@ import GHC.HsToCore.PmCheck.Ppr
 import BasicTypes (Origin, isGenerated)
 import CoreSyn (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
-import DynFlags
+import GHC.Driver.Session
 import GHC.Hs
 import TcHsSyn
 import Id

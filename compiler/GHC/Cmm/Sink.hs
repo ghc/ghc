@@ -16,7 +16,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
 import GHC.Platform (isARM, platformArch)
 
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import UniqFM
 

@@ -14,7 +14,7 @@ module CprAnal ( cprAnalProgram ) where
 import GhcPrelude
 
 import WwLib            ( deepSplitProductType_maybe )
-import DynFlags
+import GHC.Driver.Session
 import Demand
 import Cpr
 import CoreSyn

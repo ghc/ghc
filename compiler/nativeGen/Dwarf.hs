@@ -9,7 +9,7 @@ import GHC.Cmm.Expr    ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
 import CoreSyn         ( Tickish(..) )
 import GHC.Cmm.DebugBlock
-import DynFlags
+import GHC.Driver.Session
 import Module
 import Outputable
 import GHC.Platform

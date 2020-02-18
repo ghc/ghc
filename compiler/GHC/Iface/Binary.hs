@@ -38,10 +38,10 @@ import GhcPrelude
 import TcRnMonad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
-import HscTypes
+import GHC.Driver.Types
 import Module
 import Name
-import DynFlags
+import GHC.Driver.Session
 import UniqFM
 import UniqSupply
 import Panic

@@ -15,7 +15,7 @@ module FamInst (
 
 import GhcPrelude
 
-import HscTypes
+import GHC.Driver.Types
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion
@@ -27,7 +27,7 @@ import SrcLoc
 import TyCon
 import TcType
 import CoAxiom
-import DynFlags
+import GHC.Driver.Session
 import Module
 import Outputable
 import Util
@@ -239,7 +239,7 @@ two modules are consistent--because we checked that when we compiled M.
 
 For every other pair of family instance modules we import (directly or
 indirectly), we check that they are consistent now. (So that we can be
-certain that the modules in our `HscTypes.dep_finsts' are consistent.)
+certain that the modules in our `GHC.Driver.Types.dep_finsts' are consistent.)
 
 There is some fancy footwork regarding hs-boot module loops, see
 Note [Don't check hs-boot type family instances too early]

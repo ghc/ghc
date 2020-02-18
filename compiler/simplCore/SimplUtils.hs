@@ -42,7 +42,7 @@ import GhcPrelude
 
 import SimplEnv
 import CoreMonad        ( SimplMode(..), Tick(..) )
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn
 import qualified CoreSubst
 import PprCore

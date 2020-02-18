@@ -17,7 +17,7 @@ module GHC.Iface.Tidy (
 import GhcPrelude
 
 import TcRnTypes
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn
 import CoreUnfold
 import CoreFVs
@@ -53,7 +53,7 @@ import DataCon
 import TyCon
 import Class
 import Module
-import HscTypes
+import GHC.Driver.Types
 import Maybes
 import UniqSupply
 import Outputable

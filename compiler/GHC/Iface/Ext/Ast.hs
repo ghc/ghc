@@ -28,7 +28,7 @@ import ConLike                    ( conLikeName )
 import GHC.HsToCore               ( deSugarExpr )
 import FieldLabel
 import GHC.Hs
-import HscTypes
+import GHC.Driver.Types
 import Module                     ( ModuleName, ml_hs_file )
 import MonadUtils                 ( concatMapM, liftIO )
 import Name                       ( Name, nameSrcSpan, setNameLoc )

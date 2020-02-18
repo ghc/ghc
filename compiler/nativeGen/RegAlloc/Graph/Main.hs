@@ -20,7 +20,7 @@ import RegClass
 import Reg
 
 import Bag
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import UniqFM

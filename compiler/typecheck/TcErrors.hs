@@ -58,7 +58,7 @@ import Util
 import FastString
 import Outputable
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import ListSetOps       ( equivClasses )
 import Maybes
 import Pair

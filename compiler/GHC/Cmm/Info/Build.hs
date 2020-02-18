@@ -24,7 +24,7 @@ import Digraph
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
-import DynFlags
+import GHC.Driver.Session
 import Maybes
 import Outputable
 import GHC.Runtime.Heap.Layout

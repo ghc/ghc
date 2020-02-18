@@ -60,7 +60,7 @@ import GHC.Cmm.CLabel           ( CLabel )
 import Unique
 
 import GHC.Platform.Regs
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 

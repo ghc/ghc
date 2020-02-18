@@ -126,7 +126,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm hiding (RegSet)
 
 import Digraph
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import UniqSet
 import UniqFM

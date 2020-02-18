@@ -52,7 +52,7 @@ import CPrim
 
 -- The rest:
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import OrdList
 import Outputable

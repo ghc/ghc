@@ -79,7 +79,7 @@ import ForeignCall      ( CCallConv(..) )
 import OrdList
 import Outputable
 import FastString
-import DynFlags
+import GHC.Driver.Session
 import Util
 import UniqSupply       ( getUniqueM )
 

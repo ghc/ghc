@@ -69,7 +69,7 @@ import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
-import DynFlags
+import GHC.Driver.Session
 import SrcLoc
 import Util
 import VarEnv  ( emptyTidyEnv, mkInScopeSet )

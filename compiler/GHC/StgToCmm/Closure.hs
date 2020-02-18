@@ -85,7 +85,7 @@ import TyCon
 import GHC.Types.RepType
 import BasicTypes
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import Util
 
 import Data.Coerce (coerce)

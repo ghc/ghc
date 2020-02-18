@@ -46,7 +46,7 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Platform
 import Maybes
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils (withTimingSilent)
 import Panic
 import UniqSupply

@@ -33,7 +33,7 @@ import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 
 import Data.Word
 import Data.Int

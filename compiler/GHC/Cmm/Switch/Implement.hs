@@ -12,7 +12,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import UniqSupply
-import DynFlags
+import GHC.Driver.Session
 import MonadUtils (concatMapM)
 
 --

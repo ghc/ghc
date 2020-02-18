@@ -13,7 +13,7 @@ module GHC.CmmToLlvm.Mangler ( llvmFixupAsm ) where
 
 import GhcPrelude
 
-import DynFlags ( DynFlags, targetPlatform )
+import GHC.Driver.Session ( DynFlags, targetPlatform )
 import GHC.Platform ( platformArch, Arch(..) )
 import ErrUtils ( withTiming )
 import Outputable ( text )

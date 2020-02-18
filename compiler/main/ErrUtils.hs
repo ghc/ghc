@@ -72,7 +72,7 @@ import Outputable
 import Panic
 import qualified PprColour as Col
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import FastString (unpackFS)
 import StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import Json
@@ -552,7 +552,7 @@ chooseDumpFile dflags dumpOpt
                  --      by the --ddump-file-prefix flag.
                | Just prefix <- dumpPrefixForce dflags
                   = Just prefix
-                 -- dump file location chosen by DriverPipeline.runPipeline
+                 -- dump file location chosen by GHC.Driver.Pipeline.runPipeline
                | Just prefix <- dumpPrefix dflags
                   = Just prefix
                  -- we haven't got a place to put a dump file.

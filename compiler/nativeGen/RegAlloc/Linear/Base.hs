@@ -23,7 +23,7 @@ import RegAlloc.Linear.StackMap
 import RegAlloc.Liveness
 import Reg
 
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Unique
 import UniqFM

@@ -19,7 +19,7 @@ module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 import GhcPrelude
 
 import GHC.Hs
-import DynFlags
+import GHC.Driver.Session
 
 import TcRnMonad
 import FamInst

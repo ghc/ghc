@@ -38,7 +38,7 @@ import TysWiredIn
 import PrelNames
 import TcEnv
 import TcRnMonad
-import HscTypes
+import GHC.Driver.Types
 import ErrUtils( Validity(..), andValid )
 import SrcLoc
 import Bag

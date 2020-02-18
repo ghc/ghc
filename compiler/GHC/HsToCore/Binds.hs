@@ -68,7 +68,7 @@ import Maybes
 import OrdList
 import Bag
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Util
 import UniqSet( nonDetEltsUniqSet )

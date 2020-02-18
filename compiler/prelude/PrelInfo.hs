@@ -65,7 +65,7 @@ import MkId
 import Outputable
 import TysPrim
 import TysWiredIn
-import HscTypes
+import GHC.Driver.Types
 import Class
 import TyCon
 import UniqFM

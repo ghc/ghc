@@ -12,7 +12,7 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ForeignCall
 import MonadUtils

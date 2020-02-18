@@ -25,7 +25,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ForeignCall
 import Outputable hiding (panic, pprPanic)

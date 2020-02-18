@@ -22,7 +22,7 @@ where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import UniqFM
 import Unique
 

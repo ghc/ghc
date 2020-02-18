@@ -3,9 +3,9 @@ module Simple.RemovePlugin where
 
 import Control.Monad.IO.Class
 import Data.List (intercalate)
-import Plugins
+import GHC.Driver.Plugins
 import Bag
-import HscTypes
+import GHC.Driver.Types
 import TcRnTypes
 import GHC.Hs.Extension
 import GHC.Hs.Expr

@@ -36,7 +36,7 @@ import PprBase
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel

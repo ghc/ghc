@@ -58,7 +58,7 @@ import qualified TcEnv     as TcM
 import qualified TcMType   as TcM
 import qualified FamInst   as TcM
 import qualified GHC.Iface.Env as IfaceEnv
-import qualified Finder
+import qualified GHC.Driver.Finder as Finder
 
 import FamInstEnv ( FamInstEnv )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, TcPluginM
@@ -76,7 +76,7 @@ import Name
 import TyCon
 import DataCon
 import Class
-import HscTypes
+import GHC.Driver.Types
 import Outputable
 import Type
 import Id

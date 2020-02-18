@@ -1,6 +1,6 @@
 module PurePlugin where
 
-import GhcPlugins
+import GHC.Plugins
 import Common
 
 plugin :: Plugin

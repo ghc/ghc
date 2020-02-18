@@ -25,7 +25,7 @@ module GHC.Iface.Env (
 import GhcPrelude
 
 import TcRnMonad
-import HscTypes
+import GHC.Driver.Types
 import Type
 import Var
 import Name

@@ -1,12 +1,12 @@
 module Main where
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Types.RepType
 import GHC.Runtime.Heap.Layout
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Closure
 import GHC
-import GhcMonad
+import GHC.Driver.Monad
 import System.Environment
 import GHC.Platform
 

@@ -50,7 +50,7 @@ import PrelNames
 import BasicTypes
 import Module       ( Module )
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Pair
 import Util

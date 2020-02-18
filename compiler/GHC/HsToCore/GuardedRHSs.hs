@@ -24,7 +24,7 @@ import CoreSyn
 import CoreUtils (bindNonRec)
 
 import BasicTypes (Origin(FromSource))
-import DynFlags
+import GHC.Driver.Session
 import GHC.HsToCore.PmCheck (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils

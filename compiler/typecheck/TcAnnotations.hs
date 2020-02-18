@@ -15,7 +15,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} TcSplice ( runAnnotation )
 import Module
-import DynFlags
+import GHC.Driver.Session
 import Control.Monad ( when )
 
 import GHC.Hs

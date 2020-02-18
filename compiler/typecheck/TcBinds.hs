@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import CoreSyn (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import GHC.Hs
 import TcSigs

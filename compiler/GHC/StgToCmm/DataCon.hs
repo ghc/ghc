@@ -37,7 +37,7 @@ import GHC.Runtime.Heap.Layout
 import CostCentre
 import Module
 import DataCon
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Id
 import GHC.Types.RepType (countConRepArgs)

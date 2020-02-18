@@ -35,7 +35,7 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Platform
 import BasicTypes
 import GHC.Cmm.BlockId

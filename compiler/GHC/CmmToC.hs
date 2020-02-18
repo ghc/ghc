@@ -40,7 +40,7 @@ import GHC.Cmm.Switch
 
 -- Utils
 import CPrim
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Platform

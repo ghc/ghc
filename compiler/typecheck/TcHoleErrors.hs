@@ -37,7 +37,7 @@ import ConLike          ( ConLike(..) )
 import Util
 import TcEnv (tcLookup)
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
@@ -54,7 +54,7 @@ import TcUnify       ( tcSubType_NC )
 import GHC.HsToCore.Docs ( extractDocs )
 import qualified Data.Map as Map
 import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface_(..) )
+import GHC.Driver.Types        ( ModIface_(..) )
 import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)

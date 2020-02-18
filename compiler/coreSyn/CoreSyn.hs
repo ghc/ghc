@@ -113,7 +113,7 @@ import Literal
 import DataCon
 import Module
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Util
 import UniqSet
@@ -960,7 +960,7 @@ data Tickish id =
     { breakpointId     :: !Int
     , breakpointFVs    :: [id]  -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
-                                -- appropriate entry in HscTypes.ModBreaks.
+                                -- appropriate entry in GHC.Driver.Types.ModBreaks.
                                 --
                                 -- Careful about substitution!  See
                                 -- Note [substTickish] in CoreSubst.

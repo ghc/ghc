@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module NameShape(
+module GHC.Types.Name.Shape(
     NameShape(..),
     emptyNameShape,
     mkNameShape,
@@ -15,7 +15,7 @@ module NameShape(
 import GhcPrelude
 
 import Outputable
-import HscTypes
+import GHC.Driver.Types
 import Module
 import UniqFM
 import Avail

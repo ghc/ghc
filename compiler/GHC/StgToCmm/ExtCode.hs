@@ -47,7 +47,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
 
 import GHC.Cmm.BlockId
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Module
 import UniqFM

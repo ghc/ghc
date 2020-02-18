@@ -17,7 +17,7 @@ import GhcPrelude
 
 import GHC.Cmm.Utils
 import GHC.Cmm
-import DynFlags
+import GHC.Driver.Session
 import Util
 
 import Outputable

@@ -33,10 +33,10 @@ import           System.Directory
 
 import qualified CoreUtils
 import           GHC.HsToCore
-import           DynFlags (HasDynFlags(..))
+import           GHC.Driver.Session (HasDynFlags(..))
 import           FastString
 import           GHC
-import           GhcMonad
+import           GHC.Driver.Monad
 import           Name
 import           NameSet
 import           Outputable

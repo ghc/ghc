@@ -8,7 +8,7 @@ module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import TyCoRep
 import TyCoSubst
 import Coercion

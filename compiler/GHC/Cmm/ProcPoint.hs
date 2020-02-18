@@ -11,7 +11,7 @@ where
 
 import GhcPrelude hiding (last, unzip, succ, zip)
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm

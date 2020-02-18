@@ -46,7 +46,7 @@ import Instruction
 import Reg
 import GHC.Cmm.BlockId
 
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import UniqSupply
 

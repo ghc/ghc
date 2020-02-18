@@ -69,14 +69,14 @@ import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import DataCon
-import DynFlags
+import GHC.Driver.Session
 import ForeignCall ( ForeignCall )
 import Id
 import VarSet
 import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
-import Packages    ( isDllName )
+import GHC.Driver.Packages    ( isDllName )
 import GHC.Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )

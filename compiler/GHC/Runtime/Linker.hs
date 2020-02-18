@@ -38,16 +38,16 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 import TcRnMonad
-import Packages
-import DriverPhases
-import Finder
-import HscTypes
+import GHC.Driver.Packages as Packages
+import GHC.Driver.Phases
+import GHC.Driver.Finder
+import GHC.Driver.Types
 import Name
 import NameEnv
 import Module
 import ListSetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
-import DynFlags
+import GHC.Driver.Session
 import BasicTypes
 import Outputable
 import Panic

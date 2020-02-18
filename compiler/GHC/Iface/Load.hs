@@ -40,10 +40,10 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Iface.Syntax
 import GHC.Iface.Env
-import HscTypes
+import GHC.Driver.Types
 
 import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
@@ -65,7 +65,7 @@ import Avail
 import Module
 import Maybes
 import ErrUtils
-import Finder
+import GHC.Driver.Finder
 import UniqFM
 import SrcLoc
 import Outputable
@@ -74,11 +74,11 @@ import Panic
 import Util
 import FastString
 import Fingerprint
-import Hooks
+import GHC.Driver.Hooks
 import FieldLabel
 import GHC.Iface.Rename
 import UniqDSet
-import Plugins
+import GHC.Driver.Plugins
 
 import Control.Monad
 import Control.Exception
@@ -863,7 +863,7 @@ Note [Home module load error]
 If the sought-for interface is in the current package (as determined
 by -package-name flag) then it jolly well should already be in the HPT
 because we process home-package modules in dependency order.  (Except
-in one-shot mode; see notes with hsc_HPT decl in HscTypes).
+in one-shot mode; see notes with hsc_HPT decl in GHC.Driver.Types).
 
 It is possible (though hard) to get this error through user behaviour.
   * Suppose package P (modules P1, P2) depends on package Q (modules Q1,

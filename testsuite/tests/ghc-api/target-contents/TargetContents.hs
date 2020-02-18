@@ -2,7 +2,7 @@
 
 module Main where
 
-import DynFlags
+import GHC.Driver.Session
 import GHC
 
 import Control.Monad
@@ -13,7 +13,7 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import Exception
 import HeaderInfo
-import HscTypes
+import GHC.Driver.Types
 import Outputable
 import StringBuffer
 import System.Directory

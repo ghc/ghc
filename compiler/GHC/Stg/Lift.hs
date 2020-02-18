@@ -20,7 +20,7 @@ where
 import GhcPrelude
 
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import Id
 import GHC.Stg.FVs ( annBindingFreeVars )
 import GHC.Stg.Lift.Analysis

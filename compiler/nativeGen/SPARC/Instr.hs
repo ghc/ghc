@@ -41,7 +41,7 @@ import Format
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm
 import FastString
 import Outputable

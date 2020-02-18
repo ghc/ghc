@@ -5,7 +5,7 @@ module Main where
 import GHC
 import MonadUtils  ( liftIO )
 import Data.Maybe
-import DynFlags    ( defaultFatalMessager, defaultFlushOut )
+import GHC.Driver.Session    ( defaultFatalMessager, defaultFlushOut )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
 import GHC.Serialized  ( deserializeWithData )
 import Panic

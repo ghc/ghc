@@ -1,6 +1,6 @@
 module Simple.TrustworthyPlugin (plugin) where
 
-import GhcPlugins
+import GHC.Plugins
 import TcRnMonad
 
 plugin :: Plugin

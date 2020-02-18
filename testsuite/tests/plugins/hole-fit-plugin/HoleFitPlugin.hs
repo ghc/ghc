@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications, RecordWildCards #-}
 module HoleFitPlugin where
 
-import GhcPlugins hiding ((<>))
+import GHC.Plugins hiding ((<>))
 
 import TcHoleErrors
 

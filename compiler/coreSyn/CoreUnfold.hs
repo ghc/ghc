@@ -46,7 +46,7 @@ module CoreUnfold (
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import CoreSyn
 import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
 import CoreOpt

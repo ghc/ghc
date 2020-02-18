@@ -24,7 +24,7 @@ import GhcPrelude
 
 import CoreSyn
 import MkCore hiding    ( wrapFloats )
-import HscTypes         ( ModGuts(..) )
+import GHC.Driver.Types         ( ModGuts(..) )
 import CoreUtils
 import CoreFVs
 import CoreMonad        ( CoreM )
@@ -33,7 +33,7 @@ import Var
 import Type
 import VarSet
 import Util
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 -- import Data.List        ( mapAccumL )
 import BasicTypes       ( RecFlag(..), isRec )

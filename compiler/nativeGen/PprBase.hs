@@ -25,7 +25,7 @@ import GhcPrelude
 import AsmUtils
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Platform

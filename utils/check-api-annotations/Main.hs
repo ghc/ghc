@@ -3,7 +3,7 @@
 import Data.Data
 import Data.List
 import GHC
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import ApiAnnotation
 import SrcLoc

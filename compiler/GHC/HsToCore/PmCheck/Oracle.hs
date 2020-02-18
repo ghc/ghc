@@ -29,7 +29,7 @@ import GhcPrelude
 
 import GHC.HsToCore.PmCheck.Types
 
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import ErrUtils
 import Util

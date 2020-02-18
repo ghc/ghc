@@ -37,7 +37,7 @@ import GHC.Types.RepType
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 import ForeignCall
-import DynFlags
+import GHC.Driver.Session
 import Maybes
 import Outputable
 import UniqSupply

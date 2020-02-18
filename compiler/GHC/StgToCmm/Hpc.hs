@@ -18,8 +18,8 @@ import GHC.Cmm.CLabel
 import Module
 import GHC.Cmm.Utils
 import GHC.StgToCmm.Utils
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 
 import Control.Monad
 

@@ -242,7 +242,7 @@ import Literal
 import Unique
 import UniqFM
 import SrcLoc
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 import StringBuffer
 import FastString

@@ -10,7 +10,7 @@ module SysTools.Info where
 
 import Exception
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 import Util
 

@@ -37,7 +37,7 @@ import GHC.Platform
 
 import BasicTypes       (Alignment)
 import GHC.Cmm.CLabel
-import DynFlags
+import GHC.Driver.Session
 import UniqSet
 import Unique
 import UniqSupply
