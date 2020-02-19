@@ -3,7 +3,7 @@
 module ApiAnnotation (
   getAnnotation, getAndRemoveAnnotation,
   getAnnotationComments,getAndRemoveAnnotationComments,
-  ApiAnns,
+  ApiAnns(..),
   ApiAnnKey,
   AnnKeywordId(..),
   AnnotationComment(..),
@@ -41,8 +41,13 @@ pm_annotations field of the ParsedModule type.
 
 The full ApiAnns type is
 
-> type ApiAnns = ( Map.Map ApiAnnKey [SrcSpan]                  -- non-comments
->                , Map.Map SrcSpan [Located AnnotationComment]) -- comments
+> data ApiAnns =
+>  ApiAnns
+>    { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
+>      apiAnnEofPos :: Maybe RealSrcSpan,
+>      apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
+>      apiAnnRogueComments :: [RealLocated AnnotationComment]
+>    }
 
 NON-COMMENT ELEMENTS
 
@@ -52,13 +57,13 @@ can show up multiple times before the next AST element), each of which
 needs to be associated with its location in the original source code.
 
 Consequently, the structure that records non-comment elements is logically
-a two level map, from the SrcSpan of the AST element containing it, to
+a two level map, from the RealSrcSpan of the AST element containing it, to
 a map from keywords ('AnnKeyWord') to all locations of the keyword directly
 in the AST element:
 
-> type ApiAnnKey = (SrcSpan,AnnKeywordId)
+> type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 >
-> Map.Map ApiAnnKey [SrcSpan]
+> Map.Map ApiAnnKey [RealSrcSpan]
 
 So
 
@@ -87,16 +92,16 @@ Every comment is associated with a *located* AnnotationComment.
 We associate comments with the lowest (most specific) AST element
 enclosing them:
 
-> Map.Map SrcSpan [Located AnnotationComment]
+> Map.Map RealSrcSpan [RealLocated AnnotationComment]
 
 PARSER STATE
 
 There are three fields in PState (the parser state) which play a role
 with annotations.
 
->  annotations :: [(ApiAnnKey,[SrcSpan])],
->  comment_q :: [Located AnnotationComment],
->  annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
+>  annotations :: [(ApiAnnKey,[RealSrcSpan])],
+>  comment_q :: [RealLocated AnnotationComment],
+>  annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
 
 The 'annotations' and 'annotations_comments' fields are simple: they simply
 accumulate annotations that will end up in 'ApiAnns' at the end
@@ -105,21 +110,21 @@ accumulate annotations that will end up in 'ApiAnns' at the end
 The 'comment_q' field captures comments as they are seen in the token stream,
 so that when they are ready to be allocated via the parser they are
 available (at the time we lex a comment, we don't know what the enclosing
-AST node of it is, so we can't associate it with a SrcSpan in
+AST node of it is, so we can't associate it with a RealSrcSpan in
 annotations_comments).
 
 PARSER EMISSION OF ANNOTATIONS
 
 The parser interacts with the lexer using the function
 
-> addAnnotation :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+> addAnnotation :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
 
-which takes the AST element SrcSpan, the annotation keyword and the
-target SrcSpan.
+which takes the AST element RealSrcSpan, the annotation keyword and the
+target RealSrcSpan.
 
 This adds the annotation to the `annotations` field of `PState` and
 transfers any comments in `comment_q` WHICH ARE ENCLOSED by
-the SrcSpan of this element to the `annotations_comments`
+the RealSrcSpan of this element to the `annotations_comments`
 field.  (Comments which are outside of this annotation are deferred
 until later. 'allocateComments' in 'Lexer' is responsible for
 making sure we only attach comments that actually fit in the 'SrcSpan'.)
@@ -131,49 +136,59 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 -- ---------------------------------------------------------------------
 
 -- If you update this, update the Note [Api annotations] above
-type ApiAnns = ( Map.Map ApiAnnKey [SrcSpan]
-               , Map.Map SrcSpan [Located AnnotationComment])
+data ApiAnns =
+  ApiAnns
+    { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
+      apiAnnEofPos :: Maybe RealSrcSpan,
+      apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
+      apiAnnRogueComments :: [RealLocated AnnotationComment]
+    }
 
 -- If you update this, update the Note [Api annotations] above
-type ApiAnnKey = (SrcSpan,AnnKeywordId)
+type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 
 
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
 -- of the annotated AST element, and the known type of the annotation.
-getAnnotation :: ApiAnns -> SrcSpan -> AnnKeywordId -> [SrcSpan]
-getAnnotation (anns,_) span ann
-   = case Map.lookup (span,ann) anns of
-       Nothing -> []
-       Just ss -> ss
+getAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId -> [RealSrcSpan]
+getAnnotation anns span ann =
+  case Map.lookup ann_key ann_items of
+    Nothing -> []
+    Just ss -> ss
+  where ann_items = apiAnnItems anns
+        ann_key = (span,ann)
 
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
 -- of the annotated AST element, and the known type of the annotation.
 -- The list is removed from the annotations.
-getAndRemoveAnnotation :: ApiAnns -> SrcSpan -> AnnKeywordId
-                       -> ([SrcSpan],ApiAnns)
-getAndRemoveAnnotation (anns,cs) span ann
-   = case Map.lookup (span,ann) anns of
-       Nothing -> ([],(anns,cs))
-       Just ss -> (ss,(Map.delete (span,ann) anns,cs))
+getAndRemoveAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId
+                       -> ([RealSrcSpan],ApiAnns)
+getAndRemoveAnnotation anns span ann =
+  case Map.lookup ann_key ann_items of
+    Nothing -> ([],anns)
+    Just ss -> (ss,anns{ apiAnnItems = Map.delete ann_key ann_items })
+  where ann_items = apiAnnItems anns
+        ann_key = (span,ann)
 
 -- |Retrieve the comments allocated to the current 'SrcSpan'
 --
 --  Note: A given 'SrcSpan' may appear in multiple AST elements,
 --  beware of duplicates
-getAnnotationComments :: ApiAnns -> SrcSpan -> [Located AnnotationComment]
-getAnnotationComments (_,anns) span =
-  case Map.lookup span anns of
+getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
+getAnnotationComments anns span =
+  case Map.lookup span (apiAnnComments anns) of
     Just cs -> cs
     Nothing -> []
 
 -- |Retrieve the comments allocated to the current 'SrcSpan', and
 -- remove them from the annotations
-getAndRemoveAnnotationComments :: ApiAnns -> SrcSpan
-                               -> ([Located AnnotationComment],ApiAnns)
-getAndRemoveAnnotationComments (anns,canns) span =
-  case Map.lookup span canns of
-    Just cs -> (cs,(anns,Map.delete span canns))
-    Nothing -> ([],(anns,canns))
+getAndRemoveAnnotationComments :: ApiAnns -> RealSrcSpan
+                               -> ([RealLocated AnnotationComment],ApiAnns)
+getAndRemoveAnnotationComments anns span =
+  case Map.lookup span ann_comments of
+    Just cs -> (cs, anns{ apiAnnComments = Map.delete span ann_comments })
+    Nothing -> ([], anns)
+  where ann_comments = apiAnnComments anns
 
 -- --------------------------------------------------------------------
 
@@ -296,7 +311,6 @@ data AnnKeywordId
     | AnnLarrowtailU -- ^ '-<<', unicode variant
     | AnnRarrowtail -- ^ '>>-'
     | AnnRarrowtailU -- ^ '>>-', unicode variant
-    | AnnEofPos
     deriving (Eq, Ord, Data, Show)
 
 instance Outputable AnnKeywordId where
