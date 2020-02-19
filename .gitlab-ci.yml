@@ -580,7 +580,7 @@ nightly-x86_64-linux-deb9:
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: build
   variables:
     BUILD_FLAVOUR: validate
     # Ensure that stage2 also has DEBUG enabled
