@@ -96,7 +96,7 @@ mkBinIdentity(struct rootProfState *ps, Arena *arena, StgWord bin_idx,
      * but since we can only really have a small number of them anyways what
      * does it matter. */
     const StgWord len = max_combined_descr_len + n_roots + 1;
-    /*                           (intercalate "-") -^      ^-null byte */
+    /*                           (intercalate ",") -^      ^-null byte */
     char *identity = arenaAlloc(arena, len);
     char *ptr = identity;
 
@@ -105,8 +105,8 @@ mkBinIdentity(struct rootProfState *ps, Arena *arena, StgWord bin_idx,
         if(bin_idx & (1ul<<i)) {
             strcpy(ptr, descs[i]);
             ptr += strlen(descs[i]);
-            strcpy(ptr, "-");
-            ptr += strlen("-");
+            strcpy(ptr, ",");
+            ptr += strlen(",");
             ptr[0] = '\0';
         }
     }
