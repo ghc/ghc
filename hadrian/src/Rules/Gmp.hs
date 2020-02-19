@@ -9,7 +9,8 @@ import Target
 import Utilities
 import Hadrian.BuildPath
 
--- | Build GMP library objects and return their paths.
+-- | Build in-tree GMP library objects (if GmpInTree flag is set) and return
+-- their paths.
 gmpObjects :: Stage -> Action [FilePath]
 gmpObjects s = do
   isInTree <- flag GmpInTree
@@ -22,38 +23,35 @@ gmpObjects s = do
       need [integerGmpPath -/- "include/ghc-gmp.h"]
 
       -- The line below causes a Shake Lint failure on Windows, which forced
-      -- us to disable Lint by default. See more details here:
-      -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
+      -- us to disable Lint by default (we don't track the object files of the
+      -- in-tree GMP library).
+      -- See more details here: https://gitlab.haskell.org/ghc/ghc/issues/15971.
       gmpPath <- gmpIntreePath s
       map (unifyPath . (gmpPath -/-)) <$>
           liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
-gmpBase :: FilePath
-gmpBase = pkgPath integerGmp -/- "gmp"
-
--- | GMP is considered a Stage1 package. This determines GMP build directory.
-gmpContext :: Context
-gmpContext = vanillaContext Stage1 integerGmp
-
--- | Build directory for in-tree GMP library.
+-- | Build directory for in-tree GMP library
+--    <root>/stageN/gmp/gmpbuild
 gmpBuildPath :: Stage -> Action FilePath
 gmpBuildPath s = gmpIntreePath s <&> (-/- "gmpbuild")
 
+-- | Root directory for in-tree GMP library
+--    <root>/stageN/gmp
 gmpIntreePath :: Stage -> Action FilePath
 gmpIntreePath s = buildRoot <&> (-/- stageString s -/- "gmp")
 
--- | Directory for GMP library object files, relative to 'gmpIntreePath'.
+-- | Directory for in-tree GMP library object files, relative to 'gmpIntreePath'.
 gmpObjectsDir :: FilePath
 gmpObjectsDir = "objs"
-
-configureEnvironment :: Stage -> Action [CmdOption]
-configureEnvironment s = sequence [ builderEnvironment "CC" $ Cc CompileC s
-                                  , builderEnvironment "AR" (Ar Unpack s)
-                                  , builderEnvironment "NM" Nm ]
 
 gmpRules :: Rules ()
 gmpRules = do
     root <- buildRootRules
+
+    let
+      -- Path to libraries/integer-gmp/gmp in the source tree
+      gmpBase :: FilePath
+      gmpBase = pkgPath integerGmp -/- "gmp"
 
     -- Build in-tree gmp if necessary
     -- Produce: integer-gmp/build/include/ghc-gmp.h
@@ -121,18 +119,24 @@ gmpRules = do
             let gmpBuildP = takeDirectory mk
                 gmpP      = takeDirectory gmpBuildP
             ctx <- makeGmpPathContext gmpP
-            env <- configureEnvironment (stage ctx)
+            env <- sequence
+                     [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
+                     , builderEnvironment "AR" (Ar Unpack (stage ctx))
+                     , builderEnvironment "NM" Nm
+                     ]
             need [mk <.> "in"]
             buildWithCmdOptions env $
-                target gmpContext (Configure gmpBuildP) [mk <.> "in"] [mk]
+                target ctx (Configure gmpBuildP) [mk <.> "in"] [mk]
 
         -- Extract in-tree GMP sources and apply patches. Produce
         --  - <root>/stageN/gmp/gmpbuild/Makefile.in
         --  - <root>/stageN/gmp/gmpbuild/configure
         [gmpPath -/- "gmpbuild/Makefile.in", gmpPath -/- "gmpbuild/configure"] &%> \[mkIn,_] -> do
             top <- topDirectory
-            let destPath = takeDirectory mkIn
-            removeDirectory destPath
+            let gmpBuildP = takeDirectory mkIn
+                gmpP      = takeDirectory gmpBuildP
+            ctx <- makeGmpPathContext gmpP
+            removeDirectory gmpBuildP
             -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
             -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
             -- That's because the doc/ directory contents are under the GFDL,
@@ -143,7 +147,7 @@ gmpRules = do
             withTempDir $ \dir -> do
                 let tmp = unifyPath dir
                 need [top -/- tarball]
-                build $ target gmpContext (Tar Extract) [top -/- tarball] [tmp]
+                build $ target ctx (Tar Extract) [top -/- tarball] [tmp]
 
                 let patch     = gmpBase -/- "gmpsrc.patch"
                     patchName = takeFileName patch
@@ -155,4 +159,4 @@ gmpRules = do
                         ++ "-nodoc (found: " ++ name ++ ")."
                     libName = unpack $ stripSuffix "-nodoc" name
 
-                moveDirectory (tmp -/- libName) destPath
+                moveDirectory (tmp -/- libName) gmpBuildP
