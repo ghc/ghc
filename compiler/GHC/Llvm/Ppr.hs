@@ -87,9 +87,8 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
     in ppAssignment var $ ppr link <+> text const <+> rhs <> sect <> align
        $+$ newLine
 
-ppLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
-  error $ "Non Global var ppr as global! "
-          ++ showSDoc dflags (ppr var) ++ " " ++ showSDoc dflags (ppr val)
+ppLlvmGlobal (LMGlobal var val) = pprPanic "ppLlvmGlobal" $
+  text "Non Global var ppr as global! " <> ppr var <> text "=" <> ppr val
 
 
 -- | Print out a list of LLVM type aliases.

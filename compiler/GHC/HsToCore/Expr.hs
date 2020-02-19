@@ -1191,12 +1191,11 @@ levPolyPrimopErr expr_doc ty bad_tys
   = errDs $ vcat
     [ hang (text "Cannot use function with levity-polymorphic arguments:")
          2 (expr_doc <+> dcolon <+> pprWithTYPE ty)
-    , sdocWithDynFlags $ \dflags ->
-      if not (gopt Opt_PrintTypecheckerElaboration dflags) then vcat
+    , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
         [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
         , text "are eta-expanded internally because they must occur fully saturated."
         , text "Use -fprint-typechecker-elaboration to display the full expression.)"
-        ] else empty
+        ]
     , hang (text "Levity-polymorphic arguments:")
          2 $ vcat $ map
            (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))

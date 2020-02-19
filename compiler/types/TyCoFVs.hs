@@ -642,7 +642,6 @@ tyCoFVsOfCoVar v fv_cand in_scope acc
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
 
 tyCoFVsOfProv :: UnivCoProvenance -> FV
-tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -714,7 +713,6 @@ almost_devoid_co_var_of_prov (PhantomProv co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
   = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
