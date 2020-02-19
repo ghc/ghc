@@ -41,6 +41,7 @@ getCurrentThreadCPUTime(void)
 
     if (!GetThreadTimes(GetCurrentThread(), &creationTime,
                         &exitTime, &kernelTime, &userTime)) {
+        sysErrorBelch("getCurrentThreadCPUTime: Win32 error %lu", GetLastError());
         return 0;
     }
 
