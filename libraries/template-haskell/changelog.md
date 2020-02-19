@@ -3,11 +3,12 @@
 ## 2.17.0.0
 
   * Implement Overloaded Quotations (GHC Proposal #246). This patch modifies a
-     few fundamental things in the API. All the library combinators are generalised
-     to be in terms of a new minimal class `Quote`. The type of `lift` and `liftTyped`
-     are modified to return `m Exp` rather than `Q Exp`. Instances written in terms
-     of `Q` are now disallowed. The types of `unsafeTExpCoerce` and `unTypeQ`
-     are also generalised in terms of `Quote` rather than specific to `Q`.
+    few fundamental things in the API. All the library combinators are generalised
+    to be in terms of a new minimal class `Quote`. The types of `lift`, `liftTyped`,
+    and `liftData` are modified to return `m Exp` rather than `Q Exp`. Instances
+    written in terms of `Q` are now disallowed. The types of `unsafeTExpCoerce`
+    and `unTypeQ` are also generalised in terms of `Quote` rather than specific
+    to `Q`.
 
 ## 2.16.0.0 *TBA*
 

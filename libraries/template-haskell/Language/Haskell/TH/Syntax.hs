@@ -1074,13 +1074,13 @@ nonemptyName = mkNameG DataName "base" "GHC.Base" ":|"
 -- expressions and patterns; @antiQ@ allows you to override type-specific
 -- cases, a common usage is just @const Nothing@, which results in
 -- no overloading.
-dataToQa  ::  forall a k q. Data a
+dataToQa  ::  forall m a k q. (Quote m, Data a)
           =>  (Name -> k)
-          ->  (Lit -> Q q)
-          ->  (k -> [Q q] -> Q q)
-          ->  (forall b . Data b => b -> Maybe (Q q))
+          ->  (Lit -> m q)
+          ->  (k -> [m q] -> m q)
+          ->  (forall b . Data b => b -> Maybe (m q))
           ->  a
-          ->  Q q
+          ->  m q
 dataToQa mkCon mkLit appCon antiQ t =
     case antiQ t of
       Nothing ->
@@ -1117,7 +1117,7 @@ dataToQa mkCon mkLit appCon antiQ t =
                     tyconPkg = tyConPackage tycon
                     tyconMod = tyConModule  tycon
 
-                conArgs :: [Q q]
+                conArgs :: [m q]
                 conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
             IntConstr n ->
                 mkLit $ IntegerL n
@@ -1159,14 +1159,14 @@ function.  Two complications
   "pack" is defined in a different module than the data type "Text".
   -}
 
--- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
+-- | 'dataToExpQ' converts a value to a 'Exp' representation of the
 -- same value, in the SYB style. It is generalized to take a function
 -- override type-specific cases; see 'liftData' for a more commonly
 -- used variant.
-dataToExpQ  ::  Data a
-            =>  (forall b . Data b => b -> Maybe (Q Exp))
+dataToExpQ  ::  (Quote m, Data a)
+            =>  (forall b . Data b => b -> Maybe (m Exp))
             ->  a
-            ->  Q Exp
+            ->  m Exp
 dataToExpQ = dataToQa varOrConE litE (foldl appE)
     where
           -- Make sure that VarE is used if the Constr value relies on a
@@ -1176,23 +1176,23 @@ dataToExpQ = dataToQa varOrConE litE (foldl appE)
             case nameSpace s of
                  Just VarName  -> return (VarE s)
                  Just DataName -> return (ConE s)
-                 _ -> fail $ "Can't construct an expression from name "
-                          ++ showName s
+                 _ -> error $ "Can't construct an expression from name "
+                           ++ showName s
           appE x y = do { a <- x; b <- y; return (AppE a b)}
           litE c = return (LitE c)
 
 -- | 'liftData' is a variant of 'lift' in the 'Lift' type class which
 -- works for any type with a 'Data' instance.
-liftData :: Data a => a -> Q Exp
+liftData :: (Quote m, Data a) => a -> m Exp
 liftData = dataToExpQ (const Nothing)
 
--- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
+-- | 'dataToPatQ' converts a value to a 'Pat' representation of the same
 -- value, in the SYB style. It takes a function to handle type-specific cases,
 -- alternatively, pass @const Nothing@ to get default behavior.
-dataToPatQ  ::  Data a
-            =>  (forall b . Data b => b -> Maybe (Q Pat))
+dataToPatQ  ::  (Quote m, Data a)
+            =>  (forall b . Data b => b -> Maybe (m Pat))
             ->  a
-            ->  Q Pat
+            ->  m Pat
 dataToPatQ = dataToQa id litP conP
     where litP l = return (LitP l)
           conP n ps =
@@ -1200,8 +1200,8 @@ dataToPatQ = dataToQa id litP conP
                 Just DataName -> do
                     ps' <- sequence ps
                     return (ConP n ps')
-                _ -> fail $ "Can't construct a pattern from name "
-                         ++ showName n
+                _ -> error $ "Can't construct a pattern from name "
+                          ++ showName n
 
 -----------------------------------------------------
 --              Names and uniques
