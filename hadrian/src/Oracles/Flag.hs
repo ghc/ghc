@@ -40,7 +40,7 @@ flag f = do
             LeadingUnderscore  -> "leading-underscore"
             SolarisBrokenShld  -> "solaris-broken-shld"
             WithLibdw          -> "with-libdw"
-            WithLibnuma        -> "with-numa"
+            WithLibnuma        -> "with-libnuma"
             HaveLibMingwEx     -> "have-lib-mingw-ex"
             UseSystemFfi       -> "use-system-ffi"
     value <- lookupValueOrError configFile key

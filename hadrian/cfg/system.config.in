@@ -179,4 +179,5 @@ libnuma-lib-dir       = @LibNumaLibDir@
 #=======================
 
 with-libdw = @UseLibdw@
+with-libnuma = @UseLibNuma@
 have-lib-mingw-ex = @HaveLibMingwEx@
