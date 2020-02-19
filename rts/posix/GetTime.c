@@ -63,6 +63,19 @@ Time getCurrentThreadCPUTime(void)
 #if defined(HAVE_CLOCK_GETTIME)          &&  \
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
        defined(HAVE_SYSCONF)
+    static bool have_checked_usability = false;
+    if (!have_checked_usability) {
+        // The Linux clock_getres(2) manpage claims that some early versions of
+        // Linux will return values which are uninterpretable in the presence
+        // of migration across CPUs. They claim that clock_getcpuclockid(0)
+        // will return ENOENT in this case. Check this.
+        clockid_t clkid;
+        if (clock_getcpuclockid(0, &clkid)) {
+            sysErrorBelch("getCurrentThreadCPUTime: no supported");
+            stg_exit(EXIT_FAILURE);
+        }
+        have_checked_usability = true;
+    }
     return getClockTime(CLOCK_THREAD_CPUTIME_ID);
 #elif defined(darwin_HOST_OS)
     mach_port_t port = pthread_mach_thread_np(GetCurrentThread());
