@@ -122,7 +122,9 @@ StgWord64 getMonotonicNSec(void)
 
     struct timeval tv;
 
-    gettimeofday(&tv, (struct timezone *) NULL);
+    if (gettimeofday(&tv, (struct timezone *) NULL) != 0) {
+        debugBlech("getMonotonicNSec: gettimeofday failed: %s", strerror(errno));
+    };
     return (StgWord64)tv.tv_sec * 1000000000 +
            (StgWord64)tv.tv_usec * 1000;
 
