@@ -46,18 +46,18 @@ data Root = forall a. Root
   -- ^ Description string used to identify this root in the heap profile
   -- graph when using @+RTS -ho@.
   --
-  -- Note that this should be fairly short and not include the dash
-  -- character (@'-'@) as closures reachable via multiple roots will be
-  -- accounted into bands with names including all the relevant roots.
+  -- Note that this should be fairly short and not include any comma
+  -- characters as closures reachable via multiple roots will be accounted
+  -- into bands labeled with root names intercalated by commas.
   --
   -- For example if a closure is reachable via roots "r1", "r2" and "r3"
-  -- the band in the graph would be called: @"r1-r2-r3"@.
+  -- the band in the graph would be called: @"r1,r2,r3"@.
 
   , rootClosure :: a
   -- ^ The Haskell value the root profiler starts traversing the heap
   -- from.
   --
-  -- Yoy should be mindful of the fact that data-type accessor functions
+  -- You should be mindful of the fact that data-type accessor functions
   -- will likely turn into thunks which reference the entire datastructure
   -- in the compiled program so prefer pattern matching to extract the
   -- value of interest.
