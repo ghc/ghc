@@ -102,6 +102,7 @@ import Panic
 import ConLike
 import Control.Concurrent
 
+import ApiAnnotation
 import Module
 import Packages
 import RdrName
@@ -392,13 +393,16 @@ hscParse' mod_summary
             -- filter them out:
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
-            let res = HsParsedModule {
+            let api_anns = ApiAnns {
+                      apiAnnItems = M.fromListWith (++) $ annotations pst,
+                      apiAnnEofPos = eof_pos pst,
+                      apiAnnComments = M.fromList (annotations_comments pst),
+                      apiAnnRogueComments = comment_q pst
+                   }
+                res = HsParsedModule {
                       hpm_module    = rdr_module,
                       hpm_src_files = srcs2,
-                      hpm_annotations
-                              = (M.fromListWith (++) $ annotations pst,
-                                 M.fromList $ ((noSrcSpan,comment_q pst)
-                                                 :(annotations_comments pst)))
+                      hpm_annotations = api_anns
                    }
 
             -- apply parse transformation of plugins
@@ -1895,7 +1899,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}
-         ; simpl_expr <- simplifyExpr dflags ds_expr
+         ; simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
          ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr

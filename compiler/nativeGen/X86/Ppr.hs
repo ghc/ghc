@@ -120,15 +120,17 @@ pprSizeDecl lbl
 
 pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
-  = sdocWithDynFlags $ \dflags ->
-    maybe_infotable dflags $
+  = maybe_infotable $
     pprLabel asmLbl $$
     vcat (map pprInstr instrs) $$
-    (if debugLevel dflags > 0
-     then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
+    (sdocOption sdocDebugLevel $ \level ->
+        if level > 0
+           then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
+           else empty
+    )
   where
     asmLbl = blockLbl blockid
-    maybe_infotable dflags c = case mapLookup blockid info_env of
+    maybe_infotable c = case mapLookup blockid info_env of
        Nothing -> c
        Just (RawCmmStatics infoLbl info) ->
            pprAlignForSection Text $$
@@ -136,8 +138,11 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
            vcat (map pprData info) $$
            pprLabel infoLbl $$
            c $$
-           (if debugLevel dflags > 0
-            then ppr (mkAsmTempEndLabel infoLbl) <> char ':' else empty)
+           (sdocOption sdocDebugLevel $ \level ->
+               if level > 0
+                  then ppr (mkAsmTempEndLabel infoLbl) <> char ':'
+                  else empty
+           )
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See [Note: Info Offset]
     infoTableLoc = case instrs of

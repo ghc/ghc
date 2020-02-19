@@ -23,6 +23,7 @@ import GhcPrelude
 -- In a separate module because it hooks into the parser.
 import BkpSyn
 
+import ApiAnnotation
 import GHC hiding (Failed, Succeeded)
 import Packages
 import Parser
@@ -538,8 +539,9 @@ msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
-        $ "Instantiating " ++ renderWithStyle dflags (ppr pk)
-                                (backpackStyle dflags)
+        $ "Instantiating " ++ renderWithStyle
+                                (initSDocContext dflags (backpackStyle dflags))
+                                (ppr pk)
 
 -- | Message when we include a Backpack unit.
 msgInclude :: (Int,Int) -> UnitId -> BkpM ()
@@ -548,7 +550,8 @@ msgInclude (i,n) uid = do
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
         $ showModuleIndex (i, n) ++ "Including " ++
-          renderWithStyle dflags (ppr uid) (backpackStyle dflags)
+          renderWithStyle (initSDocContext dflags (backpackStyle dflags))
+            (ppr uid)
 
 -- ----------------------------------------------------------------------------
 -- Conversion from PackageName to HsComponentId
@@ -700,7 +703,7 @@ summariseRequirement pn mod_name = do
                         hsmodHaddockModHeader = Nothing
                     }),
                 hpm_src_files = [],
-                hpm_annotations = (Map.empty, Map.empty)
+                hpm_annotations = ApiAnns Map.empty Nothing Map.empty []
             }),
         ms_hspp_file = "", -- none, it came inline
         ms_hspp_opts = dflags,
@@ -810,7 +813,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
                     hpm_src_files = [], -- TODO if we preprocessed it
-                    hpm_annotations = (Map.empty, Map.empty) -- BOGUS
+                    hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
                 }),
             ms_hs_date = time,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
