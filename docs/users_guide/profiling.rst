@@ -701,18 +701,18 @@ following RTS options select which break-down to use:
 
 .. rts-flag:: -hT
 
-    Breaks down the graph by heap closure type.
+    Breaks down the graph by heap closure type (see :ref:`rts-profiling`).
 
 .. rts-flag:: -hc
               -h
 
-    *Requires* :ghc-flag:`-prof`. Breaks down the graph by the cost-centre stack
-    which produced the data.
+    The :rts-flag:`-hc` flag *requires* :ghc-flag:`-prof` and breaks down the
+    graph by the cost-centre stack which produced the data.
 
-    .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
-              your program was compiled for profiling. When compiled for profiling,
-              :rts-flag:`-h` is equivalent to :rts-flag:`-hc`, but otherwise is
-              equivalent to :rts-flag:`-hT` (see :ref:`rts-profiling`).
+    The meaning of the shortened :rts-flag:`-h` is dependent on whether
+    your program was compiled for profiling or not. When compiled for
+    profiling, :rts-flag:`-h` is equivalent to :rts-flag:`-hc`, but
+    otherwise is equivalent to :rts-flag:`-hT` (see :ref:`rts-profiling`).
 
 .. rts-flag:: -hm
 
@@ -736,6 +736,16 @@ following RTS options select which break-down to use:
     *Requires* :ghc-flag:`-prof`. Break down the graph by retainer set. Retainer
     profiling is described in more detail below (:ref:`retainer-prof`).
 
+.. rts-flag:: -ho
+
+    *Requires* :ghc-flag:`-prof`, implies :rts-flag:`-hO`. Break down the
+    graph by sharing structure of "root" objects specified by the program
+    using :base-ref:`GHC.Profiling.setHeapProfilingRoots`. A band
+    represents the total size of all closures exclusively reachable from
+    the set of roots mentioned in it's label.
+
+    This profiling mode is described in more detail in :ref:`root-prof` below.
+
 .. rts-flag:: -hb
 
     *Requires* :ghc-flag:`-prof`. Break down the graph by biography.
@@ -752,6 +762,11 @@ following RTS options select which break-down to use:
     This format is both more expressive than the old ``.hp`` format
     and can be correlated with other events over the program's runtime.
     See :ref:`heap-profiler-events` for details on the produced event structure.
+
+.. _rts-options-heap-prof-restrict:
+
+RTS options for restricting a heap profile
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In addition, the profile can be restricted to heap data which satisfies
 certain criteria - for example, you might want to display a profile by
@@ -799,12 +814,26 @@ follows:
     cost-centre stacks with one of the specified cost centres at the
     top.
 
+    Cannot be mixed with :rts-flag:`-hb`, :rts-flag:`-ho` or
+    :rts-flag:`-hO`.
+
+.. rts-flag:: -hO
+
+    Restrict the profile to closures reachable from "roots" specified by
+    the program using the :base-ref:`GHC.Profiling.setHeapProfilingRoots`
+    function. See :ref:`root-prof` below for details.
+
+    Cannot be mixed with :rts-flag:`-hr` or :rts-flag:`-hb`.
+
 .. rts-flag:: -hb ⟨bio⟩
     :noindex:
 
     Restrict the profile to closures with one of the specified
     biographies, where ⟨bio⟩ is one of ``lag``, ``drag``, ``void``, or
     ``use``.
+
+    Cannot be mixed with :rts-flag:`-hr`, :rts-flag:`-ho` or
+    :rts-flag:`-hO`.
 
 For example, the following options will generate a retainer profile
 restricted to ``Branch`` and ``Leaf`` constructors:
@@ -816,7 +845,8 @@ restricted to ``Branch`` and ``Leaf`` constructors:
 There can only be one "break-down" option (eg. :rts-flag:`-hr` in the example
 above), but there is no limit on the number of further restrictions that
 may be applied. All the options may be combined, with one exception: GHC
-doesn't currently support mixing the :rts-flag:`-hr` and :rts-flag:`-hb` options.
+doesn't currently support mixing the :rts-flag:`-hr`, :rts-flag:`-hb`,
+:rts-flag:`-ho` and :rts-flag:`-hO` options.
 
 There are three more options which relate to heap profiling:
 
@@ -827,6 +857,9 @@ There are three more options which relate to heap profiling:
     get 5 samples per second. This only affects heap profiling; time
     profiles are always sampled with the frequency of the RTS clock. See
     :ref:`prof-time-options` for changing that.
+
+    Setting it to zero will cause heap profiling to run on every GC. The
+    interval is also disabled if :rts-flag:`-V ⟨secs⟩` is set to zero.
 
 .. rts-flag:: -xt
 
@@ -915,6 +948,153 @@ we get a profile of the retainers of ``B``:
 This trick isn't foolproof, because there might be other ``B`` closures in
 the heap which aren't the retainers we are interested in, but we've
 found this to be a useful technique in most cases.
+
+.. _root-prof:
+
+Heap profiling with program-specified roots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. Note that this section's title is referenced in the GHC.Profiling module
+   in base. Please fix it if you change it.
+
+In large Haskell programs it can become quite difficult to pinpoint the
+source of a memory leak or higher than expected memory usage with just the
+information from heap profiles covering the entire live heap of the
+program. While the traditional per-closure break-downs and filters such as
+:rts-flag:`-hy` or :rts-flag:`-hm` do help with this to some extent you may
+end up trying to understand where, more generally, allocations come from
+since they don't take into account the relationship between closures.
+
+To improve the situation the "root" profiler provides a way to inspect a
+specific subset of the heap, dynamically specified by the program being
+profiled. The root profiler supports two related but distinct modes:
+
+- We can either restrict a traditional heap profile to the specified set of
+  closures with :rts-flag:`-hO` or
+
+- break-down the profile graph by sharing structure with :rts-flag:`-ho`.
+
+In either case the program must use
+:base-ref:`GHC.Profiling.setHeapProfilingRoots` to inform the RTS of the
+set of closures the program is interested in. Closures are considered
+during profiling only when they are rechable from at least one of the the
+specified roots.
+
+.. NOTE:: The number of roots is currently limited to 20 to keep the
+   implementation simple. If you have a compelling use-case that requires
+   more roots do feel free to open an issue on the GHC bug tracker about
+   this.
+
+
+Restricting heap profiles by roots
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To restrict a heap profile to a certain subset of the heap, we simply call
+``setHeapProfilingRoots`` in the program we want to profile to register the
+root objects and then request heap profiling from the RTS like normal. The
+roots can be dynamically determined by the program and updated as
+needed. ::
+
+    import GHC.Profiling
+    main = do
+      let a = ...
+      let b = ...
+      let c = ...
+      setHeapProfilingRoots [Root "a" a, Root "b" b, Root "c" c]
+      ...
+
+This will cause the heap profiler to only consider the three root objects
+and closures reachable by following references. Note the ``rootDescr``
+string is ignored and doesn't have to be unique when using only
+:rts-flag:`-hO`.
+
+Then to perform, for example, a :rts-flag:`-hd` profile run:
+
+.. code-block:: none
+
+    prog +RTS -hd -hO
+
+This will produce a heap profile named ``prog.hp`` that may be visualized
+as usual.
+
+Break-down by root sharing structure
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In addition to filtering, the root profiler can also help you get a more
+source-level overview of a program's heap than regular heap profiling can
+provide. Normally the heap profiler divides closures into certain
+categories based on information available locally, such as the closure's
+Haskell type, closure description or originating module.
+
+In contrast the root profiler explores the relationship between closures by
+following references starting from the roots, incidentally much like the
+garbage collector. In doing so it partitions the heap into exclusive groups
+of closures reachable by only a certain set of roots, eventually producing the
+total size of all closures in each group.
+
+It does this by traversing the heap starting from the roots, while
+decorating each closure with a set of roots it has been reached from so
+far. Every time a closure is newly reached from a root we add the closure's
+size to a global counter for the bin corresponding to the new set of roots
+and subtract the size from the old bin if applicable.
+
+Take the following simple example ::
+
+    import GHC.Profiling
+    data T = A Int Int | B Int Int
+    main = do
+      let a = A c 1
+          b = B c 2
+          c = 3
+      setHeapProfilingRoots [Root "a" a, Root "b" b]
+
+roots ``a`` and ``b`` share some data ``c``, but the roots constructors are
+unshared. Here we can think of the root profiler producing three groups ::
+
+    a   -> {A _ _, 1}
+    b   -> {B _ _, 2}
+    a,b -> {3}
+
+though in reality it just sums the closure's sizes. In this case ``A _ _``
+and ``B _ _`` have a size of three machine words, one for the info pointer
+and another two for the references to the boxed integers for a total of
+five while the boxed integers have a size of two words, giving ::
+
+    a   -> 5
+    b   -> 5
+    a,b -> 2
+
+So much for theory, to run a root profile compile the program with
+profiling enabled like usual and then pass the :rts-flag:`-ho` RTS option,
+like so:
+
+.. code-block:: none
+
+    prog +RTS -ho
+
+Again this will produce a heap profile named ``prog.hp`` that you can
+visualize like normal.
+
+Note that profiling samples are only produced when garbage collection runs
+so a short program like above might not produce any output. To force
+profiling to run immediately we can call :base-ref:`System.Mem.performGC`
+while also passing zero to the :rts-flag:`-i ⟨secs⟩` RTS option to run heap
+profiling on every GC ::
+
+    import GHC.Profiling
+    import System.Mem
+    main = do
+      setHeapProfilingRoots [...]
+      performGC
+
+Then run the program with ``-i0`` added:
+
+.. code-block:: none
+
+    prog +RTS -ho -i0
+
+This should at the very least yield one heap profiling sample in the output
+file regardless of how short the program is.
 
 .. _biography-prof:
 
