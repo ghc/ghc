@@ -851,8 +851,8 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
         prefetchForRead(&new.mark_closure.p->header.info);
         prefetchForRead(Bdescr((StgPtr) new.mark_closure.p));
         {
-            struct NonmovingSegment *seg = nonmovingGetSegment(new.mark_closure.p);
-            nonmoving_block_idx blk_idx = nonmovingGetBlockIdx(new.mark_closure.p);
+            struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) new.mark_closure.p);
+            nonmoving_block_idx blk_idx = nonmovingGetBlockIdx((StgPtr) new.mark_closure.p);
             prefetchForRead(&seg->bitmap[blk_idx]);
         }
         q->prefetch_queue[i] = new;
