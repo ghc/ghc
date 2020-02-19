@@ -90,7 +90,7 @@ Time getCurrentThreadCPUTime(void)
         stg_exit(EXIT_FAILURE);
     }
 #else
-#error No known means of finding current thread's CPU time
+#error I know of no means to find the CPU time of current thread on this platform.
 #endif
 }
 
