@@ -209,7 +209,7 @@ GarbageCollect (uint32_t collect_gen,
   gc_thread *saved_gct;
 #endif
   uint32_t g, n;
-  // the time we should report our heap census as occurring at, if necessary.
+  // The time we should report our heap census as occurring at, if necessary.
   Time mut_time = 0;
 
   if (do_heap_census) {
