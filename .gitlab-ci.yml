@@ -17,6 +17,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
+  - test
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
@@ -580,7 +581,7 @@ nightly-x86_64-linux-deb9:
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: test
   variables:
     BUILD_FLAVOUR: validate
     # Ensure that stage2 also has DEBUG enabled
