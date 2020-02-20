@@ -29,8 +29,8 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta,
-        MkDeltas(..), liftDeltasM
+        VarInfo(..), TmState(..), TyState(..), Delta(..),
+        Deltas(..), initDeltas, liftDeltasM
     ) where
 
 #include "HsVersions.h"
@@ -65,6 +65,7 @@ import Numeric (fromRat)
 import Data.Foldable (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
+import qualified Data.Semigroup as Semi
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -540,6 +541,9 @@ instance Outputable Delta where
 
 -- | A disjunctive bag of 'Delta's, representing a refinement type.
 newtype Deltas = MkDeltas (Bag Delta)
+
+initDeltas :: Deltas
+initDeltas = MkDeltas (unitBag initDelta)
 
 instance Outputable Deltas where
   ppr (MkDeltas deltas) = ppr deltas
