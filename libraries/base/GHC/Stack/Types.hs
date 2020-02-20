@@ -20,7 +20,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- type definitions for implicit call-stacks.
+-- Type definitions for implicit call-stacks.
 -- Use "GHC.Stack" from the base package instead of importing this
 -- module directly.
 --
@@ -99,37 +99,25 @@ type HasCallStack = (?callStack :: CallStack)
 -- CallStack (from HasCallStack):
 --   putStrLnWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
 --
+-- GHC solves 'HasCallStack' constraints in two steps:
 --
--- GHC solves 'HasCallStack' constraints in three steps:
+--    1. If there is a 'CallStack' in scope -- i.e. the enclosing definition
+--       has a 'HasCallStack' constraint -- GHC will push the new call-site
+--       onto the existing 'CallStack'.
 --
--- 1. If there is a 'CallStack' in scope -- i.e. the enclosing function
---    has a 'HasCallStack' constraint -- GHC will append the new
---    call-site to the existing 'CallStack'.
+--    2. Otherwise GHC will solve the 'HasCallStack' constraint for the
+--       singleton 'CallStack' containing just the current call-site.
 --
--- 2. If there is no 'CallStack' in scope -- e.g. in the GHCi session
---    above -- and the enclosing definition does not have an explicit
---    type signature, GHC will infer a 'HasCallStack' constraint for the
---    enclosing definition (subject to the monomorphism restriction).
---
--- 3. If there is no 'CallStack' in scope and the enclosing definition
---    has an explicit type signature, GHC will solve the 'HasCallStack'
---    constraint for the singleton 'CallStack' containing just the
---    current call-site.
+-- Importantly, GHC will __never__ infer a 'HasCallStack' constraint,
+-- you must request it explicitly.
 --
 -- 'CallStack's do not interact with the RTS and do not require compilation
 -- with @-prof@. On the other hand, as they are built up explicitly via the
 -- 'HasCallStack' constraints, they will generally not contain as much
 -- information as the simulated call-stacks maintained by the RTS.
 --
--- A 'CallStack' is a @[(String, SrcLoc)]@. The @String@ is the name of
--- function that was called, the 'SrcLoc' is the call-site. The list is
--- ordered with the most recently called function at the head.
---
--- NOTE: The intrepid user may notice that 'HasCallStack' is just an
--- alias for an implicit parameter @?callStack :: CallStack@. This is an
--- implementation detail and __should not__ be considered part of the
--- 'CallStack' API, we may decide to change the implementation in the
--- future.
+-- 'CallStack' is kept abstract, but this module provides a function 'getCallStack'
+-- to access the individual call-sites in the stack.
 --
 -- @since 4.8.1.0
 data CallStack
@@ -141,9 +129,12 @@ data CallStack
 
   -- See Note [Overview of implicit CallStacks]
 
--- | Extract a list of call-sites from the 'CallStack'.
+-- | Extract a list of call-sites from the 'CallStack'.  For each
+-- call-site, the @[Char]@ is the name of the function that was
+-- called, and the 'SrcLoc' provides the package, module, and file
+-- name, as well as the line and column numbers.
 --
--- The list is ordered by most recent call.
+-- The list is ordered with most recent call first.
 --
 -- @since 4.8.1.0
 getCallStack :: CallStack -> [([Char], SrcLoc)]
