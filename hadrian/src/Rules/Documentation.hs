@@ -85,6 +85,10 @@ documentationRules = do
     -- Haddock's manual, and builds man pages
     "docs" ~> do
         root <- buildRoot
+
+        -- we need to ensure that `configure` has been run (#17840)
+        need [configFile]
+
         doctargets <- ghcDocs =<< flavour
         let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
             archives = map pathArchive docPaths
