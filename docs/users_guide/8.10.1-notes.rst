@@ -220,6 +220,22 @@ Compiler
 - Deprecated flag ``-fmax-pmcheck-iterations`` in favor of
   :ghc-flag:`-fmax-pmcheck-models=⟨n⟩`, which uses a completely different mechanism.
 
+- GHC now writes ``.o`` files atomically, resulting in reduced chances
+  of truncated files when a build is cancelled or the computer crashes.
+
+  This fixes numerous bug reports in Stack and Cabal where GHC was not
+  able to recover from such situations by itself and users reported having
+  to clean the build directory.
+
+  Other file types are not yet written atomically.
+  Users that observe related problems should report them on
+  `GHC issue #14533 <https://gitlab.haskell.org/ghc/ghc/issues/14533>`__.
+  This fix is part of the
+  `Stack initiative to get rid of persistent build errors due to non-atomic
+  file writes across the Haskell tooling ecosystem
+  <https://github.com/commercialhaskell/stack/issues/4559>`__.
+
+
 GHCi
 ~~~~
 
@@ -326,24 +342,6 @@ Template Haskell
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
-
-Build system
-~~~~~~~~~~~~
-
-- GHC now writes ``.o`` files atomically, resulting in reduced chances
-  of truncated files when a build is cancelled or the computer crashes.
-
-  This fixes numerous bug reports in Stack and Cabal where GHC was not
-  able to recover from such situations by itself and users reported having
-  to clean the build directory.
-
-  Other file types are not yet written atomically.
-  Users that observe related problems should report them on
-  `GHC issue #14533 <https://gitlab.haskell.org/ghc/ghc/issues/14533>`__.
-  This fix is part of the
-  `Stack initiative to get rid of persistent build errors due to non-atomic
-  file writes across the Haskell tooling ecosystem
-  <https://github.com/commercialhaskell/stack/issues/4559>`__.
 
 Included libraries
 ------------------
