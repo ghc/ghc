@@ -17,7 +17,7 @@ module GHC.HsToCore.PmCheck (
         needToRunPmCheck, isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
-        addTyCsDs, addScrutTmCs, addPatTmCs
+        addTyCsDs, addScrutTmCs
     ) where
 
 #include "HsVersions.h"
@@ -108,8 +108,8 @@ data PmGrd
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
     -- /binds/ @x@.
   | PmLet {
-      pm_id       :: !Id,
-      pm_let_expr :: !CoreExpr
+      pm_id        :: !Id,
+      _pm_let_expr :: !CoreExpr
     }
 
 -- | Should not be user-facing.
@@ -1010,7 +1010,7 @@ f x = case x of
              (_:_) -> True
              []    -> False -- can't happen
 
-Functions `addScrutTmCs' and `addPatTmCs' are responsible for generating
+Functions `addScrutTmCs' is responsible for generating
 these constraints.
 -}
 
@@ -1040,46 +1040,6 @@ addScrutTmCs (Just scr) [x] k = do
   scr_e <- dsLExpr scr
   locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (unitBag (PmCoreCt x scr_e))) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
-
-addPmConCts :: Deltas -> Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> DsM Deltas
-addPmConCts deltas x con tvs dicts fields = do
-  deltas_ty    <- addPmCtsDeltas deltas (listToBag (PmTyCt . evVarPred <$> dicts))
-  deltas_tm_ty <- addPmCtsDeltas deltas_ty (unitBag (PmConCt x con tvs fields))
-  pure deltas_tm_ty
-
--- | Add equalities to the local 'DsM' environment when checking the RHS of a
--- case expression:
---     case e of x { p1 -> e1; ... pn -> en }
--- When we go deeper to check e.g. e1 we record (x ~ p1).
-addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
-           -> [Id]                  -- MatchVars (should have length 1)
-           -> DsM a
-           -> DsM a
--- Computes an approximation of the Covered set for p1 (which pmCheck currently
--- discards).
-addPatTmCs ps xs k = do
-  fam_insts <- dsGetFamInstEnvs
-  grds <- concat <$> zipWithM (translatePat fam_insts) xs ps
-  locallyExtendPmDelta (\delta -> computeCovered grds delta) k
-
--- | A dead simple version of 'pmCheck' that only computes the Covered set.
--- So it only cares about collecting positive info.
--- We use it to collect info from a pattern when we check its RHS.
--- See 'addPatTmCs'.
-computeCovered :: GrdVec -> Deltas -> DsM Deltas
--- The duplication with 'pmCheck' is really unfortunate, but it's simpler than
--- separating out the common cases with 'pmCheck', because that would make the
--- ConVar case harder to understand.
-computeCovered [] deltas = pure deltas
-computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) deltas = do
-  deltas' <- addPmCtsDeltas deltas (unitBag (PmCoreCt x e))
-  computeCovered ps deltas'
-computeCovered (PmBang{} : ps) deltas = do
-  computeCovered ps deltas
-computeCovered (p : ps) deltas
-  | PmCon{ pm_id = x, pm_con_con = con, pm_con_tvs = tvs, pm_con_args = args
-         , pm_con_dicts = dicts } <- p
-  = addPmConCts deltas x con tvs dicts args >>= computeCovered ps
 
 {-
 %************************************************************************

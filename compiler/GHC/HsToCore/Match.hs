@@ -34,6 +34,7 @@ import TcHsSyn
 import TcEvidence
 import TcRnMonad
 import GHC.HsToCore.PmCheck
+import GHC.HsToCore.PmCheck.Types (initDeltas)
 import CoreSyn
 import Literal
 import CoreUtils
@@ -62,7 +63,7 @@ import FastString
 import Unique
 import UniqDFM
 
-import Control.Monad( when, unless, void )
+import Control.Monad( unless )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -743,35 +744,39 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/
-        ; when (isMatchContextPmChecked dflags origin ctxt) $
-            addScrutTmCs mb_scr new_vars $
-            -- See Note [Type and Term Equality Propagation]
-            void (checkMatches dflags (DsMatchContext ctxt locn) new_vars matches)
+        ; rhss_deltas <- if isMatchContextPmChecked dflags origin ctxt
+            then addScrutTmCs mb_scr new_vars $
+              -- See Note [Type and Term Equality Propagation]
+              checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+            else pure (take (length matches) (repeat initDeltas))
 
-        ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
+        ; eqns_info   <- mk_eqn_infos matches rhss_deltas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
+    -- rhss_deltas is a flat list, whereas there are multiple GRHSs per match.
+    -- mk_eqn_infos will thread rhss_deltas as state through calls to
+    -- mk_eqn_info, distributing each rhss_deltas to a GRHS.
+    mk_eqn_infos (L _ match : matches) rhss_deltas
+      = do { (info, rhss_deltas') <- mk_eqn_info  match   rhss_deltas
+           ; infos                <- mk_eqn_infos matches rhss_deltas'
+           ; return (info:infos) }
+    mk_eqn_infos [] _ = return []
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
+    mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) rhss_deltas
+      | XGRHSs nec <- grhss = noExtCon nec
+      | GRHSs _ grhss' _  <- grhss, let n_grhss = length grhss'
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-                 dicts = collectEvVarsPats upats
-
-           ; match_result <-
-              -- Extend the environment with knowledge about
-              -- the matches before desugaring the RHS
-              -- See Note [Type and Term Equality Propagation]
-              applyWhen (needToRunPmCheck dflags origin)
-                        (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
-                        (dsGRHSs ctxt grhss rhs_ty)
-
-           ; return (EqnInfo { eqn_pats = upats
-                             , eqn_orig = FromSource
-                             , eqn_rhs = match_result }) }
-    mk_eqn_info _ (L _ (XMatch nec)) = noExtCon nec
+           ; let (match_deltas, rhss_deltas') = splitAt n_grhss rhss_deltas
+           ; match_result <- dsGRHSs ctxt grhss rhs_ty match_deltas
+           ; return ( EqnInfo { eqn_pats = upats
+                              , eqn_orig = FromSource
+                              , eqn_rhs = match_result }
+                    , rhss_deltas' ) }
+    mk_eqn_info (XMatch nec) _ = noExtCon nec
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
