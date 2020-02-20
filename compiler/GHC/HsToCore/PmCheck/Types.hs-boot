@@ -1,7 +1,9 @@
 module GHC.HsToCore.PmCheck.Types where
 
-import GhcPrelude ()
+import Bag
 
 data Delta
 
-initDelta :: Delta
+newtype Deltas = MkDeltas (Bag Delta)
+
+initDeltas :: Deltas
