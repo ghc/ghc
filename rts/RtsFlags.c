@@ -21,8 +21,10 @@
 #include <ctype.h>
 #endif
 
-#include <string.h>
 #include <errno.h>
+
+#include <string.h>
+#include <stdlib.h>
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
