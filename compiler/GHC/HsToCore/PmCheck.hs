@@ -159,7 +159,7 @@ data GrdTree
 -- tree. 'redundantAndInaccessibleRhss' can figure out redundant and proper
 -- inaccessible RHSs from this.
 data AnnotatedTree
-  = AccessibleRhs !RhsInfo
+  = AccessibleRhs !Deltas !RhsInfo
   -- ^ A RHS deemed accessible.
   | InaccessibleRhs !RhsInfo
   -- ^ A RHS deemed inaccessible; no value could possibly reach it.
@@ -202,17 +202,6 @@ instance Outputable AnnotatedTree where
       collect_seqs (SequenceAnn l r) = collect_seqs l ++ collect_seqs r
       collect_seqs t                 = [ppr t]
   ppr EmptyAnn               = text "<empty case>"
-
-newtype Deltas = MkDeltas (Bag Delta)
-
-instance Outputable Deltas where
-  ppr (MkDeltas deltas) = ppr deltas
-
-instance Semigroup Deltas where
-  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
-
-liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
-liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)
 
 -- | Lift 'addPmCts' over 'Deltas'.
 addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
@@ -297,7 +286,7 @@ checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
+             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM [Deltas]
 checkMatches dflags ctxt vars matches = do
   tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
@@ -315,6 +304,8 @@ checkMatches dflags ctxt vars matches = do
   res <- checkGrdTree grd_tree missing
 
   dsPmWarn dflags ctxt vars res
+
+  return (cr_clauses res)
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

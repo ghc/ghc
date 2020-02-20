@@ -29,7 +29,8 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta
+        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta,
+        MkDeltas(..), liftDeltasM
     ) where
 
 #include "HsVersions.h"
@@ -520,8 +521,7 @@ instance Outputable TyState where
 initTyState :: TyState
 initTyState = TySt emptyBag
 
--- | Term and type constraints to accompany each value vector abstraction.
--- For efficiency, we store the term oracle state instead of the term
+-- | An inert set of canonical (i.e. mutually compatible) term and type
 -- constraints.
 data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
                      , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
@@ -537,3 +537,15 @@ instance Outputable Delta where
       ppr (delta_tm_st delta),
       ppr (delta_ty_st delta)
     ]
+
+-- | A disjunctive bag of 'Delta's, representing a refinement type.
+newtype Deltas = MkDeltas (Bag Delta)
+
+instance Outputable Deltas where
+  ppr (MkDeltas deltas) = ppr deltas
+
+instance Semigroup Deltas where
+  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
+
+liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
+liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)
