@@ -194,7 +194,7 @@ instance Outputable GrdTree where
   ppr Empty          = text "<empty case>"
 
 instance Outputable AnnotatedTree where
-  ppr (AccessibleRhs info)   = pprRhsInfo info
+  ppr (AccessibleRhs _ info) = pprRhsInfo info
   ppr (InaccessibleRhs info) = text "inaccessible" <+> pprRhsInfo info
   ppr (MayDiverge t)         = text "div" <+> ppr t
     -- Format nested Sequences in blocks "{ grds1; grds2; ... }"
@@ -261,7 +261,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
   -- Omitting checking this flag emits redundancy warnings twice in obscure
   -- cases like #17646.
   when (exhaustive dflags kind) $ do
-    missing   <- MkDeltas . unitBag <$> getPmDelta
+    missing   <- getPmDeltas
     tracePm "checkSingle: missing" (ppr missing)
     fam_insts <- dsGetFamInstEnvs
     grd_tree  <- mkGrdTreeRhs (L locn $ ppr p) <$> translatePat fam_insts var p
@@ -272,7 +272,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 -- in @MultiIf@ expressions.
 checkGuardMatches :: HsMatchContext GhcRn         -- Match context
                   -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
-                  -> DsM ()
+                  -> DsM [Deltas]
 checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
@@ -295,7 +295,7 @@ checkMatches dflags ctxt vars matches = do
                                2
                                (vcat (map ppr matches)))
 
-  init_deltas <- MkDeltas . unitBag <$> getPmDelta
+  init_deltas <- getPmDeltas
   missing <- case matches of
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
     [] | [var] <- vars -> addPmCtDeltas init_deltas (PmNotBotCt var)
@@ -306,7 +306,20 @@ checkMatches dflags ctxt vars matches = do
 
   dsPmWarn dflags ctxt vars res
 
-  return (cr_clauses res)
+  return (extractRhsDeltas init_deltas (cr_clauses res))
+
+-- | Extract the 'Deltas' reaching the RHSs of the 'AnnotatedTree'.
+-- For 'AccessibleRhs's, this is stored in the tree node, whereas
+-- 'InaccessibleRhs's fall back to the supplied original 'Deltas'.
+-- See @Note [Recovering from unsatisfiable pattern-matching constraints]@.
+extractRhsDeltas :: Deltas -> AnnotatedTree -> [Deltas]
+extractRhsDeltas orig_deltas = fromOL . go
+  where
+    go (AccessibleRhs deltas _) = unitOL deltas
+    go (InaccessibleRhs _)      = unitOL orig_deltas
+    go (MayDiverge t)           = go t
+    go (SequenceAnn l r)        = go l Semi.<> go r
+    go EmptyAnn                 = nilOL
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -911,7 +924,9 @@ checkGrdTree' :: GrdTree -> Deltas -> DsM CheckResult
 -- RHS: Check that it covers something and wrap Inaccessible if not
 checkGrdTree' (Rhs sdoc) deltas = do
   is_covered <- isInhabited deltas
-  let clauses = if is_covered then AccessibleRhs sdoc else InaccessibleRhs sdoc
+  let clauses
+        | is_covered = AccessibleRhs deltas sdoc
+        | otherwise  = InaccessibleRhs sdoc
   pure CheckResult
     { cr_clauses = clauses
     , cr_uncov   = MkDeltas emptyBag
@@ -1000,18 +1015,20 @@ Functions `addScrutTmCs' and `addPatTmCs' are responsible for generating
 these constraints.
 -}
 
-locallyExtendPmDelta :: (Delta -> DsM (Maybe Delta)) -> DsM a -> DsM a
-locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
+locallyExtendPmDelta :: (Deltas -> DsM Deltas) -> DsM a -> DsM a
+locallyExtendPmDelta ext k = getPmDeltas >>= ext >>= \deltas -> do
+  inh <- isInhabited deltas
   -- If adding a constraint would lead to a contradiction, don't add it.
   -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
   -- for why this is done.
-  Nothing     -> k
-  Just delta' -> updPmDelta delta' k
+  if inh
+    then updPmDeltas deltas k
+    else k
 
 -- | Add in-scope type constraints
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
 addTyCsDs ev_vars =
-  locallyExtendPmDelta (\delta -> addPmCts delta (PmTyCt . evVarPred <$> ev_vars))
+  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars))
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
@@ -1022,14 +1039,14 @@ addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
 addScrutTmCs Nothing    _   k = k
 addScrutTmCs (Just scr) [x] k = do
   scr_e <- dsLExpr scr
-  locallyExtendPmDelta (\delta -> addPmCts delta (unitBag (PmCoreCt x scr_e))) k
+  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (unitBag (PmCoreCt x scr_e))) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
 
-addPmConCts :: Delta -> Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> DsM (Maybe Delta)
-addPmConCts delta x con tvs dicts fields = runMaybeT $ do
-  delta_ty    <- MaybeT $ addPmCts delta (listToBag (PmTyCt . evVarPred <$> dicts))
-  delta_tm_ty <- MaybeT $ addPmCts delta_ty (unitBag (PmConCt x con tvs fields))
-  pure delta_tm_ty
+addPmConCts :: Deltas -> Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> DsM Deltas
+addPmConCts deltas x con tvs dicts fields = do
+  deltas_ty    <- addPmCtsDeltas deltas (listToBag (PmTyCt . evVarPred <$> dicts))
+  deltas_tm_ty <- addPmCtsDeltas deltas_ty (unitBag (PmConCt x con tvs fields))
+  pure deltas_tm_ty
 
 -- | Add equalities to the local 'DsM' environment when checking the RHS of a
 -- case expression:
@@ -1050,22 +1067,20 @@ addPatTmCs ps xs k = do
 -- So it only cares about collecting positive info.
 -- We use it to collect info from a pattern when we check its RHS.
 -- See 'addPatTmCs'.
-computeCovered :: GrdVec -> Delta -> DsM (Maybe Delta)
+computeCovered :: GrdVec -> Deltas -> DsM Deltas
 -- The duplication with 'pmCheck' is really unfortunate, but it's simpler than
 -- separating out the common cases with 'pmCheck', because that would make the
 -- ConVar case harder to understand.
-computeCovered [] delta = pure (Just delta)
-computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) delta = do
-  delta' <- expectJust "x is fresh" <$> addPmCts delta (unitBag (PmCoreCt x e))
-  computeCovered ps delta'
-computeCovered (PmBang{} : ps) delta = do
-  computeCovered ps delta
-computeCovered (p : ps) delta
+computeCovered [] deltas = pure deltas
+computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) deltas = do
+  deltas' <- addPmCtsDeltas deltas (unitBag (PmCoreCt x e))
+  computeCovered ps deltas'
+computeCovered (PmBang{} : ps) deltas = do
+  computeCovered ps deltas
+computeCovered (p : ps) deltas
   | PmCon{ pm_id = x, pm_con_con = con, pm_con_tvs = tvs, pm_con_args = args
          , pm_con_dicts = dicts } <- p
-  = addPmConCts delta x con tvs dicts args >>= \case
-      Nothing     -> pure Nothing
-      Just delta' -> computeCovered ps delta'
+  = addPmConCts deltas x con tvs dicts args >>= computeCovered ps
 
 {-
 %************************************************************************
@@ -1105,7 +1120,7 @@ redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc)
     --       even safely delete the equation without altering semantics)
     -- See Note [Determining inaccessible clauses]
     go :: AnnotatedTree -> (OrdList RhsInfo, OrdList RhsInfo, OrdList RhsInfo)
-    go (AccessibleRhs info)   = (unitOL info, nilOL, nilOL)
+    go (AccessibleRhs _ info) = (unitOL info, nilOL, nilOL)
     go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info) -- presumably redundant
     go (MayDiverge t)         = case go t of
       -- See Note [Determining inaccessible clauses]

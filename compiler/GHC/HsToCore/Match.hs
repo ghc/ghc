@@ -62,7 +62,7 @@ import FastString
 import Unique
 import UniqDFM
 
-import Control.Monad( when, unless )
+import Control.Monad( when, unless, void )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -742,13 +742,13 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                            []    -> mapM newSysLocalDsNoLP arg_tys
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 
-        ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
-
         -- Pattern match check warnings for /this match-group/
         ; when (isMatchContextPmChecked dflags origin ctxt) $
             addScrutTmCs mb_scr new_vars $
             -- See Note [Type and Term Equality Propagation]
-            checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+            void (checkMatches dflags (DsMatchContext ctxt locn) new_vars matches)
+
+        ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
