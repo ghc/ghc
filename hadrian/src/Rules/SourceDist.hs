@@ -43,15 +43,15 @@ prepareTree dest = do
   where
 
     copyAlexHappyFiles root =
-      forM_ alexHappyFiles $ \(stg, pkg, inp, srcDir, out) -> do
+      forM_ alexHappyFiles $ \(stg, pkg, inp, out) -> do
         let dir = root -/- buildDir (Context stg pkg vanilla)
-            srcInputFile = dest -/- pkgPath pkg -/- maybe id (-/-) srcDir inp
+            srcInputFile = dest -/- pkgPath pkg -/- inp
         -- We first make sure that the generated file is... generated.
         need [ dir -/- out ]
         -- We then copy the generated file in the source dist, right
         -- next to the input file.
         copyFile (dir -/- out)
-                 (dest -/- pkgPath pkg -/- maybe id (-/-) srcDir out)
+                 (dest -/- pkgPath pkg -/- out)
         -- We finally add a ".source" suffix to the input file to
         -- prevent it from being used when building GHC, since the
         -- generated file being there already should prevent
@@ -134,23 +134,13 @@ prepareTree dest = do
         , "llvm-passes"
         ]
 
-    -- (stage, package, input file, dir, output file)
-    --
-    -- where "dir" is the subdirectory of the package's directory
-    -- where the input file resides and where we're supposed to
-    -- put the output file, in the source distribution.
-    --
-    -- This list was taken from ghc.mk. The treatment of those
-    -- alex/happy files is exactly the one implemented in ghc.mk,
-    -- where Make ends up calling 'sdist-ghc-file' on all those
-    -- files, which implements exactly the logic that we
-    -- have for 'alexHappyFiles' above.
+    -- (stage, package, input file, output file)
     alexHappyFiles =
-        [ (Stage0, compiler, "Parser.y", Just ("GHC" -/- "Cmm"), "Parser.hs")
-        , (Stage0, compiler, "Lexer.x", Just ("GHC" -/- "Cmm"), "Lexer.hs")
-        , (Stage0, compiler, "Parser.y", Just "parser", "Parser.hs")
-        , (Stage0, compiler, "Lexer.x", Just "parser", "Lexer.hs")
-        , (Stage0, hpcBin, "HpcParser.y", Nothing, "HpcParser.hs")
-        , (Stage0, genprimopcode, "Parser.y", Nothing, "Parser.hs")
-        , (Stage0, genprimopcode, "Lexer.x", Nothing, "Lexer.hs")
+        [ (Stage0, compiler,      "GHC/Cmm/Parser.y", "GHC/Cmm/Parser.hs")
+        , (Stage0, compiler,      "GHC/Cmm/Lexer.x",  "GHC/Cmm/Lexer.hs")
+        , (Stage0, compiler,      "parser/Parser.y",  "Parser.hs")
+        , (Stage0, compiler,      "parser/Lexer.x",   "Lexer.hs")
+        , (Stage0, hpcBin,        "HpcParser.y",      "HpcParser.hs")
+        , (Stage0, genprimopcode, "Parser.y",         "Parser.hs")
+        , (Stage0, genprimopcode, "Lexer.x",          "Lexer.hs")
         ]
