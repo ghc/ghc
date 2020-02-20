@@ -34,7 +34,7 @@ test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
-test('T3118', normal, compile, [''])
+test('T3118', normal, compile, ['-Wno-overlapping-patterns'])
 test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
