@@ -6,6 +6,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- #name_types#
@@ -104,7 +105,6 @@ import GhcPrelude
 
 import Util
 import Unique
-import DynFlags
 import UniqFM
 import UniqSet
 import FastString
@@ -278,10 +278,9 @@ pprOccName (OccName sp occ)
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
                  | otherwise      = empty
 
-    pp_occ = sdocWithDynFlags $ \dflags ->
-             if gopt Opt_SuppressUniques dflags
-             then text (strip_th_unique (unpackFS occ))
-             else ftext occ
+    pp_occ = sdocOption sdocSuppressUniques $ \case
+               True  -> text (strip_th_unique (unpackFS occ))
+               False -> ftext occ
 
         -- See Note [Suppressing uniques in OccNames]
     strip_th_unique ('[' : c : _) | isAlphaNum c = []

@@ -68,6 +68,9 @@ module GHC.Exts
         -- @since 4.7.0.0
         Data.Coerce.coerce, Data.Coerce.Coercible,
 
+        -- * Very unsafe coercion
+        unsafeCoerce#,
+
         -- * Equality
         type (~~),
 
@@ -112,6 +115,7 @@ import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
 import qualified Debug.Trace
+import Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
 
 import Control.Applicative (ZipList(..))
 
