@@ -12,7 +12,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Oracle (
 
         DsM, tracePm, mkPmId,
-        Delta, initDelta, lookupRefuts, lookupSolution,
+        Delta, initDeltas, lookupRefuts, lookupSolution,
 
         PmCt(PmTyCt), PmCts, pattern PmVarCt, pattern PmCoreCt,
         pattern PmConCt, pattern PmNotConCt, pattern PmBotCt,

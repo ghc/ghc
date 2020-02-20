@@ -75,6 +75,7 @@ import UniqSet( nonDetEltsUniqSet )
 import MonadUtils
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
+import Data.List.NonEmpty ( nonEmpty )
 
 {-**********************************************************************
 *                                                                      *
@@ -175,8 +176,8 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = NPatBindTc _ ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { body_expr <- dsGuarded grhss ty
-        ; checkGuardMatches PatBindGuards grhss
+  = do  { rhss_deltas <- checkGuardMatches PatBindGuards grhss
+        ; body_expr <- dsGuarded grhss ty (nonEmpty rhss_deltas)
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'

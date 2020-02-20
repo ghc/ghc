@@ -69,6 +69,7 @@ import Outputable
 import PatSyn
 
 import Control.Monad
+import Data.List.NonEmpty ( nonEmpty )
 
 {-
 ************************************************************************
@@ -216,8 +217,8 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = NPatBindTc _ ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
-    do { rhs <- dsGuarded grhss ty
-       ; checkGuardMatches PatBindGuards grhss
+    do { rhs_deltas <- checkGuardMatches PatBindGuards grhss
+       ; rhs         <- dsGuarded grhss ty (nonEmpty rhs_deltas)
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
@@ -446,9 +447,9 @@ dsExpr (HsMultiIf res_ty alts)
   = mkErrorExpr
 
   | otherwise
-  = do { match_result <- liftM (foldr1 combineMatchResults)
-                               (mapM (dsGRHS IfAlt res_ty) alts)
-       ; checkGuardMatches IfAlt (GRHSs noExtField alts (noLoc emptyLocalBinds))
+  = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
+       ; rhss_deltas  <- checkGuardMatches IfAlt grhss
+       ; match_result <- dsGRHSs IfAlt grhss res_ty (nonEmpty rhss_deltas)
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
