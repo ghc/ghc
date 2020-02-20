@@ -149,6 +149,8 @@ test('CaseOfKnownCon', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('TooManyDeltas', [], compile,
      ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('LongDistanceInfo', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Series (inspired) by Luke Maranget
 

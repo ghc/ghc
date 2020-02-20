@@ -1482,16 +1482,19 @@ genMachOp_slow opt op [x, y] = case op of
     MO_FF_Conv _ _ -> panicOp
 
     MO_V_Insert  {} -> panicOp
-    MO_V_Extract {} -> panicOp
 
     MO_VS_Neg {} -> panicOp
 
     MO_VF_Insert  {} -> panicOp
-    MO_VF_Extract {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
 
     MO_AlignmentCheck {} -> panicOp
+
+#if __GLASGOW_HASKELL__ < 811
+    MO_VF_Extract {} -> panicOp
+    MO_V_Extract {} -> panicOp
+#endif
 
     where
         binLlvmOp ty binOp = runExprData $ do

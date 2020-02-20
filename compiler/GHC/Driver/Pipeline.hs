@@ -353,7 +353,9 @@ compileForeign hsc_env lang stub_c = do
               LangObjc   -> Cobjc
               LangObjcxx -> Cobjcxx
               LangAsm    -> As True -- allow CPP
+#if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
+#endif
         (_, stub_o, _) <- runPipeline StopLn hsc_env
                        (stub_c, Nothing, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)

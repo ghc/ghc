@@ -62,7 +62,7 @@ import FastString
 import Unique
 import UniqDFM
 
-import Control.Monad( when, unless )
+import Control.Monad( unless )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -742,36 +742,49 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                            []    -> mapM newSysLocalDsNoLP arg_tys
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 
-        ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
+        -- Pattern match check warnings for /this match-group/.
+        -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
+        -- Each Match will split off one Deltas for its RHSs from this.
+        ; rhss_deltas <- if isMatchContextPmChecked dflags origin ctxt
+            then addScrutTmCs mb_scr new_vars $
+              -- See Note [Type and Term Equality Propagation]
+              checkMatches (DsMatchContext ctxt locn) new_vars matches
+            else pure [] -- Ultimately this will result in passing Nothing
+                         -- to dsGRHSs as match_deltas
 
-        -- Pattern match check warnings for /this match-group/
-        ; when (isMatchContextPmChecked dflags origin ctxt) $
-            addScrutTmCs mb_scr new_vars $
-            -- See Note [Type and Term Equality Propagation]
-            checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+        ; eqns_info   <- mk_eqn_infos matches rhss_deltas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
+    -- rhss_deltas is a flat list, whereas there are multiple GRHSs per match.
+    -- mk_eqn_infos will thread rhss_deltas as state through calls to
+    -- mk_eqn_info, distributing each rhss_deltas to a GRHS.
+    mk_eqn_infos (L _ match : matches) rhss_deltas
+      = do { (info, rhss_deltas') <- mk_eqn_info  match   rhss_deltas
+           ; infos                <- mk_eqn_infos matches rhss_deltas'
+           ; return (info:infos) }
+    mk_eqn_infos [] _ = return []
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
+    mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) rhss_deltas
+      | XGRHSs nec <- grhss = noExtCon nec
+      | GRHSs _ grhss' _  <- grhss, let n_grhss = length grhss'
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-                 dicts = collectEvVarsPats upats
-
-           ; match_result <-
-              -- Extend the environment with knowledge about
-              -- the matches before desugaring the RHS
-              -- See Note [Type and Term Equality Propagation]
-              applyWhen (needToRunPmCheck dflags origin)
-                        (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
-                        (dsGRHSs ctxt grhss rhs_ty)
-
-           ; return (EqnInfo { eqn_pats = upats
-                             , eqn_orig = FromSource
-                             , eqn_rhs = match_result }) }
-    mk_eqn_info _ (L _ (XMatch nec)) = noExtCon nec
+           -- Split off one Deltas for each GRHS of the current Match from the
+           -- flat list of GRHS Deltas *for all matches* (see the call to
+           -- checkMatches above).
+           ; let (match_deltas, rhss_deltas') = splitAt n_grhss rhss_deltas
+           -- The list of Deltas is empty iff we don't perform any coverage
+           -- checking, in which case nonEmpty does the right thing by passing
+           -- Nothing.
+           ; match_result <- dsGRHSs ctxt grhss rhs_ty (NEL.nonEmpty match_deltas)
+           ; return ( EqnInfo { eqn_pats = upats
+                              , eqn_orig = FromSource
+                              , eqn_rhs = match_result }
+                    , rhss_deltas' ) }
+    mk_eqn_info (XMatch nec) _ = noExtCon nec
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
