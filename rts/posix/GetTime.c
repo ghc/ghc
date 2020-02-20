@@ -78,7 +78,7 @@ Time getCurrentThreadCPUTime(void)
     }
     return getClockTime(CLOCK_THREAD_CPUTIME_ID);
 #elif defined(darwin_HOST_OS)
-    mach_port_t port = pthread_mach_thread_np(GetCurrentThread());
+    mach_port_t port = pthread_mach_thread_np(osThreadId());
     thread_basic_info_data_t info = { 0 };
     mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
     kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
