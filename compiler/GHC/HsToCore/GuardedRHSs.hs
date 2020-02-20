@@ -23,15 +23,14 @@ import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)
 
-import BasicTypes (Origin(FromSource))
-import DynFlags
-import GHC.HsToCore.PmCheck (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
+import GHC.HsToCore.PmCheck.Types (Deltas)
 import Type   ( Type )
 import Util
 import SrcLoc
 import Outputable
+import Control.Monad ( zipWithM )
 
 {-
 @dsGuarded@ is used for pattern bindings.
@@ -46,9 +45,9 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
 -}
 
-dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> DsM CoreExpr
-dsGuarded grhss rhs_ty = do
-    match_result <- dsGRHSs PatBindRhs grhss rhs_ty
+dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> [Deltas] -> DsM CoreExpr
+dsGuarded grhss rhs_ty rhss_deltas = do
+    match_result <- dsGRHSs PatBindRhs grhss rhs_ty rhss_deltas
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
 
@@ -57,21 +56,22 @@ dsGuarded grhss rhs_ty = do
 dsGRHSs :: HsMatchContext GhcRn
         -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
         -> Type                                 -- Type of RHS
+        -> [Deltas]
         -> DsM MatchResult
-dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty
+dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_deltas
   = ASSERT( notNull grhss )
-    do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
+    do { match_results <- zipWithM (dsGRHS hs_ctx rhs_ty) grhss rhss_deltas
        ; let match_result1 = foldr1 combineMatchResults match_results
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
-dsGRHSs _ (XGRHSs nec) _ = noExtCon nec
+dsGRHSs _ (XGRHSs nec) _ _ = noExtCon nec
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContext GhcRn -> Type -> LGRHS GhcTc (LHsExpr GhcTc) -> Deltas
        -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs))
-  = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
-dsGRHS _ _ (L _ (XGRHS nec)) = noExtCon nec
+dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs)) rhs_deltas
+  = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
+dsGRHS _ _ (L _ (XGRHS nec)) _ = noExtCon nec
 
 {-
 ************************************************************************
@@ -120,18 +120,9 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
 
 matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
-        dicts = collectEvVarsPat upat
     match_var <- selectMatchVar upat
 
-    dflags <- getDynFlags
-    match_result <-
-      -- See Note [Type and Term Equality Propagation] in Check
-      applyWhen (needToRunPmCheck dflags FromSource)
-                -- FromSource might not be accurate, but at worst
-                -- we do superfluous calls to the pattern match
-                -- oracle.
-                (addTyCsDs dicts . addScrutTmCs (Just bind_rhs) [match_var] . addPatTmCs [upat] [match_var])
-                (matchGuards stmts ctx rhs rhs_ty)
+    match_result <- matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
     match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
                                        match_result
