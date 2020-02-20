@@ -1300,6 +1300,7 @@ The rules for map work like this.
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
+-- See Note [Getting the map/coerce RULE to work] in CoreOpt
 
 ----------------------------------------------
 --              append
