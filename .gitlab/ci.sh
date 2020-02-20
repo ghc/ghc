@@ -151,7 +151,8 @@ function set_toolchain_paths() {
 function setup() {
   if [ -d "$TOP/cabal-cache" ]; then
       info "Extracting cabal cache..."
-      cp -Rf cabal-cache "$cabal_dir"
+      mkdir -p "$cabal_dir"
+      cp -Rf cabal-cache/* "$cabal_dir"
   fi
 
   if [[ -n "$needs_toolchain" ]]; then
