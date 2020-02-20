@@ -99,7 +99,7 @@ import TcOrigin
 import Annotations
 import InstEnv
 import FamInstEnv
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Delta)
+import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
 import IOEnv
 import RdrName
 import Name
@@ -317,9 +317,9 @@ data DsLclEnv = DsLclEnv {
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
-        -- The oracle state Delta is augmented as we walk inwards,
-        -- through each pattern match in turn
-        dsl_delta   :: Delta
+        -- The set of reaching values Deltas is augmented as we walk inwards,
+        -- refined through each pattern match in turn
+        dsl_deltas  :: Deltas
      }
 
 -- Inside [| |] brackets, the desugarer looks
