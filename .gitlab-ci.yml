@@ -704,6 +704,7 @@ release-x86_64-linux-deb8:
   variables:
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-alpine"
+    INTEGER_LIBRARY: integer-simple
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
