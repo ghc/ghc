@@ -34,7 +34,6 @@ import TcHsSyn
 import TcEvidence
 import TcRnMonad
 import GHC.HsToCore.PmCheck
-import GHC.HsToCore.PmCheck.Types (initDeltas)
 import CoreSyn
 import Literal
 import CoreUtils
@@ -748,7 +747,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
             then addScrutTmCs mb_scr new_vars $
               -- See Note [Type and Term Equality Propagation]
               checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
-            else pure (take (length matches) (repeat initDeltas))
+            else pure [] -- dsGRHSs will ultimately catch this and substitute
+                         -- for initDeltas
 
         ; eqns_info   <- mk_eqn_infos matches rhss_deltas
 

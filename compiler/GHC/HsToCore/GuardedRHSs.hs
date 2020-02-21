@@ -25,7 +25,7 @@ import CoreUtils (bindNonRec)
 
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck.Types (Deltas)
+import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
 import Type   ( Type )
 import Util
 import SrcLoc
@@ -54,24 +54,30 @@ dsGuarded grhss rhs_ty rhss_deltas = do
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 dsGRHSs :: HsMatchContext GhcRn
-        -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
-        -> Type                                 -- Type of RHS
-        -> [Deltas]
+        -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
+        -> Type                        -- ^ Type of RHS
+        -> [Deltas]                    -- ^ Refined pattern match checking
+                                       --   models, one for each GRHS. Empty
+                                       --   iff we don't care, in which case
+                                       --   it defaults to 'initDeltas'.
         -> DsM MatchResult
 dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_deltas
   = ASSERT( notNull grhss )
-    do { match_results <- zipWithM (dsGRHS hs_ctx rhs_ty) grhss rhss_deltas
+    ASSERT( null rhss_deltas || length grhss == length rhss_deltas )
+    do { match_results <- case rhss_deltas of
+             [] -> mapM     (dsGRHS hs_ctx rhs_ty initDeltas) grhss
+             _  -> zipWithM (dsGRHS hs_ctx rhs_ty) rhss_deltas grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 dsGRHSs _ (XGRHSs nec) _ _ = noExtCon nec
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> LGRHS GhcTc (LHsExpr GhcTc) -> Deltas
+dsGRHS :: HsMatchContext GhcRn -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs)) rhs_deltas
+dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
   = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
-dsGRHS _ _ (L _ (XGRHS nec)) _ = noExtCon nec
+dsGRHS _ _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 {-
 ************************************************************************

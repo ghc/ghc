@@ -446,9 +446,9 @@ dsExpr (HsMultiIf res_ty alts)
   = mkErrorExpr
 
   | otherwise
-  = do { rhss_deltas  <- checkGuardMatches IfAlt (GRHSs noExtField alts (noLoc emptyLocalBinds))
-       ; match_result <- liftM (foldr1 combineMatchResults)
-                               (zipWithM (dsGRHS IfAlt res_ty) alts rhss_deltas)
+  = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
+       ; rhss_deltas  <- checkGuardMatches IfAlt grhss
+       ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_deltas
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
