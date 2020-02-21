@@ -12,9 +12,6 @@
 #if defined(PROFILING)
 
 #include <rts/Types.h>
-#include "RetainerSet.h"
-
-#include "BeginPrivate.h"
 
 typedef enum {
     // Object with fixed layout. Keeps an information about that
@@ -66,7 +63,7 @@ typedef union stackData_ {
      /**
       * Most recent retainer for the corresponding closure on the stack.
       */
-    retainer c_child_r;
+    CostCentreStack *c_child_r;
 } stackData;
 
 extern const stackData nullStackData;
@@ -286,7 +283,5 @@ int getTraverseStackMaxSize(traverseState *ts);
 // for GC.c
 W_ traverseWorkStackBlocks(traverseState *ts);
 void resetStaticObjectForProfiling(const traverseState *ts, StgClosure *static_objects);
-
-#include "EndPrivate.h"
 
 #endif /* PROFILING */
