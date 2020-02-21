@@ -14,5 +14,5 @@
 #pragma once
 
 #if defined(PROFILING)
-StgWord setRootProfPtrs(StgWord n, HsStablePtr *sps, const char** descs);
+StgInt setRootProfPtrs(StgInt n, HsStablePtr *sps, const char** descs);
 #endif
