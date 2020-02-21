@@ -1,10 +1,6 @@
-
-#if defined(PROFILING) && defined(DEBUG)
-
-#include "PosixSource.h"
 #include <string.h>
-#include "SyntheticHeap.h"
-#include "TraverseHeap.h"
+#include "rts/SyntheticHeap.h"
+#include "rts/TraverseHeap.h"
 
 static StgClosure *c10, *c11, *c20, *c30;
 
@@ -136,9 +132,10 @@ testVisit(StgClosure *c, const StgClosure *cp,
 
 static traverseState state;
 
-void traverseHeapRunTests(void);
-void traverseHeapRunTests(void)
+int main(int argc, char *argv[])
 {
+    hs_init(0, NULL);
+
     traverseState *ts = &state;
 
     initializeTestHeap();
@@ -198,6 +195,8 @@ void traverseHeapRunTests(void)
     }
 
     freeSynthHeap(sh);
-}
 
-#endif
+    hs_exit();
+
+    return 0;
+}
