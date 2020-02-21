@@ -6,22 +6,29 @@
 {-# LANGUAGE MagicHash #-}
 
 -- | @since 4.7.0.0
-module GHC.Profiling where
+module GHC.Profiling
+    ( stopProfTimer
+    , startProfTimer
+    -- * Root Profiling
+    , Root(..)
+    , setHeapProfilingRoots
+    , maximumSupportedRoots
+  ) where
 
 #if defined(PROFILING)
 import Foreign.C.String
-import Foreign.C.Types
 import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.StablePtr
 import GHC.List (length)
 import GHC.Real (fromIntegral)
 import Unsafe.Coerce
-#else
+import GHC.Show (show)
+#endif
+
+import Data.IORef
 import System.IO
 import System.IO.Unsafe
-import Data.IORef
-#endif
 
 import GHC.Base
 
@@ -67,31 +74,49 @@ data Root = forall a. Root
 -- should consider. See the Profiling chapter in the GHC User Guide,
 -- section "Profiling by program-specified objects" for details.
 --
+-- Only a certain number of roots may be supported, see
+-- 'maximumSupportedRoots'. If more than the supported number are passed
+-- the list is truncated to the maximum length and a warning is printed.
+--
 -- When compiled without profiling this function will print a warning to
--- stderr, once. Use 'isCompiledWithProfiling' to avoid printing the
--- warning if needed.
+-- stderr, once. Use 'maximumSupportedRoots' to avoid printing the warning
+-- if needed.
 --
 -- @since 4.14.0.0
 setHeapProfilingRoots :: [Root] -> IO ()
 
--- | Is this program being compiled with profiling?
+-- | The maximum number of roots which can be set using
+-- 'setHeapProfilingRoots'. 'Nothing' if program is not compiled with
+-- profiling enabled.
 --
 -- @since 4.14.0.0
-isCompiledWithProfiling :: Bool
+maximumSupportedRoots :: Maybe Int
+
+emitHeapProfilingRootsWarning :: IORef Bool
+emitHeapProfilingRootsWarning = unsafePerformIO (newIORef True)
+{-# NOINLINE emitHeapProfilingRootsWarning #-}
 
 #if defined(PROFILING)
 
 foreign import ccall unsafe "setRootProfPtrs" c_setRootProfPtrs
-  :: CInt -> Ptr (StablePtr a) -> Ptr CString -> IO ()
+  :: Int -> Ptr (StablePtr a) -> Ptr CString -> IO Int
 
 setHeapProfilingRoots xs = do
   descs <- mapM (newCString . rootDescr) xs
   sps   <- mapM (\(Root _ a) -> newStablePtr (unsafeCoerce# a)) xs
   withArray descs $ \descs_arr ->
-    withArray sps $ \sps_arr ->
-      c_setRootProfPtrs (fromIntegral (length xs)) sps_arr descs_arr
+    withArray sps $ \sps_arr -> do
+      let len = fromIntegral $ length xs
+      len' <- c_setRootProfPtrs len sps_arr descs_arr
+      when (len /= len') $ do
+        x <- readIORef emitHeapProfilingRootsWarning
+        when x $ do
+          hPutStrLn stderr $
+            "WARNING: setHeapProfilingRoots was called with "++show len++" roots, but only "++show len'++" are supported. The rest will be ignored."
+          writeIORef emitHeapProfilingRootsWarning False
 
-isCompiledWithProfiling = True
+maximumSupportedRoots =
+  Just $ unsafePerformIO $ c_setRootProfPtrs (-1) nullPtr nullPtr
 
 #else
 
@@ -102,10 +127,6 @@ setHeapProfilingRoots _ = do
       "WARNING: setHeapProfilingRoots was called but this program is compiled without profiling enabled."
     writeIORef emitHeapProfilingRootsWarning False
 
-emitHeapProfilingRootsWarning :: IORef Bool
-emitHeapProfilingRootsWarning = unsafePerformIO (newIORef True)
-{-# NOINLINE emitHeapProfilingRootsWarning #-}
-
-isCompiledWithProfiling = False
+maximumSupportedRoots = Nothing
 
 #endif
