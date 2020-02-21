@@ -16,7 +16,7 @@
 
 #include "RtsFlags.h"
 #include "Profiling.h"
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 #include "ProfHeapInternal.h"
 #include "Hash.h"
 #include "StablePtr.h"
