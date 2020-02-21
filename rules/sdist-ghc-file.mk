@@ -37,7 +37,7 @@ sdist_$1_$2_$4 : sdist-ghc-prep-tree
 # Generate the .hs files if they don't exist yet, then do actual copying and
 # moving.
 sdist_$1_$2_$4 : $1/$2/build/$4.hs
-	"$(CP)" $1/$2/build/$4.hs $(SRC_DIST_GHC_DIR)/$1/$3
+	"$(CP)" $1/$2/build/$4.hs $(SRC_DIST_GHC_DIR)/$1/$3/$$(dir $4)
 	mv $(SRC_DIST_GHC_DIR)/$1/$3/$4.$5 $(SRC_DIST_GHC_DIR)/$1/$3/$4.$5.source
 
 # And make sure the rules for generating the .hs files exist, even when we
