@@ -9,7 +9,7 @@ Matching guarded right-hand-sides (GRHSs)
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module GHC.HsToCore.GuardedRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
+module GHC.HsToCore.GuardedRHSs ( dsGuarded, dsGRHSs, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 
