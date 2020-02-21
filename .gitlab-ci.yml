@@ -17,6 +17,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
+  - test
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
@@ -714,6 +715,11 @@ release-x86_64-linux-deb8:
     when: always
     expire_in: 2 week
 
+
+test-x86_64-linux-alpine:
+  extends: .build-x86_64-linux-alpine
+  stage: test
+  
 release-x86_64-linux-alpine:
   <<: *release
   extends: .build-x86_64-linux-alpine
