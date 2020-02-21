@@ -159,12 +159,12 @@ rootVisit(StgClosure *c, const StgClosure *cp,
     return first_visit;
 }
 
-StgWord setRootProfPtrs(StgWord n, HsStablePtr *sps, const char** descs)
+StgInt setRootProfPtrs(StgInt n, HsStablePtr *sps, const char** descs)
 {
     struct rootProfState *ps = &g_rootProfState;
-    StgWord i;
+    StgInt i;
 
-    if(n > MAX_ROOTS)
+    if(n < 0 || n > MAX_ROOTS)
         return MAX_ROOTS;
 
     for (i = 0; i < ps->n_roots; i++) {
