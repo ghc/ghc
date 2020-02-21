@@ -18,6 +18,7 @@
 #include "GCThread.h"
 #include "GCTDecl.h"
 #include "Schedule.h"
+#include "Stats.h"
 
 #include "NonMoving.h"
 #include "NonMovingMark.h"
@@ -951,6 +952,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 {
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
+    stat_startNonmovingGc();
 
     // Walk the list of filled segments that we collected during preparation,
     // updated their snapshot pointers and move them to the sweep list.
@@ -1132,6 +1134,7 @@ finish:
 
     // We are done...
     mark_thread = 0;
+    stat_endNonmovingGc();
 
     // Signal that the concurrent collection is finished, allowing the next
     // non-moving collection to proceed

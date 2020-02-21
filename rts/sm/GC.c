@@ -209,6 +209,14 @@ GarbageCollect (uint32_t collect_gen,
   gc_thread *saved_gct;
 #endif
   uint32_t g, n;
+  // The time we should report our heap census as occurring at, if necessary.
+  Time mut_time = 0;
+
+  if (do_heap_census) {
+      RTSStats stats;
+      getRTSStats(&stats);
+      mut_time = stats.mutator_cpu_ns;
+  }
 
   // necessary if we stole a callee-saves register for gct:
 #if defined(THREADED_RTS)
@@ -846,7 +854,7 @@ GarbageCollect (uint32_t collect_gen,
   if (do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
       RELEASE_SM_LOCK;
-      heapCensus(gct->gc_start_cpu);
+      heapCensus(mut_time);
       ACQUIRE_SM_LOCK;
   }
 
@@ -927,9 +935,11 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
   // ok, GC over: tell the stats department what happened.
+  stat_endGCWorker(cap, gct);
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, par_max_copied, par_balanced_copied,
+             N, n_gc_threads, gc_threads,
+             par_max_copied, par_balanced_copied,
              gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
              any_work, no_work, scav_find_work);
 
@@ -1209,6 +1219,7 @@ gcWorkerThread (Capability *cap)
 
     SET_GCT(gc_threads[cap->no]);
     gct->id = osThreadId();
+    stat_startGCWorker (cap, gct);
 
     // Wait until we're told to wake up
     RELEASE_SPIN_LOCK(&gct->mut_spin);
@@ -1247,6 +1258,7 @@ gcWorkerThread (Capability *cap)
     gct->wakeup = GC_THREAD_WAITING_TO_CONTINUE;
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
+    stat_endGCWorker (cap, gct);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 
