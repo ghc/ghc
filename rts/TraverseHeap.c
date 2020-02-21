@@ -14,7 +14,7 @@
 #include "Rts.h"
 #include "sm/Storage.h"
 
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 
 const stackData nullStackData;
 
