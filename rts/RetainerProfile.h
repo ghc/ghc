@@ -12,7 +12,7 @@
 #if defined(PROFILING)
 
 #include "RetainerSet.h"
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 
 #include "BeginPrivate.h"
 
