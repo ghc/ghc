@@ -160,11 +160,13 @@ library
                       rts/StableName.h
                       rts/StablePtr.h
                       rts/StaticPtrTable.h
+                      rts/SyntheticHeap.h
                       rts/TTY.h
                       rts/Threads.h
                       rts/Ticky.h
                       rts/Time.h
                       rts/Timer.h
+                      rts/TraverseHeap.h
                       rts/Types.h
                       rts/Utils.h
                       rts/prof/CCS.h
@@ -465,7 +467,6 @@ library
                TopHandler.c
                Trace.c
                TraverseHeap.c
-               TraverseHeapTest.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c
