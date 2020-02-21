@@ -193,7 +193,8 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    eps_var <- newIORef initExternalPackageState
+    eps_var_nop <- newIORef initExternalPackageState
+    eps_var_opt <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
@@ -204,7 +205,8 @@ newHscEnv dflags = do
                   ,  hsc_mod_graph    = emptyMG
                   ,  hsc_IC           = emptyInteractiveContext dflags
                   ,  hsc_HPT          = emptyHomePackageTable
-                  ,  hsc_EPS          = eps_var
+                  ,  hsc_EPS_nop      = eps_var_nop
+                  ,  hsc_EPS_opt      = eps_var_opt
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
                   ,  hsc_type_env_var = Nothing

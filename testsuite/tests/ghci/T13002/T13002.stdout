@@ -1,0 +1,7 @@
+Rule fired: Class op length (BUILTIN)
+Rule fired: Class op enumFromTo (BUILTIN)
+Rule fired: length (GHC.List)
+Rule fired: fold/build (GHC.Base)
+Rule fired: SPEC ^ (GHC.Real)
+Rule fired: ># (BUILTIN)
+Rule fired: ==# (BUILTIN)

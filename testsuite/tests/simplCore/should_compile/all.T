@@ -169,6 +169,7 @@ test('T5996',
      normal,
      makefile_test, ['T5996'])
 test('T8537', normal, compile, [''])
+test('T8635', normal, multimod_compile, ['T8635Bar','--make'])
 test('T8832',
      normal,
      run_command, ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
@@ -178,6 +179,7 @@ test('T8848', normal,
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
+test('T9370', normal, multimod_compile, ['T9370a', ''])
 test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T9441a', [only_ways(['optasm']), check_errmsg(r'f1 = f2') ], compile, ['-ddump-simpl -dsuppress-ticks'])
 test('T9441b', [only_ways(['optasm']), check_errmsg(r'Rec {') ], compile, ['-ddump-simpl'])

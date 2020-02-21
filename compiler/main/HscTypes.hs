@@ -18,7 +18,7 @@
 -- | Types for the per-module compiler
 module HscTypes (
         -- * compilation state
-        HscEnv(..), hscEPS,
+        HscEnv(..), hscEPS, hsc_EPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
@@ -455,10 +455,22 @@ data HscEnv
                 --
                 -- (This changes a previous invariant: changed Jan 05.)
 
-        hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
+
+        hsc_EPS_opt :: {-# UNPACK #-} !(IORef ExternalPackageState),
                 -- ^ Information about the currently loaded external packages.
                 -- This is mutable because packages will be demand-loaded during
                 -- a compilation run as required.
+                -- This field contains the packages loaded when the flag
+                -- Opt_IgnoreInterfacePragmas is set to False.
+                -- See note [EPS is dependent on optimization level]
+
+        hsc_EPS_nop :: {-# UNPACK #-} !(IORef ExternalPackageState),
+                -- ^ Information about the currently loaded external packages.
+                -- This is mutable because packages will be demand-loaded during
+                -- a compilation run as required.
+                -- This field contains the packages loaded when the flag
+                -- Opt_IgnoreInterfacePragmas is set to True.
+                -- See note [EPS is dependent on optimization level]
 
         hsc_NC  :: {-# UNPACK #-} !(IORef NameCache),
                 -- ^ As with 'hsc_EPS', this is side-effected by compiling to
@@ -481,6 +493,44 @@ data HscEnv
                 -- ^ dynamic linker.
 
  }
+
+hsc_EPS :: HscEnv -> IORef ExternalPackageState
+hsc_EPS hsc = if gopt Opt_IgnoreInterfacePragmas (hsc_dflags hsc)
+              then hsc_EPS_nop hsc
+              else hsc_EPS_opt hsc
+
+{- Note [EPS is dependent on optimization level]
+
+Depending on the value of the dynamic flag `Opt_IgnoreInterfacePragmas`
+GHC reads different library modules and stores different values in the
+`ExternalPackageState` (EPS) for further processing in the simplifier .
+eg, if `Opt_IgnoreInterfacePragmas` is set to `True`, then GHC will not
+read in any inline pragma into `eps_decls` and any simplifier rules into
+`eps_decls`. See module compiler/iface/LoadIface.hs function loadInterface.
+
+The flag `Opt_IgnoreInterfacePragmas` itself is dependent on the
+optimization level.
+
+Different submodules of a batch compilation may have different
+optimization levels specified in their OPTIONS_GHC pragmas.
+GHCi users are free to switch optimization levels during their session.
+
+A library module is not reloaded and reprocessed, after a change of the
+optimization level. Hence after a switch from eg. no-optimization to
+optimization, GHC may miss rules and pragmas. GHC maybe unable to
+perform the requested optimizations.
+
+As the contents of the EPS is dependent on the flag
+`Opt_IgnoreInterfacePragmas`, 2 fields are used to store the EPS:
+  - `hsc_EPS_nop` is used if Opt_IgnoreInterfacePragmas=True
+  - `hsc_EPS_opt` is used if Opt_IgnoreInterfacePragmas=False
+They replace the previous `hsc_EPS` field in `HscEnv`.
+The field `hsc_EPS` has been changed to a function. It returns `hsc_EPS_nop`
+or `hsc_EPS_opt` depending of the value of `Opt_IgnoreInterfacePragmas` and
+should be used instead of `hsc_EPS_nop` and `hsc_EPS_opt`!
+
+See #8635, #9370 and #13002.
+-}
 
 -- Note [hsc_type_env_var hack]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

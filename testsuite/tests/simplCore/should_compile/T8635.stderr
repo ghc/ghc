@@ -1,0 +1,6 @@
+[1 of 2] Compiling T8635Foo         ( T8635Foo.hs, T8635Foo.o )
+[2 of 2] Compiling T8635Bar         ( T8635Bar.hs, T8635Bar.o )
+Rule fired: Class op == (BUILTIN)
+Rule fired: ==# (BUILTIN)
+Rule fired: tagToEnum# (BUILTIN)
+Rule fired: tagToEnum# (BUILTIN)
