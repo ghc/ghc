@@ -14,7 +14,7 @@
 
 #include "RetainerProfile.h"
 #include "RetainerSet.h"
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "StablePtr.h" /* markStablePtrTable */
