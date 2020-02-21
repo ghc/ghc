@@ -11,8 +11,6 @@
 #include <Rts.h>
 #include <rts/storage/Closures.h>
 
-#include "BeginPrivate.h"
-
 typedef struct synthHeap_ {
     bdescr *heap;
     bdescr *descr;
