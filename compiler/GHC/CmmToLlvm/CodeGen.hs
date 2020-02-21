@@ -1482,12 +1482,16 @@ genMachOp_slow opt op [x, y] = case op of
     MO_FF_Conv _ _ -> panicOp
 
     MO_V_Insert  {} -> panicOp
+#if __GLASGOW_HASKELL__ <= 810
     MO_V_Extract {} -> panicOp
+#endif
 
     MO_VS_Neg {} -> panicOp
 
     MO_VF_Insert  {} -> panicOp
+#if __GLASGOW_HASKELL__ <= 810
     MO_VF_Extract {} -> panicOp
+#endif
 
     MO_VF_Neg {} -> panicOp
 
