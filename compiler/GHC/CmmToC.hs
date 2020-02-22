@@ -39,7 +39,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 
 -- Utils
-import CPrim
+import GHC.CmmToAsm.CPrim
 import GHC.Driver.Session
 import FastString
 import Outputable

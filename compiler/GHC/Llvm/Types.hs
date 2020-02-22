@@ -20,7 +20,7 @@ import Outputable
 import Unique
 
 -- from NCG
-import PprBase
+import GHC.CmmToAsm.Ppr
 
 import GHC.Float
 
