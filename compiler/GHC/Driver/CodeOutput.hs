@@ -12,7 +12,7 @@ module GHC.Driver.CodeOutput ( codeOutput, outputForeignStubs ) where
 
 import GhcPrelude
 
-import AsmCodeGen       ( nativeCodeGen )
+import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import UniqSupply       ( mkSplitUniqSupply )
