@@ -212,7 +212,29 @@ def haddock_role(lib):
      * reference to identifier:  :base-ref:`Control.Applicative.pure`
      * reference to type:        :base-ref:`Control.Applicative.Applicative`
     """
-    path = '%s/%s-%s' % (ghc_config.libs_base_uri, lib, ghc_config.lib_versions[lib])
+
+    def get_relative_uri(topdir, current_doc, module, anchor):
+      lib_version = ghc_config.lib_versions[lib]
+      libs_base_uri = ghc_config.libs_base_uri
+
+      # We want to find the relative uri to the Haddocks for relative links
+      # from users guide to haddocks. The inputs are:
+      #
+      # - The users guide lives under 'topdir': //docs/users_guide
+      # - The current doc file is 'current_doc': //docs/users_guide/exts/template_haskell.rst
+      #   (The html output will be //docs/users_guide/exts/template_haskell.html)
+      # - The haddocks live under 'libs_base_uri' (relative to 'topdir'): ../libraries
+
+      # for the template_haskell.rst example this will be '..'
+      current_doc_to_topdir = os.path.relpath(topdir, os.path.dirname(current_doc))
+
+      relative_path = '%s/%s/%s-%s' % (current_doc_to_topdir, libs_base_uri, lib, lib_version)
+
+      uri = '%s/%s.html%s' % (relative_path, module, anchor)
+
+      return uri
+
+
     def role(name, rawtext, text, lineno, inliner, options={}, content=[]):
         try:
             parts = text.split('.')
@@ -228,7 +250,12 @@ def haddock_role(lib):
                 anchor = ''
                 link_text = '.'.join(module_parts)
 
-            uri = '%s/%s.html%s' % (path, '-'.join(module_parts), anchor)
+            uri = get_relative_uri(
+                  inliner.document.settings.env.srcdir,
+                  inliner.document.current_source,
+                  '-'.join(module_parts),
+                  anchor)
+
             node = nodes.reference(link_text, link_text, refuri=uri)
             return [node], []
         except ValueError:
