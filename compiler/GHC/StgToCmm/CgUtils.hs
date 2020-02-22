@@ -24,7 +24,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
-import DynFlags
+import GHC.Driver.Session
 import Outputable
 
 -- -----------------------------------------------------------------------------

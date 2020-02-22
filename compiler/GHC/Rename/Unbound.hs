@@ -20,7 +20,7 @@ where
 import GhcPrelude
 
 import RdrName
-import HscTypes
+import GHC.Driver.Types
 import TcRnMonad
 import Name
 import Module
@@ -29,7 +29,7 @@ import Outputable
 import PrelNames ( mkUnboundName, isUnboundName, getUnique)
 import Util
 import Maybes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Data.List
 import Data.Function ( on )

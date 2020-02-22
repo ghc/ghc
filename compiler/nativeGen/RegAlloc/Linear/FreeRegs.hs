@@ -14,7 +14,7 @@ import GhcPrelude
 import Reg
 import RegClass
 
-import DynFlags
+import GHC.Driver.Session
 import Panic
 import GHC.Platform
 

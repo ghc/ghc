@@ -13,7 +13,7 @@ module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 import GhcPrelude
 
-import DynFlags
+import GHC.Driver.Session
 import SimplMonad
 import Type hiding      ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import SimplEnv

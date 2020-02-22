@@ -54,7 +54,7 @@ import Control.Monad
 import Maybes( isJust )
 import Pair (Pair(..))
 import Unique( hasKey )
-import DynFlags
+import GHC.Driver.Session
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 

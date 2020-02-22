@@ -83,9 +83,9 @@ import InstEnv
 import FamInstEnv
 import TcRnMonad
 import GHC.Hs
-import HscTypes
-import Finder
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Finder
+import GHC.Driver.Session
 import VarEnv
 import Var
 import Name
@@ -108,7 +108,7 @@ import Binary
 import Fingerprint
 import Exception
 import UniqSet
-import Packages
+import GHC.Driver.Packages
 import GHC.HsToCore.Docs
 
 import Control.Monad
@@ -120,7 +120,7 @@ import Data.Ord
 import Data.IORef
 import System.Directory
 import System.FilePath
-import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
+import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
 --Qualified import so we can define a Semigroup instance

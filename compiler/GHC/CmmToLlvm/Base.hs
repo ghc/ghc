@@ -48,7 +48,7 @@ import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs )
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import GHC.Cmm              hiding ( succ )
 import GHC.Cmm.Utils (regsOverlap)

@@ -4,7 +4,7 @@ import Data.List
 import SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
-import DynFlags
+import GHC.Driver.Session
 import Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit

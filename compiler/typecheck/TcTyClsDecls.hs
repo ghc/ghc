@@ -29,7 +29,7 @@ module TcTyClsDecls (
 import GhcPrelude
 
 import GHC.Hs
-import HscTypes
+import GHC.Driver.Types
 import BuildTyCl
 import TcRnMonad
 import TcEnv
@@ -71,7 +71,7 @@ import Unify
 import Util
 import SrcLoc
 import ListSetOps
-import DynFlags
+import GHC.Driver.Session
 import Unique
 import ConLike( ConLike(..) )
 import BasicTypes

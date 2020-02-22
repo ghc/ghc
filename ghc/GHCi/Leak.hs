@@ -11,7 +11,7 @@ import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Ptr (Ptr (..))
 import GHCi.Util
-import HscTypes
+import GHC.Driver.Types
 import Outputable
 import GHC.Platform (target32Bit)
 import Prelude

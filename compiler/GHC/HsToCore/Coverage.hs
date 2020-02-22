@@ -23,7 +23,7 @@ import Type
 import GHC.Hs
 import Module
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import ConLike
 import Control.Monad
 import SrcLoc
@@ -38,7 +38,7 @@ import Id
 import VarSet
 import Data.List
 import FastString
-import HscTypes
+import GHC.Driver.Types
 import TyCon
 import BasicTypes
 import MonadUtils

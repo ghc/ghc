@@ -28,7 +28,7 @@ import NameSet
 import Avail
 import TyCon
 import SrcLoc
-import HscTypes
+import GHC.Driver.Types
 import Outputable
 import ConLike
 import DataCon
@@ -39,7 +39,7 @@ import Util (capitalise)
 import FastString (fsLit)
 
 import Control.Monad
-import DynFlags
+import GHC.Driver.Session
 import GHC.Rename.Doc   ( rnHsDoc )
 import RdrHsSyn         ( setRdrNameSpace )
 import Data.Either      ( partitionEithers )

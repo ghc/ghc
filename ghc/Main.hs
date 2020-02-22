@@ -20,21 +20,21 @@ import GHC              ( -- DynFlags(..), HscTarget(..),
                           -- GhcMode(..), GhcLink(..),
                           Ghc, GhcMonad(..),
                           LoadHowMuch(..) )
-import CmdLineParser
+import GHC.Driver.CmdLine
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import GHC.Iface.Load   ( showIface )
-import HscMain          ( newHscEnv )
-import DriverPipeline   ( oneShot, compileFile )
-import DriverMkDepend   ( doMkDependHS )
-import DriverBkp   ( doBackpack )
+import GHC.Iface.Load       ( showIface )
+import GHC.Driver.Main      ( newHscEnv )
+import GHC.Driver.Pipeline  ( oneShot, compileFile )
+import GHC.Driver.MakeFile  ( doMkDependHS )
+import GHC.Driver.Backpack  ( doBackpack )
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
 import GHC.Runtime.Loader   ( loadFrontendPlugin )
-import Plugins
+import GHC.Driver.Plugins
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif
@@ -47,11 +47,11 @@ import GHC.Platform
 import GHC.Platform.Host
 import Config
 import Constants
-import HscTypes
-import Packages         ( pprPackages, pprPackagesSimple )
-import DriverPhases
+import GHC.Driver.Types
+import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
+import GHC.Driver.Phases
 import BasicTypes       ( failed )
-import DynFlags hiding (WarnReason(..))
+import GHC.Driver.Session hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
@@ -66,7 +66,7 @@ import MonadUtils       ( liftIO )
 -- Imports for --abi-hash
 import GHC.Iface.Load           ( loadUserInterface )
 import Module              ( mkModuleName )
-import Finder              ( findImportedModule, cannotFindModule )
+import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )
 import BinFingerprint      ( fingerprintBinMem )

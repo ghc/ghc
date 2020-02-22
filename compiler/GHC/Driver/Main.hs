@@ -7,7 +7,7 @@
 --
 -- This module implements compilation of a Haskell source. It is
 -- /not/ concerned with preprocessing of source files; this is handled
--- in "DriverPipeline".
+-- in GHC.Driver.Pipeline
 --
 -- There are various entry points depending on what mode we're in:
 -- "batch" mode (@--make@), "one-shot" mode (@-c@, @-S@ etc.), and
@@ -30,7 +30,7 @@
 --
 -------------------------------------------------------------------------------
 
-module HscMain
+module GHC.Driver.Main
     (
     -- * Making an HscEnv
       newHscEnv
@@ -104,7 +104,7 @@ import Control.Concurrent
 
 import ApiAnnotation
 import Module
-import Packages
+import GHC.Driver.Packages
 import RdrName
 import GHC.Hs
 import GHC.Hs.Dump
@@ -140,23 +140,23 @@ import GHC.Cmm.Parser         ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
-import CodeOutput
+import GHC.Driver.CodeOutput
 import InstEnv
 import FamInstEnv
 import Fingerprint      ( Fingerprint )
-import Hooks
+import GHC.Driver.Hooks
 import TcEnv
 import PrelNames
-import Plugins
+import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
 
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 
 import Outputable
 import NameEnv
 import HscStats         ( ppSourceStats )
-import HscTypes
+import GHC.Driver.Types
 import FastString
 import UniqSupply
 import Bag
@@ -818,7 +818,7 @@ finish summary tc_result mb_old_hash = do
               liftIO $ tidyProgram hsc_env simplified_guts
 
           let !partial_iface =
-                {-# SCC "HscMain.mkPartialIface" #-}
+                {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details simplified_guts)
@@ -848,11 +848,11 @@ finish summary tc_result mb_old_hash = do
 Note [Writing interface files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We write interface files in HscMain.hs and DriverPipeline.hs using
+We write interface files in GHC.Driver.Main and GHC.Driver.Pipeline using
 hscMaybeWriteIface, but only once per compilation (twice with dynamic-too).
 
 * If a compilation does NOT require (re)compilation of the hard code we call
-  hscMaybeWriteIface inside HscMain:finish.
+  hscMaybeWriteIface inside GHC.Driver.Main:finish.
 * If we run in One Shot mode and target bytecode we write it in compileOne'
 * Otherwise we must be compiling to regular hard code and require recompilation.
   In this case we create the interface file inside RunPhase using the interface
@@ -1061,7 +1061,7 @@ checkSafeImports tcg_env
     pkgReqs  = imp_trust_pkgs impInfo  -- [UnitId]
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
-    condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
+    condense (_, [])   = panic "GHC.Driver.Main.condense: Pattern match failure!"
     condense (m, x:xs) = do imv <- foldlM cond' x xs
                             return (m, imv_span imv, imv_is_safe imv)
 
@@ -1621,7 +1621,7 @@ you run it you get a list of HValues that should be the same length as the list
 of names; add them to the ClosureEnv.
 
 A naked expression returns a singleton Name [it]. The stmt is lifted into the
-IO monad as explained in Note [Interactively-bound Ids in GHCi] in HscTypes
+IO monad as explained in Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
 -}
 
 -- | Compile a stmt all the way to an HValue, but don't run it
@@ -1763,7 +1763,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
             -- We only need to keep around the external bindings
             -- (as decided by GHC.Iface.Tidy), since those are the only ones
             -- that might later be looked up by name.  But we can exclude
-            --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in HscTypes
+            --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in GHC.Driver.Types
             --    - Implicit Ids, which are implicit in tcs
             -- c.f. TcRnDriver.runTcInteractive, which reconstructs the TypeEnv
 

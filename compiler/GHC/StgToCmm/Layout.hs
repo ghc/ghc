@@ -52,7 +52,7 @@ import GHC.Stg.Syntax
 import Id
 import TyCon             ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
-import DynFlags
+import GHC.Driver.Session
 import Module
 
 import Util

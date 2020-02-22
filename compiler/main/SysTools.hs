@@ -43,11 +43,11 @@ import GhcPrelude
 import GHC.Settings
 
 import Module
-import Packages
+import GHC.Driver.Packages
 import Outputable
 import ErrUtils
 import GHC.Platform
-import DynFlags
+import GHC.Driver.Session
 
 import Control.Monad.Trans.Except (runExceptT)
 import System.FilePath

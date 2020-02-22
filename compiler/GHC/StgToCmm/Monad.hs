@@ -63,7 +63,7 @@ import GhcPrelude hiding( sequence, succ )
 
 import GHC.Cmm
 import GHC.StgToCmm.Closure
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId

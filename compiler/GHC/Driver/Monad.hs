@@ -8,7 +8,7 @@
 --
 -- -----------------------------------------------------------------------------
 
-module GhcMonad (
+module GHC.Driver.Monad (
         -- * 'Ghc' monad stuff
         GhcMonad(..),
         Ghc(..),
@@ -26,8 +26,8 @@ module GhcMonad (
 import GhcPrelude
 
 import MonadUtils
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import Exception
 import ErrUtils
 

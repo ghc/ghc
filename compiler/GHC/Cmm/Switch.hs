@@ -15,7 +15,7 @@ module GHC.Cmm.Switch (
 import GhcPrelude
 
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import GHC.Cmm.Dataflow.Label (Label)
 
 import Data.Maybe

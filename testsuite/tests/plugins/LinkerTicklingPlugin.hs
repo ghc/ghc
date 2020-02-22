@@ -1,7 +1,7 @@
 module LinkerTicklingPlugin where
 
-import GhcPlugins
-import DynFlags
+import GHC.Plugins
+import GHC.Driver.Session
 
 plugin :: Plugin
 plugin = defaultPlugin {

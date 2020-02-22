@@ -10,10 +10,10 @@ module Main(main) where
 -- provided with as small a number of modules as possible for when the
 -- need exists to produce ASTs and nothing more.
 
-import HscTypes
+import GHC.Driver.Types
 import Module
-import DynFlags
-import HscMain
+import GHC.Driver.Session
+import GHC.Driver.Main
 import GHC
 import Util
 import Data.Maybe

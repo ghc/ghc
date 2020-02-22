@@ -148,7 +148,7 @@ import Var
 import VarSet
 import Class
 import BasicTypes
-import DynFlags
+import GHC.Driver.Session
 import ForeignCall
 import Name
 import NameEnv

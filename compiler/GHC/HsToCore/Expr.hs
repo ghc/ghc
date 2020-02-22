@@ -49,7 +49,7 @@ import CoreSyn
 import CoreUtils
 import MkCore
 
-import DynFlags
+import GHC.Driver.Session
 import CostCentre
 import Id
 import MkId
