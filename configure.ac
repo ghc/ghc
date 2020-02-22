@@ -1370,8 +1370,10 @@ dnl ** Determine library versions
 dnl The packages below should include all packages needed by
 dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
-LIBRARY_VERSION(Cabal, Cabal/Cabal)
-LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(Cabal, Cabal/Cabal/Cabal.cabal)
+dnl template-haskell.cabal is generated later
+dnl but the .in file already has the version
+LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.in)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
