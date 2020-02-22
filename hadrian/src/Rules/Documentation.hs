@@ -135,7 +135,9 @@ checkSphinxWarnings out = do
 checkUserGuideFlags :: FilePath -> Action ()
 checkUserGuideFlags documentedFlagList = do
     scriptPath <- (</> "docs/users_guide/compare-flags.py") <$> topDirectory
-    ghcPath <- (</>) <$> topDirectory <*> programPath (vanillaContext Stage1 ghc)
+    ghc <- programPath (vanillaContext Stage1 ghc)
+    need [ghc]
+    ghcPath <- (</>) <$> topDirectory <*> pure ghc
     runBuilder Python
       [ scriptPath
       , "--doc-flags", documentedFlagList
