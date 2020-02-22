@@ -4,7 +4,7 @@ import GHC.Cmm.Expr
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
 import PlainPanic
 #endif
-import Reg
+import GHC.Platform.Reg
 
 #include "stg/MachRegs.h"
 

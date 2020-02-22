@@ -7,7 +7,7 @@ import GhcPrelude
 
 import GHC.Cmm.Expr
 import GHC.Platform
-import Reg
+import GHC.Platform.Reg
 
 import qualified GHC.Platform.ARM        as ARM
 import qualified GHC.Platform.ARM64      as ARM64
