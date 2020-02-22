@@ -786,7 +786,7 @@ validate-x86_64-linux-fedora27:
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
     CABAL_INSTALL_VERSION: 3.0.0.0
-    GHC_VERSION: "8.6.5"
+    GHC_VERSION: "8.8.3"
   cache:
     paths:
       - cabal-cache
