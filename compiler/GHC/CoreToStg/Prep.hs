@@ -1453,14 +1453,26 @@ mkConvertNumLiteral dflags hsc_env = do
 
          | otherwise -- build a BigNat and embed into IN or IP
          = let con = if i > 0 then integerIPDataCon else integerINDataCon
-           in mkConApp con [ convertBignatPrim (abs i) ]
+           in mkBigNum con (convertBignatPrim (abs i))
 
       convertNatural i
          | inWordRange dflags i -- fit in a Word#
          = mkConApp naturalNSDataCon [Lit (mkLitWord dflags i)]
 
          | otherwise --build a BigNat and embed into NB
-         = mkConApp naturalNBDataCon [ convertBignatPrim i ]
+         = mkBigNum naturalNBDataCon (convertBignatPrim i)
+
+      -- we can't simply generate:
+      --
+      --    NB (bigNatFromWordList# [W# 10, W# 20])
+      --
+      -- using `mkConApp` because it isn't in ANF form. Instead we generate:
+      --
+      --    case bigNatFromWordList# [W# 10, W# 20] of ba { DEFAULT -> NB ba }
+      --
+      -- via `mkCoreApps`
+
+      mkBigNum con ba = mkCoreApps (Var (dataConWorkId con)) [ba]
 
       convertBignatPrim i =
          let
@@ -1472,13 +1484,8 @@ mkConvertNumLiteral dflags hsc_env = do
             -- wordSize  = platformWordSize target
             -- bigEndian = wORDS_BIGENDIAN dflags
 
-            -- TODO: even without ByteArray# literals, we could build an
-            -- expression `bigNatFromAddr# literal_string#` because literals
-            -- string bytes are stored unmodified and the literal value is
-            -- replaced by an `Addr#` value.
-            --
-            -- But for now we build a list of Words and we produce
-            -- `bigNatFromWordList list_of_words`
+            -- For now we build a list of Words and we produce
+            -- `bigNatFromWordList# list_of_words`
 
             words = mkListExpr wordTy (reverse (unfoldr f i))
                where
