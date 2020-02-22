@@ -11,7 +11,7 @@ Haskell <http://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
 
 The `Template Haskell <http://www.haskell.org/haskellwiki/Template_Haskell>`__
 page on the GHC Wiki has a wealth of information. You may also consult the
-:th-ref:`Haddock reference documentation <Language.Haskell.TH.>`.
+Haddock reference documentation :th-ref:`Language.Haskell.TH.`.
 Many changes to the original
 design are described in `Notes on Template Haskell version
 2 <https://www.haskell.org/ghc/docs/papers/th2.ps>`__.
