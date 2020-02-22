@@ -1416,6 +1416,7 @@ echo "\
    Using (for bootstrapping) : $CC_STAGE0
    Using $CompilerName       : $CC
       which is version       : $GccVersion
+      linker options         : $GccUseLdOpt
    Building a cross compiler : $CrossCompiling
    Unregisterised            : $Unregisterised
    TablesNextToCode          : $TablesNextToCode
