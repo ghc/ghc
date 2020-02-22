@@ -969,7 +969,7 @@ doc-tarball:
     - validate-x86_64-linux-deb9-debug
     - validate-x86_64-windows
   variables:
-    LINUX_BINDIST: "ghc-x86_64-deb9-linux.tar.xz"
+    LINUX_BINDIST: "ghc-x86_64-deb9-linux-debug.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
   # Due to Windows allow_failure
   allow_failure: true
