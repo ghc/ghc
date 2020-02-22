@@ -212,8 +212,17 @@ def haddock_role(lib):
      * reference to identifier:  :base-ref:`Control.Applicative.pure`
      * reference to type:        :base-ref:`Control.Applicative.Applicative`
     """
-    path = '%s/%s-%s' % (ghc_config.libs_base_uri, lib, ghc_config.lib_versions[lib])
+
+    ver = ghc_config.lib_versions[lib]
+
     def role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+        # .../docs/users_guide directory
+        srcdir = inliner.document.settings.env.srcdir
+        # .../docs/users_guide/path/to/doc.rst
+        src = inliner.document.current_source
+        # ../..
+        rel_path = os.path.relpath(srcdir, os.path.dirname(src))
+        path = '%s/%s/%s-%s' % (rel_path, ghc_config.libs_base_uri, lib, ver)
         try:
             parts = text.split('.')
             module_parts = parts[:-1]
