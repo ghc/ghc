@@ -41,7 +41,7 @@ end_section() {
 echo_color() {
   local color="$1"
   local msg="$2"
-  echo -e "\e[${color}m${msg}\e[0m"
+  echo -e "\033[${color}m${msg}\033[0m"
 }
 
 error() { echo_color "${RED}" "$1"; }
