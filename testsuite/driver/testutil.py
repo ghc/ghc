@@ -92,7 +92,7 @@ def symlinks_work() -> bool:
         works = False
         with tempfile.NamedTemporaryFile() as tmp:
             try:
-                tmp.write('hello')
+                tmp.write(b'hello')
                 os.symlink(tmp.name, '__symlink-test')
                 works = True
             except OSError as e:
