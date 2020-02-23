@@ -759,7 +759,8 @@ data Token
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
   | ITdarrow            IsUnicodeSyntax
-  | ITminus
+  | ITminus       -- Minus sign, only when LexicalNegation is off.
+  | ITprefixminus -- Prefix (-), when LexicalNegation is on.
   | ITbang     -- Prefix (!) only, e.g. f !x = rhs
   | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
   | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
@@ -962,7 +963,7 @@ reservedSymsFM = listToUFM $
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("-",   ITminus,                    NormalSyntax,  0 )
+       ,("-",   ITminus,                    NormalSyntax,  xbit NonLexicalNegationBit)
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -1452,6 +1453,7 @@ varsym_prefix = sym $ \exts s ->
      -> return ITdollar
      | ThQuotesBit `xtest` exts, s == fsLit "$$"
      -> return ITdollardollar
+     | s == fsLit "-" -> return ITprefixminus
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
      | otherwise -> return (ITvarsym s)
@@ -2468,6 +2470,7 @@ data ExtBits
   | MultiWayIfBit
   | GadtSyntaxBit
   | ImportQualifiedPostBit
+  | NonLexicalNegationBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2555,12 +2558,14 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
+      .|. NonLexicalNegationBit    `xoptNotBit` LangExt.LexicalNegation
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
       .|. UsePosPragsBit    `setBitIf` usePosPrags
 
     xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
+    xoptNotBit bit ext = bit `setBitIf` not (EnumSet.member ext extensionFlags)
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b

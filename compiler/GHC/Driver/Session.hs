@@ -3806,6 +3806,7 @@ xFlagsDeps = [
   flagSpec "JavaScriptFFI"                    LangExt.JavaScriptFFI,
   flagSpec "KindSignatures"                   LangExt.KindSignatures,
   flagSpec "LambdaCase"                       LangExt.LambdaCase,
+  flagSpec "LexicalNegation"                  LangExt.LexicalNegation,
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
