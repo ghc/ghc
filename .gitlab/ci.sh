@@ -408,6 +408,15 @@ function clean() {
   run rm -Rf _build
 }
 
+# A convenience function to allow debugging in the CI environment.
+function shell() {
+  local cmd=$@
+  if [ -z "$cmd" ]; then
+    cmd="bash -i"
+  fi
+  run $cmd
+}
+
 # Determine Cabal data directory
 case "$(uname)" in
   MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
@@ -437,5 +446,6 @@ case $1 in
   build_hadrian) build_hadrian ;;
   test_hadrian) fetch_perf_notes; test_hadrian; push_perf_notes ;;
   clean) clean ;;
+  shell) shell $@ ;;
   *) fail "unknown mode $1" ;;
 esac
