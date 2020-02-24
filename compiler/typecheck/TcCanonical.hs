@@ -925,14 +925,15 @@ kind. For instance, we may have,
 
     FunTy (a :: k) Int
 
-Where k is a unification variable. tcRepSplitTyConApp_maybe panics in the event
-that it sees such a type as it cannot determine the RuntimeReps which the (->)
-is applied to. Consequently, it is vital that we instead use
-tcRepSplitTyConApp_maybe', which simply returns Nothing in such a case.
-
-When this happens can_eq_nc' will fail to decompose, zonk, and try again.
+Where k is a unification variable. So the calls to getRuntimeRep_maybe may
+fail (returning Nothing).  In that case we'll fall through, zonk, and try again.
 Zonking should fill the variable k, meaning that decomposition will succeed the
 second time around.
+
+Also note that we require the AnonArgFlag to match.  This will stop
+us decomposing
+   (Int -> Bool)  ~  (Show a => blah)
+It's as if we treat (->) and (=>) as different type constructors.
 -}
 
 canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)
@@ -1016,9 +1017,20 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Try to decompose type constructor applications
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-    --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
+    --- See Note [FunTy and decomposing type constructor applications]
+  | FunTy { ft_af = af1, ft_arg = ty1a, ft_res = ty1b } <- ty1
+  , FunTy { ft_af = af2, ft_arg = ty2a, ft_res = ty2b } <- ty2
+  , af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+  , Just ty1a_rep <- getRuntimeRep_maybe ty1a
+  , Just ty1b_rep <- getRuntimeRep_maybe ty1b
+  , Just ty2a_rep <- getRuntimeRep_maybe ty2a
+  , Just ty2b_rep <- getRuntimeRep_maybe ty2b
+  = canDecomposableTyConAppOK ev eq_rel funTyCon
+                              [ty1a_rep, ty1b_rep, ty1a, ty1b]
+                              [ty2a_rep, ty2b_rep, ty2a, ty2b]
+
+  | TyConApp tc1 tys1 <- ty1
+  , TyConApp tc2 tys2 <- ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
@@ -1460,15 +1472,13 @@ canTyConApp :: CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApps]
+-- Neither tc1 nor tc2 is a saturated funTyCon
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
-         then do { traceTcS "canTyConApp"
-                       (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
-                 ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-                 ; stopWith ev "Decomposed TyConApp" }
+         then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
          else canEqFailure ev eq_rel ty1 ty2 }
 
   -- See Note [Skolem abstract data] (at tyConSkolem)
@@ -1484,6 +1494,11 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | otherwise
   = canEqHardFailure ev ty1 ty2
   where
+    -- Reconstruct the types for error messages. This would do
+    -- the wrong thing (from a pretty printing point of view)
+    -- for functions, because we've lost the AnonArgFlag; but
+    -- in fact we never call canTyConApp on a saturated FunTyCon
+    -- Note [FunTy and decomposing type constructor applications]
     ty1 = mkTyConApp tc1 tys1
     ty2 = mkTyConApp tc2 tys2
 
@@ -1681,30 +1696,35 @@ Conclusion:
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
                           -> TyCon -> [TcType] -> [TcType]
-                          -> TcS ()
+                          -> TcS (StopOrContinue Ct)
 -- Precondition: tys1 and tys2 are the same length, hence "OK"
 canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
   = ASSERT( tys1 `equalLength` tys2 )
-    case ev of
-     CtDerived {}
-        -> unifyDeriveds loc tc_roles tys1 tys2
+    do { traceTcS "canDecomposableTyConAppOK"
+                  (ppr ev $$ ppr eq_rel $$ ppr tc $$ ppr tys1 $$ ppr tys2)
+       ; case ev of
+           CtDerived {}
+             -> unifyDeriveds loc tc_roles tys1 tys2
 
-     CtWanted { ctev_dest = dest }
-                   -- new_locs and tc_roles are both infinite, so
-                   -- we are guaranteed that cos has the same length
-                   -- as tys1 and tys2
-        -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
-              ; setWantedEq dest (mkTyConAppCo role tc cos) }
+           CtWanted { ctev_dest = dest }
+                  -- new_locs and tc_roles are both infinite, so
+                  -- we are guaranteed that cos has the same length
+                  -- as tys1 and tys2
+             -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
+                   ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
-     CtGiven { ctev_evar = evar }
-        -> do { let ev_co = mkCoVarCo evar
-              ; given_evs <- newGivenEvVars loc $
-                             [ ( mkPrimEqPredRole r ty1 ty2
-                               , evCoercion $ mkNthCo r i ev_co )
-                             | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
-                             , r /= Phantom
-                             , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
-              ; emitWorkNC given_evs }
+           CtGiven { ctev_evar = evar }
+             -> do { let ev_co = mkCoVarCo evar
+                   ; given_evs <- newGivenEvVars loc $
+                                  [ ( mkPrimEqPredRole r ty1 ty2
+                                    , evCoercion $ mkNthCo r i ev_co )
+                                  | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
+                                  , r /= Phantom
+                                  , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
+                   ; emitWorkNC given_evs }
+
+    ; stopWith ev "Decomposed TyConApp" }
+
   where
     loc        = ctEvLoc ev
     role       = eqRelRole eq_rel
@@ -1755,7 +1775,8 @@ canEqHardFailure :: CtEvidence
                  -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
-  = do { (s1, co1) <- flatten FM_SubstOnly ev ty1
+  = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
+       ; (s1, co1) <- flatten FM_SubstOnly ev ty1
        ; (s2, co2) <- flatten FM_SubstOnly ev ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; continueWith (mkInsolubleCt new_ev) }
