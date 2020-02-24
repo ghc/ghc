@@ -695,8 +695,8 @@ release-x86_64-linux-deb8:
 # x86_64-linux-alpine
 #################################
 
-.build-x86_64-linux-alpine:
-  extends: .validate-linux
+.build-x86_64-linux-alpine-hadrian:
+  extends: .validate-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
   # There are currently a few failing tests
@@ -707,6 +707,9 @@ release-x86_64-linux-deb8:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
+    # encoding004 due to lack of locale support
+    # T10458 due to fact that dynamic linker tries to reload libAS
+    BROKEN_TESTS: "encoding004 T10458"
   cache:
     key: linux-x86_64-alpine
   artifacts:
@@ -715,11 +718,11 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-alpine:
   <<: *release
-  extends: .build-x86_64-linux-alpine
+  extends: .build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
-  extends: .build-x86_64-linux-alpine
+  extends: .build-x86_64-linux-alpine-hadrian
 
 #################################
 # x86_64-linux-centos7
