@@ -1253,7 +1253,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
 // Time is process CPU time of beginning of current GC and is used as
 // the mutator CPU time reported as the census timestamp.
-void heapCensus (Time t)
+Census* performHeapCensus(Time t)
 {
   uint32_t g, n;
   Census *census;
@@ -1316,7 +1316,11 @@ void heapCensus (Time t)
     dumpCensus( census );
 #endif
 
+    return census;
+}
 
+void endHeapCensus(Census *census)
+{
   // free our storage, unless we're keeping all the census info for
   // future restriction by biography.
 #if defined(PROFILING)
@@ -1334,4 +1338,9 @@ void heapCensus (Time t)
 #if defined(PROFILING)
   stat_endHeapCensus();
 #endif
+}
+
+void heapCensus(Time t)
+{
+    endHeapCensus(performHeapCensus(t));
 }
