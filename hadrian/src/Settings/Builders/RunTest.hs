@@ -162,6 +162,7 @@ getTestArgs = do
         skipPerfArg  = if testSkipPerf args
                            then Just "--skip-perf-tests"
                            else Nothing
+        brokenTestArgs = concat [ ["--broken-test", t] | t <- brokenTests args ]
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg   = case testSummary args of
                            Just filepath -> Just $ "--summary-file " ++ show filepath
@@ -192,6 +193,7 @@ getTestArgs = do
                       , junitArg, metricsArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
+         ++ brokenTestArgs
 
   where areDocsPresent = expr $ do
           root <- buildRoot
