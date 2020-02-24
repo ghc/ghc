@@ -868,6 +868,9 @@ def test(name: TestName,
 
     executeSetups([thisdir_settings, setup], name, myTestOpts)
 
+    if name in config.broken_tests:
+        myTestOpts.expect = 'fail'
+
     thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
     if myTestOpts.alone:
         aloneTests.append(thisTest)
