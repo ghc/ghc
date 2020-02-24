@@ -1336,12 +1336,12 @@ void heapCensus (Time t)
   // future restriction by biography.
 #if defined(PROFILING)
   if (RtsFlags.ProfFlags.bioSelector == NULL)
+#endif
   {
       freeEra(census);
       census->hash = NULL;
       census->arena = NULL;
   }
-#endif
 
   // we're into the next time period now
   nextEra();
