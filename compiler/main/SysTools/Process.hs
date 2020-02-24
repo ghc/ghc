@@ -32,6 +32,19 @@ import System.Process
 
 import FileCleanup
 
+-- | Enable process jobs support on Windows if it can be expected to work (e.g.
+-- @process >= 1.6.8.0@).
+enableProcessJobs :: CreateProcess -> CreateProcess
+#if defined(MIN_VERSION_process)
+#if MIN_VERSION_process(1,6,8)
+enableProcessJobs opts = opts { use_process_jobs = True }
+#else
+enableProcessJobs opts = opts
+#endif
+#else
+enableProcessJobs opts = opts
+#endif
+
 -- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
 -- inherited from the parent process, and output to stderr is not captured.
 readCreateProcessWithExitCode'
@@ -68,7 +81,7 @@ readProcessEnvWithExitCode
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    readCreateProcessWithExitCode ((proc prog args) {use_process_jobs = True}) {
+    readCreateProcessWithExitCode (enableProcessJobs $ proc prog args) {
         env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
@@ -226,13 +239,14 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
         -- not have finished yet.  This caused #16450.  To fix this use a
         -- process job to track all child processes and wait for each one to
         -- finish.
-        let procdata = (proc pgm real_args) { cwd = mb_cwd
-                                            , env = mb_env
-                                            , use_process_jobs = True
-                                            , std_in  = CreatePipe
-                                            , std_out = CreatePipe
-                                            , std_err = CreatePipe
-                                            }
+        let procdata =
+              enableProcessJobs
+              $ (proc pgm real_args) { cwd = mb_cwd
+                                     , env = mb_env
+                                     , std_in  = CreatePipe
+                                     , std_out = CreatePipe
+                                     , std_err = CreatePipe
+                                     }
         (Just hStdIn, Just hStdOut, Just hStdErr, hProcess) <- restore $
           createProcess_ "builderMainLoop" procdata
         let cleanup_handles = do
