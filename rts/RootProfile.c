@@ -63,6 +63,7 @@ static const char *i2b(StgWord bin_idx)
 
 static struct rootProfState {
     StgWord n_roots;
+    StgWord max_combined_descr_len;
     StgStablePtr roots[MAX_ROOTS];
     const char* descs[MAX_ROOTS];
     stackElement ses[MAX_ROOTS];
@@ -84,10 +85,11 @@ sumDescSizes(StgWord n_roots, const char** descs)
     return sum;
 }
 
-static const char *
-mkBinIdentity(struct rootProfState *ps, Arena *arena, StgWord bin_idx,
-              StgWord max_combined_descr_len)
+const char *
+rootProfileMkClosureLabel(Arena *arena, const void *key)
 {
+    struct rootProfState *ps = &g_rootProfState;
+    const StgWord bin_idx = (StgWord)key;
     const StgWord n_roots = ps->n_roots;
     const char** descs = ps->descs;
 
@@ -95,8 +97,8 @@ mkBinIdentity(struct rootProfState *ps, Arena *arena, StgWord bin_idx,
      * root descriptions together with ", " seperators. This is quite wasteful
      * but since we can only really have a small number of them anyways what
      * does it matter. */
-    const StgWord len = max_combined_descr_len + n_roots + 1;
-    /*                           (intercalate ",") -^      ^-null byte */
+    const StgWord len = ps->max_combined_descr_len + n_roots + 1;
+    /*                               (intercalate ",") -^      ^-null byte */
     char *identity = arenaAlloc(arena, len);
     char *ptr = identity;
 
@@ -114,6 +116,12 @@ mkBinIdentity(struct rootProfState *ps, Arena *arena, StgWord bin_idx,
         ptr[-1] = '\0';
 
     return identity;
+}
+
+const void *rootProfileGetClosureIdentity(const StgClosure *c)
+{
+    ASSERT(traverseIsClosureDataValid(&g_rootTraverseState, c));
+    return (void*)(traverseGetClosureData(c)>>2);
 }
 
 static bool
@@ -180,6 +188,7 @@ StgInt setRootProfPtrs(StgInt n, HsStablePtr *sps, const char** descs)
         ps->descs[i] = descs[i];
     }
     ps->n_roots = i;
+    ps->max_combined_descr_len = sumDescSizes(ps->n_roots, ps->descs);
 
     return n;
 }
@@ -257,15 +266,14 @@ rootProfile(Time t, Census *census)
             continue;
 
         const char* identity =
-            mkBinIdentity(ps, census->arena, i,
-                          sumDescSizes(n_roots, ps->descs));
+            rootProfileMkClosureLabel(census->arena, (void*)i);
 
         debug(1, "bin %s = %lu\n", identity, ps->sizes[i]);
 
         if(RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
             counter *ctr = lookupHashTable(census->hash, i);
             if(!ctr) {
-                ctr = heapInsertNewCounter(census, i);
+                ctr = heapInsertNewCounter(census, (void*)i);
                 ctr->identity = identity;
             }
 
