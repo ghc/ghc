@@ -55,7 +55,6 @@ typedef struct {
     ssize_t    drag_total;
 } Census;
 
-void initLDVCtr(counter *ctr);
 counter* heapInsertNewCounter(Census *census, const void *identity);
 
 #include "EndPrivate.h"
