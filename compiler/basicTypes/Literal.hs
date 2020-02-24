@@ -599,7 +599,7 @@ rubbishLit = LitRubbish
 -- structured, ensuring that the compiler can't inline in ways that will break
 -- user code. One approach to this is described in #8472.
 litIsTrivial :: Literal -> Bool
---      c.f. CoreUtils.exprIsTrivial
+--      c.f. GHC.Core.Utils.exprIsTrivial
 litIsTrivial (LitString _)      = False
 litIsTrivial (LitNumber nt _ _) = case nt of
   LitNumInteger -> False
@@ -612,7 +612,7 @@ litIsTrivial _                  = True
 
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
---      c.f. CoreUtils.exprIsDupable
+--      c.f. GHC.Core.Utils.exprIsDupable
 litIsDupable _      (LitString _)      = False
 litIsDupable dflags (LitNumber nt i _) = case nt of
   LitNumInteger -> inIntRange dflags i

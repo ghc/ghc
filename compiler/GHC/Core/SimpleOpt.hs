@@ -4,7 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-module CoreOpt (
+module GHC.Core.SimpleOpt (
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
 
@@ -22,15 +22,15 @@ module CoreOpt (
 
 import GhcPrelude
 
-import CoreArity( etaExpandToJoinPoint )
+import GHC.Core.Arity( etaExpandToJoinPoint )
 
-import CoreSyn
-import CoreSubst
-import CoreUtils
-import CoreFVs
-import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
-import MkCore ( FloatBind(..) )
-import PprCore  ( pprCoreBindings, pprRules )
+import GHC.Core
+import GHC.Core.Subst
+import GHC.Core.Utils
+import GHC.Core.FVs
+import {-# SOURCE #-} GHC.Core.Unfold( mkUnfolding )
+import GHC.Core.Make ( FloatBind(..) )
+import GHC.Core.Ppr  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
@@ -384,7 +384,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
   | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
     -- The previous two guards got rid of tyvars and coercions
-    -- See Note [CoreSyn type and coercion invariant] in CoreSyn
+    -- See Note [Core type and coercion invariant] in GHC.Core
     pre_inline_unconditionally
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
@@ -452,7 +452,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
                      occ_info active stable_unf top_level
   | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
     -- Type and coercion bindings are caught earlier
-    -- See Note [CoreSyn type and coercion invariant]
+    -- See Note [Core type and coercion invariant]
     post_inline_unconditionally
   = ( env' { soe_subst = extendIdSubst (soe_subst env) in_bndr out_rhs }
     , Nothing)
@@ -530,7 +530,7 @@ But not for join points!  For two reasons:
   Lint may reject.  I say "may" because this is /explicitly/
   allowed in the "Compiling without Continuations" paper
   (Section 3, "Managing \Delta").  But GHC currently does not
-  allow this slightly-more-flexible form.  See CoreSyn
+  allow this slightly-more-flexible form.  See GHC.Core
   Note [Join points are less general than the paper].
 
 The simple thing to do is to disable this transformation
@@ -576,7 +576,7 @@ subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
 --
 -- Rather like SimplEnv.substIdBndr
 --
--- It's important to zap fragile OccInfo (which CoreSubst.substIdBndr
+-- It's important to zap fragile OccInfo (which GHC.Core.Subst.substIdBndr
 -- carefully does not do) because simplOptExpr invalidates it
 
 subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
@@ -820,7 +820,7 @@ Note [exprIsConApp_maybe on literal strings]
 See #9400 and #13317.
 
 Conceptually, a string literal "abc" is just ('a':'b':'c':[]), but in Core
-they are represented as unpackCString# "abc"# by MkCore.mkStringExprFS, or
+they are represented as unpackCString# "abc"# by GHC.Core.Make.mkStringExprFS, or
 unpackCStringUtf8# when the literal contains multi-byte UTF8 characters.
 
 For optimizations we want to be able to treat it as a list, so they can be
@@ -872,7 +872,7 @@ Here's how exprIsConApp_maybe achieves this:
 0.  Start with scrutinee = $WMkT e
 
 1.  Inline $WMkT on-the-fly.  That's why data-constructor wrappers are marked
-    as expandable. (See CoreUtils.isExpandableApp.) Now we have
+    as expandable. (See GHC.Core.Utils.isExpandableApp.) Now we have
       scrutinee = (\n. case n of n' -> MkT n') e
 
 2.  Beta-reduce the application, generating a floated 'let'.
@@ -1076,10 +1076,10 @@ exprIsConApp_maybe (in_scope, id_unf) expr
            ; return (in_scope, floats, con, tys, args) }
 
     ----------------------------
-    -- Operations on the (Either InScopeSet CoreSubst)
+    -- Operations on the (Either InScopeSet GHC.Core.Subst)
     -- The Left case is wildly dominant
     subst_co (Left {}) co = co
-    subst_co (Right s) co = CoreSubst.substCo s co
+    subst_co (Right s) co = GHC.Core.Subst.substCo s co
 
     subst_expr (Left {}) e = e
     subst_expr (Right s) e = substExpr (text "exprIsConApp2") s e
@@ -1102,7 +1102,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
                       -> Maybe (DataCon, [Type], [CoreExpr])
 
--- This is not possible with user-supplied empty literals, MkCore.mkStringExprFS
+-- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
 -- turns those into [] automatically, but just in case something else in GHC
 -- generates a string literal directly.
 dealWithStringLiteral _   str co
@@ -1140,7 +1140,7 @@ Note [DFun arity check]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Here we check that the total number of supplied arguments (including
 type args) matches what the dfun is expecting.  This may be *less*
-than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
+than the ordinary arity of the dfun: see Note [DFun unfoldings] in GHC.Core
 -}
 
 exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
@@ -1164,7 +1164,7 @@ exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
 casts (using the Push rule), and it unfolds function calls if the unfolding
 has a greater arity than arguments are present.
 
-Currently, it is used in Rules.match, and is required to make
+Currently, it is used in GHC.Core.Rules.match, and is required to make
 "map coerce = coerce" match.
 -}
 
@@ -1288,7 +1288,7 @@ pushCoTyArg co ty
        -- co1 :: k2 ~N k1
        -- Note that NthCo can extract a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
-       -- See the NthCo case in CoreLint.
+       -- See the NthCo case in GHC.Core.Lint.
 
     co2 = mkInstCo co (mkGReflLeftCo Nominal ty co1)
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]

@@ -689,7 +689,7 @@ instance Binary TyConBndrVis where
 -- such as those for function and tuple types.
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 data TyCon
   = -- | The function type constructor, @(->)@
     FunTyCon {
@@ -1469,7 +1469,7 @@ isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
 -- A PrimRep is compatible with another iff one can be coerced to the other.
--- See Note [bad unsafe coercion] in CoreLint for when are two types coercible.
+-- See Note [bad unsafe coercion] in GHC.Core.Lint for when are two types coercible.
 primRepCompatible :: DynFlags -> PrimRep -> PrimRep -> Bool
 primRepCompatible dflags rep1 rep2 =
     (isUnboxed rep1 == isUnboxed rep2) &&

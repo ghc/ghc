@@ -461,7 +461,7 @@ data DataCon
         -- It's convenient to apply the rep-type of MkT to 't', to get
         --      forall x y. (t~(x,y), x~y, Ord x) => x -> y -> T t
         -- and use that to check the pattern.  Mind you, this is really only
-        -- used in CoreLint.
+        -- used in GHC.Core.Lint.
 
 
         dcInfix :: Bool,        -- True <=> declared infix
