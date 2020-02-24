@@ -67,6 +67,7 @@ parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
+parser.add_argument("--broken-test", action="append", help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
@@ -122,6 +123,8 @@ if args.skipway:
     config.other_ways = [w for w in config.other_ways if w not in args.skipway]
     config.run_ways = [w for w in config.run_ways if w not in args.skipway]
     config.compile_ways = [w for w in config.compile_ways if w not in args.skipway]
+
+config.broken_tests |= {TestName(t) for t in args.broken_tests}
 
 if args.threads:
     config.threads = args.threads
