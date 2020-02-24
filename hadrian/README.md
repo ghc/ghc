@@ -40,7 +40,7 @@ Notes:
 
 * If the default build script doesn't work, you might want to try another one,
 e.g. based on Cabal sandboxes (`build-cabal.*`), Stack (`build-stack.*`) or Nix
-(`build-stack.nix.*`).
+(`build-stack-nix.*`).
 
 * On Windows, if you do not want to install MSYS, you can use the Stack-based
 build script (Stack provides a managed MSYS environment), as described in
