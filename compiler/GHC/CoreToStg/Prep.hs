@@ -24,13 +24,13 @@ import OccurAnal
 import GHC.Driver.Types
 import PrelNames
 import MkId             ( realWorldPrimId )
-import CoreUtils
-import CoreArity
-import CoreFVs
+import GHC.Core.Utils
+import GHC.Core.Arity
+import GHC.Core.FVs
 import CoreMonad        ( CoreToDo(..) )
-import CoreLint         ( endPassIO )
-import CoreSyn
-import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
+import GHC.Core.Lint    ( endPassIO )
+import GHC.Core
+import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import Type
 import Literal
 import Coercion
@@ -1094,7 +1094,7 @@ maybeSaturate fn expr n_args
 {-
 ************************************************************************
 *                                                                      *
-                Simple CoreSyn operations
+                Simple GHC.Core operations
 *                                                                      *
 ************************************************************************
 -}
@@ -1137,7 +1137,7 @@ After ANFing we get
 and now we do NOT want eta expansion to give
                 f = /\a -> \ y -> (let s = h 3 in g s) y
 
-Instead CoreArity.etaExpand gives
+Instead GHC.Core.Arity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
 
 -}
@@ -1161,7 +1161,7 @@ get to a partial application:
 -}
 
 -- When updating this function, make sure it lines up with
--- CoreUtils.tryEtaReduce!
+-- GHC.Core.Utils.tryEtaReduce!
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f
@@ -1564,7 +1564,7 @@ cpCloneBndr env bndr
 
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
-       -- and Note [Preserve evaluatedness] in CoreTidy
+       -- and Note [Preserve evaluatedness] in GHC.Core.Op.Tidy
        ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
@@ -1597,7 +1597,7 @@ We want to drop the unfolding/rules on every Id:
     we'd have to substitute in them
 
 HOWEVER, we want to preserve evaluated-ness;
-see Note [Preserve evaluatedness] in CoreTidy.
+see Note [Preserve evaluatedness] in GHC.Core.Op.Tidy.
 -}
 
 ------------------------------------------------------------------------------

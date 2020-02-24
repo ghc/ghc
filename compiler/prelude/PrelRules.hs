@@ -29,20 +29,21 @@ import GhcPrelude
 
 import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
 
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 import Id
 import Literal
-import CoreOpt     ( exprIsLiteral_maybe )
-import PrimOp      ( PrimOp(..), tagToEnumKey )
+import GHC.Core.SimpleOpt ( exprIsLiteral_maybe )
+import PrimOp             ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
                    , tyConFamilySize )
 import DataCon     ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import CoreUtils   ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType, stripTicksTop, stripTicksTopT, mkTicks )
-import CoreUnfold  ( exprIsConApp_maybe )
+import GHC.Core.Utils  ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
+                       , stripTicksTop, stripTicksTopT, mkTicks )
+import GHC.Core.Unfold ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
 import PrelNames
@@ -739,7 +740,7 @@ as follows:
     in ...
 
 This was originally done in the fix to #16449 but this breaks the let/app
-invariant (see Note [CoreSyn let/app invariant] in CoreSyn) as noted in #16742.
+invariant (see Note [Core let/app invariant] in GHC.Core) as noted in #16742.
 For the reasons discussed in Note [Checking versus non-checking primops] (in
 the PrimOp module) there is no safe way rewrite the argument of I# such that
 it bottoms.
@@ -1103,12 +1104,12 @@ Only `SeqOp` shares that property.  (Other primops do not do anything
 as fancy as argument evaluation.)  The special handling for dataToTag#
 is:
 
-* CoreUtils.exprOkForSpeculation has a special case for DataToTagOp,
+* GHC.Core.Utils.exprOkForSpeculation has a special case for DataToTagOp,
   (actually in app_ok).  Most primops with lifted arguments do not
   evaluate those arguments, but DataToTagOp and SeqOp are two
   exceptions.  We say that they are /never/ ok-for-speculation,
   regardless of the evaluated-ness of their argument.
-  See CoreUtils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
+  See GHC.Core.Utils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
 
 * There is a special case for DataToTagOp in GHC.StgToCmm.Expr.cgExpr,
   that evaluates its argument and then extracts the tag from
@@ -1200,8 +1201,8 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
 
-- CoreUtils.exprOkForSpeculation;
-  see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in CoreUtils
+- GHC.Core.Utils.exprOkForSpeculation;
+  see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in GHC.Core.Utils
 
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]

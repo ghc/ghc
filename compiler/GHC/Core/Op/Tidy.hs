@@ -9,7 +9,7 @@ The code for *top-level* bindings is in GHC.Iface.Tidy.
 
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-module CoreTidy (
+module GHC.Core.Op.Tidy (
         tidyExpr, tidyRules, tidyUnfolding
     ) where
 
@@ -17,8 +17,8 @@ module CoreTidy (
 
 import GhcPrelude
 
-import CoreSyn
-import CoreSeq ( seqUnfolding )
+import GHC.Core
+import GHC.Core.Seq ( seqUnfolding )
 import Id
 import IdInfo
 import Demand ( zapUsageEnvSig )

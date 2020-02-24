@@ -1211,7 +1211,7 @@ data DynFlags = DynFlags {
   extensionFlags        :: EnumSet LangExt.Extension,
 
   -- Unfolding control
-  -- See Note [Discounts and thresholds] in CoreUnfold
+  -- See Note [Discounts and thresholds] in GHC.Core.Unfold
   ufCreationThreshold   :: Int,
   ufUseThreshold        :: Int,
   ufFunAppDiscount      :: Int,

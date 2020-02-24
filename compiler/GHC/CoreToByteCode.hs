@@ -31,12 +31,12 @@ import Id
 import Var             ( updateVarType )
 import ForeignCall
 import GHC.Driver.Types
-import CoreUtils
-import CoreSyn
-import PprCore
+import GHC.Core.Utils
+import GHC.Core
+import GHC.Core.Ppr
 import Literal
 import PrimOp
-import CoreFVs
+import GHC.Core.FVs
 import Type
 import GHC.Types.RepType
 import DataCon
@@ -718,10 +718,10 @@ Note [Not-necessarily-lifted join points]
 A join point variable is essentially a goto-label: it is, for example,
 never used as an argument to another function, and it is called only
 in tail position. See Note [Join points] and Note [Invariants on join points],
-both in CoreSyn. Because join points do not compile to true, red-blooded
+both in GHC.Core. Because join points do not compile to true, red-blooded
 variables (with, e.g., registers allocated to them), they are allowed
 to be levity-polymorphic. (See invariant #6 in Note [Invariants on join points]
-in CoreSyn.)
+in GHC.Core.)
 
 However, in this byte-code generator, join points *are* treated just as
 ordinary variables. There is no check whether a binding is for a join point
@@ -731,7 +731,7 @@ opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
 We thus must have *some* strategy for dealing with levity-polymorphic and
 unlifted join points. Levity-polymorphic variables are generally not allowed
 (though levity-polymorphic join points *are*; see Note [Invariants on join points]
-in CoreSyn, point 6), and we don't wish to evaluate unlifted join points eagerly.
+in GHC.Core, point 6), and we don't wish to evaluate unlifted join points eagerly.
 The questionable join points are *not-necessarily-lifted join points*
 (NNLJPs). (Not having such a strategy led to #16509, which panicked in the
 isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
@@ -1545,8 +1545,8 @@ pushAtom d p e
 pushAtom _ _ (AnnCoercion {})   -- Coercions are zero-width things,
    = return (nilOL, 0)          -- treated just like a variable V
 
--- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
--- and Note [Bottoming expressions] in coreSyn/CoreUtils.hs:
+-- See Note [Empty case alternatives] in GHC.Core
+-- and Note [Bottoming expressions] in GHC.Core.Utils:
 -- The scrutinee of an empty case evaluates to bottom
 pushAtom d p (AnnCase (_, a) _ _ []) -- trac #12128
    = pushAtom d p a
@@ -1922,7 +1922,7 @@ atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 
 -- #12128:
 -- A case expression can be an atom because empty cases evaluate to bottom.
--- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
+-- See Note [Empty case alternatives] in GHC.Core
 atomPrimRep (AnnCase _ _ ty _)      =
   ASSERT(case typePrimRep ty of [LiftedRep] -> True; _ -> False) LiftedRep
 atomPrimRep (AnnCoercion {})        = VoidRep

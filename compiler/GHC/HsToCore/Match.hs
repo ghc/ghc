@@ -34,10 +34,10 @@ import TcHsSyn
 import TcEvidence
 import TcRnMonad
 import GHC.HsToCore.PmCheck
-import CoreSyn
+import GHC.Core
 import Literal
-import CoreUtils
-import MkCore
+import GHC.Core.Utils
+import GHC.Core.Make
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 import GHC.HsToCore.GuardedRHSs
@@ -331,7 +331,7 @@ In that situation we desugar to
 The *desugarer* isn't certain whether there really should be no
 alternatives, so it adds a default case, as it always does.  A later
 pass may remove it if it's inaccessible.  (See also Note [Empty case
-alternatives] in CoreSyn.)
+alternatives] in GHC.Core.)
 
 We do *not* desugar simply to
    error "empty case"

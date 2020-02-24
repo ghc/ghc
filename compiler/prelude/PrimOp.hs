@@ -323,7 +323,7 @@ Note [Checking versus non-checking primops]
 
   It is important that a non-checking primop never be transformed in a way that
   would cause it to bottom. Doing so would violate Core's let/app invariant
-  (see Note [CoreSyn let/app invariant] in CoreSyn) which is critical to
+  (see Note [Core let/app invariant] in GHC.Core) which is critical to
   the simplifier's ability to float without fear of changing program meaning.
 
 
@@ -483,7 +483,7 @@ primOpCanFail :: PrimOp -> Bool
 
 primOpOkForSpeculation :: PrimOp -> Bool
   -- See Note [PrimOp can_fail and has_side_effects]
-  -- See comments with CoreUtils.exprOkForSpeculation
+  -- See comments with GHC.Core.Utils.exprOkForSpeculation
   -- primOpOkForSpeculation => primOpOkForSideEffects
 primOpOkForSpeculation op
   =  primOpOkForSideEffects op
@@ -535,7 +535,7 @@ primOpIsCheap op = primOpOkForSpeculation op
 primOpCodeSize
 ~~~~~~~~~~~~~~
 Gives an indication of the code size of a primop, for the purposes of
-calculating unfolding sizes; see CoreUnfold.sizeExpr.
+calculating unfolding sizes; see GHC.Core.Unfold.sizeExpr.
 -}
 
 primOpCodeSize :: PrimOp -> Int
@@ -543,7 +543,7 @@ primOpCodeSize :: PrimOp -> Int
 
 primOpCodeSizeDefault :: Int
 primOpCodeSizeDefault = 1
-  -- CoreUnfold.primOpSize already takes into account primOpOutOfLine
+  -- GHC.Core.Unfold.primOpSize already takes into account primOpOutOfLine
   -- and adds some further costs for the args in that case.
 
 primOpCodeSizeForeignCall :: Int
