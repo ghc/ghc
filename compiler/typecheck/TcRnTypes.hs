@@ -500,6 +500,10 @@ data TcGblEnv
           --
           -- Splices disable recompilation avoidance (see #481)
 
+        tcg_th_top_level_locs :: TcRef (Set RealSrcSpan),
+          -- ^ Locations of the top-level splices; used for providing details on
+          -- scope in error messages for out-of-scope variables
+
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
 
