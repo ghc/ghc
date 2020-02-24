@@ -47,7 +47,7 @@ import GhcPrelude
 import GHC.Stg.Syntax
 import Id
 import VarSet
-import CoreSyn    ( Tickish(Breakpoint) )
+import GHC.Core    ( Tickish(Breakpoint) )
 import Outputable
 import Util
 

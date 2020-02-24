@@ -6,13 +6,13 @@
 -- with saying "import GHC.Plugins".
 --
 -- Particularly interesting modules for plugin writers include
--- "CoreSyn" and "CoreMonad".
+-- "GHC.Core" and "CoreMonad".
 module GHC.Plugins(
         module GHC.Driver.Plugins,
         module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module CoreMonad, module CoreSyn, module Literal, module DataCon,
-        module CoreUtils, module MkCore, module CoreFVs, module CoreSubst,
-        module Rules, module Annotations,
+        module CoreMonad, module GHC.Core, module Literal, module DataCon,
+        module GHC.Core.Utils, module GHC.Core.Make, module GHC.Core.FVs,
+        module GHC.Core.Subst, module GHC.Core.Rules, module Annotations,
         module GHC.Driver.Session, module GHC.Driver.Packages,
         module Module, module Type, module TyCon, module Coercion,
         module TysWiredIn, module GHC.Driver.Types, module BasicTypes,
@@ -38,17 +38,17 @@ import IdInfo
 
 -- Core
 import CoreMonad
-import CoreSyn
+import GHC.Core
 import Literal
 import DataCon
-import CoreUtils
-import MkCore
-import CoreFVs
-import CoreSubst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
+import GHC.Core.Utils
+import GHC.Core.Make
+import GHC.Core.FVs
+import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
        -- These names are also exported by Type
 
 -- Core "extras"
-import Rules
+import GHC.Core.Rules
 import Annotations
 
 -- Pipeline-related stuff
@@ -57,9 +57,9 @@ import GHC.Driver.Packages
 
 -- Important GHC types
 import Module
-import Type     hiding {- conflict with CoreSubst -}
+import Type     hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
-import Coercion hiding {- conflict with CoreSubst -}
+import Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import TyCon
 import TysWiredIn

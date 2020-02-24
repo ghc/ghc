@@ -39,13 +39,13 @@ import GhcPrelude
 import Var
 import Id
 import IdInfo
-import CoreSyn
-import CoreUtils
+import GHC.Core
+import GHC.Core.Utils
 import State
 import Unique
 import VarSet
 import VarEnv
-import CoreFVs
+import GHC.Core.FVs
 import FastString
 import Type
 import Util( mapSnd )

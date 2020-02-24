@@ -10,7 +10,7 @@ See Note [Core Lint guarantee].
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module CoreLint (
+module GHC.Core.Lint (
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
     lintAnnots, lintTypes,
@@ -18,17 +18,17 @@ module CoreLint (
     -- ** Debug output
     endPass, endPassIO,
     dumpPassResult,
-    CoreLint.dumpIfSet,
+    GHC.Core.Lint.dumpIfSet,
  ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import CoreSyn
-import CoreFVs
-import CoreUtils
-import CoreStats   ( coreBindsStats )
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Utils
+import GHC.Core.Stats ( coreBindsStats )
 import CoreMonad
 import Bag
 import Literal
@@ -42,7 +42,7 @@ import VarSet
 import Name
 import Id
 import IdInfo
-import PprCore
+import GHC.Core.Ppr
 import ErrUtils
 import Coercion
 import SrcLoc
@@ -63,7 +63,7 @@ import FastString
 import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
-import CoreArity ( typeArity )
+import GHC.Core.Arity ( typeArity )
 import Demand ( splitStrictSig, isBotDiv )
 
 import GHC.Driver.Types
@@ -92,7 +92,7 @@ then running the compiled program will not seg-fault, assuming no bugs downstrea
 to decouple the safety of the resulting program from the type inference algorithm.
 
 However, do note point (4) above. Core Lint does not check for incomplete case-matches;
-see Note [Case expression invariants] in CoreSyn, invariant (4). As explained there,
+see Note [Case expression invariants] in GHC.Core, invariant (4). As explained there,
 an incomplete case-match might slip by Core Lint and cause trouble at runtime.
 
 Note [GHC Formalism]
@@ -162,7 +162,7 @@ Note [Linting type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 In the desugarer, it's very very convenient to be able to say (in effect)
         let a = Type Int in <body>
-That is, use a type let.   See Note [Type let] in CoreSyn.
+That is, use a type let.   See Note [Type let] in GHC.Core.
 
 However, when linting <body> we need to remember that a=Int, else we might
 reject a correct program.  So we carry a type substitution (in this example
@@ -197,7 +197,7 @@ different types, called bad coercions. Following coercions are forbidden:
 
 Note [Join points]
 ~~~~~~~~~~~~~~~~~~
-We check the rules listed in Note [Invariants on join points] in CoreSyn. The
+We check the rules listed in Note [Invariants on join points] in GHC.Core. The
 only one that causes any difficulty is the first: All occurrences must be tail
 calls. To this end, along with the in-scope set, we remember in le_joins the
 subset of in-scope Ids that are valid join ids. For example:
@@ -549,7 +549,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
 
        -- If the binding is for a CoVar, the RHS should be (Coercion co)
-       -- See Note [CoreSyn type and coercion invariant] in CoreSyn
+       -- See Note [Core type and coercion invariant] in GHC.Core
        ; checkL (not (isCoVar binder) || isCoArg rhs)
                 (mkLetErr binder rhs)
 
@@ -561,7 +561,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
                 (badBndrTyMsg binder (text "levity-polymorphic"))
 
         -- Check the let/app invariant
-        -- See Note [CoreSyn let/app invariant] in CoreSyn
+        -- See Note [Core let/app invariant] in GHC.Core
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
@@ -570,7 +570,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
         -- Check that if the binder is top-level or recursive, it's not
         -- demanded. Primitive string literals are exempt as there is no
-        -- computation to perform, see Note [CoreSyn top-level string literals].
+        -- computation to perform, see Note [Core top-level string literals].
        ; checkL (not (isStrictId binder)
             || (isNonRec rec_flag && not (isTopLevel top_lvl_flag))
             || exprIsTickedString rhs)
@@ -578,7 +578,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
         -- Check that if the binder is at the top level and has type Addr#,
         -- that it is a string literal, see
-        -- Note [CoreSyn top-level string literals].
+        -- Note [Core top-level string literals].
        ; checkL (not (isTopLevel top_lvl_flag && binder_ty `eqType` addrPrimTy)
                  || exprIsTickedString rhs)
            (mkTopNonLitStrMsg binder)
@@ -687,7 +687,7 @@ lintIdUnfolding bndr bndr_ty uf
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
-                    -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
+                    -- to exponential behaviour; c.f. GHC.Core.FVs.idUnfoldingVars
 
 {-
 Note [Checking for INLINE loop breakers]
@@ -702,7 +702,7 @@ the desugarer.
 Note [Checking for levity polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We ordinarily want to check for bad levity polymorphism. See
-Note [Levity polymorphism invariants] in CoreSyn. However, we do *not*
+Note [Levity polymorphism invariants] in GHC.Core. However, we do *not*
 want to do this in a compulsory unfolding. Compulsory unfoldings arise
 only internally, for things like newtype wrappers, dictionaries, and
 (notably) unsafeCoerce#. These might legitimately be levity-polymorphic;
@@ -838,7 +838,7 @@ lintVarOcc :: Var -> Int -- Number of arguments (type or value) being passed
 lintVarOcc var nargs
   = do  { checkL (isNonCoVarId var)
                  (text "Non term variable" <+> ppr var)
-                 -- See CoreSyn Note [Variable occurrences in Core]
+                 -- See GHC.Core Note [Variable occurrences in Core]
 
         -- Cneck that the type of the occurrence is the same
         -- as the type of the binding site
@@ -971,7 +971,7 @@ Consider:
 
 This is clearly ill-typed, since the jump is inside both an application and a
 lambda, either of which is enough to disqualify it as a tail call (see Note
-[Invariants on join points] in CoreSyn). However, strictly from a
+[Invariants on join points] in GHC.Core). However, strictly from a
 lambda-calculus perspective, the term doesn't go wrong---after the two beta
 reductions, the jump *is* a tail call and everything is fine.
 
@@ -981,10 +981,10 @@ rules: naively reducing the above example using lets will capture any free
 occurrence of y in e2. More fundamentally, type lets are tricky; many passes,
 such as Float Out, tacitly assume that the incoming program's type lets have
 all been dealt with by the simplifier. Thus we don't want to let-bind any types
-in, say, CoreSubst.simpleOptPgm, which in some circumstances can run immediately
+in, say, GHC.Core.Subst.simpleOptPgm, which in some circumstances can run immediately
 before Float Out.
 
-All that said, currently CoreSubst.simpleOptPgm is the only thing using this
+All that said, currently GHC.Core.Subst.simpleOptPgm is the only thing using this
 loophole, doing so to avoid re-traversing large functions (beta-reducing a type
 lambda without introducing a type let requires a substitution). TODO: Improve
 simpleOptPgm so that we can forget all this ever happened.
@@ -1013,7 +1013,7 @@ lintCoreArg fun_ty (Type arg_ty)
 
 lintCoreArg fun_ty arg
   = do { arg_ty <- markAllJoinsBad $ lintCoreExpr arg
-           -- See Note [Levity polymorphism invariants] in CoreSyn
+           -- See Note [Levity polymorphism invariants] in GHC.Core
        ; flags <- getLintFlags
        ; lintL (not (lf_check_levity_poly flags) || not (isTypeLevPoly arg_ty))
            (text "Levity-polymorphic argument:" <+>
@@ -1094,7 +1094,7 @@ lintCaseExpr scrut var alt_ty alts =
      -- Check the scrutinee
      ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
           -- See Note [Join points are less general than the paper]
-          -- in CoreSyn
+          -- in GHC.Core
 
      ; (alt_ty, _) <- addLoc (CaseTy scrut) $
                       lintInTy alt_ty
@@ -1107,7 +1107,7 @@ lintCaseExpr scrut var alt_ty alts =
 
      -- Check that the scrutinee is not a floating-point type
      -- if there are any literal alternatives
-     -- See CoreSyn Note [Case expression invariants] item (5)
+     -- See GHC.Core Note [Case expression invariants] item (5)
      -- See Note [Rules for floating-point comparisons] in PrelRules
      ; let isLitPat (LitAlt _, _ , _) = True
            isLitPat _                 = False
@@ -1133,7 +1133,7 @@ lintCaseExpr scrut var alt_ty alts =
 
      ; subst <- getTCvSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
-       -- See CoreSyn Note [Case expression invariants] item (7)
+       -- See GHC.Core Note [Case expression invariants] item (7)
 
      ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
@@ -1152,14 +1152,14 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 
 checkCaseAlts e ty alts =
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
-         -- See CoreSyn Note [Case expression invariants] item (2)
+         -- See GHC.Core Note [Case expression invariants] item (2)
 
      ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
-         -- See CoreSyn Note [Case expression invariants] item (3)
+         -- See GHC.Core Note [Case expression invariants] item (3)
 
           -- For types Int#, Word# with an infinite (well, large!) number of
           -- possible values, there should usually be a DEFAULT case
-          -- But (see Note [Empty case alternatives] in CoreSyn) it's ok to
+          -- But (see Note [Empty case alternatives] in GHC.Core) it's ok to
           -- have *no* case alternatives.
           -- In effect, this is a kind of partial test. I suppose it's possible
           -- that we might *know* that 'x' was 1 or 2, in which case
@@ -1185,7 +1185,7 @@ lintAltExpr :: CoreExpr -> OutType -> LintM ()
 lintAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr
        ; ensureEqTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
-         -- See CoreSyn Note [Case expression invariants] item (6)
+         -- See GHC.Core Note [Case expression invariants] item (6)
 
 lintCoreAlt :: OutType          -- Type of scrutinee
             -> OutType          -- Type of the alternative
@@ -1299,7 +1299,7 @@ lintIdBndr top_lvl bind_site id linterF
        ; (ty, k) <- addLoc (IdTy id) $
                     lintInTy (idType id)
 
-          -- See Note [Levity polymorphism invariants] in CoreSyn
+          -- See Note [Levity polymorphism invariants] in GHC.Core
        ; lintL (isJoinId id || not (lf_check_levity_poly flags) || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
@@ -1455,7 +1455,7 @@ Here 'cls' appears free in b's kind, which would usually be illegal
 #in this case (Alg cls *) = *, so all is well.  Currently we allow
 this, and make Lint expand synonyms where necessary to make it so.
 
-c.f. TcUnify.occCheckExpand and CoreUtils.coreAltsType which deal
+c.f. TcUnify.occCheckExpand and GHC.Core.Utils.coreAltsType which deal
 with the same problem. A single systematic solution eludes me.
 -}
 
@@ -1612,7 +1612,7 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     rhs_fvs = exprFreeVars rhs
 
     is_bad_bndr :: Var -> Bool
-    -- See Note [Unbound RULE binders] in Rules
+    -- See Note [Unbound RULE binders] in GHC.Core.Rules
     is_bad_bndr bndr = not (bndr `elemVarSet` lhs_fvs)
                     && bndr `elemVarSet` rhs_fvs
                     && isNothing (isReflCoVar_maybe bndr)
@@ -1659,7 +1659,7 @@ argument to be made for allowing a situation like this:
 
 Applying this rule can't turn a well-typed program into an ill-typed one, so
 conceivably we could allow it. But we can always eta-expand such an
-"undersaturated" rule (see 'CoreArity.etaExpandToJoinPointRule'), and in fact
+"undersaturated" rule (see 'GHC.Core.Arity.etaExpandToJoinPointRule'), and in fact
 the simplifier would have to in order to deal with the RHS. So we take a
 conservative view and don't allow undersaturated rules for join points. See
 Note [Rules and join points] in OccurAnal for further discussion.

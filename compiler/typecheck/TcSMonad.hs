@@ -175,7 +175,7 @@ import UniqFM
 import UniqDFM
 import Maybes
 
-import CoreMap
+import GHC.Core.Map
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import MonadUtils

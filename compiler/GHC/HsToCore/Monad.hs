@@ -56,9 +56,9 @@ import GhcPrelude
 
 import TcRnMonad
 import FamInstEnv
-import CoreSyn
-import MkCore    ( unitExpr )
-import CoreUtils ( exprType, isExprLevPoly )
+import GHC.Core
+import GHC.Core.Make  ( unitExpr )
+import GHC.Core.Utils ( exprType, isExprLevPoly )
 import GHC.Hs
 import GHC.IfaceToCore
 import TcMType ( checkForLevPolyX, formatLevPolyErr )

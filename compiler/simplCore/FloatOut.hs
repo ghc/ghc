@@ -12,10 +12,10 @@ module FloatOut ( floatOutwards ) where
 
 import GhcPrelude
 
-import CoreSyn
-import CoreUtils
-import MkCore
-import CoreArity        ( etaExpand )
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.Make
+import GHC.Core.Arity   ( etaExpand )
 import CoreMonad        ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
@@ -111,7 +111,7 @@ Well, maybe.  We don't do this at the moment.
 Note [Join points]
 ~~~~~~~~~~~~~~~~~~
 Every occurrence of a join point must be a tail call (see Note [Invariants on
-join points] in CoreSyn), so we must be careful with how far we float them. The
+join points] in GHC.Core), so we must be careful with how far we float them. The
 mechanism for doing so is the *join ceiling*, detailed in Note [Join ceiling]
 in SetLevels. For us, the significance is that a binder might be marked to be
 dropped at the nearest boundary between tail calls and non-tail calls. For

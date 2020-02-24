@@ -66,18 +66,18 @@ module SetLevels (
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 import CoreMonad        ( FloatOutSwitches(..) )
-import CoreUtils        ( exprType, exprIsHNF
+import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable
                         , isExprLevPoly
                         , collectMakeStaticArgs
                         )
-import CoreArity        ( exprBotStrictness_maybe )
-import CoreFVs          -- all of it
-import CoreSubst
-import MkCore           ( sortQuantVars )
+import GHC.Core.Arity   ( exprBotStrictness_maybe )
+import GHC.Core.FVs     -- all of it
+import GHC.Core.Subst
+import GHC.Core.Make    ( sortQuantVars )
 
 import Id
 import IdInfo
@@ -340,7 +340,7 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 -}
 
-lvlExpr env (_, AnnType ty)     = return (Type (CoreSubst.substTy (le_subst env) ty))
+lvlExpr env (_, AnnType ty)     = return (Type (GHC.Core.Subst.substTy (le_subst env) ty))
 lvlExpr env (_, AnnCoercion co) = return (Coercion (substCo (le_subst env) co))
 lvlExpr env (_, AnnVar v)       = return (lookupVar env v)
 lvlExpr _   (_, AnnLit lit)     = return (Lit lit)
@@ -522,7 +522,7 @@ Things to note:
      - exrpIsHNF catches the key case of an evaluated variable
 
      - exprOkForSpeculation is /false/ of an evaluated variable;
-       See Note [exprOkForSpeculation and evaluated variables] in CoreUtils
+       See Note [exprOkForSpeculation and evaluated variables] in GHC.Core.Utils
        So we'd actually miss the key case!
 
      - Nothing is gained from the extra generality of exprOkForSpeculation
@@ -602,7 +602,7 @@ lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
 -- the expression, so that it can itself be floated.
 
 lvlMFE env _ (_, AnnType ty)
-  = return (Type (CoreSubst.substTy (le_subst env) ty))
+  = return (Type (GHC.Core.Subst.substTy (le_subst env) ty))
 
 -- No point in floating out an expression wrapped in a coercion or note
 -- If we do we'll transform  lvl = e |> co
@@ -628,7 +628,7 @@ lvlMFE env strict_ctxt ann_expr
                                -- See Note [Free join points]
   || isExprLevPoly expr
          -- We can't let-bind levity polymorphic expressions
-         -- See Note [Levity polymorphism invariants] in CoreSyn
+         -- See Note [Levity polymorphism invariants] in GHC.Core
   || notWorthFloating expr abs_vars
   || not float_me
   =     -- Don't float it out
@@ -1331,7 +1331,7 @@ substAndLvlBndrs is_rec env lvl bndrs
     (subst_env, subst_bndrs) = substBndrsSL is_rec env bndrs
 
 substBndrsSL :: RecFlag -> LevelEnv -> [InVar] -> (LevelEnv, [OutVar])
--- So named only to avoid the name clash with CoreSubst.substBndrs
+-- So named only to avoid the name clash with GHC.Core.Subst.substBndrs
 substBndrsSL is_rec env@(LE { le_subst = subst, le_env = id_env }) bndrs
   = ( env { le_subst    = subst'
           , le_env      = foldl' add_id  id_env (bndrs `zip` bndrs') }
@@ -1672,7 +1672,7 @@ newPolyBndrs dest_lvl
                              mkSysLocal (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
-                             poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
+                             poly_ty = mkLamTypes abs_vars (GHC.Core.Subst.substTy subst (idType bndr))
 
     -- If we are floating a join point to top level, it stops being
     -- a join point.  Otherwise it continues to be a join point,
