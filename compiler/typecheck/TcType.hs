@@ -209,7 +209,7 @@ import TyCon
 
 -- others:
 import GHC.Driver.Session
-import CoreFVs
+import GHC.Core.FVs
 import Name -- hiding (varName)
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?

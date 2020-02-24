@@ -43,14 +43,14 @@ import GhcPrelude
 import SimplEnv
 import CoreMonad        ( SimplMode(..), Tick(..) )
 import GHC.Driver.Session
-import CoreSyn
-import qualified CoreSubst
-import PprCore
+import GHC.Core
+import qualified GHC.Core.Subst
+import GHC.Core.Ppr
 import TyCoPpr          ( pprParendType )
-import CoreFVs
-import CoreUtils
-import CoreArity
-import CoreUnfold
+import GHC.Core.FVs
+import GHC.Core.Utils
+import GHC.Core.Arity
+import GHC.Core.Unfold
 import Name
 import Id
 import IdInfo
@@ -353,7 +353,7 @@ mkFunRules rs = Just (n_required, rs)
 mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
 
-mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in CoreUnfold
+mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
 mkRhsStop ty = Stop ty RhsCtxt
 
 mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
@@ -432,7 +432,7 @@ contArgs cont
   | lone cont = (True, [], cont)
   | otherwise = go [] cont
   where
-    lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in CoreUnfold
+    lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in GHC.Core.Unfold
     lone (ApplyToVal {}) = False
     lone (CastIt {})     = False
     lone _               = True
@@ -632,7 +632,7 @@ interestingCallContext env cont
         -- Can happen if we have (f Int |> co) y
         -- If f has an INLINE prag we need to give it some
         -- motivation to inline. See Note [Cast then apply]
-        -- in CoreUnfold
+        -- in GHC.Core.Unfold
 
     interesting (StrictArg { sc_cci = cci }) = cci
     interesting (StrictBind {})              = BoringCtxt
@@ -1135,7 +1135,7 @@ preInlineUnconditionally
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let/app invariant
--- See Note [CoreSyn let/app invariant] in CoreSyn
+-- See Note [Core let/app invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
@@ -1259,7 +1259,7 @@ postInlineUnconditionally
     -> OutExpr
     -> Bool
 -- Precondition: rhs satisfies the let/app invariant
--- See Note [CoreSyn let/app invariant] in CoreSyn
+-- See Note [Core let/app invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env top_lvl bndr occ_info rhs
@@ -1517,7 +1517,7 @@ tryEtaExpandRhs mode bndr rhs
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
          -- these are used to set the bndr's IdInfo (#15517)
-         -- Note [Invariants on join points] invariant 2b, in CoreSyn
+         -- Note [Invariants on join points] invariant 2b, in GHC.Core
 
   | otherwise
   = do { (new_arity, is_bot, new_rhs) <- try_expand
@@ -1553,7 +1553,7 @@ Note [Eta-expanding at let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We now eta expand at let-bindings, which is where the payoff comes.
 The most significant thing is that we can do a simple arity analysis
-(in CoreArity.findRhsArity), which we can't do for free-floating lambdas
+(in GHC.Core.Arity.findRhsArity), which we can't do for free-floating lambdas
 
 One useful consequence of not eta-expanding lambdas is this example:
    genMap :: C a => ...
@@ -1747,21 +1747,21 @@ abstractFloats dflags top_lvl main_tvs floats body
   = ASSERT( notNull body_floats )
     ASSERT( isNilOL (sfJoinFloats floats) )
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-        ; return (float_binds, CoreSubst.substExpr (text "abstract_floats1") subst body) }
+        ; return (float_binds, GHC.Core.Subst.substExpr (text "abstract_floats1") subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     main_tv_set = mkVarSet main_tvs
     body_floats = letFloatBinds (sfLetFloats floats)
-    empty_subst = CoreSubst.mkEmptySubst (sfInScope floats)
+    empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
 
-    abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)
+    abstract :: GHC.Core.Subst.Subst -> OutBind -> SimplM (GHC.Core.Subst.Subst, OutBind)
     abstract subst (NonRec id rhs)
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
-                 subst' = CoreSubst.extendIdSubst subst id poly_app
+                 subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
            ; return (subst', NonRec poly_id2 poly_rhs) }
       where
-        rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
+        rhs' = GHC.Core.Subst.substExpr (text "abstract_floats2") subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = scopedSort $
@@ -1771,10 +1771,10 @@ abstractFloats dflags top_lvl main_tvs floats body
 
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
-            ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
+            ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
                   poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                                | (poly_id, rhs) <- poly_ids `zip` rhss
-                               , let rhs' = CoreSubst.substExpr (text "abstract_floats")
+                               , let rhs' = GHC.Core.Subst.substExpr (text "abstract_floats")
                                                                 subst' rhs ]
             ; return (subst', Rec poly_pairs) }
        where
@@ -2207,7 +2207,7 @@ mkCase2 dflags scrut bndr alts_ty alts
 
     re_sort :: [CoreAlt] -> [CoreAlt]
     -- Sort the alternatives to re-establish
-    -- CoreSyn Note [Case expression invariants]
+    -- GHC.Core Note [Case expression invariants]
     re_sort alts = sortBy cmpAlt alts
 
     add_default :: [CoreAlt] -> [CoreAlt]

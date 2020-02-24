@@ -33,7 +33,7 @@ import UniqSet
 import Type
 import GHC
 import Outputable
-import PprTyThing
+import GHC.Core.Ppr.TyThing
 import ErrUtils
 import MonadUtils
 import GHC.Driver.Session

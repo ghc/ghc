@@ -45,7 +45,7 @@ import TcSMonad
 import Bag
 import MonadUtils ( concatMapM, foldlM )
 
-import CoreSyn
+import GHC.Core
 import Data.List( partition, deleteFirstsBy )
 import SrcLoc
 import VarEnv

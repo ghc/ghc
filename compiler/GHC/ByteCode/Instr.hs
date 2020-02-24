@@ -17,13 +17,13 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import PprCore
+import GHC.Core.Ppr
 import Outputable
 import FastString
 import Name
 import Unique
 import Id
-import CoreSyn
+import GHC.Core
 import Literal
 import DataCon
 import VarSet

@@ -19,7 +19,7 @@ find, unsurprisingly, a Core expression.
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module CoreUnfold (
+module GHC.Core.Unfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types
 
         noUnfolding, mkImplicitUnfolding,
@@ -37,7 +37,7 @@ module CoreUnfold (
 
         callSiteInline, CallCtxt(..),
 
-        -- Reexport from CoreSubst (it only live there so it can be used
+        -- Reexport from GHC.Core.Subst (it only live there so it can be used
         -- by the Very Simple Optimiser)
         exprIsConApp_maybe, exprIsLiteral_maybe
     ) where
@@ -47,11 +47,11 @@ module CoreUnfold (
 import GhcPrelude
 
 import GHC.Driver.Session
-import CoreSyn
-import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
-import CoreOpt
-import CoreArity       ( manifestArity )
-import CoreUtils
+import GHC.Core
+import OccurAnal          ( occurAnalyseExpr_NoBinderSwap )
+import GHC.Core.SimpleOpt
+import GHC.Core.Arity     ( manifestArity )
+import GHC.Core.Utils
 import Id
 import Demand          ( isBottomingSig )
 import DataCon
@@ -828,7 +828,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
--- Used by CoreUnfold.sizeExpr
+-- Used by GHC.Core.Unfold.sizeExpr
 litSize (LitNumber LitNumInteger _ _) = 100   -- Note [Size of literal integers]
 litSize (LitNumber LitNumNatural _ _) = 100
 litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
@@ -1534,7 +1534,7 @@ because the latter is strict.
         f = \x -> ...(error s)...
 
 Fundamentally such contexts should not encourage inlining because, provided
-the RHS is "expandable" (see Note [exprIsExpandable] in CoreUtils) the
+the RHS is "expandable" (see Note [exprIsExpandable] in GHC.Core.Utils) the
 context can ``see'' the unfolding of the variable (e.g. case or a
 RULE) so there's no gain.
 

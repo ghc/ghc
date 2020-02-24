@@ -4332,7 +4332,7 @@ checkRoleAnnot tv (L _ (Just r1)) r2
 -- -dcore-lint is enabled. See Note [Role inference] in TcTyDecls
 checkValidRoles :: TyCon -> TcM ()
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in CoreLint
+-- See Note [GHC Formalism] in GHC.Core.Lint
 checkValidRoles tc
   | isAlgTyCon tc
     -- tyConDataCons returns an empty list for data families

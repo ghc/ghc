@@ -15,22 +15,22 @@ module CSE (cseProgram, cseOneExpr) where
 
 import GhcPrelude
 
-import CoreSubst
+import GHC.Core.Subst
 import Var              ( Var )
 import VarEnv           ( elemInScopeSet, mkInScopeSet )
 import Id               ( Id, idType, isDeadBinder, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
-import CoreUtils        ( mkAltExpr, eqExpr
+import GHC.Core.Utils        ( mkAltExpr, eqExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
-import CoreFVs          ( exprFreeVars )
+import GHC.Core.FVs          ( exprFreeVars )
 import Type             ( tyConAppArgs )
-import CoreSyn
+import GHC.Core
 import Outputable
 import BasicTypes
-import CoreMap
+import GHC.Core.Map
 import Util             ( filterOut )
 import Data.List        ( mapAccumL )
 
@@ -271,7 +271,7 @@ We must not be naive about join points in CSE:
    join j = e in
    if b then jump j else 1 + e
 The expression (1 + jump j) is not good (see Note [Invariants on join points] in
-CoreSyn). This seems to come up quite seldom, but it happens (first seen
+GHC.Core). This seems to come up quite seldom, but it happens (first seen
 compiling ppHtml in Haddock.Backends.Xhtml).
 
 We could try and be careful by tracking which join points are still valid at
@@ -416,7 +416,7 @@ addBinding :: CSEnv                      -- Includes InId->OutId cloning
 -- unless we can instead just substitute [in-id -> rhs]
 --
 -- It's possible for the binder to be a type variable (see
--- Note [Type-let] in CoreSyn), in which case we can just substitute.
+-- Note [Type-let] in GHC.Core), in which case we can just substitute.
 addBinding env in_id out_id rhs'
   | not (isId in_id) = (extendCSSubst env in_id rhs',     out_id)
   | noCSE in_id      = (env,                              out_id)
@@ -469,7 +469,7 @@ We would normally turn this into:
 
 But this breaks an invariant of Core, namely that the RHS of a top-level binding
 of type Addr# must be a string literal, not another variable. See Note
-[CoreSyn top-level string literals] in CoreSyn.
+[Core top-level string literals] in GHC.Core.
 
 For this reason, we special case top-level bindings to literal strings and leave
 the original RHS unmodified. This produces:

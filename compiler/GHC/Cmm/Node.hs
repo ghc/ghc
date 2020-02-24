@@ -36,7 +36,7 @@ import FastString
 import ForeignCall
 import Outputable
 import GHC.Runtime.Heap.Layout
-import CoreSyn (Tickish)
+import GHC.Core (Tickish)
 import qualified Unique as U
 
 import GHC.Cmm.Dataflow.Block

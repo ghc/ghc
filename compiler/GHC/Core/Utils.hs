@@ -9,7 +9,7 @@ Utility functions on @Core@ syntax
 {-# LANGUAGE CPP #-}
 
 -- | Commonly useful utilities for manipulating the Core language
-module CoreUtils (
+module GHC.Core.Utils (
         -- * Constructing expressions
         mkCast,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
@@ -64,10 +64,10 @@ module CoreUtils (
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 import PrelNames ( makeStaticName )
-import PprCore
-import CoreFVs( exprFreeVars )
+import GHC.Core.Ppr
+import GHC.Core.FVs( exprFreeVars )
 import Var
 import SrcLoc
 import VarEnv
@@ -112,7 +112,7 @@ import UniqSet
 
 exprType :: CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
--- applied to the actual 'CoreSyn.Type' expression as it cannot
+-- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
 exprType (Var var)           = idType var
 exprType (Lit lit)           = literalType lit
@@ -222,7 +222,7 @@ Various possibilities suggest themselves:
 Note that there might be existentially quantified coercion variables, too.
 -}
 
--- Not defined with applyTypeToArg because you can't print from CoreSyn.
+-- Not defined with applyTypeToArg because you can't print from GHC.Core.
 applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
@@ -482,7 +482,7 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- It's used by the desugarer to avoid building bindings
 -- that give Core Lint a heart attack, although actually
 -- the simplifier deals with them perfectly well. See
--- also 'MkCore.mkCoreLet'
+-- also 'GHC.Core.Make.mkCoreLet'
 bindNonRec bndr rhs body
   | isTyVar bndr                       = let_bind
   | isCoVar bndr                       = if isCoArg rhs then let_bind
@@ -495,7 +495,7 @@ bindNonRec bndr rhs body
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
--- as per the invariants of 'CoreExpr': see "CoreSyn#let_app_invariant"
+-- as per the invariants of 'CoreExpr': see "GHC.Core#let_app_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
 needsCaseBinding ty rhs = isUnliftedType ty && not (exprOkForSpeculation rhs)
         -- Make a case expression instead of a let
@@ -555,7 +555,7 @@ can be eliminated by expanding the synonym.
 Note [Binding coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider binding a CoVar, c = e.  Then, we must satisfy
-Note [CoreSyn type and coercion invariant] in CoreSyn,
+Note [Core type and coercion invariant] in GHC.Core,
 which allows only (Coercion co) on the RHS.
 
 ************************************************************************
@@ -979,7 +979,7 @@ Note [Empty case is trivial]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The expression (case (x::Int) Bool of {}) is just a type-changing
 case used when we are sure that 'x' will not return.  See
-Note [Empty case alternatives] in CoreSyn.
+Note [Empty case alternatives] in GHC.Core.
 
 If the scrutinee is trivial, then so is the whole expression; and the
 CoreToSTG pass in fact drops the case expression leaving only the
@@ -1048,7 +1048,7 @@ getIdFromTrivialExpr_maybe e
 {-
 exprIsBottom is a very cheap and cheerful function; it may return
 False for bottoming expressions, but it never costs much to ask.  See
-also CoreArity.exprBotStrictness_maybe, but that's a bit more
+also GHC.Core.Arity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
@@ -1068,7 +1068,7 @@ exprIsBottom e
     go n (Let _ e)               = go n e
     go n (Lam v e) | isTyVar v   = go n e
     go _ (Case _ _ _ alts)       = null alts
-       -- See Note [Empty case alternatives] in CoreSyn
+       -- See Note [Empty case alternatives] in GHC.Core
     go _ _                       = False
 
 {- Note [Bottoming expressions]
@@ -1193,8 +1193,11 @@ the moment we go for the slightly more aggressive version which treats
 Moreover it improves arities of overloaded functions where
 there is only dictionary selection (no construction) involved
 
-Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
-~~~~~~~~~~~~~~~~~~   in CoreUnfold.hs
+Note [exprIsCheap]
+~~~~~~~~~~~~~~~~~~
+
+See also Note [Interaction of exprIsCheap and lone variables] in GHC.Core.Unfold
+
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
 it is obviously in weak head normal form, or is cheap to get to WHNF.
 [Note that that's not the same as exprIsDupable; an expression might be
@@ -1296,7 +1299,7 @@ so might make a RULE or case-of-constructor fire.  Consider
        y = build g
    in ....(case x of (p,q) -> rhs)....(foldr k z y)....
 
-We don't inline 'x' or 'y' (see Note [Lone variables] in CoreUnfold),
+We don't inline 'x' or 'y' (see Note [Lone variables] in GHC.Core.Unfold),
 but we do want
 
  * the case-expression to simplify
@@ -1835,7 +1838,7 @@ it doesn't have the trickiness of the let/app invariant to worry about.
 -- > C (f x :: Int#)
 --
 -- Suppose @f x@ diverges; then @C (f x)@ is not a value. However this can't
--- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
+-- happen: see "GHC.Core#let_app_invariant". This invariant states that arguments of
 -- unboxed type must be ok-for-speculation (or trivial).
 exprIsHNF :: CoreExpr -> Bool           -- True => Value-lambda, constructor, PAP
 exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
@@ -1894,7 +1897,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     id_app_is_value id n_val_args
        = is_con id
        || idArity id > n_val_args
-       || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in MkCore
+       || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in GHC.Core.Make
                       -- absentError behaves like an honorary data constructor
 
 
@@ -1915,10 +1918,10 @@ don't want to discard a seq on it.
 
 -- | Can we bind this 'CoreExpr' at the top level?
 exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
--- See Note [CoreSyn top-level string literals]
+-- See Note [Core top-level string literals]
 -- Precondition: exprType expr = ty
 -- Top-level literal strings can't even be wrapped in ticks
---   see Note [CoreSyn top-level string literals] in CoreSyn
+--   see Note [Core top-level string literals] in GHC.Core
 exprIsTopLevelBindable expr ty
   = not (mightBeUnliftedType ty)
     -- Note that 'expr' may be levity polymorphic here consequently we must use

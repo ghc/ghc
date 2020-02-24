@@ -80,8 +80,8 @@ import TcEvidence
 import Constraint
 import TcOrigin
 import qualified BooleanFormula as BF
-import PprTyThing( pprTyThingInContext )
-import CoreFVs( orphNamesOfFamInst )
+import GHC.Core.Ppr.TyThing ( pprTyThingInContext )
+import GHC.Core.FVs         ( orphNamesOfFamInst )
 import FamInst
 import InstEnv
 import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons

@@ -34,8 +34,8 @@ import GHC.HsToCore.Utils
 import GHC.Hs
 
 import Id
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 import TyCon
 import DataCon
 import TcHsSyn ( shortCutLit )

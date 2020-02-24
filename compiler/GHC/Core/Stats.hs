@@ -5,7 +5,7 @@
 
 -- | Functions to computing the statistics reflective of the "size"
 -- of a Core expression
-module CoreStats (
+module GHC.Core.Stats (
         -- * Expression and bindings size
         coreBindsSize, exprSize,
         CoreStats(..), coreBindsStats, exprStats,
@@ -14,7 +14,7 @@ module CoreStats (
 import GhcPrelude
 
 import BasicTypes
-import CoreSyn
+import GHC.Core
 import Outputable
 import Coercion
 import Var

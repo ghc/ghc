@@ -59,7 +59,7 @@ import Name
 import GHC.Driver.Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
                              listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
-import PprTyThing
+import GHC.Core.Ppr.TyThing
 import PrelNames
 import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import SrcLoc

@@ -440,7 +440,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   = do { let arity  = length tup_args
              tup_tc = tupleTyCon boxity arity
                -- NB: tupleTyCon doesn't flatten 1-tuples
-               -- See Note [Don't flatten tuples from HsSyn] in MkCore
+               -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
        ; res_ty <- expTypeToType res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
                            -- Unboxed tuples have RuntimeRep vars, which we
@@ -461,7 +461,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; let actual_res_ty
                  = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy1 boxity arg_tys)
-                   -- See Note [Don't flatten tuples from HsSyn] in MkCore
+                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
                              (Just expr)

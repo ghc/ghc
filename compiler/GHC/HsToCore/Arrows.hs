@@ -39,10 +39,10 @@ import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalB
 import TcType
 import Type ( splitPiTy )
 import TcEvidence
-import CoreSyn
-import CoreFVs
-import CoreUtils
-import MkCore
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Utils
+import GHC.Core.Make
 import GHC.HsToCore.Binds (dsHsWrapper)
 
 import Id

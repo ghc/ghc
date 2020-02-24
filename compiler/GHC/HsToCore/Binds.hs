@@ -35,15 +35,15 @@ import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
 import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
-import GHC.Hs           -- lots of things
-import CoreSyn          -- lots of things
-import CoreOpt          ( simpleOptExpr )
-import OccurAnal        ( occurAnalyseExpr )
-import MkCore
-import CoreUtils
-import CoreArity ( etaExpand )
-import CoreUnfold
-import CoreFVs
+import GHC.Hs             -- lots of things
+import GHC.Core           -- lots of things
+import GHC.Core.SimpleOpt ( simpleOptExpr )
+import OccurAnal          ( occurAnalyseExpr )
+import GHC.Core.Make
+import GHC.Core.Utils
+import GHC.Core.Arity     ( etaExpand )
+import GHC.Core.Unfold
+import GHC.Core.FVs
 import Digraph
 import Predicate
 
@@ -58,7 +58,7 @@ import Id
 import MkId(proxyHashId)
 import Name
 import VarSet
-import Rules
+import GHC.Core.Rules
 import VarEnv
 import Var( EvVar )
 import Outputable
@@ -1160,7 +1160,7 @@ dsEvBinds bs
 
 mk_ev_binds :: Bag (Id,CoreExpr) -> [CoreBind]
 -- We do SCC analysis of the evidence bindings, /after/ desugaring
--- them. This is convenient: it means we can use the CoreSyn
+-- them. This is convenient: it means we can use the GHC.Core
 -- free-variable functions rather than having to do accurate free vars
 -- for EvTerm.
 mk_ev_binds ds_binds

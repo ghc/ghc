@@ -1,9 +1,9 @@
-module CoreUnfold (
+module GHC.Core.Unfold (
         mkUnfolding, mkInlineUnfolding
     ) where
 
 import GhcPrelude
-import CoreSyn
+import GHC.Core
 import GHC.Driver.Session
 
 mkInlineUnfolding :: CoreExpr -> Unfolding

@@ -300,7 +300,7 @@ copyTicks env g
              foldr blockCons code (map CmmTick ticks)
 
 -- Group by [Label]
--- See Note [Compressed TrieMap] in coreSyn/TrieMap about the usage of GenMap.
+-- See Note [Compressed TrieMap] in GHC.Core.Map about the usage of GenMap.
 groupByLabel :: [(Key, DistinctBlocks)] -> [(Key, [DistinctBlocks])]
 groupByLabel =
   go (TM.emptyTM :: TM.ListMap (TM.GenMap LabelMap) (Key, [DistinctBlocks]))

@@ -14,10 +14,10 @@ import VarEnv
 import GHC.Driver.Session ( DynFlags )
 
 import BasicTypes
-import CoreSyn
+import GHC.Core
 import Id
-import CoreArity ( typeArity )
-import CoreUtils ( exprIsCheap, exprIsTrivial )
+import GHC.Core.Arity ( typeArity )
+import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import UnVarGraph
 import Demand
 import Util
@@ -384,7 +384,7 @@ the case for Core!
  1. We need to ensure the invariant
       callArity e <= typeArity (exprType e)
     for the same reasons that exprArity needs this invariant (see Note
-    [exprArity invariant] in CoreArity).
+    [exprArity invariant] in GHC.Core.Arity).
 
     If we are not doing that, a too-high arity annotation will be stored with
     the id, confusing the simplifier later on.

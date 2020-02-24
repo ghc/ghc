@@ -20,14 +20,14 @@ import {-# SOURCE #-} GHC.HsToCore.Expr ( dsHandleMonadicFailure, dsExpr, dsLExp
 
 import GHC.Hs
 import TcHsSyn
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 
 import GHC.HsToCore.Monad          -- the monadery used in the desugarer
 import GHC.HsToCore.Utils
 
 import GHC.Driver.Session
-import CoreUtils
+import GHC.Core.Utils
 import Id
 import Type
 import TysWiredIn

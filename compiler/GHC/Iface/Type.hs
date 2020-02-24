@@ -137,7 +137,7 @@ type IfaceKind     = IfaceType
 -- | A kind of universal type, used for types and kinds.
 --
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
--- before being printed. See Note [Pretty printing via Iface syntax] in PprTyThing
+-- before being printed. See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
 data IfaceType
   = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
@@ -248,7 +248,7 @@ instance Outputable IfaceTyConSort where
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
 an IfaceType and pretty printing that.  This eliminates a lot of
 pretty-print duplication, and it matches what we do with pretty-
-printing TyThings. See Note [Pretty printing via Iface syntax] in PprTyThing.
+printing TyThings. See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing.
 
 It works fine for closed types, but when printing debug traces (e.g.
 when using -ddump-tc-trace) we print a lot of /open/ types.  These

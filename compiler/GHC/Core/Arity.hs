@@ -11,21 +11,22 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Arity and eta expansion
-module CoreArity (
-        manifestArity, joinRhsArity, exprArity, typeArity,
-        exprEtaExpandArity, findRhsArity, etaExpand,
-        etaExpandToJoinPoint, etaExpandToJoinPointRule,
-        exprBotStrictness_maybe
-    ) where
+module GHC.Core.Arity
+   ( manifestArity, joinRhsArity, exprArity, typeArity
+   , exprEtaExpandArity, findRhsArity, etaExpand
+   , etaExpandToJoinPoint, etaExpandToJoinPointRule
+   , exprBotStrictness_maybe
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import CoreSyn
-import CoreFVs
-import CoreUtils
-import CoreSubst
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Utils
+import GHC.Core.Subst
 import Demand
 import Var
 import VarEnv
@@ -992,19 +993,19 @@ etaInfoApp :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
 --             ((substExpr s e) `appliedto` eis)
 
 etaInfoApp subst (Lam v1 e) (EtaVar v2 : eis)
-  = etaInfoApp (CoreSubst.extendSubstWithVar subst v1 v2) e eis
+  = etaInfoApp (GHC.Core.Subst.extendSubstWithVar subst v1 v2) e eis
 
 etaInfoApp subst (Cast e co1) eis
   = etaInfoApp subst e (pushCoercion co' eis)
   where
-    co' = CoreSubst.substCo subst co1
+    co' = GHC.Core.Subst.substCo subst co1
 
 etaInfoApp subst (Case e b ty alts) eis
   = Case (subst_expr subst e) b1 ty' alts'
   where
     (subst1, b1) = substBndr subst b
     alts' = map subst_alt alts
-    ty'   = etaInfoAppTy (CoreSubst.substTy subst ty) eis
+    ty'   = etaInfoAppTy (GHC.Core.Subst.substTy subst ty) eis
     subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis)
               where
                  (subst2,bs') = substBndrs subst1 bs
@@ -1095,7 +1096,7 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
        ----------- Function types  (t1 -> t2)
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
        , not (isTypeLevPoly arg_ty)
-          -- See Note [Levity polymorphism invariants] in CoreSyn
+          -- See Note [Levity polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
        , let (subst', eta_id') = freshEtaId n subst arg_ty
@@ -1135,7 +1136,7 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
 -- TODO Check if we actually *are* changing any join points' types
 
 subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr = substExpr (text "CoreArity:substExpr")
+subst_expr = substExpr (text "GHC.Core.Arity:substExpr")
 
 
 --------------

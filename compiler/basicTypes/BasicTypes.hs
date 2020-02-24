@@ -154,7 +154,7 @@ instance Outputable LeftOrRight where
 -- "real work". So:
 --  fib 100     has arity 0
 --  \x -> fib x has arity 1
--- See also Note [Definition of arity] in CoreArity
+-- See also Note [Definition of arity] in GHC.Core.Arity
 type Arity = Int
 
 -- | Representation Arity
@@ -1377,13 +1377,13 @@ The main effects of CONLIKE are:
     - The occurrence analyser (OccAnal) and simplifier (Simplify) treat
       CONLIKE thing like constructors, by ANF-ing them
 
-    - New function CoreUtils.exprIsExpandable is like exprIsCheap, but
+    - New function GHC.Core.Utils.exprIsExpandable is like exprIsCheap, but
       additionally spots applications of CONLIKE functions
 
     - A CoreUnfolding has a field that caches exprIsExpandable
 
     - The rule matcher consults this field.  See
-      Note [Expanding variables] in Rules.hs.
+      Note [Expanding variables] in GHC.Core.Rules.
 -}
 
 isConLike :: RuleMatchInfo -> Bool

@@ -5,7 +5,7 @@
 -- because of a type synonym that discards one of its arguments
 --
 -- See Note [Existential variables and silly type synonyms] 
--- in CoreUtils
+-- in GHC.Core.Utils
 
 -- In GHC 6.10, both tests below (independently) give Lint errors
 

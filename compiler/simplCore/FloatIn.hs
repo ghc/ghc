@@ -22,11 +22,11 @@ module FloatIn ( floatInwards ) where
 
 import GhcPrelude
 
-import CoreSyn
-import MkCore hiding    ( wrapFloats )
-import GHC.Driver.Types         ( ModGuts(..) )
-import CoreUtils
-import CoreFVs
+import GHC.Core
+import GHC.Core.Make hiding ( wrapFloats )
+import GHC.Driver.Types     ( ModGuts(..) )
+import GHC.Core.Utils
+import GHC.Core.FVs
 import CoreMonad        ( CoreM )
 import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import Var

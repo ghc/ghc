@@ -90,14 +90,13 @@ import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
 import Id
 import GHC.Runtime.Interpreter ( addSptEntry )
-import GHCi.RemoteTypes ( ForeignHValue )
-import GHC.CoreToByteCode ( byteCodeGen, coreExprToBCOs )
+import GHCi.RemoteTypes        ( ForeignHValue )
+import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
-import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import {- Kind parts of -} Type         ( Kind )
-import CoreLint         ( lintInteractiveExpr )
-import VarEnv           ( emptyTidyEnv )
+import GHC.Core.Op.Tidy        ( tidyExpr )
+import Type                    ( Type, Kind )
+import GHC.Core.Lint           ( lintInteractiveExpr )
+import VarEnv                  ( emptyTidyEnv )
 import Panic
 import ConLike
 import Control.Concurrent
@@ -108,7 +107,7 @@ import GHC.Driver.Packages
 import RdrName
 import GHC.Hs
 import GHC.Hs.Dump
-import CoreSyn
+import GHC.Core
 import StringBuffer
 import Parser
 import Lexer

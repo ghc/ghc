@@ -52,11 +52,11 @@ import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr )
 import GHC.Hs
 import TcHsSyn
 import TcType( tcSplitTyConApp )
-import CoreSyn
+import GHC.Core
 import GHC.HsToCore.Monad
 
-import CoreUtils
-import MkCore
+import GHC.Core.Utils
+import GHC.Core.Make
 import MkId
 import Id
 import Literal
@@ -168,7 +168,7 @@ will propagate that Name to all the occurrence sites, as well as
 un-shadowing it, so we'll get
              M.a{r8} = case e of (v:_) ->
                        case v of Just a{s77} -> a{s77}
-In fact, even CoreSubst.simplOptExpr will do this, and simpleOptExpr
+In fact, even GHC.Core.Subst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
@@ -418,7 +418,7 @@ There are a few subtleties in the desugaring of `seq`:
     Consider,
        f x y = x `seq` (y `seq` (# x,y #))
 
-    The [CoreSyn let/app invariant] means that, other things being equal, because
+    The [Core let/app invariant] means that, other things being equal, because
     the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
 
        f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
@@ -490,21 +490,21 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ty1
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
+mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic
 mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
--- We define a desugarer-specific version of CoreUtils.mkCast,
+-- We define a desugarer-specific version of GHC.Core.Utils.mkCast,
 -- because in the immediate output of the desugarer, we can have
 -- apparently-mis-matched coercions:  E.g.
 --     let a = b
 --     in (x :: a) |> (co :: b ~ Int)
 -- Lint know about type-bindings for let and does not complain
 -- So here we do not make the assertion checks that we make in
--- CoreUtils.mkCast; and we do less peephole optimisation too
+-- GHC.Core.Utils.mkCast; and we do less peephole optimisation too
 mkCastDs e co | isReflCo co = e
               | otherwise   = Cast e co
 

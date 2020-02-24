@@ -8,7 +8,7 @@
 
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
-module Rules (
+module GHC.Core.Rules (
         -- ** Constructing
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
         unionRuleBase, pprRuleBase,
@@ -30,22 +30,22 @@ module Rules (
 
 import GhcPrelude
 
-import CoreSyn          -- All of it
+import GHC.Core         -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
-import CoreSubst
-import CoreOpt          ( exprIsLambda_maybe )
-import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
+import GHC.Core.Subst
+import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
+import GHC.Core.FVs     ( exprFreeVars, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
-import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
-                          stripTicksTopT, stripTicksTopE,
-                          isJoinBind )
-import PprCore          ( pprRules )
+import GHC.Core.Utils   ( exprType, eqExpr, mkTick, mkTicks
+                        , stripTicksTopT, stripTicksTopE
+                        , isJoinBind )
+import GHC.Core.Ppr     ( pprRules )
 import Type             ( Type, TCvSubst, extendTvSubst, extendCvSubst
                         , mkEmptyTCvSubst, substTy )
 import TcType           ( tcSplitTyConApp_maybe )
 import TysWiredIn       ( anyTypeOfKind )
 import Coercion
-import CoreTidy         ( tidyRules )
+import GHC.Core.Op.Tidy ( tidyRules )
 import Id
 import IdInfo           ( RuleInfo( RuleInfo ) )
 import Var
@@ -171,7 +171,7 @@ where pi' :: Lift Int# is the specialised version of pi.
 mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
--- compiled. See also 'CoreSyn.CoreRule'
+-- compiled. See also 'GHC.Core.CoreRule'
 mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
            ru_bndrs = bndrs, ru_args = args,
@@ -262,7 +262,7 @@ pprRulesForUser :: DynFlags -> [CoreRule] -> SDoc
 -- (b) sort them into order based on the rule name
 -- (c) suppress uniques (unless -dppr-debug is on)
 -- This combination makes the output stable so we can use in testing
--- It's here rather than in PprCore because it calls tidyRules
+-- It's here rather than in GHC.Core.Ppr because it calls tidyRules
 pprRulesForUser dflags rules
   = withPprStyle (defaultUserStyle dflags) $
     pprRules $
@@ -341,7 +341,7 @@ but that isn't quite right:
 ************************************************************************
 -}
 
--- RuleBase itself is defined in CoreSyn, along with CoreRule
+-- RuleBase itself is defined in GHC.Core, along with CoreRule
 
 emptyRuleBase :: RuleBase
 emptyRuleBase = emptyNameEnv
@@ -1066,7 +1066,7 @@ Our cunning plan is this:
     check that does not mention any locally bound (lambda, case)
     variables.  If so we fail
 
-  * We use CoreSubst.substBind to freshen the binding, using an
+  * We use GHC.Core.Subst.substBind to freshen the binding, using an
     in-scope set that is the original in-scope variables plus the
     rs_bndrs (currently floated let-bindings).  So in (a) above
     we'll freshen the 'v' binding; in (b) above we'll freshen

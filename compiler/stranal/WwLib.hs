@@ -15,14 +15,14 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 
 import GhcPrelude
 
-import CoreSyn
-import CoreUtils        ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
+import GHC.Core
+import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
 import Id
 import IdInfo           ( JoinArity )
 import DataCon
 import Demand
 import Cpr
-import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
+import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import MkId             ( voidArgId, voidPrimId )
 import TysWiredIn       ( tupleDataCon )

@@ -23,8 +23,8 @@ import FamInstEnv       ( FamInstEnv )
 import Literal          ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import Id
 import MkId             ( seqId )
-import MkCore           ( FloatBind, mkImpossibleExpr, castBottomExpr )
-import qualified MkCore as MkCore
+import GHC.Core.Make           ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import qualified GHC.Core.Make
 import IdInfo
 import Name             ( mkSystemVarName, isExternalName, getOccFS )
 import Coercion hiding  ( substCo, substCoVar )
@@ -34,16 +34,16 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
                         , dataConRepArgTys, isUnboxedTupleCon
                         , StrictnessMark (..) )
 import CoreMonad        ( Tick(..), SimplMode(..) )
-import CoreSyn
+import GHC.Core
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import Cpr              ( mkCprSig, botCpr )
-import PprCore          ( pprCoreExpr )
-import CoreUnfold
-import CoreUtils
-import CoreOpt          ( pushCoTyArg, pushCoValArg
-                        , joinPointBinding_maybe, joinPointBindings_maybe )
-import Rules            ( mkRuleInfo, lookupRule, getRules )
+import GHC.Core.Ppr     ( pprCoreExpr )
+import GHC.Core.Unfold
+import GHC.Core.Utils
+import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
+                          , joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.Rules   ( mkRuleInfo, lookupRule, getRules )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
@@ -386,7 +386,7 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
                 -> OutExpr              -- Simplified RHS
                 -> SimplM (SimplFloats, SimplEnv)    -- The new binding is in the floats
 -- Precondition: rhs satisfies the let/app invariant
---               See Note [CoreSyn let/app invariant] in CoreSyn
+--               See Note [Core let/app invariant] in GHC.Core
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = ASSERT2( not (isJoinId new_bndr), ppr new_bndr )
@@ -634,7 +634,7 @@ We want to turn this into:
    foo1 = "blob"#
    foo = Ptr foo1
 
-See Note [CoreSyn top-level string literals] in CoreSyn.
+See Note [Core top-level string literals] in GHC.Core.
 
 ************************************************************************
 *                                                                      *
@@ -782,7 +782,7 @@ propagate the info that x's RHS is bottom to x's IdInfo as rapidly as
 possible.
 
 We use tryEtaExpandRhs on every binding, and it turns ou that the
-arity computation it performs (via CoreArity.findRhsArity) already
+arity computation it performs (via GHC.Core.Arity.findRhsArity) already
 does a simple bottoming-expression analysis.  So all we need to do
 is propagate that info to the binder's IdInfo.
 
@@ -1173,7 +1173,7 @@ simplTick env tickish expr cont
   splitCont other = (mkBoringStop (contHoleType other), other)
 
   getDoneId (DoneId id)  = id
-  getDoneId (DoneEx e _) = getIdFromTrivialExpr e -- Note [substTickish] in CoreSubst
+  getDoneId (DoneEx e _) = getIdFromTrivialExpr e -- Note [substTickish] in GHC.Core.Subst
   getDoneId other = pprPanic "getDoneId" (ppr other)
 
 -- Note [case-of-scc-of-case]
@@ -1326,7 +1326,7 @@ simplCast env body co0 cont0
           | Just (co1, m_co2) <- pushCoValArg co
           , let new_ty = coercionRKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
-                                        -- See Note [Levity polymorphism invariants] in CoreSyn
+                                        -- See Note [Levity polymorphism invariants] in GHC.Core
                                         -- test: typecheck/should_run/EtaExpandLevPoly
           = {-#SCC "addCoerce-pushCoValArg" #-}
             do { tail' <- addCoerceM m_co2 tail
@@ -1457,7 +1457,7 @@ simplNonRecE :: SimplEnv
 -- which may abort the whole process
 --
 -- Precondition: rhs satisfies the let/app invariant
---               Note [CoreSyn let/app invariant] in CoreSyn
+--               Note [Core let/app invariant] in GHC.Core
 --
 -- The "body" of the binding comes as a pair of ([InId],InExpr)
 -- representing a lambda; so we recurse back to simplLam
@@ -2314,7 +2314,7 @@ We treat the unlifted and lifted cases separately:
   we won't build a thunk because the let is strict.
   See also Note [Case-to-let for strictly-used binders]
 
-  NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in MkCore.
+  NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in GHC.Core.Make.
   We want to turn
      case (absentError "foo") of r -> ...MkT r...
   into
@@ -2346,7 +2346,7 @@ this transformation. If you want to fix the evaluation order, use
 'pseq'.  See #8900 for an example where the loss of this
 transformation bit us in practice.
 
-See also Note [Empty case alternatives] in CoreSyn.
+See also Note [Empty case alternatives] in GHC.Core.
 
 Historical notes
 
@@ -2377,7 +2377,7 @@ There have been various earlier versions of this patch:
     case_bndr_evald_next _               = False
 
   This patch was part of fixing #7542. See also
-  Note [Eta reduction of an eval'd function] in CoreUtils.)
+  Note [Eta reduction of an eval'd function] in GHC.Core.Utils.)
 
 
 Further notes about case elimination
@@ -2491,7 +2491,7 @@ rebuildCase env scrut case_bndr alts cont
              _ -> return
                -- See Note [FloatBinds from constructor wrappers]
                    ( emptyFloats env,
-                     MkCore.wrapFloats wfloats $
+                     GHC.Core.Make.wrapFloats wfloats $
                      wrapFloats (floats1 `addFloats` floats2) expr' )}
 
 
@@ -2551,8 +2551,8 @@ doCaseToLet :: OutExpr          -- Scrutinee
 -- The situation is         case scrut of b { DEFAULT -> body }
 -- Can we transform thus?   let { b = scrut } in body
 doCaseToLet scrut case_bndr
-  | isTyCoVar case_bndr    -- Respect CoreSyn
-  = isTyCoArg scrut        -- Note [CoreSyn type and coercion invariant]
+  | isTyCoVar case_bndr    -- Respect GHC.Core
+  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
 
   | isUnliftedType (idType case_bndr)
   = exprOkForSpeculation scrut
@@ -2936,7 +2936,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
             _ ->
               return ( emptyFloats env
                -- See Note [FloatBinds from constructor wrappers]
-                     , MkCore.wrapFloats dc_floats $
+                     , GHC.Core.Make.wrapFloats dc_floats $
                        wrapFloats (floats1 `addFloats` floats2 `addFloats` floats3) expr') }
   where
     zap_occ = zapBndrOccInfo (isDeadBinder bndr)    -- bndr is an InId
@@ -3556,7 +3556,7 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
                         -- But retain a previous boring_ok of True; e.g. see
                         -- the way it is set in calcUnfoldingGuidanceWithArity
                         in return (mkCoreUnfolding src is_top_lvl expr' guide')
-                            -- See Note [Top-level flag on inline rules] in CoreUnfold
+                            -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
 
                   _other              -- Happens for INLINABLE things
                      -> mkLetUnfolding dflags top_lvl src id expr' }

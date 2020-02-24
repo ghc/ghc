@@ -32,7 +32,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 
 import GHC.Hs.Extension
 import GHC.Hs.Types
-import CoreSyn
+import GHC.Core
 import TcEvidence
 import Type
 import NameSet

@@ -9,8 +9,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
--- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
-module CoreSyn (
+-- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
+module GHC.Core (
         -- * Main data types
         Expr(..), Alt, Bind(..), AltCon(..), Arg,
         Tickish(..), TickishScoping(..), TickishPlacement(..),
@@ -180,7 +180,7 @@ These data types are the heart of the compiler
 -- *  Primitive literals
 --
 -- *  Applications: note that the argument may be a 'Type'.
---    See Note [CoreSyn let/app invariant]
+--    See Note [Core let/app invariant]
 --    See Note [Levity polymorphism invariants]
 --
 -- *  Lambda abstraction
@@ -190,10 +190,10 @@ These data types are the heart of the compiler
 --    this corresponds to allocating a thunk for the things
 --    bound and then executing the sub-expression.
 --
---    See Note [CoreSyn letrec invariant]
---    See Note [CoreSyn let/app invariant]
+--    See Note [Core letrec invariant]
+--    See Note [Core let/app invariant]
 --    See Note [Levity polymorphism invariants]
---    See Note [CoreSyn type and coercion invariant]
+--    See Note [Core type and coercion invariant]
 --
 -- *  Case expression. Operationally this corresponds to evaluating
 --    the scrutinee (expression examined) to weak head normal form
@@ -239,7 +239,7 @@ is better for at least three reasons:
    Then exprType of the RHS is (S a), but we cannot make that be
    the 'ty' in the Case constructor because 'a' is simply not in
    scope there. Instead we must expand the synonym to Int before
-   putting it in the Case constructor.  See CoreUtils.mkSingleAltCase.
+   putting it in the Case constructor.  See GHC.Core.Utils.mkSingleAltCase.
 
    So we'd have to do synonym expansion in exprType which would
    be inefficient.
@@ -252,7 +252,7 @@ is better for at least three reasons:
 -}
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 data Expr b
   = Var   Id
   | Lit   Literal
@@ -276,13 +276,13 @@ type Arg b = Expr b
 -- The default alternative is @(DEFAULT, [], rhs)@
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 type Alt b = (AltCon, [b], Expr b)
 
 -- | A case alternative constructor (i.e. pattern match)
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 data AltCon
   = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
                       -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
@@ -297,7 +297,7 @@ data AltCon
 -- This instance is a bit shady. It can only be used to compare AltCons for
 -- a single type constructor. Fortunately, it seems quite unlikely that we'll
 -- ever need to compare AltCons for different type constructors.
--- The instance adheres to the order described in [CoreSyn case invariants]
+-- The instance adheres to the order described in [Core case invariants]
 instance Ord AltCon where
   compare (DataAlt con1) (DataAlt con2) =
     ASSERT( dataConTyCon con1 == dataConTyCon con2 )
@@ -312,7 +312,7 @@ instance Ord AltCon where
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
   deriving Data
@@ -356,7 +356,7 @@ Also, we do not permit case analysis with literal patterns on floating-point
 types. See #9238 and Note [Rules for floating-point comparisons] in
 PrelRules for the rationale for this restriction.
 
--------------------------- CoreSyn INVARIANTS ---------------------------
+-------------------------- GHC.Core INVARIANTS ---------------------------
 
 Note [Variable occurrences in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -368,18 +368,18 @@ For example
 Here 'c' is a CoVar, which is lambda-bound, but it /occurs/ in
 a Coercion, (sym c).
 
-Note [CoreSyn letrec invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core letrec invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The right hand sides of all top-level and recursive @let@s
 /must/ be of lifted type (see "Type#type_classification" for
 the meaning of /lifted/ vs. /unlifted/).
 
 There is one exception to this rule, top-level @let@s are
 allowed to bind primitive string literals: see
-Note [CoreSyn top-level string literals].
+Note [Core top-level string literals].
 
-Note [CoreSyn top-level string literals]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core top-level string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As an exception to the usual rule that top-level binders must be lifted,
 we allow binding primitive string literals (of type Addr#) of type Addr# at the
 top level. This allows us to share string literals earlier in the pipeline and
@@ -413,7 +413,7 @@ parts of the compilation pipeline.
   at the top level.
 
 * In Core, we have a special rule that permits top-level Addr# bindings. See
-  Note [CoreSyn top-level string literals]. Core-to-core passes may introduce
+  Note [Core top-level string literals]. Core-to-core passes may introduce
   new top-level string literals.
 
 * In STG, top-level string literals are explicitly represented in the syntax
@@ -423,8 +423,8 @@ parts of the compilation pipeline.
   in the object file, the content of the exported literal is given a label with
   the _bytes suffix.
 
-Note [CoreSyn let/app invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core let/app invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The let/app invariant
      the right hand side of a non-recursive 'Let', and
      the argument of an 'App',
@@ -443,12 +443,12 @@ expression is floated out:
    y::Int# = fac 4#
 
 In this situation you should use @case@ rather than a @let@. The function
-'CoreUtils.needsCaseBinding' can help you determine which to generate, or
-alternatively use 'MkCore.mkCoreLet' rather than this constructor directly,
+'GHC.Core.Utils.needsCaseBinding' can help you determine which to generate, or
+alternatively use 'GHC.Core.Make.mkCoreLet' rather than this constructor directly,
 which will generate a @case@ if necessary
 
 The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
-coreSyn/MkCore.
+GHC.Core.Make.
 
 For discussion of some implications of the let/app invariant primops see
 Note [Checking versus non-checking primops] in PrimOp.
@@ -463,13 +463,13 @@ checked by Core Lint.
    See Note [Empty case alternatives]
 
 2. The 'DEFAULT' case alternative must be first in the list,
-   if it occurs at all.  Checked in CoreLint.checkCaseAlts.
+   if it occurs at all.  Checked in GHC.Core.Lint.checkCaseAlts.
 
 3. The remaining cases are in order of (strictly) increasing
      tag  (for 'DataAlts') or
      lit  (for 'LitAlts').
    This makes finding the relevant constructor easy, and makes
-   comparison easier too.   Checked in CoreLint.checkCaseAlts.
+   comparison easier too.   Checked in GHC.Core.Lint.checkCaseAlts.
 
 4. The list of alternatives must be exhaustive. An /exhaustive/ case
    does not necessarily mention all constructors:
@@ -504,7 +504,7 @@ checked by Core Lint.
    Blue (since, if the case is exhaustive, that's all that
    remains).  Of course, if it's not Blue and we start fetching
    fields that should be in a Blue constructor, we may die
-   horribly. See also Note [Core Lint guarantee] in CoreLint.
+   horribly. See also Note [Core Lint guarantee] in GHC.Core.Lint.
 
 5. Floating-point values must not be scrutinised against literals.
    See #9238 and Note [Rules for floating-point comparisons]
@@ -518,8 +518,8 @@ checked by Core Lint.
 7. The type of the scrutinee must be the same as the type
    of the case binder, obviously.  Checked in lintCaseExpr.
 
-Note [CoreSyn type and coercion invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core type and coercion invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and
 coercion variables.  These can be very convenient for postponing type
 substitutions until the next run of the simplifier.
@@ -539,8 +539,8 @@ substitutions until the next run of the simplifier.
   Note [Equality superclasses in quantified constraints]
   in TcCanonical
 
-Note [CoreSyn case invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core case invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Case expression invariants]
 
 Note [Levity polymorphism invariants]
@@ -563,8 +563,8 @@ is illegal because x's type has kind (TYPE r), which has 'r' free.
 See Note [Levity polymorphism checking] in GHC.HsToCore.Monad to see where these
 invariants are established for user-written code.
 
-Note [CoreSyn let goal]
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core let goal]
+~~~~~~~~~~~~~~~~~~~~
 * The simplifier tries to ensure that if the RHS of a let is a constructor
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
@@ -580,7 +580,7 @@ this exhaustive list can be empty!
 
 * A case expression can have empty alternatives if (and only if) the
   scrutinee is bound to raise an exception or diverge. When do we know
-  this?  See Note [Bottoming expressions] in CoreUtils.
+  this?  See Note [Bottoming expressions] in GHC.Core.Utils.
 
 * The possibility of empty alternatives is one reason we need a type on
   the case expression: if the alternatives are empty we can't get the
@@ -614,8 +614,8 @@ this exhaustive list can be empty!
   unboxed type.
 
 * We treat a case expression with empty alternatives as trivial iff
-  its scrutinee is (see CoreUtils.exprIsTrivial).  This is actually
-  important; see Note [Empty case is trivial] in CoreUtils
+  its scrutinee is (see GHC.Core.Utils.exprIsTrivial).  This is actually
+  important; see Note [Empty case is trivial] in GHC.Core.Utils
 
 * An empty case is replaced by its scrutinee during the CoreToStg
   conversion; remember STG is un-typed, so there is no need for
@@ -677,7 +677,7 @@ Join points must follow these invariants:
      See Note [Join points are less general than the paper]
 
   2. For join arity n, the right-hand side must begin with at least n lambdas.
-     No ticks, no casts, just lambdas!  C.f. CoreUtils.joinRhsArity.
+     No ticks, no casts, just lambdas!  C.f. GHC.Core.Utils.joinRhsArity.
 
      2a. Moreover, this same constraint applies to any unfolding of
          the binder.  Reason: if we want to push a continuation into
@@ -795,7 +795,7 @@ and join points] in Simplify):
 
 The body of the join point now returns a Bool, so the label `j` has to have its
 type updated accordingly. Inconvenient though this may be, it has the advantage
-that 'CoreUtils.exprType' can still return a type for any expression, including
+that 'GHC.Core.Utils.exprType' can still return a type for any expression, including
 a jump.
 
 This differs from the paper (see Note [Invariants on join points]). In the
@@ -931,7 +931,7 @@ type MOutCoercion = MCoercion
 -- | Allows attaching extra information to points in expressions
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 data Tickish id =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
     -- added by the desugarer as a result of -auto-all, or added by
@@ -963,7 +963,7 @@ data Tickish id =
                                 -- appropriate entry in GHC.Driver.Types.ModBreaks.
                                 --
                                 -- Careful about substitution!  See
-                                -- Note [substTickish] in CoreSubst.
+                                -- Note [substTickish] in GHC.Core.Subst.
     }
 
   -- | A source note.
@@ -1295,8 +1295,9 @@ Orphan-hood is computed
 *                                                                      *
 ************************************************************************
 
-The CoreRule type and its friends are dealt with mainly in CoreRules,
-but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
+The CoreRule type and its friends are dealt with mainly in GHC.Core.Rules, but
+GHC.Core.FVs, GHC.Core.Subst, GHC.Core.Ppr, GHC.Core.Op.Tidy also inspect the
+representation.
 -}
 
 -- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
@@ -1381,7 +1382,7 @@ data CoreRule
                 -- arguments, it simply discards them; the returned 'CoreExpr'
                 -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
-                -- See Note [Extra args in rule matching] in Rules.hs
+                -- See Note [Extra args in rule matching] in GHC.Core.Rules
 
 type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
 type InScopeEnv = (InScopeSet, IdUnfoldingFun)
@@ -1439,7 +1440,7 @@ The @Unfolding@ type is declared here to avoid numerous loops
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
 -- identifier would have if we substituted its definition in for the identifier.
--- This type should be treated as abstract everywhere except in "CoreUnfold"
+-- This type should be treated as abstract everywhere except in GHC.Core.Unfold
 data Unfolding
   = NoUnfolding        -- ^ We have no information about the unfolding.
 
@@ -1540,7 +1541,7 @@ data UnfoldingGuidance
   = UnfWhen {   -- Inline without thinking about the *size* of the uf_tmpl
                 -- Used (a) for small *and* cheap unfoldings
                 --      (b) for INLINE functions
-                -- See Note [INLINE for small functions] in CoreUnfold
+                -- See Note [INLINE for small functions] in GHC.Core.Unfold
       ug_arity    :: Arity,     -- Number of value arguments expected
 
       ug_unsat_ok  :: Bool,     -- True <=> ok to inline even if unsaturated
@@ -1701,7 +1702,7 @@ isExpandableUnfolding _                                              = False
 
 expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- Expand an expandable unfolding; this is used in rule matching
---   See Note [Expanding variables] in Rules.hs
+--   See Note [Expanding variables] in GHC.Core.Rules
 -- The key point here is that CONLIKE things can be expanded
 expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
 expandUnfolding_maybe _                                                       = Nothing
@@ -1786,7 +1787,7 @@ on the left, thus
 it'd only inline when applied to three arguments.  This slightly-experimental
 change was requested by Roman, but it seems to make sense.
 
-See also Note [Inlining an InlineRule] in CoreUnfold.
+See also Note [Inlining an InlineRule] in GHC.Core.Unfold.
 
 
 Note [OccInfo in unfoldings and rules]
@@ -1869,7 +1870,7 @@ a list of CoreBind
 -}
 
 -- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 type CoreProgram = [CoreBind]   -- See Note [CoreProgram]
 
 -- | The common case for the type of binders and variables when
@@ -1931,7 +1932,7 @@ deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
 -}
 
 -- | Apply a list of argument expressions to a function expression in a nested fashion. Prefer to
--- use 'MkCore.mkCoreApps' if possible
+-- use 'GHC.Core.Make.mkCoreApps' if possible
 mkApps    :: Expr b -> [Arg b]  -> Expr b
 -- | Apply a list of type argument expressions to a function expression in a nested fashion
 mkTyApps  :: Expr b -> [Type]   -> Expr b
@@ -1940,7 +1941,7 @@ mkCoApps  :: Expr b -> [Coercion] -> Expr b
 -- | Apply a list of type or value variables to a function expression in a nested fashion
 mkVarApps :: Expr b -> [Var] -> Expr b
 -- | Apply a list of argument expressions to a data constructor in a nested fashion. Prefer to
--- use 'MkCore.mkCoreConApps' if possible
+-- use 'GHC.Core.Make.mkCoreConApps' if possible
 mkConApp      :: DataCon -> [Arg b] -> Expr b
 
 mkApps    f args = foldl' App                       f args
@@ -1961,20 +1962,20 @@ mkTyArg ty
   | otherwise                        = Type ty
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
--- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
+-- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
 mkIntLit      :: DynFlags -> Integer -> Expr b
 -- | Create a machine integer literal expression of type @Int#@ from an @Int@.
--- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
+-- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
 mkIntLitInt   :: DynFlags -> Int     -> Expr b
 
 mkIntLit    dflags n = Lit (mkLitInt dflags n)
 mkIntLitInt dflags n = Lit (mkLitInt dflags (toInteger n))
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
--- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
+-- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
 mkWordLit     :: DynFlags -> Integer -> Expr b
 -- | Create a machine word literal expression of type  @Word#@ from a @Word@.
--- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
+-- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
 mkWordLitWord :: DynFlags -> Word -> Expr b
 
 mkWordLit     dflags w = Lit (mkLitWord dflags w)
@@ -1987,41 +1988,41 @@ mkInt64LitInt64 :: Int64 -> Expr b
 mkInt64LitInt64 w = Lit (mkLitInt64 (toInteger w))
 
 -- | Create a machine character literal expression of type @Char#@.
--- If you want an expression of type @Char@ use 'MkCore.mkCharExpr'
+-- If you want an expression of type @Char@ use 'GHC.Core.Make.mkCharExpr'
 mkCharLit :: Char -> Expr b
 -- | Create a machine string literal expression of type @Addr#@.
--- If you want an expression of type @String@ use 'MkCore.mkStringExpr'
+-- If you want an expression of type @String@ use 'GHC.Core.Make.mkStringExpr'
 mkStringLit :: String -> Expr b
 
 mkCharLit   c = Lit (mkLitChar c)
 mkStringLit s = Lit (mkLitString s)
 
 -- | Create a machine single precision literal expression of type @Float#@ from a @Rational@.
--- If you want an expression of type @Float@ use 'MkCore.mkFloatExpr'
+-- If you want an expression of type @Float@ use 'GHC.Core.Make.mkFloatExpr'
 mkFloatLit :: Rational -> Expr b
 -- | Create a machine single precision literal expression of type @Float#@ from a @Float@.
--- If you want an expression of type @Float@ use 'MkCore.mkFloatExpr'
+-- If you want an expression of type @Float@ use 'GHC.Core.Make.mkFloatExpr'
 mkFloatLitFloat :: Float -> Expr b
 
 mkFloatLit      f = Lit (mkLitFloat f)
 mkFloatLitFloat f = Lit (mkLitFloat (toRational f))
 
 -- | Create a machine double precision literal expression of type @Double#@ from a @Rational@.
--- If you want an expression of type @Double@ use 'MkCore.mkDoubleExpr'
+-- If you want an expression of type @Double@ use 'GHC.Core.Make.mkDoubleExpr'
 mkDoubleLit :: Rational -> Expr b
 -- | Create a machine double precision literal expression of type @Double#@ from a @Double@.
--- If you want an expression of type @Double@ use 'MkCore.mkDoubleExpr'
+-- If you want an expression of type @Double@ use 'GHC.Core.Make.mkDoubleExpr'
 mkDoubleLitDouble :: Double -> Expr b
 
 mkDoubleLit       d = Lit (mkLitDouble d)
 mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
--- that the rhs satisfies the let/app invariant.  Prefer to use 'MkCore.mkCoreLets' if
+-- that the rhs satisfies the let/app invariant.  Prefer to use 'GHC.Core.Make.mkCoreLets' if
 -- possible, which does guarantee the invariant
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
--- use 'MkCore.mkCoreLams' if possible
+-- use 'GHC.Core.Make.mkCoreLams' if possible
 mkLams        :: [b] -> Expr b -> Expr b
 
 mkLams binders body = foldr Lam body binders
@@ -2043,12 +2044,12 @@ mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
--- | Create a binding group where a type variable is bound to a type. Per "CoreSyn#type_let",
+-- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
--- | Create a binding group where a type variable is bound to a type. Per "CoreSyn#type_let",
+-- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
@@ -2069,7 +2070,7 @@ varsToCoreExprs vs = map varToCoreExpr vs
 *                                                                      *
 ************************************************************************
 
-These are defined here to avoid a module loop between CoreUtils and CoreFVs
+These are defined here to avoid a module loop between GHC.Core.Utils and GHC.Core.FVs
 
 -}
 
@@ -2100,7 +2101,7 @@ exprToCoercion_maybe _             = Nothing
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 

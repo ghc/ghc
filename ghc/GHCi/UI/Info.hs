@@ -31,7 +31,7 @@ import           Data.Time
 import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
-import qualified CoreUtils
+import qualified GHC.Core.Utils
 import           GHC.HsToCore
 import           GHC.Driver.Session (HasDynFlags(..))
 import           FastString
@@ -334,7 +334,7 @@ processAllTypeCheckedModule tcm = do
     getTypeLHsExpr e = do
         hs_env  <- getSession
         (_,mbe) <- liftIO $ deSugarExpr hs_env e
-        return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
+        return $ fmap (\expr -> (mid, getLoc e, GHC.Core.Utils.exprType expr)) mbe
       where
         mid :: Maybe Id
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i

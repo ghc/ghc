@@ -33,12 +33,12 @@ import Name
 import Type
 import TyCon       ( tyConDataCons )
 import Avail
-import CoreSyn
-import CoreFVs     ( exprsSomeFreeVarsList )
-import CoreOpt     ( simpleOptPgm, simpleOptExpr )
-import CoreUtils
-import CoreUnfold
-import PprCore
+import GHC.Core
+import GHC.Core.FVs       ( exprsSomeFreeVarsList )
+import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
+import GHC.Core.Utils
+import GHC.Core.Unfold
+import GHC.Core.Ppr
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
@@ -48,14 +48,14 @@ import TysPrim
 import Coercion
 import TysWiredIn
 import DataCon     ( dataConWrapId )
-import MkCore
+import GHC.Core.Make
 import Module
 import NameSet
 import NameEnv
-import Rules
+import GHC.Core.Rules
 import BasicTypes
 import CoreMonad        ( CoreToDo(..) )
-import CoreLint         ( endPassIO )
+import GHC.Core.Lint    ( endPassIO )
 import VarSet
 import FastString
 import ErrUtils
@@ -511,7 +511,7 @@ For that we replace any forall'ed `c :: Coercible a b` value in a RULE by
 corresponding `co :: a ~#R b` and wrap the LHS and the RHS in
 `let c = MkCoercible co in ...`. This is later simplified to the desired form
 by simpleOptExpr (for the LHS) resp. the simplifiers (for the RHS).
-See also Note [Getting the map/coerce RULE to work] in CoreOpt.
+See also Note [Getting the map/coerce RULE to work] in GHC.Core.SimpleOpt.
 
 Note [Rules and inlining/other rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

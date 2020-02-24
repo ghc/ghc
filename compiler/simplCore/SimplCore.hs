@@ -13,18 +13,18 @@ module SimplCore ( core2core, simplifyExpr ) where
 import GhcPrelude
 
 import GHC.Driver.Session
-import CoreSyn
+import GHC.Core
 import GHC.Driver.Types
 import CSE              ( cseProgram )
-import Rules            ( mkRuleBase, unionRuleBase,
+import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules )
-import PprCore          ( pprCoreBindings, pprCoreExpr )
+import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreStats        ( coreBindsSize, coreBindsStats, exprSize )
-import CoreUtils        ( mkTicks, stripTicksTop )
-import CoreLint         ( endPass, lintPassResult, dumpPassResult,
+import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
+import GHC.Core.Utils   ( mkTicks, stripTicksTop )
+import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import Simplify         ( simplTopBinds, simplExpr, simplRules )
 import SimplUtils       ( simplEnvForGHCi, activeRule, activeUnfolding )
@@ -52,8 +52,8 @@ import WorkWrap         ( wwTopBinds )
 import SrcLoc
 import Util
 import Module
-import GHC.Driver.Plugins          ( withPlugins, installCoreToDos )
-import GHC.Runtime.Loader  -- ( initializePlugins )
+import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
+import GHC.Runtime.Loader -- ( initializePlugins )
 
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import UniqFM
@@ -701,7 +701,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                      (pprCoreBindings tagged_binds);
 
                 -- Get any new rules, and extend the rule base
-                -- See Note [Overall plumbing for rules] in Rules.hs
+                -- See Note [Overall plumbing for rules] in GHC.Core.Rules
                 -- We need to do this regularly, because simplification can
                 -- poke on IdInfo thunks, which in turn brings in new rules
                 -- behind the scenes.  Otherwise there's a danger we'll simply

@@ -36,7 +36,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import CoreSyn
+import GHC.Core
 import DataCon
 import GHC.Driver.Session         ( mAX_PTR_TAG )
 import ForeignCall
@@ -324,8 +324,8 @@ calls to nonVoidIds in various places.  So we must not look up
 Note [Dead-binder optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A case-binder, or data-constructor argument, may be marked as dead,
-because we preserve occurrence-info on binders in CoreTidy (see
-CoreTidy.tidyIdBndr).
+because we preserve occurrence-info on binders in GHC.Core.Op.Tidy (see
+GHC.Core.Op.Tidy.tidyIdBndr).
 
 If the binder is dead, we can sometimes eliminate a load.  While
 CmmSink will eliminate that load, it's very easy to kill it at source
@@ -336,7 +336,7 @@ to keep it for -O0. See also Phab:D5358.
 
 This probably also was the reason for occurrence hack in Phab:D5339 to
 exist, perhaps because the occurrence information preserved by
-'CoreTidy.tidyIdBndr' was insufficient.  But now that CmmSink does the
+'GHC.Core.Op.Tidy.tidyIdBndr' was insufficient.  But now that CmmSink does the
 job we deleted the hacks.
 -}
 

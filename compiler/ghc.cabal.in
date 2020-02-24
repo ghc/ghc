@@ -162,7 +162,6 @@ Library
         .
         basicTypes
         cmm
-        coreSyn
         iface
         main
         parser
@@ -301,21 +300,21 @@ Library
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
         GHC.Runtime.Heap.Layout
-        CoreArity
-        CoreFVs
-        CoreLint
-        CoreSubst
-        CoreOpt
-        CoreSyn
+        GHC.Core.Arity
+        GHC.Core.FVs
+        GHC.Core.Lint
+        GHC.Core.Subst
+        GHC.Core.SimpleOpt
+        GHC.Core
         TrieMap
-        CoreTidy
-        CoreUnfold
-        CoreUtils
-        CoreMap
-        CoreSeq
-        CoreStats
-        MkCore
-        PprCore
+        GHC.Core.Op.Tidy
+        GHC.Core.Unfold
+        GHC.Core.Utils
+        GHC.Core.Map
+        GHC.Core.Seq
+        GHC.Core.Stats
+        GHC.Core.Make
+        GHC.Core.Ppr
         GHC.HsToCore.PmCheck.Oracle
         GHC.HsToCore.PmCheck.Ppr
         GHC.HsToCore.PmCheck.Types
@@ -388,7 +387,7 @@ Library
         PlatformConstants
         GHC.Driver.Plugins
         TcPluginM
-        PprTyThing
+        GHC.Core.Ppr.TyThing
         Settings
         StaticPtrTable
         SysTools
@@ -460,7 +459,7 @@ Library
         GHC.CoreToStg
         GHC.CoreToStg.Prep
         GHC.Types.RepType
-        Rules
+        GHC.Core.Rules
         SpecConstr
         Specialise
         CallArity

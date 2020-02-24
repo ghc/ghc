@@ -86,7 +86,7 @@ module IdInfo (
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 
 import Class
 import {-# SOURCE #-} PrimOp (PrimOp)
@@ -165,7 +165,7 @@ data IdDetails
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
-       -- Note [Join points] in CoreSyn
+       -- Note [Join points] in GHC.Core
 
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
@@ -242,7 +242,7 @@ pprIdDetails other     = brackets (pp other)
 data IdInfo
   = IdInfo {
         arityInfo       :: !ArityInfo,
-        -- ^ 'Id' arity, as computed by 'CoreArity'. Specifies how many
+        -- ^ 'Id' arity, as computed by 'GHC.Core.Arity'. Specifies how many
         -- arguments this 'Id' has to be applied to before it doesn any
         -- meaningful work.
         ruleInfo        :: RuleInfo,
@@ -617,7 +617,7 @@ Ids store whether or not they can be levity-polymorphic at any amount
 of saturation. This is helpful in optimizing the levity-polymorphism check
 done in the desugarer, where we can usually learn that something is not
 levity-polymorphic without actually figuring out its type. See
-isExprLevPoly in CoreUtils for where this info is used. Storing
+isExprLevPoly in GHC.Core.Utils for where this info is used. Storing
 this is required to prevent perf/compiler/T5631 from blowing up.
 
 -}

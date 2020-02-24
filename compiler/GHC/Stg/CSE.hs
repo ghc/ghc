@@ -93,10 +93,10 @@ import Id
 import GHC.Stg.Syntax
 import Outputable
 import VarEnv
-import CoreSyn (AltCon(..))
+import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe)
-import CoreMap
+import GHC.Core.Map
 import NameEnv
 import Control.Monad( (>=>) )
 
@@ -232,7 +232,7 @@ substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
 
 -- Functions to enter binders
 
--- This is much simpler than the equivalent code in CoreSubst:
+-- This is much simpler than the equivalent code in GHC.Core.Subst:
 --  * We do not substitute type variables, and
 --  * There is nothing relevant in IdInfo at this stage
 --    that needs substitutions.

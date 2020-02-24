@@ -31,7 +31,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
-import CoreSyn
+import GHC.Core
 import FastString      ( nilFS, mkFastString )
 import Module
 import Outputable
