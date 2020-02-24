@@ -475,7 +475,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf uv
+exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsConLikeOut {})    = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld _ f)    = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel _ _ l)  = OverLabelOrigin l
