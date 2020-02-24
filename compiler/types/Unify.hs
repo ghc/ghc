@@ -1029,7 +1029,7 @@ unify_ty env ty1 (AppTy ty2a ty2b) _kco
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
 unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
-  = do { unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
+  = do { unify_ty env (varType tv1) (varType tv2) reflLiftedTypeKind
        ; let env' = umRnBndr2 env tv1 tv2
        ; unify_ty env' ty1 ty2 kco }
 
@@ -1064,7 +1064,7 @@ unify_ty_app env ty1 ty1args ty2 ty2args
   = do { let ki1 = typeKind ty1
              ki2 = typeKind ty2
            -- See Note [Kind coercions in Unify]
-       ; unify_ty  env ki1 ki2 (mkNomReflCo liftedTypeKind)
+       ; unify_ty  env ki1 ki2 reflLiftedTypeKind
        ; unify_ty  env ty1 ty2 (mkNomReflCo ki2)
                  -- Very important: 'ki2' not 'ki1'
                  -- See Note [Matching in the presence of casts (2)]
@@ -1391,7 +1391,7 @@ liftCoMatch tmpls ty co
 
     ki       = typeKind ty
     ki_co    = promoteCoercion co
-    ki_ki_co = mkNomReflCo liftedTypeKind
+    ki_ki_co = reflLiftedTypeKind
 
     Pair co_lkind co_rkind = coercionKind ki_co
 
@@ -1488,7 +1488,7 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
              menv'   = menv { me_env = rn_env1 }
        ; ty_co_match menv' subst1 ty1 co2 lkco rkco }
   where
-    ki_ki_co = mkNomReflCo liftedTypeKind
+    ki_ki_co = reflLiftedTypeKind
 
 -- ty_co_match menv subst (ForAllTy (Bndr cv1 _) ty1)
 --                        (ForAllCo cv2 kind_co2 co2)
@@ -1563,7 +1563,7 @@ ty_co_match_app menv subst ty1 ty1args co2 co2args
   where
     ki1 = typeKind ty1
     ki2 = promoteCoercion co2
-    ki_ki_co = mkNomReflCo liftedTypeKind
+    ki_ki_co = reflLiftedTypeKind
 
 ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type]
                  -> [Coercion] -> [Coercion] -> [Coercion]

@@ -1409,11 +1409,17 @@ uType t_or_k origin orig_ty1 orig_ty2
               [ text "tclvl" <+> ppr tclvl
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
               , pprCtOrigin origin]
-       ; co <- go orig_ty1 orig_ty2
-       ; if isReflCo co
-            then traceTc "u_tys yields no coercion" Outputable.empty
-            else traceTc "u_tys yields coercion:" (ppr co)
-       ; return co }
+       ; if isLiftedTypeKind orig_ty1 && isLiftedTypeKind orig_ty2
+           then
+             do { traceTc "u_tys shortcut on *" Outputable.empty
+                ; return reflLiftedTypeKind }
+           else
+             do { co <- go orig_ty1 orig_ty2
+                ; if isReflCo co
+                     then traceTc "u_tys yields no coercion" Outputable.empty
+                     else traceTc "u_tys yields coercion:" (ppr co)
+                ; return co }
+       }
   where
     go :: TcType -> TcType -> TcM CoercionN
         -- The arguments to 'go' are always semantically identical

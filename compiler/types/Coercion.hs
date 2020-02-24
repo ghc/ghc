@@ -23,6 +23,9 @@ module Coercion (
         coercionKind, coercionLKind, coercionRKind,coercionKinds,
         coercionRole, coercionKindRole,
 
+        -- ** Constant coercions
+        reflLiftedTypeKind,
+
         -- ** Constructing coercions
         mkGReflCo, mkReflCo, mkRepReflCo, mkNomReflCo,
         mkCoVarCo, mkCoVarCos,
@@ -670,6 +673,10 @@ mkRepReflCo ty = GRefl Representational ty MRefl
 -- | Make a nominal reflexive coercion
 mkNomReflCo :: Type -> Coercion
 mkNomReflCo = Refl
+
+-- | The reflexive coercion from * to *.
+reflLiftedTypeKind :: Coercion
+reflLiftedTypeKind = Refl liftedTypeKind
 
 -- | Apply a type constructor to a list of coercions. It is the
 -- caller's responsibility to get the roles correct on argument coercions.
@@ -1366,12 +1373,12 @@ promoteCoercion co = case co of
 
     ForAllCo _ _ _
       -> ASSERT( False )
-         mkNomReflCo liftedTypeKind
+         reflLiftedTypeKind
       -- See Note [Weird typing rule for ForAllTy] in Type
 
     FunCo _ _ _
       -> ASSERT( False )
-         mkNomReflCo liftedTypeKind
+         reflLiftedTypeKind
 
     CoVarCo {}     -> mkKindCo co
     HoleCo {}      -> mkKindCo co
@@ -1395,7 +1402,7 @@ promoteCoercion co = case co of
 
       | Just _ <- splitForAllCo_maybe co
       , n == 0
-      -> ASSERT( False ) mkNomReflCo liftedTypeKind
+      -> ASSERT( False ) reflLiftedTypeKind
 
       | otherwise
       -> mkKindCo co
@@ -1415,12 +1422,12 @@ promoteCoercion co = case co of
          promoteCoercion g
       | otherwise
       -> ASSERT( False)
-         mkNomReflCo liftedTypeKind
+         reflLiftedTypeKind
            -- See Note [Weird typing rule for ForAllTy] in Type
 
     KindCo _
       -> ASSERT( False )
-         mkNomReflCo liftedTypeKind
+         reflLiftedTypeKind
 
     SubCo g
       -> promoteCoercion g
