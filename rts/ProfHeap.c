@@ -153,11 +153,10 @@ static void dumpCensus( Census *census );
 
 static bool closureSatisfiesConstraints( const StgClosure* p );
 
-/* ----------------------------------------------------------------------------
- * Find the "closure identity", which is a unique pointer representing
- * the band to which this closure's heap space is attributed in the
- * heap profile.
- * ------------------------------------------------------------------------- */
+/**
+ * Find a unique pointer representing the band to which this closure's heap
+ * space is attributed in the heap profile.
+ */
 static const void *
 closureIdentity( const StgClosure *p )
 {
@@ -204,6 +203,21 @@ closureIdentity( const StgClosure *p )
     }
 }
 
+/**
+ * Retrive the counter for a given closure identity. If it doesn't exist in the
+ * census->hash table yet create a new one.
+ */
+static counter*
+closureCounter( Census *census, const void *identity )
+{
+    counter *ctr = lookupHashTable(census->hash, (StgWord)identity);
+    if(ctr)
+        return ctr;
+
+    return heapInsertNewCounter(census, identity);
+}
+
+
 /* --------------------------------------------------------------------------
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
@@ -243,7 +257,6 @@ doingRootProfiling( void )
 void
 LDV_recordDead( const StgClosure *c, uint32_t size )
 {
-    const void *id;
     uint32_t t;
     counter *ctr;
 
@@ -258,21 +271,14 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
                     censuses[era].void_total -= size;
                     ASSERT(censuses[t].void_total <= censuses[t].not_used);
                 } else {
-                    id = closureIdentity(c);
-                    ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
+                    const void* identity = closureIdentity(c);
+                    ctr = lookupHashTable(censuses[t].hash, (StgWord)identity);
                     if (ctr == NULL)
                         barf("LDV_recordDead: Failed to find counter for closure %p", c);
 
                     ctr->c.ldv.void_total += size;
-                    ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
-                    if (ctr == NULL) {
-                        ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
-                        initLDVCtr(ctr);
-                        insertHashTable(censuses[era].hash, (StgWord)id, ctr);
-                        ctr->identity = id;
-                        ctr->next = censuses[era].ctrs;
-                        censuses[era].ctrs = ctr;
-                    }
+
+                    ctr = closureCounter(&censuses[era], identity);
                     ctr->c.ldv.void_total -= size;
                 }
             }
@@ -283,20 +289,12 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
                     censuses[t+1].drag_total += size;
                     censuses[era].drag_total -= size;
                 } else {
-                    const void *id;
-                    id = closureIdentity(c);
-                    ctr = lookupHashTable(censuses[t+1].hash, (StgWord)id);
+                    const void *identity = closureIdentity(c);
+                    ctr = lookupHashTable(censuses[t+1].hash, (StgWord)identity);
                     ASSERT( ctr != NULL );
                     ctr->c.ldv.drag_total += size;
-                    ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
-                    if (ctr == NULL) {
-                        ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
-                        initLDVCtr(ctr);
-                        insertHashTable(censuses[era].hash, (StgWord)id, ctr);
-                        ctr->identity = id;
-                        ctr->next = censuses[era].ctrs;
-                        censuses[era].ctrs = ctr;
-                    }
+
+                    ctr = closureCounter(&censuses[era], identity);
                     ctr->c.ldv.drag_total -= size;
                 }
             }
@@ -875,6 +873,8 @@ dumpCensus( Census *census )
 #endif
 
     for (ctr = census->ctrs; ctr != NULL; ctr = ctr->next) {
+        if(ctr->identity == NULL)
+            continue;
 
 #if defined(PROFILING)
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
@@ -956,14 +956,15 @@ dumpCensus( Census *census )
     restore_locale();
 }
 
-inline counter*
-heapInsertNewCounter(Census *census, StgWord identity)
+counter*
+heapInsertNewCounter(Census *census, const void *identity)
 {
     counter *ctr = arenaAlloc(census->arena, sizeof(counter));
 
+    ctr->c.resid = 0;
     initLDVCtr(ctr);
-    insertHashTable( census->hash, identity, ctr );
-    ctr->identity = (void*)identity;
+    insertHashTable( census->hash, (StgWord)identity, ctr );
+    ctr->identity = identity;
     ctr->next = census->ctrs;
     census->ctrs = ctr;
 
@@ -977,11 +978,8 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
 #endif
                            )
 {
-    const void *identity;
     size_t real_size;
     counter *ctr;
-
-            identity = NULL;
 
 #if defined(PROFILING)
             // subtract the profiling overhead
@@ -1002,40 +1000,20 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
                 } else
 #endif
                 {
-                    identity = closureIdentity((StgClosure *)p);
+                    ctr = closureCounter(census, closureIdentity(p));
 
-                    if (identity != NULL) {
-                        ctr = lookupHashTable(census->hash, (StgWord)identity);
-                        if (ctr != NULL) {
 #if defined(PROFILING)
-                            if (RtsFlags.ProfFlags.bioSelector != NULL) {
-                                if (prim)
-                                    ctr->c.ldv.prim += real_size;
-                                else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
-                                    ctr->c.ldv.not_used += real_size;
-                                else
-                                    ctr->c.ldv.used += real_size;
-                            } else
+                    if (RtsFlags.ProfFlags.bioSelector != NULL) {
+                        if (prim)
+                            ctr->c.ldv.prim += real_size;
+                        else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
+                            ctr->c.ldv.not_used += real_size;
+                        else
+                            ctr->c.ldv.used += real_size;
+                    } else
 #endif
-                            {
-                                ctr->c.resid += real_size;
-                            }
-                        } else {
-                            ctr = heapInsertNewCounter(census, (StgWord)identity);
-#if defined(PROFILING)
-                            if (RtsFlags.ProfFlags.bioSelector != NULL) {
-                                if (prim)
-                                    ctr->c.ldv.prim = real_size;
-                                else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
-                                    ctr->c.ldv.not_used = real_size;
-                                else
-                                    ctr->c.ldv.used = real_size;
-                            } else
-#endif
-                            {
-                                ctr->c.resid = real_size;
-                            }
-                        }
+                    {
+                        ctr->c.resid += real_size;
                     }
                 }
             }
