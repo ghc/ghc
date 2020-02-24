@@ -34,6 +34,10 @@ instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
 
 type LHsExpr a = Located (HsExpr a)
 
+data UnboundVar
+  = OutOfScope OccName GlobalRdrEnv
+  | TrueExprHole OccName
+
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
 pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
