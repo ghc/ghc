@@ -2085,7 +2085,7 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 114
 
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
-unsafeReflDataConKey      = mkPreludeDataConUnique 114
+unsafeReflDataConKey = mkPreludeDataConUnique 115
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 200-250
