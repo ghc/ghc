@@ -12,6 +12,8 @@ module GHC.Hs.Expr where
 
 import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
+import {-# SOURCE #-} OccName (OccName)
+import {-# SOURCE #-} RdrName (GlobalRdrEnv)
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
@@ -33,6 +35,10 @@ instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
 instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
 
 type LHsExpr a = Located (HsExpr a)
+
+data UnboundVar
+  = OutOfScope OccName GlobalRdrEnv
+  | TrueExprHole OccName
 
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
