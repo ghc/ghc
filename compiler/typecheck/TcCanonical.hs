@@ -27,7 +27,7 @@ import Class
 import TyCon
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
 import Coercion
-import CoreSyn
+import GHC.Core
 import Id( idType, mkTemplateLocals )
 import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )

@@ -7,7 +7,7 @@ import GhcPrelude
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr    ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
-import CoreSyn         ( Tickish(..) )
+import GHC.Core        ( Tickish(..) )
 import GHC.Cmm.DebugBlock
 import GHC.Driver.Session
 import Module

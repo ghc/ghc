@@ -1088,7 +1088,7 @@ piResultTy_maybe ty arg
 -- there are more type args than foralls in 'undefined's type.
 
 -- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 
 -- This is a heavily used function (e.g. from typeKind),
 -- so we pay attention to efficiency, especially in the special case
@@ -2085,7 +2085,7 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 -- in its return type, since given
 --   join j @a @b x y z = e1 in e2,
 -- the types of e1 and e2 must be the same, and a and b are not in scope for e2.
--- (See Note [The polymorphism rule of join points] in CoreSyn.) Returns False
+-- (See Note [The polymorphism rule of join points] in GHC.Core.) Returns False
 -- also if the type simply doesn't have enough arguments.
 --
 -- Note that we need to know how many arguments (type *and* value) the putative
@@ -2113,7 +2113,7 @@ isValidJoinPointType arity ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In principle, if a function would be a join point except that it fails
 the polymorphism rule (see Note [The polymorphism rule of join points] in
-CoreSyn), it can still be made a join point with some effort. This is because
+GHC.Core), it can still be made a join point with some effort. This is because
 all tail calls must return the same type (they return to the same context!), and
 thus if the return type depends on an argument, that argument must always be the
 same.
@@ -2643,7 +2643,7 @@ occCheckExpand :: [Var] -> Type -> Maybe Type
 -- free of the variable, then the same type is returned.
 occCheckExpand vs_to_avoid ty
   | null vs_to_avoid  -- Efficient shortcut
-  = Just ty           -- Can happen, eg. CoreUtils.mkSingleAltCase
+  = Just ty           -- Can happen, eg. GHC.Core.Utils.mkSingleAltCase
 
   | otherwise
   = go (mkVarSet vs_to_avoid, emptyVarEnv) ty

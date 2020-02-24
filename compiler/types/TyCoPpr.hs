@@ -76,7 +76,7 @@ See Note [Precedence in types] in BasicTypes.
 --------------------------------------------------------
 -- When pretty-printing types, we convert to IfaceType,
 --   and pretty-print that.
--- See Note [Pretty printing via Iface syntax] in PprTyThing
+-- See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
 --------------------------------------------------------
 
 pprType, pprParendType, pprTidiedType :: Type -> SDoc

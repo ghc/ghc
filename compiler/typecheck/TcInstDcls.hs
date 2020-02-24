@@ -44,9 +44,9 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
-import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
-import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
+import GHC.Core.Unfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
 import Type
 import TcEvidence
 import TyCon
@@ -189,7 +189,7 @@ Instead we use a cunning trick.
  * We give 'df' a magical unfolding (DFunUnfolding [$cop1, $cop2, ..])
    that lists its methods.
 
- * We make CoreUnfold.exprIsConApp_maybe spot a DFunUnfolding and return
+ * We make GHC.Core.Unfold.exprIsConApp_maybe spot a DFunUnfolding and return
    a suitable constructor application -- inlining df "on the fly" as it
    were.
 

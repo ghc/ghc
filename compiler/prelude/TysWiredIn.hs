@@ -733,8 +733,8 @@ Note that there is *not* a unary constraint tuple, unlike for other forms of
 tuples. See [Ignore unary constraint tuples] in TcHsType for more
 details.
 
-See also Note [Flattening one-tuples] in MkCore and
-Note [Don't flatten tuples from HsSyn] in MkCore.
+See also Note [Flattening one-tuples] in GHC.Core.Make and
+Note [Don't flatten tuples from HsSyn] in GHC.Core.Make.
 
 -}
 
@@ -1604,7 +1604,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 -- | Make a tuple type. The list of types should /not/ include any
 -- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
 -- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
--- in MkCore
+-- in GHC.Core.Make
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))

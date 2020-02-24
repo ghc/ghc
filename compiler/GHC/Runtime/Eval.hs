@@ -60,7 +60,7 @@ import GHC.Driver.Types
 import InstEnv
 import GHC.Iface.Env   ( newInteractiveBinder )
 import FamInstEnv      ( FamInst )
-import CoreFVs         ( orphNamesOfFamInst )
+import GHC.Core.FVs    ( orphNamesOfFamInst )
 import TyCon
 import Type             hiding( typeKind )
 import GHC.Types.RepType

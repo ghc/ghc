@@ -19,7 +19,7 @@ import GHC.Driver.Types
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion
-import CoreLint
+import GHC.Core.Lint
 import TcEvidence
 import GHC.Iface.Load
 import TcRnMonad
