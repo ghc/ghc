@@ -132,7 +132,7 @@ restore_locale( void )
 unsigned int era;
 static uint32_t max_era;
 
-inline void
+static inline void
 initLDVCtr( counter *ctr )
 {
     ctr->c.ldv.prim = 0;
