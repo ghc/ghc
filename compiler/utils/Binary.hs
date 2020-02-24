@@ -27,6 +27,8 @@ module Binary
     {-type-}  BinHandle,
     SymbolTable, Dictionary,
 
+   BinData(..), dataHandle, handleData,
+
    openBinMem,
 --   closeBin,
 
@@ -75,6 +77,7 @@ import Fingerprint
 import BasicTypes
 import SrcLoc
 
+import Control.DeepSeq
 import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
@@ -128,6 +131,38 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
   withForeignPtr arr $ \ptr ->
     BS.unsafePackCStringLen (castPtr ptr, ix) >>= action
 
+
+data BinData = BinData Int BinArray
+
+instance NFData BinData where
+  rnf (BinData sz _) = rnf sz
+
+instance Binary BinData where
+  put_ bh (BinData sz dat) = do
+    put_ bh sz
+    putPrim bh sz $ \dest ->
+      withForeignPtr dat $ \orig ->
+        copyBytes dest orig sz
+  --
+  get bh = do
+    sz <- get bh
+    dat <- mallocForeignPtrBytes sz
+    getPrim bh sz $ \orig ->
+      withForeignPtr dat $ \dest ->
+        copyBytes dest orig sz
+    undefined
+
+dataHandle :: BinData -> IO BinHandle
+dataHandle (BinData size bin) = do
+  ixr <- newFastMutInt
+  szr <- newFastMutInt
+  writeFastMutInt ixr 0
+  writeFastMutInt szr size
+  binr <- newIORef bin
+  return (BinMem noUserData ixr szr binr)
+
+handleData :: BinHandle -> IO BinData
+handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
 
 ---------------------------------------------------------------
 -- Bin

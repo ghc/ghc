@@ -92,6 +92,7 @@ module GHC.Driver.Types (
         mi_semantic_module,
         mi_free_holes,
         renameFreeHoles,
+        ExtendedFields(..), emptyExtendedFields,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -217,6 +218,8 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.IORef
 import Data.Time
 import Exception
@@ -1073,10 +1076,30 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
 
-        mi_final_exts :: !(IfaceBackendExts phase)
+        mi_final_exts :: !(IfaceBackendExts phase),
                 -- ^ Either `()` or `ModIfaceBackend` for
                 -- a fully instantiated interface.
+
+        mi_ext_fields :: ExtendedFields
+                -- ^ Additional optional fields, where the Map key represents
+                -- the field name, resulting in a (size, serialized data) pair.
+                -- Because the data is intended to be serialized through the
+                -- internal `Binary` class (increasing compatibility with types
+                -- using `Name` and `FastString`, such as HIE), this format is
+                -- chosen over `ByteString`s.
      }
+
+newtype ExtendedFields = ExtendedFields { getExtendedFields :: (Map String BinData) }
+
+instance Binary ExtendedFields where
+  put_ bh (ExtendedFields fs) = put_ bh (Map.toList fs)
+  get bh = ExtendedFields . Map.fromList <$> get bh
+
+instance NFData ExtendedFields where
+  rnf (ExtendedFields fs) = rnf fs
+
+emptyExtendedFields :: ExtendedFields
+emptyExtendedFields = ExtendedFields Map.empty
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
@@ -1158,7 +1181,8 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash
-                 }}) = do
+                 },
+                 mi_ext_fields = ext_fields}) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1190,6 +1214,7 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        put_ bh ext_fields
 
    get bh = do
         mod         <- get bh
@@ -1223,6 +1248,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        ext_fields  <- get bh
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1261,7 +1287,8 @@ instance Binary ModIface where
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
-                 }})
+                 },
+                 mi_ext_fields = ext_fields})
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1290,7 +1317,8 @@ emptyPartialModIface mod
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
-               mi_final_exts        = () }
+               mi_final_exts        = (),
+               mi_ext_fields  = emptyExtendedFields }
 
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
@@ -3262,7 +3290,8 @@ phaseForeignLanguage phase = case phase of
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
+                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+    `seq` rnf f24

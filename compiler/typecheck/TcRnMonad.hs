@@ -239,6 +239,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 | dopt Opt_D_dump_rn_ast dflags = Just empty_val
 
                 | gopt Opt_WriteHie dflags       = Just empty_val
+                | gopt Opt_InterfaceField_hie dflags = Just empty_val
 
                   -- We want to serialize the documentation in the .hi-files,
                   -- and need to extract it from the renamed syntax first.

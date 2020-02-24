@@ -360,6 +360,7 @@ Library
         GHC.Iface.Load
         GHC.Iface.Utils
         GHC.IfaceToCore
+        GHC.Iface.Extended
         FlagChecker
         Annotations
         GHC.Driver.CmdLine

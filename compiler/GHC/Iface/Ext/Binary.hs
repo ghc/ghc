@@ -6,6 +6,7 @@ module GHC.Iface.Ext.Binary
    ( readHieFile
    , readHieFileWithVersion
    , HieHeader
+   , writeHieHandle
    , writeHieFile
    , HieName(..)
    , toHieName
@@ -115,7 +116,15 @@ putBinLine bh xs = do
 -- symbol tables for `Name`s and `FastString`s
 writeHieFile :: FilePath -> HieFile -> IO ()
 writeHieFile hie_file_path hiefile = do
-  bh0 <- openBinMem initBinMemSize
+  bh <- openBinMem initBinMemSize
+
+  writeHieHandle bh hiefile
+
+  createDirectoryIfMissing True (takeDirectory hie_file_path)
+  writeBinMem bh hie_file_path
+
+writeHieHandle :: BinHandle -> HieFile -> IO ()
+writeHieHandle bh0 hiefile = do
 
   -- Write the header: hieHeader followed by the
   -- hieVersion and the GHC version used to generate this file
@@ -171,10 +180,6 @@ writeHieFile hie_file_path hiefile = do
   dict_map  <- readIORef dict_map_ref
   putDictionary bh dict_next dict_map
 
-  -- and send the result to the file
-  createDirectoryIfMissing True (takeDirectory hie_file_path)
-  writeBinMem bh hie_file_path
-  return ()
 
 data HieFileResult
   = HieFileResult

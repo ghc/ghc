@@ -594,6 +594,13 @@ data GeneralFlag
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
 
+   -- Interface file extended fields
+   | Opt_InterfaceField_hie
+   | Opt_InterfaceField_parsed
+   | Opt_InterfaceField_rn
+   | Opt_InterfaceField_tc
+   | Opt_InterfaceField_ds
+
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries
@@ -4161,6 +4168,11 @@ dFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
+  flagSpec "field-ds"                   Opt_InterfaceField_ds,
+  flagSpec "field-hie"                  Opt_InterfaceField_hie,
+  flagSpec "field-parsed"               Opt_InterfaceField_parsed,
+  flagSpec "field-rn"                   Opt_InterfaceField_rn,
+  flagSpec "field-tc"                   Opt_InterfaceField_tc,
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
      (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),

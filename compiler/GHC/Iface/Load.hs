@@ -48,6 +48,7 @@ import GHC.Driver.Types
 import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
 
+import Binary   ( BinData(..) )
 import Constants
 import PrelNames
 import PrelInfo
@@ -82,6 +83,7 @@ import GHC.Driver.Plugins
 
 import Control.Monad
 import Control.Exception
+import Data.Map (toList)
 import Data.IORef
 import System.FilePath
 
@@ -1153,11 +1155,18 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
+        , text "extended fields:" $$ nest 2 (pprExtendedFields (mi_ext_fields iface))
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile = text "[hsig]"
     pp_hsc_src HsSrcFile = Outputable.empty
+
+pprExtendedFields :: ExtendedFields -> SDoc
+pprExtendedFields (ExtendedFields fs) = vcat . map pprField $ toList fs
+  where
+    pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
+
 
 {-
 When printing export lists, we print like this:
