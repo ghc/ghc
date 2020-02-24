@@ -1179,8 +1179,14 @@ mk_absent_let dflags fam_envs arg
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
     arg_ty       = idType arg
+
+    -- Normalise the type to have best chance of finding an absent literal
+    -- e.g. (#17852)   data unlifted N = MkN Int#
+    --                 f :: N -> a -> a
+    --                 f _ x = x
     (co, nty)    = topNormaliseType_maybe fam_envs arg_ty
                    `orElse` (mkRepReflCo arg_ty, arg_ty)
+
     abs_rhs      = mkAbsentErrorApp arg_ty msg
     msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
                           (ppr arg <+> ppr (idType arg))
