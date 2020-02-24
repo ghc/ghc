@@ -153,6 +153,10 @@ class TestConfig:
         self.threads = 1
         self.use_threads = False
 
+        # tests which should be considered to be broken during this testsuite
+        # run.
+        self.broken_tests = set() # type: Set[TestName]
+
         # Should we skip performance tests
         self.skip_perf_tests = False
 
@@ -399,6 +403,7 @@ class TestOptions:
 global default_testopts
 default_testopts = TestOptions()
 
-# (bug, directory, name) of tests marked broken
+# (bug, directory, name) of tests marked broken. Used by config.list_broken
+# feature.
 global brokens
 brokens = []  # type: List[Tuple[IssueNumber, str, str]]
