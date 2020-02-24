@@ -666,8 +666,6 @@ type instance XBinTick       (GhcPass _) = NoExtField
 
 type instance XPragE         (GhcPass _) = NoExtField
 
-type instance XWrap          (GhcPass _) = NoExtField
-
 type instance XXExpr         GhcPs       = NoExtCon
 type instance XXExpr         GhcRn       = NoExtCon
 type instance XXExpr         GhcTc       = HsWrap HsExpr
