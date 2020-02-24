@@ -56,6 +56,6 @@ typedef struct {
 } Census;
 
 void initLDVCtr(counter *ctr);
-counter* heapInsertNewCounter(Census *census, StgWord identity);
+counter* heapInsertNewCounter(Census *census, const void *identity);
 
 #include "EndPrivate.h"
