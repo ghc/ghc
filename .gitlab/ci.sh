@@ -405,6 +405,7 @@ function run_hadrian() {
   run hadrian/build.cabal.sh \
     --flavour="$FLAVOUR" \
     -j"$cores" \
+    --broken-test="$BROKEN_TESTS" \
     $HADRIAN_ARGS \
     $@
 }
