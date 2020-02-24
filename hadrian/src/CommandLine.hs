@@ -61,6 +61,7 @@ data TestArgs = TestArgs
     , testSummary    :: Maybe FilePath
     , testVerbosity  :: Maybe String
     , testWays       :: [String]
+    , brokenTests    :: [String]
     , testAccept     :: Bool}
     deriving (Eq, Show)
 
@@ -81,6 +82,7 @@ defaultTestArgs = TestArgs
     , testSummary    = Nothing
     , testVerbosity  = Nothing
     , testWays       = []
+    , brokenTests    = []
     , testAccept     = False }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
@@ -194,6 +196,14 @@ readTestWay way =
             let newWays = way : testWays (testArgs flags)
             in flags { testArgs = (testArgs flags) {testWays = newWays} }
 
+readBrokenTests :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readBrokenTests way =
+    case way of
+        Nothing -> Left "--broken-tests expects argument"
+        Just tests -> Right $ \flags ->
+            let newTests = words tests ++ brokenTests (testArgs flags)
+            in flags { testArgs = (testArgs flags) {brokenTests = newTests} }
+
 readCompleteStg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readCompleteStg ms = Right $ \flags -> flags { completeStg = ms }
 
@@ -263,6 +273,8 @@ optDescrs =
       "A verbosity value between 0 and 5. 0 is silent, 4 and higher activates extra output."
     , Option [] ["test-way"] (OptArg readTestWay "TEST_WAY")
       "only run these ways"
+    , Option [] ["broken-test"] (OptArg readBrokenTests "TEST_NAME")
+      "consider these tests to be broken"
     , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
