@@ -10,6 +10,8 @@
 
 #include "BeginPrivate.h"
 
+typedef struct _Census Census;
+
 void        heapCensus         (Time t);
 void        initHeapProfiling  (void);
 void        endHeapProfiling   (void);
