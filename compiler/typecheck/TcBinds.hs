@@ -20,7 +20,7 @@ import GhcPrelude
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
-import CoreSyn (Tickish (..))
+import GHC.Core (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import FastString

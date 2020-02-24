@@ -168,7 +168,7 @@ import Avail
 import Module
 import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
 import FamInstEnv
-import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
+import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
 import VarSet
@@ -1409,7 +1409,7 @@ data ModGuts
                                          -- ^ Family instances declared in this module
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
-                                         -- See Note [Overall plumbing for rules] in Rules.hs
+                                         -- See Note [Overall plumbing for rules] in GHC.Core.Rules
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
         mg_foreign_files :: ![(ForeignSrcLang, FilePath)],

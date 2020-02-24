@@ -1,9 +1,9 @@
 {-# LANGUAGE TupleSections #-}
-import CoreSyn
-import CoreUtils
+import GHC.Core
+import GHC.Core.Utils
 import Id
 import Type
-import MkCore
+import GHC.Core.Make
 import CallArity (callArityRHS)
 import MkId
 import SysTools
@@ -17,10 +17,10 @@ import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment( getArgs )
 import VarSet
-import PprCore
+import GHC.Core.Ppr
 import Unique
 import UniqSet
-import CoreLint
+import GHC.Core.Lint
 import FastString
 
 -- Build IDs. use mkTemplateLocal, more predictable than proper uniques

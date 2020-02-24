@@ -19,9 +19,9 @@ import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} GHC.HsToCore.Match ( matchSinglePatVar )
 
 import GHC.Hs
-import MkCore
-import CoreSyn
-import CoreUtils (bindNonRec)
+import GHC.Core.Make
+import GHC.Core
+import GHC.Core.Utils (bindNonRec)
 
 import BasicTypes (Origin(FromSource))
 import GHC.Driver.Session

@@ -52,7 +52,7 @@ import TcEnv
 import TcEvidence
 import InstEnv
 import TysWiredIn  ( heqDataCon, eqDataCon )
-import CoreSyn     ( isOrphan )
+import GHC.Core    ( isOrphan )
 import FunDeps
 import TcMType
 import Type
@@ -62,7 +62,7 @@ import TcType
 import GHC.Driver.Types
 import Class( Class )
 import MkId( mkDictFunId )
-import CoreSyn( Expr(..) )  -- For the Coercion constructor
+import GHC.Core( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
 import Var      ( EvVar, tyVarName, VarBndr(..) )

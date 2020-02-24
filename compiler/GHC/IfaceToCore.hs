@@ -42,11 +42,11 @@ import GHC.Driver.Types
 import Annotations
 import InstEnv
 import FamInstEnv
-import CoreSyn
-import CoreUtils
-import CoreUnfold
-import CoreLint
-import MkCore
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.Unfold
+import GHC.Core.Lint
+import GHC.Core.Make
 import Id
 import MkId
 import IdInfo
@@ -1546,7 +1546,7 @@ an unfolding that isn't going to be looked at.
 -}
 
 tcPragExpr :: Bool  -- Is this unfolding compulsory?
-                    -- See Note [Checking for levity polymorphism] in CoreLint
+                    -- See Note [Checking for levity polymorphism] in GHC.Core.Lint
            -> TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
 tcPragExpr is_compulsory toplvl name expr
   = forkM_maybe doc $ do
