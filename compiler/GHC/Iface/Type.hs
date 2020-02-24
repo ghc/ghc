@@ -395,15 +395,21 @@ isIfaceLiftedTypeKind _ = False
 --
 -- * K is TYPE
 -- * A is a singleton IfaceAppArgs of the form ('BoxedRep 'LiftedRep)
+--
+-- For the second condition, we must also check for the type
+-- synonym LiftedRep.
 isIfaceTyConAppLiftedTypeKind :: IfaceTyCon -> IfaceAppArgs -> Bool
 isIfaceTyConAppLiftedTypeKind tc1 args1
-  | IA_Arg soleArg1 Required IA_Nil <- args1
-  , IfaceTyConApp rep args2 <- soleArg1
-  , IA_Arg soleArg2 Required IA_Nil <- args2
-  , IfaceTyConApp lev IA_Nil <- soleArg2
-  =  tc1 `ifaceTyConHasKey` tYPETyConKey
-  && rep `ifaceTyConHasKey` boxedRepDataConKey
-  && lev `ifaceTyConHasKey` liftedDataConKey
+  | tc1 `ifaceTyConHasKey` tYPETyConKey
+  , IA_Arg soleArg1 Required IA_Nil <- args1
+  , IfaceTyConApp rep args2 <- soleArg1 =
+    if | rep `ifaceTyConHasKey` boxedRepDataConKey
+       , IA_Arg soleArg2 Required IA_Nil <- args2
+       , IfaceTyConApp lev IA_Nil <- soleArg2
+       , lev `ifaceTyConHasKey` liftedDataConKey -> True
+       | rep `ifaceTyConHasKey` liftedRepTyConKey
+       , IA_Nil <- args2 -> True
+       | otherwise -> False
   | otherwise = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
