@@ -437,10 +437,6 @@ data CtOrigin
   | ListOrigin          -- An overloaded list
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
-  | FailablePattern (LPat GhcTcId) -- A failable pattern in do-notation for the
-                                   -- MonadFail Proposal (MFP). Obsolete when
-                                   -- actual desugaring to MonadFail.fail is
-                                   -- live.
   | Shouldn'tHappenOrigin String
                             -- the user should never see this one,
                             -- unless ImpredicativeTypes is on, where all
@@ -601,10 +597,6 @@ pprCtOrigin (MCompPatOrigin pat)
     = ctoHerald <+> hsep [ text "the failable pattern"
            , quotes (ppr pat)
            , text "in a statement in a monad comprehension" ]
-pprCtOrigin (FailablePattern pat)
-    = ctoHerald <+> text "the failable pattern" <+> quotes (ppr pat)
-      $$
-      text "(this will become an error in a future GHC release)"
 
 pprCtOrigin (Shouldn'tHappenOrigin note)
   = sdocOption sdocImpredicativeTypes $ \case

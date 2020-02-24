@@ -522,7 +522,6 @@ type family XStatic         x
 type family XTick           x
 type family XBinTick        x
 type family XPragE          x
-type family XWrap           x
 type family XXExpr          x
 
 type family XSCC            x
