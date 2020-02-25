@@ -138,6 +138,8 @@ runTestBuilderArgs = builder RunTest ? do
             , arg $ "--threads=" ++ show threads
             , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
+            , emitWhenSet junitArg $ \file -> arg ("--junit=" ++ file)
+            , arg $ "--summary-file=" ++ fromMaybe "testsuite_summary.txt" (testSummary args)
             , getTestArgs -- User-provided arguments from command line.
             ]
 
@@ -164,15 +166,6 @@ getTestArgs = do
                            else Nothing
         brokenTestArgs = concat [ ["--broken-test", t] | t <- brokenTests args ]
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
-        summaryArg   = case testSummary args of
-                           Just filepath -> Just $ "--summary-file " ++ show filepath
-                           Nothing -> Just $ "--summary-file=testsuite_summary.txt"
-        junitArg     = case testJUnit args of
-                           Just filepath -> Just $ "--junit=" ++ filepath
-                           Nothing -> Nothing
-        metricsArg   = case testMetricsFile args of
-                           Just filepath -> Just $ "--metrics-file=" ++ filepath
-                           Nothing -> Nothing
         configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
         verbosityArg = case testVerbosity args of
                            Nothing -> Just $ "--verbose=" ++ show (fromEnum globalVerbosity)
@@ -189,8 +182,7 @@ getTestArgs = do
           show (testCompiler args `elem` ["stage1", "stage2", "stage3"]) ]
 
     pure $  configFileArg ++ testOnlyArg ++ speedArg
-         ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, metricsArg, verbosityArg  ]
+         ++ catMaybes [ onlyPerfArg, skipPerfArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
          ++ brokenTestArgs
