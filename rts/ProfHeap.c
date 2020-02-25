@@ -25,6 +25,7 @@
 
 #include <fs_rts.h>
 #include <string.h>
+#include <locale.h>
 
 #if !defined(mingw32_HOST_OS)
 #if defined(darwin_HOST_OS)
@@ -36,6 +37,7 @@
 
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
+static locale_t prof_locale = 0, saved_locale = 0;
 
 #if !defined(mingw32_HOST_OS)
 static locale_t prof_locale = 0, saved_locale = 0;
