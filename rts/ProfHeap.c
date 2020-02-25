@@ -27,6 +27,12 @@
 #include <string.h>
 #include <locale.h>
 
+#if defined(darwin_HOST_OS)
+#include <xlocale.h>
+#else
+#include <locale.h>
+#endif
+
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
 static locale_t prof_locale = 0, saved_locale = 0;
