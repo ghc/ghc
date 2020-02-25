@@ -27,21 +27,45 @@
 #include <string.h>
 #include <locale.h>
 
-#if !defined(mingw32_HOST_OS)
 #if defined(darwin_HOST_OS)
 #include <xlocale.h>
 #else
 #include <locale.h>
 #endif
-#endif
 
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
+static locale_t prof_locale = 0, saved_locale = 0;
 
-#if !defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+static int prof_locale_per_thread = -1;
+static const char *saved_locale = NULL;
+#else
 static locale_t prof_locale = 0, saved_locale = 0;
 #endif
 
+STATIC_INLINE void
+set_prof_locale( void )
+{
+#if defined(mingw32_HOST_OS)
+    prof_locale_per_thread = _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
+    saved_locale = setlocale(LC_NUMERIC, NULL);
+    setlocale(LC_NUMERIC, "C");
+#else
+    saved_locale = uselocale(prof_locale);
+#endif
+}
+
+STATIC_INLINE void
+restore_locale( void )
+{
+#if defined(mingw32_HOST_OS)
+    _configthreadlocale(prof_locale_per_thread);
+    setlocale(LC_NUMERIC, saved_locale);
+#else
+    uselocale(saved_locale);
+#endif
+}
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
  * number of censuses that have been performed.
@@ -383,8 +407,8 @@ initHeapProfiling(void)
             /* non-fatal: risk using an unknown locale, but won't crash */
         }
     }
-    saved_locale = uselocale(prof_locale);
 #endif
+    set_prof_locale();
 
     char *prog;
 
@@ -483,9 +507,7 @@ initHeapProfiling(void)
     }
 #endif
 
-#if !defined(mingw32_HOST_OS)
-    uselocale(saved_locale);
-#endif
+    restore_locale();
 
     traceHeapProfBegin(0);
 }
@@ -499,9 +521,7 @@ endHeapProfiling(void)
         return;
     }
 
-#if !defined(mingw32_HOST_OS)
-    saved_locale = uselocale(prof_locale);
-#endif
+    set_prof_locale();
 
 #if defined(PROFILING)
     if (doingRetainerProfiling()) {
@@ -544,9 +564,7 @@ endHeapProfiling(void)
     printSample(false, seconds);
     fclose(hp_file);
 
-#if !defined(mingw32_HOST_OS)
-    uselocale(saved_locale);
-#endif
+    restore_locale();
 }
 
 
@@ -801,9 +819,7 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
-#if !defined(mingw32_HOST_OS)
-    saved_locale = uselocale(prof_locale);
-#endif
+    set_prof_locale();
 
     printSample(true, census->time);
 
@@ -934,9 +950,7 @@ dumpCensus( Census *census )
     traceHeapProfSampleEnd(era);
     printSample(false, census->time);
 
-#if !defined(mingw32_HOST_OS)
-    uselocale(saved_locale);
-#endif
+    restore_locale();
 }
 
 
