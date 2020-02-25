@@ -1404,7 +1404,11 @@ uType_defer t_or_k origin ty1 ty2
 
 --------------
 uType t_or_k origin orig_ty1 orig_ty2
-  = do { tclvl <- getTcLevel
+  | fastEqType orig_ty1 orig_ty2 =
+    -- See [Unification and fastEqType]
+    pure (mkNomReflCo orig_ty1)
+  | otherwise =
+    do { tclvl <- getTcLevel
        ; traceTc "u_tys" $ vcat
               [ text "tclvl" <+> ppr tclvl
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
@@ -1534,7 +1538,29 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; co_t <- uType t_or_k arg_origin t1 t2
            ; return $ mkAppCo co_s co_t }
 
-{- Note [Check for equality before deferring]
+{-
+Note [Unification and fastEqType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The unifier is often presented with trivial equalities like * ~ *. In such
+situations, the normal unification process (the worker named go) correctly
+returns a nominal ReflCo, but it must perform allocations to do so. To avoid
+allocating in these simple cases, we start with fastEqType, which tells us
+without performing any allocations if two types are trivially equal.
+If it returns True, we return a ReflCo. If it returns False, it is possible
+that the two types were actually equal, so we must call go.
+
+The tests most noticeably impacted by this optimization are:
+
+* T5631: allocations decreased 5.6%
+* T14683: allocations decreased 4.1%
+* T9020: allocations decreased 3.6%
+
+This optimization was introduced in preparation for the BoxedRep proposal,
+that is, breaking up (TYPE 'LiftedRep) into (TYPE ('BoxedRep 'Lifted)).
+It somewhat mitigates the performance degradations were observed in the
+initial implementation of that proposal.
+
+Note [Check for equality before deferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Particularly in ambiguity checks we can get equalities like (ty ~ ty).
 If ty involves a type function we may defer, which isn't very sensible.
