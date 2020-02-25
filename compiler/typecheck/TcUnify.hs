@@ -1404,7 +1404,11 @@ uType_defer t_or_k origin ty1 ty2
 
 --------------
 uType t_or_k origin orig_ty1 orig_ty2
-  = do { tclvl <- getTcLevel
+  =
+  if fastEqType orig_ty1 orig_ty2
+    then pure (mkNomReflCo orig_ty1)
+    else
+    do { tclvl <- getTcLevel
        ; traceTc "u_tys" $ vcat
               [ text "tclvl" <+> ppr tclvl
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
