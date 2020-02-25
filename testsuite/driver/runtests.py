@@ -98,7 +98,7 @@ if args.rootdir:
     config.rootdirs = args.rootdir
 
 config.metrics_file = args.metrics_file
-hasMetricsFile = bool(config.metrics_file)
+hasMetricsFile = config.metrics_file is not None
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
 
