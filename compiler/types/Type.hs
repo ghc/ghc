@@ -161,6 +161,7 @@ module Type (
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
         nonDetCmpTypesX, nonDetCmpTc,
         eqVarBndrs,
+        fastEqType,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -2173,6 +2174,23 @@ to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
 -}
+
+-- | If this returns True, the type are definitely equal. If this returns
+-- False, the types may or may not be equal. Notably, this does not expand
+-- type synonyms, so it returns False if given [Char] and String.
+-- See also Note [Unification and fastEqType] in TcUnify.
+fastEqType :: Type -> Type -> Bool
+fastEqType = go
+  where
+  go (AppTy f1 a1) (AppTy f2 a2) = go f1 f2 && go a1 a2
+  go (TyConApp f1 xs1) (TyConApp f2 xs2) = f1 == f2 && zipGo xs1 xs2
+  go (LitTy a1) (LitTy a2) = a1 == a2
+  go (TyVarTy a1) (TyVarTy a2) = a1 == a2
+  go (FunTy a1 b1 c1) (FunTy a2 b2 c2) = a1 == a2 && go b1 b2 && go c1 c2
+  go _ _ = False
+  zipGo (a : as) (b : bs) = go a b && zipGo as bs
+  zipGo [] [] = True
+  zipGo _ _ = False
 
 eqType :: Type -> Type -> Bool
 -- ^ Type equality on source types. Does not look through @newtypes@ or
