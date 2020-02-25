@@ -191,10 +191,6 @@ Compiler
   support for 64-bit ``MOV``\s. In particular, ``setByteArray#`` and
   ``copyByteArray#`` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
-- GHC's runtime linker no longer uses global state. This allows programs
-  that use the GHC API to safely use multiple GHC sessions in a single
-  process, as long as there are no native dependencies that rely on
-  global state.
 
 - When loading modules that use :extension:`UnboxedTuples` or
   :extension:`UnboxedSums` into GHCi, it will now automatically enable
@@ -246,6 +242,22 @@ Compiler
   `Stack initiative to get rid of persistent build errors due to non-atomic
   file writes across the Haskell tooling ecosystem
   <https://github.com/commercialhaskell/stack/issues/4559>`__.
+
+GHC API
+~~~~~~~
+
+- GHC's runtime linker no longer uses global state. This allows programs
+  that use the GHC API to safely use multiple GHC sessions in a single
+  process, as long as there are no native dependencies that rely on
+  global state.
+
+- In the process of making GHC's codebase more modular, many modules have been
+  renamed to better reflect the different phases of the compiler. See
+  :ghc-ticket:`13009`. Programs that rely on the previous GHC API may use the
+  `ghc-api-compat <https://hackage.haskell.org/package/ghc-api-compat>`_ package
+  to make the transition to the new interface easier. The renaming process is
+  still going on so you must expect other similar changes in the next major
+  release.
 
 GHCi
 ~~~~
