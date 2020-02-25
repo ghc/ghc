@@ -30,3 +30,15 @@ T15897:
 	"$(TEST_HC)" -prof -fprof-auto -debug -v0 T15897.hs
 	./T15897 10000000 +RTS -s -hc 2>/dev/null
 	./T15897 10000000 +RTS -s -hr 2>/dev/null
+
+.PHONY: T17877-locale
+T17877-locale:
+	"$(HSC2HS)" "$@.hsc"
+	"$(TEST_HC)" $(TEST_HC_OPTS) -rtsopts "$@.hs"
+	"./$@" +RTS -h
+	sed -ne '/BEGIN_SAMPLE/,/END_SAMPLE/ p' "$@.hp" | grep -qv _SAMPLE
+	"$(HP2PS_ABS)" "$@.hp"
+	# In some locales (e.g. mine is fr_FR), printf format sample times as:
+	#   BEGIN_SAMPLE 0,022049
+	# which is unreadable to hp2ps:
+	# hp2ps: prof-locale.hp, line 7, floating point number must follow BEGIN_SAMPLE
