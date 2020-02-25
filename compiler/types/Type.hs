@@ -2978,7 +2978,7 @@ the pattern synonyms 'Specified' or 'Inferred', as this results in a
 non-exhaustive pattern match warning.
 Instead, pattern match against 'Invisible spec' and do another case analysis on
 this specificity argument.
-GJ : TODO Link a bug report for this.
+This is discussed in GHC issue #17876.
 
 Note [When does a tycon application need an explicit kind signature?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
