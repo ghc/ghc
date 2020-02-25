@@ -146,16 +146,7 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------ integerGmp ------------------------------
-        , package integerGmp ? mconcat
-          [ builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            -- Windows is always built with inplace GMP until we have dynamic
-            -- linking working.
-            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
-            ]
-          ]
+        , gmpPackageArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -177,6 +168,32 @@ packageArgs = do
         , package text ?
           builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
           pure ["+integer-simple", "-bytestring-builder"] ]
+
+gmpPackageArgs :: Args
+gmpPackageArgs = do
+    -- These are only used for non-in-tree builds.
+    librariesGmp <- getSetting GmpLibDir
+    includesGmp <- getSetting GmpIncludeDir
+
+    -- Windows is always built with inplace GMP until we have dynamic
+    -- linking working.
+    inTreeFlag <- getFlag GmpInTree
+    let inTree = inTreeFlag || windowsHost
+
+    package integerGmp ? mconcat
+          [ builder (Cabal Setup) ? mconcat
+            [ inTree ? arg "--configure-option=--with-intree-gmp"
+            , flag GmpFrameworkPref ?
+              arg "--configure-option=--with-gmp-framework-preferred"
+
+              -- Ensure that the integer-gmp package registration includes
+              -- knowledge of the system gmp's library and include directories.
+            , notM (flag GmpInTree) ? mconcat
+              [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
+              , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
+              ]
+            ]
+          ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
@@ -205,6 +222,8 @@ rtsPackageArgs = package rts ? do
     ffiLibraryDir  <- getSetting FfiLibDir
     libdwIncludeDir   <- getSetting LibdwIncludeDir
     libdwLibraryDir   <- getSetting LibdwLibDir
+    libnumaIncludeDir <- getSetting LibnumaIncludeDir
+    libnumaLibraryDir <- getSetting LibnumaLibDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -212,6 +231,8 @@ rtsPackageArgs = package rts ? do
           , arg $ "-I" ++ path
           , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
           , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
+          , flag WithLibnuma ? if not (null libnumaIncludeDir) then arg ("-I" ++ libnumaIncludeDir) else mempty
+          , flag WithLibnuma ? if not (null libnumaLibraryDir) then arg ("-L" ++ libnumaLibraryDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
@@ -321,6 +342,9 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Dynamic) rtsWays ? arg "dynamic"
           , Debug `wayUnit` way           ? arg "find-ptr"
           ]
+        , builder (Cabal Setup) ?
+               if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
+            <> if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? ghcArgs

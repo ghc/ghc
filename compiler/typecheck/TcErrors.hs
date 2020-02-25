@@ -810,31 +810,20 @@ cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
             -> [Ct] -> TcM ()
 reportGroup mk_err ctxt cts =
-  case partition isMonadFailInstanceMissing cts of
-        -- Only warn about missing MonadFail constraint when
-        -- there are no other missing constraints!
-        (monadFailCts, []) ->
-            do { err <- mk_err ctxt monadFailCts
-               ; reportWarning (Reason Opt_WarnMissingMonadFailInstances) err }
-
-        (_, cts') -> do { err <- mk_err ctxt cts'
-                        ; traceTc "About to maybeReportErr" $
-                          vcat [ text "Constraint:"             <+> ppr cts'
-                               , text "cec_suppress ="          <+> ppr (cec_suppress ctxt)
-                               , text "cec_defer_type_errors =" <+> ppr (cec_defer_type_errors ctxt) ]
-                        ; maybeReportError ctxt err
-                            -- But see Note [Always warn with -fdefer-type-errors]
-                        ; traceTc "reportGroup" (ppr cts')
-                        ; mapM_ (addDeferredBinding ctxt err) cts' }
-                            -- Add deferred bindings for all
-                            -- Redundant if we are going to abort compilation,
-                            -- but that's hard to know for sure, and if we don't
-                            -- abort, we need bindings for all (e.g. #12156)
-  where
-    isMonadFailInstanceMissing ct =
-        case ctLocOrigin (ctLoc ct) of
-            FailablePattern _pat -> True
-            _otherwise           -> False
+  ASSERT( not (null cts))
+  do { err <- mk_err ctxt cts
+     ; traceTc "About to maybeReportErr" $
+       vcat [ text "Constraint:"             <+> ppr cts
+            , text "cec_suppress ="          <+> ppr (cec_suppress ctxt)
+            , text "cec_defer_type_errors =" <+> ppr (cec_defer_type_errors ctxt) ]
+     ; maybeReportError ctxt err
+         -- But see Note [Always warn with -fdefer-type-errors]
+     ; traceTc "reportGroup" (ppr cts)
+     ; mapM_ (addDeferredBinding ctxt err) cts }
+         -- Add deferred bindings for all
+         -- Redundant if we are going to abort compilation,
+         -- but that's hard to know for sure, and if we don't
+         -- abort, we need bindings for all (e.g. #12156)
 
 maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 -- Unlike maybeReportError, these "hole" errors are
