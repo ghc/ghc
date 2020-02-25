@@ -29,7 +29,7 @@ import qualified Data.Set as Set
 
 import Class
 import GHC.Driver.Session
-import CoreSyn (isOrphan)
+import GHC.Core (isOrphan)
 import ErrUtils
 import FamInstEnv
 import GHC
