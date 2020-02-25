@@ -2185,6 +2185,10 @@ then continue. Easy to do, but also easy to forget to do.
 
 -}
 
+-- | If this returns True, the type are definitely equal. If this returns
+-- False, the types may or may not be equal. Notably, this does not expand
+-- type synonyms, so it returns False if given [Char] and String.
+-- See also Note [Unification and fastEqType] in TcUnify.
 fastEqType :: Type -> Type -> Bool
 fastEqType = go
   where
