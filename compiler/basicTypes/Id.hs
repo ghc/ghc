@@ -92,7 +92,7 @@ module Id (
         idCallArity, idFunRepArity,
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
-        idCafInfo,
+        idCafInfo, idLFInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
         isNeverLevPolyId,
@@ -105,6 +105,7 @@ module Id (
         setIdSpecialisation,
         setIdCafInfo,
         setIdOccInfo, zapIdOccInfo,
+        setIdLFInfo,
 
         setIdDemandInfo,
         setIdStrictness,
@@ -730,6 +731,19 @@ idCafInfo id = cafInfo (idInfo id)
 
 setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
+
+        ---------------------------------
+        -- Lambda form info
+idLFInfo :: HasCallStack => Id -> LambdaFormInfo
+idLFInfo id = case lfInfo (idInfo id) of
+                Nothing -> pprPanic "idLFInfo" (text "LFInfo not available for Id" <+> ppr id)
+                Just lf_info -> lf_info
+
+idLFInfo_maybe :: Id -> Maybe LambdaFormInfo
+idLFInfo_maybe = lfInfo . idInfo
+
+setIdLFInfo :: Id -> LambdaFormInfo -> Id
+setIdLFInfo id lf = modifyIdInfo (`setLFInfo` lf) id
 
         ---------------------------------
         -- Occurrence INFO
