@@ -75,6 +75,10 @@ module GHC.Types.Id.Info (
         ppCafInfo, mayHaveCafRefs,
         cafInfo, setCafInfo,
 
+        -- ** The LambdaFormInfo type
+        LambdaFormInfo(..),
+        lfInfo, setLFInfo,
+
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
 
@@ -108,6 +112,8 @@ import GHC.Utils.Misc
 
 import Data.Word
 import Data.Bits
+
+import GHC.StgToCmm.Types (LambdaFormInfo (..))
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -263,13 +269,14 @@ data IdInfo
         -- freshly allocated constructor.
         demandInfo      :: Demand,
         -- ^ ID demand information
-        bitfield        :: {-# UNPACK #-} !BitField
+        bitfield        :: {-# UNPACK #-} !BitField,
         -- ^ Bitfield packs CafInfo, OneShotInfo, arity info, LevityInfo, and
         -- call arity info in one 64-bit word. Packing these fields reduces size
         -- of `IdInfo` from 12 words to 7 words and reduces residency by almost
         -- 4% in some programs. See #17497 and associated MR.
         --
         -- See documentation of the getters for what these packed fields mean.
+        lfInfo          :: !(Maybe LambdaFormInfo)
     }
 
 -- | Encodes arities, OneShotInfo, CafInfo and LevityInfo.
@@ -390,6 +397,9 @@ setCafInfo :: IdInfo -> CafInfo -> IdInfo
 setCafInfo info caf =
     info { bitfield = bitfieldSetCafInfo caf (bitfield info) }
 
+setLFInfo :: IdInfo -> LambdaFormInfo -> IdInfo
+setLFInfo info lf = info { lfInfo = Just lf }
+
 setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo
 setOneShotInfo info lb =
     info { bitfield = bitfieldSetOneShotInfo lb (bitfield info) }
@@ -419,7 +429,8 @@ vanillaIdInfo
                                   bitfieldSetCallArityInfo unknownArity $
                                   bitfieldSetOneShotInfo NoOneShotInfo $
                                   bitfieldSetLevityInfo NoLevityInfo $
-                                  emptyBitField
+                                  emptyBitField,
+            lfInfo              = Nothing
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
