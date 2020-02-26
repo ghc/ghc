@@ -38,6 +38,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.StgToCmm.Types (CgInfos (..))
 import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -98,15 +99,19 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
--- | Fully instantiate a interface
--- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NonCaffySet -> IO ModIface
-mkFullIface hsc_env partial_iface mb_non_cafs = do
+-- | Fully instantiate an interface. Adds fingerprints and potentially code
+-- generator produced information.
+--
+-- CgInfos is not available when not generating code (-fno-code), or when not
+-- generating interface pragmas (-fomit-interface-pragmas). See also
+-- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
+mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+          = updateDecl (mi_decls partial_iface) mb_cg_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
@@ -117,15 +122,23 @@ mkFullIface hsc_env partial_iface mb_non_cafs = do
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe NonCaffySet -> [IfaceDecl]
-updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just (NonCaffySet non_cafs)) = map update_decl decls
+updateDecl :: [IfaceDecl] -> Maybe CgInfos -> [IfaceDecl]
+updateDecl decls Nothing = decls
+updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos }) = map update_decl decls
   where
+    update_decl (IfaceId nm ty details infos)
+      | let not_caffy = elemNameSet nm non_cafs
+      , let mb_lf_info = lookupNameEnv lf_infos nm
+      , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
+        -- Only allocate a new IfaceId if we're going to update the infos
+      , isJust mb_lf_info || not_caffy
+      = IfaceId nm ty details $
+          (if not_caffy then (HsNoCafRefs :) else id)
+          (case mb_lf_info of
+             Nothing -> infos -- LFInfos not available when building .cmm files
+             Just lf_info -> HsLFInfo (toIfaceLFInfo nm lf_info) : infos)
+
     update_decl decl
-      | IfaceId nm ty details infos <- decl
-      , elemNameSet nm non_cafs
-      = IfaceId nm ty details (HsNoCafRefs : infos)
-      | otherwise
       = decl
 
 -- | Make an interface from the results of typechecking only.  Useful

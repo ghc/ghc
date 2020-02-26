@@ -71,7 +71,7 @@ import GHC.Settings
 import GHC.Data.Bag             ( unitBag )
 import GHC.Data.FastString      ( mkFastString )
 import GHC.Iface.Make           ( mkFullIface )
-import GHC.Iface.UpdateCafInfos ( updateModDetailsCafInfos )
+import GHC.Iface.UpdateIdInfos  ( updateModDetailsIdInfos )
 
 import GHC.Utils.Exception as Exception
 import System.Directory
@@ -1180,12 +1180,12 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files, caf_infos) <- liftIO $
+                    (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just caf_infos))
-                    let final_mod_details = {-# SCC updateModDetailsCafInfos #-}
-                                            updateModDetailsCafInfos iface_dflags caf_infos mod_details
+                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just cg_infos))
+                    let final_mod_details = {-# SCC updateModDetailsIdInfos #-}
+                                            updateModDetailsIdInfos iface_dflags cg_infos mod_details
                     setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
