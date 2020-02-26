@@ -42,12 +42,12 @@ import VarEnv
 import UniqDFM
 import Var           (EvVar)
 import Name
-import CoreSyn
-import CoreFVs ( exprFreeVars )
-import CoreMap
-import CoreOpt (simpleOptExpr, exprIsConApp_maybe)
-import CoreUtils (exprType)
-import MkCore (mkListExpr, mkCharExpr)
+import GHC.Core
+import GHC.Core.FVs       (exprFreeVars)
+import GHC.Core.Map
+import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
+import GHC.Core.Utils     (exprType)
+import GHC.Core.Make      (mkListExpr, mkCharExpr)
 import UniqSupply
 import FastString
 import SrcLoc

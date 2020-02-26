@@ -37,7 +37,7 @@ import GHC.Hs.Binds
 
 -- others:
 import TcEvidence
-import CoreSyn
+import GHC.Core
 import Name
 import NameSet
 import BasicTypes
@@ -665,8 +665,6 @@ type instance XTick          (GhcPass _) = NoExtField
 type instance XBinTick       (GhcPass _) = NoExtField
 
 type instance XPragE         (GhcPass _) = NoExtField
-
-type instance XWrap          (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
 type instance XXExpr         GhcRn       = NoExtCon

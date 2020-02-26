@@ -9,11 +9,11 @@ module WorkWrap ( wwTopBinds ) where
 
 import GhcPrelude
 
-import CoreArity        ( manifestArity )
-import CoreSyn
-import CoreUnfold       ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
-import CoreUtils        ( exprType, exprIsHNF )
-import CoreFVs          ( exprFreeVars )
+import GHC.Core.Arity  ( manifestArity )
+import GHC.Core
+import GHC.Core.Unfold ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
+import GHC.Core.Utils  ( exprType, exprIsHNF )
+import GHC.Core.FVs    ( exprFreeVars )
 import Var
 import Id
 import IdInfo
@@ -201,7 +201,7 @@ unfolding to the *worker*.  So we will get something like this:
   fw d x y' = let y = I# y' in ...f...
 
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
-in work_fn! See CoreUnfold.mkWorkerUnfolding.
+in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
 
 Note [Worker-wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -534,12 +534,12 @@ Note [Zapping DmdEnv after Demand Analyzer] above.
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A binding where the manifestArity of the RHS is less than idArity of the binder
-means CoreArity didn't eta expand that binding. When this happens, it does so
-for a reason (see Note [exprArity invariant] in CoreArity) and we probably have
+means GHC.Core.Arity didn't eta expand that binding. When this happens, it does so
+for a reason (see Note [exprArity invariant] in GHC.Core.Arity) and we probably have
 a PAP, cast or trivial expression as RHS.
 
 Performing the worker/wrapper split will implicitly eta-expand the binding to
-idArity, overriding CoreArity's decision. Other than playing fast and loose with
+idArity, overriding GHC.Core.Arity's decision. Other than playing fast and loose with
 divergence, it's also broken for newtypes:
 
   f = (\xy.blah) |> co

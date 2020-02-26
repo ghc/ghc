@@ -6,7 +6,7 @@
              ScopedTypeVariables #-}
 
 -- | Module for (a) type kinds and (b) type coercions,
--- as used in System FC. See 'CoreSyn.Expr' for
+-- as used in System FC. See 'GHC.Core.Expr' for
 -- more on System FC and how coercions fit into it.
 --
 module Coercion (
@@ -847,7 +847,7 @@ mkCoVarCos = map mkCoVarCo
 {- Note [mkCoVarCo]
 ~~~~~~~~~~~~~~~~~~~
 In the past, mkCoVarCo optimised (c :: t~t) to (Refl t).  That is
-valid (although see Note [Unbound RULE binders] in Rules), but
+valid (although see Note [Unbound RULE binders] in GHC.Core.Rules), but
 it's a relatively expensive test and perhaps better done in
 optCoercion.  Not a big deal either way.
 -}

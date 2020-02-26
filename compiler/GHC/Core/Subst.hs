@@ -8,7 +8,7 @@ Utility functions on @Core@ syntax
 
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-module CoreSubst (
+module GHC.Core.Subst (
         -- * Main data types
         Subst(..), -- Implementation exported for supercompiler's Renaming.hs only
         TvSubstEnv, IdSubstEnv, InScopeSet,
@@ -39,10 +39,10 @@ module CoreSubst (
 
 import GhcPrelude
 
-import CoreSyn
-import CoreFVs
-import CoreSeq
-import CoreUtils
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Seq
+import GHC.Core.Utils
 import qualified Type
 import qualified Coercion
 
@@ -251,7 +251,7 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, text "CoreSubst.lookupIdSubst" <+> doc <+> ppr v
+  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> doc <+> ppr v
                             $$ ppr in_scope)
                 Var v
 

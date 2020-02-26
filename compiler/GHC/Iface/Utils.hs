@@ -71,7 +71,7 @@ import FlagChecker
 import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import Annotations
-import CoreSyn
+import GHC.Core
 import Class
 import TyCon
 import CoAxiom

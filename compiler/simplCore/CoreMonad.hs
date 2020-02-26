@@ -51,7 +51,7 @@ module CoreMonad (
 
 import GhcPrelude hiding ( read )
 
-import CoreSyn
+import GHC.Core
 import GHC.Driver.Types
 import Module
 import GHC.Driver.Session

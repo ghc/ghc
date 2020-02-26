@@ -18,8 +18,8 @@ import GhcPrelude
 import GHC.Driver.Session
 import WwLib            ( findTypeShape )
 import Demand   -- All of it
-import CoreSyn
-import CoreSeq          ( seqBinds )
+import GHC.Core
+import GHC.Core.Seq     ( seqBinds )
 import Outputable
 import VarEnv
 import BasicTypes
@@ -27,7 +27,7 @@ import Data.List        ( mapAccumL )
 import DataCon
 import Id
 import IdInfo
-import CoreUtils
+import GHC.Core.Utils
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -590,7 +590,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     rhs_arity      = idArity id
     rhs_dmd
       -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in CoreSyn
+      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
       --     rhs_arity matches the join arity of the join point
       | isJoinId id
       = mkCallDmds rhs_arity let_dmd
@@ -768,7 +768,7 @@ complexity.
 
 Note [idArity varies independently of dmdTypeDepth]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to check in CoreLint that dmdTypeDepth <= idArity for a let-bound
+We used to check in GHC.Core.Lint that dmdTypeDepth <= idArity for a let-bound
 identifier. But that means we would have to zap demand signatures every time we
 reset or decrease arity. That's an unnecessary dependency, because
 
@@ -852,9 +852,9 @@ we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
 have type (Int->Int->Int) ~ T.
 
-Fortunately, CoreArity gives 'foo' arity 2, which is enough for LetDown to
+Fortunately, GHC.Core.Arity gives 'foo' arity 2, which is enough for LetDown to
 forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
-CoreArity)! A small example is the test case NewtypeArity.
+GHC.Core.Arity)! A small example is the test case NewtypeArity.
 
 
 Note [Product demands for function body]

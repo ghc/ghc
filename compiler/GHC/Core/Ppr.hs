@@ -10,7 +10,7 @@ Printing of Core syntax
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module PprCore (
+module GHC.Core.Ppr (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
@@ -19,8 +19,8 @@ module PprCore (
 
 import GhcPrelude
 
-import CoreSyn
-import CoreStats (exprStats)
+import GHC.Core
+import GHC.Core.Stats (exprStats)
 import Literal( pprLiteral )
 import Name( pprInfixName, pprPrefixName )
 import Var
@@ -517,7 +517,7 @@ ppIdInfo id info
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
-        -- see PprCore.pprIdBndr
+        -- see GHC.Core.Ppr.pprIdBndr
   where
     pp_scope | isGlobalId id   = text "GblId"
              | isExportedId id = text "LclIdX"

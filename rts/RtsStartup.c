@@ -277,7 +277,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)nestedAtomically_closure);
     getStablePtr((StgPtr)absentSumFieldError_closure);
         // `Id` for this closure is marked as non-CAFFY,
-        // see Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore.
+        // see Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make.
 
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);

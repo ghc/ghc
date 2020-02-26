@@ -41,7 +41,7 @@ end_section() {
 echo_color() {
   local color="$1"
   local msg="$2"
-  echo -e "\e[${color}m${msg}\e[0m"
+  echo -e "\033[${color}m${msg}\033[0m"
 }
 
 error() { echo_color "${RED}" "$1"; }
@@ -378,11 +378,7 @@ function build_hadrian() {
     fail "FLAVOUR not set"
   fi
 
-  run hadrian/build.cabal.sh \
-    --flavour="$FLAVOUR" \
-    -j"$cores" \
-    $HADRIAN_ARGS \
-    binary-dist
+  run_hadrian binary-dist
 
   mv _build/bindist/ghc*.tar.xz ghc.tar.xz
 }
@@ -393,10 +389,7 @@ function test_hadrian() {
   run "$MAKE" install
   cd ../../../
 
-  run hadrian/build.cabal.sh \
-    --flavour="$FLAVOUR" \
-    -j"$cores" \
-    $HADRIAN_ARGS \
+  run_hadrian \
     test \
     --summary-junit=./junit.xml \
     --test-compiler="$TOP"/_build/install/bin/ghc
@@ -406,6 +399,24 @@ function clean() {
   rm -R tmp
   run "$MAKE" --quiet clean || true
   run rm -Rf _build
+}
+
+function run_hadrian() {
+  run hadrian/build.cabal.sh \
+    --flavour="$FLAVOUR" \
+    -j"$cores" \
+    --broken-test="$BROKEN_TESTS" \
+    $HADRIAN_ARGS \
+    $@
+}
+
+# A convenience function to allow debugging in the CI environment.
+function shell() {
+  local cmd=$@
+  if [ -z "$cmd" ]; then
+    cmd="bash -i"
+  fi
+  run $cmd
 }
 
 # Determine Cabal data directory
@@ -436,6 +447,8 @@ case $1 in
   test_make) fetch_perf_notes; test_make; push_perf_notes ;;
   build_hadrian) build_hadrian ;;
   test_hadrian) fetch_perf_notes; test_hadrian; push_perf_notes ;;
+  run_hadrian) run_hadrian $@ ;;
   clean) clean ;;
+  shell) shell $@ ;;
   *) fail "unknown mode $1" ;;
 esac

@@ -875,7 +875,7 @@ data WarningFlag =
    | Opt_WarnRedundantRecordWildcards
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnMissingMonadFailInstances -- since 8.0
+   | Opt_WarnMissingMonadFailInstances -- since 8.0, has no effect since 8.8
    | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
@@ -1211,7 +1211,7 @@ data DynFlags = DynFlags {
   extensionFlags        :: EnumSet LangExt.Extension,
 
   -- Unfolding control
-  -- See Note [Discounts and thresholds] in CoreUnfold
+  -- See Note [Discounts and thresholds] in GHC.Core.Unfold
   ufCreationThreshold   :: Int,
   ufUseThreshold        :: Int,
   ufFunAppDiscount      :: Int,
@@ -4918,8 +4918,7 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnMissingMonadFailInstances
-      , Opt_WarnSemigroup
+    = [ Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnStarIsType
       , Opt_WarnCompatUnqualifiedImports

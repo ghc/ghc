@@ -20,7 +20,7 @@ module GHC.StgToCmm.DataCon (
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import CoreSyn  ( AltCon(..) )
+import GHC.Core  ( AltCon(..) )
 
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env

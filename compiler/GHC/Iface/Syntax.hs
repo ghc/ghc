@@ -46,7 +46,7 @@ import GhcPrelude
 
 import GHC.Iface.Type
 import BinFingerprint
-import CoreSyn( IsOrphan, isOrphan )
+import GHC.Core( IsOrphan, isOrphan )
 import Demand
 import Cpr
 import Class
@@ -188,7 +188,7 @@ data IfaceTyConParent
   | IfDataInstance
        IfExtName     -- Axiom name
        IfaceTyCon    -- Family TyCon (pretty-printing only, not used in GHC.IfaceToCore)
-                     -- see Note [Pretty printing via Iface syntax] in PprTyThing
+                     -- see Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
        IfaceAppArgs  -- Arguments of the family TyCon
 
 data IfaceFamTyConFlav
@@ -197,7 +197,7 @@ data IfaceFamTyConFlav
   | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
-    -- See Note [Pretty printing via Iface syntax] in PprTyThing
+    -- See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
@@ -533,7 +533,7 @@ Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Iface syntax an IfaceCase does not record the types of the alternatives,
 unlike Core syntax Case. But we need this type if the alternatives are empty.
-Hence IfaceECase. See Note [Empty case alternatives] in CoreSyn.
+Hence IfaceECase. See Note [Empty case alternatives] in GHC.Core.
 
 Note [Expose recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -549,7 +549,7 @@ that came up was a NOINLINE pragma on a let-binding inside an INLINE
 function.  The user (Duncan Coutts) really wanted the NOINLINE control
 to cross the separate compilation boundary.
 
-In general we retain all info that is left by CoreTidy.tidyLetBndr, since
+In general we retain all info that is left by GHC.Core.Op.Tidy.tidyLetBndr, since
 that is what is seen by importing module with --make
 
 Note [Displaying axiom incompatibilities]
@@ -676,7 +676,7 @@ Note [Printing IfaceDecl binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The binders in an IfaceDecl are just OccNames, so we don't know what module they
 come from.  But when we pretty-print a TyThing by converting to an IfaceDecl
-(see PprTyThing), the TyThing may come from some other module so we really need
+(see GHC.Core.Ppr.TyThing), the TyThing may come from some other module so we really need
 the module qualifier.  We solve this by passing in a pretty-printer for the
 binders.
 
@@ -746,7 +746,7 @@ constraintIfaceKind =
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
---     See Note [Pretty-printing TyThings] in PprTyThing
+--     See Note [Pretty-printing TyThings] in GHC.Core.Ppr.TyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context, ifResKind = kind,
                              ifRoles = roles, ifCons = condecls,

@@ -19,7 +19,7 @@ find, unsurprisingly, a Core expression.
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module CoreUnfold (
+module GHC.Core.Unfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types
 
         noUnfolding, mkImplicitUnfolding,
@@ -37,7 +37,7 @@ module CoreUnfold (
 
         callSiteInline, CallCtxt(..),
 
-        -- Reexport from CoreSubst (it only live there so it can be used
+        -- Reexport from GHC.Core.Subst (it only live there so it can be used
         -- by the Very Simple Optimiser)
         exprIsConApp_maybe, exprIsLiteral_maybe
     ) where
@@ -47,11 +47,11 @@ module CoreUnfold (
 import GhcPrelude
 
 import GHC.Driver.Session
-import CoreSyn
-import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
-import CoreOpt
-import CoreArity       ( manifestArity )
-import CoreUtils
+import GHC.Core
+import OccurAnal          ( occurAnalyseExpr_NoBinderSwap )
+import GHC.Core.SimpleOpt
+import GHC.Core.Arity     ( manifestArity )
+import GHC.Core.Utils
 import Id
 import Demand          ( isBottomingSig )
 import DataCon
@@ -444,8 +444,9 @@ inlineBoringOk e
     go :: Int -> CoreExpr -> Bool
     go credit (Lam x e) | isId x           = go (credit+1) e
                         | otherwise        = go credit e
-    go credit (App f a) | isTyCoArg a      = go credit f
-                        | credit > 0
+        -- See Note [Count coercion arguments in boring contexts]
+    go credit (App f (Type {}))            = go credit f
+    go credit (App f a) | credit > 0
                         , exprIsTrivial a  = go (credit-1) f
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
@@ -591,6 +592,29 @@ Things to note:
     NB: you might think that PostInlineUnconditionally would do this
     but it doesn't fire for top-level things; see SimplUtils
     Note [Top level and postInlineUnconditionally]
+
+Note [Count coercion arguments in boring contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In inlineBoringOK, we ignore type arguments when deciding whether an
+expression is okay to inline into boring contexts. This is good, since
+if we have a definition like
+
+  let y = x @Int in f y y
+
+there’s no reason not to inline y at both use sites — no work is
+actually duplicated. It may seem like the same reasoning applies to
+coercion arguments, and indeed, in #17182 we changed inlineBoringOK to
+treat coercions the same way.
+
+However, this isn’t a good idea: unlike type arguments, which have
+no runtime representation, coercion arguments *do* have a runtime
+representation (albeit the zero-width VoidRep, see Note [Coercion tokens]
+in CoreToStg.hs). This caused trouble in #17787 for DataCon wrappers for
+nullary GADT constructors: the wrappers would be inlined and each use of
+the constructor would lead to a separate allocation instead of just
+sharing the wrapper closure.
+
+The solution: don’t ignore coercion arguments after all.
 -}
 
 uncondInline :: CoreExpr -> Arity -> Int -> Bool
@@ -804,7 +828,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
--- Used by CoreUnfold.sizeExpr
+-- Used by GHC.Core.Unfold.sizeExpr
 litSize (LitNumber LitNumInteger _ _) = 100   -- Note [Size of literal integers]
 litSize (LitNumber LitNumNatural _ _) = 100
 litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
@@ -1510,7 +1534,7 @@ because the latter is strict.
         f = \x -> ...(error s)...
 
 Fundamentally such contexts should not encourage inlining because, provided
-the RHS is "expandable" (see Note [exprIsExpandable] in CoreUtils) the
+the RHS is "expandable" (see Note [exprIsExpandable] in GHC.Core.Utils) the
 context can ``see'' the unfolding of the variable (e.g. case or a
 RULE) so there's no gain.
 
