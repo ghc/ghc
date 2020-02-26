@@ -38,6 +38,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.StgToCmm.Types (CgInfos (..))
 import TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -100,13 +101,13 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
-mkFullIface hsc_env partial_iface mb_non_cafs = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+          = updateDecl (mi_decls partial_iface) mb_cg_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
@@ -117,15 +118,23 @@ mkFullIface hsc_env partial_iface mb_non_cafs = do
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
-updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
+updateDecl :: [IfaceDecl] -> Maybe CgInfos -> [IfaceDecl]
+updateDecl decls Nothing = decls
+updateDecl decls (Just CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos }) = map update_decl decls
   where
+    update_decl (IfaceId nm ty details infos)
+      | let not_caffy = elemNameSet nm non_cafs
+      , let mb_lf_info = lookupNameEnv lf_infos nm
+      , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
+        -- Only allocate a new IfaceId if we're going to update the infos
+      , isJust mb_lf_info || not_caffy
+      = IfaceId nm ty details $
+          (if not_caffy then (HsNoCafRefs :) else id)
+          (case mb_lf_info of
+             Nothing -> infos
+             Just lf_info -> HsLFInfo (toIfaceLFInfo lf_info) : infos)
+
     update_decl decl
-      | IfaceId nm ty details infos <- decl
-      , elemNameSet nm non_cafs
-      = IfaceId nm ty details (HsNoCafRefs : infos)
-      | otherwise
       = decl
 
 -- | Make an interface from the results of typechecking only.  Useful
