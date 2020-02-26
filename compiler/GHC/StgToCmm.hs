@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -25,6 +26,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -45,6 +47,8 @@ import Outputable
 import Stream
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
+import GHC.Types.Unique.FM
+import GHC.Types.Name.Env
 
 import OrdList
 import GHC.Cmm.Graph
@@ -59,7 +63,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup ModuleLFInfos
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -101,6 +106,18 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+
+        ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+
+        ; let extractInfo info = (name, lf)
+                where
+                  !id = cg_id info
+                  !name = idName id
+                  !lf = cg_lf info
+
+        ; let !generatedInfo = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
+
+        ; return generatedInfo
         }
 
 ---------------------------------------------------------------
