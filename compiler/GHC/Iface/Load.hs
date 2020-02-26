@@ -22,7 +22,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface,    -- Used when reading the module's old interface
+        findAndReadIface, readIface, writeIface,
         loadDecls,      -- Should move to GHC.IfaceToCore and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
@@ -84,6 +84,7 @@ import Control.Monad
 import Control.Exception
 import Data.IORef
 import System.FilePath
+import System.Directory
 
 {-
 ************************************************************************
@@ -486,7 +487,6 @@ loadInterface doc_str mod from
                             -- Warn warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
-                            -- in GHC.Iface.Utils.
 
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
@@ -536,7 +536,7 @@ loadInterface doc_str mod from
 Generally speaking, when compiling module M, we should not
 load M.hi boot into the EPS.  After all, we are very shortly
 going to have full information about M.  Moreover, see
-Note [Do not update EPS with your own hi-boot] in GHC.Iface.Utils.
+Note [Do not update EPS with your own hi-boot] in GHC.Iface.Recomp.
 
 But there is a HORRIBLE HACK here.
 
@@ -974,8 +974,13 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                              liftIO $ writeIORef ref False
           checkBuildDynamicToo _ = return ()
 
--- @readIface@ tries just the one file.
+-- | Write interface file
+writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
+writeIface dflags hi_file_path new_iface
+    = do createDirectoryIfMissing True (takeDirectory hi_file_path)
+         writeBinIface dflags hi_file_path new_iface
 
+-- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
           -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
