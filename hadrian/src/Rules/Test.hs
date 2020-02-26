@@ -6,6 +6,8 @@ import Base
 import CommandLine
 import Expression
 import Flavour
+import Hadrian.Haskell.Cabal.Type (packageDependencies)
+import Hadrian.Oracles.Cabal (readPackageData)
 import Oracles.Setting
 import Oracles.TestSettings
 import Packages
@@ -30,10 +32,10 @@ checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
 checkApiAnnotationsProgPath = "test/bin/check-api-annotations" <.> exe
 checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
 
-checkPrograms :: [(FilePath, FilePath)]
+checkPrograms :: [(FilePath, FilePath, Package)]
 checkPrograms =
-    [ (checkPprProgPath, checkPprSourcePath)
-    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath)
+    [ (checkPprProgPath, checkPprSourcePath, checkPpr)
+    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath, checkApiAnnotations)
     ]
 
 ghcConfigPath :: FilePath
@@ -53,16 +55,28 @@ testRules = do
 
     -- Rules for building check-ppr and check-ppr-annotations with the compiler
     -- we are going to test (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(progPath, sourcePath) ->
+    forM_ checkPrograms $ \(progPath, sourcePath, progPkg) ->
         root -/- progPath %> \path -> do
+            need [ sourcePath ]
             testGhc <- testCompiler <$> userSetting defaultTestArgs
             top <- topDirectory
+            depsPkgs <- packageDependencies <$> readPackageData progPkg
+
+            -- when we're about to test an in-tree compiler, we make sure that
+            -- we have the corresponding GHC binary available, along with the
+            -- necessary libraries to build the check-* programs
             when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
                 let stg = stageOf testGhc
-                need . (:[]) =<< programPath (Context stg ghc vanilla)
+                ghcPath <- programPath (Context stg ghc vanilla)
+                depsLibs <- traverse
+                  (\p -> pkgRegisteredLibraryFile (vanillaContext stg p))
+                  depsPkgs
+                need (ghcPath : depsLibs)
+
             bindir <- getBinaryDirectory testGhc
-            cmd [bindir </> "ghc" <.> exe]
-                ["-package", "ghc", "-o", top -/- path, top -/- sourcePath]
+            cmd [bindir </> "ghc" <.> exe] $
+                concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
+                ["-o", top -/- path, top -/- sourcePath]
 
     root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
