@@ -19,7 +19,8 @@ module GHC.IfaceToCore (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+        tcIfaceOneShot
  ) where
 
 #include "HsVersions.h"
@@ -30,6 +31,7 @@ import TcTypeNats(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
+import GHC.StgToCmm.Types
 import BuildTyCl
 import TcRnMonad
 import TcType
@@ -1464,8 +1466,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
     let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                   | otherwise       = vanillaIdInfo
 
-    let needed = needed_prags info
-    foldlM tcPrag init_info needed
+    foldlM tcPrag init_info (needed_prags info)
   where
     needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
     needed_prags items
@@ -1485,6 +1486,9 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsCpr cpr)        = return (info `setCprInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
     tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
+    tcPrag info (HsLFInfo lf_info) = do
+      lf_info <- tcLFInfo lf_info
+      return (info `setLFInfo` lf_info)
 
         -- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf)
@@ -1496,6 +1500,23 @@ tcIdInfo ignore_prags toplvl name ty info = do
 tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
 tcJoinInfo (IfaceJoinPoint ar) = Just ar
 tcJoinInfo IfaceNotJoinPoint   = Nothing
+
+tcLFInfo :: IfaceLFInfo -> IfL LambdaFormInfo
+tcLFInfo lfi = case lfi of
+    IfLFReEntrant rep_arity ->
+      return (LFReEntrant TopLevel NoOneShotInfo rep_arity True ArgUnknown)
+
+    IfLFThunk updatable sfi mb_fun ->
+      return (LFThunk TopLevel True updatable (tcStandardFormInfo sfi) mb_fun)
+
+    IfLFUnlifted ->
+      return LFUnlifted
+
+    IfLFCon con_name ->
+      LFCon <$!> tcIfaceDataCon con_name
+
+    IfLFUnknown fun_flag ->
+      return (LFUnknown fun_flag)
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
@@ -1582,6 +1603,10 @@ tcPragExpr is_compulsory toplvl name expr
     bindingsVars ufm = mkVarSet $ nonDetEltsUFM ufm
       -- It's OK to use nonDetEltsUFM here because we immediately forget
       -- the ordering by creating a set
+
+tcIfaceOneShot :: IfaceOneShot -> OneShotInfo
+tcIfaceOneShot IfaceNoOneShot = NoOneShotInfo
+tcIfaceOneShot IfaceOneShot = OneShotLam
 
 {-
 ************************************************************************

@@ -226,7 +226,7 @@ Library
         GHC.Types.SrcLoc
         GHC.Types.Unique.Supply
         GHC.Types.Unique
-        UpdateCafInfos
+        UpdateIdInfos
         GHC.Types.Var
         GHC.Types.Var.Env
         GHC.Types.Var.Set
@@ -295,6 +295,7 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
+        GHC.StgToCmm.Types
         GHC.Runtime.Heap.Layout
         GHC.Core.Arity
         GHC.Core.FVs
