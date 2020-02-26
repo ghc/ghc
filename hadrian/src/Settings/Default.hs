@@ -125,18 +125,7 @@ stage2Packages = stage1Packages
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
-testsuitePackages = do
-    return $ [ checkApiAnnotations
-             , checkPpr
-             , ghci
-             , ghcCompact
-             , ghcPkg
-             , hpcBin
-             , hsc2hs
-             , iserv
-             , runGhc
-             , unlit                 ] ++
-             [ timeout | windowsHost ]
+testsuitePackages = return [ timeout | windowsHost ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
