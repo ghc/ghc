@@ -49,8 +49,6 @@ ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 libraries/ghc-bignum_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
 
-ifeq "$(phase)" "final"
-
 ifneq "$(CLEANING)" "YES"
 # Hack. The file config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
@@ -101,6 +99,7 @@ gmp_CC_OPTS += -Ilibraries/ghc-bignum/gmp
 
 libraries/ghc-bignum_dist-install_EXTRA_OBJS += libraries/ghc-bignum/gmp/objs/*.o
 else
+
 $(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/include/ghc-gmp.h
 
 libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/ghc-gmp.h
@@ -141,4 +140,3 @@ libraries/ghc-bignum/gmp/libgmp.a libraries/ghc-bignum/gmp/gmp.h:
 	$(RANLIB_CMD) libraries/ghc-bignum/gmp/libgmp.a
 
 endif # CLEANING
-endif # phase
