@@ -2513,7 +2513,7 @@ data Dependencies
                         -- ^ All the plugins used while compiling this module.
          }
   deriving( Eq )
-        -- Equality used only for old/new comparison in GHC.Iface.Utils.addFingerprints
+        -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where

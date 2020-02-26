@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.HsToCore.Usage (
-    -- * Dependency/fingerprinting code (used by GHC.Iface.Utils)
+    -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
     mkUsageInfo, mkUsedNames, mkDependencies
     ) where
 

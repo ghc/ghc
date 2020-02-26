@@ -26,7 +26,7 @@ import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
 import CoAxiom ( coAxiomTyCon )
 import GHC.Driver.Types( tyThingParent_maybe )
-import GHC.Iface.Utils ( tyThingToIfaceDecl )
+import GHC.Iface.Make ( tyThingToIfaceDecl )
 import FamInstEnv( FamInst(..), FamFlavor(..) )
 import TyCoPpr ( pprUserForAll, pprTypeApp, pprSigmaType )
 import Name
@@ -72,7 +72,7 @@ Why do this?
 
 * Interface files contains fast-strings, not uniques, so the very same
   tidying must take place when we convert to IfaceDecl. E.g.
-  GHC.Iface.Utils.tyThingToIfaceDecl which converts a TyThing (i.e. TyCon,
+  GHC.Iface.Make.tyThingToIfaceDecl which converts a TyThing (i.e. TyCon,
   Class etc) to an IfaceDecl.
 
   Bottom line: IfaceDecls are already 'tidy', so it's straightforward

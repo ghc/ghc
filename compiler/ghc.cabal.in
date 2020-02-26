@@ -356,7 +356,8 @@ Library
         GHC.Iface.Type
         GHC.CoreToIface
         GHC.Iface.Load
-        GHC.Iface.Utils
+        GHC.Iface.Make
+        GHC.Iface.Recomp
         GHC.IfaceToCore
         FlagChecker
         Annotations

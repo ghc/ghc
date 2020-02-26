@@ -116,11 +116,12 @@ import GHC.IfaceToCore  ( typecheckIface )
 import TcRnMonad
 import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
-import GHC.Iface.Load   ( ifaceStats, initExternalPackageState )
 import PrelInfo
-import GHC.Iface.Utils
-import GHC.HsToCore
 import SimplCore
+import GHC.HsToCore
+import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
+import GHC.Iface.Make
+import GHC.Iface.Recomp
 import GHC.Iface.Tidy
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
@@ -1370,7 +1371,7 @@ hscWriteIface dflags iface no_change mod_location = do
     unless no_change $
         let ifaceFile = buildIfName ifaceBaseFile (hiSuf dflags)
         in  {-# SCC "writeIface" #-}
-            writeIfaceFile dflags ifaceFile iface
+            writeIface dflags ifaceFile iface
     whenGeneratingDynamicToo dflags $ do
         -- TODO: We should do a no_change check for the dynamic
         --       interface file too
@@ -1379,7 +1380,7 @@ hscWriteIface dflags iface no_change mod_location = do
             -- dynDflags will have set hiSuf correctly.
             dynIfaceFile = buildIfName ifaceBaseFile (hiSuf dynDflags)
 
-        writeIfaceFile dynDflags dynIfaceFile iface
+        writeIface dynDflags dynIfaceFile iface
   where
     buildIfName :: String -> String -> String
     buildIfName baseName suffix
