@@ -39,7 +39,7 @@ import Type                       ( mkVisFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
-import GHC.Iface.Utils            ( mkIfaceExports )
+import GHC.Iface.Make             ( mkIfaceExports )
 import Panic
 import Maybes
 
