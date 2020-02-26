@@ -2729,9 +2729,8 @@ mkJoinBndrOccMismatchMsg bndr join_arity_bndr join_arity_occ
 mkBndrOccTypeMismatchMsg :: Var -> Var -> OutType -> OutType -> SDoc
 mkBndrOccTypeMismatchMsg bndr var bndr_ty var_ty
   = vcat [ text "Mismatch in type between binder and occurrence"
-         , text "Var:" <+> ppr bndr
-         , text "Binder type:" <+> ppr bndr_ty
-         , text "Occurrence type:" <+> ppr var_ty
+         , text "Binder:" <+> ppr bndr <+> dcolon <+> ppr bndr_ty
+         , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr var_ty
          , text "  Before subst:" <+> ppr (idType var) ]
 
 mkBadJoinPointRuleMsg :: JoinId -> JoinArity -> CoreRule -> SDoc
