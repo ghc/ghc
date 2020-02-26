@@ -419,7 +419,7 @@ naturalLogBaseWord (W# base) !a = W# (naturalLogBaseWord# base a)
 -- | Logarithm for an arbitrary base
 naturalLogBase# :: Natural -> Natural -> Word#
 naturalLogBase# (NS base) !a     = naturalLogBaseWord# base a
-naturalLogBase# (NB _   ) (NS _) = 1##
+naturalLogBase# (NB _   ) (NS _) = 0##
 naturalLogBase# (NB base) (NB a) = bigNatLogBase# base a
 
 -- | Logarithm for an arbitrary base
