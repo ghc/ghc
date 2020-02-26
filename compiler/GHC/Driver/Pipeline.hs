@@ -68,7 +68,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import GHC.Iface.Utils  ( mkFullIface )
+import GHC.Iface.Make  ( mkFullIface )
 import UpdateCafInfos   ( updateModDetailsCafInfos )
 
 import Exception

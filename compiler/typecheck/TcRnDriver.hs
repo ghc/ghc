@@ -88,7 +88,7 @@ import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
                  , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import TcAnnotations
 import TcBinds
-import GHC.Iface.Utils  ( coAxiomToIfaceDecl )
+import GHC.Iface.Make   ( coAxiomToIfaceDecl )
 import HeaderInfo       ( mkPrelImports )
 import TcDefaults
 import TcEnv
@@ -1837,7 +1837,7 @@ being called "Main.main".  That's why root_main_id has a fixed module
 ":Main".)
 
 This is unusual: it's a LocalId whose Name has a Module from another
-module. Tiresomely, we must filter it out again in GHC.Iface.Utils, less we
+module. Tiresomely, we must filter it out again in GHC.Iface.Make, less we
 get two defns for 'main' in the interface file!
 
 

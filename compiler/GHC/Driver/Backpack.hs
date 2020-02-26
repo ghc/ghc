@@ -44,7 +44,7 @@ import UniqDFM
 import Outputable
 import Maybes
 import HeaderInfo
-import GHC.Iface.Utils
+import GHC.Iface.Recomp
 import GHC.Driver.Make
 import UniqDSet
 import PrelNames
