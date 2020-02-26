@@ -138,7 +138,7 @@ getCgIdInfo id
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
               in return $
-                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
+                  litIdInfo dflags id (idLFInfo id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}

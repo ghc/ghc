@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -45,6 +46,8 @@ import Outputable
 import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
+import UniqFM
+import Name
 
 import OrdList
 import GHC.Cmm.Graph
@@ -52,6 +55,7 @@ import GHC.Cmm.Graph
 import Data.IORef
 import Control.Monad (when,void)
 import Util
+import Data.Maybe
 
 codeGen :: DynFlags
         -> Module
@@ -59,7 +63,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup [(Name, LambdaFormInfo)]
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -101,6 +106,20 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+
+        ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+
+        -- Only external names are actually visible to codeGen. So they are the
+        -- only ones we care about.
+        ; let extractInfo info = lf `seq` Just (name,lf)
+                where
+                  id = cg_id info
+                  !name = idName id
+                  lf = cg_lf info
+
+        ; let generatedInfo = mapMaybe extractInfo (eltsUFM cg_id_infos)
+
+        ; return $! seqList generatedInfo generatedInfo
         }
 
 ---------------------------------------------------------------

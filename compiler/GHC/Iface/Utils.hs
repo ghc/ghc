@@ -123,6 +123,8 @@ import System.FilePath
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
+import GHC.StgToCmm.Types (LambdaFormInfo (..))
+
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
@@ -160,13 +162,13 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
-mkFullIface hsc_env partial_iface mb_non_cafs = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameSet, [(Name, LambdaFormInfo)]) -> IO ModIface
+mkFullIface hsc_env partial_iface mb_id_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+          = updateDecl (mi_decls partial_iface) mb_id_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
@@ -177,15 +179,23 @@ mkFullIface hsc_env partial_iface mb_non_cafs = do
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
-updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
+updateDecl :: [IfaceDecl] -> Maybe (NameSet, [(Name, LambdaFormInfo)]) -> [IfaceDecl]
+updateDecl decls Nothing = decls
+updateDecl decls (Just (non_cafs, lf_infos)) = map update_decl decls
   where
+    update_decl (IfaceId nm ty details infos)
+      | let not_caffy = elemNameSet nm non_cafs
+      , let mb_lf_info = lookup nm lf_infos
+      , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
+        -- Only allocate a new IfaceId if we're going to update the infos
+      , isJust mb_lf_info || not_caffy
+      = IfaceId nm ty details $
+          (if not_caffy then (HsNoCafRefs :) else id)
+          (case mb_lf_info of
+             Nothing -> infos
+             Just lf_info -> HsLFInfo (toIfaceLFInfo lf_info) : infos)
+
     update_decl decl
-      | IfaceId nm ty details infos <- decl
-      , elemNameSet nm non_cafs
-      = IfaceId nm ty details (HsNoCafRefs : infos)
-      | otherwise
       = decl
 
 -- | Make an interface from the results of typechecking only.  Useful
@@ -1760,7 +1770,8 @@ idToIfaceDecl id
   = IfaceId { ifName      = getName id,
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (idDetails id),
-              ifIdInfo    = toIfaceIdInfo (idInfo id) }
+              ifIdInfo    = toIfaceIdInfo (idInfo id)
+              }
 
 --------------------------
 dataConToIfaceDecl :: DataCon -> IfaceDecl
@@ -1768,7 +1779,8 @@ dataConToIfaceDecl dataCon
   = IfaceId { ifName      = getName dataCon,
               ifType      = toIfaceType (dataConUserType dataCon),
               ifIdDetails = IfVanillaId,
-              ifIdInfo    = [] }
+              ifIdInfo    = []
+              }
 
 --------------------------
 coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
