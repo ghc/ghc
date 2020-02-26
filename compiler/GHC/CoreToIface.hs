@@ -34,13 +34,14 @@ module GHC.CoreToIface
     , toIfaceIdDetails
     , toIfaceIdInfo
     , toIfUnfolding
-    , toIfaceOneShot
     , toIfaceTickish
     , toIfaceBind
     , toIfaceAlt
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Other stuff
+    , toIfaceLFInfo
     ) where
 
 #include "HsVersions.h"
@@ -51,6 +52,7 @@ import GHC.Iface.Syntax
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.StgToCmm.Types
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
@@ -615,6 +617,31 @@ toIfaceVar v
     | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
 
+
+---------------------
+toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo
+toIfaceLFInfo nm lfi = case lfi of
+    LFReEntrant top_lvl arity no_fvs _arg_descr ->
+      -- Exported LFReEntrant closures are top level, and top-level closures
+      -- don't have free variables
+      ASSERT2(isTopLevel top_lvl, ppr nm)
+      ASSERT2(no_fvs, ppr nm)
+      IfLFReEntrant arity
+    LFThunk top_lvl no_fvs updatable sfi mb_fun ->
+      -- Exported LFThunk closures are top level (which don't have free
+      -- variables) and non-standard (see cgTopRhsClosure)
+      ASSERT2(isTopLevel top_lvl, ppr nm)
+      ASSERT2(no_fvs, ppr nm)
+      ASSERT2(sfi == NonStandardThunk, ppr nm)
+      IfLFThunk updatable mb_fun
+    LFCon dc ->
+      IfLFCon (dataConName dc)
+    LFUnknown mb_fun ->
+      IfLFUnknown mb_fun
+    LFUnlifted ->
+      IfLFUnlifted
+    LFLetNoEscape ->
+      panic "toIfaceLFInfo: LFLetNoEscape"
 
 {- Note [Inlining and hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

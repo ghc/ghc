@@ -22,6 +22,7 @@ module GHC.Iface.Syntax (
         IfaceAxBranch(..),
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
+        IfaceLFInfo(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -67,11 +68,11 @@ import GHC.Utils.Binary
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
-import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn )
+import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn,
+                       seqList )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Builtin.Types ( constraintKindTyConName )
-import GHC.Utils.Misc (seqList)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -114,7 +115,8 @@ data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
               ifType      :: IfaceType,
               ifIdDetails :: IfaceIdDetails,
-              ifIdInfo    :: IfaceIdInfo }
+              ifIdInfo    :: IfaceIdInfo
+              }
 
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
                 ifBinders    :: [IfaceTyConBinder],
@@ -348,6 +350,7 @@ data IfaceInfoItem
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
   | HsLevity                         -- Present <=> never levity polymorphic
+  | HsLFInfo        IfaceLFInfo
 
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
@@ -378,6 +381,61 @@ data IfaceIdDetails
   = IfVanillaId
   | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
   | IfDFunId
+
+-- | Iface type for LambdaFormInfo. Fields not relevant for imported Ids are
+-- omitted in this type.
+data IfaceLFInfo
+  = IfLFReEntrant !RepArity
+  | IfLFThunk
+      !Bool -- True <=> updatable
+      !Bool -- True <=> might be a function type
+  | IfLFCon !Name
+  | IfLFUnknown !Bool
+  | IfLFUnlifted
+
+instance Outputable IfaceLFInfo where
+    ppr (IfLFReEntrant arity) =
+      text "LFReEntrant" <+> ppr arity
+
+    ppr (IfLFThunk updatable mb_fun) =
+      text "LFThunk" <+> parens
+        (text "updatable=" <> ppr updatable <+>
+         text "might_be_function=" <+> ppr mb_fun)
+
+    ppr (IfLFCon con) =
+      text "LFCon" <> brackets (ppr con)
+
+    ppr IfLFUnlifted =
+      text "LFUnlifted"
+
+    ppr (IfLFUnknown fun_flag) =
+      text "LFUnknown" <+> ppr fun_flag
+
+instance Binary IfaceLFInfo where
+    put_ bh (IfLFReEntrant arity) = do
+        putByte bh 0
+        put_ bh arity
+    put_ bh (IfLFThunk updatable mb_fun) = do
+        putByte bh 1
+        put_ bh updatable
+        put_ bh mb_fun
+    put_ bh (IfLFCon con_name) = do
+        putByte bh 2
+        put_ bh con_name
+    put_ bh (IfLFUnknown fun_flag) = do
+        putByte bh 3
+        put_ bh fun_flag
+    put_ bh IfLFUnlifted =
+        putByte bh 4
+    get bh = do
+        tag <- getByte bh
+        case tag of
+            0 -> IfLFReEntrant <$> get bh
+            1 -> IfLFThunk <$> get bh <*> get bh
+            2 -> IfLFCon <$> get bh
+            3 -> IfLFUnknown <$> get bh
+            4 -> pure IfLFUnlifted
+            _ -> panic "Invalid byte"
 
 {-
 Note [Versioning of instances]
@@ -1393,6 +1451,7 @@ instance Outputable IfaceInfoItem where
   ppr (HsCpr cpr)           = text "CPR:" <+> ppr cpr
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"
+  ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
 
 instance Outputable IfaceJoinInfo where
   ppr IfaceNotJoinPoint   = empty
@@ -1853,7 +1912,7 @@ instance Binary IfaceDecl where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> do name    <- get bh
+            0 -> do name <- get bh
                     ~(ty, details, idinfo) <- lazyGet bh
                     -- See Note [Lazy deserialization of IfaceId]
                     return (IfaceId name ty details idinfo)
@@ -2153,6 +2212,8 @@ instance Binary IfaceInfoItem where
     put_ bh HsNoCafRefs           = putByte bh 4
     put_ bh HsLevity              = putByte bh 5
     put_ bh (HsCpr cpr)           = putByte bh 6 >> put_ bh cpr
+    put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
+
     get bh = do
         h <- getByte bh
         case h of
@@ -2164,7 +2225,8 @@ instance Binary IfaceInfoItem where
             3 -> liftM HsInline $ get bh
             4 -> return HsNoCafRefs
             5 -> return HsLevity
-            _ -> HsCpr <$> get bh
+            6 -> HsCpr <$> get bh
+            _ -> HsLFInfo <$> get bh
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do
@@ -2495,6 +2557,7 @@ instance NFData IfaceInfoItem where
     HsNoCafRefs -> ()
     HsLevity -> ()
     HsCpr cpr -> cpr `seq` ()
+    HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
 
 instance NFData IfaceUnfolding where
   rnf = \case
