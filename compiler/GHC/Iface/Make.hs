@@ -100,13 +100,13 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
-mkFullIface hsc_env partial_iface mb_non_cafs = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameSet, ModuleLFInfos) -> IO ModIface
+mkFullIface hsc_env partial_iface mb_id_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+          = updateDecl (mi_decls partial_iface) mb_id_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}

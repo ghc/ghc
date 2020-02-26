@@ -1192,12 +1192,12 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files, caf_infos) <- liftIO $
+                    (outputFilename, mStub, foreign_files, caf_infos, lf_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just caf_infos))
+                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just (caf_infos, lf_infos)))
                     let final_mod_details = {-# SCC updateModDetailsCafInfos #-}
-                                            updateModDetailsCafInfos iface_dflags caf_infos mod_details
+                                            updateModDetailsCafInfos iface_dflags caf_infos lf_infos mod_details
                     setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
