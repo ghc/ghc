@@ -34,13 +34,14 @@ module GHC.CoreToIface
     , toIfaceIdDetails
     , toIfaceIdInfo
     , toIfUnfolding
-    , toIfaceOneShot
     , toIfaceTickish
     , toIfaceBind
     , toIfaceAlt
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Other stuff
+    , toIfaceLFInfo
     ) where
 
 #include "HsVersions.h"
@@ -49,6 +50,7 @@ import GhcPrelude
 
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
+import GHC.StgToCmm.Types
 import Id
 import IdInfo
 import GHC.Core
@@ -74,6 +76,8 @@ import Demand ( isTopSig )
 import Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
+import Data.Word
+import Data.Bits
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -614,6 +618,43 @@ toIfaceVar v
     | isExternalName name             = IfaceExt name
     | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
+
+
+---------------------
+toIfaceLFInfo :: LambdaFormInfo -> IfaceLFInfo
+toIfaceLFInfo lfi = case lfi of
+    LFReEntrant _ _ arity _ _ ->
+      IfLFReEntrant arity
+    LFThunk _ _ updatable sfi mb_fun ->
+      IfLFThunk updatable (toIfaceStandardFormInfo sfi) mb_fun
+    LFCon dc ->
+      IfLFCon (dataConName dc)
+    LFUnknown mb_fun ->
+      IfLFUnknown mb_fun
+    LFUnlifted ->
+      IfLFUnlifted
+    LFLetNoEscape ->
+      panic "toIfaceLFInfo: LFLetNoEscape"
+
+toIfaceStandardFormInfo :: StandardFormInfo -> IfaceStandardFormInfo
+toIfaceStandardFormInfo NonStandardThunk = IfStandardFormInfo 1
+toIfaceStandardFormInfo sf =
+    IfStandardFormInfo $!
+      tag sf .|. encodeField (field sf)
+  where
+    tag SelectorThunk{} = 0
+    tag ApThunk{} = 2 -- == setBit 0 1
+    tag _ = panic "Impossible"
+
+    field (SelectorThunk n) = n
+    field (ApThunk n) = n
+    field _ = panic "Impossible"
+
+    encodeField n =
+      let wn = fromIntegral n :: Word
+          shifted = wn `unsafeShiftL` 2
+      in ASSERT(shifted > 0 && shifted < fromIntegral (maxBound :: Word16))
+         (fromIntegral shifted :: Word16)
 
 
 {- Note [Inlining and hs-boot files]
