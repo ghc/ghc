@@ -49,8 +49,6 @@ ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 libraries/ghc-bignum_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
 
-ifeq "$(phase)" "final"
-
 ifneq "$(CLEANING)" "YES"
 # Hack. The file config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
@@ -91,18 +89,17 @@ UseIntreeGmp = YES
 endif
 endif
 
-ifeq "$(UseIntreeGmp)" "YES"
-$(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/gmp/gmp.h libraries/ghc-bignum/include/ghc-gmp.h
+# gmp_wrappers.c includes "ghc-gmp.h"
+libraries/ghc-bignum/cbits/gmp_wrappers.c: libraries/ghc-bignum/include/ghc-gmp.h
 
+ifeq "$(UseIntreeGmp)" "YES"
+# Copy header from in-tree build (gmp.h => ghc-gmp.h)
 libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/gmp.h
 	$(CP) $< $@
-
-gmp_CC_OPTS += -Ilibraries/ghc-bignum/gmp
-
+# Link in-tree GMP objects
 libraries/ghc-bignum_dist-install_EXTRA_OBJS += libraries/ghc-bignum/gmp/objs/*.o
 else
-$(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/include/ghc-gmp.h
-
+# Copy header from source tree
 libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/ghc-gmp.h
 	$(CP) $< $@
 endif
@@ -141,4 +138,3 @@ libraries/ghc-bignum/gmp/libgmp.a libraries/ghc-bignum/gmp/gmp.h:
 	$(RANLIB_CMD) libraries/ghc-bignum/gmp/libgmp.a
 
 endif # CLEANING
-endif # phase

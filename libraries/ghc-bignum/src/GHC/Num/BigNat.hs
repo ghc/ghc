@@ -1042,7 +1042,7 @@ bigNatLogBase# base a
           (# q, e #) -> if q `bigNatLt` pw
             then (# q, 2## `timesWord#` e #)
             else (# q `bigNatQuot` pw
-                 , 2## `timesWord#` e `plusWord#` 1## #)
+                 , (2## `timesWord#` e) `plusWord#` 1## #)
 
 -- | Logarithm for an arbitrary base
 bigNatLogBase :: BigNat -> BigNat -> Word

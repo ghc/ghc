@@ -651,9 +651,7 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
-ifeq "$(GMP_ENABLED)" "YES"
 BUILD_DIRS += libraries/ghc-bignum/gmp
-endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
@@ -699,7 +697,6 @@ ifeq "$(GhcWithInterpreter)" "NO"
 # runghc is just GHCi in disguise
 BUILD_DIRS := $(filter-out utils/runghc,$(BUILD_DIRS))
 endif
-BUILD_DIRS := $(filter-out libraries/ghc-bignum/gmp,$(BUILD_DIRS))
 ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
