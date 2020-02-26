@@ -9,7 +9,6 @@ import Expression ( getContextData )
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
-import Oracles.Setting
 import Packages
 import Rules.Rts
 import {-# SOURCE #-} Rules.Library (needLibrary)
@@ -109,7 +108,7 @@ registerPackageRules rs stage = do
             _               -> buildConf rs ctx conf
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildConf _ context@Context {..} conf = do
+buildConf _ context@Context {..} _conf = do
     depPkgIds <- cabalDependencies context
     ensureConfigured context
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
@@ -137,19 +136,19 @@ buildConf _ context@Context {..} conf = do
     Cabal.copyPackage context
     Cabal.registerPackage context
 
-    -- The above two steps produce an entry in the package database, with copies
-    -- of many of the files we have build, e.g. Haskell interface files. We need
-    -- to record this side effect so that Shake can cache these files too.
-    -- See why we need 'fixWindows': https://gitlab.haskell.org/ghc/ghc/issues/16073
-    let fixWindows path = do
-            version  <- setting GhcVersion
-            hostOs   <- cabalOsString <$> setting BuildOs
-            hostArch <- cabalArchString <$> setting BuildArch
-            let dir = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
-            return $ if windowsHost then path -/- "../.." -/- dir else path
-    pkgDbPath <- fixWindows =<< packageDbPath stage
-    let dir = pkgDbPath -/- takeBaseName conf
-    files <- liftIO $ getDirectoryFilesIO "." [dir -/- "**"]
+    -- We declare that this rule also produces files matching:
+    --   - <root>/stage<N>/lib/<arch>-<os>-ghc-<version>/*libHS<pkgid>*
+    --     (for .so files, Cabal's registration mechanism places them there)
+    --   - <root>/stage<N>/lib/<arch>-<os>-ghc-<version>/<pkgid>/**
+    --     (for interface files, static libs, ghci libs, includes, ...)
+    --
+    -- so that if any change ends up modifying a library (but not its .conf
+    -- file), we still rebuild things that depend on it.
+    dir <- (-/-) <$> libPath context <*> distDir stage
+    pkgid <- pkgIdentifier package
+    files <- liftIO $
+      (++) <$> getDirectoryFilesIO "." [dir -/- "*libHS"++pkgid++"*"]
+           <*> getDirectoryFilesIO "." [dir -/- pkgid -/- "**"]
     produces files
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
