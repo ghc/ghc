@@ -51,6 +51,7 @@ import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import FastString
+import GHC.StgToCmm.Types
 
 import Data.Word
 import Data.Bits
@@ -63,9 +64,6 @@ import Data.ByteString (ByteString)
 *                                                                      *
 ************************************************************************
 -}
-
--- | Word offset, or word count
-type WordOff = Int
 
 -- | Byte offset, or byte count
 type ByteOff = Int
@@ -195,29 +193,6 @@ data ClosureTypeInfo
 type ConstrDescription = ByteString -- result of dataConIdentity
 type FunArity          = Int
 type SelectorOffset    = Int
-
--------------------------
--- We represent liveness bitmaps as a Bitmap (whose internal
--- representation really is a bitmap).  These are pinned onto case return
--- vectors to indicate the state of the stack for the garbage collector.
---
--- In the compiled program, liveness bitmaps that fit inside a single
--- word (StgWord) are stored as a single word, while larger bitmaps are
--- stored as a pointer to an array of words.
-
-type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
-                         --                    False <=> ptr
-
--------------------------
--- An ArgDescr describes the argument pattern of a function
-
-data ArgDescr
-  = ArgSpec             -- Fits one of the standard patterns
-        !Int            -- RTS type identifier ARG_P, ARG_N, ...
-
-  | ArgGen              -- General case
-        Liveness        -- Details about the arguments
-
 
 -----------------------------------------------------------------------------
 -- Construction
@@ -544,10 +519,6 @@ instance Outputable SMRep where
    ppr (StackRep bs) = text "StackRep" <+> ppr bs
 
    ppr (RTSRep ty rep) = text "tag:" <> ppr ty <+> ppr rep
-
-instance Outputable ArgDescr where
-  ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
-  ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
 
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)

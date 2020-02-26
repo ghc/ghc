@@ -132,7 +132,6 @@ import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.Types.CostCentre
 import GHC.Core.TyCon
 import GHC.Types.Name
-import GHC.Types.Name.Set
 import GHC.Cmm
 import GHC.Cmm.Parser         ( parseCmmFile )
 import GHC.Cmm.Info.Build
@@ -161,6 +160,7 @@ import Bag
 import Exception
 import qualified Stream
 import Stream (Stream)
+import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 
 import Util
 
@@ -175,6 +175,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
+import Data.Bifunctor (first)
 
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
@@ -1391,7 +1392,7 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], NameSet)
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], CgInfos)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1450,11 +1451,11 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps, caf_infos)
+            return (output_filename, stub_c_exists, foreign_fps, cg_infos)
 
 
 hscInteractive :: HscEnv
@@ -1548,7 +1549,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroupSRTs NameSet)
+            -> IO (Stream IO CmmGroupSRTs CgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1560,7 +1561,7 @@ doCodeGen hsc_env this_mod data_tycons
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings stg_binds_w_fvs)
 
-    let cmm_stream :: Stream IO CmmGroup ()
+    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
@@ -1579,10 +1580,14 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream =
-          {-# SCC "cmmPipeline" #-}
-          Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
-            <&> (srtMapNonCAFs . moduleSRTMap)
+        pipeline_stream :: Stream IO CmmGroupSRTs CgInfos
+        pipeline_stream = do
+          (non_cafs, lf_infos) <-
+            {-# SCC "cmmPipeline" #-}
+            Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
+              <&> first (srtMapNonCAFs . moduleSRTMap)
+
+          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos }
 
         dump2 a = do
           unless (null a) $

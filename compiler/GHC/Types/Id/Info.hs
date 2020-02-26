@@ -74,6 +74,10 @@ module GHC.Types.Id.Info (
         ppCafInfo, mayHaveCafRefs,
         cafInfo, setCafInfo,
 
+        -- ** The LambdaFormInfo type
+        LambdaFormInfo(..),
+        lfInfo, setLFInfo,
+
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
 
@@ -104,6 +108,8 @@ import GHC.Types.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import Util
+
+import GHC.StgToCmm.Types (LambdaFormInfo (..))
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -251,7 +257,7 @@ data IdInfo
         -- See Note [Specialisations and RULES in IdInfo]
         unfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
-        cafInfo         :: CafInfo,
+        cafInfo         :: !CafInfo,
         -- ^ 'Id' CAF info
         oneShotInfo     :: OneShotInfo,
         -- ^ Info about a lambda-bound variable, if the 'Id' is one
@@ -271,8 +277,9 @@ data IdInfo
         -- ^ How this is called. This is the number of arguments to which a
         -- binding can be eta-expanded without losing any sharing.
         -- n <=> all calls have at least n arguments
-        levityInfo      :: LevityInfo
+        levityInfo      :: LevityInfo,
         -- ^ when applied, will this Id ever have a levity-polymorphic type?
+        lfInfo          :: !(Maybe LambdaFormInfo)
     }
 
 -- Setters
@@ -295,13 +302,18 @@ setUnfoldingInfo info uf
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo      info ar  = info { arityInfo = ar  }
+
 setCallArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setCallArityInfo info ar  = info { callArityInfo = ar  }
+
 setCafInfo :: IdInfo -> CafInfo -> IdInfo
-setCafInfo        info caf = info { cafInfo = caf }
+setCafInfo info caf = info { cafInfo = caf }
+
+setLFInfo :: IdInfo -> LambdaFormInfo -> IdInfo
+setLFInfo info lf = info { lfInfo = Just lf }
 
 setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo
-setOneShotInfo      info lb = {-lb `seq`-} info { oneShotInfo = lb }
+setOneShotInfo info lb = {-lb `seq`-} info { oneShotInfo = lb }
 
 setDemandInfo :: IdInfo -> Demand -> IdInfo
 setDemandInfo info dd = dd `seq` info { demandInfo = dd }
@@ -327,7 +339,8 @@ vanillaIdInfo
             strictnessInfo      = nopSig,
             cprInfo             = topCprSig,
             callArityInfo       = unknownArity,
-            levityInfo          = NoLevityInfo
+            levityInfo          = NoLevityInfo,
+            lfInfo              = Nothing
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
