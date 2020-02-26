@@ -517,6 +517,7 @@ instance Outputable LexicalFixity where
 data TopLevelFlag
   = TopLevel
   | NotTopLevel
+  deriving (Eq)
 
 isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
 

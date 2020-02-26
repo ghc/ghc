@@ -49,6 +49,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
+import GHC.StgToCmm.Types (ModuleLFInfos)
+
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
@@ -1315,6 +1317,7 @@ oldMD5 dflags bh = do
         return $! readHexFingerprint hash_str
 -}
 
+<<<<<<< HEAD:compiler/GHC/Iface/Recomp.hs
 ----------------------
 -- mkOrphMap partitions instance decls or rules into
 --      (a) an OccEnv for ones that are not orphans,
@@ -1327,6 +1330,585 @@ mkOrphMap :: (decl -> IsOrphan) -- Extract orphan status from decl
               [decl])           -- Orphan decls; in canonical order
 mkOrphMap get_key decls
   = foldl' go (emptyOccEnv, []) decls
+||||||| constructed merge base:compiler/GHC/Iface/Utils.hs
+tyThingToIfaceDecl :: TyThing -> IfaceDecl
+tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
+tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
+    PatSynCon ps   -> patSynToIfaceDecl ps
+
+--------------------------
+idToIfaceDecl :: Id -> IfaceDecl
+-- The Id is already tidied, so that locally-bound names
+-- (lambdas, for-alls) already have non-clashing OccNames
+-- We can't tidy it here, locally, because it may have
+-- free variables in its type or IdInfo
+idToIfaceDecl id
+  = IfaceId { ifName      = getName id,
+              ifType      = toIfaceType (idType id),
+              ifIdDetails = toIfaceIdDetails (idDetails id),
+              ifIdInfo    = toIfaceIdInfo (idInfo id) }
+
+--------------------------
+dataConToIfaceDecl :: DataCon -> IfaceDecl
+dataConToIfaceDecl dataCon
+  = IfaceId { ifName      = getName dataCon,
+              ifType      = toIfaceType (dataConUserType dataCon),
+              ifIdDetails = IfVanillaId,
+              ifIdInfo    = [] }
+
+--------------------------
+coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
+-- We *do* tidy Axioms, because they are not (and cannot
+-- conveniently be) built in tidy form
+coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
+                               , co_ax_role = role })
+ = IfaceAxiom { ifName       = getName ax
+              , ifTyCon      = toIfaceTyCon tycon
+              , ifRole       = role
+              , ifAxBranches = map (coAxBranchToIfaceBranch tycon
+                                     (map coAxBranchLHS branch_list))
+                                   branch_list }
+ where
+   branch_list = fromBranches branches
+
+-- 2nd parameter is the list of branch LHSs, in case of a closed type family,
+-- for conversion from incompatible branches to incompatible indices.
+-- For an open type family the list should be empty.
+-- See Note [Storing compatibility] in CoAxiom
+coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch tc lhs_s
+                        (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                    , cab_eta_tvs = eta_tvs
+                                    , cab_lhs = lhs, cab_roles = roles
+                                    , cab_rhs = rhs, cab_incomps = incomps })
+
+  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tvs
+                  , ifaxbCoVars  = map toIfaceIdBndr cvs
+                  , ifaxbEtaTyVars = toIfaceTvBndrs eta_tvs
+                  , ifaxbLHS     = toIfaceTcArgs tc lhs
+                  , ifaxbRoles   = roles
+                  , ifaxbRHS     = toIfaceType rhs
+                  , ifaxbIncomps = iface_incomps }
+  where
+    iface_incomps = map (expectJust "iface_incomps"
+                        . flip findIndex lhs_s
+                        . eqTypes
+                        . coAxBranchLHS) incomps
+
+-----------------
+tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
+-- We *do* tidy TyCons, because they are not (and cannot
+-- conveniently be) built in tidy form
+-- The returned TidyEnv is the one after tidying the tyConTyVars
+tyConToIfaceDecl env tycon
+  | Just clas <- tyConClass_maybe tycon
+  = classToIfaceDecl env clas
+
+  | Just syn_rhs <- synTyConRhs_maybe tycon
+  = ( tc_env1
+    , IfaceSynonym { ifName    = getName tycon,
+                     ifRoles   = tyConRoles tycon,
+                     ifSynRhs  = if_syn_type syn_rhs,
+                     ifBinders = if_binders,
+                     ifResKind = if_res_kind
+                   })
+
+  | Just fam_flav <- famTyConFlav_maybe tycon
+  = ( tc_env1
+    , IfaceFamily { ifName    = getName tycon,
+                    ifResVar  = if_res_var,
+                    ifFamFlav = to_if_fam_flav fam_flav,
+                    ifBinders = if_binders,
+                    ifResKind = if_res_kind,
+                    ifFamInj  = tyConInjectivityInfo tycon
+                  })
+
+  | isAlgTyCon tycon
+  = ( tc_env1
+    , IfaceData { ifName    = getName tycon,
+                  ifBinders = if_binders,
+                  ifResKind = if_res_kind,
+                  ifCType   = tyConCType tycon,
+                  ifRoles   = tyConRoles tycon,
+                  ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon),
+                  ifGadtSyntax = isGadtSyntaxTyCon tycon,
+                  ifParent  = parent })
+
+  | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
+  -- We only convert these TyCons to IfaceTyCons when we are
+  -- just about to pretty-print them, not because we are going
+  -- to put them into interface files
+  = ( env
+    , IfaceData { ifName       = getName tycon,
+                  ifBinders    = if_binders,
+                  ifResKind    = if_res_kind,
+                  ifCType      = Nothing,
+                  ifRoles      = tyConRoles tycon,
+                  ifCtxt       = [],
+                  ifCons       = IfDataTyCon [],
+                  ifGadtSyntax = False,
+                  ifParent     = IfNoParent })
+  where
+    -- NOTE: Not all TyCons have `tyConTyVars` field. Forcing this when `tycon`
+    -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
+    -- an error.
+    (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
+    tc_tyvars      = binderVars tc_binders
+    if_binders     = toIfaceTyCoVarBinders tc_binders
+                     -- No tidying of the binders; they are already tidy
+    if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
+    if_syn_type ty = tidyToIfaceType tc_env1 ty
+    if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
+
+    parent = case tyConFamInstSig_maybe tycon of
+               Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
+                                                   (toIfaceTyCon tc)
+                                                   (tidyToIfaceTcArgs tc_env1 tc ty)
+               Nothing           -> IfNoParent
+
+    to_if_fam_flav OpenSynFamilyTyCon             = IfaceOpenSynFamilyTyCon
+    to_if_fam_flav AbstractClosedSynFamilyTyCon   = IfaceAbstractClosedSynFamilyTyCon
+    to_if_fam_flav (DataFamilyTyCon {})           = IfaceDataFamilyTyCon
+    to_if_fam_flav (BuiltInSynFamTyCon {})        = IfaceBuiltInSynFamTyCon
+    to_if_fam_flav (ClosedSynFamilyTyCon Nothing) = IfaceClosedSynFamilyTyCon Nothing
+    to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
+      = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
+      where defs = fromBranches $ coAxiomBranches ax
+            lhss = map coAxBranchLHS defs
+            ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs
+            axn  = coAxiomName ax
+
+    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
+        -- The AbstractTyCon case happens when a TyCon has been trimmed
+        -- during tidying.
+        -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
+        -- for GHCi, when browsing a module, in which case the
+        -- AbstractTyCon and TupleTyCon cases are perfectly sensible.
+        -- (Tuple declarations are not serialised into interface files.)
+
+    ifaceConDecl data_con
+        = IfCon   { ifConName    = dataConName data_con,
+                    ifConInfix   = dataConIsInfix data_con,
+                    ifConWrapper = isJust (dataConWrapId_maybe data_con),
+                    ifConExTCvs  = map toIfaceBndr ex_tvs',
+                    ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
+                    ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
+                    ifConCtxt    = tidyToIfaceContext con_env2 theta,
+                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
+                    ifConFields  = dataConFieldLabels data_con,
+                    ifConStricts = map (toIfaceBang con_env2)
+                                       (dataConImplBangs data_con),
+                    ifConSrcStricts = map toIfaceSrcBang
+                                          (dataConSrcBangs data_con)}
+        where
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+            = dataConFullSig data_con
+          user_bndrs = dataConUserTyVarBinders data_con
+
+          -- Tidy the univ_tvs of the data constructor to be identical
+          -- to the tyConTyVars of the type constructor.  This means
+          -- (a) we don't need to redundantly put them into the interface file
+          -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
+          --     we know that the type variables will line up
+          -- The latter (b) is important because we pretty-print type constructors
+          -- by converting to Iface syntax and pretty-printing that
+          con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
+                     -- A bit grimy, perhaps, but it's simple!
+
+          (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
+          user_bndrs' = map (tidyUserTyCoVarBinder con_env2) user_bndrs
+          to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
+
+          -- By this point, we have tidied every universal and existential
+          -- tyvar. Because of the dcUserTyCoVarBinders invariant
+          -- (see Note [DataCon user type variable binders]), *every*
+          -- user-written tyvar must be contained in the substitution that
+          -- tidying produced. Therefore, tidying the user-written tyvars is a
+          -- simple matter of looking up each variable in the substitution,
+          -- which tidyTyCoVarOcc accomplishes.
+          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarBinder -> TyCoVarBinder
+          tidyUserTyCoVarBinder env (Bndr tv vis) =
+            Bndr (tidyTyCoVarOcc env tv) vis
+
+classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
+classToIfaceDecl env clas
+  = ( env1
+    , IfaceClass { ifName   = getName tycon,
+                   ifRoles  = tyConRoles (classTyCon clas),
+                   ifBinders = toIfaceTyCoVarBinders tc_binders,
+                   ifBody   = body,
+                   ifFDs    = map toIfaceFD clas_fds })
+  where
+    (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
+      = classExtraBigSig clas
+    tycon = classTyCon clas
+
+    body | isAbstractTyCon tycon = IfAbstractClass
+         | otherwise
+         = IfConcreteClass {
+                ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
+                ifATs    = map toIfaceAT clas_ats,
+                ifSigs   = map toIfaceClassOp op_stuff,
+                ifMinDef = fmap getOccFS (classMinimalDef clas)
+            }
+
+    (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
+
+    toIfaceAT :: ClassATItem -> IfaceAT
+    toIfaceAT (ATI tc def)
+      = IfaceAT if_decl (fmap (tidyToIfaceType env2 . fst) def)
+      where
+        (env2, if_decl) = tyConToIfaceDecl env1 tc
+
+    toIfaceClassOp (sel_id, def_meth)
+        = ASSERT( sel_tyvars == binderVars tc_binders )
+          IfaceClassOp (getName sel_id)
+                       (tidyToIfaceType env1 op_ty)
+                       (fmap toDmSpec def_meth)
+        where
+                -- Be careful when splitting the type, because of things
+                -- like         class Foo a where
+                --                op :: (?x :: String) => a -> a
+                -- and          class Baz a where
+                --                op :: (Ord a) => a -> a
+          (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
+          op_ty                = funResultTy rho_ty
+
+    toDmSpec :: (Name, DefMethSpec Type) -> DefMethSpec IfaceType
+    toDmSpec (_, VanillaDM)       = VanillaDM
+    toDmSpec (_, GenericDM dm_ty) = GenericDM (tidyToIfaceType env1 dm_ty)
+
+    toIfaceFD (tvs1, tvs2) = (map (tidyTyVar env1) tvs1
+                             ,map (tidyTyVar env1) tvs2)
+
+--------------------------
+
+tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
+-- If the type variable "binder" is in scope, don't re-bind it
+-- In a class decl, for example, the ATD binders mention
+-- (amd must mention) the class tyvars
+tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
+ = case lookupVarEnv subst tv of
+     Just tv' -> (env,  Bndr tv' vis)
+     Nothing  -> tidyTyCoVarBinder env tvb
+
+tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
+tidyTyConBinders = mapAccumL tidyTyConBinder
+
+tidyTyVar :: TidyEnv -> TyVar -> FastString
+tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
+
+--------------------------
+instanceToIfaceInst :: ClsInst -> IfaceClsInst
+instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
+                             , is_cls_nm = cls_name, is_cls = cls
+                             , is_tcs = mb_tcs
+                             , is_orphan = orph })
+  = ASSERT( cls_name == className cls )
+    IfaceClsInst { ifDFun    = dfun_name,
+                ifOFlag   = oflag,
+                ifInstCls = cls_name,
+                ifInstTys = map do_rough mb_tcs,
+                ifInstOrph = orph }
+=======
+tyThingToIfaceDecl :: TyThing -> IfaceDecl
+tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
+tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
+    PatSynCon ps   -> patSynToIfaceDecl ps
+
+--------------------------
+idToIfaceDecl :: Id -> IfaceDecl
+-- The Id is already tidied, so that locally-bound names
+-- (lambdas, for-alls) already have non-clashing OccNames
+-- We can't tidy it here, locally, because it may have
+-- free variables in its type or IdInfo
+idToIfaceDecl id
+  = IfaceId { ifName      = getName id,
+              ifType      = toIfaceType (idType id),
+              ifIdDetails = toIfaceIdDetails (idDetails id),
+              ifIdInfo    = toIfaceIdInfo (idInfo id)
+              }
+
+--------------------------
+dataConToIfaceDecl :: DataCon -> IfaceDecl
+dataConToIfaceDecl dataCon
+  = IfaceId { ifName      = getName dataCon,
+              ifType      = toIfaceType (dataConUserType dataCon),
+              ifIdDetails = IfVanillaId,
+              ifIdInfo    = []
+              }
+
+--------------------------
+coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
+-- We *do* tidy Axioms, because they are not (and cannot
+-- conveniently be) built in tidy form
+coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
+                               , co_ax_role = role })
+ = IfaceAxiom { ifName       = getName ax
+              , ifTyCon      = toIfaceTyCon tycon
+              , ifRole       = role
+              , ifAxBranches = map (coAxBranchToIfaceBranch tycon
+                                     (map coAxBranchLHS branch_list))
+                                   branch_list }
+ where
+   branch_list = fromBranches branches
+
+-- 2nd parameter is the list of branch LHSs, in case of a closed type family,
+-- for conversion from incompatible branches to incompatible indices.
+-- For an open type family the list should be empty.
+-- See Note [Storing compatibility] in CoAxiom
+coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch tc lhs_s
+                        (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                    , cab_eta_tvs = eta_tvs
+                                    , cab_lhs = lhs, cab_roles = roles
+                                    , cab_rhs = rhs, cab_incomps = incomps })
+
+  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tvs
+                  , ifaxbCoVars  = map toIfaceIdBndr cvs
+                  , ifaxbEtaTyVars = toIfaceTvBndrs eta_tvs
+                  , ifaxbLHS     = toIfaceTcArgs tc lhs
+                  , ifaxbRoles   = roles
+                  , ifaxbRHS     = toIfaceType rhs
+                  , ifaxbIncomps = iface_incomps }
+  where
+    iface_incomps = map (expectJust "iface_incomps"
+                        . flip findIndex lhs_s
+                        . eqTypes
+                        . coAxBranchLHS) incomps
+
+-----------------
+tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
+-- We *do* tidy TyCons, because they are not (and cannot
+-- conveniently be) built in tidy form
+-- The returned TidyEnv is the one after tidying the tyConTyVars
+tyConToIfaceDecl env tycon
+  | Just clas <- tyConClass_maybe tycon
+  = classToIfaceDecl env clas
+
+  | Just syn_rhs <- synTyConRhs_maybe tycon
+  = ( tc_env1
+    , IfaceSynonym { ifName    = getName tycon,
+                     ifRoles   = tyConRoles tycon,
+                     ifSynRhs  = if_syn_type syn_rhs,
+                     ifBinders = if_binders,
+                     ifResKind = if_res_kind
+                   })
+
+  | Just fam_flav <- famTyConFlav_maybe tycon
+  = ( tc_env1
+    , IfaceFamily { ifName    = getName tycon,
+                    ifResVar  = if_res_var,
+                    ifFamFlav = to_if_fam_flav fam_flav,
+                    ifBinders = if_binders,
+                    ifResKind = if_res_kind,
+                    ifFamInj  = tyConInjectivityInfo tycon
+                  })
+
+  | isAlgTyCon tycon
+  = ( tc_env1
+    , IfaceData { ifName    = getName tycon,
+                  ifBinders = if_binders,
+                  ifResKind = if_res_kind,
+                  ifCType   = tyConCType tycon,
+                  ifRoles   = tyConRoles tycon,
+                  ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon),
+                  ifGadtSyntax = isGadtSyntaxTyCon tycon,
+                  ifParent  = parent })
+
+  | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
+  -- We only convert these TyCons to IfaceTyCons when we are
+  -- just about to pretty-print them, not because we are going
+  -- to put them into interface files
+  = ( env
+    , IfaceData { ifName       = getName tycon,
+                  ifBinders    = if_binders,
+                  ifResKind    = if_res_kind,
+                  ifCType      = Nothing,
+                  ifRoles      = tyConRoles tycon,
+                  ifCtxt       = [],
+                  ifCons       = IfDataTyCon [],
+                  ifGadtSyntax = False,
+                  ifParent     = IfNoParent })
+  where
+    -- NOTE: Not all TyCons have `tyConTyVars` field. Forcing this when `tycon`
+    -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
+    -- an error.
+    (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
+    tc_tyvars      = binderVars tc_binders
+    if_binders     = toIfaceTyCoVarBinders tc_binders
+                     -- No tidying of the binders; they are already tidy
+    if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
+    if_syn_type ty = tidyToIfaceType tc_env1 ty
+    if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
+
+    parent = case tyConFamInstSig_maybe tycon of
+               Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
+                                                   (toIfaceTyCon tc)
+                                                   (tidyToIfaceTcArgs tc_env1 tc ty)
+               Nothing           -> IfNoParent
+
+    to_if_fam_flav OpenSynFamilyTyCon             = IfaceOpenSynFamilyTyCon
+    to_if_fam_flav AbstractClosedSynFamilyTyCon   = IfaceAbstractClosedSynFamilyTyCon
+    to_if_fam_flav (DataFamilyTyCon {})           = IfaceDataFamilyTyCon
+    to_if_fam_flav (BuiltInSynFamTyCon {})        = IfaceBuiltInSynFamTyCon
+    to_if_fam_flav (ClosedSynFamilyTyCon Nothing) = IfaceClosedSynFamilyTyCon Nothing
+    to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
+      = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
+      where defs = fromBranches $ coAxiomBranches ax
+            lhss = map coAxBranchLHS defs
+            ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs
+            axn  = coAxiomName ax
+
+    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
+        -- The AbstractTyCon case happens when a TyCon has been trimmed
+        -- during tidying.
+        -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
+        -- for GHCi, when browsing a module, in which case the
+        -- AbstractTyCon and TupleTyCon cases are perfectly sensible.
+        -- (Tuple declarations are not serialised into interface files.)
+
+    ifaceConDecl data_con
+        = IfCon   { ifConName    = dataConName data_con,
+                    ifConInfix   = dataConIsInfix data_con,
+                    ifConWrapper = isJust (dataConWrapId_maybe data_con),
+                    ifConExTCvs  = map toIfaceBndr ex_tvs',
+                    ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
+                    ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
+                    ifConCtxt    = tidyToIfaceContext con_env2 theta,
+                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
+                    ifConFields  = dataConFieldLabels data_con,
+                    ifConStricts = map (toIfaceBang con_env2)
+                                       (dataConImplBangs data_con),
+                    ifConSrcStricts = map toIfaceSrcBang
+                                          (dataConSrcBangs data_con)}
+        where
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+            = dataConFullSig data_con
+          user_bndrs = dataConUserTyVarBinders data_con
+
+          -- Tidy the univ_tvs of the data constructor to be identical
+          -- to the tyConTyVars of the type constructor.  This means
+          -- (a) we don't need to redundantly put them into the interface file
+          -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
+          --     we know that the type variables will line up
+          -- The latter (b) is important because we pretty-print type constructors
+          -- by converting to Iface syntax and pretty-printing that
+          con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
+                     -- A bit grimy, perhaps, but it's simple!
+
+          (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
+          user_bndrs' = map (tidyUserTyCoVarBinder con_env2) user_bndrs
+          to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
+
+          -- By this point, we have tidied every universal and existential
+          -- tyvar. Because of the dcUserTyCoVarBinders invariant
+          -- (see Note [DataCon user type variable binders]), *every*
+          -- user-written tyvar must be contained in the substitution that
+          -- tidying produced. Therefore, tidying the user-written tyvars is a
+          -- simple matter of looking up each variable in the substitution,
+          -- which tidyTyCoVarOcc accomplishes.
+          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarBinder -> TyCoVarBinder
+          tidyUserTyCoVarBinder env (Bndr tv vis) =
+            Bndr (tidyTyCoVarOcc env tv) vis
+
+classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
+classToIfaceDecl env clas
+  = ( env1
+    , IfaceClass { ifName   = getName tycon,
+                   ifRoles  = tyConRoles (classTyCon clas),
+                   ifBinders = toIfaceTyCoVarBinders tc_binders,
+                   ifBody   = body,
+                   ifFDs    = map toIfaceFD clas_fds })
+  where
+    (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
+      = classExtraBigSig clas
+    tycon = classTyCon clas
+
+    body | isAbstractTyCon tycon = IfAbstractClass
+         | otherwise
+         = IfConcreteClass {
+                ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
+                ifATs    = map toIfaceAT clas_ats,
+                ifSigs   = map toIfaceClassOp op_stuff,
+                ifMinDef = fmap getOccFS (classMinimalDef clas)
+            }
+
+    (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
+
+    toIfaceAT :: ClassATItem -> IfaceAT
+    toIfaceAT (ATI tc def)
+      = IfaceAT if_decl (fmap (tidyToIfaceType env2 . fst) def)
+      where
+        (env2, if_decl) = tyConToIfaceDecl env1 tc
+
+    toIfaceClassOp (sel_id, def_meth)
+        = ASSERT( sel_tyvars == binderVars tc_binders )
+          IfaceClassOp (getName sel_id)
+                       (tidyToIfaceType env1 op_ty)
+                       (fmap toDmSpec def_meth)
+        where
+                -- Be careful when splitting the type, because of things
+                -- like         class Foo a where
+                --                op :: (?x :: String) => a -> a
+                -- and          class Baz a where
+                --                op :: (Ord a) => a -> a
+          (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
+          op_ty                = funResultTy rho_ty
+
+    toDmSpec :: (Name, DefMethSpec Type) -> DefMethSpec IfaceType
+    toDmSpec (_, VanillaDM)       = VanillaDM
+    toDmSpec (_, GenericDM dm_ty) = GenericDM (tidyToIfaceType env1 dm_ty)
+
+    toIfaceFD (tvs1, tvs2) = (map (tidyTyVar env1) tvs1
+                             ,map (tidyTyVar env1) tvs2)
+
+--------------------------
+
+tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
+-- If the type variable "binder" is in scope, don't re-bind it
+-- In a class decl, for example, the ATD binders mention
+-- (amd must mention) the class tyvars
+tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
+ = case lookupVarEnv subst tv of
+     Just tv' -> (env,  Bndr tv' vis)
+     Nothing  -> tidyTyCoVarBinder env tvb
+
+tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
+tidyTyConBinders = mapAccumL tidyTyConBinder
+
+tidyTyVar :: TidyEnv -> TyVar -> FastString
+tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
+
+--------------------------
+instanceToIfaceInst :: ClsInst -> IfaceClsInst
+instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
+                             , is_cls_nm = cls_name, is_cls = cls
+                             , is_tcs = mb_tcs
+                             , is_orphan = orph })
+  = ASSERT( cls_name == className cls )
+    IfaceClsInst { ifDFun    = dfun_name,
+                ifOFlag   = oflag,
+                ifInstCls = cls_name,
+                ifInstTys = map do_rough mb_tcs,
+                ifInstOrph = orph }
+>>>>>>> Cross-module LambdaFormInfo passing:compiler/GHC/Iface/Utils.hs
   where
     go (non_orphs, orphs) d
         | NotOrphan occ <- get_key d
