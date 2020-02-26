@@ -41,6 +41,8 @@ module GHC.CoreToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Other stuff
+    , toIfaceLFInfo
     ) where
 
 #include "HsVersions.h"
@@ -48,6 +50,7 @@ module GHC.CoreToIface
 import GhcPrelude
 
 import GHC.Iface.Syntax
+import GHC.StgToCmm.Types
 import DataCon
 import Id
 import IdInfo
@@ -74,6 +77,8 @@ import Demand ( isTopSig )
 import Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
+import Data.Word
+import Data.Bits
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -614,6 +619,41 @@ toIfaceVar v
     | isExternalName name             = IfaceExt name
     | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
+
+
+---------------------
+toIfaceLFInfo :: LambdaFormInfo -> IfaceLFInfo
+toIfaceLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
+    IfLFReEntrant oneshot rep fvs_flag
+toIfaceLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
+   -- Assert that arity fits in 14 bits
+   ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
+   IfLFThunk hasfv updateable (toIfaceStandardFormInfo sfi) m_function
+toIfaceLFInfo LFUnlifted = IfLFUnlifted
+toIfaceLFInfo (LFCon con) = IfLFCon (dataConName con)
+-- All other cases are not possible at the top level.
+toIfaceLFInfo lf = pprPanic "Invalid IfaceLFInfo conversion:"
+                   (ppr lf <+> text "should not be exported")
+
+toIfaceStandardFormInfo :: StandardFormInfo -> IfaceStandardFormInfo
+toIfaceStandardFormInfo NonStandardThunk = IfStandardFormInfo 1
+toIfaceStandardFormInfo sf =
+    IfStandardFormInfo $!
+      tag sf .|. encodeField (field sf)
+  where
+    tag SelectorThunk{} = 0
+    tag ApThunk{} = 2 -- == setBit 0 1
+    tag _ = panic "Impossible"
+
+    field (SelectorThunk n) = n
+    field (ApThunk n) = n
+    field _ = panic "Impossible"
+
+    encodeField n =
+      let wn = fromIntegral n :: Word
+          shifted = wn `unsafeShiftL` 2
+      in ASSERT(shifted > 0 && shifted < fromIntegral (maxBound :: Word16))
+         (fromIntegral shifted :: Word16)
 
 
 {- Note [Inlining and hs-boot files]

@@ -78,6 +78,7 @@ import FastString
 import ListSetOps
 import Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.StgToCmm.Closure (mkLFArgument)
 
 import Data.Maybe       ( maybeToList )
 
@@ -495,14 +496,23 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
-  | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
-      -- See Note [Newtype workers]
-
-  | otherwise
-  = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
-
+    = id `setIdLFInfo` lf_info
   where
+    id | isNewTyCon tycon
+       = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
+           -- See Note [Newtype workers]
+
+       | otherwise
+       = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
+
+    lf_info
+      | isNullaryRepDataCon data_con
+      = LFCon data_con
+      | wkr_arity > 0
+      = LFReEntrant TopLevel noOneShotInfo wkr_arity True (panic "arg_descr")
+      | otherwise
+      = mkLFArgument id
+
     tycon  = dataConTyCon data_con  -- The representation TyCon
     wkr_ty = dataConRepType data_con
 
@@ -1696,7 +1706,7 @@ coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- See Note [Coercion tokens] in CoreToStg.hs
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
-                 noCafIdInfo
+                 noCafIdInfo `setIdLFInfo` LFUnlifted
 
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
