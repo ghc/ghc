@@ -4,7 +4,7 @@
 -- It can often be useful to force various parts of the AST. This module
 -- provides a number of @seq@-like functions to accomplish this.
 
-module CoreSeq (
+module GHC.Core.Seq (
         -- * Utilities for forcing Core structures
         seqExpr, seqExprs, seqUnfolding, seqRules,
         megaSeqIdInfo, seqRuleInfo, seqBinds,
@@ -12,7 +12,7 @@ module CoreSeq (
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 import IdInfo
 import Demand( seqDemand, seqStrictSig )
 import Cpr( seqCprSig )

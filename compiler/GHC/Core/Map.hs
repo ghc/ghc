@@ -11,7 +11,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module CoreMap(
+module GHC.Core.Map (
    -- * Maps over Core expressions
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
    -- * Maps over 'Type's
@@ -40,7 +40,7 @@ module CoreMap(
 import GhcPrelude
 
 import TrieMap
-import CoreSyn
+import GHC.Core
 import Coercion
 import Name
 import Type
@@ -139,7 +139,7 @@ We could compare the return type regardless, but the wildly common case
 is that it's unnecessary, so we have two fields (cm_case and cm_ecase)
 for the two possibilities.  Only cm_ecase looks at the type.
 
-See also Note [Empty case alternatives] in CoreSyn.
+See also Note [Empty case alternatives] in GHC.Core.
 -}
 
 -- | @CoreMap a@ is a map from 'CoreExpr' to @a@.  If you are a client, this

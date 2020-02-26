@@ -20,14 +20,14 @@ import GhcPrelude
 
 import TcRnMonad        -- temp
 
-import CoreSyn
+import GHC.Core
 
 import GHC.HsToCore.Foreign.Call
 import GHC.HsToCore.Monad
 
 import GHC.Hs
 import DataCon
-import CoreUnfold
+import GHC.Core.Unfold
 import Id
 import Literal
 import Module

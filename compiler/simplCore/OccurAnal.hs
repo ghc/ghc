@@ -23,11 +23,11 @@ module OccurAnal (
 
 import GhcPrelude
 
-import CoreSyn
-import CoreFVs
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
-import CoreArity        ( joinRhsArity )
+import GHC.Core.Arity   ( joinRhsArity )
 import Id
 import IdInfo
 import Name( localiseName )
@@ -2762,7 +2762,7 @@ setBinderOcc occ_info bndr
 -- the decision about another binding 'g' might be invalidated if (say)
 -- 'f' tail-calls 'g'.
 --
--- See Note [Invariants on join points] in CoreSyn.
+-- See Note [Invariants on join points] in GHC.Core.
 decideJoinPointHood :: TopLevelFlag -> UsageDetails
                     -> [CoreBndr]
                     -> Bool
@@ -2835,7 +2835,7 @@ unfolding captured by the INLINE pragma has arity 1.  If we try to
 convert g to be a join point, its unfolding will still have arity 1
 (since it is stable, and we don't meddle with stable unfoldings), and
 Lint will complain (see Note [Invariants on join points], (2a), in
-CoreSyn.  #13413.
+GHC.Core.  #13413.
 
 Moreover, since g is going to be inlined anyway, there is no benefit
 from making it a join point.
@@ -2847,7 +2847,7 @@ TcInstDcls) we mark recursive things as INLINE but the recursion
 unravels; so ignoring INLINE pragmas on recursive things isn't good
 either.
 
-See Invariant 2a of Note [Invariants on join points] in CoreSyn
+See Invariant 2a of Note [Invariants on join points] in GHC.Core
 
 
 ************************************************************************

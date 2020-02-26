@@ -42,7 +42,7 @@ import Bag
 import RdrName
 import Name
 import Id
-import CoreSyn
+import GHC.Core
 import GHCi.RemoteTypes
 import SrcLoc
 import Type

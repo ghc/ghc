@@ -8,15 +8,15 @@ import GhcPrelude
 
 import FastString
 import Type
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 import Literal ( Literal(..) )
 import TcEvidence
 import GHC.Driver.Types
 import GHC.Driver.Session
 import Name
 import Module
-import CoreUtils
+import GHC.Core.Utils
 import PrelNames
 import SrcLoc
 

@@ -301,7 +301,7 @@ import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 
-import PprTyThing       ( pprFamInst )
+import GHC.Core.Ppr.TyThing  ( pprFamInst )
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Pipeline   ( compileOne' )
@@ -327,7 +327,7 @@ import Avail
 import InstEnv
 import FamInstEnv ( FamInst )
 import SrcLoc
-import CoreSyn
+import GHC.Core
 import GHC.Iface.Tidy
 import GHC.Driver.Phases     ( Phase(..), isHaskellSrcFilename )
 import GHC.Driver.Finder
@@ -353,7 +353,7 @@ import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
-import CoreFVs          ( orphNamesOfFamInst )
+import GHC.Core.FVs     ( orphNamesOfFamInst )
 import FamInstEnv       ( famInstEnvElts )
 import TcRnDriver
 import Inst
