@@ -92,7 +92,7 @@ module GHC.Types.Id (
         idCallArity, idFunRepArity,
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
-        idCafInfo,
+        idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
         isNeverLevPolyId,
@@ -105,6 +105,7 @@ module GHC.Types.Id (
         setIdSpecialisation,
         setIdCafInfo,
         setIdOccInfo, zapIdOccInfo,
+        setIdLFInfo,
 
         setIdDemandInfo,
         setIdStrictness,
@@ -730,6 +731,15 @@ idCafInfo id = cafInfo (idInfo id)
 
 setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
+
+        ---------------------------------
+        -- Lambda form info
+
+idLFInfo_maybe :: Id -> Maybe LambdaFormInfo
+idLFInfo_maybe = lfInfo . idInfo
+
+setIdLFInfo :: Id -> LambdaFormInfo -> Id
+setIdLFInfo id lf = modifyIdInfo (`setLFInfo` lf) id
 
         ---------------------------------
         -- Occurrence INFO
