@@ -106,7 +106,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.accept=" ++ show accept
             , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
             , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
-            , arg "-e", arg $ "config.exeext=" ++ quote exe
+            , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
             , arg "-e", arg $ "config.compiler_debugged=" ++
               show debugged
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
