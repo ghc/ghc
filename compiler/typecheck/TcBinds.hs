@@ -505,7 +505,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
 recursivePatSynErr ::
-     (OutputableBndrId p, XCollectPat (GhcPass p))
+     (OutputableBndrId p, CollectPass (GhcPass p))
   => SrcSpan -- ^ The location of the first pattern synonym binding
              --   (for error reporting)
   -> LHsBinds (GhcPass p)

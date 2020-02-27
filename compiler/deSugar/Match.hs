@@ -520,7 +520,7 @@ tidy_bang_pat v o _ p@(SumPat {})    = tidy1 v o p
 tidy_bang_pat v o l p@(ConPat { pat_con = L _ (RealDataCon dc)
                               , pat_args = args
                               , pat_con_ext = ConPatTc
-                                { pat_arg_tys = arg_tys
+                                { cpt_arg_tys = arg_tys
                                 }
                               })
   -- Newtypes: push bang inwards (#9844)
@@ -1106,7 +1106,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
 patGroup :: DynFlags -> Pat GhcTc -> PatGroup
 patGroup _ (ConPat { pat_con = L _ con
-                   , pat_con_ext = ConPatTc { pat_arg_tys = tys }
+                   , pat_con_ext = ConPatTc { cpt_arg_tys = tys }
                    })
  | RealDataCon dcon <- con              = PgCon dcon
  | PatSynCon psyn <- con                = PgSyn psyn tys

@@ -1128,7 +1128,7 @@ tcCollectEx pat = go pat
     go1 (SumPat _ p _ _)   = go p
     go1 (ViewPat _ _ p)    = go p
     go1 con@ConPat{ pat_con_ext = con' }
-                           = merge (pat_tvs con', pat_dicts con') $
+                           = merge (cpt_tvs con', cpt_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
     go1 (XPat (CoPat _ p _)) = go1 p

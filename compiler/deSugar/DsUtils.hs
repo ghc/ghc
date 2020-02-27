@@ -760,7 +760,7 @@ mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
-mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
+mkVanillaTuplePat :: [LPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 
