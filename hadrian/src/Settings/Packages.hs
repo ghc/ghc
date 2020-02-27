@@ -176,14 +176,9 @@ gmpPackageArgs = do
         librariesGmp <- getSetting GmpLibDir
         includesGmp  <- getSetting GmpIncludeDir
 
-        -- Windows is always built with inplace GMP until we have dynamic
-        -- linking working.
-        inTreeFlag <- getFlag GmpInTree
-        let inTree = inTreeFlag || windowsHost
-
         mconcat
           [ builder (Cabal Setup) ? mconcat
-            [ inTree ? arg "--configure-option=--with-intree-gmp"
+            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
             , flag GmpFrameworkPref ?
               arg "--configure-option=--with-gmp-framework-preferred"
 
