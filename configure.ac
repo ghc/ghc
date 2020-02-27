@@ -458,6 +458,12 @@ FP_ICONV
 FP_GMP
 FP_CURSES
 
+dnl On Windows we force in-tree GMP build until we support dynamic linking
+if test "$HostOS" = "mingw32"
+then
+  GMP_FORCE_INTREE="YES"
+fi
+
 XCODE_VERSION()
 
 
@@ -1453,6 +1459,7 @@ echo "\
    Building a cross compiler : $CrossCompiling
    Unregisterised            : $Unregisterised
    TablesNextToCode          : $TablesNextToCode
+   Build GMP in tree         : $GMP_FORCE_INTREE
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd
