@@ -270,7 +270,7 @@ deListComp (ApplicativeStmt {} : _) _ =
 deListComp (XStmtLR nec : _) _ =
   noExtCon nec
 
-deBindComp :: OutPat GhcTc
+deBindComp :: LPat GhcTc
            -> CoreExpr
            -> [ExprStmt GhcTc]
            -> CoreExpr

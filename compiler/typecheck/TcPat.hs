@@ -495,7 +495,7 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat penv (ConPat con arg_pats NoExtField) pat_ty thing_inside
+tc_pat penv (ConPat NoExtField con arg_pats) pat_ty thing_inside
   = tcConPat penv con pat_ty arg_pats thing_inside
 
 ------------------------
@@ -789,10 +789,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = arg_pats'
                                          , pat_con_ext = ConPatTc
-                                           { pat_tvs = [], pat_dicts = []
-                                           , pat_binds = emptyTcEvBinds
-                                           , pat_arg_tys = ctxt_res_tys
-                                           , pat_wrap = idHsWrapper
+                                           { cpt_tvs = [], cpt_dicts = []
+                                           , cpt_binds = emptyTcEvBinds
+                                           , cpt_arg_tys = ctxt_res_tys
+                                           , cpt_wrap = idHsWrapper
                                            }
                                          }
 
@@ -827,11 +827,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
                 { pat_con   = header
                 , pat_args  = arg_pats'
                 , pat_con_ext = ConPatTc
-                  { pat_tvs   = ex_tvs'
-                  , pat_dicts = given
-                  , pat_binds = ev_binds
-                  , pat_arg_tys = ctxt_res_tys
-                  , pat_wrap  = idHsWrapper
+                  { cpt_tvs   = ex_tvs'
+                  , cpt_dicts = given
+                  , cpt_binds = ev_binds
+                  , cpt_arg_tys = ctxt_res_tys
+                  , cpt_wrap  = idHsWrapper
                   }
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
@@ -881,11 +881,11 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
                                , pat_args  = arg_pats'
                                , pat_con_ext = ConPatTc
-                                 { pat_tvs   = ex_tvs'
-                                 , pat_dicts = prov_dicts'
-                                 , pat_binds = ev_binds
-                                 , pat_arg_tys = mkTyVarTys univ_tvs'
-                                 , pat_wrap  = req_wrap
+                                 { cpt_tvs   = ex_tvs'
+                                 , cpt_dicts = prov_dicts'
+                                 , cpt_binds = ev_binds
+                                 , cpt_arg_tys = mkTyVarTys univ_tvs'
+                                 , cpt_wrap  = req_wrap
                                  }
                                }
         ; pat_ty <- readExpType pat_ty
