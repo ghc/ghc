@@ -23,10 +23,11 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Hs.Pat (
-        Pat(..), InPat, OutPat, LPat,
+        Pat(..), LPat,
         ConPatTc (..),
         CoPat (..),
         ListPatTc(..),
+        ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
@@ -72,11 +73,9 @@ import GHC.Core.Type
 import SrcLoc
 import Bag -- collect ev vars from pats
 import Maybes
+import Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
-
-type InPat p  = LPat p        -- No 'Out' constructors
-type OutPat p = LPat GhcTc    -- No 'In' constructors
 
 type LPat p = XRec p Pat
 
@@ -175,9 +174,9 @@ data Pat p
 
         ------------ Constructor patterns ---------------
   | ConPat {
-        pat_con   :: Located (XConPatCon p),
-        pat_args  :: HsConPatDetails p,
-        pat_con_ext :: XConPat p
+        pat_con_ext :: XConPat p,
+        pat_con     :: Located (ConLikeP p),
+        pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
 
@@ -282,10 +281,6 @@ type instance XConPat GhcPs = NoExtField
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
-type instance XConPatCon GhcPs = IdP GhcPs
-type instance XConPatCon GhcRn = IdP GhcRn
-type instance XConPatCon GhcTc = ConLike
-
 type instance XSumPat GhcPs = NoExtField
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
@@ -313,6 +308,11 @@ type instance XXPat GhcPs = NoExtCon
 type instance XXPat GhcRn = NoExtCon
 type instance XXPat GhcTc = CoPat
 
+type family ConLikeP x
+
+type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
+type instance ConLikeP GhcRn = Name -- IdP GhcRn
+type instance ConLikeP GhcTc = ConLike
 
 -- ---------------------------------------------------------------------
 
@@ -329,26 +329,26 @@ data ConPatTc
   = ConPatTc
     { -- | The universal arg types  1-1 with the universal
       -- tyvars of the constructor/pattern synonym
-      -- Use (conLikeResTy pat_con pat_arg_tys) to get
+      -- Use (conLikeResTy pat_con cpt_arg_tys) to get
       -- the type of the pattern
-      pat_arg_tys :: [Type]
+      cpt_arg_tys :: [Type]
 
     , -- | Existentially bound type variables
       -- in correctly-scoped order e.g. [k:*  x:k]
-      pat_tvs   :: [TyVar]
+      cpt_tvs   :: [TyVar]
 
     , -- | Ditto *coercion variables* and *dictionaries*
       -- One reason for putting coercion variable here  I think
       --      is to ensure their kinds are zonked
-      pat_dicts :: [EvVar]
+      cpt_dicts :: [EvVar]
 
     , -- | Bindings involving those dictionaries
-      pat_binds :: TcEvBinds
+      cpt_binds :: TcEvBinds
 
     , -- ^ Extra wrapper to pass to the matcher
       -- Only relevant for pattern-synonyms;
       --   ignored for data cons
-      pat_wrap  :: HsWrapper
+      cpt_wrap  :: HsWrapper
     }
 
 -- | Coercion Pattern (translation only)
@@ -360,7 +360,7 @@ data CoPat
     { -- | Coercion Pattern
       -- If co :: t1 ~ t2, p :: t2,
       -- then (CoPat co p) :: t1
-      co_pat_wrap :: HsWrapper
+      co_cpt_wrap :: HsWrapper
 
     , -- | Why not LPat?  Ans: existing locn will do
       co_pat_inner :: Pat GhcTc
@@ -523,16 +523,14 @@ pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
 
-pprParendPat
-  :: forall p
-  .  OutputableBndrId p
-  => PprPrec
-  -> Pat (GhcPass p)
-  -> SDoc
+pprParendPat :: forall p. OutputableBndrId p
+             => PprPrec
+             -> Pat (GhcPass p)
+             -> SDoc
 pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_elab ->
     if need_parens print_tc_elab pat
     then parens (pprPat pat)
-    else  pprPat pat
+    else pprPat pat
   where
     need_parens print_tc_elab pat
       | GhcTc <- ghcPass @p
@@ -547,7 +545,7 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: forall p. (IsPass p, OutputableBndrId p) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -591,16 +589,16 @@ pprPat (ConPat { pat_con = con
           -- error message, and we want to make sure it prints nicely
           ppr con
             <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                           , pprIfTc @p $ ppr binds ])
+                           , ppr binds ])
             <+> pprConArgs details
-        where ConPatTc { pat_tvs = tvs
-                       , pat_dicts = dicts
-                       , pat_binds = binds
+        where ConPatTc { cpt_tvs = tvs
+                       , cpt_dicts = dicts
+                       , cpt_binds = binds
                        } = ext
 pprPat (XPat ext) = case ghcPass @p of
   GhcPs -> noExtCon ext
   GhcRn -> noExtCon ext
-  GhcTc -> pprIfTc @p $ pprHsWrapper co $ \parens ->
+  GhcTc -> pprHsWrapper co $ \parens ->
       if parens
       then pprParendPat appPrec pat
       else pprPat pat
@@ -643,24 +641,24 @@ instance (Outputable p, Outputable arg)
 -}
 
 mkPrefixConPat :: DataCon ->
-                  [OutPat (GhcPass p)] -> [Type] -> OutPat (GhcPass p)
+                  [LPat GhcTc] -> [Type] -> LPat GhcTc
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLoc $ ConPat { pat_con = noLoc (RealDataCon dc)
                    , pat_args = PrefixCon pats
                    , pat_con_ext = ConPatTc
-                     { pat_tvs = []
-                     , pat_dicts = []
-                     , pat_binds = emptyTcEvBinds
-                     , pat_arg_tys = tys
-                     , pat_wrap = idHsWrapper
+                     { cpt_tvs = []
+                     , cpt_dicts = []
+                     , cpt_binds = emptyTcEvBinds
+                     , cpt_arg_tys = tys
+                     , cpt_wrap = idHsWrapper
                      }
                    }
 
-mkNilPat :: Type -> OutPat (GhcPass p)
+mkNilPat :: Type -> LPat GhcTc
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
-mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
+mkCharLitPat :: SourceText -> Char -> LPat GhcTc
 mkCharLitPat src c = mkPrefixConPat charDataCon
                           [noLoc $ LitPat noExtField (HsCharPrim src c)] []
 
@@ -728,7 +726,7 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: forall p. (IsPass p, OutputableBndrId p) => LPat (GhcPass p) -> Bool
+isIrrefutableHsPat :: forall p. (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -867,11 +865,10 @@ conPatNeedsParens p = go
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
-parenthesizePat
-  :: IsPass p
-  => PprPrec
-  -> LPat (GhcPass p)
-  -> LPat (GhcPass p)
+parenthesizePat :: IsPass p
+                => PprPrec
+                -> LPat (GhcPass p)
+                -> LPat (GhcPass p)
 parenthesizePat p lpat@(L loc pat)
   | patNeedsParens p pat = L loc (ParPat noExtField lpat)
   | otherwise            = lpat
@@ -900,7 +897,7 @@ collectEvVarsPat pat =
     ConPat
       { pat_args  = args
       , pat_con_ext = ConPatTc
-        { pat_dicts = dicts
+        { cpt_dicts = dicts
         }
       }
                      -> unionBags (listToBag dicts)
