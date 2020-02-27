@@ -806,9 +806,6 @@ validate-x86_64-linux-fedora27:
     # which might result in some broken perf tests?
     HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
 
-  # due to #16574 this currently fails
-  allow_failure: true
-
   script:
     - bash .gitlab/ci.sh configure
     - bash .gitlab/ci.sh build_hadrian
