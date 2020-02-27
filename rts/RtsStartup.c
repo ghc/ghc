@@ -284,6 +284,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise libdw session pool */
     libdwPoolInit();
 
+    /* Start the "ticker" and profiling timer but don't start until the
+     * scheduler is up. However, the ticker itself needs to be initialized
+     * before the scheduler to ensure that the ticker mutex is initialized as
+     * moreCapabilities will attempt to acquire it.
+     */
+    initTimer();
+
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -359,7 +366,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */
-    initTimer();
     startTimer();
 
 #if defined(RTS_USER_SIGNALS)
