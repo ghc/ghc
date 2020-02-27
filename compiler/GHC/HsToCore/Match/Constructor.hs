@@ -147,9 +147,9 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                              { eqn_pats = ConPat
                                { pat_args = args
                                , pat_con_ext = ConPatTc
-                                 { pat_tvs = tvs
-                                 , pat_dicts = ds
-                                 , pat_binds = bind
+                                 { cpt_tvs = tvs
+                                 , cpt_dicts = ds
+                                 , cpt_binds = bind
                                  }
                                } : pats
                              }))
@@ -181,10 +181,10 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
     ConPat { pat_con = L _ con1
            , pat_args = args1
            , pat_con_ext = ConPatTc
-             { pat_arg_tys = arg_tys
-             , pat_wrap = wrapper1
-             , pat_tvs = tvs1
-             , pat_dicts = dicts1
+             { cpt_arg_tys = arg_tys
+             , cpt_wrap = wrapper1
+             , cpt_tvs = tvs1
+             , cpt_dicts = dicts1
              }
            } = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
