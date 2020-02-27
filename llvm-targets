@@ -1,6 +1,7 @@
 [("i386-unknown-windows", ("e-m:x-p:32:32-i64:64-f80:32-n8:16:32-a:0:32-S32", "pentium4", ""))
 ,("i686-unknown-windows", ("e-m:x-p:32:32-i64:64-f80:32-n8:16:32-a:0:32-S32", "pentium4", ""))
 ,("x86_64-unknown-windows", ("e-m:w-i64:64-f80:128-n8:16:32:64-S128", "x86-64", ""))
+,("arm-unknown-linux-gnueabi", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm7tdmi", "+soft-float -fp16 -vfp2 -vfp2sp -vfp2d16 -vfp2d16sp -vfp3 -vfp3sp -vfp3d16 -vfp3d16sp -vfp4 -vfp4sp -vfp4d16 -vfp4d16sp -fp-armv8 -fp-armv8sp -fp-armv8d16 -fp-armv8d16sp -fullfp16 -neon -crypto -dotprod -fp16fml -fp64 -d32 -fpregs +strict-align"))
 ,("arm-unknown-linux-gnueabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
 ,("arm-unknown-linux-musleabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
 ,("armv6-unknown-linux-gnueabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1136jf-s", "+strict-align"))
