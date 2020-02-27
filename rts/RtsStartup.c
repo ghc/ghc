@@ -231,6 +231,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise libdw session pool */
     libdwPoolInit();
 
+    /* Start the "ticker" and profiling timer but don't start until the
+     * scheduler is up.
+     */
+    initTimer();
+
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -307,7 +312,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */
-    initTimer();
     startTimer();
 
 #if defined(RTS_USER_SIGNALS)
