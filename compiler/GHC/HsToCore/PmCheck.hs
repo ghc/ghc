@@ -502,9 +502,9 @@ translatePat fam_insts x pat = case pat of
   ConPat { pat_con     = L _ con
          , pat_args    = ps
          , pat_con_ext = ConPatTc
-           { pat_arg_tys = arg_tys
-           , pat_tvs     = ex_tvs
-           , pat_dicts   = dicts
+           { cpt_arg_tys = arg_tys
+           , cpt_tvs     = ex_tvs
+           , cpt_dicts   = dicts
            }
          } -> do
     translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
