@@ -66,14 +66,14 @@ gmpRules = do
 
         isInTree <- flag GmpInTree
 
-        if windowsHost || isInTree  -- TODO: We don't use system GMP on Windows. Fix?
+        if isInTree
         then do
-            putBuild "| No GMP library/framework detected; in tree GMP will be built"
+            putBuild "| In tree GMP will be built"
             let intreeHeader = stageP -/- "gmp/gmp.h"
             need [intreeHeader]
             copyFile intreeHeader header
         else do
-            putBuild "| GMP library/framework detected and will be used"
+            putBuild "| System GMP library/framework will be used"
             copyFile (gmpBase -/- "ghc-gmp.h") header
 
     -- Build in-tree GMP library for the current stage, prioritised so that it
