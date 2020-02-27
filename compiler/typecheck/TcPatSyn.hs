@@ -942,7 +942,7 @@ tcPatToExpr name args pat = go pat
     go (L loc p) = L loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
-    go1 (ConPat con info NoExtField)
+    go1 (ConPat NoExtField con info)
       = case info of
           PrefixCon ps  -> mkPrefixConExpr con ps
           InfixCon l r  -> mkPrefixConExpr con [l,r]

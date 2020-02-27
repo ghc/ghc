@@ -456,26 +456,34 @@ nlInfixConPat con l r = noLoc $ ConPat
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLoc $ ConPat
-  (noLoc con)
-  (PrefixCon (map (parenthesizePat appPrec) pats))
-  noExtField
+  { pat_con_ext = noExtField
+  , pat_con = noLoc con
+  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
+  }
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLoc $ ConPat
-  (noLoc con)
-  (PrefixCon (map (parenthesizePat appPrec) pats))
-  noExtField
+  { pat_con_ext = noExtField
+  , pat_con = noLoc con
+  , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
+  }
 
 nlNullaryConPat :: RdrName -> LPat GhcPs
-nlNullaryConPat con = noLoc $ ConPat (noLoc con) (PrefixCon []) noExtField
+nlNullaryConPat con = noLoc $ ConPat
+  { pat_con_ext = noExtField
+  , pat_con = noLoc con
+  , pat_args = PrefixCon []
+  }
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLoc $ ConPat
-  (noLoc $ getRdrName con)
-  (PrefixCon $
+  { pat_con_ext = noExtField
+  , pat_con = noLoc $ getRdrName con
+  , pat_args = PrefixCon $
      replicate (dataConSourceArity con)
-               nlWildPat)
-  noExtField
+               nlWildPat
+  }
+  
 
 -- | Wildcard pattern - after parsing
 nlWildPat :: LPat GhcPs

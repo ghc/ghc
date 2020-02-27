@@ -495,7 +495,7 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat penv (ConPat con arg_pats NoExtField) pat_ty thing_inside
+tc_pat penv (ConPat NoExtField con arg_pats) pat_ty thing_inside
   = tcConPat penv con pat_ty arg_pats thing_inside
 
 ------------------------

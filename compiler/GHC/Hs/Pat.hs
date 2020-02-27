@@ -173,9 +173,9 @@ data Pat p
 
         ------------ Constructor patterns ---------------
   | ConPat {
-        pat_con   :: Located (ConLikeP p),
-        pat_args  :: HsConPatDetails p,
-        pat_con_ext :: XConPat p
+        pat_con_ext :: XConPat p,
+        pat_con     :: Located (ConLikeP p),
+        pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
 
