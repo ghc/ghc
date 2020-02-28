@@ -1466,8 +1466,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
                   | otherwise       = vanillaIdInfo
 
     case info of
-      NoInfo       -> return init_info
-      HasInfo info -> let needed = needed_prags info in
+      [] -> return init_info
+      _  -> let needed = needed_prags info in
                       foldlM tcPrag init_info needed
   where
     needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
