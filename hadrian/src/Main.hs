@@ -65,6 +65,9 @@ main = do
                 -- Ignore access to autom4te.cache directories.
                 -- They are managed externally by auto tools.
                 , "//autom4te.cache/**"
+
+                -- Ignore in-tree GMP objects
+                , buildRoot -/- "**/gmp/objs/**"
                 ]
             }
 
