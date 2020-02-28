@@ -22,12 +22,10 @@ gmpObjects s = do
       integerGmpPath <- buildPath ctx
       need [integerGmpPath -/- "include/ghc-gmp.h"]
 
-      -- The line below causes a Shake Lint failure on Windows, which forced
-      -- us to disable Lint by default (we don't track the object files of the
-      -- in-tree GMP library).
-      -- See more details here: https://gitlab.haskell.org/ghc/ghc/issues/15971.
       gmpPath <- gmpIntreePath s
       map (unifyPath . (gmpPath -/-)) <$>
+          -- Note we don't track the object files of the in-tree GMP library (cf
+          -- #15971).
           liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
 -- | Build directory for in-tree GMP library
