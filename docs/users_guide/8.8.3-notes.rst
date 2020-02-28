@@ -9,7 +9,7 @@ GHC 8.8.3 is a minor release intended to fix regressions and minor bugs in the
 Highlights
 ----------
 
-- Fix a compiler panic due to over-zealous eta reducation (:ghc-ticket:`17429`).
+- Fix a compiler panic due to over-zealous eta reduction (:ghc-ticket:`17429`).
 - Fix a linker crash on Windows (:ghc-ticket:`17575`).
 - Fix missing source notes in imported unfoldings when ``-g`` is used
   (:ghc-ticket:`17616`).
