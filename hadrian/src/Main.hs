@@ -64,7 +64,7 @@ main = do
 
                 -- Ignore access to autom4te.cache directories.
                 -- They are managed externally by auto tools.
-                , "**/autom4te.cache/**"
+                , "//autom4te.cache/**"
                 ]
             }
 
