@@ -98,7 +98,7 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) = do
     root <- buildRootRules
     let dir         = buildDir context
-        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("**/autogen/*" ?== f)
+        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f)
         go gen file = generate file context gen
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
