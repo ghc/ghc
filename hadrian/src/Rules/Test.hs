@@ -48,7 +48,7 @@ testRules = do
 
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath %> \_ -> do
-        ghc0Path <- (<.> exe) <$> getCompilerPath "stage0"
+        ghc0Path <- getCompilerPath "stage0"
         -- Invoke via bash to work around #17362.
         -- Reasons why this is required are not entirely clear.
         cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
