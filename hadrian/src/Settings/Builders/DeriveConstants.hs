@@ -24,7 +24,7 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
             _      -> error $ "DeriveConstants: expected two outputs, got " ++ show outs
     mconcat
         [ mconcat $ flip fmap deriveConstantsPairs $ \(fileName, flag) ->
-            output ("**/" ++ fileName) ? arg flag
+            output ("//" ++ fileName) ? arg flag
         , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
         , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)

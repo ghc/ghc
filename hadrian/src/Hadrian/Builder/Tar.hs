@@ -28,9 +28,9 @@ instance NFData   TarMode
 args :: (ShakeValue c, ShakeValue b) => TarMode -> Args c b
 args Create = mconcat
     [ arg "-c"
-    , output "**/*.gz"  ? arg "--gzip"
-    , output "**/*.bz2" ? arg "--bzip2"
-    , output "**/*.xz"  ? arg "--xz"
+    , output "//*.gz"  ? arg "--gzip"
+    , output "//*.bz2" ? arg "--bzip2"
+    , output "//*.xz"  ? arg "--xz"
     , arg "-f", arg =<< getOutput
     , getInputs ]
 args Extract = mconcat
