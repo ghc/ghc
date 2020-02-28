@@ -1465,10 +1465,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
     let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                   | otherwise       = vanillaIdInfo
 
-    case info of
-      NoInfo       -> return init_info
-      HasInfo info -> let needed = needed_prags info in
-                      foldlM tcPrag init_info needed
+    let needed = needed_prags info
+    foldlM tcPrag init_info needed
   where
     needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
     needed_prags items
