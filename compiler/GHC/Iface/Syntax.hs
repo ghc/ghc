@@ -13,7 +13,7 @@ module GHC.Iface.Syntax (
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..), IfaceJoinInfo(..),
         IfaceBinding(..), IfaceConAlt(..),
-        IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
+        IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..),
@@ -337,9 +337,7 @@ instance Outputable IfaceCompleteMatch where
 --   * The version comparison sees that new (=NoInfo) differs from old (=HasInfo *)
 --      and so gives a new version.
 
-data IfaceIdInfo
-  = NoInfo                      -- When writing interface file without -O
-  | HasInfo [IfaceInfoItem]     -- Has info, and here it is
+type IfaceIdInfo = [IfaceInfoItem]
 
 data IfaceInfoItem
   = HsArity         Arity
@@ -1385,11 +1383,6 @@ instance Outputable IfaceIdDetails where
                                 else Outputable.empty
   ppr IfDFunId          = text "DFunId"
 
-instance Outputable IfaceIdInfo where
-  ppr NoInfo       = Outputable.empty
-  ppr (HasInfo is) = text "{-" <+> pprWithCommas ppr is
-                     <+> text "-}"
-
 instance Outputable IfaceInfoItem where
   ppr (HsUnfold lb unf)     = text "Unfolding"
                               <> ppWhen lb (text "(loop-breaker)")
@@ -1650,8 +1643,7 @@ freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
 freeNamesIfIdBndr (_fs,k) = freeNamesIfKind k
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
-freeNamesIfIdInfo NoInfo      = emptyNameSet
-freeNamesIfIdInfo (HasInfo i) = fnList freeNamesItem i
+freeNamesIfIdInfo = fnList freeNamesItem
 
 freeNamesItem :: IfaceInfoItem -> NameSet
 freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
@@ -2153,16 +2145,6 @@ instance Binary IfaceIdDetails where
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
             _ -> return IfDFunId
 
-instance Binary IfaceIdInfo where
-    put_ bh NoInfo      = putByte bh 0
-    put_ bh (HasInfo i) = putByte bh 1 >> lazyPut bh i -- NB lazyPut
-
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return NoInfo
-            _ -> liftM HasInfo $ lazyGet bh    -- NB lazyGet
-
 instance Binary IfaceInfoItem where
     put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
     put_ bh (HsStrictness ab)     = putByte bh 1 >> put_ bh ab
@@ -2503,11 +2485,6 @@ instance NFData IfaceIdDetails where
     IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
     IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
     IfDFunId -> ()
-
-instance NFData IfaceIdInfo where
-  rnf = \case
-    NoInfo -> ()
-    HasInfo f1 -> rnf f1
 
 instance NFData IfaceInfoItem where
   rnf = \case
