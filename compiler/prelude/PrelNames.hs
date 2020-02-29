@@ -803,9 +803,6 @@ showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showCommaSpace_RDR      = varQual_RDR gHC_SHOW (fsLit "showCommaSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
 
-undefined_RDR :: RdrName
-undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
-
 error_RDR :: RdrName
 error_RDR = varQual_RDR gHC_ERR (fsLit "error")
 
@@ -1592,17 +1589,8 @@ realFracClassKey        = mkPreludeClassUnique 16
 showClassKey            = mkPreludeClassUnique 17
 ixClassKey              = mkPreludeClassUnique 18
 
-typeableClassKey, typeable1ClassKey, typeable2ClassKey, typeable3ClassKey,
-    typeable4ClassKey, typeable5ClassKey, typeable6ClassKey, typeable7ClassKey
-    :: Unique
+typeableClassKey :: Unique
 typeableClassKey        = mkPreludeClassUnique 20
-typeable1ClassKey       = mkPreludeClassUnique 21
-typeable2ClassKey       = mkPreludeClassUnique 22
-typeable3ClassKey       = mkPreludeClassUnique 23
-typeable4ClassKey       = mkPreludeClassUnique 24
-typeable5ClassKey       = mkPreludeClassUnique 25
-typeable6ClassKey       = mkPreludeClassUnique 26
-typeable7ClassKey       = mkPreludeClassUnique 27
 
 monadFixClassKey :: Unique
 monadFixClassKey        = mkPreludeClassUnique 28
@@ -1767,10 +1755,6 @@ ptrTyConKey                             = mkPreludeTyConUnique 77
 funPtrTyConKey                          = mkPreludeTyConUnique 78
 tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
-
--- dotnet interop
-objectTyConKey :: Unique
-objectTyConKey                          = mkPreludeTyConUnique 83
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
@@ -2245,18 +2229,6 @@ noinlineIdKey                 = mkPreludeMiscIdUnique 125
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
-
--- dotnet interop
-unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,
-    unmarshalStringIdKey, checkDotnetResNameIdKey :: Unique
-unmarshalObjectIdKey          = mkPreludeMiscIdUnique 150
-marshalObjectIdKey            = mkPreludeMiscIdUnique 151
-marshalStringIdKey            = mkPreludeMiscIdUnique 152
-unmarshalStringIdKey          = mkPreludeMiscIdUnique 153
-checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
-
-undefinedKey :: Unique
-undefinedKey                  = mkPreludeMiscIdUnique 155
 
 magicDictKey :: Unique
 magicDictKey                  = mkPreludeMiscIdUnique 156
