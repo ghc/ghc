@@ -259,7 +259,7 @@ hadrian-ghc-in-ghci:
     - git submodule update --init --recursive
     - git checkout .gitmodules
   variables:
-    GHC_FLAGS: -Werror
+    GHC_FLAGS: "-Werror -j$(mk/detect-cpu-count.sh)"
   tags:
     - x86_64-linux
   script:
