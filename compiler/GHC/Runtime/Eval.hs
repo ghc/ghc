@@ -142,14 +142,6 @@ getHistorySpan hsc_env History{..} =
     Just hmi -> modBreaks_locs (getModBreaks hmi) ! breakInfo_number
     _ -> panic "getHistorySpan"
 
-getModBreaks :: HomeModInfo -> ModBreaks
-getModBreaks hmi
-  | Just linkable <- hm_linkable hmi,
-    [BCOs cbc _] <- linkableUnlinked linkable
-  = fromMaybe emptyModBreaks (bc_breaks cbc)
-  | otherwise
-  = emptyModBreaks -- probably object code
-
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
 -- by the coverage pass, which gives the list of lexically-enclosing bindings

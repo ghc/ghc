@@ -15,5 +15,5 @@ Breakpoint 13 activated at HappyTest.hs:237:18-35
 Stopped in Main.lexer, HappyTest.hs:228:11-19
 _result :: Bool = _
 c :: Char = '1'
-*** Ignoring breakpoint
+*** Ignoring breakpoint [HappyTest.hs:228:11-19]
 _result = False
