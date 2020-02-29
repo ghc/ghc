@@ -98,8 +98,7 @@ addHaddockModule (L l_mod mod) = do
       pure $ concatLHsDocString docs
   hsmodExports' <- traverse @Maybe addHaddockExports (hsmodExports mod)
   traverse_ registerHdkA (hsmodImports mod)
-  hsmodDecls' <- addHaddockInterleaveItems (VirtualBraces 1) getDocDecl addHaddockDecl (hsmodDecls mod)
-                                        --- ^^^^^^^^^ TODO (int-index): actual module indent level
+  hsmodDecls' <- addHaddockInterleaveItems (hsmodLayout mod) getDocDecl addHaddockDecl (hsmodDecls mod)
   pure $ L l_mod $
     mod { hsmodExports = hsmodExports'
         , hsmodDecls = hsmodDecls'

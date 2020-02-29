@@ -782,4 +782,4 @@ data LayoutInfo =
     -- associated with them.
     NoLayoutInfo
 
-  deriving (Eq, Ord, Data)
+  deriving (Eq, Ord, Show, Data)

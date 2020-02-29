@@ -711,12 +711,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                    False -> HsSrcFile
                    True  -> HsBootFile)
                  $3
-                 (Just $ sL1 $1 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 Nothing)) }
+                 (Just $ sL1 $1 (HsModule (thdOf3 $7) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7) $4 Nothing)) }
         | 'signature' modid maybemodwarning maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  $2
-                 (Just $ sL1 $1 (HsModule (Just $2) $4 (fst $ snd $6) (snd $ snd $6) $3 Nothing)) }
+                 (Just $ sL1 $1 (HsModule (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6) $3 Nothing)) }
         | 'module' maybe_src modid
              { sL1 $1 $ DeclD (case snd $2 of
                    False -> HsSrcFile
@@ -745,23 +745,23 @@ unitdecl :: { LHsUnitDecl PackageName }
 signature :: { Located HsModule }
        : 'signature' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                ams (L loc (HsModule (Just $2) $4 (fst $ snd $6)
-                              (snd $ snd $6) $3 Nothing)
+                ams (L loc (HsModule (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6)
+                              (snd $ sndOf3 $6) $3 Nothing)
                     )
-                    ([mj AnnSignature $1, mj AnnWhere $5] ++ fst $6) }
+                    ([mj AnnSignature $1, mj AnnWhere $5] ++ fstOf3 $6) }
 
 module :: { Located HsModule }
        : 'module' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                ams (L loc (HsModule (Just $2) $4 (fst $ snd $6)
-                              (snd $ snd $6) $3 Nothing)
+                ams (L loc (HsModule (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6)
+                              (snd $ sndOf3 $6) $3 Nothing)
                     )
-                    ([mj AnnModule $1, mj AnnWhere $5] ++ fst $6) }
+                    ([mj AnnModule $1, mj AnnWhere $5] ++ fstOf3 $6) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
-                   ams (L loc (HsModule Nothing Nothing
-                               (fst $ snd $1) (snd $ snd $1) Nothing Nothing))
-                       (fst $1) }
+                   ams (L loc (HsModule (thdOf3 $1) Nothing Nothing
+                               (fst $ sndOf3 $1) (snd $ sndOf3 $1) Nothing Nothing))
+                       (fstOf3 $1) }
 
 missing_module_keyword :: { () }
         : {- empty -}                           {% pushModuleContext }
@@ -779,16 +779,18 @@ maybemodwarning :: { Maybe (Located WarningTxt) }
     |  {- empty -}                  { Nothing }
 
 body    :: { ([AddAnn]
-             ,([LImportDecl GhcPs], [LHsDecl GhcPs])) }
+             ,([LImportDecl GhcPs], [LHsDecl GhcPs])
+             ,LayoutInfo) }
         :  '{'            top '}'      { (moc $1:mcc $3:(fst $2)
-                                         , snd $2) }
-        |      vocurly    top close    { (fst $2, snd $2) }
+                                         , snd $2, ExplicitBraces) }
+        |      vocurly    top close    { (fst $2, snd $2, VirtualBraces (getVOCURLY $1)) }
 
 body2   :: { ([AddAnn]
-             ,([LImportDecl GhcPs], [LHsDecl GhcPs])) }
+             ,([LImportDecl GhcPs], [LHsDecl GhcPs])
+             ,LayoutInfo) }
         :  '{' top '}'                          { (moc $1:mcc $3
-                                                   :(fst $2), snd $2) }
-        |  missing_module_keyword top close     { ([],snd $2) }
+                                                   :(fst $2), snd $2, ExplicitBraces) }
+        |  missing_module_keyword top close     { ([],snd $2, VirtualBraces 1) }
 
 
 top     :: { ([AddAnn]
@@ -806,15 +808,15 @@ top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
 header  :: { Located HsModule }
         : 'module' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
-                   ams (L loc (HsModule (Just $2) $4 $6 [] $3 Nothing
+                   ams (L loc (HsModule NoLayoutInfo (Just $2) $4 $6 [] $3 Nothing
                           )) [mj AnnModule $1,mj AnnWhere $5] }
         | 'signature' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
-                   ams (L loc (HsModule (Just $2) $4 $6 [] $3 Nothing
+                   ams (L loc (HsModule NoLayoutInfo (Just $2) $4 $6 [] $3 Nothing
                           )) [mj AnnModule $1,mj AnnWhere $5] }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
-                   return (L loc (HsModule Nothing Nothing $1 [] Nothing
+                   return (L loc (HsModule NoLayoutInfo Nothing Nothing $1 [] Nothing
                           Nothing)) }
 
 header_body :: { [LImportDecl GhcPs] }

@@ -3,6 +3,8 @@
 
 ({ DumpParsedAst.hs:1:1 }
  (HsModule
+  (VirtualBraces
+   (1))
   (Just
    ({ DumpParsedAst.hs:4:8-20 }
     {ModuleName: DumpParsedAst}))
