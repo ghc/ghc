@@ -108,7 +108,6 @@ templateHaskellNames = [
     -- Role
     nominalRName, representationalRName, phantomRName, inferRName,
     -- Kind
-    varKName, conKName, tupleKName, arrowKName, listKName, appKName,
     starKName, constraintKName,
     -- FamilyResultSig
     noSigName, kindSigName, tyVarSigName,
@@ -480,14 +479,7 @@ phantomRName          = libFun (fsLit "phantomR")          phantomRIdKey
 inferRName            = libFun (fsLit "inferR")            inferRIdKey
 
 -- data Kind = ...
-varKName, conKName, tupleKName, arrowKName, listKName, appKName,
-  starKName, constraintKName :: Name
-varKName        = libFun (fsLit "varK")         varKIdKey
-conKName        = libFun (fsLit "conK")         conKIdKey
-tupleKName      = libFun (fsLit "tupleK")       tupleKIdKey
-arrowKName      = libFun (fsLit "arrowK")       arrowKIdKey
-listKName       = libFun (fsLit "listK")        listKIdKey
-appKName        = libFun (fsLit "appK")         appKIdKey
+starKName, constraintKName :: Name
 starKName       = libFun (fsLit "starK")        starKIdKey
 constraintKName = libFun (fsLit "constraintK")  constraintKIdKey
 
@@ -1001,14 +993,7 @@ phantomRIdKey          = mkPreludeMiscIdUnique 417
 inferRIdKey            = mkPreludeMiscIdUnique 418
 
 -- data Kind = ...
-varKIdKey, conKIdKey, tupleKIdKey, arrowKIdKey, listKIdKey, appKIdKey,
-  starKIdKey, constraintKIdKey :: Unique
-varKIdKey         = mkPreludeMiscIdUnique 419
-conKIdKey         = mkPreludeMiscIdUnique 420
-tupleKIdKey       = mkPreludeMiscIdUnique 421
-arrowKIdKey       = mkPreludeMiscIdUnique 422
-listKIdKey        = mkPreludeMiscIdUnique 423
-appKIdKey         = mkPreludeMiscIdUnique 424
+starKIdKey, constraintKIdKey :: Unique
 starKIdKey        = mkPreludeMiscIdUnique 425
 constraintKIdKey  = mkPreludeMiscIdUnique 426
 
