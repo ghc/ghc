@@ -77,7 +77,7 @@ module GHC.Hs.Utils(
 
   -- * Template Haskell
   mkUntypedSplice, mkTypedSplice,
-  mkHsQuasiQuote, unqualQuasiQuote,
+  mkHsQuasiQuote,
 
   -- * Collecting binders
   isUnliftedHsBind, isBangedHsBind,
@@ -366,11 +366,6 @@ mkTypedSplice hasParen e = HsTypedSplice noExtField hasParen unqualSplice e
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
 mkHsQuasiQuote quoter span quote
   = HsQuasiQuote noExtField unqualSplice quoter span quote
-
-unqualQuasiQuote :: RdrName
-unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
-                -- A name (uniquified later) to
-                -- identify the quasi-quote
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
