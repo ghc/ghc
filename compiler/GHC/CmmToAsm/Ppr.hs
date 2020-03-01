@@ -25,6 +25,7 @@ import GhcPrelude
 import AsmUtils
 import GHC.Cmm.CLabel
 import GHC.Cmm
+import GHC.CmmToAsm.Config
 import GHC.Driver.Session
 import FastString
 import Outputable
@@ -203,48 +204,49 @@ string in source code. See #14741 for profiling results.
 -- identical strings in the linker. With -split-sections each string also gets
 -- a unique section to allow strings from unused code to be GC'd.
 
-pprSectionHeader :: Platform -> Section -> SDoc
-pprSectionHeader platform (Section t suffix) =
- case platformOS platform of
+pprSectionHeader :: NCGConfig -> Section -> SDoc
+pprSectionHeader config (Section t suffix) =
+ case platformOS (ncgPlatform config) of
    OSAIX     -> pprXcoffSectionHeader t
    OSDarwin  -> pprDarwinSectionHeader t
-   OSMinGW32 -> pprGNUSectionHeader (char '$') t suffix
-   _         -> pprGNUSectionHeader (char '.') t suffix
+   OSMinGW32 -> pprGNUSectionHeader config (char '$') t suffix
+   _         -> pprGNUSectionHeader config (char '.') t suffix
 
-pprGNUSectionHeader :: SDoc -> SectionType -> CLabel -> SDoc
-pprGNUSectionHeader sep t suffix = sdocWithDynFlags $ \dflags ->
-  let splitSections = gopt Opt_SplitSections dflags
-      subsection | splitSections = sep <> ppr suffix
-                 | otherwise     = empty
-  in  text ".section " <> ptext (header dflags) <> subsection <>
-      flags dflags
+pprGNUSectionHeader :: NCGConfig -> SDoc -> SectionType -> CLabel -> SDoc
+pprGNUSectionHeader config sep t suffix =
+  text ".section " <> ptext header <> subsection <> flags
   where
-    header dflags = case t of
+    platform      = ncgPlatform config
+    splitSections = ncgSplitSections config
+    subsection
+      | splitSections = sep <> ppr suffix
+      | otherwise     = empty
+    header = case t of
       Text -> sLit ".text"
       Data -> sLit ".data"
-      ReadOnlyData  | OSMinGW32 <- platformOS (targetPlatform dflags)
+      ReadOnlyData  | OSMinGW32 <- platformOS platform
                                 -> sLit ".rdata"
                     | otherwise -> sLit ".rodata"
-      RelocatableReadOnlyData | OSMinGW32 <- platformOS (targetPlatform dflags)
+      RelocatableReadOnlyData | OSMinGW32 <- platformOS platform
                                 -- Concept does not exist on Windows,
                                 -- So map these to R/O data.
                                           -> sLit ".rdata$rel.ro"
                               | otherwise -> sLit ".data.rel.ro"
       UninitialisedData -> sLit ".bss"
-      ReadOnlyData16 | OSMinGW32 <- platformOS (targetPlatform dflags)
+      ReadOnlyData16 | OSMinGW32 <- platformOS platform
                                  -> sLit ".rdata$cst16"
                      | otherwise -> sLit ".rodata.cst16"
       CString
-        | OSMinGW32 <- platformOS (targetPlatform dflags)
+        | OSMinGW32 <- platformOS platform
                     -> sLit ".rdata"
         | otherwise -> sLit ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
-    flags dflags = case t of
+    flags = case t of
       CString
-        | OSMinGW32 <- platformOS (targetPlatform dflags)
+        | OSMinGW32 <- platformOS platform
                     -> empty
-        | otherwise -> text ",\"aMS\"," <> sectionType "progbits" <> text ",1"
+        | otherwise -> text ",\"aMS\"," <> sectionType platform "progbits" <> text ",1"
       _ -> empty
 
 -- XCOFF doesn't support relocating label-differences, so we place all
