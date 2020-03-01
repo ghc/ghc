@@ -71,7 +71,7 @@ module Outputable (
         neverQualify, neverQualifyNames, neverQualifyModules,
         alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
-        sdocWithDynFlags, sdocWithPlatform, sdocOption,
+        sdocWithDynFlags, sdocOption,
         updSDocContext,
         SDocContext (..), sdocWithContext,
         getPprStyle, withPprStyle, setStyleColoured,
@@ -96,7 +96,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
-                           , targetPlatform, pprUserLength, pprCols
+                           , pprUserLength, pprCols
                            , unsafeGlobalDynFlags, initSDocContext
                            )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
@@ -106,7 +106,6 @@ import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
-import GHC.Platform
 import qualified PprColour as Col
 import Pretty           ( Doc, Mode(..) )
 import Panic
@@ -346,7 +345,6 @@ data SDocContext = SDC
       -- ^ True if Unicode encoding is supported
       -- and not disable by GHC_NO_UNICODE environment variable
   , sdocHexWordLiterals             :: !Bool
-  , sdocDebugLevel                  :: !Int
   , sdocPprDebug                    :: !Bool
   , sdocPrintUnicodeSyntax          :: !Bool
   , sdocPrintCaseAsLet              :: !Bool
@@ -421,9 +419,6 @@ getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
 
 sdocWithDynFlags :: (DynFlags -> SDoc) -> SDoc
 sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
-
-sdocWithPlatform :: (Platform -> SDoc) -> SDoc
-sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 sdocWithContext :: (SDocContext -> SDoc) -> SDoc
 sdocWithContext f = SDoc $ \ctx -> runSDoc (f ctx) ctx
