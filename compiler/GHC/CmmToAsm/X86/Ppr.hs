@@ -28,6 +28,7 @@ import GHC.CmmToAsm.X86.Regs
 import GHC.CmmToAsm.X86.Instr
 import GHC.CmmToAsm.X86.Cond
 import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Ppr
@@ -69,36 +70,36 @@ import Data.Bits
 -- .subsections_via_symbols and -dead_strip can be found at
 -- <https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/Assembler/040-Assembler_Directives/asm_directives.html#//apple_ref/doc/uid/TP30000823-TPXREF101>
 
-pprProcAlignment :: SDoc
-pprProcAlignment = sdocWithDynFlags $ \dflags ->
-  (maybe empty (pprAlign . mkAlignment) (cmmProcAlignment dflags))
+pprProcAlignment :: NCGConfig -> SDoc
+pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
+   where
+      platform = ncgPlatform config
 
-pprNatCmmDecl :: NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
-  pprSectionAlign section $$ pprDatas dats
+pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc
+pprNatCmmDecl config (CmmData section dats) =
+  pprSectionAlign config section $$ pprDatas config dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
-  sdocWithDynFlags $ \dflags ->
-  pprProcAlignment $$
+pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  let platform = ncgPlatform config in
+  pprProcAlignment config $$
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
-        pprSectionAlign (Section Text lbl) $$
-        pprProcAlignment $$
-        pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-        vcat (map (pprBasicBlock top_info) blocks) $$
-        (if debugLevel dflags > 0
+        pprSectionAlign config (Section Text lbl) $$
+        pprProcAlignment config $$
+        pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+        vcat (map (pprBasicBlock config top_info) blocks) $$
+        (if ncgDebugLevel config > 0
          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
-        pprSizeDecl lbl
+        pprSizeDecl platform lbl
 
     Just (RawCmmStatics info_lbl _) ->
-      sdocWithPlatform $ \platform ->
-      pprSectionAlign (Section Text info_lbl) $$
-      pprProcAlignment $$
+      pprSectionAlign config (Section Text info_lbl) $$
+      pprProcAlignment config $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock top_info) blocks) $$
+      vcat (map (pprBasicBlock config top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -108,51 +109,49 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> char '-'
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
-      pprSizeDecl info_lbl
+      pprSizeDecl platform info_lbl
 
 -- | Output the ELF .size directive.
-pprSizeDecl :: CLabel -> SDoc
-pprSizeDecl lbl
- = sdocWithPlatform $ \platform ->
-   if osElfTarget (platformOS platform)
+pprSizeDecl :: Platform -> CLabel -> SDoc
+pprSizeDecl platform lbl
+ = if osElfTarget (platformOS platform)
    then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
-pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
-pprBasicBlock info_env (BasicBlock blockid instrs)
+pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
-    pprLabel asmLbl $$
-    vcat (map pprInstr instrs) $$
-    (sdocOption sdocDebugLevel $ \level ->
-        if level > 0
-           then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
-           else empty
+    pprLabel platform asmLbl $$
+    vcat (map (pprInstr platform) instrs) $$
+    (if ncgDebugLevel config > 0
+      then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
+      else empty
     )
   where
     asmLbl = blockLbl blockid
+    platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
        Nothing -> c
        Just (RawCmmStatics infoLbl info) ->
-           pprAlignForSection Text $$
+           pprAlignForSection platform Text $$
            infoTableLoc $$
-           vcat (map pprData info) $$
-           pprLabel infoLbl $$
+           vcat (map (pprData config) info) $$
+           pprLabel platform infoLbl $$
            c $$
-           (sdocOption sdocDebugLevel $ \level ->
-               if level > 0
-                  then ppr (mkAsmTempEndLabel infoLbl) <> char ':'
-                  else empty
+           (if ncgDebugLevel config > 0
+               then ppr (mkAsmTempEndLabel infoLbl) <> char ':'
+               else empty
            )
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See [Note: Info Offset]
     infoTableLoc = case instrs of
-      (l@LOCATION{} : _) -> pprInstr l
+      (l@LOCATION{} : _) -> pprInstr platform l
       _other             -> empty
 
 
-pprDatas :: (Alignment, RawCmmStatics) -> SDoc
+pprDatas :: NCGConfig -> (Alignment, RawCmmStatics) -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas _config (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -162,18 +161,21 @@ pprDatas (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind,
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 
-pprDatas (align, (RawCmmStatics lbl dats))
- = vcat (pprAlign align : pprLabel lbl : map pprData dats)
+pprDatas config (align, (RawCmmStatics lbl dats))
+ = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
+   where
+      platform = ncgPlatform config
 
-pprData :: CmmStatic -> SDoc
-pprData (CmmString str) = pprBytes str
+pprData :: NCGConfig -> CmmStatic -> SDoc
+pprData _config (CmmString str) = pprBytes str
 
-pprData (CmmUninitialised bytes)
- = sdocWithPlatform $ \platform ->
-   if platformOS platform == OSDarwin then text ".space " <> int bytes
-                                      else text ".skip "  <> int bytes
+pprData config (CmmUninitialised bytes)
+ = let platform = ncgPlatform config
+   in if platformOS platform == OSDarwin
+         then text ".space " <> int bytes
+         else text ".skip "  <> int bytes
 
-pprData (CmmStaticLit lit) = pprDataItem lit
+pprData config (CmmStaticLit lit) = pprDataItem config lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
@@ -238,24 +240,23 @@ pprLabelType' dflags lbl =
       isInfoTableLabel lbl && not (isConInfoTableLabel lbl)
 
 
-pprTypeDecl :: CLabel -> SDoc
-pprTypeDecl lbl
-    = sdocWithPlatform $ \platform ->
-      if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
+pprTypeDecl :: Platform -> CLabel -> SDoc
+pprTypeDecl platform lbl
+    = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
       then
         sdocWithDynFlags $ \df ->
           text ".type " <> ppr lbl <> ptext (sLit  ", ") <> pprLabelType' df lbl
       else empty
 
-pprLabel :: CLabel -> SDoc
-pprLabel lbl = pprGloblDecl lbl
-            $$ pprTypeDecl lbl
-            $$ (ppr lbl <> char ':')
+pprLabel :: Platform -> CLabel -> SDoc
+pprLabel platform lbl =
+   pprGloblDecl lbl
+   $$ pprTypeDecl platform lbl
+   $$ (ppr lbl <> char ':')
 
-pprAlign :: Alignment -> SDoc
-pprAlign alignment
-        = sdocWithPlatform $ \platform ->
-          text ".align " <> int (alignmentOn platform)
+pprAlign :: Platform -> Alignment -> SDoc
+pprAlign platform alignment
+        = text ".align " <> int (alignmentOn platform)
   where
         bytes = alignmentBytes alignment
         alignmentOn platform = if platformOS platform == OSDarwin
@@ -269,18 +270,15 @@ pprAlign alignment
         log2 8 = 3
         log2 n = 1 + log2 (n `quot` 2)
 
--- -----------------------------------------------------------------------------
--- pprInstr: print an 'Instr'
-
 instance Outputable Instr where
-    ppr instr = pprInstr instr
+    ppr instr = sdocWithDynFlags $ \dflags ->
+                  pprInstr (targetPlatform dflags) instr
 
 
-pprReg :: Format -> Reg -> SDoc
-pprReg f r
+pprReg :: Platform -> Format -> Reg -> SDoc
+pprReg platform f r
   = case r of
       RegReal    (RealRegSingle i) ->
-          sdocWithPlatform $ \platform ->
           if target32Bit platform then ppr32_reg_no f i
                                   else ppr64_reg_no f i
       RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
@@ -439,8 +437,8 @@ pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
 
 
 
-pprAddr :: AddrMode -> SDoc
-pprAddr (ImmAddr imm off)
+pprAddr :: Platform -> AddrMode -> SDoc
+pprAddr _platform (ImmAddr imm off)
   = let pp_imm = pprImm imm
     in
     if (off == 0) then
@@ -450,12 +448,11 @@ pprAddr (ImmAddr imm off)
     else
         pp_imm <> char '+' <> int off
 
-pprAddr (AddrBaseIndex base index displacement)
-  = sdocWithPlatform $ \platform ->
-    let
+pprAddr platform (AddrBaseIndex base index displacement)
+  = let
         pp_disp  = ppr_disp displacement
         pp_off p = pp_disp <> char '(' <> p <> char ')'
-        pp_reg r = pprReg (archWordFormat (target32Bit platform)) r
+        pp_reg r = pprReg platform (archWordFormat (target32Bit platform)) r
     in
     case (base, index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
@@ -471,18 +468,16 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 -- | Print section header and appropriate alignment for that section.
-pprSectionAlign :: Section -> SDoc
-pprSectionAlign (Section (OtherSection _) _) =
+pprSectionAlign :: NCGConfig -> Section -> SDoc
+pprSectionAlign _config (Section (OtherSection _) _) =
      panic "X86.Ppr.pprSectionAlign: unknown section"
-pprSectionAlign sec@(Section seg _) =
-  sdocWithPlatform $ \platform ->
-    pprSectionHeader platform sec $$
-    pprAlignForSection seg
+pprSectionAlign config sec@(Section seg _) =
+    pprSectionHeader config sec $$
+    pprAlignForSection (ncgPlatform config) seg
 
 -- | Print appropriate alignment for the given section type.
-pprAlignForSection :: SectionType -> SDoc
-pprAlignForSection seg =
-  sdocWithPlatform $ \platform ->
+pprAlignForSection :: Platform -> SectionType -> SDoc
+pprAlignForSection platform seg =
     text ".align " <>
     case platformOS platform of
       -- Darwin: alignments are given as shifts.
@@ -511,14 +506,14 @@ pprAlignForSection seg =
            CString           -> int 1
            _                 -> int 8
 
-pprDataItem :: CmmLit -> SDoc
-pprDataItem lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags lit
+pprDataItem :: NCGConfig -> CmmLit -> SDoc
+pprDataItem config lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags config lit
 
-pprDataItem' :: DynFlags -> CmmLit -> SDoc
-pprDataItem' dflags lit
+pprDataItem' :: DynFlags -> NCGConfig -> CmmLit -> SDoc
+pprDataItem' dflags config lit
   = vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
     where
-        platform = targetPlatform dflags
+        platform = ncgPlatform config
         imm = litToImm lit
 
         -- These seem to be common:
@@ -577,38 +572,38 @@ pprDataItem' dflags lit
 asmComment :: SDoc -> SDoc
 asmComment c = whenPprDebug $ text "# " <> c
 
-pprInstr :: Instr -> SDoc
+pprInstr :: Platform -> Instr -> SDoc
+pprInstr platform i = case i of
+   COMMENT s
+      -> asmComment (ftext s)
 
-pprInstr (COMMENT s)
-   = asmComment (ftext s)
+   LOCATION file line col _name
+      -> text "\t.loc " <> ppr file <+> ppr line <+> ppr col
 
-pprInstr (LOCATION file line col _name)
-   = text "\t.loc " <> ppr file <+> ppr line <+> ppr col
+   DELTA d
+      -> asmComment $ text ("\tdelta = " ++ show d)
 
-pprInstr (DELTA d)
-   = asmComment $ text ("\tdelta = " ++ show d)
+   NEWBLOCK _
+      -> panic "pprInstr: NEWBLOCK"
 
-pprInstr (NEWBLOCK _)
-   = panic "PprMach.pprInstr: NEWBLOCK"
+   UNWIND lbl d
+      -> asmComment (text "\tunwind = " <> ppr d)
+         $$ ppr lbl <> colon
 
-pprInstr (UNWIND lbl d)
-   = asmComment (text "\tunwind = " <> ppr d)
-     $$ ppr lbl <> colon
-
-pprInstr (LDATA _ _)
-   = panic "PprMach.pprInstr: LDATA"
+   LDATA _ _
+      -> panic "pprInstr: LDATA"
 
 {-
-pprInstr (SPILL reg slot)
-   = hcat [
-        text "\tSPILL",
-        char ' ',
-        pprUserReg reg,
-        comma,
-        text "SLOT" <> parens (int slot)]
+   SPILL reg slot
+      -> hcat [
+           text "\tSPILL",
+           char ' ',
+           pprUserReg reg,
+           comma,
+           text "SLOT" <> parens (int slot)]
 
-pprInstr (RELOAD slot reg)
-   = hcat [
+   RELOAD slot reg
+      -> hcat [
         text "\tRELOAD",
         char ' ',
         text "SLOT" <> parens (int slot),
@@ -616,120 +611,170 @@ pprInstr (RELOAD slot reg)
         pprUserReg reg]
 -}
 
--- Replace 'mov $0x0,%reg' by 'xor %reg,%reg', which is smaller and cheaper.
--- The code generator catches most of these already, but not all.
-pprInstr (MOV format (OpImm (ImmInt 0)) dst@(OpReg _))
-  = pprInstr (XOR format' dst dst)
-  where format' = case format of
-          II64 -> II32          -- 32-bit version is equivalent, and smaller
-          _    -> format
-pprInstr (MOV format src dst)
-  = pprFormatOpOp (sLit "mov") format src dst
+   -- Replace 'mov $0x0,%reg' by 'xor %reg,%reg', which is smaller and cheaper.
+   -- The code generator catches most of these already, but not all.
+   MOV format (OpImm (ImmInt 0)) dst@(OpReg _)
+     -> pprInstr platform (XOR format' dst dst)
+        where format' = case format of
+                II64 -> II32          -- 32-bit version is equivalent, and smaller
+                _    -> format
 
-pprInstr (CMOV cc format src dst)
-  = pprCondOpReg (sLit "cmov") format cc src dst
+   MOV format src dst
+     -> pprFormatOpOp (sLit "mov") format src dst
 
-pprInstr (MOVZxL II32 src dst) = pprFormatOpOp (sLit "mov") II32 src dst
+   CMOV cc format src dst
+     -> pprCondOpReg (sLit "cmov") format cc src dst
+
+   MOVZxL II32 src dst
+      -> pprFormatOpOp (sLit "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
         -- movl.  But we represent it as a MOVZxL instruction, because
         -- the reg alloc would tend to throw away a plain reg-to-reg
         -- move, and we still want it to do that.
 
-pprInstr (MOVZxL formats src dst)
-  = pprFormatOpOpCoerce (sLit "movz") formats II32 src dst
+   MOVZxL formats src dst
+      -> pprFormatOpOpCoerce (sLit "movz") formats II32 src dst
         -- zero-extension only needs to extend to 32 bits: on x86_64,
         -- the remaining zero-extension to 64 bits is automatic, and the 32-bit
         -- instruction is shorter.
 
-pprInstr (MOVSxL formats src dst)
-  = sdocWithPlatform $ \platform ->
-    pprFormatOpOpCoerce (sLit "movs") formats (archWordFormat (target32Bit platform)) src dst
+   MOVSxL formats src dst
+      -> pprFormatOpOpCoerce (sLit "movs") formats (archWordFormat (target32Bit platform)) src dst
 
--- here we do some patching, since the physical registers are only set late
--- in the code generation.
-pprInstr (LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
-  | reg1 == reg3
-  = pprFormatOpOp (sLit "add") format (OpReg reg2) dst
+   -- here we do some patching, since the physical registers are only set late
+   -- in the code generation.
+   LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3)
+      | reg1 == reg3
+      -> pprFormatOpOp (sLit "add") format (OpReg reg2) dst
 
-pprInstr (LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
-  | reg2 == reg3
-  = pprFormatOpOp (sLit "add") format (OpReg reg1) dst
+   LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3)
+      | reg2 == reg3
+      -> pprFormatOpOp (sLit "add") format (OpReg reg1) dst
 
-pprInstr (LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3))
-  | reg1 == reg3
-  = pprInstr (ADD format (OpImm displ) dst)
+   LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3)
+      | reg1 == reg3
+      -> pprInstr platform (ADD format (OpImm displ) dst)
 
-pprInstr (LEA format src dst) = pprFormatOpOp (sLit "lea") format src dst
+   LEA format src dst
+      -> pprFormatOpOp (sLit "lea") format src dst
 
-pprInstr (ADD format (OpImm (ImmInt (-1))) dst)
-  = pprFormatOp (sLit "dec") format dst
-pprInstr (ADD format (OpImm (ImmInt 1)) dst)
-  = pprFormatOp (sLit "inc") format dst
-pprInstr (ADD format src dst) = pprFormatOpOp (sLit "add") format src dst
-pprInstr (ADC format src dst) = pprFormatOpOp (sLit "adc") format src dst
-pprInstr (SUB format src dst) = pprFormatOpOp (sLit "sub") format src dst
-pprInstr (SBB format src dst) = pprFormatOpOp (sLit "sbb") format src dst
-pprInstr (IMUL format op1 op2) = pprFormatOpOp (sLit "imul") format op1 op2
+   ADD format (OpImm (ImmInt (-1))) dst
+      -> pprFormatOp (sLit "dec") format dst
 
-pprInstr (ADD_CC format src dst)
-  = pprFormatOpOp (sLit "add") format src dst
-pprInstr (SUB_CC format src dst)
-  = pprFormatOpOp (sLit "sub") format src dst
+   ADD format (OpImm (ImmInt 1)) dst
+      -> pprFormatOp (sLit "inc") format dst
 
-{- A hack.  The Intel documentation says that "The two and three
-   operand forms [of IMUL] may also be used with unsigned operands
-   because the lower half of the product is the same regardless if
-   (sic) the operands are signed or unsigned.  The CF and OF flags,
-   however, cannot be used to determine if the upper half of the
-   result is non-zero."  So there.
--}
+   ADD format src dst
+      -> pprFormatOpOp (sLit "add") format src dst
 
--- Use a 32-bit instruction when possible as it saves a byte.
--- Notably, extracting the tag bits of a pointer has this form.
--- TODO: we could save a byte in a subsequent CMP instruction too,
--- but need something like a peephole pass for this
-pprInstr (AND II64 src@(OpImm (ImmInteger mask)) dst)
-  | 0 <= mask && mask < 0xffffffff
-    = pprInstr (AND II32 src dst)
-pprInstr (AND FF32 src dst) = pprOpOp (sLit "andps") FF32 src dst
-pprInstr (AND FF64 src dst) = pprOpOp (sLit "andpd") FF64 src dst
-pprInstr (AND format src dst) = pprFormatOpOp (sLit "and") format src dst
-pprInstr (OR  format src dst) = pprFormatOpOp (sLit "or")  format src dst
+   ADC format src dst
+      -> pprFormatOpOp (sLit "adc") format src dst
 
-pprInstr (XOR FF32 src dst) = pprOpOp (sLit "xorps") FF32 src dst
-pprInstr (XOR FF64 src dst) = pprOpOp (sLit "xorpd") FF64 src dst
-pprInstr (XOR format src dst) = pprFormatOpOp (sLit "xor")  format src dst
+   SUB format src dst
+      -> pprFormatOpOp (sLit "sub") format src dst
 
-pprInstr (POPCNT format src dst) = pprOpOp (sLit "popcnt") format src (OpReg dst)
-pprInstr (LZCNT format src dst)  = pprOpOp (sLit "lzcnt")  format src (OpReg dst)
-pprInstr (TZCNT format src dst)  = pprOpOp (sLit "tzcnt")  format src (OpReg dst)
-pprInstr (BSF format src dst)    = pprOpOp (sLit "bsf")    format src (OpReg dst)
-pprInstr (BSR format src dst)    = pprOpOp (sLit "bsr")    format src (OpReg dst)
+   SBB format src dst
+      -> pprFormatOpOp (sLit "sbb") format src dst
 
-pprInstr (PDEP format src mask dst)   = pprFormatOpOpReg (sLit "pdep") format src mask dst
-pprInstr (PEXT format src mask dst)   = pprFormatOpOpReg (sLit "pext") format src mask dst
+   IMUL format op1 op2
+      -> pprFormatOpOp (sLit "imul") format op1 op2
 
-pprInstr (PREFETCH NTA format src ) = pprFormatOp_ (sLit "prefetchnta") format src
-pprInstr (PREFETCH Lvl0 format src) = pprFormatOp_ (sLit "prefetcht0") format src
-pprInstr (PREFETCH Lvl1 format src) = pprFormatOp_ (sLit "prefetcht1") format src
-pprInstr (PREFETCH Lvl2 format src) = pprFormatOp_ (sLit "prefetcht2") format src
+   ADD_CC format src dst
+      -> pprFormatOpOp (sLit "add") format src dst
 
-pprInstr (NOT format op) = pprFormatOp (sLit "not") format op
-pprInstr (BSWAP format op) = pprFormatOp (sLit "bswap") format (OpReg op)
-pprInstr (NEGI format op) = pprFormatOp (sLit "neg") format op
+   SUB_CC format src dst
+      -> pprFormatOpOp (sLit "sub") format src dst
 
-pprInstr (SHL format src dst) = pprShift (sLit "shl") format src dst
-pprInstr (SAR format src dst) = pprShift (sLit "sar") format src dst
-pprInstr (SHR format src dst) = pprShift (sLit "shr") format src dst
+   -- Use a 32-bit instruction when possible as it saves a byte.
+   -- Notably, extracting the tag bits of a pointer has this form.
+   -- TODO: we could save a byte in a subsequent CMP instruction too,
+   -- but need something like a peephole pass for this
+   AND II64 src@(OpImm (ImmInteger mask)) dst
+      | 0 <= mask && mask < 0xffffffff
+      -> pprInstr platform (AND II32 src dst)
 
-pprInstr (BT  format imm src) = pprFormatImmOp (sLit "bt") format imm src
+   AND FF32 src dst
+      -> pprOpOp (sLit "andps") FF32 src dst
 
-pprInstr (CMP format src dst)
-  | isFloatFormat format =  pprFormatOpOp (sLit "ucomi") format src dst -- SSE2
-  | otherwise     =  pprFormatOpOp (sLit "cmp")   format src dst
+   AND FF64 src dst
+      -> pprOpOp (sLit "andpd") FF64 src dst
 
-pprInstr (TEST format src dst) = sdocWithPlatform $ \platform ->
-  let format' = case (src,dst) of
+   AND format src dst
+      -> pprFormatOpOp (sLit "and") format src dst
+
+   OR  format src dst
+      -> pprFormatOpOp (sLit "or")  format src dst
+
+   XOR FF32 src dst
+      -> pprOpOp (sLit "xorps") FF32 src dst
+
+   XOR FF64 src dst
+      ->  pprOpOp (sLit "xorpd") FF64 src dst
+
+   XOR format src dst
+      -> pprFormatOpOp (sLit "xor") format src dst
+
+   POPCNT format src dst
+      -> pprOpOp (sLit "popcnt") format src (OpReg dst)
+
+   LZCNT format src dst
+      ->  pprOpOp (sLit "lzcnt") format src (OpReg dst)
+
+   TZCNT format src dst
+      -> pprOpOp (sLit "tzcnt") format src (OpReg dst)
+
+   BSF format src dst
+      -> pprOpOp (sLit "bsf") format src (OpReg dst)
+
+   BSR format src dst
+      -> pprOpOp (sLit "bsr") format src (OpReg dst)
+
+   PDEP format src mask dst
+      -> pprFormatOpOpReg (sLit "pdep") format src mask dst
+
+   PEXT format src mask dst
+      -> pprFormatOpOpReg (sLit "pext") format src mask dst
+
+   PREFETCH NTA format src
+      -> pprFormatOp_ (sLit "prefetchnta") format src
+
+   PREFETCH Lvl0 format src
+      -> pprFormatOp_ (sLit "prefetcht0") format src
+
+   PREFETCH Lvl1 format src
+      -> pprFormatOp_ (sLit "prefetcht1") format src
+
+   PREFETCH Lvl2 format src
+      -> pprFormatOp_ (sLit "prefetcht2") format src
+
+   NOT format op
+      -> pprFormatOp (sLit "not") format op
+
+   BSWAP format op
+      -> pprFormatOp (sLit "bswap") format (OpReg op)
+
+   NEGI format op
+      -> pprFormatOp (sLit "neg") format op
+
+   SHL format src dst
+      -> pprShift (sLit "shl") format src dst
+
+   SAR format src dst
+      -> pprShift (sLit "sar") format src dst
+
+   SHR format src dst
+      -> pprShift (sLit "shr") format src dst
+
+   BT format imm src
+      -> pprFormatImmOp (sLit "bt") format imm src
+
+   CMP format src dst
+     | isFloatFormat format -> pprFormatOpOp (sLit "ucomi") format src dst -- SSE2
+     | otherwise            -> pprFormatOpOp (sLit "cmp")   format src dst
+
+   TEST format src dst
+      -> pprFormatOpOp (sLit "test") format' src dst
+         where
         -- Match instructions like 'test $0x3,%esi' or 'test $0x7,%rbx'.
         -- We can replace them by equivalent, but smaller instructions
         -- by reducing the size of the immediate operand as far as possible.
@@ -740,275 +785,308 @@ pprInstr (TEST format src dst) = sdocWithPlatform $ \platform ->
         -- to be completely equivalent to the original; in particular so
         -- that the signed comparison condition bits are the same as they
         -- would be if doing a full word comparison. See #13425.
-        (OpImm (ImmInteger mask), OpReg dstReg)
-          | 0 <= mask && mask < 128 -> minSizeOfReg platform dstReg
-        _ -> format
-  in pprFormatOpOp (sLit "test") format' src dst
-  where
-    minSizeOfReg platform (RegReal (RealRegSingle i))
-      | target32Bit platform && i <= 3        = II8  -- al, bl, cl, dl
-      | target32Bit platform && i <= 7        = II16 -- si, di, bp, sp
-      | not (target32Bit platform) && i <= 15 = II8  -- al .. r15b
-    minSizeOfReg _ _ = format                 -- other
+          format' = case (src,dst) of
+           (OpImm (ImmInteger mask), OpReg dstReg)
+             | 0 <= mask && mask < 128 -> minSizeOfReg platform dstReg
+           _ -> format
+          minSizeOfReg platform (RegReal (RealRegSingle i))
+            | target32Bit platform && i <= 3        = II8  -- al, bl, cl, dl
+            | target32Bit platform && i <= 7        = II16 -- si, di, bp, sp
+            | not (target32Bit platform) && i <= 15 = II8  -- al .. r15b
+          minSizeOfReg _ _ = format                 -- other
 
-pprInstr (PUSH format op) = pprFormatOp (sLit "push") format op
-pprInstr (POP format op) = pprFormatOp (sLit "pop") format op
+   PUSH format op
+      -> pprFormatOp (sLit "push") format op
+
+   POP format op
+      -> pprFormatOp (sLit "pop") format op
 
 -- both unused (SDM):
--- pprInstr PUSHA = text "\tpushal"
--- pprInstr POPA = text "\tpopal"
+-- PUSHA -> text "\tpushal"
+-- POPA  -> text "\tpopal"
 
-pprInstr NOP = text "\tnop"
-pprInstr (CLTD II8) = text "\tcbtw"
-pprInstr (CLTD II16) = text "\tcwtd"
-pprInstr (CLTD II32) = text "\tcltd"
-pprInstr (CLTD II64) = text "\tcqto"
-pprInstr (CLTD x) = panic $ "pprInstr: " ++ show x
+   NOP
+      -> text "\tnop"
 
-pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
+   CLTD II8
+      -> text "\tcbtw"
 
-pprInstr (JXX cond blockid)
-  = pprCondInstr (sLit "j") cond (ppr lab)
-  where lab = blockLbl blockid
+   CLTD II16
+      -> text "\tcwtd"
 
-pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
+   CLTD II32
+      -> text "\tcltd"
 
-pprInstr        (JMP (OpImm imm) _) = text "\tjmp " <> pprImm imm
-pprInstr (JMP op _)          = sdocWithPlatform $ \platform ->
-                               text "\tjmp *"
-                                   <> pprOperand (archWordFormat (target32Bit platform)) op
-pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op [])
-pprInstr        (CALL (Left imm) _)    = text "\tcall " <> pprImm imm
-pprInstr (CALL (Right reg) _)   = sdocWithPlatform $ \platform ->
-                                  text "\tcall *"
-                                      <> pprReg (archWordFormat (target32Bit platform)) reg
+   CLTD II64
+      -> text "\tcqto"
 
-pprInstr (IDIV fmt op)   = pprFormatOp (sLit "idiv") fmt op
-pprInstr (DIV fmt op)    = pprFormatOp (sLit "div")  fmt op
-pprInstr (IMUL2 fmt op)  = pprFormatOp (sLit "imul") fmt op
+   CLTD x
+      -> panic $ "pprInstr: CLTD " ++ show x
 
--- x86_64 only
-pprInstr (MUL format op1 op2) = pprFormatOpOp (sLit "mul") format op1 op2
-pprInstr (MUL2 format op) = pprFormatOp (sLit "mul") format op
+   SETCC cond op
+      -> pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
 
-pprInstr (FDIV format op1 op2) = pprFormatOpOp (sLit "div") format op1 op2
-pprInstr (SQRT format op1 op2) = pprFormatOpReg (sLit "sqrt") format op1 op2
+   JXX cond blockid
+      -> pprCondInstr (sLit "j") cond (ppr lab)
+         where lab = blockLbl blockid
 
-pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
-pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ fmt from to) = pprFormatFormatOpReg (sLit "cvttss2si") FF32 fmt from to
-pprInstr (CVTTSD2SIQ fmt from to) = pprFormatFormatOpReg (sLit "cvttsd2si") FF64 fmt from to
-pprInstr (CVTSI2SS fmt from to)   = pprFormatOpReg (sLit "cvtsi2ss") fmt from to
-pprInstr (CVTSI2SD fmt from to)   = pprFormatOpReg (sLit "cvtsi2sd") fmt from to
+   JXX_GBL cond imm
+      -> pprCondInstr (sLit "j") cond (pprImm imm)
 
-    -- FETCHGOT for PIC on ELF platforms
-pprInstr (FETCHGOT reg)
-   = vcat [ text "\tcall 1f",
-            hcat [ text "1:\tpopl\t", pprReg II32 reg ],
-            hcat [ text "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), ",
-                   pprReg II32 reg ]
-          ]
+   JMP (OpImm imm) _
+      -> text "\tjmp " <> pprImm imm
+
+   JMP op _
+      -> text "\tjmp *" <> pprOperand platform (archWordFormat (target32Bit platform)) op
+
+   JMP_TBL op _ _ _
+      -> pprInstr platform (JMP op [])
+
+   CALL (Left imm) _
+      -> text "\tcall " <> pprImm imm
+
+   CALL (Right reg) _
+      -> text "\tcall *" <> pprReg platform (archWordFormat (target32Bit platform)) reg
+
+   IDIV fmt op
+      -> pprFormatOp (sLit "idiv") fmt op
+
+   DIV fmt op
+      -> pprFormatOp (sLit "div")  fmt op
+
+   IMUL2 fmt op
+      -> pprFormatOp (sLit "imul") fmt op
+
+   -- x86_64 only
+   MUL format op1 op2
+      -> pprFormatOpOp (sLit "mul") format op1 op2
+
+   MUL2 format op
+      -> pprFormatOp (sLit "mul") format op
+
+   FDIV format op1 op2
+      -> pprFormatOpOp (sLit "div") format op1 op2
+
+   SQRT format op1 op2
+      -> pprFormatOpReg (sLit "sqrt") format op1 op2
+
+   CVTSS2SD from to
+      -> pprRegReg (sLit "cvtss2sd") from to
+
+   CVTSD2SS from to
+      -> pprRegReg (sLit "cvtsd2ss") from to
+
+   CVTTSS2SIQ fmt from to
+      -> pprFormatFormatOpReg (sLit "cvttss2si") FF32 fmt from to
+
+   CVTTSD2SIQ fmt from to
+      -> pprFormatFormatOpReg (sLit "cvttsd2si") FF64 fmt from to
+
+   CVTSI2SS fmt from to
+      -> pprFormatOpReg (sLit "cvtsi2ss") fmt from to
+
+   CVTSI2SD fmt from to
+      -> pprFormatOpReg (sLit "cvtsi2sd") fmt from to
+
+       -- FETCHGOT for PIC on ELF platforms
+   FETCHGOT reg
+      -> vcat [ text "\tcall 1f",
+                hcat [ text "1:\tpopl\t", pprReg platform II32 reg ],
+                hcat [ text "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), ",
+                       pprReg platform II32 reg ]
+              ]
 
     -- FETCHPC for PIC on Darwin/x86
     -- get the instruction pointer into a register
     -- (Terminology note: the IP is called Program Counter on PPC,
     --  and it's a good thing to use the same name on both platforms)
-pprInstr (FETCHPC reg)
-   = vcat [ text "\tcall 1f",
-            hcat [ text "1:\tpopl\t", pprReg II32 reg ]
-          ]
+   FETCHPC reg
+      -> vcat [ text "\tcall 1f",
+                hcat [ text "1:\tpopl\t", pprReg platform II32 reg ]
+              ]
+
+   -- the
+   -- GST fmt src addr ==> FLD dst ; FSTPsz addr
+   g@(X87Store fmt  addr)
+      -> pprX87 g (hcat [gtab, text "fstp", pprFormat_x87 fmt, gsp, pprAddr platform addr])
+
+   -- Atomics
+   LOCK i
+      -> text "\tlock" $$ pprInstr platform i
+
+   MFENCE
+      -> text "\tmfence"
+
+   XADD format src dst
+      -> pprFormatOpOp (sLit "xadd") format src dst
+
+   CMPXCHG format src dst
+      -> pprFormatOpOp (sLit "cmpxchg") format src dst
 
 
--- the
--- GST fmt src addr ==> FLD dst ; FSTPsz addr
-pprInstr g@(X87Store fmt  addr)
- = pprX87 g (hcat [gtab,
-                 text "fstp", pprFormat_x87 fmt, gsp, pprAddr addr])
+  where
+   gtab :: SDoc
+   gtab  = char '\t'
 
-
--- Atomics
-
-pprInstr (LOCK i) = text "\tlock" $$ pprInstr i
-
-pprInstr MFENCE = text "\tmfence"
-
-pprInstr (XADD format src dst) = pprFormatOpOp (sLit "xadd") format src dst
-
-pprInstr (CMPXCHG format src dst)
-   = pprFormatOpOp (sLit "cmpxchg") format src dst
-
-
-
---------------------------
--- some left over
-
-
-
-gtab :: SDoc
-gtab  = char '\t'
-
-gsp :: SDoc
-gsp   = char ' '
+   gsp :: SDoc
+   gsp   = char ' '
 
 
 
-pprX87 :: Instr -> SDoc -> SDoc
-pprX87 fake actual
-   = (char '#' <> pprX87Instr fake) $$ actual
+   pprX87 :: Instr -> SDoc -> SDoc
+   pprX87 fake actual
+      = (char '#' <> pprX87Instr fake) $$ actual
 
-pprX87Instr :: Instr -> SDoc
-pprX87Instr (X87Store fmt  dst) = pprFormatAddr (sLit "gst") fmt  dst
-pprX87Instr _ = panic "X86.Ppr.pprX87Instr: no match"
+   pprX87Instr :: Instr -> SDoc
+   pprX87Instr (X87Store fmt dst) = pprFormatAddr (sLit "gst") fmt dst
+   pprX87Instr _ = panic "X86.Ppr.pprX87Instr: no match"
 
-pprDollImm :: Imm -> SDoc
-pprDollImm i = text "$" <> pprImm i
-
-
-pprOperand :: Format -> Operand -> SDoc
-pprOperand f (OpReg r)   = pprReg f r
-pprOperand _ (OpImm i)   = pprDollImm i
-pprOperand _ (OpAddr ea) = pprAddr ea
+   pprDollImm :: Imm -> SDoc
+   pprDollImm i = text "$" <> pprImm i
 
 
-pprMnemonic_  :: PtrString -> SDoc
-pprMnemonic_ name =
-   char '\t' <> ptext name <> space
+   pprOperand :: Platform -> Format -> Operand -> SDoc
+   pprOperand platform f op = case op of
+      OpReg r   -> pprReg platform f r
+      OpImm i   -> pprDollImm i
+      OpAddr ea -> pprAddr platform ea
 
 
-pprMnemonic  :: PtrString -> Format -> SDoc
-pprMnemonic name format =
-   char '\t' <> ptext name <> pprFormat format <> space
+   pprMnemonic_  :: PtrString -> SDoc
+   pprMnemonic_ name =
+      char '\t' <> ptext name <> space
 
 
-pprFormatImmOp :: PtrString -> Format -> Imm -> Operand -> SDoc
-pprFormatImmOp name format imm op1
-  = hcat [
-        pprMnemonic name format,
-        char '$',
-        pprImm imm,
-        comma,
-        pprOperand format op1
-    ]
+   pprMnemonic  :: PtrString -> Format -> SDoc
+   pprMnemonic name format =
+      char '\t' <> ptext name <> pprFormat format <> space
 
 
-pprFormatOp_ :: PtrString -> Format -> Operand -> SDoc
-pprFormatOp_ name format op1
-  = hcat [
-        pprMnemonic_ name ,
-        pprOperand format op1
-    ]
-
-pprFormatOp :: PtrString -> Format -> Operand -> SDoc
-pprFormatOp name format op1
-  = hcat [
-        pprMnemonic name format,
-        pprOperand format op1
-    ]
+   pprFormatImmOp :: PtrString -> Format -> Imm -> Operand -> SDoc
+   pprFormatImmOp name format imm op1
+     = hcat [
+           pprMnemonic name format,
+           char '$',
+           pprImm imm,
+           comma,
+           pprOperand platform format op1
+       ]
 
 
-pprFormatOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
-pprFormatOpOp name format op1 op2
-  = hcat [
-        pprMnemonic name format,
-        pprOperand format op1,
-        comma,
-        pprOperand format op2
-    ]
+   pprFormatOp_ :: PtrString -> Format -> Operand -> SDoc
+   pprFormatOp_ name format op1
+     = hcat [
+           pprMnemonic_ name ,
+           pprOperand platform format op1
+       ]
+
+   pprFormatOp :: PtrString -> Format -> Operand -> SDoc
+   pprFormatOp name format op1
+     = hcat [
+           pprMnemonic name format,
+           pprOperand platform format op1
+       ]
 
 
-pprOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
-pprOpOp name format op1 op2
-  = hcat [
-        pprMnemonic_ name,
-        pprOperand format op1,
-        comma,
-        pprOperand format op2
-    ]
+   pprFormatOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprFormatOpOp name format op1 op2
+     = hcat [
+           pprMnemonic name format,
+           pprOperand platform format op1,
+           comma,
+           pprOperand platform format op2
+       ]
 
 
+   pprOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprOpOp name format op1 op2
+     = hcat [
+           pprMnemonic_ name,
+           pprOperand platform format op1,
+           comma,
+           pprOperand platform format op2
+       ]
 
-pprRegReg :: PtrString -> Reg -> Reg -> SDoc
-pprRegReg name reg1 reg2
-  = sdocWithPlatform $ \platform ->
-    hcat [
-        pprMnemonic_ name,
-        pprReg (archWordFormat (target32Bit platform)) reg1,
-        comma,
-        pprReg (archWordFormat (target32Bit platform)) reg2
-    ]
+   pprRegReg :: PtrString -> Reg -> Reg -> SDoc
+   pprRegReg name reg1 reg2
+     = hcat [
+           pprMnemonic_ name,
+           pprReg platform (archWordFormat (target32Bit platform)) reg1,
+           comma,
+           pprReg platform (archWordFormat (target32Bit platform)) reg2
+       ]
 
 
-pprFormatOpReg :: PtrString -> Format -> Operand -> Reg -> SDoc
-pprFormatOpReg name format op1 reg2
-  = sdocWithPlatform $ \platform ->
-    hcat [
-        pprMnemonic name format,
-        pprOperand format op1,
-        comma,
-        pprReg (archWordFormat (target32Bit platform)) reg2
-    ]
+   pprFormatOpReg :: PtrString -> Format -> Operand -> Reg -> SDoc
+   pprFormatOpReg name format op1 reg2
+     = hcat [
+           pprMnemonic name format,
+           pprOperand platform format op1,
+           comma,
+           pprReg platform (archWordFormat (target32Bit platform)) reg2
+       ]
 
-pprCondOpReg :: PtrString -> Format -> Cond -> Operand -> Reg -> SDoc
-pprCondOpReg name format cond op1 reg2
-  = hcat [
-        char '\t',
-        ptext name,
-        pprCond cond,
-        space,
-        pprOperand format op1,
-        comma,
-        pprReg format reg2
-    ]
+   pprCondOpReg :: PtrString -> Format -> Cond -> Operand -> Reg -> SDoc
+   pprCondOpReg name format cond op1 reg2
+     = hcat [
+           char '\t',
+           ptext name,
+           pprCond cond,
+           space,
+           pprOperand platform format op1,
+           comma,
+           pprReg platform format reg2
+       ]
 
-pprFormatFormatOpReg :: PtrString -> Format -> Format -> Operand -> Reg -> SDoc
-pprFormatFormatOpReg name format1 format2 op1 reg2
-  = hcat [
-        pprMnemonic name format2,
-        pprOperand format1 op1,
-        comma,
-        pprReg format2 reg2
-    ]
+   pprFormatFormatOpReg :: PtrString -> Format -> Format -> Operand -> Reg -> SDoc
+   pprFormatFormatOpReg name format1 format2 op1 reg2
+     = hcat [
+           pprMnemonic name format2,
+           pprOperand platform format1 op1,
+           comma,
+           pprReg platform format2 reg2
+       ]
 
-pprFormatOpOpReg :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
-pprFormatOpOpReg name format op1 op2 reg3
-  = hcat [
-        pprMnemonic name format,
-        pprOperand format op1,
-        comma,
-        pprOperand format op2,
-        comma,
-        pprReg format reg3
-    ]
+   pprFormatOpOpReg :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
+   pprFormatOpOpReg name format op1 op2 reg3
+     = hcat [
+           pprMnemonic name format,
+           pprOperand platform format op1,
+           comma,
+           pprOperand platform format op2,
+           comma,
+           pprReg platform format reg3
+       ]
 
 
 
-pprFormatAddr :: PtrString -> Format -> AddrMode -> SDoc
-pprFormatAddr name format  op
-  = hcat [
-        pprMnemonic name format,
-        comma,
-        pprAddr op
-    ]
+   pprFormatAddr :: PtrString -> Format -> AddrMode -> SDoc
+   pprFormatAddr name format  op
+     = hcat [
+           pprMnemonic name format,
+           comma,
+           pprAddr platform op
+       ]
 
-pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
-pprShift name format src dest
-  = hcat [
-        pprMnemonic name format,
-        pprOperand II8 src,  -- src is 8-bit sized
-        comma,
-        pprOperand format dest
-    ]
-
-
-pprFormatOpOpCoerce :: PtrString -> Format -> Format -> Operand -> Operand -> SDoc
-pprFormatOpOpCoerce name format1 format2 op1 op2
-  = hcat [ char '\t', ptext name, pprFormat format1, pprFormat format2, space,
-        pprOperand format1 op1,
-        comma,
-        pprOperand format2 op2
-    ]
+   pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprShift name format src dest
+     = hcat [
+           pprMnemonic name format,
+           pprOperand platform II8 src,  -- src is 8-bit sized
+           comma,
+           pprOperand platform format dest
+       ]
 
 
-pprCondInstr :: PtrString -> Cond -> SDoc -> SDoc
-pprCondInstr name cond arg
-  = hcat [ char '\t', ptext name, pprCond cond, space, arg]
+   pprFormatOpOpCoerce :: PtrString -> Format -> Format -> Operand -> Operand -> SDoc
+   pprFormatOpOpCoerce name format1 format2 op1 op2
+     = hcat [ char '\t', ptext name, pprFormat format1, pprFormat format2, space,
+           pprOperand platform format1 op1,
+           comma,
+           pprOperand platform format2 op2
+       ]
+
+
+   pprCondInstr :: PtrString -> Cond -> SDoc -> SDoc
+   pprCondInstr name cond arg
+     = hcat [ char '\t', ptext name, pprCond cond, space, arg]

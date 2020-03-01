@@ -41,15 +41,15 @@ import GhcPrelude
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
-import GHC.CmmToAsm.CFG
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import Digraph
-import GHC.Driver.Session
 import MonadUtils
 import Outputable
 import GHC.Platform
@@ -483,11 +483,11 @@ slurpReloadCoalesce live
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
         :: (Outputable statics, Outputable instr, Instruction instr)
-        => DynFlags
+        => NCGConfig
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
 
-stripLive dflags live
+stripLive config live
         = stripCmm live
 
  where  stripCmm :: (Outputable statics, Outputable instr, Instruction instr)
@@ -503,7 +503,7 @@ stripLive dflags live
                                 = partition ((== first_id) . blockId) final_blocks
 
            in   CmmProc info label live
-                          (ListGraph $ map (stripLiveBlock dflags) $ first' : rest')
+                          (ListGraph $ map (stripLiveBlock config) $ first' : rest')
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
@@ -514,11 +514,11 @@ stripLive dflags live
 
 stripLiveBlock
         :: Instruction instr
-        => DynFlags
+        => NCGConfig
         -> LiveBasicBlock instr
         -> NatBasicBlock instr
 
-stripLiveBlock dflags (BasicBlock i lis)
+stripLiveBlock config (BasicBlock i lis)
  =      BasicBlock i instrs'
 
  where  (instrs', _)
@@ -529,11 +529,11 @@ stripLiveBlock dflags (BasicBlock i lis)
 
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                spillNat (mkSpillInstr dflags reg delta slot : acc) instrs
+                spillNat (mkSpillInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                spillNat (mkLoadInstr dflags reg delta slot : acc) instrs
+                spillNat (mkLoadInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr

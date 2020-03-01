@@ -119,6 +119,7 @@ import qualified GHC.CmmToAsm.Reg.Linear.X86_64 as X86_64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -126,7 +127,6 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm hiding (RegSet)
 
 import Digraph
-import GHC.Driver.Session
 import Unique
 import UniqSet
 import UniqFM
@@ -144,7 +144,7 @@ import Control.Monad
 -- Allocate registers
 regAlloc
         :: (Outputable instr, Instruction instr)
-        => DynFlags
+        => NCGConfig
         -> LiveCmmDecl statics instr
         -> UniqSM ( NatCmmDecl statics instr
                   , Maybe Int  -- number of extra stack slots required,
@@ -163,19 +163,19 @@ regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
                  , Nothing
                  , Nothing )
 
-regAlloc dflags (CmmProc static lbl live sccs)
+regAlloc config (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
                 (final_blocks, stats, stack_use)
-                        <- linearRegAlloc dflags entry_ids block_live sccs
+                        <- linearRegAlloc config entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
                 let ((first':_), rest')
                                 = partition ((== first_id) . blockId) final_blocks
 
-                let max_spill_slots = maxSpillSlots dflags
+                let max_spill_slots = maxSpillSlots config
                     extra_stack
                       | stack_use > max_spill_slots
                       = Just (stack_use - max_spill_slots)
@@ -201,7 +201,7 @@ regAlloc _ (CmmProc _ _ _ _)
 --
 linearRegAlloc
         :: (Outputable instr, Instruction instr)
-        => DynFlags
+        => NCGConfig
         -> [BlockId] -- ^ entry points
         -> BlockMap RegSet
               -- ^ live regs on entry to each basic block
@@ -209,7 +209,7 @@ linearRegAlloc
               -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc dflags entry_ids block_live sccs
+linearRegAlloc config entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
@@ -226,22 +226,22 @@ linearRegAlloc dflags entry_ids block_live sccs
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
  where
-  go f = linearRegAlloc' dflags f entry_ids block_live sccs
-  platform = targetPlatform dflags
+  go f = linearRegAlloc' config f entry_ids block_live sccs
+  platform = ncgPlatform config
 
 linearRegAlloc'
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => DynFlags
+        => NCGConfig
         -> freeRegs
         -> [BlockId]                    -- ^ entry points
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' dflags initFreeRegs entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = do   us      <- getUniqueSupplyM
         let (_, stack, stats, blocks) =
-                runR dflags mapEmpty initFreeRegs emptyRegMap (emptyStackMap dflags) us
+                runR config mapEmpty initFreeRegs emptyRegMap emptyStackMap us
                     $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
 
@@ -342,9 +342,8 @@ processBlock block_live (BasicBlock id instrs)
 initBlock :: FR freeRegs
           => BlockId -> BlockMap RegSet -> RegM freeRegs ()
 initBlock id block_live
- = do   dflags <- getDynFlags
-        let platform = targetPlatform dflags
-        block_assig     <- getBlockAssigR
+ = do   platform    <- getPlatform
+        block_assig <- getBlockAssigR
         case mapLookup id block_assig of
                 -- no prior info about this block: we must consider
                 -- any fixed regs to be allocated, but we can ignore
@@ -487,8 +486,7 @@ genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
+  platform <- getPlatform
   case regUsageOfInstr platform instr of { RU read written ->
     do
     let real_written    = [ rr  | (RegReal     rr) <- written ]
@@ -590,8 +588,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 
 releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
 releaseRegs regs = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
+  platform <- getPlatform
   assig <- getAssigR
   free <- getFreeRegsR
   let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
@@ -651,8 +648,7 @@ saveClobberedTemps clobbered dying
             = return (instrs, assig)
 
      clobber assig instrs ((temp, reg) : rest)
-       = do dflags <- getDynFlags
-            let platform = targetPlatform dflags
+       = do platform <- getPlatform
 
             freeRegs <- getFreeRegsR
             let regclass = targetClassOfRealReg platform reg
@@ -693,10 +689,8 @@ clobberRegs []
         = return ()
 
 clobberRegs clobbered
- = do   dflags <- getDynFlags
-        let platform = targetPlatform dflags
-
-        freeregs        <- getFreeRegsR
+ = do   platform <- getPlatform
+        freeregs <- getFreeRegsR
         setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs clobbered
 
         assig           <- getAssigR
@@ -799,9 +793,8 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
                         -> SpillLoc
                         -> RegM freeRegs ([instr], [RealReg])
 allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
- = do   dflags <- getDynFlags
-        let platform = targetPlatform dflags
-        freeRegs                <- getFreeRegsR
+ = do   platform <- getPlatform
+        freeRegs <- getFreeRegsR
         let freeRegs_thisClass  = frGetFreeRegs platform (classOfVirtualReg r) freeRegs
 
         case freeRegs_thisClass of
