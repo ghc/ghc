@@ -14,7 +14,7 @@ import GhcPrelude
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 
-import GHC.Driver.Session
+import GHC.CmmToAsm.Config
 import Panic
 import GHC.Platform
 
@@ -69,21 +69,19 @@ instance FR SPARC.FreeRegs where
     frInitFreeRegs = SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
 
-maxSpillSlots :: DynFlags -> Int
-maxSpillSlots dflags
-              = case platformArch (targetPlatform dflags) of
-                ArchX86       -> X86.Instr.maxSpillSlots dflags
-                ArchX86_64    -> X86.Instr.maxSpillSlots dflags
-                ArchPPC       -> PPC.Instr.maxSpillSlots dflags
-                ArchS390X     -> panic "maxSpillSlots ArchS390X"
-                ArchSPARC     -> SPARC.Instr.maxSpillSlots dflags
-                ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
-                ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
-                ArchARM64     -> panic "maxSpillSlots ArchARM64"
-                ArchPPC_64 _  -> PPC.Instr.maxSpillSlots dflags
-                ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
-                ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
-                ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
-                ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
-                ArchUnknown   -> panic "maxSpillSlots ArchUnknown"
-
+maxSpillSlots :: NCGConfig -> Int
+maxSpillSlots config = case platformArch (ncgPlatform config) of
+   ArchX86       -> X86.Instr.maxSpillSlots config
+   ArchX86_64    -> X86.Instr.maxSpillSlots config
+   ArchPPC       -> PPC.Instr.maxSpillSlots config
+   ArchS390X     -> panic "maxSpillSlots ArchS390X"
+   ArchSPARC     -> SPARC.Instr.maxSpillSlots config
+   ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
+   ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
+   ArchARM64     -> panic "maxSpillSlots ArchARM64"
+   ArchPPC_64 _  -> PPC.Instr.maxSpillSlots config
+   ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
+   ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
+   ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
+   ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
+   ArchUnknown   -> panic "maxSpillSlots ArchUnknown"

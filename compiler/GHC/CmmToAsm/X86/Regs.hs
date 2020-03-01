@@ -57,7 +57,6 @@ import GHC.Platform.Reg.Class
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
-import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 
@@ -188,11 +187,11 @@ addrModeRegs _ = []
 -- applicable, is the same but for the frame pointer.
 
 
-spRel :: DynFlags
+spRel :: Platform
       -> Int -- ^ desired stack offset in bytes, positive or negative
       -> AddrMode
-spRel dflags n
- | target32Bit (targetPlatform dflags)
+spRel platform n
+ | target32Bit platform
     = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt n)
  | otherwise
     = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt n)
