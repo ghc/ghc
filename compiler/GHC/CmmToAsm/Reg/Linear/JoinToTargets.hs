@@ -17,12 +17,12 @@ import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import Digraph
-import GHC.Driver.Session
 import Outputable
 import Unique
 import UniqFM
@@ -125,8 +125,8 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
         block_assig src_assig
         to_free
 
- = do   dflags <- getDynFlags
-        let platform = targetPlatform dflags
+ = do   config <- getConfig
+        let platform = ncgPlatform config
 
         -- free up the regs that are not live on entry to this block.
         freeregs        <- getFreeRegsR
@@ -355,8 +355,8 @@ makeMove
     -> RegM freeRegs instr  -- ^ move instruction.
 
 makeMove delta vreg src dst
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
+ = do config <- getConfig
+      let platform = ncgPlatform config
 
       case (src, dst) of
           (InReg s, InReg d) ->
@@ -364,10 +364,10 @@ makeMove delta vreg src dst
                  return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
           (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkLoadInstr dflags (RegReal d) delta s
+                 return $ mkLoadInstr config (RegReal d) delta s
           (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkSpillInstr dflags (RegReal s) delta d
+                 return $ mkSpillInstr config (RegReal s) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share

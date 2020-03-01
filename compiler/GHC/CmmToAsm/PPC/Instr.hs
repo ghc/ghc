@@ -31,6 +31,7 @@ import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
@@ -38,7 +39,6 @@ import GHC.Platform.Regs
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Driver.Session
 import GHC.Cmm
 import GHC.Cmm.Info
 import FastString
@@ -534,15 +534,15 @@ ppc_patchJumpInstr insn patchF
 
 -- | An instruction to spill a register into a spill slot.
 ppc_mkSpillInstr
-   :: DynFlags
+   :: NCGConfig
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkSpillInstr dflags reg delta slot
-  = let platform = targetPlatform dflags
-        off      = spillSlotToOffset dflags slot
+ppc_mkSpillInstr config reg delta slot
+  = let platform = ncgPlatform config
+        off      = spillSlotToOffset platform slot
         arch     = platformArch platform
     in
     let fmt = case targetClassOfReg platform reg of
@@ -559,15 +559,15 @@ ppc_mkSpillInstr dflags reg delta slot
 
 
 ppc_mkLoadInstr
-   :: DynFlags
+   :: NCGConfig
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkLoadInstr dflags reg delta slot
-  = let platform = targetPlatform dflags
-        off      = spillSlotToOffset dflags slot
+ppc_mkLoadInstr config reg delta slot
+  = let platform = ncgPlatform config
+        off      = spillSlotToOffset platform slot
         arch     = platformArch platform
     in
     let fmt = case targetClassOfReg platform reg of
@@ -585,8 +585,8 @@ ppc_mkLoadInstr dflags reg delta slot
 
 -- | The size of a minimal stackframe header including minimal
 -- parameter save area.
-stackFrameHeaderSize :: DynFlags -> Int
-stackFrameHeaderSize dflags
+stackFrameHeaderSize :: Platform -> Int
+stackFrameHeaderSize platform
   = case platformOS platform of
       OSAIX    -> 24 + 8 * 4
       _ -> case platformArch platform of
@@ -595,7 +595,6 @@ stackFrameHeaderSize dflags
              ArchPPC_64 ELF_V1 -> 48 + 8 * 8
              ArchPPC_64 ELF_V2 -> 32 + 8 * 8
              _ -> panic "PPC.stackFrameHeaderSize: not defined for this OS"
-     where platform = targetPlatform dflags
 
 -- | The maximum number of bytes required to spill a register. PPC32
 -- has 32-bit GPRs and 64-bit FPRs, while PPC64 has 64-bit GPRs and
@@ -606,11 +605,12 @@ spillSlotSize :: Int
 spillSlotSize = 8
 
 -- | The number of spill slots available without allocating more.
-maxSpillSlots :: DynFlags -> Int
-maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - stackFrameHeaderSize dflags)
-       `div` spillSlotSize) - 1
---     = 0 -- useful for testing allocMoreStack
+maxSpillSlots :: NCGConfig -> Int
+maxSpillSlots config
+--  = 0 -- useful for testing allocMoreStack
+    = let platform = ncgPlatform config
+      in ((ncgSpillPreallocSize config - stackFrameHeaderSize platform)
+         `div` spillSlotSize) - 1
 
 -- | The number of bytes that the stack pointer should be aligned
 -- to. This is 16 both on PPC32 and PPC64 ELF (see ELF processor
@@ -619,9 +619,9 @@ stackAlign :: Int
 stackAlign = 16
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
-spillSlotToOffset :: DynFlags -> Int -> Int
-spillSlotToOffset dflags slot
-   = stackFrameHeaderSize dflags + spillSlotSize * slot
+spillSlotToOffset :: Platform -> Int -> Int
+spillSlotToOffset platform slot
+   = stackFrameHeaderSize platform + spillSlotSize * slot
 
 
 --------------------------------------------------------------------------------

@@ -37,11 +37,11 @@ import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
-import GHC.Driver.Session
 import GHC.Cmm
 import FastString
 import Outputable
@@ -369,15 +369,15 @@ sparc_patchJumpInstr insn patchF
 -- | Make a spill instruction.
 --      On SPARC we spill below frame pointer leaving 2 words/spill
 sparc_mkSpillInstr
-    :: DynFlags
+    :: NCGConfig
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkSpillInstr dflags reg _ slot
- = let  platform = targetPlatform dflags
-        off      = spillSlotToOffset dflags slot
+sparc_mkSpillInstr config reg _ slot
+ = let  platform = ncgPlatform config
+        off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
         fmt      = case targetClassOfReg platform reg of
                         RcInteger -> II32
@@ -389,15 +389,15 @@ sparc_mkSpillInstr dflags reg _ slot
 
 -- | Make a spill reload instruction.
 sparc_mkLoadInstr
-    :: DynFlags
+    :: NCGConfig
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkLoadInstr dflags reg _ slot
-  = let platform = targetPlatform dflags
-        off      = spillSlotToOffset dflags slot
+sparc_mkLoadInstr config reg _ slot
+  = let platform = ncgPlatform config
+        off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
         fmt      = case targetClassOfReg platform reg of
                         RcInteger -> II32
