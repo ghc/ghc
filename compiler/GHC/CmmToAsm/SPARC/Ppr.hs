@@ -36,6 +36,7 @@ import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Ppr
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Ppr() -- For Outputable instances
@@ -52,25 +53,26 @@ import FastString
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl RawCmmStatics Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
-  pprSectionAlign section $$ pprDatas dats
+pprNatCmmDecl :: NCGConfig -> NatCmmDecl RawCmmStatics Instr -> SDoc
+pprNatCmmDecl config (CmmData section dats) =
+  pprSectionAlign config section
+  $$ pprDatas (ncgPlatform config) dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  let platform = ncgPlatform config in
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
-        pprSectionAlign (Section Text lbl) $$
-        pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-        vcat (map (pprBasicBlock top_info) blocks)
+        pprSectionAlign config (Section Text lbl) $$
+        pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+        vcat (map (pprBasicBlock platform top_info) blocks)
 
     Just (RawCmmStatics info_lbl _) ->
-      sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionAlign dspSection $$
+          then pprSectionAlign config dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock top_info) blocks) $$
+      vcat (map (pprBasicBlock platform top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -86,10 +88,10 @@ dspSection :: Section
 dspSection = Section Text $
     panic "subsections-via-symbols doesn't combine with split-sections"
 
-pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
-pprBasicBlock info_env (BasicBlock blockid instrs)
+pprBasicBlock :: Platform -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock platform info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
-    pprLabel (blockLbl blockid) $$
+    pprLabel platform (blockLbl blockid) $$
     vcat (map pprInstr instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
@@ -97,12 +99,12 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
        Just (RawCmmStatics info_lbl info) ->
            pprAlignForSection Text $$
            vcat (map pprData info) $$
-           pprLabel info_lbl
+           pprLabel platform info_lbl
 
 
-pprDatas :: RawCmmStatics -> SDoc
+pprDatas :: Platform -> RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -111,7 +113,7 @@ pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _,
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas (RawCmmStatics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)          = pprBytes str
@@ -123,17 +125,17 @@ pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = text ".global " <> ppr lbl
 
-pprTypeAndSizeDecl :: CLabel -> SDoc
-pprTypeAndSizeDecl lbl
-    = sdocWithPlatform $ \platform ->
-      if platformOS platform == OSLinux && externallyVisibleCLabel lbl
+pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
+pprTypeAndSizeDecl platform lbl
+    = if platformOS platform == OSLinux && externallyVisibleCLabel lbl
       then text ".type " <> ppr lbl <> ptext (sLit ", @object")
       else empty
 
-pprLabel :: CLabel -> SDoc
-pprLabel lbl = pprGloblDecl lbl
-            $$ pprTypeAndSizeDecl lbl
-            $$ (ppr lbl <> char ':')
+pprLabel :: Platform -> CLabel -> SDoc
+pprLabel platform lbl =
+   pprGloblDecl lbl
+   $$ pprTypeAndSizeDecl platform lbl
+   $$ (ppr lbl <> char ':')
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
@@ -321,10 +323,9 @@ pprImm imm
 --      On SPARC all the data sections must be at least 8 byte aligned
 --      incase we store doubles in them.
 --
-pprSectionAlign :: Section -> SDoc
-pprSectionAlign sec@(Section seg _) =
-  sdocWithPlatform $ \platform ->
-    pprSectionHeader platform sec $$
+pprSectionAlign :: NCGConfig -> Section -> SDoc
+pprSectionAlign config sec@(Section seg _) =
+    pprSectionHeader config sec $$
     pprAlignForSection seg
 
 -- | Print appropriate alignment for the given section type.

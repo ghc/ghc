@@ -27,6 +27,7 @@ import GHC.CmmToAsm.Format
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
@@ -39,7 +40,6 @@ import GHC.Platform
 
 import BasicTypes       (Alignment)
 import GHC.Cmm.CLabel
-import GHC.Driver.Session
 import UniqSet
 import Unique
 import UniqSupply
@@ -660,50 +660,51 @@ x86_patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 x86_mkSpillInstr
-    :: DynFlags
+    :: NCGConfig
     -> Reg      -- register to spill
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkSpillInstr dflags reg delta slot
+x86_mkSpillInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordFormat is32Bit)
-                              (OpReg reg) (OpAddr (spRel dflags off))
-           RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
+                              (OpReg reg) (OpAddr (spRel platform off))
+           RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off))
            _         -> panic "X86.mkSpillInstr: no match"
-    where platform = targetPlatform dflags
+    where platform = ncgPlatform config
           is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
-    :: DynFlags
+    :: NCGConfig
     -> Reg      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkLoadInstr dflags reg delta slot
+x86_mkLoadInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordFormat is32Bit)
-                               (OpAddr (spRel dflags off)) (OpReg reg)
-              RcDouble  -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
+                               (OpAddr (spRel platform off)) (OpReg reg)
+              RcDouble  -> MOV FF64 (OpAddr (spRel platform off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
-    where platform = targetPlatform dflags
+    where platform = ncgPlatform config
           is32Bit = target32Bit platform
 
 spillSlotSize :: Platform -> Int
-spillSlotSize dflags = if is32Bit then 12 else 8
-    where is32Bit = target32Bit dflags
+spillSlotSize platform
+   | target32Bit platform = 12
+   | otherwise            = 8
 
-maxSpillSlots :: DynFlags -> Int
-maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize (targetPlatform dflags)) - 1
---     = 0 -- useful for testing allocMoreStack
+maxSpillSlots :: NCGConfig -> Int
+maxSpillSlots config
+    = ((ncgSpillPreallocSize config - 64) `div` spillSlotSize (ncgPlatform config)) - 1
+--  = 0 -- useful for testing allocMoreStack
 
 -- number of bytes that the stack pointer should be aligned to
 stackAlign :: Int

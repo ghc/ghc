@@ -144,20 +144,20 @@ dW_OP_call_frame_cfa = 0x9c
 
 -- * Dwarf section declarations
 dwarfInfoSection, dwarfAbbrevSection, dwarfLineSection,
-  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: SDoc
-dwarfInfoSection    = dwarfSection "info"
-dwarfAbbrevSection  = dwarfSection "abbrev"
-dwarfLineSection    = dwarfSection "line"
-dwarfFrameSection   = dwarfSection "frame"
-dwarfGhcSection     = dwarfSection "ghc"
-dwarfARangesSection = dwarfSection "aranges"
+  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: Platform -> SDoc
+dwarfInfoSection    platform = dwarfSection platform "info"
+dwarfAbbrevSection  platform = dwarfSection platform "abbrev"
+dwarfLineSection    platform = dwarfSection platform "line"
+dwarfFrameSection   platform = dwarfSection platform "frame"
+dwarfGhcSection     platform = dwarfSection platform "ghc"
+dwarfARangesSection platform = dwarfSection platform "aranges"
 
-dwarfSection :: String -> SDoc
-dwarfSection name = sdocWithPlatform $ \plat ->
-  case platformOS plat of
+dwarfSection :: Platform -> String -> SDoc
+dwarfSection platform name =
+  case platformOS platform of
     os | osElfTarget os
        -> text "\t.section .debug_" <> text name <> text ",\"\","
-          <> sectionType "progbits"
+          <> sectionType platform "progbits"
        | osMachOTarget os
        -> text "\t.section __DWARF,__debug_" <> text name <> text ",regular,debug"
        | otherwise

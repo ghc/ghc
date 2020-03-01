@@ -21,9 +21,9 @@ import GhcPrelude
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
-import GHC.Driver.Session
 import Outputable
 import Unique
 import UniqFM
@@ -133,7 +133,9 @@ data RA_State freeRegs
         --      Just keep a list here instead of a map of regs -> reasons.
         --      We don't want to slow down the allocator if we're not going to emit the stats.
         , ra_spills     :: [SpillReason]
-        , ra_DynFlags   :: DynFlags
+
+        -- | Native code generator configuration
+        , ra_config     :: !NCGConfig
 
         -- | (from,fixup,to) : We inserted fixup code between from and to
         , ra_fixups     :: [(BlockId,BlockId,BlockId)] }

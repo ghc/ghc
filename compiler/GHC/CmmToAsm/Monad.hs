@@ -16,6 +16,7 @@ module GHC.CmmToAsm.Monad (
 
         NatM, -- instance Monad
         initNat,
+        initConfig,
         addImportNat,
         addNodeBetweenNat,
         addImmediateSuccessorNat,
@@ -23,6 +24,8 @@ module GHC.CmmToAsm.Monad (
         getUniqueNat,
         mapAccumLNat,
         setDeltaNat,
+        getConfig,
+        getPlatform,
         getDeltaNat,
         getThisModuleNat,
         getBlockIdNat,
@@ -45,9 +48,11 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
@@ -69,6 +74,7 @@ import GHC.Cmm (RawCmmDecl, RawCmmStatics)
 import GHC.CmmToAsm.CFG
 
 data NcgImpl statics instr jumpDest = NcgImpl {
+    ncgConfig                 :: !NCGConfig,
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
@@ -102,6 +108,7 @@ data NatM_State
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
                 natm_dflags      :: DynFlags,
+                natm_config      :: NCGConfig,
                 natm_this_module :: Module,
                 natm_modloc      :: ModLocation,
                 natm_fileid      :: DwarfFiles,
@@ -130,12 +137,31 @@ mkNatM_State us delta dflags this_mod
                         , natm_imports = []
                         , natm_pic = Nothing
                         , natm_dflags = dflags
+                        , natm_config = initConfig dflags
                         , natm_this_module = this_mod
                         , natm_modloc = loc
                         , natm_fileid = dwf
                         , natm_debug_map = dbg
                         , natm_cfg = cfg
                         }
+
+-- | Initialize the native code generator configuration from the DynFlags
+initConfig :: DynFlags -> NCGConfig
+initConfig dflags = NCGConfig
+   { ncgPlatform            = targetPlatform dflags
+   , ncgProcAlignment       = cmmProcAlignment dflags
+   , ncgDebugLevel          = debugLevel dflags
+   , ncgExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
+   , ncgPIC                 = positionIndependent dflags
+   , ncgSplitSections       = gopt Opt_SplitSections dflags
+   , ncgSpillPreallocSize   = rESERVED_C_STACK_BYTES dflags
+   , ncgRegsIterative       = gopt Opt_RegsIterative dflags
+   , ncgAsmLinting          = gopt Opt_DoAsmLinting dflags
+   , ncgDumpRegAllocStages  = dopt Opt_D_dump_asm_regalloc_stages dflags
+   , ncgDumpAsmStats        = dopt Opt_D_dump_asm_stats dflags
+   , ncgDumpAsmConflicts    = dopt Opt_D_dump_asm_conflicts dflags
+   }
+
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
@@ -232,8 +258,9 @@ addNodeBetweenNat from between to
 -- | Place `succ` after `block` and change any edges
 --   block -> X to `succ` -> X
 addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
-addImmediateSuccessorNat block succ
-        = updateCfgNat (addImmediateSuccessor block succ)
+addImmediateSuccessorNat block succ = do
+   dflags <- getDynFlags
+   updateCfgNat (addImmediateSuccessor dflags block succ)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat
@@ -249,16 +276,16 @@ getNewLabelNat
 getNewRegNat :: Format -> NatM Reg
 getNewRegNat rep
  = do u <- getUniqueNat
-      dflags <- getDynFlags
-      return (RegVirtual $ targetMkVirtualReg (targetPlatform dflags) u rep)
+      platform <- getPlatform
+      return (RegVirtual $ targetMkVirtualReg platform u rep)
 
 
 getNewRegPairNat :: Format -> NatM (Reg,Reg)
 getNewRegPairNat rep
  = do u <- getUniqueNat
-      dflags <- getDynFlags
-      let vLo = targetMkVirtualReg (targetPlatform dflags) u rep
-      let lo  = RegVirtual $ targetMkVirtualReg (targetPlatform dflags) u rep
+      platform <- getPlatform
+      let vLo = targetMkVirtualReg platform u rep
+      let lo  = RegVirtual $ targetMkVirtualReg platform u rep
       let hi  = RegVirtual $ getHiVirtualRegFromLo vLo
       return (lo, hi)
 
@@ -281,6 +308,14 @@ getPicBaseNat rep
 getModLoc :: NatM ModLocation
 getModLoc
         = NatM $ \ st -> (natm_modloc st, st)
+
+-- | Get native code generator configuration
+getConfig :: NatM NCGConfig
+getConfig = NatM $ \st -> (natm_config st, st)
+
+-- | Get target platform from native code generator configuration
+getPlatform :: NatM Platform
+getPlatform = ncgPlatform <$> getConfig
 
 getFileId :: FastString -> NatM Int
 getFileId f = NatM $ \st ->
