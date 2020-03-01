@@ -26,15 +26,20 @@
 #include <fs_rts.h>
 #include <string.h>
 
+#if !defined(mingw32_HOST_OS)
 #if defined(darwin_HOST_OS)
 #include <xlocale.h>
 #else
 #include <locale.h>
 #endif
+#endif
 
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
+
+#if !defined(mingw32_HOST_OS)
 static locale_t prof_locale = 0, saved_locale = 0;
+#endif
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -351,10 +356,12 @@ printSample(bool beginSample, StgDouble sampleValue)
 
 void freeHeapProfiling (void)
 {
+#if !defined(mingw32_HOST_OS)
     if (prof_locale) {
         freelocale(prof_locale);
         prof_locale = 0;
     }
+#endif
 }
 
 /* --------------------------------------------------------------------------
@@ -367,6 +374,7 @@ initHeapProfiling(void)
         return;
     }
 
+#if !defined(mingw32_HOST_OS)
     if (! prof_locale) {
         prof_locale = newlocale(LC_NUMERIC_MASK, "POSIX", 0);
         if (! prof_locale) {
@@ -375,6 +383,7 @@ initHeapProfiling(void)
         }
     }
     saved_locale = uselocale(prof_locale);
+#endif
 
     char *prog;
 
@@ -473,7 +482,9 @@ initHeapProfiling(void)
     }
 #endif
 
+#if !defined(mingw32_HOST_OS)
     uselocale(saved_locale);
+#endif
 
     traceHeapProfBegin(0);
 }
@@ -487,7 +498,9 @@ endHeapProfiling(void)
         return;
     }
 
+#if !defined(mingw32_HOST_OS)
     saved_locale = uselocale(prof_locale);
+#endif
 
 #if defined(PROFILING)
     if (doingRetainerProfiling()) {
@@ -530,7 +543,9 @@ endHeapProfiling(void)
     printSample(false, seconds);
     fclose(hp_file);
 
+#if !defined(mingw32_HOST_OS)
     uselocale(saved_locale);
+#endif
 }
 
 
@@ -785,7 +800,9 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
+#if !defined(mingw32_HOST_OS)
     saved_locale = uselocale(prof_locale);
+#endif
 
     printSample(true, census->time);
 
@@ -916,7 +933,9 @@ dumpCensus( Census *census )
     traceHeapProfSampleEnd(era);
     printSample(false, census->time);
 
+#if !defined(mingw32_HOST_OS)
     uselocale(saved_locale);
+#endif
 }
 
 
