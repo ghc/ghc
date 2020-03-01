@@ -16,11 +16,11 @@ import GHC.CmmToAsm.Reg.Graph.Stats
 import GHC.CmmToAsm.Reg.Graph.TrivColorable
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import Bag
-import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import UniqFM
@@ -45,7 +45,7 @@ maxSpinCount    = 10
 -- | The top level of the graph coloring register allocator.
 regAlloc
         :: (Outputable statics, Outputable instr, Instruction instr)
-        => DynFlags
+        => NCGConfig
         -> UniqFM (UniqSet RealReg)     -- ^ registers we can use for allocation
         -> UniqSet Int                  -- ^ set of available spill slots.
         -> Int                          -- ^ current number of spill slots
@@ -56,18 +56,15 @@ regAlloc
            -- ^ code with registers allocated, additional stacks required
            -- and stats for each stage of allocation
 
-regAlloc dflags regsFree slotsFree slotsCount code cfg
+regAlloc config regsFree slotsFree slotsCount code cfg
  = do
-        -- TODO: the regClass function is currently hard coded to the default
-        --       target architecture. Would prefer to determine this from dflags.
-        --       There are other uses of targetRegClass later in this module.
-        let platform = targetPlatform dflags
+        let platform = ncgPlatform config
             triv = trivColorable platform
                         (targetVirtualRegSqueeze platform)
                         (targetRealRegSqueeze platform)
 
         (code_final, debug_codeGraphs, slotsCount', _)
-                <- regAlloc_spin dflags 0
+                <- regAlloc_spin config 0
                         triv
                         regsFree slotsFree slotsCount [] code cfg
 
@@ -94,7 +91,7 @@ regAlloc_spin
            (Instruction instr,
             Outputable instr,
             Outputable statics)
-        => DynFlags
+        => NCGConfig
         -> Int  -- ^ Number of solver iterations we've already performed.
         -> Color.Triv VirtualReg RegClass RealReg
                 -- ^ Function for calculating whether a register is trivially
@@ -110,17 +107,18 @@ regAlloc_spin
                   , Int                  -- Slots in use
                   , Color.Graph VirtualReg RegClass RealReg)
 
-regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code cfg
+regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code cfg
  = do
-        let platform = targetPlatform dflags
+        let platform = ncgPlatform config
 
         -- If any of these dump flags are turned on we want to hang on to
         -- intermediate structures in the allocator - otherwise tell the
         -- allocator to ditch them early so we don't end up creating space leaks.
         let dump = or
-                [ dopt Opt_D_dump_asm_regalloc_stages dflags
-                , dopt Opt_D_dump_asm_stats dflags
-                , dopt Opt_D_dump_asm_conflicts dflags ]
+                [ ncgDumpRegAllocStages config
+                , ncgDumpAsmStats       config
+                , ncgDumpAsmConflicts   config
+                ]
 
         -- Check that we're not running off down the garden path.
         when (spinCount > maxSpinCount)
@@ -161,14 +159,16 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                  then   Just $ RegAllocStatsStart
                         { raLiveCmm     = code
                         , raGraph       = graph
-                        , raSpillCosts  = spillCosts }
+                        , raSpillCosts  = spillCosts
+                        , raPlatform    = platform
+                        }
                  else   Nothing
 
         -- Try and color the graph.
         let (graph_colored, rsSpill, rmCoalesce)
                 = {-# SCC "ColorGraph" #-}
                   Color.colorGraph
-                       (gopt Opt_RegsIterative dflags)
+                       (ncgRegsIterative config)
                        spinCount
                        regsFree triv spill graph
 
@@ -193,7 +193,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 -- if -fasm-lint is turned on then validate the graph.
                 -- This checks for bugs in the graph allocator itself.
                 let graph_colored_lint  =
-                        if gopt Opt_DoAsmLinting dflags
+                        if ncgAsmLinting config
                                 then Color.validateGraph (text "")
                                         True    -- Require all nodes to be colored.
                                         graph_colored
@@ -215,7 +215,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 -- Also rewrite SPILL/RELOAD meta instructions into real machine
                 -- instructions along the way
                 let code_final
-                        = map (stripLive dflags) code_spillclean
+                        = map (stripLive config) code_spillclean
 
                 -- Record what happened in this stage for debugging
                 let stat
@@ -229,7 +229,9 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                         , raSpillClean          = code_spillclean
                         , raFinal               = code_final
                         , raSRMs                = foldl' addSRM (0, 0, 0)
-                                                $ map countSRMs code_spillclean }
+                                                $ map countSRMs code_spillclean
+                        , raPlatform    = platform
+                     }
 
                 -- Bundle up all the register allocator statistics.
                 --   .. but make sure to drop them on the floor if they're not
@@ -251,7 +253,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
          else do
                 -- if -fasm-lint is turned on then validate the graph
                 let graph_colored_lint  =
-                        if gopt Opt_DoAsmLinting dflags
+                        if ncgAsmLinting config
                                 then Color.validateGraph (text "")
                                         False   -- don't require nodes to be colored
                                         graph_colored
@@ -289,7 +291,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 -- Ensure all the statistics are evaluated, to avoid space leaks.
                 seqList statList (return ())
 
-                regAlloc_spin dflags (spinCount + 1) triv regsFree slotsFree'
+                regAlloc_spin config (spinCount + 1) triv regsFree slotsFree'
                               slotsCount' statList code_relive cfg
 
 

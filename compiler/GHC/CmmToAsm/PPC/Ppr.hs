@@ -20,6 +20,7 @@ import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
@@ -33,7 +34,7 @@ import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable
-import GHC.Driver.Session
+import GHC.Driver.Session (targetPlatform)
 
 import Data.Word
 import Data.Int
@@ -42,30 +43,30 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl RawCmmStatics Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
-  pprSectionAlign section $$ pprDatas dats
+pprNatCmmDecl :: NCGConfig -> NatCmmDecl RawCmmStatics Instr -> SDoc
+pprNatCmmDecl config (CmmData section dats) =
+  pprSectionAlign config section
+  $$ pprDatas (ncgPlatform config) dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  let platform = ncgPlatform config in
   case topInfoTable proc of
     Nothing ->
-       sdocWithPlatform $ \platform ->
          -- special case for code without info table:
-         pprSectionAlign (Section Text lbl) $$
+         pprSectionAlign config (Section Text lbl) $$
          (case platformArch platform of
             ArchPPC_64 ELF_V1 -> pprFunctionDescriptor lbl
             ArchPPC_64 ELF_V2 -> pprFunctionPrologue lbl
-            _ -> pprLabel lbl) $$ -- blocks guaranteed not null,
-                                     -- so label needed
-         vcat (map (pprBasicBlock top_info) blocks)
+            _ -> pprLabel platform lbl) $$ -- blocks guaranteed not null,
+                                           -- so label needed
+         vcat (map (pprBasicBlock platform top_info) blocks)
 
     Just (RawCmmStatics info_lbl _) ->
-      sdocWithPlatform $ \platform ->
-      pprSectionAlign (Section Text info_lbl) $$
+      pprSectionAlign config (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock top_info) blocks) $$
+      vcat (map (pprBasicBlock platform top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -104,24 +105,24 @@ pprFunctionPrologue lab =  pprGloblDecl lab
                         $$ text "\t.localentry\t" <> ppr lab
                         <> text ",.-" <> ppr lab
 
-pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
-pprBasicBlock info_env (BasicBlock blockid instrs)
+pprBasicBlock :: Platform -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock platform info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
-    pprLabel (blockLbl blockid) $$
-    vcat (map pprInstr instrs)
+    pprLabel platform (blockLbl blockid) $$
+    vcat (map (pprInstr platform) instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (RawCmmStatics info_lbl info) ->
-           pprAlignForSection Text $$
-           vcat (map pprData info) $$
-           pprLabel info_lbl
+           pprAlignForSection platform Text $$
+           vcat (map (pprData platform) info) $$
+           pprLabel platform info_lbl
 
 
 
-pprDatas :: RawCmmStatics -> SDoc
+pprDatas :: Platform -> RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -130,36 +131,38 @@ pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _,
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas (RawCmmStatics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: CmmStatic -> SDoc
-pprData (CmmString str)          = pprBytes str
-pprData (CmmUninitialised bytes) = text ".space " <> int bytes
-pprData (CmmStaticLit lit)       = pprDataItem lit
+pprData :: Platform -> CmmStatic -> SDoc
+pprData platform d = case d of
+   CmmString str          -> pprBytes str
+   CmmUninitialised bytes -> text ".space " <> int bytes
+   CmmStaticLit lit       -> pprDataItem platform lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = text ".globl " <> ppr lbl
 
-pprTypeAndSizeDecl :: CLabel -> SDoc
-pprTypeAndSizeDecl lbl
-  = sdocWithPlatform $ \platform ->
-    if platformOS platform == OSLinux && externallyVisibleCLabel lbl
+pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
+pprTypeAndSizeDecl platform lbl
+  = if platformOS platform == OSLinux && externallyVisibleCLabel lbl
     then text ".type " <>
          ppr lbl <> text ", @object"
     else empty
 
-pprLabel :: CLabel -> SDoc
-pprLabel lbl = pprGloblDecl lbl
-            $$ pprTypeAndSizeDecl lbl
-            $$ (ppr lbl <> char ':')
+pprLabel :: Platform -> CLabel -> SDoc
+pprLabel platform lbl =
+   pprGloblDecl lbl
+   $$ pprTypeAndSizeDecl platform lbl
+   $$ (ppr lbl <> char ':')
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
 instance Outputable Instr where
-    ppr instr = pprInstr instr
+    ppr instr = sdocWithDynFlags $ \dflags ->
+                  pprInstr (targetPlatform dflags) instr
 
 
 pprReg :: Reg -> SDoc
@@ -258,16 +261,14 @@ pprAddr (AddrRegImm r1 imm)
   = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 
-pprSectionAlign :: Section -> SDoc
-pprSectionAlign sec@(Section seg _) =
- sdocWithPlatform $ \platform ->
-   pprSectionHeader platform sec $$
-   pprAlignForSection seg
+pprSectionAlign :: NCGConfig -> Section -> SDoc
+pprSectionAlign config sec@(Section seg _) =
+   pprSectionHeader config sec $$
+   pprAlignForSection (ncgPlatform config) seg
 
 -- | Print appropriate alignment for the given section type.
-pprAlignForSection :: SectionType -> SDoc
-pprAlignForSection seg =
- sdocWithPlatform $ \platform ->
+pprAlignForSection :: Platform -> SectionType -> SDoc
+pprAlignForSection platform seg =
  let ppc64    = not $ target32Bit platform
  in ptext $ case seg of
        Text              -> sLit ".align 2"
@@ -291,199 +292,213 @@ pprAlignForSection seg =
         | otherwise      -> sLit ".align 2"
        OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
 
-pprDataItem :: CmmLit -> SDoc
-pprDataItem lit
+pprDataItem :: Platform -> CmmLit -> SDoc
+pprDataItem platform lit
   = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit dflags)
+    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
     where
         imm = litToImm lit
-        archPPC_64 dflags = not $ target32Bit $ targetPlatform dflags
+        archPPC_64 = not $ target32Bit platform
 
-        ppr_item II8   _ _ = [text "\t.byte\t" <> pprImm imm]
+        ppr_item II8  _ = [text "\t.byte\t" <> pprImm imm]
+        ppr_item II16 _ = [text "\t.short\t" <> pprImm imm]
+        ppr_item II32 _ = [text "\t.long\t" <> pprImm imm]
+        ppr_item II64 _
+           | archPPC_64 = [text "\t.quad\t" <> pprImm imm]
 
-        ppr_item II32  _ _ = [text "\t.long\t" <> pprImm imm]
-
-        ppr_item II64 _ dflags
-           | archPPC_64 dflags = [text "\t.quad\t" <> pprImm imm]
-
-
-        ppr_item FF32 (CmmFloat r _) _
-           = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
-
-        ppr_item FF64 (CmmFloat r _) _
-           = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
-
-        ppr_item II16 _ _      = [text "\t.short\t" <> pprImm imm]
-
-        ppr_item II64 (CmmInt x _) dflags
-           | not(archPPC_64 dflags) =
+        ppr_item II64 (CmmInt x _)
+           | not archPPC_64 =
                 [text "\t.long\t"
                     <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32)),
                  text "\t.long\t"
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
-        ppr_item _ _ _
+
+        ppr_item FF32 (CmmFloat r _)
+           = let bs = floatToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+
+        ppr_item FF64 (CmmFloat r _)
+           = let bs = doubleToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+
+        ppr_item _ _
                 = panic "PPC.Ppr.pprDataItem: no match"
 
 
-pprInstr :: Instr -> SDoc
+pprInstr :: Platform -> Instr -> SDoc
+pprInstr platform instr = case instr of
 
-pprInstr (COMMENT _) = empty -- nuke 'em
+   COMMENT _
+      -> empty -- nuke 'em
+
+   -- COMMENT s
+   --    -> if platformOS platform == OSLinux
+   --          then text "# " <> ftext s
+   --          else text "; " <> ftext s
+
+   DELTA d
+      -> pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+
+   NEWBLOCK _
+      -> panic "PprMach.pprInstr: NEWBLOCK"
+
+   LDATA _ _
+      -> panic "PprMach.pprInstr: LDATA"
+
 {-
-pprInstr (COMMENT s) =
-     if platformOS platform == OSLinux
-     then text "# " <> ftext s
-     else text "; " <> ftext s
--}
-pprInstr (DELTA d)
-   = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+   SPILL reg slot
+      -> hcat [
+              text "\tSPILL",
+           char '\t',
+           pprReg reg,
+           comma,
+           text "SLOT" <> parens (int slot)]
 
-pprInstr (NEWBLOCK _)
-   = panic "PprMach.pprInstr: NEWBLOCK"
-
-pprInstr (LDATA _ _)
-   = panic "PprMach.pprInstr: LDATA"
-
-{-
-pprInstr (SPILL reg slot)
-   = hcat [
-           text "\tSPILL",
-        char '\t',
-        pprReg reg,
-        comma,
-        text "SLOT" <> parens (int slot)]
-
-pprInstr (RELOAD slot reg)
-   = hcat [
-           text "\tRELOAD",
-        char '\t',
-        text "SLOT" <> parens (int slot),
-        comma,
-        pprReg reg]
+   RELOAD slot reg
+      -> hcat [
+              text "\tRELOAD",
+           char '\t',
+           text "SLOT" <> parens (int slot),
+           comma,
+           pprReg reg]
 -}
 
-pprInstr (LD fmt reg addr) = hcat [
-        char '\t',
-        text "l",
-        ptext (case fmt of
-            II8  -> sLit "bz"
-            II16 -> sLit "hz"
-            II32 -> sLit "wz"
-            II64 -> sLit "d"
-            FF32 -> sLit "fs"
-            FF64 -> sLit "fd"
-            ),
-        case addr of AddrRegImm _ _ -> empty
-                     AddrRegReg _ _ -> char 'x',
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprAddr addr
-    ]
+   LD fmt reg addr
+      -> hcat [
+           char '\t',
+           text "l",
+           ptext (case fmt of
+               II8  -> sLit "bz"
+               II16 -> sLit "hz"
+               II32 -> sLit "wz"
+               II64 -> sLit "d"
+               FF32 -> sLit "fs"
+               FF64 -> sLit "fd"
+               ),
+           case addr of AddrRegImm _ _ -> empty
+                        AddrRegReg _ _ -> char 'x',
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprAddr addr
+       ]
 
-pprInstr (LDFAR fmt reg (AddrRegImm source off)) =
-   sdocWithPlatform $ \platform -> vcat [
-         pprInstr (ADDIS (tmpReg platform) source (HA off)),
-         pprInstr (LD fmt reg (AddrRegImm (tmpReg platform) (LO off)))
-    ]
-pprInstr (LDFAR _ _ _) =
-   panic "PPC.Ppr.pprInstr LDFAR: no match"
+   LDFAR fmt reg (AddrRegImm source off)
+      -> vcat
+            [ pprInstr platform (ADDIS (tmpReg platform) source (HA off))
+            , pprInstr platform (LD fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+            ]
 
-pprInstr (LDR fmt reg1 addr) = hcat [
-  text "\tl",
-  case fmt of
-    II32 -> char 'w'
-    II64 -> char 'd'
-    _    -> panic "PPC.Ppr.Instr LDR: no match",
-  text "arx\t",
-  pprReg reg1,
-  text ", ",
-  pprAddr addr
-  ]
+   LDFAR _ _ _
+      -> panic "PPC.Ppr.pprInstr LDFAR: no match"
 
-pprInstr (LA fmt reg addr) = hcat [
+   LDR fmt reg1 addr
+      -> hcat [
+           text "\tl",
+           case fmt of
+             II32 -> char 'w'
+             II64 -> char 'd'
+             _    -> panic "PPC.Ppr.Instr LDR: no match",
+           text "arx\t",
+           pprReg reg1,
+           text ", ",
+           pprAddr addr
+           ]
+
+   LA fmt reg addr
+      -> hcat [
+           char '\t',
+           text "l",
+           ptext (case fmt of
+               II8  -> sLit "ba"
+               II16 -> sLit "ha"
+               II32 -> sLit "wa"
+               II64 -> sLit "d"
+               FF32 -> sLit "fs"
+               FF64 -> sLit "fd"
+               ),
+           case addr of AddrRegImm _ _ -> empty
+                        AddrRegReg _ _ -> char 'x',
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprAddr addr
+           ]
+
+   ST fmt reg addr
+      -> hcat [
+           char '\t',
+           text "st",
+           pprFormat fmt,
+           case addr of AddrRegImm _ _ -> empty
+                        AddrRegReg _ _ -> char 'x',
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprAddr addr
+           ]
+
+   STFAR fmt reg (AddrRegImm source off)
+      -> vcat [ pprInstr platform (ADDIS (tmpReg platform) source (HA off))
+              , pprInstr platform (ST fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+              ]
+
+   STFAR _ _ _
+      -> panic "PPC.Ppr.pprInstr STFAR: no match"
+
+   STU fmt reg addr
+      -> hcat [
+           char '\t',
+           text "st",
+           pprFormat fmt,
+           char 'u',
+           case addr of AddrRegImm _ _ -> empty
+                        AddrRegReg _ _ -> char 'x',
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprAddr addr
+           ]
+
+   STC fmt reg1 addr
+      -> hcat [
+           text "\tst",
+           case fmt of
+             II32 -> char 'w'
+             II64 -> char 'd'
+             _    -> panic "PPC.Ppr.Instr STC: no match",
+           text "cx.\t",
+           pprReg reg1,
+           text ", ",
+           pprAddr addr
+           ]
+
+   LIS reg imm
+      -> hcat [
+           char '\t',
+           text "lis",
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprImm imm
+           ]
+
+   LI reg imm
+      -> hcat [
+           char '\t',
+           text "li",
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprImm imm
+           ]
+
+   MR reg1 reg2
+    | reg1 == reg2 -> empty
+    | otherwise    -> hcat [
         char '\t',
-        text "l",
-        ptext (case fmt of
-            II8  -> sLit "ba"
-            II16 -> sLit "ha"
-            II32 -> sLit "wa"
-            II64 -> sLit "d"
-            FF32 -> sLit "fs"
-            FF64 -> sLit "fd"
-            ),
-        case addr of AddrRegImm _ _ -> empty
-                     AddrRegReg _ _ -> char 'x',
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprAddr addr
-    ]
-pprInstr (ST fmt reg addr) = hcat [
-        char '\t',
-        text "st",
-        pprFormat fmt,
-        case addr of AddrRegImm _ _ -> empty
-                     AddrRegReg _ _ -> char 'x',
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprAddr addr
-    ]
-pprInstr (STFAR fmt reg (AddrRegImm source off)) =
-   sdocWithPlatform $ \platform -> vcat [
-         pprInstr (ADDIS (tmpReg platform) source (HA off)),
-         pprInstr (ST fmt reg (AddrRegImm (tmpReg platform) (LO off)))
-    ]
-pprInstr (STFAR _ _ _) =
-   panic "PPC.Ppr.pprInstr STFAR: no match"
-pprInstr (STU fmt reg addr) = hcat [
-        char '\t',
-        text "st",
-        pprFormat fmt,
-        char 'u',
-        case addr of AddrRegImm _ _ -> empty
-                     AddrRegReg _ _ -> char 'x',
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprAddr addr
-    ]
-pprInstr (STC fmt reg1 addr) = hcat [
-  text "\tst",
-  case fmt of
-    II32 -> char 'w'
-    II64 -> char 'd'
-    _    -> panic "PPC.Ppr.Instr STC: no match",
-  text "cx.\t",
-  pprReg reg1,
-  text ", ",
-  pprAddr addr
-  ]
-pprInstr (LIS reg imm) = hcat [
-        char '\t',
-        text "lis",
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprImm imm
-    ]
-pprInstr (LI reg imm) = hcat [
-        char '\t',
-        text "li",
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprImm imm
-    ]
-pprInstr (MR reg1 reg2)
-    | reg1 == reg2 = empty
-    | otherwise = hcat [
-        char '\t',
-        sdocWithPlatform $ \platform ->
         case targetClassOfReg platform reg1 of
             RcInteger -> text "mr"
             _ -> text "fmr",
@@ -491,411 +506,499 @@ pprInstr (MR reg1 reg2)
         pprReg reg1,
         text ", ",
         pprReg reg2
-    ]
-pprInstr (CMP fmt reg ri) = hcat [
-        char '\t',
-        op,
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprRI ri
-    ]
-    where
-        op = hcat [
-                text "cmp",
-                pprFormat fmt,
-                case ri of
-                    RIReg _ -> empty
-                    RIImm _ -> char 'i'
-            ]
-pprInstr (CMPL fmt reg ri) = hcat [
-        char '\t',
-        op,
-        char '\t',
-        pprReg reg,
-        text ", ",
-        pprRI ri
-    ]
-    where
-        op = hcat [
-                text "cmpl",
-                pprFormat fmt,
-                case ri of
-                    RIReg _ -> empty
-                    RIImm _ -> char 'i'
-            ]
-pprInstr (BCC cond blockid prediction) = hcat [
-        char '\t',
-        text "b",
-        pprCond cond,
-        pprPrediction prediction,
-        char '\t',
-        ppr lbl
-    ]
-    where lbl = mkLocalBlockLabel (getUnique blockid)
-          pprPrediction p = case p of
-            Nothing    -> empty
-            Just True  -> char '+'
-            Just False -> char '-'
-
-pprInstr (BCCFAR cond blockid prediction) = vcat [
-        hcat [
-            text "\tb",
-            pprCond (condNegate cond),
-            neg_prediction,
-            text "\t$+8"
-        ],
-        hcat [
-            text "\tb\t",
-            ppr lbl
         ]
-    ]
-    where lbl = mkLocalBlockLabel (getUnique blockid)
-          neg_prediction = case prediction of
-            Nothing    -> empty
-            Just True  -> char '-'
-            Just False -> char '+'
 
-pprInstr (JMP lbl _)
-  -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
-  | isForeignLabel lbl = panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
-  | otherwise =
-    hcat [ -- an alias for b that takes a CLabel
-        char '\t',
-        text "b",
-        char '\t',
-        ppr lbl
-    ]
+   CMP fmt reg ri
+      -> hcat [
+           char '\t',
+           op,
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprRI ri
+           ]
+         where
+           op = hcat [
+                   text "cmp",
+                   pprFormat fmt,
+                   case ri of
+                       RIReg _ -> empty
+                       RIImm _ -> char 'i'
+               ]
 
-pprInstr (MTCTR reg) = hcat [
-        char '\t',
-        text "mtctr",
-        char '\t',
-        pprReg reg
-    ]
-pprInstr (BCTR _ _ _) = hcat [
-        char '\t',
-        text "bctr"
-    ]
-pprInstr (BL lbl _) = do
-    sdocWithPlatform $ \platform -> case platformOS platform of
-        OSAIX ->
-          -- On AIX, "printf" denotes a function-descriptor (for use
-          -- by function pointers), whereas the actual entry-code
-          -- address is denoted by the dot-prefixed ".printf" label.
-          -- Moreover, the PPC NCG only ever emits a BL instruction
-          -- for calling C ABI functions. Most of the time these calls
-          -- originate from FFI imports and have a 'ForeignLabel',
-          -- but when profiling the codegen inserts calls via
-          -- 'emitRtsCallGen' which are 'CmmLabel's even though
-          -- they'd technically be more like 'ForeignLabel's.
-          hcat [
-            text "\tbl\t.",
-            ppr lbl
+   CMPL fmt reg ri
+      -> hcat [
+           char '\t',
+           op,
+           char '\t',
+           pprReg reg,
+           text ", ",
+           pprRI ri
+           ]
+          where
+              op = hcat [
+                      text "cmpl",
+                      pprFormat fmt,
+                      case ri of
+                          RIReg _ -> empty
+                          RIImm _ -> char 'i'
+                  ]
+
+   BCC cond blockid prediction
+      -> hcat [
+           char '\t',
+           text "b",
+           pprCond cond,
+           pprPrediction prediction,
+           char '\t',
+           ppr lbl
+           ]
+         where lbl = mkLocalBlockLabel (getUnique blockid)
+               pprPrediction p = case p of
+                 Nothing    -> empty
+                 Just True  -> char '+'
+                 Just False -> char '-'
+
+   BCCFAR cond blockid prediction
+      -> vcat [
+           hcat [
+               text "\tb",
+               pprCond (condNegate cond),
+               neg_prediction,
+               text "\t$+8"
+           ],
+           hcat [
+               text "\tb\t",
+               ppr lbl
+           ]
           ]
-        _ ->
-          hcat [
-            text "\tbl\t",
-            ppr lbl
-          ]
-pprInstr (BCTRL _) = hcat [
-        char '\t',
-        text "bctrl"
-    ]
-pprInstr (ADD reg1 reg2 ri) = pprLogic (sLit "add") reg1 reg2 ri
-pprInstr (ADDIS reg1 reg2 imm) = hcat [
-        char '\t',
-        text "addis",
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprImm imm
-    ]
+          where lbl = mkLocalBlockLabel (getUnique blockid)
+                neg_prediction = case prediction of
+                  Nothing    -> empty
+                  Just True  -> char '-'
+                  Just False -> char '+'
 
-pprInstr (ADDO reg1 reg2 reg3) = pprLogic (sLit "addo") reg1 reg2 (RIReg reg3)
-pprInstr (ADDC reg1 reg2 reg3) = pprLogic (sLit "addc") reg1 reg2 (RIReg reg3)
-pprInstr (ADDE reg1 reg2 reg3) = pprLogic (sLit "adde") reg1 reg2 (RIReg reg3)
-pprInstr (ADDZE reg1 reg2) = pprUnary (sLit "addze") reg1 reg2
-pprInstr (SUBF reg1 reg2 reg3) = pprLogic (sLit "subf") reg1 reg2 (RIReg reg3)
-pprInstr (SUBFO reg1 reg2 reg3) = pprLogic (sLit "subfo") reg1 reg2 (RIReg reg3)
-pprInstr (SUBFC reg1 reg2 ri) = hcat [
-        char '\t',
-        text "subf",
-        case ri of
-            RIReg _ -> empty
-            RIImm _ -> char 'i',
-        text "c\t",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprRI ri
-    ]
-pprInstr (SUBFE reg1 reg2 reg3) = pprLogic (sLit "subfe") reg1 reg2 (RIReg reg3)
-pprInstr (MULL fmt reg1 reg2 ri) = pprMul fmt reg1 reg2 ri
-pprInstr (MULLO fmt reg1 reg2 reg3) = hcat [
-        char '\t',
-        text "mull",
-        case fmt of
-          II32 -> char 'w'
-          II64 -> char 'd'
-          _    -> panic "PPC: illegal format",
-        text "o\t",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprReg reg3
-    ]
-pprInstr (MFOV fmt reg) = vcat [
-        hcat [
+   JMP lbl _
+     -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
+     | isForeignLabel lbl -> panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
+     | otherwise ->
+       hcat [ -- an alias for b that takes a CLabel
+           char '\t',
+           text "b",
+           char '\t',
+           ppr lbl
+       ]
+
+   MTCTR reg
+      -> hcat [
+           char '\t',
+           text "mtctr",
+           char '\t',
+           pprReg reg
+        ]
+
+   BCTR _ _ _
+      -> hcat [
+           char '\t',
+           text "bctr"
+         ]
+
+   BL lbl _
+      -> case platformOS platform of
+           OSAIX ->
+             -- On AIX, "printf" denotes a function-descriptor (for use
+             -- by function pointers), whereas the actual entry-code
+             -- address is denoted by the dot-prefixed ".printf" label.
+             -- Moreover, the PPC NCG only ever emits a BL instruction
+             -- for calling C ABI functions. Most of the time these calls
+             -- originate from FFI imports and have a 'ForeignLabel',
+             -- but when profiling the codegen inserts calls via
+             -- 'emitRtsCallGen' which are 'CmmLabel's even though
+             -- they'd technically be more like 'ForeignLabel's.
+             hcat [
+               text "\tbl\t.",
+               ppr lbl
+             ]
+           _ ->
+             hcat [
+               text "\tbl\t",
+               ppr lbl
+             ]
+
+   BCTRL _
+      -> hcat [
+             char '\t',
+             text "bctrl"
+         ]
+
+   ADD reg1 reg2 ri
+      -> pprLogic (sLit "add") reg1 reg2 ri
+
+   ADDIS reg1 reg2 imm
+      -> hcat [
+           char '\t',
+           text "addis",
+           char '\t',
+           pprReg reg1,
+           text ", ",
+           pprReg reg2,
+           text ", ",
+           pprImm imm
+           ]
+
+   ADDO reg1 reg2 reg3
+      -> pprLogic (sLit "addo") reg1 reg2 (RIReg reg3)
+
+   ADDC reg1 reg2 reg3
+      -> pprLogic (sLit "addc") reg1 reg2 (RIReg reg3)
+
+   ADDE reg1 reg2 reg3
+      -> pprLogic (sLit "adde") reg1 reg2 (RIReg reg3)
+
+   ADDZE reg1 reg2
+      -> pprUnary (sLit "addze") reg1 reg2
+
+   SUBF reg1 reg2 reg3
+      -> pprLogic (sLit "subf") reg1 reg2 (RIReg reg3)
+
+   SUBFO reg1 reg2 reg3
+      -> pprLogic (sLit "subfo") reg1 reg2 (RIReg reg3)
+
+   SUBFC reg1 reg2 ri
+      -> hcat [
+           char '\t',
+           text "subf",
+           case ri of
+               RIReg _ -> empty
+               RIImm _ -> char 'i',
+           text "c\t",
+           pprReg reg1,
+           text ", ",
+           pprReg reg2,
+           text ", ",
+           pprRI ri
+           ]
+
+   SUBFE reg1 reg2 reg3
+      -> pprLogic (sLit "subfe") reg1 reg2 (RIReg reg3)
+
+   MULL fmt reg1 reg2 ri
+      -> pprMul fmt reg1 reg2 ri
+
+   MULLO fmt reg1 reg2 reg3
+      -> hcat [
+             char '\t',
+             text "mull",
+             case fmt of
+               II32 -> char 'w'
+               II64 -> char 'd'
+               _    -> panic "PPC: illegal format",
+             text "o\t",
+             pprReg reg1,
+             text ", ",
+             pprReg reg2,
+             text ", ",
+             pprReg reg3
+         ]
+
+   MFOV fmt reg
+      -> vcat [
+           hcat [
+               char '\t',
+               text "mfxer",
+               char '\t',
+               pprReg reg
+               ],
+           hcat [
+               char '\t',
+               text "extr",
+               case fmt of
+                 II32 -> char 'w'
+                 II64 -> char 'd'
+                 _    -> panic "PPC: illegal format",
+               text "i\t",
+               pprReg reg,
+               text ", ",
+               pprReg reg,
+               text ", 1, ",
+               case fmt of
+                 II32 -> text "1"
+                 II64 -> text "33"
+                 _    -> panic "PPC: illegal format"
+               ]
+           ]
+
+   MULHU fmt reg1 reg2 reg3
+      -> hcat [
             char '\t',
-            text "mfxer",
-            char '\t',
-            pprReg reg
-            ],
-        hcat [
-            char '\t',
-            text "extr",
+            text "mulh",
             case fmt of
               II32 -> char 'w'
               II64 -> char 'd'
               _    -> panic "PPC: illegal format",
-            text "i\t",
-            pprReg reg,
+            text "u\t",
+            pprReg reg1,
             text ", ",
-            pprReg reg,
-            text ", 1, ",
-            case fmt of
-              II32 -> text "1"
-              II64 -> text "33"
-              _    -> panic "PPC: illegal format"
-            ]
+            pprReg reg2,
+            text ", ",
+            pprReg reg3
         ]
 
-pprInstr (MULHU fmt reg1 reg2 reg3) = hcat [
-        char '\t',
-        text "mulh",
-        case fmt of
-          II32 -> char 'w'
-          II64 -> char 'd'
-          _    -> panic "PPC: illegal format",
-        text "u\t",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprReg reg3
-    ]
-
-pprInstr (DIV fmt sgn reg1 reg2 reg3) = pprDiv fmt sgn reg1 reg2 reg3
+   DIV fmt sgn reg1 reg2 reg3
+      -> pprDiv fmt sgn reg1 reg2 reg3
 
         -- for some reason, "andi" doesn't exist.
         -- we'll use "andi." instead.
-pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
-        char '\t',
-        text "andi.",
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprImm imm
-    ]
-pprInstr (AND reg1 reg2 ri) = pprLogic (sLit "and") reg1 reg2 ri
-pprInstr (ANDC reg1 reg2 reg3) = pprLogic (sLit "andc") reg1 reg2 (RIReg reg3)
-pprInstr (NAND reg1 reg2 reg3) = pprLogic (sLit "nand") reg1 reg2 (RIReg reg3)
+   AND reg1 reg2 (RIImm imm)
+      -> hcat [
+            char '\t',
+            text "andi.",
+            char '\t',
+            pprReg reg1,
+            text ", ",
+            pprReg reg2,
+            text ", ",
+            pprImm imm
+        ]
 
-pprInstr (OR reg1 reg2 ri) = pprLogic (sLit "or") reg1 reg2 ri
-pprInstr (XOR reg1 reg2 ri) = pprLogic (sLit "xor") reg1 reg2 ri
+   AND reg1 reg2 ri
+      -> pprLogic (sLit "and") reg1 reg2 ri
 
-pprInstr (ORIS reg1 reg2 imm) = hcat [
-        char '\t',
-        text "oris",
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprImm imm
-    ]
+   ANDC reg1 reg2 reg3
+      -> pprLogic (sLit "andc") reg1 reg2 (RIReg reg3)
 
-pprInstr (XORIS reg1 reg2 imm) = hcat [
-        char '\t',
-        text "xoris",
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        pprImm imm
-    ]
+   NAND reg1 reg2 reg3
+      -> pprLogic (sLit "nand") reg1 reg2 (RIReg reg3)
 
-pprInstr (EXTS fmt reg1 reg2) = hcat [
-        char '\t',
-        text "exts",
-        pprFormat fmt,
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2
-    ]
-pprInstr (CNTLZ fmt reg1 reg2) = hcat [
-        char '\t',
-        text "cntlz",
-        case fmt of
-          II32 -> char 'w'
-          II64 -> char 'd'
-          _    -> panic "PPC: illegal format",
-        char '\t',
-        pprReg reg1,
-        text ", ",
-        pprReg reg2
-    ]
+   OR reg1 reg2 ri
+      -> pprLogic (sLit "or") reg1 reg2 ri
 
-pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
-pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
+   XOR reg1 reg2 ri
+      -> pprLogic (sLit "xor") reg1 reg2 ri
 
-pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+   ORIS reg1 reg2 imm
+      -> hcat [
+            char '\t',
+            text "oris",
+            char '\t',
+            pprReg reg1,
+            text ", ",
+            pprReg reg2,
+            text ", ",
+            pprImm imm
+        ]
+
+   XORIS reg1 reg2 imm
+      -> hcat [
+            char '\t',
+            text "xoris",
+            char '\t',
+            pprReg reg1,
+            text ", ",
+            pprReg reg2,
+            text ", ",
+            pprImm imm
+        ]
+
+   EXTS fmt reg1 reg2
+      -> hcat [
+           char '\t',
+           text "exts",
+           pprFormat fmt,
+           char '\t',
+           pprReg reg1,
+           text ", ",
+           pprReg reg2
+         ]
+
+   CNTLZ fmt reg1 reg2
+      -> hcat [
+           char '\t',
+           text "cntlz",
+           case fmt of
+             II32 -> char 'w'
+             II64 -> char 'd'
+             _    -> panic "PPC: illegal format",
+           char '\t',
+           pprReg reg1,
+           text ", ",
+           pprReg reg2
+         ]
+
+   NEG reg1 reg2
+      -> pprUnary (sLit "neg") reg1 reg2
+
+   NOT reg1 reg2
+      -> pprUnary (sLit "not") reg1 reg2
+
+   SR II32 reg1 reg2 (RIImm (ImmInt i))
     -- Handle the case where we are asked to shift a 32 bit register by
     -- less than zero or more than 31 bits. We convert this into a clear
     -- of the destination register.
     -- Fixes ticket https://gitlab.haskell.org/ghc/ghc/issues/5900
-    pprInstr (XOR reg1 reg2 (RIReg reg2))
+      | i < 0  || i > 31 -> pprInstr platform (XOR reg1 reg2 (RIReg reg2))
 
-pprInstr (SL II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+   SL II32 reg1 reg2 (RIImm (ImmInt i))
     -- As above for SR, but for left shifts.
     -- Fixes ticket https://gitlab.haskell.org/ghc/ghc/issues/10870
-    pprInstr (XOR reg1 reg2 (RIReg reg2))
+      | i < 0  || i > 31 -> pprInstr platform (XOR reg1 reg2 (RIReg reg2))
 
-pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 =
+   SRA II32 reg1 reg2 (RIImm (ImmInt i))
     -- PT: I don't know what to do for negative shift amounts:
     -- For now just panic.
     --
     -- For shift amounts greater than 31 set all bit to the
     -- value of the sign bit, this also what sraw does.
-    pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt 31)))
+      | i > 31 -> pprInstr platform (SRA II32 reg1 reg2 (RIImm (ImmInt 31)))
 
-pprInstr (SL fmt reg1 reg2 ri) =
-         let op = case fmt of
+   SL fmt reg1 reg2 ri
+      -> let op = case fmt of
                        II32 -> "slw"
                        II64 -> "sld"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (SR fmt reg1 reg2 ri) =
-         let op = case fmt of
+   SR fmt reg1 reg2 ri
+      -> let op = case fmt of
                        II32 -> "srw"
                        II64 -> "srd"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (SRA fmt reg1 reg2 ri) =
-         let op = case fmt of
+   SRA fmt reg1 reg2 ri
+      -> let op = case fmt of
                        II32 -> "sraw"
                        II64 -> "srad"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
-        text "\trlwinm\t",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        int sh,
-        text ", ",
-        int mb,
-        text ", ",
-        int me
-    ]
+   RLWINM reg1 reg2 sh mb me
+      -> hcat [
+             text "\trlwinm\t",
+             pprReg reg1,
+             text ", ",
+             pprReg reg2,
+             text ", ",
+             int sh,
+             text ", ",
+             int mb,
+             text ", ",
+             int me
+         ]
 
-pprInstr (CLRLI fmt reg1 reg2 n) = hcat [
-        text "\tclrl",
-        pprFormat fmt,
-        text "i ",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        int n
-    ]
-pprInstr (CLRRI fmt reg1 reg2 n) = hcat [
-        text "\tclrr",
-        pprFormat fmt,
-        text "i ",
-        pprReg reg1,
-        text ", ",
-        pprReg reg2,
-        text ", ",
-        int n
-    ]
+   CLRLI fmt reg1 reg2 n
+      -> hcat [
+            text "\tclrl",
+            pprFormat fmt,
+            text "i ",
+            pprReg reg1,
+            text ", ",
+            pprReg reg2,
+            text ", ",
+            int n
+        ]
 
-pprInstr (FADD fmt reg1 reg2 reg3) = pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
-pprInstr (FSUB fmt reg1 reg2 reg3) = pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
-pprInstr (FMUL fmt reg1 reg2 reg3) = pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
-pprInstr (FDIV fmt reg1 reg2 reg3) = pprBinaryF (sLit "fdiv") fmt reg1 reg2 reg3
-pprInstr (FABS reg1 reg2) = pprUnary (sLit "fabs") reg1 reg2
-pprInstr (FNEG reg1 reg2) = pprUnary (sLit "fneg") reg1 reg2
+   CLRRI fmt reg1 reg2 n
+      -> hcat [
+            text "\tclrr",
+            pprFormat fmt,
+            text "i ",
+            pprReg reg1,
+            text ", ",
+            pprReg reg2,
+            text ", ",
+            int n
+        ]
 
-pprInstr (FCMP reg1 reg2) = hcat [
-        char '\t',
-        text "fcmpu\t0, ",
-            -- Note: we're using fcmpu, not fcmpo
-            -- The difference is with fcmpo, compare with NaN is an invalid operation.
-            -- We don't handle invalid fp ops, so we don't care.
-            -- Moreover, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
-            -- better portability since some non-GNU assembler (such as
-            -- IBM's `as`) tend not to support the symbolic register name cr0.
-            -- This matches the syntax that GCC seems to emit for PPC targets.
-        pprReg reg1,
-        text ", ",
-        pprReg reg2
-    ]
+   FADD fmt reg1 reg2 reg3
+      -> pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
 
-pprInstr (FCTIWZ reg1 reg2) = pprUnary (sLit "fctiwz") reg1 reg2
-pprInstr (FCTIDZ reg1 reg2) = pprUnary (sLit "fctidz") reg1 reg2
-pprInstr (FCFID reg1 reg2) = pprUnary (sLit "fcfid") reg1 reg2
-pprInstr (FRSP reg1 reg2) = pprUnary (sLit "frsp") reg1 reg2
+   FSUB fmt reg1 reg2 reg3
+      -> pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
 
-pprInstr (CRNOR dst src1 src2) = hcat [
-        text "\tcrnor\t",
-        int dst,
-        text ", ",
-        int src1,
-        text ", ",
-        int src2
-    ]
+   FMUL fmt reg1 reg2 reg3
+      -> pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
 
-pprInstr (MFCR reg) = hcat [
-        char '\t',
-        text "mfcr",
-        char '\t',
-        pprReg reg
-    ]
+   FDIV fmt reg1 reg2 reg3
+      -> pprBinaryF (sLit "fdiv") fmt reg1 reg2 reg3
 
-pprInstr (MFLR reg) = hcat [
-        char '\t',
-        text "mflr",
-        char '\t',
-        pprReg reg
-    ]
+   FABS reg1 reg2
+      -> pprUnary (sLit "fabs") reg1 reg2
 
-pprInstr (FETCHPC reg) = vcat [
-        text "\tbcl\t20,31,1f",
-        hcat [ text "1:\tmflr\t", pprReg reg ]
-    ]
+   FNEG reg1 reg2
+      -> pprUnary (sLit "fneg") reg1 reg2
 
-pprInstr HWSYNC = text "\tsync"
+   FCMP reg1 reg2
+      -> hcat [
+           char '\t',
+           text "fcmpu\t0, ",
+               -- Note: we're using fcmpu, not fcmpo
+               -- The difference is with fcmpo, compare with NaN is an invalid operation.
+               -- We don't handle invalid fp ops, so we don't care.
+               -- Moreover, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
+               -- better portability since some non-GNU assembler (such as
+               -- IBM's `as`) tend not to support the symbolic register name cr0.
+               -- This matches the syntax that GCC seems to emit for PPC targets.
+           pprReg reg1,
+           text ", ",
+           pprReg reg2
+         ]
 
-pprInstr ISYNC  = text "\tisync"
+   FCTIWZ reg1 reg2
+      -> pprUnary (sLit "fctiwz") reg1 reg2
 
-pprInstr LWSYNC = text "\tlwsync"
+   FCTIDZ reg1 reg2
+      -> pprUnary (sLit "fctidz") reg1 reg2
 
-pprInstr NOP = text "\tnop"
+   FCFID reg1 reg2
+      -> pprUnary (sLit "fcfid") reg1 reg2
 
+   FRSP reg1 reg2
+      -> pprUnary (sLit "frsp") reg1 reg2
+
+   CRNOR dst src1 src2
+      -> hcat [
+           text "\tcrnor\t",
+           int dst,
+           text ", ",
+           int src1,
+           text ", ",
+           int src2
+         ]
+
+   MFCR reg
+      -> hcat [
+             char '\t',
+             text "mfcr",
+             char '\t',
+             pprReg reg
+         ]
+
+   MFLR reg
+      -> hcat [
+           char '\t',
+           text "mflr",
+           char '\t',
+           pprReg reg
+         ]
+
+   FETCHPC reg
+      -> vcat [
+             text "\tbcl\t20,31,1f",
+             hcat [ text "1:\tmflr\t", pprReg reg ]
+         ]
+
+   HWSYNC
+      -> text "\tsync"
+
+   ISYNC
+      -> text "\tisync"
+
+   LWSYNC
+      -> text "\tlwsync"
+
+   NOP
+      -> text "\tnop"
 
 pprLogic :: PtrString -> Reg -> Reg -> RI -> SDoc
 pprLogic op reg1 reg2 ri = hcat [

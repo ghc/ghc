@@ -328,12 +328,12 @@ shortcutWeightMap cuts cfg =
 --             \                  \
 --              -> C    =>         -> C
 --
-addImmediateSuccessor :: BlockId -> BlockId -> CFG -> CFG
-addImmediateSuccessor node follower cfg
+addImmediateSuccessor :: D.DynFlags -> BlockId -> BlockId -> CFG -> CFG
+addImmediateSuccessor dflags node follower cfg
     = updateEdges . addWeightEdge node follower uncondWeight $ cfg
     where
         uncondWeight = fromIntegral . D.uncondWeight .
-                       D.cfgWeightInfo $ D.unsafeGlobalDynFlags
+                       D.cfgWeightInfo $ dflags
         targets = getSuccessorEdges cfg node
         successors = map fst targets :: [BlockId]
         updateEdges = addNewSuccs . remOldSuccs
@@ -508,13 +508,13 @@ mapWeights f cfg =
 -- these cases.
 -- We assign the old edge info to the edge A -> B and assign B -> C the
 -- weight of an unconditional jump.
-addNodesBetween :: CFG -> [(BlockId,BlockId,BlockId)] -> CFG
-addNodesBetween m updates =
+addNodesBetween :: D.DynFlags -> CFG -> [(BlockId,BlockId,BlockId)] -> CFG
+addNodesBetween dflags m updates =
   foldl'  updateWeight m .
           weightUpdates $ updates
     where
       weight = fromIntegral . D.uncondWeight .
-                D.cfgWeightInfo $ D.unsafeGlobalDynFlags
+                D.cfgWeightInfo $ dflags
       -- We might add two blocks for different jumps along a single
       -- edge. So we end up with edges:   A -> B -> C   ,   A -> D -> C
       -- in this case after applying the first update the weight for A -> C
