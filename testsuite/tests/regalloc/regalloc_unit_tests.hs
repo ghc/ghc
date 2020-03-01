@@ -200,7 +200,7 @@ testGraphNoSpills dflags' path us = do
           -- discard irrelevant stats
           extractSRMs x = case x of
                                 Color.RegAllocStatsColored _ _ _ _ _ _ _ _
-                                    rSrms -> Just rSrms
+                                    rSrms _ -> Just rSrms
                                 _ -> Nothing
 
           matchesExpected (a, b, c) = a == 0 && b == 0
