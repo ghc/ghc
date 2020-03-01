@@ -8,7 +8,6 @@
 module GHC.CmmToAsm.SPARC.Base (
         wordLength,
         wordLengthInBits,
-        spillAreaLength,
         spillSlotSize,
         extraStackArgsHere,
         fits13Bits,
@@ -20,7 +19,6 @@ where
 
 import GhcPrelude
 
-import GHC.Driver.Session
 import Panic
 
 import Data.Int
@@ -33,11 +31,6 @@ wordLength = 4
 wordLengthInBits :: Int
 wordLengthInBits
         = wordLength * 8
-
--- Size of the available spill area
-spillAreaLength :: DynFlags -> Int
-spillAreaLength
-        = rESERVED_C_STACK_BYTES
 
 -- | We need 8 bytes because our largest registers are 64 bit.
 spillSlotSize :: Int

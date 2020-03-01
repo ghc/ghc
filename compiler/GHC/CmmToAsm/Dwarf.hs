@@ -36,6 +36,7 @@ dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
             -> IO (SDoc, UniqSupply)
 dwarfGen _  _      us [] = return (empty, us)
 dwarfGen df modLoc us blocks = do
+  let platform = targetPlatform df
 
   -- Convert debug data structures to DWARF info records
   -- We strip out block information when running with -g0 or -g1.
@@ -64,33 +65,33 @@ dwarfGen df modLoc us blocks = do
       haveSrc = any haveSrcIn procs
 
   -- .debug_abbrev section: Declare the format we're using
-  let abbrevSct = pprAbbrevDecls haveSrc
+  let abbrevSct = pprAbbrevDecls platform haveSrc
 
   -- .debug_info section: Information records on procedures and blocks
   let -- unique to identify start and end compilation unit .debug_inf
       (unitU, us') = takeUniqFromSupply us
       infoSct = vcat [ ptext dwarfInfoLabel <> colon
-                     , dwarfInfoSection
-                     , compileUnitHeader unitU
-                     , pprDwarfInfo haveSrc dwarfUnit
+                     , dwarfInfoSection platform
+                     , compileUnitHeader platform unitU
+                     , pprDwarfInfo platform haveSrc dwarfUnit
                      , compileUnitFooter unitU
                      ]
 
   -- .debug_line section: Generated mainly by the assembler, but we
   -- need to label it
-  let lineSct = dwarfLineSection $$
+  let lineSct = dwarfLineSection platform $$
                 ptext dwarfLineLabel <> colon
 
   -- .debug_frame section: Information about the layout of the GHC stack
   let (framesU, us'') = takeUniqFromSupply us'
-      frameSct = dwarfFrameSection $$
+      frameSct = dwarfFrameSection platform $$
                  ptext dwarfFrameLabel <> colon $$
-                 pprDwarfFrame (debugFrame framesU procs)
+                 pprDwarfFrame platform (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
   let aranges' | gopt Opt_SplitSections df = map mkDwarfARange procs
                | otherwise                 = [DwarfARange lowLabel highLabel]
-  let aranges = dwarfARangesSection $$ pprDwarfARanges aranges' unitU
+  let aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
@@ -106,17 +107,17 @@ mkDwarfARange proc = DwarfARange start end
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
-compileUnitHeader :: Unique -> SDoc
-compileUnitHeader unitU = sdocWithPlatform $ \plat ->
+compileUnitHeader :: Platform -> Unique -> SDoc
+compileUnitHeader platform unitU =
   let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
       length = ppr (mkAsmTempEndLabel cuLabel) <> char '-' <> ppr cuLabel
                <> text "-4"       -- length of initialLength field
   in vcat [ ppr cuLabel <> colon
           , text "\t.long " <> length  -- compilation unit size
           , pprHalf 3                          -- DWARF version
-          , sectionOffset (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
+          , sectionOffset platform (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
                                                -- abbrevs offset
-          , text "\t.byte " <> ppr (platformWordSizeInBytes plat) -- word size
+          , text "\t.byte " <> ppr (platformWordSizeInBytes platform) -- word size
           ]
 
 -- | Compilation unit footer, mainly establishing size of debug sections
@@ -176,7 +177,7 @@ parent, B.
 -- | Generate DWARF info for a procedure debug block
 procToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
 procToDwarf df prc
-  = DwarfSubprogram { dwChildren = map (blockToDwarf df) (dblBlocks prc)
+  = DwarfSubprogram { dwChildren = map blockToDwarf (dblBlocks prc)
                     , dwName     = case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
                          _otherwise -> showSDocDump df $ ppr $ dblLabel prc
@@ -195,10 +196,10 @@ procToDwarf df prc
   goodParent _ = True
 
 -- | Generate DWARF info for a block
-blockToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
-blockToDwarf df blk
-  = DwarfBlock { dwChildren = concatMap (tickToDwarf df) (dblTicks blk)
-                              ++ map (blockToDwarf df) (dblBlocks blk)
+blockToDwarf :: DebugBlock -> DwarfInfo
+blockToDwarf blk
+  = DwarfBlock { dwChildren = concatMap tickToDwarf (dblTicks blk)
+                              ++ map blockToDwarf (dblBlocks blk)
                , dwLabel    = dblCLabel blk
                , dwMarker   = marker
                }
@@ -207,9 +208,9 @@ blockToDwarf df blk
       | Just _ <- dblPosition blk = Just $ mkAsmTempLabel $ dblLabel blk
       | otherwise                 = Nothing   -- block was optimized out
 
-tickToDwarf :: DynFlags -> Tickish () -> [DwarfInfo]
-tickToDwarf _  (SourceNote ss _) = [DwarfSrcNote ss]
-tickToDwarf _ _ = []
+tickToDwarf :: Tickish () -> [DwarfInfo]
+tickToDwarf  (SourceNote ss _) = [DwarfSrcNote ss]
+tickToDwarf _ = []
 
 -- | Generates the data for the debug frame section, which encodes the
 -- desired stack unwind behaviour for the debugger

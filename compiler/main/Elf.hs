@@ -19,6 +19,7 @@ import GhcPrelude
 import AsmUtils
 import Exception
 import GHC.Driver.Session
+import GHC.Platform
 import ErrUtils
 import Maybes     (MaybeT(..),runMaybeT)
 import Util       (charToC)
@@ -408,12 +409,12 @@ readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
 -- | Generate the GAS code to create a Note section
 --
 -- Header fields for notes are 32-bit long (see Note [ELF specification]).
-makeElfNote :: String -> String -> Word32 -> String -> SDoc
-makeElfNote sectionName noteName typ contents = hcat [
+makeElfNote :: Platform -> String -> String -> Word32 -> String -> SDoc
+makeElfNote platform sectionName noteName typ contents = hcat [
     text "\t.section ",
     text sectionName,
     text ",\"\",",
-    sectionType "note",
+    sectionType platform "note",
     text "\n",
     text "\t.balign 4\n",
 

@@ -1355,18 +1355,18 @@ instance Outputable ForeignLabelSource where
 internalNamePrefix :: Name -> SDoc
 internalNamePrefix name = getPprStyle $ \ sty ->
   if asmStyle sty && isRandomGenerated then
-    sdocWithPlatform $ \platform ->
-      ptext (asmTempLabelPrefix platform)
+    sdocWithDynFlags $ \dflags ->
+      ptext (asmTempLabelPrefix (targetPlatform dflags))
   else
     empty
   where
     isRandomGenerated = not $ isExternalName name
 
 tempLabelPrefixOrUnderscore :: SDoc
-tempLabelPrefixOrUnderscore = sdocWithPlatform $ \platform ->
+tempLabelPrefixOrUnderscore = sdocWithDynFlags $ \dflags ->
   getPprStyle $ \ sty ->
    if asmStyle sty then
-      ptext (asmTempLabelPrefix platform)
+      ptext (asmTempLabelPrefix (targetPlatform dflags))
    else
       char '_'
 

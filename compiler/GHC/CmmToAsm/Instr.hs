@@ -16,14 +16,15 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Driver.Session
 import GHC.Cmm hiding (topInfoTable)
-import GHC.Platform
+
+import GHC.CmmToAsm.Config
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
@@ -132,7 +133,7 @@ class   Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: DynFlags
+                :: NCGConfig
                 -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
@@ -141,7 +142,7 @@ class   Instruction instr where
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: DynFlags
+                :: NCGConfig
                 -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use

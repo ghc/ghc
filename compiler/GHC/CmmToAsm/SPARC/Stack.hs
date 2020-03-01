@@ -13,8 +13,8 @@ import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Base
 import GHC.CmmToAsm.SPARC.Imm
+import GHC.CmmToAsm.Config
 
-import GHC.Driver.Session
 import Outputable
 
 -- | Get an AddrMode relative to the address in sp.
@@ -37,15 +37,15 @@ fpRel n
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
 --
-spillSlotToOffset :: DynFlags -> Int -> Int
-spillSlotToOffset dflags slot
-        | slot >= 0 && slot < maxSpillSlots dflags
+spillSlotToOffset :: NCGConfig -> Int -> Int
+spillSlotToOffset config slot
+        | slot >= 0 && slot < maxSpillSlots config
         = 64 + spillSlotSize * slot
 
         | otherwise
         = pprPanic "spillSlotToOffset:"
                       (   text "invalid spill location: " <> int slot
-                      $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
+                      $$  text "maxSpillSlots:          " <> int (maxSpillSlots config))
 
 
 -- | The maximum number of spill slots available on the C stack.
@@ -54,6 +54,6 @@ spillSlotToOffset dflags slot
 --      Why do we reserve 64 bytes, instead of using the whole thing??
 --              -- BL 2009/02/15
 --
-maxSpillSlots :: DynFlags -> Int
-maxSpillSlots dflags
-        = ((spillAreaLength dflags - 64) `div` spillSlotSize) - 1
+maxSpillSlots :: NCGConfig -> Int
+maxSpillSlots config
+        = ((ncgSpillPreallocSize config - 64) `div` spillSlotSize) - 1

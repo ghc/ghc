@@ -60,7 +60,6 @@ import GHC.Cmm.CLabel           ( CLabel )
 import Unique
 
 import GHC.Platform.Regs
-import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 
@@ -199,11 +198,11 @@ addrOffset addr off
 -- temporaries and for excess call arguments.  @fpRel@, where
 -- applicable, is the same but for the frame pointer.
 
-spRel :: DynFlags
+spRel :: Platform
       -> Int    -- desired stack offset in words, positive or negative
       -> AddrMode
 
-spRel dflags n = AddrRegImm sp (ImmInt (n * wORD_SIZE dflags))
+spRel platform n = AddrRegImm sp (ImmInt (n * platformWordSizeInBytes platform))
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.

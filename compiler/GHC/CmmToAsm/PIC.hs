@@ -57,6 +57,7 @@ import GHC.Platform
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Monad
+import GHC.CmmToAsm.Config
 
 
 import GHC.Cmm.Dataflow.Collections
@@ -163,7 +164,7 @@ cmmMakePicReference dflags lbl
         | OSAIX <- platformOS $ targetPlatform dflags
         = CmmMachOp (MO_Add W32)
                 [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative dflags
+                , CmmLit $ picRelative (wordWidth dflags)
                                 (platformArch   $ targetPlatform dflags)
                                 (platformOS     $ targetPlatform dflags)
                                 lbl ]
@@ -172,7 +173,7 @@ cmmMakePicReference dflags lbl
         | ArchPPC_64 _ <- platformArch $ targetPlatform dflags
         = CmmMachOp (MO_Add W32) -- code model medium
                 [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative dflags
+                , CmmLit $ picRelative (wordWidth dflags)
                                 (platformArch   $ targetPlatform dflags)
                                 (platformOS     $ targetPlatform dflags)
                                 lbl ]
@@ -181,7 +182,7 @@ cmmMakePicReference dflags lbl
             && absoluteLabel lbl
         = CmmMachOp (MO_Add (wordWidth dflags))
                 [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative dflags
+                , CmmLit $ picRelative (wordWidth dflags)
                                 (platformArch   $ targetPlatform dflags)
                                 (platformOS     $ targetPlatform dflags)
                                 lbl ]
@@ -404,7 +405,7 @@ howToAccessLabel dflags _ _ _ _ _
 -- | Says what we have to add to our 'PIC base register' in order to
 --      get the address of a label.
 
-picRelative :: DynFlags -> Arch -> OS -> CLabel -> CmmLit
+picRelative :: Width -> Arch -> OS -> CLabel -> CmmLit
 
 -- Darwin, but not x86_64:
 -- The PIC base register points to the PIC base label at the beginning
@@ -413,15 +414,15 @@ picRelative :: DynFlags -> Arch -> OS -> CLabel -> CmmLit
 -- We have already made sure that all labels that are not from the current
 -- module are accessed indirectly ('as' can't calculate differences between
 -- undefined labels).
-picRelative dflags arch OSDarwin lbl
+picRelative width arch OSDarwin lbl
         | arch /= ArchX86_64
-        = CmmLabelDiffOff lbl mkPicBaseLabel 0 (wordWidth dflags)
+        = CmmLabelDiffOff lbl mkPicBaseLabel 0 width
 
 -- On AIX we use an indirect local TOC anchored by 'gotLabel'.
 -- This way we use up only one global TOC entry per compilation-unit
 -- (this is quite similar to GCC's @-mminimal-toc@ compilation mode)
-picRelative dflags _ OSAIX lbl
-        = CmmLabelDiffOff lbl gotLabel 0 (wordWidth dflags)
+picRelative width _ OSAIX lbl
+        = CmmLabelDiffOff lbl gotLabel 0 width
 
 -- PowerPC Linux:
 -- The PIC base register points to our fake GOT. Use a label difference
@@ -429,9 +430,9 @@ picRelative dflags _ OSAIX lbl
 -- We have made sure that *everything* is accessed indirectly, so this
 -- is only used for offsets from the GOT to symbol pointers inside the
 -- GOT.
-picRelative dflags ArchPPC os lbl
+picRelative width ArchPPC os lbl
         | osElfTarget os
-        = CmmLabelDiffOff lbl gotLabel 0 (wordWidth dflags)
+        = CmmLabelDiffOff lbl gotLabel 0 width
 
 
 -- Most Linux versions:
@@ -453,14 +454,14 @@ picRelative _ arch os lbl
           in    result
 
 picRelative _ _ _ _
-        = panic "PositionIndependentCode.picRelative undefined for this platform"
+        = panic "GHC.CmmToAsm.PIC.picRelative undefined for this platform"
 
 
 
 --------------------------------------------------------------------------------
 
-needImportedSymbols :: DynFlags -> Arch -> OS -> Bool
-needImportedSymbols dflags arch os
+needImportedSymbols :: NCGConfig -> Bool
+needImportedSymbols config
         | os    == OSDarwin
         , arch  /= ArchX86_64
         = True
@@ -471,7 +472,7 @@ needImportedSymbols dflags arch os
         -- PowerPC Linux: -fPIC or -dynamic
         | osElfTarget os
         , arch  == ArchPPC
-        = positionIndependent dflags || gopt Opt_ExternalDynamicRefs dflags
+        = ncgPIC config || ncgExternalDynamicRefs config
 
         -- PowerPC 64 Linux: always
         | osElfTarget os
@@ -481,11 +482,15 @@ needImportedSymbols dflags arch os
         -- i386 (and others?): -dynamic but not -fPIC
         | osElfTarget os
         , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
-        = gopt Opt_ExternalDynamicRefs dflags &&
-          not (positionIndependent dflags)
+        = ncgExternalDynamicRefs config &&
+          not (ncgPIC config)
 
         | otherwise
         = False
+   where
+      platform = ncgPlatform config
+      arch     = platformArch platform
+      os       = platformOS   platform
 
 -- gotLabel
 -- The label used to refer to our "fake GOT" from
@@ -499,13 +504,16 @@ gotLabel
 
 
 
---------------------------------------------------------------------------------
+-- Emit GOT declaration
+-- Output whatever needs to be output once per .s file.
+--
 -- We don't need to declare any offset tables.
 -- However, for PIC on x86, we need a small helper function.
-pprGotDeclaration :: DynFlags -> Arch -> OS -> SDoc
-pprGotDeclaration dflags ArchX86 OSDarwin
-        | positionIndependent dflags
-        = vcat [
+pprGotDeclaration :: NCGConfig -> SDoc
+pprGotDeclaration config = case (arch,os) of
+   (ArchX86, OSDarwin)
+        | ncgPIC config
+        -> vcat [
                 text ".section __TEXT,__textcoal_nt,coalesced,no_toc",
                 text ".weak_definition ___i686.get_pc_thunk.ax",
                 text ".private_extern ___i686.get_pc_thunk.ax",
@@ -513,48 +521,49 @@ pprGotDeclaration dflags ArchX86 OSDarwin
                 text "\tmovl (%esp), %eax",
                 text "\tret" ]
 
-pprGotDeclaration _ _ OSDarwin
-        = empty
+   (_, OSDarwin) -> empty
 
--- Emit XCOFF TOC section
-pprGotDeclaration _ _ OSAIX
-        = vcat $ [ text ".toc"
-                 , text ".tc ghc_toc_table[TC],.LCTOC1"
-                 , text ".csect ghc_toc_table[RW]"
-                   -- See Note [.LCTOC1 in PPC PIC code]
-                 , text ".set .LCTOC1,$+0x8000"
-                 ]
+   -- Emit XCOFF TOC section
+   (_, OSAIX)
+        -> vcat $ [ text ".toc"
+                  , text ".tc ghc_toc_table[TC],.LCTOC1"
+                  , text ".csect ghc_toc_table[RW]"
+                    -- See Note [.LCTOC1 in PPC PIC code]
+                  , text ".set .LCTOC1,$+0x8000"
+                  ]
 
 
--- PPC 64 ELF v1 needs a Table Of Contents (TOC)
-pprGotDeclaration _ (ArchPPC_64 ELF_V1) _
-        = text ".section \".toc\",\"aw\""
--- In ELF v2 we also need to tell the assembler that we want ABI
--- version 2. This would normally be done at the top of the file
--- right after a file directive, but I could not figure out how
--- to do that.
-pprGotDeclaration _ (ArchPPC_64 ELF_V2) _
-        = vcat [ text ".abiversion 2",
-                 text ".section \".toc\",\"aw\""
-               ]
+   -- PPC 64 ELF v1 needs a Table Of Contents (TOC)
+   (ArchPPC_64 ELF_V1, _)
+        -> text ".section \".toc\",\"aw\""
 
--- Emit GOT declaration
--- Output whatever needs to be output once per .s file.
-pprGotDeclaration dflags arch os
+   -- In ELF v2 we also need to tell the assembler that we want ABI
+   -- version 2. This would normally be done at the top of the file
+   -- right after a file directive, but I could not figure out how
+   -- to do that.
+   (ArchPPC_64 ELF_V2, _)
+        -> vcat [ text ".abiversion 2",
+                  text ".section \".toc\",\"aw\""
+                ]
+
+   (arch, os)
         | osElfTarget os
         , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
-        , not (positionIndependent dflags)
-        = empty
+        , not (ncgPIC config)
+        -> empty
 
         | osElfTarget os
         , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
-        = vcat [
+        -> vcat [
                 -- See Note [.LCTOC1 in PPC PIC code]
                 text ".section \".got2\",\"aw\"",
                 text ".LCTOC1 = .+32768" ]
 
-pprGotDeclaration _ _ _
-        = panic "pprGotDeclaration: no match"
+   _ -> panic "pprGotDeclaration: no match"
+ where
+   platform = ncgPlatform config
+   arch     = platformArch platform
+   os       = platformOS   platform
 
 
 --------------------------------------------------------------------------------
@@ -563,43 +572,44 @@ pprGotDeclaration _ _ _
 -- and one for non-PIC.
 --
 
-pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
-pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_arch = ArchX86, platformMini_os = OSDarwin } }) importedLbl
+pprImportedSymbol :: DynFlags -> NCGConfig -> CLabel -> SDoc
+pprImportedSymbol dflags config importedLbl = case (arch,os) of
+   (ArchX86, OSDarwin)
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
-        = case positionIndependent dflags of
-           False ->
-            vcat [
-                text ".symbol_stub",
-                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
-                    text "\tjmp *L" <> pprCLabel dflags lbl
-                        <> text "$lazy_ptr",
-                text "L" <> pprCLabel dflags lbl
-                    <> text "$stub_binder:",
-                    text "\tpushl $L" <> pprCLabel dflags lbl
-                        <> text "$lazy_ptr",
-                    text "\tjmp dyld_stub_binding_helper"
-            ]
-           True ->
-            vcat [
-                text ".section __TEXT,__picsymbolstub2,"
-                    <> text "symbol_stubs,pure_instructions,25",
-                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
-                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
-                    text "\tcall ___i686.get_pc_thunk.ax",
-                text "1:",
-                    text "\tmovl L" <> pprCLabel dflags lbl
-                        <> text "$lazy_ptr-1b(%eax),%edx",
-                    text "\tjmp *%edx",
-                text "L" <> pprCLabel dflags lbl
-                    <> text "$stub_binder:",
-                    text "\tlea L" <> pprCLabel dflags lbl
-                        <> text "$lazy_ptr-1b(%eax),%eax",
-                    text "\tpushl %eax",
-                    text "\tjmp dyld_stub_binding_helper"
-            ]
-          $+$ vcat [        text ".section __DATA, __la_sym_ptr"
-                    <> (if positionIndependent dflags then int 2 else int 3)
+        -> if not pic
+             then
+              vcat [
+                  text ".symbol_stub",
+                  text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
+                      text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                      text "\tjmp *L" <> pprCLabel dflags lbl
+                          <> text "$lazy_ptr",
+                  text "L" <> pprCLabel dflags lbl
+                      <> text "$stub_binder:",
+                      text "\tpushl $L" <> pprCLabel dflags lbl
+                          <> text "$lazy_ptr",
+                      text "\tjmp dyld_stub_binding_helper"
+              ]
+             else
+              vcat [
+                  text ".section __TEXT,__picsymbolstub2,"
+                      <> text "symbol_stubs,pure_instructions,25",
+                  text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
+                      text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                      text "\tcall ___i686.get_pc_thunk.ax",
+                  text "1:",
+                      text "\tmovl L" <> pprCLabel dflags lbl
+                          <> text "$lazy_ptr-1b(%eax),%edx",
+                      text "\tjmp *%edx",
+                  text "L" <> pprCLabel dflags lbl
+                      <> text "$stub_binder:",
+                      text "\tlea L" <> pprCLabel dflags lbl
+                          <> text "$lazy_ptr-1b(%eax),%eax",
+                      text "\tpushl %eax",
+                      text "\tjmp dyld_stub_binding_helper"
+              ]
+           $+$ vcat [        text ".section __DATA, __la_sym_ptr"
+                    <> (if pic then int 2 else int 3)
                     <> text ",lazy_symbol_pointers",
                 text "L" <> pprCLabel dflags lbl <> ptext (sLit "$lazy_ptr:"),
                     text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
@@ -607,71 +617,68 @@ pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_
                     <> text "$stub_binder"]
 
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-        = vcat [
+        -> vcat [
                 text ".non_lazy_symbol_pointer",
                 char 'L' <> pprCLabel dflags lbl <> text "$non_lazy_ptr:",
                 text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
                 text "\t.long\t0"]
 
         | otherwise
-        = empty
+        -> empty
+
+   (_, OSDarwin) -> empty
 
 
-pprImportedSymbol _ (Platform { platformMini = PlatformMini { platformMini_os = OSDarwin } }) _
-        = empty
+   -- XCOFF / AIX
+   --
+   -- Similar to PPC64 ELF v1, there's dedicated TOC register (r2). To
+   -- workaround the limitation of a global TOC we use an indirect TOC
+   -- with the label `ghc_toc_table`.
+   --
+   -- See also GCC's `-mminimal-toc` compilation mode or
+   -- http://www.ibm.com/developerworks/rational/library/overview-toc-aix/
+   --
+   -- NB: No DSO-support yet
 
--- XCOFF / AIX
---
--- Similar to PPC64 ELF v1, there's dedicated TOC register (r2). To
--- workaround the limitation of a global TOC we use an indirect TOC
--- with the label `ghc_toc_table`.
---
--- See also GCC's `-mminimal-toc` compilation mode or
--- http://www.ibm.com/developerworks/rational/library/overview-toc-aix/
---
--- NB: No DSO-support yet
-
-pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_os = OSAIX } }) importedLbl
-        = case dynamicLinkerLabelInfo importedLbl of
+   (_, OSAIX) -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
                    text "LC.." <> pprCLabel dflags lbl <> char ':',
                    text "\t.long" <+> pprCLabel dflags lbl ]
             _ -> empty
 
--- ELF / Linux
---
--- In theory, we don't need to generate any stubs or symbol pointers
--- by hand for Linux.
---
--- Reality differs from this in two areas.
---
--- 1) If we just use a dynamically imported symbol directly in a read-only
---    section of the main executable (as GCC does), ld generates R_*_COPY
---    relocations, which are fundamentally incompatible with reversed info
---    tables. Therefore, we need a table of imported addresses in a writable
---    section.
---    The "official" GOT mechanism (label@got) isn't intended to be used
---    in position dependent code, so we have to create our own "fake GOT"
---    when not Opt_PIC && WayDyn `elem` ways dflags.
---
--- 2) PowerPC Linux is just plain broken.
---    While it's theoretically possible to use GOT offsets larger
---    than 16 bit, the standard crt*.o files don't, which leads to
---    linker errors as soon as the GOT size exceeds 16 bit.
---    Also, the assembler doesn't support @gotoff labels.
---    In order to be able to use a larger GOT, we have to circumvent the
---    entire GOT mechanism and do it ourselves (this is also what GCC does).
+   -- ELF / Linux
+   --
+   -- In theory, we don't need to generate any stubs or symbol pointers
+   -- by hand for Linux.
+   --
+   -- Reality differs from this in two areas.
+   --
+   -- 1) If we just use a dynamically imported symbol directly in a read-only
+   --    section of the main executable (as GCC does), ld generates R_*_COPY
+   --    relocations, which are fundamentally incompatible with reversed info
+   --    tables. Therefore, we need a table of imported addresses in a writable
+   --    section.
+   --    The "official" GOT mechanism (label@got) isn't intended to be used
+   --    in position dependent code, so we have to create our own "fake GOT"
+   --    when not Opt_PIC && WayDyn `elem` ways dflags.
+   --
+   -- 2) PowerPC Linux is just plain broken.
+   --    While it's theoretically possible to use GOT offsets larger
+   --    than 16 bit, the standard crt*.o files don't, which leads to
+   --    linker errors as soon as the GOT size exceeds 16 bit.
+   --    Also, the assembler doesn't support @gotoff labels.
+   --    In order to be able to use a larger GOT, we have to circumvent the
+   --    entire GOT mechanism and do it ourselves (this is also what GCC does).
 
 
--- When needImportedSymbols is defined,
--- the NCG will keep track of all DynamicLinkerLabels it uses
--- and output each of them using pprImportedSymbol.
+   -- When needImportedSymbols is defined,
+   -- the NCG will keep track of all DynamicLinkerLabels it uses
+   -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol dflags platform@(Platform { platformMini = PlatformMini { platformMini_arch = ArchPPC_64 _ } })
-                  importedLbl
-        | osElfTarget (platformOS platform)
-        = case dynamicLinkerLabelInfo importedLbl of
+   (ArchPPC_64 _, _)
+        | osElfTarget os
+        -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
                    text ".section \".toc\", \"aw\"",
@@ -679,11 +686,10 @@ pprImportedSymbol dflags platform@(Platform { platformMini = PlatformMini { plat
                    text "\t.quad" <+> pprCLabel dflags lbl ]
             _ -> empty
 
-pprImportedSymbol dflags platform importedLbl
-        | osElfTarget (platformOS platform)
-        = case dynamicLinkerLabelInfo importedLbl of
+   _ | osElfTarget os
+     -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
-              -> let symbolSize = case wordWidth dflags of
+              -> let symbolSize = case ncgWordWidth config of
                          W32 -> sLit "\t.long"
                          W64 -> sLit "\t.quad"
                          _ -> panic "Unknown wordRep in pprImportedSymbol"
@@ -696,8 +702,12 @@ pprImportedSymbol dflags platform importedLbl
             -- PLT code stubs are generated automatically by the dynamic linker.
             _ -> empty
 
-pprImportedSymbol _ _ _
-        = panic "PIC.pprImportedSymbol: no match"
+   _ -> panic "PIC.pprImportedSymbol: no match"
+ where
+   platform = ncgPlatform config
+   arch     = platformArch platform
+   os       = platformOS   platform
+   pic      = ncgPIC config
 
 --------------------------------------------------------------------------------
 -- Generate code to calculate the address that should be put in the

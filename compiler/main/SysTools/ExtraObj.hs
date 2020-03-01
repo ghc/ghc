@@ -143,22 +143,23 @@ mkNoteObjsToLinkIntoBinary :: DynFlags -> [InstalledUnitId] -> IO [FilePath]
 mkNoteObjsToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
 
-   if (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
+   if (platformSupportsSavingLinkOpts (platformOS platform ))
      then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc dflags (link_opts link_info))
      else return []
 
   where
+    platform = targetPlatform dflags
     link_opts info = hcat [
       -- "link info" section (see Note [LinkInfo section])
-      makeElfNote ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
+      makeElfNote platform ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
 
       -- ALL generated assembly must have this section to disable
       -- executable stacks.  See also
       -- compiler/nativeGen/AsmCodeGen.hs for another instance
       -- where we need to do this.
-      if platformHasGnuNonexecStack (targetPlatform dflags)
+      if platformHasGnuNonexecStack platform
         then text ".section .note.GNU-stack,\"\","
-             <> sectionType "progbits" <> char '\n'
+             <> sectionType platform "progbits" <> char '\n'
         else Outputable.empty
       ]
 

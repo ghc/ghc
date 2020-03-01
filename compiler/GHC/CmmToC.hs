@@ -406,7 +406,7 @@ pprLoad dflags e ty
         --       (For tagging to work, I had to avoid unaligned loads. --ARY)
                         -> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift dflags))
 
-        _other -> cLoad e ty
+        _other -> cLoad (targetPlatform dflags) e ty
   where
     width = typeWidth ty
 
@@ -1145,10 +1145,9 @@ te_Reg _            = return ()
 cCast :: SDoc -> CmmExpr -> SDoc
 cCast ty expr = parens ty <> pprExpr1 expr
 
-cLoad :: CmmExpr -> CmmType -> SDoc
-cLoad expr rep
-    = sdocWithPlatform $ \platform ->
-      if bewareLoadStoreAlignment (platformArch platform)
+cLoad :: Platform -> CmmExpr -> CmmType -> SDoc
+cLoad platform expr rep
+    = if bewareLoadStoreAlignment (platformArch platform)
       then let decl = machRepCType rep <+> text "x" <> semi
                struct = text "struct" <+> braces (decl)
                packed_attr = text "__attribute__((packed))"

@@ -235,7 +235,7 @@ module GHC.Driver.Session (
         initSDocContext,
 
         -- * Make use of the Cmm CFG
-        CfgWeights(..), backendMaintainsCfg
+        CfgWeights(..)
   ) where
 
 #include "HsVersions.h"
@@ -851,12 +851,6 @@ parseCfgWeights s oldWeights =
             "condBranchWeight=800,switchWeight=0,callWeight=300" ++
             ",likelyCondWeight=900,unlikelyCondWeight=300" ++
             ",infoTablePenalty=300,backEdgeBonus=400"
-
-backendMaintainsCfg :: DynFlags -> Bool
-backendMaintainsCfg dflags = case (platformArch $ targetPlatform dflags) of
-    -- ArchX86 -- Should work but not tested so disabled currently.
-    ArchX86_64 -> True
-    _otherwise -> False
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
@@ -5226,7 +5220,6 @@ initSDocContext dflags style = SDC
   , sdocLineLength                  = pprCols dflags
   , sdocCanUseUnicode               = useUnicode dflags
   , sdocHexWordLiterals             = gopt Opt_HexWordLiterals dflags
-  , sdocDebugLevel                  = debugLevel dflags
   , sdocPprDebug                    = dopt Opt_D_ppr_debug dflags
   , sdocPrintUnicodeSyntax          = gopt Opt_PrintUnicodeSyntax dflags
   , sdocPrintCaseAsLet              = gopt Opt_PprCaseAsLet dflags

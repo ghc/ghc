@@ -269,6 +269,7 @@ Library
         FileSettings
         GHC.Cmm.Graph
         GHC.CmmToAsm.Ppr
+        GHC.CmmToAsm.Config
         GHC.CmmToC
         GHC.Cmm.Ppr
         GHC.Cmm.Ppr.Decl
