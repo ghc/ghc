@@ -29,8 +29,8 @@ module KnownUniques
 import GhcPrelude
 
 import TysWiredIn
-import TyCon
-import DataCon
+import GHC.Core.TyCon
+import GHC.Core.DataCon
 import Id
 import BasicTypes
 import Outputable

@@ -104,13 +104,13 @@ import GhcPrelude
 import CostCentre
 import VarEnv( InScopeSet )
 import Var
-import Type
-import Coercion
+import GHC.Core.Type
+import GHC.Core.Coercion
 import Name
 import NameSet
 import NameEnv( NameEnv, emptyNameEnv )
 import Literal
-import DataCon
+import GHC.Core.DataCon
 import Module
 import BasicTypes
 import GHC.Driver.Session

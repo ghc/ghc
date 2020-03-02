@@ -7,7 +7,7 @@ where
 import GhcPrelude
 
 import FastString
-import Type
+import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
 import Literal ( Literal(..) )

@@ -1,8 +1,8 @@
 module MkId where
 import Name( Name )
 import Var( Id )
-import Class( Class )
-import {-# SOURCE #-} DataCon( DataCon )
+import GHC.Core.Class( Class )
+import {-# SOURCE #-} GHC.Core.DataCon( DataCon )
 import {-# SOURCE #-} PrimOp( PrimOp )
 
 data DataConBoxer

@@ -1,4 +1,4 @@
-module TyCon where
+module GHC.Core.TyCon where
 
 import GhcPrelude
 

@@ -16,7 +16,7 @@ import GhcPrelude
 
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
-import TyCoRep( Type(..), TyLit(..) )
+import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
@@ -29,9 +29,9 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , nilDataCon, consDataCon )
 import Name
 import Id
-import Type
-import TyCon
-import DataCon
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.DataCon
 import Module
 import GHC.Hs
 import GHC.Driver.Session
@@ -76,7 +76,7 @@ The overall plan is this:
    recipe for computing the kind of an instantiation of the tycon (see
    Note [Representing TyCon kinds: KindRep] later in this file for details).
 
-   We define (in TyCon)
+   We define (in GHC.Core.TyCon)
 
         type TyConRepName = Name
 

@@ -36,7 +36,7 @@ import GHC.Cmm.Graph
 import GHC.Runtime.Heap.Layout
 import CostCentre
 import Module
-import DataCon
+import GHC.Core.DataCon
 import GHC.Driver.Session
 import FastString
 import Id

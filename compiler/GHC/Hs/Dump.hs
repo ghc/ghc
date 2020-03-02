@@ -23,7 +23,7 @@ import BasicTypes
 import FastString
 import NameSet
 import Name
-import DataCon
+import GHC.Core.DataCon
 import SrcLoc
 import GHC.Hs
 import OccName hiding (occName)

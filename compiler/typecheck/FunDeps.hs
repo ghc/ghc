@@ -23,17 +23,17 @@ import GhcPrelude
 
 import Name
 import Var
-import Class
-import Predicate
-import Type
+import GHC.Core.Class
+import GHC.Core.Predicate
+import GHC.Core.Type
 import TcType( transSuperClasses )
-import CoAxiom( TypeEqn )
-import Unify
-import InstEnv
+import GHC.Core.Coercion.Axiom( TypeEqn )
+import GHC.Core.Unify
+import GHC.Core.InstEnv
 import VarSet
 import VarEnv
-import TyCoFVs
-import TyCoPpr( pprWithExplicitKindsWhen )
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
 import FV
 import Outputable
 import ErrUtils( Validity(..), allValid )

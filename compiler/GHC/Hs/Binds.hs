@@ -34,7 +34,7 @@ import GHC.Hs.Extension
 import GHC.Hs.Types
 import GHC.Core
 import TcEvidence
-import Type
+import GHC.Core.Type
 import NameSet
 import BasicTypes
 import Outputable

@@ -1462,7 +1462,7 @@ must come after any variables mentioned in their kinds.
 
 The k comes first because a depends on k, even though the k appears later than
 the a in the code. Thus, GHC does ScopedSort on the variables.
-See Note [ScopedSort] in Type.
+See Note [ScopedSort] in GHC.Core.Type.
 
 Implicitly bound variables are collected by any function which returns a
 FreeKiTyVars, FreeKiTyVarsWithDups, or FreeKiTyVarsNoDups, which notably

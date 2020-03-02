@@ -1,5 +1,5 @@
 -- | Pretty-printing types and coercions.
-module TyCoPpr
+module GHC.Core.TyCo.Ppr
   (
         -- * Precedence
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
@@ -31,17 +31,18 @@ import {-# SOURCE #-} GHC.CoreToIface
    ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
    , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
-import {-# SOURCE #-} DataCon( dataConFullSig
-                             , dataConUserTyVarBinders
-                             , DataCon )
+import {-# SOURCE #-} GHC.Core.DataCon
+   ( dataConFullSig , dataConUserTyVarBinders
+   , DataCon )
 
-import {-# SOURCE #-} Type( isLiftedTypeKind )
+import {-# SOURCE #-} GHC.Core.Type
+   ( isLiftedTypeKind )
 
-import TyCon
-import TyCoRep
-import TyCoTidy
-import TyCoFVs
-import Class
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy
+import GHC.Core.TyCo.FVs
+import GHC.Core.Class
 import Var
 
 import GHC.Iface.Type

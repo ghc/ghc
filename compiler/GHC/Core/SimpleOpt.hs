@@ -38,13 +38,13 @@ import IdInfo   ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
-import DataCon
+import GHC.Core.DataCon
 import Demand( etaExpandStrictSig )
-import OptCoercion ( optCoercion )
-import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
-                       , isInScope, substTyVarBndr, cloneTyVarBndr )
-import Coercion hiding ( substCo, substCoVarBndr )
-import TyCon        ( tyConArity )
+import GHC.Core.Coercion.Opt ( optCoercion )
+import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
+                            , isInScope, substTyVarBndr, cloneTyVarBndr )
+import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.TyCon ( tyConArity )
 import TysWiredIn
 import PrelNames
 import BasicTypes

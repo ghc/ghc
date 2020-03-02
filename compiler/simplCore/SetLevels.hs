@@ -91,10 +91,10 @@ import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increa
 import Cpr              ( mkCprSig, botCpr )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
+import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
-import DataCon          ( dataConOrigResTy )
+import GHC.Core.DataCon ( dataConOrigResTy )
 import TysWiredIn
 import UniqSupply
 import Util

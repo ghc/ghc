@@ -54,12 +54,12 @@ import GHC.Core.Arity     ( manifestArity )
 import GHC.Core.Utils
 import Id
 import Demand          ( isBottomingSig )
-import DataCon
+import GHC.Core.DataCon
 import Literal
 import PrimOp
 import IdInfo
 import BasicTypes       ( Arity, InlineSpec(..), inlinePragmaSpec )
-import Type
+import GHC.Core.Type
 import PrelNames
 import TysPrim          ( realWorldStatePrimTy )
 import Bag

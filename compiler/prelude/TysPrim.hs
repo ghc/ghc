@@ -112,14 +112,14 @@ import {-# SOURCE #-} TysWiredIn
 
 import Var              ( TyVar, mkTyVar )
 import Name
-import TyCon
+import GHC.Core.TyCon
 import SrcLoc
 import Unique
 import PrelNames
 import FastString
 import Outputable
-import TyCoRep   -- Doesn't need special access, but this is easier to avoid
-                 -- import loops which show up if you import Type instead
+import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
+                         -- import loops which show up if you import Type instead
 
 import Data.Char
 
@@ -475,14 +475,14 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 
 Note [PrimRep and kindPrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As part of its source code, in TyCon, GHC has
+As part of its source code, in GHC.Core.TyCon, GHC has
   data PrimRep = LiftedRep | UnliftedRep | IntRep | FloatRep | ...etc...
 
 Notice that
  * RuntimeRep is part of the syntax tree of the program being compiled
      (defined in a library: ghc-prim:GHC.Types)
  * PrimRep is part of GHC's source code.
-     (defined in TyCon)
+     (defined in GHC.Core.TyCon)
 
 We need to get from one to the other; that is what kindPrimRep does.
 Suppose we have a value
@@ -707,7 +707,7 @@ It responds "yes" to Type.isEqPrimPred and classifies as an EqPred in
 Type.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.
-(See Note [Coercion holes] in TyCoRep.) But see also
+(See Note [Coercion holes] in GHC.Core.TyCo.Rep.) But see also
 Note [Deferred errors for coercion holes] in TcErrors to see how
 equality constraints are deferred.
 

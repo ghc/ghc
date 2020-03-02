@@ -43,7 +43,7 @@ import TcRnMonad
 import Name
 import NameSet
 import NameEnv
-import DataCon
+import GHC.Core.DataCon
 import SrcLoc
 import Outputable
 import Util

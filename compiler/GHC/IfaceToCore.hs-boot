@@ -3,10 +3,10 @@ module GHC.IfaceToCore where
 import GhcPrelude
 import GHC.Iface.Syntax ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule
                         , IfaceAnnotation, IfaceCompleteMatch )
-import TyCoRep          ( TyThing )
-import TcRnTypes        ( IfL )
-import InstEnv          ( ClsInst )
-import FamInstEnv       ( FamInst )
+import GHC.Core.TyCo.Rep   ( TyThing )
+import TcRnTypes           ( IfL )
+import GHC.Core.InstEnv    ( ClsInst )
+import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core         ( CoreRule )
 import GHC.Driver.Types ( CompleteMatch )
 import Annotations      ( Annotation )

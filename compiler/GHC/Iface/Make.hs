@@ -32,15 +32,15 @@ import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import Annotations
 import GHC.Core
-import Class
-import TyCon
-import CoAxiom
-import ConLike
-import DataCon
-import Type
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Type
 import TcType
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import TcRnMonad
 import GHC.Hs
 import GHC.Driver.Types
@@ -416,7 +416,7 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
 -- 2nd parameter is the list of branch LHSs, in case of a closed type family,
 -- for conversion from incompatible branches to incompatible indices.
 -- For an open type family the list should be empty.
--- See Note [Storing compatibility] in CoAxiom
+-- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch tc lhs_s
                         (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs

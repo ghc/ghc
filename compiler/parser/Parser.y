@@ -48,8 +48,8 @@ import qualified Prelude
 import GHC.Hs
 
 -- compiler/main
-import GHC.Driver.Phases     ( HscSource(..) )
-import GHC.Driver.Types         ( IsBootInterface, WarningTxt(..) )
+import GHC.Driver.Phases  ( HscSource(..) )
+import GHC.Driver.Types   ( IsBootInterface, WarningTxt(..) )
 import GHC.Driver.Session
 import GHC.Driver.Backpack.Syntax
 import UnitInfo
@@ -64,14 +64,14 @@ import Outputable
 -- compiler/basicTypes
 import RdrName
 import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
-import DataCon          ( DataCon, dataConName )
+import GHC.Core.DataCon ( DataCon, dataConName )
 import SrcLoc
 import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( funTyCon )
-import Class            ( FunDep )
+import GHC.Core.Type    ( funTyCon )
+import GHC.Core.Class   ( FunDep )
 
 -- compiler/parser
 import RdrHsSyn

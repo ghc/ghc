@@ -1,4 +1,4 @@
-module TyCoRep where
+module GHC.Core.TyCo.Rep where
 
 import Data.Data  ( Data )
 import {-# SOURCE #-} Var( Var, ArgFlag, AnonArgFlag )
@@ -20,4 +20,4 @@ type MCoercionN = MCoercion
 mkFunTy   :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
 
-instance Data Type  -- To support Data instances in CoAxiom
+instance Data Type  -- To support Data instances in GHC.Core.Coercion.Axiom

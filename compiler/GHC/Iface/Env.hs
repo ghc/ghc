@@ -26,7 +26,7 @@ import GhcPrelude
 
 import TcRnMonad
 import GHC.Driver.Types
-import Type
+import GHC.Core.Type
 import Var
 import Name
 import Avail

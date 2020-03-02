@@ -49,10 +49,10 @@ import BinFingerprint
 import GHC.Core( IsOrphan, isOrphan )
 import Demand
 import Cpr
-import Class
+import GHC.Core.Class
 import FieldLabel
 import NameSet
-import CoAxiom ( BranchIndex )
+import GHC.Core.Coercion.Axiom ( BranchIndex )
 import Name
 import CostCentre
 import Literal
@@ -66,9 +66,9 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
-import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
+import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
-import DataCon (SrcStrictness(..), SrcUnpackedness(..))
+import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
 import Util (seqList)
@@ -222,7 +222,7 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
                                    , ifaxbRoles     :: [Role]
                                    , ifaxbRHS       :: IfaceType
                                    , ifaxbIncomps   :: [BranchIndex] }
-                                     -- See Note [Storing compatibility] in CoAxiom
+                                     -- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 
 data IfaceConDecls
   = IfAbstractTyCon     -- c.f TyCon.AbstractTyCon
@@ -254,7 +254,7 @@ data IfaceConDecl
           --            set of tyvars (*not* covars) of ifConExTCvs, unioned
           --            with the set of ifBinders (from the parent IfaceDecl)
           --            whose tyvars do not appear in ifConEqSpec
-          -- See Note [DataCon user type variable binders] in DataCon
+          -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [IfaceType],        -- Arg types
@@ -281,7 +281,7 @@ data IfaceClsInst
                    ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
                    ifDFun     :: IfExtName,                -- The dfun
                    ifOFlag    :: OverlapFlag,              -- Overlap flag
-                   ifInstOrph :: IsOrphan }                -- See Note [Orphans] in InstEnv
+                   ifInstOrph :: IsOrphan }                -- See Note [Orphans] in GHC.Core.InstEnv
         -- There's always a separate IfaceDecl for the DFun, which gives
         -- its IdInfo with its full type and version number.
         -- The instance declarations taken together have a version number,
@@ -1200,7 +1200,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- 3. Pretty-print the data type constructor applied to its arguments.
     --    This process will omit any invisible arguments, such as coercion
     --    variables, if necessary. (See Note
-    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.)
+    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.)
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
       <+> pprParendIfaceAppArgs

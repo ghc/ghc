@@ -10,11 +10,11 @@
 module GHC.Plugins(
         module GHC.Driver.Plugins,
         module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module CoreMonad, module GHC.Core, module Literal, module DataCon,
+        module CoreMonad, module GHC.Core, module Literal, module GHC.Core.DataCon,
         module GHC.Core.Utils, module GHC.Core.Make, module GHC.Core.FVs,
         module GHC.Core.Subst, module GHC.Core.Rules, module Annotations,
         module GHC.Driver.Session, module GHC.Driver.Packages,
-        module Module, module Type, module TyCon, module Coercion,
+        module Module, module GHC.Core.Type, module GHC.Core.TyCon, module GHC.Core.Coercion,
         module TysWiredIn, module GHC.Driver.Types, module BasicTypes,
         module VarSet, module VarEnv, module NameSet, module NameEnv,
         module UniqSet, module UniqFM, module FiniteMap,
@@ -40,7 +40,7 @@ import IdInfo
 import CoreMonad
 import GHC.Core
 import Literal
-import DataCon
+import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Core.FVs
@@ -57,11 +57,11 @@ import GHC.Driver.Packages
 
 -- Important GHC types
 import Module
-import Type     hiding {- conflict with GHC.Core.Subst -}
+import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
-import Coercion hiding {- conflict with GHC.Core.Subst -}
+import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Driver.Types
 import BasicTypes hiding ( Version {- conflicts with Packages.Version -} )

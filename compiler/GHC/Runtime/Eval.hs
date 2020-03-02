@@ -58,17 +58,17 @@ import GHC.Driver.Monad
 import GHC.Driver.Main
 import GHC.Hs
 import GHC.Driver.Types
-import InstEnv
-import GHC.Iface.Env   ( newInteractiveBinder )
-import FamInstEnv      ( FamInst )
-import GHC.Core.FVs    ( orphNamesOfFamInst )
-import TyCon
-import Type             hiding( typeKind )
+import GHC.Core.InstEnv
+import GHC.Iface.Env       ( newInteractiveBinder )
+import GHC.Core.FamInstEnv ( FamInst )
+import GHC.Core.FVs        ( orphNamesOfFamInst )
+import GHC.Core.TyCon
+import GHC.Core.Type       hiding( typeKind )
 import GHC.Types.RepType
 import TcType
 import Constraint
 import TcOrigin
-import Predicate
+import GHC.Core.Predicate
 import Var
 import Id
 import Name             hiding ( varName )

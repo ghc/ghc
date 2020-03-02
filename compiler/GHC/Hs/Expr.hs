@@ -41,12 +41,12 @@ import GHC.Core
 import Name
 import NameSet
 import BasicTypes
-import ConLike
+import GHC.Core.ConLike
 import SrcLoc
 import Util
 import Outputable
 import FastString
-import Type
+import GHC.Core.Type
 import TysWiredIn (mkTupleStr)
 import TcType (TcType)
 import {-# SOURCE #-} TcRnTypes (TcLclEnv)

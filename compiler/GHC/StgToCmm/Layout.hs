@@ -50,7 +50,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.CLabel
 import GHC.Stg.Syntax
 import Id
-import TyCon             ( PrimRep(..), primRepSizeB )
+import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
 import GHC.Driver.Session
 import Module

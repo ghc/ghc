@@ -40,7 +40,7 @@ import TcOrigin
 import Name
 import TysWiredIn
 import Id
-import TyCon
+import GHC.Core.TyCon
 import TysPrim
 import TcEvidence
 import Outputable

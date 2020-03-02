@@ -1,4 +1,3 @@
--- Var.hs-boot is Imported (only) by TyCoRep.hs-boot
 module Var where
 
 import GhcPrelude ()

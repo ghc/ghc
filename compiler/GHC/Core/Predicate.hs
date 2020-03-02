@@ -4,7 +4,7 @@ Describes predicates as they are considered by the solver.
 
 -}
 
-module Predicate (
+module GHC.Core.Predicate (
   Pred(..), classifyPredType,
   isPredTy, isEvVarType,
 
@@ -30,11 +30,11 @@ module Predicate (
 
 import GhcPrelude
 
-import Type
-import Class
-import TyCon
+import GHC.Core.Type
+import GHC.Core.Class
+import GHC.Core.TyCon
 import Var
-import Coercion
+import GHC.Core.Coercion
 
 import PrelNames
 
@@ -159,7 +159,7 @@ in TcCanonical.
 isEvVarType :: Type -> Bool
 -- True of (a) predicates, of kind Constraint, such as (Eq a), and (a ~ b)
 --         (b) coercion types, such as (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in TyCoRep
+-- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
 

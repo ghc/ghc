@@ -8,7 +8,7 @@ The @TyCon@ datatype
 
 {-# LANGUAGE CPP, FlexibleInstances #-}
 
-module TyCon(
+module GHC.Core.TyCon(
         -- * Main TyCon data types
         TyCon,
         AlgTyConRhs(..), visibleDataCons,
@@ -135,24 +135,28 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
-import {-# SOURCE #-} TyCoPpr    ( pprType )
-import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
-                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind )
-import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
-                                 , dataConTyCon, dataConFullSig
-                                 , isUnboxedSumCon )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep
+   ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr
+   ( pprType )
+import {-# SOURCE #-} TysWiredIn
+   ( runtimeRepTyCon, constraintKind
+   , vecCountTyCon, vecElemTyCon, liftedTypeKind )
+import {-# SOURCE #-} GHC.Core.DataCon
+   ( DataCon, dataConExTyCoVars, dataConFieldLabels
+   , dataConTyCon, dataConFullSig
+   , isUnboxedSumCon )
 
 import Binary
 import Var
 import VarSet
-import Class
+import GHC.Core.Class
 import BasicTypes
 import GHC.Driver.Session
 import ForeignCall
 import Name
 import NameEnv
-import CoAxiom
+import GHC.Core.Coercion.Axiom
 import PrelNames
 import Maybes
 import Outputable
@@ -235,10 +239,10 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         DataFamInstTyCon T [Int] ax_ti
 
 * The axiom ax_ti may be eta-reduced; see
-  Note [Eta reduction for data families] in FamInstEnv
+  Note [Eta reduction for data families] in GHC.Core.FamInstEnv
 
 * Data family instances may have a different arity than the data family.
-  See Note [Arity of data families] in FamInstEnv
+  See Note [Arity of data families] in GHC.Core.FamInstEnv
 
 * The data constructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
@@ -401,7 +405,7 @@ must be True.
 See also:
  * [Injectivity annotation] in GHC.Hs.Decls
  * [Renaming injectivity annotation] in GHC.Rename.Source
- * [Verifying injectivity annotation] in FamInstEnv
+ * [Verifying injectivity annotation] in GHC.Core.FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
 
 ************************************************************************
@@ -517,7 +521,7 @@ can arise in one of two ways:
 
     'MkT :: forall a b. (a~b) => blah
 
-  See Note [Constraints in kinds] in TyCoRep, and
+  See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and
   Note [Promoted data constructors] in this module.
 * In a data type whose kind has an equality constraint, as in the
   following example from #12102:
@@ -583,7 +587,7 @@ The last part about Required->Specified comes from this:
   data T k (a:k) b = MkT (a b)
 Here k is Required in T's kind, but we don't have Required binders in
 the TyCoBinders for a term (see Note [No Required TyCoBinder in terms]
-in TyCoRep), so we change it to Specified when making MkT's TyCoBinders
+in GHC.Core.TyCo.Rep), so we change it to Specified when making MkT's TyCoBinders
 -}
 
 
@@ -613,7 +617,7 @@ They fit together like so:
   Note that that are three binders here, including the
   kind variable k.
 
-* See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
+* See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
   for what the visibility flag means.
 
 * Each TyConBinder tyConBinders has a TyVar (sometimes it is TyCoVar), and
@@ -1022,7 +1026,7 @@ mkDataTyConRhs cons
         data_cons = cons,
         data_cons_size = length cons,
         is_enum = not (null cons) && all is_enum_con cons
-                  -- See Note [Enumeration types] in TyCon
+                  -- See Note [Enumeration types] in GHC.Core.TyCon
     }
   where
     is_enum_con con
@@ -1070,7 +1074,7 @@ data AlgTyConFlav
        (Maybe TyConRepName)
 
   -- | Type constructors representing a class dictionary.
-  -- See Note [ATyCon for classes] in TyCoRep
+  -- See Note [ATyCon for classes] in GHC.Core.TyCo.Rep
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the
                         -- current tycon
@@ -1103,7 +1107,7 @@ data AlgTyConFlav
         TyCon   -- The family TyCon
         [Type]  -- Argument types (mentions the tyConTyVars of this TyCon)
                 -- No shorter in length than the tyConTyVars of the family TyCon
-                -- How could it be longer? See [Arity of data families] in FamInstEnv
+                -- How could it be longer? See [Arity of data families] in GHC.Core.FamInstEnv
 
         -- E.g.  data instance T [a] = ...
         -- gives a representation tycon:
@@ -1193,7 +1197,7 @@ nothing for the axiom to prove!
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All data constructors can be promoted to become a type constructor,
-via the PromotedDataCon alternative in TyCon.
+via the PromotedDataCon alternative in GHC.Core.TyCon.
 
 * The TyCon promoted from a DataCon has the *same* Name and Unique as
   the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
@@ -1579,7 +1583,7 @@ So we compromise, and move their Kind calculation to the call site.
 -}
 
 -- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is recommended to use 'TyCoRep.funTyCon' if you want
+-- corresponding 'TyCon'. It is recommended to use 'GHC.Core.TyCo.Rep.funTyCon' if you want
 -- this functionality
 mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm
@@ -2050,7 +2054,7 @@ isGadtSyntaxTyCon _                                    = False
 
 -- | Is this an algebraic 'TyCon' which is just an enumeration of values?
 isEnumerationTyCon :: TyCon -> Bool
--- See Note [Enumeration types] in TyCon
+-- See Note [Enumeration types] in GHC.Core.TyCon
 isEnumerationTyCon (AlgTyCon { tyConArity = arity, algTcRhs = rhs })
   = case rhs of
        DataTyCon { is_enum = res } -> res

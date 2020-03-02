@@ -16,8 +16,8 @@ import BasicTypes
 import Id
 import VarEnv
 import UniqDFM
-import ConLike
-import DataCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
 import TysWiredIn
 import Outputable
 import Control.Monad.Trans.RWS.CPS

@@ -47,11 +47,11 @@ import BasicTypes       ( TopLevelFlag(..), isTopLevel )
 import CostCentre       ( isCurrentCCS )
 import Id               ( Id, idType, isJoinId, idName )
 import VarSet
-import DataCon
+import GHC.Core.DataCon
 import GHC.Core         ( AltCon(..) )
 import Name             ( getSrcLoc, nameIsLocalOrFrom )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
-import Type
+import GHC.Core.Type
 import GHC.Types.RepType
 import SrcLoc
 import Outputable

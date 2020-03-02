@@ -11,7 +11,7 @@ module TcDefaults ( tcDefaults ) where
 import GhcPrelude
 
 import GHC.Hs
-import Class
+import GHC.Core.Class
 import TcRnMonad
 import TcEnv
 import TcHsType

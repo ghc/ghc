@@ -47,7 +47,7 @@ import VarSet
 import VarEnv
 import GHC.Core.FVs
 import FastString
-import Type
+import GHC.Core.Type
 import Util( mapSnd )
 
 import Data.Bifunctor

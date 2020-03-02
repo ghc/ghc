@@ -28,10 +28,10 @@ import Id
 import IdInfo
 import Demand
 import Cpr
-import DataCon
-import TyCon
-import TyCoPpr
-import Coercion
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr
+import GHC.Core.Coercion
 import BasicTypes
 import Maybes
 import Util

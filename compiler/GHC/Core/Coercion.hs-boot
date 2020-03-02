@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Coercion where
+module GHC.Core.Coercion where
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep
-import {-# SOURCE #-} TyCon
+import {-# SOURCE #-} GHC.Core.TyCo.Rep
+import {-# SOURCE #-} GHC.Core.TyCon
 
 import BasicTypes ( LeftOrRight )
-import CoAxiom
+import GHC.Core.Coercion.Axiom
 import Var
 import Pair
 import Util

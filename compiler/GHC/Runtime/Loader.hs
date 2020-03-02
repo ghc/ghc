@@ -40,9 +40,9 @@ import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Types
 import GHCi.RemoteTypes ( HValue )
-import Type             ( Type, eqType, mkTyConTy )
-import TyCoPpr          ( pprTyThingCategory )
-import TyCon            ( TyCon )
+import GHC.Core.Type     ( Type, eqType, mkTyConTy )
+import GHC.Core.TyCo.Ppr ( pprTyThingCategory )
+import GHC.Core.TyCon    ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
 import Module           ( Module, ModuleName )

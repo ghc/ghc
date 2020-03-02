@@ -5,7 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module Class (
+module GHC.Core.Class (
         Class,
         ClassOpItem,
         ClassATItem(..),
@@ -25,9 +25,9 @@ module Class (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCon     ( TyCon )
-import {-# SOURCE #-} TyCoRep   ( Type, PredType )
-import {-# SOURCE #-} TyCoPpr   ( pprType )
+import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
 import Var
 import Name
 import BasicTypes
@@ -53,7 +53,7 @@ data Class
   = Class {
         classTyCon :: TyCon,    -- The data type constructor for
                                 -- dictionaries of this class
-                                -- See Note [ATyCon for classes] in TyCoRep
+                                -- See Note [ATyCon for classes] in GHC.Core.TyCo.Rep
 
         className :: Name,              -- Just the cached name of the TyCon
         classKey  :: Unique,            -- Cached unique of TyCon

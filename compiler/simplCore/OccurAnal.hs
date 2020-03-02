@@ -33,8 +33,8 @@ import IdInfo
 import Name( localiseName )
 import BasicTypes
 import Module( Module )
-import Coercion
-import Type
+import GHC.Core.Coercion
+import GHC.Core.Type
 
 import VarSet
 import VarEnv

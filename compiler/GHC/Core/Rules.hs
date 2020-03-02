@@ -40,11 +40,12 @@ import GHC.Core.Utils   ( exprType, eqExpr, mkTick, mkTicks
                         , stripTicksTopT, stripTicksTopE
                         , isJoinBind )
 import GHC.Core.Ppr     ( pprRules )
-import Type             ( Type, TCvSubst, extendTvSubst, extendCvSubst
-                        , mkEmptyTCvSubst, substTy )
+import GHC.Core.Type as Type
+   ( Type, TCvSubst, extendTvSubst, extendCvSubst
+   , mkEmptyTCvSubst, substTy )
 import TcType           ( tcSplitTyConApp_maybe )
 import TysWiredIn       ( anyTypeOfKind )
-import Coercion
+import GHC.Core.Coercion as Coercion
 import GHC.Core.Op.Tidy ( tidyRules )
 import Id
 import IdInfo           ( RuleInfo( RuleInfo ) )
@@ -55,7 +56,7 @@ import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
 import UniqFM
-import Unify            ( ruleMatchTyKiX )
+import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import BasicTypes
 import GHC.Driver.Session         ( DynFlags )
 import Outputable
@@ -181,7 +182,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
            ru_orphan = orph,
            ru_auto = is_auto, ru_local = is_local }
   where
-        -- Compute orphanhood.  See Note [Orphans] in InstEnv
+        -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
     lhs_names = extendNameSet (exprsOrphNames args) fn
@@ -734,7 +735,7 @@ match _ _ e@Tick{} _
 -- might substitute [a/b] in the template, and then erroneously
 -- succeed in matching what looks like the template variable 'a' against 3.
 
--- The Var case follows closely what happens in Unify.match
+-- The Var case follows closely what happens in GHC.Core.Unify.match
 match renv subst (Var v1) e2
   = match_var renv subst v1 e2
 

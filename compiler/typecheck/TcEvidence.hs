@@ -56,24 +56,24 @@ module TcEvidence (
 import GhcPrelude
 
 import Var
-import CoAxiom
-import Coercion
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import TcType
-import Type
-import TyCon
-import DataCon( DataCon, dataConWrapId )
-import Class( Class )
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.DataCon( DataCon, dataConWrapId )
+import GHC.Core.Class( Class )
 import PrelNames
 import VarEnv
 import VarSet
-import Predicate
+import GHC.Core.Predicate
 import Name
 import Pair
 
 import GHC.Core
-import Class ( classSCSelId )
-import GHC.Core.FVs ( exprSomeFreeVars )
+import GHC.Core.Class ( classSCSelId )
+import GHC.Core.FVs   ( exprSomeFreeVars )
 
 import Util
 import Bag

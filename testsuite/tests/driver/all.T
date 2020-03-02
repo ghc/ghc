@@ -148,7 +148,7 @@ test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
 # T4437: A test to ensure that Cabal's language extension list remains
 # consistent with those known by GHC.
 #
-# See Note [Adding a language extension] in DynFlags.hs for details.
+# See Note [Adding a language extension] in GHC.Driver.Session for details.
 test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
 test('werror', normal, compile_fail, [''])

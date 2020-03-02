@@ -17,7 +17,7 @@ import GHC.Core.FVs    ( exprFreeVars )
 import Var
 import Id
 import IdInfo
-import Type
+import GHC.Core.Type
 import UniqSupply
 import BasicTypes
 import GHC.Driver.Session
@@ -26,7 +26,7 @@ import Cpr
 import WwLib
 import Util
 import Outputable
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import MonadUtils
 
 #include "HsVersions.h"

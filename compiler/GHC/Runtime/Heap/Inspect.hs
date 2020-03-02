@@ -32,10 +32,10 @@ import GHCi.RemoteTypes
 import GHC.Driver.Types
 import GHCi.Message ( fromSerializableException )
 
-import DataCon
-import Type
+import GHC.Core.DataCon
+import GHC.Core.Type
 import GHC.Types.RepType
-import qualified Unify as U
+import qualified GHC.Core.Unify as U
 import Var
 import TcRnMonad
 import TcType
@@ -44,7 +44,7 @@ import TcHsSyn ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi )
 import TcUnify
 import TcEnv
 
-import TyCon
+import GHC.Core.TyCon
 import Name
 import OccName
 import Module
@@ -833,7 +833,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
     go ptr_i arr_i (ty:tys)
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
       , isUnboxedTupleTyCon tc
-                -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
       = do (ptr_i, arr_i, terms0) <-
                go ptr_i arr_i (dropRuntimeRepArgs elem_tys)
            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys

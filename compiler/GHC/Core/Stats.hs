@@ -16,9 +16,9 @@ import GhcPrelude
 import BasicTypes
 import GHC.Core
 import Outputable
-import Coercion
+import GHC.Core.Coercion
 import Var
-import Type (Type, typeSize)
+import GHC.Core.Type(Type, typeSize)
 import Id (isJoinId)
 
 data CoreStats = CS { cs_tm :: !Int    -- Terms

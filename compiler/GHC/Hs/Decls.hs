@@ -103,19 +103,19 @@ import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
 import GHC.Hs.Binds
 import GHC.Hs.Types
 import GHC.Hs.Doc
-import TyCon
+import GHC.Core.TyCon
 import BasicTypes
-import Coercion
+import GHC.Core.Coercion
 import ForeignCall
 import GHC.Hs.Extension
 import NameSet
 
 -- others:
-import Class
+import GHC.Core.Class
 import Outputable
 import Util
 import SrcLoc
-import Type
+import GHC.Core.Type
 
 import Bag
 import Maybes
@@ -447,7 +447,7 @@ Default methods
 
  - If there is a default method name at all, it's recorded in
    the ClassOpSig (in GHC.Hs.Binds), in the DefMethInfo field.
-   (DefMethInfo is defined in Class.hs)
+   (DefMethInfo is defined in GHC.Core.Class)
 
 Source-code class decls and interface-code class decls are treated subtly
 differently, which has given me a great deal of confusion over the years.
@@ -631,7 +631,7 @@ The idea is that the associated type is really a top-level decl in its
 own right.  However we are careful to use the same name 'a', so that
 we can match things up.
 
-c.f. Note [Associated type tyvar names] in Class.hs
+c.f. Note [Associated type tyvar names] in GHC.Core.Class
      Note [Family instance declaration binders]
 -}
 
@@ -1057,7 +1057,7 @@ other argument:
 Here injectivity annotation would consist of two comma-separated injectivity
 conditions.
 
-See also Note [Injective type families] in TyCon
+See also Note [Injective type families] in GHC.Core.TyCon
 -}
 
 -- | Located type Family Result Signature

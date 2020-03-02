@@ -35,7 +35,7 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.PmCheck ( checkGuardMatches )
 import Name
 import NameEnv
-import FamInstEnv( topNormaliseType )
+import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
 import GHC.Hs
 
@@ -44,7 +44,7 @@ import GHC.Hs
 import TcType
 import TcEvidence
 import TcRnMonad
-import Type
+import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -54,9 +54,9 @@ import CostCentre
 import Id
 import MkId
 import Module
-import ConLike
-import DataCon
-import TyCoPpr( pprWithTYPE )
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCo.Ppr( pprWithTYPE )
 import TysWiredIn
 import PrelNames
 import BasicTypes
@@ -66,7 +66,7 @@ import SrcLoc
 import Util
 import Bag
 import Outputable
-import PatSyn
+import GHC.Core.PatSyn
 
 import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
@@ -673,7 +673,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                           -- Be sure to use user_tvs (which may be ordered
                           -- differently than `univ_tvs ++ ex_tvs) above.
                           -- See Note [DataCon user type variable binders]
-                          -- in DataCon.
+                          -- in GHC.Core.DataCon.
                  rhs = foldl' (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast

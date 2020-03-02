@@ -22,7 +22,7 @@ import NameEnv
 import Outputable
 import PrimOp
 import SizedSeq
-import Type
+import GHC.Core.Type
 import SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes

@@ -24,8 +24,8 @@ import TcOrigin
 import TcMType
 import TcEvidence
 import TcType
-import Type
-import DataCon
+import GHC.Core.Type
+import GHC.Core.DataCon
 import Name
 import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
 import PrelNames ( gHC_ERR )
@@ -33,7 +33,7 @@ import Id
 import VarSet
 import VarEnv
 import Bag
-import ConLike          ( ConLike(..) )
+import GHC.Core.ConLike ( ConLike(..) )
 import Util
 import TcEnv (tcLookup)
 import Outputable

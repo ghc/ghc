@@ -43,13 +43,14 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Seq
 import GHC.Core.Utils
-import qualified Type
-import qualified Coercion
+import qualified GHC.Core.Type as Type
+import qualified GHC.Core.Coercion as Coercion
 
         -- We are defining local versions
-import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
-                       , isInScope, substTyVarBndr, cloneTyVarBndr )
-import Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.Type hiding
+   ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
+   , isInScope, substTyVarBndr, cloneTyVarBndr )
+import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
 import PrelNames
 import VarSet
@@ -79,9 +80,9 @@ import Data.List
 --
 -- Some invariants apply to how you use the substitution:
 --
--- 1. Note [The substitution invariant] in TyCoSubst
+-- 1. Note [The substitution invariant] in GHC.Core.TyCo.Subst
 --
--- 2. Note [Substitutions apply only once] in TyCoSubst
+-- 2. Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
 data Subst
   = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
                       -- applying the substitution
@@ -104,7 +105,7 @@ Note [Extending the Subst]
 For a core Subst, which binds Ids as well, we make a different choice for Ids
 than we do for TyVars.
 
-For TyVars, see Note [Extending the TCvSubst] in TyCoSubst.
+For TyVars, see Note [Extending the TCvSubst] in GHC.Core.TyCo.Subst.
 
 For Ids, we have a different invariant
         The IdSubstEnv is extended *only* when the Unique on an Id changes
@@ -339,7 +340,7 @@ instance Outputable Subst where
 
 -- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only
 -- apply the substitution /once/:
--- See Note [Substitutions apply only once] in TyCoSubst
+-- See Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]

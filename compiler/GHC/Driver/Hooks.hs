@@ -45,11 +45,11 @@ import Id
 import GHC.Core
 import GHCi.RemoteTypes
 import SrcLoc
-import Type
+import GHC.Core.Type
 import System.Process
 import BasicTypes
 import Module
-import TyCon
+import GHC.Core.TyCon
 import CostCentre
 import GHC.Stg.Syntax
 import Stream

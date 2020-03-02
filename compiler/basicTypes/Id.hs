@@ -17,10 +17,11 @@
 --
 -- * 'Name.Name': see "Name#name_types"
 --
--- * 'Id.Id' represents names that not only have a 'Name.Name' but also a 'TyCoRep.Type' and some additional
---   details (a 'IdInfo.IdInfo' and one of 'Var.LocalIdDetails' or 'IdInfo.GlobalIdDetails') that
---   are added, modified and inspected by various compiler passes. These 'Var.Var' names may either
---   be global or local, see "Var#globalvslocal"
+-- * 'Id.Id' represents names that not only have a 'Name.Name' but also a
+--   'GHC.Core.TyCo.Rep.Type' and some additional details (a 'IdInfo.IdInfo' and
+--   one of 'Var.LocalIdDetails' or 'IdInfo.GlobalIdDetails') that are added,
+--   modified and inspected by various compiler passes. These 'Var.Var' names
+--   may either be global or local, see "Var#globalvslocal"
 --
 -- * 'Var.Var': see "Var#name_types"
 
@@ -134,15 +135,15 @@ import Var( Id, CoVar, JoinId,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
-import Type
+import GHC.Core.Type
 import GHC.Types.RepType
 import TysPrim
-import DataCon
+import GHC.Core.DataCon
 import Demand
 import Cpr
 import Name
 import Module
-import Class
+import GHC.Core.Class
 import {-# SOURCE #-} PrimOp (PrimOp)
 import ForeignCall
 import Maybes

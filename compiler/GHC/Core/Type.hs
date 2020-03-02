@@ -8,7 +8,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Main functions for manipulating types and type-related things
-module Type (
+module GHC.Core.Type (
         -- Note some of this is just re-exports from TyCon..
 
         -- * Main data types representing Types
@@ -225,13 +225,13 @@ import GhcPrelude
 
 import BasicTypes
 
--- We import the representation and primitive functions from TyCoRep.
+-- We import the representation and primitive functions from GHC.Core.TyCo.Rep.
 -- Many things are reexported, but not the representation!
 
-import TyCoRep
-import TyCoSubst
-import TyCoTidy
-import TyCoFVs
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.Tidy
+import GHC.Core.TyCo.FVs
 
 -- friends:
 import Var
@@ -239,7 +239,7 @@ import VarEnv
 import VarSet
 import UniqSet
 
-import TyCon
+import GHC.Core.TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
@@ -247,15 +247,16 @@ import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , constraintKind )
 import Name( Name )
 import PrelNames
-import CoAxiom
-import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
-                              , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
-                              , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
-                              , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
-                              , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
-                              , decomposePiCos, coercionKind, coercionLKind
-                              , coercionRKind, coercionType
-                              , isReflexiveCo, seqCo )
+import GHC.Core.Coercion.Axiom
+import {-# SOURCE #-} GHC.Core.Coercion
+   ( mkNomReflCo, mkGReflCo, mkReflCo
+   , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
+   , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
+   , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
+   , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
+   , decomposePiCos, coercionKind, coercionLKind
+   , coercionRKind, coercionType
+   , isReflexiveCo, seqCo )
 
 -- others
 import Util
@@ -358,7 +359,7 @@ tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
   = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here.
-               -- See also Note [The substitution invariant] in TyCoSubst.
+               -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
@@ -566,7 +567,7 @@ on all variables and binding sites. Primarily used for zonking.
 
 Note [Efficiency for mapCoercion ForAllCo case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As noted in Note [Forall coercions] in TyCoRep, a ForAllCo is a bit redundant.
+As noted in Note [Forall coercions] in GHC.Core.TyCo.Rep, a ForAllCo is a bit redundant.
 It stores a TyCoVar and a Coercion, where the kind of the TyCoVar always matches
 the left-hand kind of the coercion. This is convenient lots of the time, but
 not when mapping a function over a coercion.
@@ -601,7 +602,7 @@ data TyCoMapper env m
       , tcm_covar :: env -> CoVar -> m Coercion
       , tcm_hole  :: env -> CoercionHole -> m Coercion
           -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in TyCoRep.
+          -- See Note [Coercion holes] in GHC.Core.TyCo.Rep.
 
       , tcm_tycobinder :: env -> TyCoVar -> ArgFlag -> m (env, TyCoVar)
           -- ^ The returned env is used in the extended scope
@@ -766,7 +767,7 @@ up decomposing (Eq Int => Int), and we definitely don't want that.
 This really only applies to the type checker; in Core, '=>' and '->'
 are the same, as are 'Constraint' and '*'.  But for now I've put
 the test in repSplitAppTy_maybe, which applies throughout, because
-the other calls to splitAppTy are in Unify, which is also used by
+the other calls to splitAppTy are in GHC.Core.Unify, which is also used by
 the type checker (e.g. when matching type-function equations).
 
 -}
@@ -798,7 +799,7 @@ mkAppTys ty1                []   = ty1
 mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- Why do this? See (EQ1) of
                                      -- Note [Respecting definitional equality]
-                                     -- in TyCoRep
+                                     -- in GHC.Core.TyCo.Rep
   = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
     (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
@@ -1346,7 +1347,7 @@ splitCastTy_maybe _                            = Nothing
 
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
--- See Note [Respecting definitional equality] in TyCoRep
+-- See Note [Respecting definitional equality] in GHC.Core.TyCo.Rep
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
@@ -1382,7 +1383,7 @@ tyConBindersTyCoBinders = map to_tyb
 
 -- | Drop the cast on a type, if any. If there is no
 -- cast, just return the original type. This is rarely what
--- you want. The CastTy data constructor (in TyCoRep) has the
+-- you want. The CastTy data constructor (in GHC.Core.TyCo.Rep) has the
 -- invariant that another CastTy is not inside. See the
 -- data constructor for a full description of this invariant.
 -- Since CastTy cannot be nested, the result of discardCast
@@ -1534,7 +1535,7 @@ and has a type built with mkLamTypes.
 
 Conclusion: the easiest thing is to make mkLamType build
             (c => ty)
-when the argument is a predicate type.  See TyCoRep
+when the argument is a predicate type.  See GHC.Core.TyCo.Rep
 Note [Types for coercions, predicates, and evidence]
 -}
 
@@ -1931,7 +1932,7 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 -- | Does this type classify a core (unlifted) Coercion?
 -- At either role nominal or representational
 --    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in TyCoRep
+-- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 isCoVarType :: Type -> Bool
   -- ToDo: should we check saturation?
 isCoVarType ty
@@ -2181,7 +2182,7 @@ eqType :: Type -> Type -> Bool
 -- checks whether the types are equal, ignoring casts and coercions.
 -- (The kind check is a recursive call, but since all kinds have type
 -- @Type@, there is no need to check the types of kinds.)
--- See also Note [Non-trivial definitional equality] in TyCoRep.
+-- See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
 eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
   -- It's OK to use nonDetCmpType here and eqType is deterministic,
   -- nonDetCmpType does equality deterministically
@@ -2246,7 +2247,7 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
 nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
-    -- See Note [Non-trivial definitional equality] in TyCoRep
+    -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
 nonDetCmpTypeX env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
       -- If there are casts then we also need to do a comparison of the kinds of
@@ -2470,7 +2471,8 @@ typeKind ty@(ForAllTy {})
     body_kind   = typeKind body
 
 ---------------------------------------------
--- Utilities to be used in Unify, which uses "tc" functions
+-- Utilities to be used in GHC.Core.Unify,
+-- which uses "tc" functions
 ---------------------------------------------
 
 tcTypeKind :: HasDebugCallStack => Type -> Kind
@@ -2515,7 +2517,7 @@ tcTypeKind ty@(ForAllTy {})
 
 
 isPredTy :: HasDebugCallStack => Type -> Bool
--- See Note [Types for coercions, predicates, and evidence] in TyCoRep
+-- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
 
 -- tcIsConstraintKind stuff only makes sense in the typechecker
@@ -2946,7 +2948,7 @@ classifiesTypeWithValues k = isJust (kindRep_maybe k)
 %*                                                                      *
 %************************************************************************
 
-Most pretty-printing is either in TyCoRep or GHC.Iface.Type.
+Most pretty-printing is either in GHC.Core.TyCo.Rep or GHC.Iface.Type.
 
 -}
 

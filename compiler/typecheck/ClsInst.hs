@@ -19,10 +19,10 @@ import TcType
 import TcTypeable
 import TcMType
 import TcEvidence
-import Predicate
+import GHC.Core.Predicate
 import GHC.Rename.Env( addUsedGRE )
 import RdrName( lookupGRE_FieldLabel )
-import InstEnv
+import GHC.Core.InstEnv
 import Inst( instDFunType )
 import FamInst( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 
@@ -31,14 +31,14 @@ import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
 import PrelNames
 
 import Id
-import Type
+import GHC.Core.Type
 import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
 import Name   ( Name, pprDefinedAt )
 import VarEnv ( VarEnv )
-import DataCon
-import TyCon
-import Class
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Class
 import GHC.Driver.Session
 import Outputable
 import Util( splitAtList, fstOf3 )
@@ -200,7 +200,7 @@ matchInstEnv dflags short_cut_solver clas tys
      pred = mkClassPred clas tys
 
 match_one :: SafeOverlapping -> DFunId -> [DFunInstType] -> TcM ClsInstResult
-             -- See Note [DFunInstType: instantiating types] in InstEnv
+             -- See Note [DFunInstType: instantiating types] in GHC.Core.InstEnv
 match_one so dfun_id mb_inst_tys
   = do { traceTc "match_one" (ppr dfun_id $$ ppr mb_inst_tys)
        ; (tys, theta) <- instDFunType dfun_id mb_inst_tys

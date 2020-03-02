@@ -34,8 +34,8 @@ import Module
 import RdrHsSyn
 import OccName
 import SrcLoc
-import Type
-import qualified Coercion ( Role(..) )
+import GHC.Core.Type
+import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall

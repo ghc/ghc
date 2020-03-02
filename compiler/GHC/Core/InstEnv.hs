@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
-module InstEnv (
+module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
@@ -37,12 +37,12 @@ import TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import Module
-import Class
+import GHC.Core.Class
 import Var
 import VarSet
 import Name
 import NameSet
-import Unify
+import GHC.Core.Unify
 import Outputable
 import ErrUtils
 import BasicTypes
@@ -276,7 +276,7 @@ mkLocalInstance dfun oflag tvs cls tys
     this_mod = ASSERT( isExternalName dfun_name ) nameModule dfun_name
     is_local name = nameIsLocalOrFrom this_mod name
 
-        -- Compute orphanhood.  See Note [Orphans] in InstEnv
+        -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
     (cls_tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
 

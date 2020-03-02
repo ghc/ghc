@@ -34,11 +34,11 @@ import TcType
 import GHC.Hs
 
 import Id
-import DataCon
-import ConLike
-import TyCon
-import InstEnv
-import PatSyn
+import GHC.Core.DataCon
+import GHC.Core.ConLike
+import GHC.Core.TyCon
+import GHC.Core.InstEnv
+import GHC.Core.PatSyn
 
 import Module
 import Name

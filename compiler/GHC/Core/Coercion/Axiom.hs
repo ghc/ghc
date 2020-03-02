@@ -6,7 +6,7 @@
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
 
-module CoAxiom (
+module GHC.Core.Coercion.Axiom (
        BranchFlag, Branched, Unbranched, BranchIndex, Branches(..),
        manyBranches, unbranched,
        fromBranches, numBranches,
@@ -31,9 +31,9 @@ module CoAxiom (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep ( Type )
-import {-# SOURCE #-} TyCoPpr ( pprType )
-import {-# SOURCE #-} TyCon ( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
+import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import Outputable
 import FastString
 import Name
@@ -87,7 +87,7 @@ can unify with the supplied arguments. After all, it is possible that some
 of the type arguments are lambda-bound type variables whose instantiation may
 cause an earlier match among the branches. We wish to prohibit this behavior,
 so the type checker rules out the choice of a branch where a previous branch
-can unify. See also [Apartness] in FamInstEnv.hs.
+can unify. See also [Apartness] in GHC.Core.FamInstEnv.
 
 For example, the following is malformed, where 'a' is a lambda-bound type
 variable:
@@ -306,7 +306,7 @@ isImplicitCoAxiom = co_ax_implicit
 coAxBranchIncomps :: CoAxBranch -> [CoAxBranch]
 coAxBranchIncomps = cab_incomps
 
--- See Note [Compatibility checking] in FamInstEnv
+-- See Note [Compatibility checking] in GHC.Core.FamInstEnv
 placeHolderIncomps :: [CoAxBranch]
 placeHolderIncomps = panic "placeHolderIncomps"
 
@@ -431,7 +431,7 @@ looked like
 (See #9692, #14179, and #15845 for examples of what can go wrong if
 we don't eta-expand when showing things to the user.)
 
-(See also Note [Newtype eta] in TyCon.  This is notionally separate
+(See also Note [Newtype eta] in GHC.Core.TyCon.  This is notionally separate
 and deals with the axiom connecting a newtype with its representation
 type; but it too is eta-reduced.)
 -}
@@ -473,8 +473,8 @@ instance Outputable CoAxBranch where
 Roles are defined here to avoid circular dependencies.
 -}
 
--- See Note [Roles] in Coercion
--- defined here to avoid cyclic dependency with Coercion
+-- See Note [Roles] in GHC.Core.Coercion
+-- defined here to avoid cyclic dependency with GHC.Core.Coercion
 --
 -- Order of constructors matters: the Ord instance coincides with the *super*typing
 -- relation on roles.

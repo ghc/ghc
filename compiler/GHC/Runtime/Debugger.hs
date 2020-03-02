@@ -30,7 +30,7 @@ import Name
 import Var hiding ( varName )
 import VarSet
 import UniqSet
-import Type
+import GHC.Core.Type
 import GHC
 import Outputable
 import GHC.Core.Ppr.TyThing

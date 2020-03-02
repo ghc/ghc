@@ -46,22 +46,22 @@ import GHC.Core.Rules
 import TysPrim
 import TysWiredIn
 import PrelRules
-import Type
-import TyCoRep
-import FamInstEnv
-import Coercion
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.FamInstEnv
+import GHC.Core.Coercion
 import TcType
 import GHC.Core.Make
 import GHC.Core.Utils  ( mkCast, mkDefaultCase )
 import GHC.Core.Unfold
 import Literal
-import TyCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.Class
 import NameSet
 import Name
 import PrimOp
 import ForeignCall
-import DataCon
+import GHC.Core.DataCon
 import Id
 import IdInfo
 import Demand
@@ -853,7 +853,7 @@ not. What sets them apart? The types of their constructors, which are:
   MkT2 :: forall b a. b -> T2 a b
 
 MkT2's use of GADT syntax allows it to permute the order in which `a` and `b`
-would normally appear. See Note [DataCon user type variable binders] in DataCon
+would normally appear. See Note [DataCon user type variable binders] in GHC.Core.DataCon
 for further discussion on this topic.
 
 The worker data cons for T1 and T2, however, both have types such that `a` is

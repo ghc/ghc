@@ -7,7 +7,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module FamInstEnv (
+module GHC.Core.FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts,
@@ -43,12 +43,12 @@ module FamInstEnv (
 
 import GhcPrelude
 
-import Unify
-import Type
-import TyCoRep
-import TyCon
-import Coercion
-import CoAxiom
+import GHC.Core.Unify
+import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon
+import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom
 import VarSet
 import VarEnv
 import Name
@@ -106,7 +106,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             , fi_fam   :: Name          -- Family name
 
                 -- Used for "rough matching"; same idea as for class instances
-                -- See Note [Rough-match field] in InstEnv
+                -- See Note [Rough-match field] in GHC.Core.InstEnv
             , fi_tcs   :: [Maybe Name]  -- Top of type args
                 -- INVARIANT: fi_tcs = roughMatchTcs fi_tys
 
@@ -114,7 +114,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             , fi_tvs :: [TyVar]      -- Template tyvars for full match
             , fi_cvs :: [CoVar]      -- Template covars for full match
                  -- Like ClsInsts, these variables are always fresh
-                 -- See Note [Template tyvars are fresh] in InstEnv
+                 -- See Note [Template tyvars are fresh] in GHC.Core.InstEnv
 
             , fi_tys    :: [Type]       --   The LHS type patterns
             -- May be eta-reduced; see Note [Eta reduction for data families]
@@ -479,7 +479,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 Note [Compatibility of eta-reduced axioms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In newtype instances of data families we eta-reduce the axioms,
-See Note [Eta reduction for data families] in FamInstEnv. This means that
+See Note [Eta reduction for data families] in GHC.Core.FamInstEnv. This means that
 we sometimes need to test compatibility of two axioms that were eta-reduced to
 different degrees, e.g.:
 
@@ -560,7 +560,7 @@ injectiveBranches injectivity
 
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
--- See Note [Storing compatibility] in CoAxiom
+-- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 computeAxiomIncomps :: [CoAxBranch] -> [CoAxBranch]
 computeAxiomIncomps branches
   = snd (mapAccumL go [] branches)
@@ -580,7 +580,7 @@ computeAxiomIncomps branches
 *                                                                      *
            Constructing axioms
     These functions are here because tidyType / tcUnifyTysFG
-    are not available in CoAxiom
+    are not available in GHC.Core.Coercion.Axiom
 
     Also computeAxiomIncomps is too sophisticated for CoAxiom
 *                                                                      *
@@ -629,7 +629,7 @@ here:
 
 Which is at least legal syntax.
 
-See also Note [CoAxBranch type variables] in CoAxiom; note that we
+See also Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom; note that we
 are tidying (changing OccNames only), not freshening, in accordance with
 that Note.
 -}
@@ -657,7 +657,7 @@ mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
     (env2, eta_tvs') = tidyVarBndrs env1          eta_tvs
     (env,  cvs')     = tidyVarBndrs env2          cvs
     -- See Note [Tidy axioms when we build them]
-    -- See also Note [CoAxBranch type variables] in CoAxiom
+    -- See also Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom
 
     init_occ_env = initTidyOccEnv [mkTyVarOcc "_"]
     init_tidy_env = mkEmptyTidyEnv init_occ_env
@@ -711,7 +711,7 @@ mkNewTypeCoAxiom :: Name -> TyCon -> [TyVar] -> [Role] -> Type -> CoAxiom Unbran
 mkNewTypeCoAxiom name tycon tvs roles rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique name
             , co_ax_name     = name
-            , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
+            , co_ax_implicit = True  -- See Note [Implicit axioms] in GHC.Core.TyCon
             , co_ax_role     = Representational
             , co_ax_tc       = tycon
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
@@ -829,7 +829,7 @@ conditions hold:
 1. For each pair of *different* equations of a type family, one of the following
    conditions holds:
 
-   A:  RHSs are different. (Check done in FamInstEnv.injectiveBranches)
+   A:  RHSs are different. (Check done in GHC.Core.FamInstEnv.injectiveBranches)
 
    B1: OPEN TYPE FAMILIES: If the RHSs can be unified under some substitution
        then it must be possible to unify the LHSs under the same substitution.
@@ -841,7 +841,7 @@ conditions hold:
 
        RHSs of these two equations unify under [ a |-> Int ] substitution.
        Under this substitution LHSs are equal therefore these equations don't
-       violate injectivity annotation. (Check done in FamInstEnv.injectiveBranches)
+       violate injectivity annotation. (Check done in GHC.Core.FamInstEnv.injectiveBranches)
 
    B2: CLOSED TYPE FAMILIES: If the RHSs can be unified under some
        substitution then either the LHSs unify under the same substitution or
@@ -902,7 +902,7 @@ imported equations led to #17405, as the behavior of check (4) depends on
 -XUndecidableInstances (see Note [Coverage condition for injective type families] in
 FamInst), which may vary between modules.
 
-See also Note [Injective type families] in TyCon
+See also Note [Injective type families] in GHC.Core.TyCon
 -}
 
 
@@ -1218,7 +1218,7 @@ type. However, an ordinary TCvSubst just won't do: when we hit a type variable
 whose kind has changed during normalisation, we need both the new type
 variable *and* the coercion. We could conjure up a new VarEnv with just this
 property, but a usable substitution environment already exists:
-LiftingContexts from the liftCoSubst family of functions, defined in Coercion.
+LiftingContexts from the liftCoSubst family of functions, defined in GHC.Core.Coercion.
 A LiftingContext maps a type variable to a coercion and a coercion variable to
 a pair of coercions. Let's ignore coercion variables for now. Because the
 coercion a type variable maps to contains the destination type (via

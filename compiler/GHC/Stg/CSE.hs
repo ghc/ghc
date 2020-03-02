@@ -88,7 +88,7 @@ module GHC.Stg.CSE (stgCse) where
 
 import GhcPrelude
 
-import DataCon
+import GHC.Core.DataCon
 import Id
 import GHC.Stg.Syntax
 import Outputable

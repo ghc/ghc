@@ -19,12 +19,12 @@ import GHCi.RemoteTypes
 import Data.Array
 import GHC.ByteCode.Types
 import GHC.Stack.CCS
-import Type
+import GHC.Core.Type
 import GHC.Hs
 import Module
 import Outputable
 import GHC.Driver.Session
-import ConLike
+import GHC.Core.ConLike
 import Control.Monad
 import SrcLoc
 import ErrUtils
@@ -39,7 +39,7 @@ import VarSet
 import Data.List
 import FastString
 import GHC.Driver.Types
-import TyCon
+import GHC.Core.TyCon
 import BasicTypes
 import MonadUtils
 import Maybes

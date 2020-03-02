@@ -68,7 +68,7 @@ import GHC.Driver.Session
 import GHC.Hs
 import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
 import GHC.Iface.Type   ( ShowForAllFlag(..) )
-import PatSyn( pprPatSynType )
+import GHC.Core.PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
 import RdrName
@@ -83,9 +83,10 @@ import qualified BooleanFormula as BF
 import GHC.Core.Ppr.TyThing ( pprTyThingInContext )
 import GHC.Core.FVs         ( orphNamesOfFamInst )
 import FamInst
-import InstEnv
-import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
-                 , famInstEnvElts, extendFamInstEnvList, normaliseType )
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
+   ( FamInst, pprFamInst, famInstsRepTyCons
+   , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import TcAnnotations
 import TcBinds
 import GHC.Iface.Make   ( coAxiomToIfaceDecl )
@@ -116,17 +117,17 @@ import Name
 import NameEnv
 import NameSet
 import Avail
-import TyCon
+import GHC.Core.TyCon
 import SrcLoc
 import GHC.Driver.Types
 import ListSetOps
 import Outputable
-import ConLike
-import DataCon
-import Type
-import Class
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Type
+import GHC.Core.Class
 import BasicTypes hiding( SuccessFlag(..) )
-import CoAxiom
+import GHC.Core.Coercion.Axiom
 import Annotations
 import Data.List ( sortBy, sort )
 import Data.Ord

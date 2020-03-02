@@ -7,7 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module PatSyn (
+module GHC.Core.PatSyn (
         -- * Main data types
         PatSyn, mkPatSyn,
 
@@ -26,8 +26,8 @@ module PatSyn (
 
 import GhcPrelude
 
-import Type
-import TyCoPpr
+import GHC.Core.Type
+import GHC.Core.TyCo.Ppr
 import Name
 import Outputable
 import Unique

@@ -19,9 +19,9 @@ import GhcPrelude
 
 import GHC.StgToCmm.Closure ( idPrimRep )
 
-import GHC.Runtime.Heap.Layout            ( WordOff )
+import GHC.Runtime.Heap.Layout ( WordOff )
 import Id               ( Id )
-import TyCon            ( PrimRep(..), primElemRepSizeB )
+import GHC.Core.TyCon   ( PrimRep(..), primElemRepSizeB )
 import BasicTypes       ( RepArity )
 import Constants        ( wORD64_SIZE )
 import GHC.Driver.Session

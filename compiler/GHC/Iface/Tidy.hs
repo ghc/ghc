@@ -27,8 +27,8 @@ import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
 import GHC.Core.Rules
-import PatSyn
-import ConLike
+import GHC.Core.PatSyn
+import GHC.Core.ConLike
 import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
 import StaticPtrTable
 import VarEnv
@@ -37,8 +37,8 @@ import Var
 import Id
 import MkId             ( mkDictSelRhs )
 import IdInfo
-import InstEnv
-import Type             ( tidyTopType )
+import GHC.Core.InstEnv
+import GHC.Core.Type    ( tidyTopType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import Cpr              ( mkCprSig, botCpr )
 import BasicTypes
@@ -49,9 +49,9 @@ import Avail
 import GHC.Iface.Env
 import TcEnv
 import TcRnMonad
-import DataCon
-import TyCon
-import Class
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Class
 import Module
 import GHC.Driver.Types
 import Maybes
@@ -1349,7 +1349,7 @@ mustExposeTyCon no_trim_types exports tc
 
   | null data_cons              -- Ditto if there are no data constructors
   = True                        -- (NB: empty data types do not count as enumerations
-                                -- see Note [Enumeration types] in TyCon
+                                -- see Note [Enumeration types] in GHC.Core.TyCon
 
   | any exported_con data_cons  -- Expose rep if any datacon or field is exported
   = True

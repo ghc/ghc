@@ -19,7 +19,7 @@ import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
 import Id
 import IdInfo           ( JoinArity )
-import DataCon
+import GHC.Core.DataCon
 import Demand
 import Cpr
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
@@ -30,13 +30,13 @@ import TysPrim          ( voidPrimTy )
 import Literal          ( absentLiteralOf, rubbishLit )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
-import Type
-import Predicate        ( isClassPred )
-import GHC.Types.RepType          ( isVoidTy, typePrimRep )
-import Coercion
-import FamInstEnv
+import GHC.Core.Type
+import GHC.Core.Predicate ( isClassPred )
+import GHC.Types.RepType  ( isVoidTy, typePrimRep )
+import GHC.Core.Coercion
+import GHC.Core.FamInstEnv
 import BasicTypes       ( Boxity(..) )
-import TyCon
+import GHC.Core.TyCon
 import UniqSupply
 import Unique
 import Maybes

@@ -22,11 +22,11 @@ import Id               ( Id, idType, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
-import GHC.Core.Utils        ( mkAltExpr, eqExpr
+import GHC.Core.Utils   ( mkAltExpr, eqExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
-import GHC.Core.FVs          ( exprFreeVars )
-import Type             ( tyConAppArgs )
+import GHC.Core.FVs     ( exprFreeVars )
+import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
 import Outputable
 import BasicTypes

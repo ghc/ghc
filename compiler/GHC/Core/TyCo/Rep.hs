@@ -1,27 +1,27 @@
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1998
-\section[TyCoRep]{Type and Coercion - friends' interface}
+\section[GHC.Core.TyCo.Rep]{Type and Coercion - friends' interface}
 
 Note [The Type-related module hierarchy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Class
-  CoAxiom
-  TyCon    imports Class, CoAxiom
-  TyCoRep  imports Class, CoAxiom, TyCon
-  TyCoPpr  imports TyCoRep
-  TyCoFVs  imports TyCoRep
-  TyCoSubst imports TyCoRep, TyCoFVs, TyCoPpr
-  TyCoTidy imports TyCoRep, TyCoFVs
-  TysPrim  imports TyCoRep ( including mkTyConTy )
-  Coercion imports Type
+  GHC.Core.Class
+  GHC.Core.Coercion.Axiom
+  GHC.Core.TyCon      imports GHC.Core.{Class, Coercion.Axiom}
+  GHC.Core.TyCo.Rep   imports GHC.Core.{Class, Coercion.Axiom, TyCon}
+  GHC.Core.TyCo.Ppr   imports GHC.Core.TyCo.Rep
+  GHC.Core.TyCo.FVs   imports GHC.Core.TyCo.Rep
+  GHC.Core.TyCo.Subst imports GHC.Core.TyCo.{Rep, FVs, Ppr}
+  GHC.Core.TyCo.Tidy  imports GHC.Core.TyCo.{Rep, FVs}
+  TysPrim             imports GHC.Core.TyCo.Rep ( including mkTyConTy )
+  GHC.Core.Coercion   imports GHC.Core.Type
 -}
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
 
-module TyCoRep (
+module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
@@ -72,19 +72,19 @@ module TyCoRep (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoPpr ( pprType, pprCo, pprTyLit )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
-import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
+import {-# SOURCE #-} GHC.Core.ConLike ( ConLike(..), conLikeName )
 
 -- friends:
 import GHC.Iface.Type
 import Var
 import VarSet
 import Name hiding ( varName )
-import TyCon
-import CoAxiom
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
 
 -- others
 import BasicTypes ( LeftOrRight(..), pickLR )
@@ -369,7 +369,7 @@ How does this work?
      data T a b where
        MkT :: (a~b) => a -> b -> T a b
   See DataCon.mkPromotedDataCon
-  and Note [Promoted data constructors] in TyCon
+  and Note [Promoted data constructors] in GHC.Core.TyCon
 
 * We support both homogeneous (~) and heterogeneous (~~)
   equality.  (See Note [The equality types story]
@@ -578,7 +578,7 @@ In sum, in order to uphold (EQ), we need the following three invariants:
   (EQ2) No reflexive casts in CastTy.
   (EQ3) No nested CastTys.
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
-        See Note [Weird typing rule for ForAllTy] in Type.
+        See Note [Weird typing rule for ForAllTy] in GHC.Core.Type.
 
 These invariants are all documented above, in the declaration for Type.
 
@@ -1653,14 +1653,14 @@ Note [mapType vs foldType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We define foldType here, but mapType in module Type. Why?
 
-* foldType is used in TyCoFVs for finding free variables.
+* foldType is used in GHC.Core.TyCo.FVs for finding free variables.
   It's a very simple function that analyses a type,
   but does not construct one.
 
 * mapType constructs new types, and so it needs to call
   the "smart constructors", mkAppTy, mkCastTy, and so on.
   These are sophisticated functions, and can't be defined
-  here in TyCoRep.
+  here in GHC.Core.TyCo.Rep.
 
 Note [Specialising foldType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1726,7 +1726,7 @@ data TyCoFolder env a
       , tcf_covar :: env -> CoVar -> a
       , tcf_hole  :: env -> CoercionHole -> a
           -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in TyCoRep.
+          -- See Note [Coercion holes] in GHC.Core.TyCo.Rep.
 
       , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
           -- ^ The returned env is used in the extended scope

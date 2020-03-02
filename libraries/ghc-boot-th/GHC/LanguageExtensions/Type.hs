@@ -21,7 +21,8 @@ import GHC.Generics
 -- here as this would require adding transitive dependencies to the
 -- @template-haskell@ package, which must have a minimal dependency set.
 data Extension
--- See Note [Updating flag description in the User's Guide] in DynFlags
+-- See Note [Updating flag description in the User's Guide] in
+-- GHC.Driver.Session
    = Cpp
    | OverlappingInstances
    | UndecidableInstances

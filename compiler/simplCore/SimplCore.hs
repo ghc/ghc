@@ -34,7 +34,7 @@ import CoreMonad
 import qualified ErrUtils as Err
 import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import Id
 import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )

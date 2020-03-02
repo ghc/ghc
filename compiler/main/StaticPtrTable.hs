@@ -127,7 +127,7 @@ import GhcPrelude
 import GHC.Cmm.CLabel
 import GHC.Core
 import GHC.Core.Utils (collectMakeStaticArgs)
-import DataCon
+import GHC.Core.DataCon
 import GHC.Driver.Session
 import GHC.Driver.Types
 import Id
@@ -138,7 +138,7 @@ import Outputable
 import GHC.Platform
 import PrelNames
 import TcEnv (lookupGlobal)
-import Type
+import GHC.Core.Type
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State

@@ -23,14 +23,14 @@ module TcTypeNats
 
 import GhcPrelude
 
-import Type
+import GHC.Core.Type
 import Pair
-import TcType     ( TcType, tcEqType )
-import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
-                  , Injectivity(..) )
-import Coercion   ( Role(..) )
+import TcType            ( TcType, tcEqType )
+import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
+                         , Injectivity(..) )
+import GHC.Core.Coercion ( Role(..) )
 import Constraint ( Xi )
-import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import Name       ( Name, BuiltInSyntax(..) )
 import TysWiredIn
 import TysPrim    ( mkTemplateAnonTyConBinders )

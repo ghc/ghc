@@ -46,7 +46,7 @@ import GHC.Driver.Session
 import GHC.Core
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
-import TyCoPpr          ( pprParendType )
+import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Arity
@@ -57,9 +57,9 @@ import IdInfo
 import Var
 import Demand
 import SimplMonad
-import Type     hiding( substTy )
-import Coercion hiding( substCo )
-import DataCon          ( dataConWorkId, isNullaryRepDataCon )
+import GHC.Core.Type     hiding( substTy )
+import GHC.Core.Coercion hiding( substCo )
+import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import VarSet
 import BasicTypes
 import Util

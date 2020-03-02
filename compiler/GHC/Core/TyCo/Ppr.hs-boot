@@ -1,6 +1,6 @@
-module TyCoPpr where
+module GHC.Core.TyCo.Ppr where
 
-import {-# SOURCE #-} TyCoRep (Type, Kind, Coercion, TyLit)
+import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind, Coercion, TyLit)
 import Outputable
 
 pprType :: Type -> SDoc

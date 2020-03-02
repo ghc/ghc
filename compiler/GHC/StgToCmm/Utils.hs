@@ -64,8 +64,8 @@ import GHC.StgToCmm.CgUtils
 
 import ForeignCall
 import IdInfo
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
 import Module
 import Literal

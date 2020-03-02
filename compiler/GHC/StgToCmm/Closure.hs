@@ -76,12 +76,12 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import Id
 import IdInfo
-import DataCon
+import GHC.Core.DataCon
 import Name
-import Type
-import TyCoRep
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import TcType
-import TyCon
+import GHC.Core.TyCon
 import GHC.Types.RepType
 import BasicTypes
 import Outputable

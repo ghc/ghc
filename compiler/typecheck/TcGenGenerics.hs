@@ -19,13 +19,13 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
 import GhcPrelude
 
 import GHC.Hs
-import Type
+import GHC.Core.Type
 import TcType
 import TcGenDeriv
 import TcGenFunctor
-import DataCon
-import TyCon
-import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( moduleName, moduleNameFS
                         , moduleUnitId, unitIdFS, getModule )

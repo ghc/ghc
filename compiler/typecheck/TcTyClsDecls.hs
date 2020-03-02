@@ -47,16 +47,16 @@ import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
 import GHC.Rename.Env( lookupConstructorFields )
 import FamInst
-import FamInstEnv
-import Coercion
+import GHC.Core.FamInstEnv
+import GHC.Core.Coercion
 import TcOrigin
-import Type
-import TyCoRep   -- for checkValidRoles
-import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen )
-import Class
-import CoAxiom
-import TyCon
-import DataCon
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep   -- for checkValidRoles
+import GHC.Core.TyCo.Ppr( pprTyVars, pprWithExplicitKindsWhen )
+import GHC.Core.Class
+import GHC.Core.Coercion.Axiom
+import GHC.Core.TyCon
+import GHC.Core.DataCon
 import Id
 import Var
 import VarEnv
@@ -67,13 +67,13 @@ import NameSet
 import NameEnv
 import Outputable
 import Maybes
-import Unify
+import GHC.Core.Unify
 import Util
 import SrcLoc
 import ListSetOps
 import GHC.Driver.Session
 import Unique
-import ConLike( ConLike(..) )
+import GHC.Core.ConLike( ConLike(..) )
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -841,7 +841,7 @@ generaliseTcTyCon (tc, scoped_prs, tc_res_kind)
     do { -- Step 1: Separate Specified from Required variables
          -- NB: spec_req_tvs = spec_tvs ++ req_tvs
          --     And req_tvs is 1-1 with tyConTyVars
-         --     See Note [Scoped tyvars in a TcTyCon] in TyCon
+         --     See Note [Scoped tyvars in a TcTyCon] in GHC.Core.TyCon
        ; let spec_req_tvs        = map snd scoped_prs
              n_spec              = length spec_req_tvs - tyConArity tc
              (spec_tvs, req_tvs) = splitAt n_spec spec_req_tvs
@@ -931,7 +931,7 @@ promises about the ordering of some variables. These might swizzle
 around even between minor released. By forbidding visible type
 application, we ensure users aren't caught unawares.
 
-Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.
 
 The question for this Note is this:
    given a TyClDecl, how are its quantified type variables classified?
@@ -2638,7 +2638,7 @@ have
 
 After checking (F :: forall k. k) (with no visible patterns), we still need
 to instantiate the k. With data family instances, this problem can be even
-more intricate, due to Note [Arity of data families] in FamInstEnv. See
+more intricate, due to Note [Arity of data families] in GHC.Core.FamInstEnv. See
 indexed-types/should_compile/T12369 for an example.
 
 So, the kind-checker must return the new skolems and args (that is, Type
@@ -2992,7 +2992,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
            ex_tvs    = qkvs ++ user_qtvs
            -- For H98 datatypes, the user-written tyvar binders are precisely
            -- the universals followed by the existentials.
-           -- See Note [DataCon user type variable binders] in DataCon.
+           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
            user_tvbs = univ_tvbs ++ ex_tvbs
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixH98 name hs_args
@@ -3066,7 +3066,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
 
              -- Compute the user-written tyvar binders. These have the same
              -- tyvars as univ_tvs/ex_tvs, but perhaps in a different order.
-             -- See Note [DataCon user type variable binders] in DataCon.
+             -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
              tkv_bndrs      = mkTyVarBinders Inferred  tkvs'
              user_tv_bndrs  = mkTyVarBinders Specified user_tvs'
              all_user_bndrs = tkv_bndrs ++ user_tv_bndrs
@@ -3234,7 +3234,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- Existentials are the leftover type vars: [x,y]
         -- The user-written type variables are what is listed in the forall:
         --   [x, y, z] (all specified). We must rejig these as well.
-        --   See Note [DataCon user type variable binders] in DataCon.
+        --   See Note [DataCon user type variable binders] in GHC.Core.DataCon.
         -- So we return ( [a,b,z], [x,y]
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
@@ -3247,7 +3247,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- gives us exactly what we need to rejig the user-written tyvars,
         -- since the dcUserTyVarBinders invariant guarantees that the
         -- substitution has *all* the tyvars in its domain.
-        -- See Note [DataCon user type variable binders] in DataCon.
+        -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
         subst_user_tvs = map (getTyVar "rejigConRes" . substTyVar arg_subst)
         substed_inferred_tvs  = subst_user_tvs dc_inferred_tvs
         substed_specified_tvs = subst_user_tvs dc_specified_tvs
@@ -3803,7 +3803,7 @@ checkValidDataCon dflags existential_ok tc con
         ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
           -- Check the dcUserTyVarBinders invariant
-          -- See Note [DataCon user type variable binders] in DataCon
+          -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
           -- checked here because we sometimes build invalid DataCons before
           -- erroring above here
         ; when debugIsOn $

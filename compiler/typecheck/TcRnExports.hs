@@ -26,13 +26,13 @@ import Name
 import NameEnv
 import NameSet
 import Avail
-import TyCon
+import GHC.Core.TyCon
 import SrcLoc
 import GHC.Driver.Types
 import Outputable
-import ConLike
-import DataCon
-import PatSyn
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import Maybes
 import UniqSet
 import Util (capitalise)

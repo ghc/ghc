@@ -60,7 +60,7 @@ import qualified FamInst   as TcM
 import qualified GHC.Iface.Env as IfaceEnv
 import qualified GHC.Driver.Finder as Finder
 
-import FamInstEnv ( FamInstEnv )
+import GHC.Core.FamInstEnv ( FamInstEnv )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
@@ -73,14 +73,14 @@ import Var        ( EvVar )
 
 import Module
 import Name
-import TyCon
-import DataCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.DataCon
+import GHC.Core.Class
 import GHC.Driver.Types
 import Outputable
-import Type
+import GHC.Core.Type
 import Id
-import InstEnv
+import GHC.Core.InstEnv
 import FastString
 import Unique
 
