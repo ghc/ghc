@@ -36,10 +36,6 @@ nitpick_ignore = [
 
     ("c:type", "bool"),
 
-    # See #17314
-    ("ghc-flag", "-pgmo ⟨port⟩"),
-    ("ghc-flag", "-pgmo ⟨option⟩"),
-
     ("extension", "DoAndIfThenElse"),
     ("extension", "RelaxedPolyRec"),
 
