@@ -35,12 +35,61 @@
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
 
+/* ------------------------------------------------------------------------
+ * Locales
+ *
+ * The heap profile contains information that is sensitive to the C runtime's
+ * LC_NUMERIC locale settings.  By default libc starts in a "C" setting that's
+ * the same everywhere, and the one hp2ps expects.  But the program may change
+ * that at runtime.  So we change it back when we're writing a sample, and
+ * restore it before yielding back.
+ *
+ * On POSIX.1-2008 systems, this is done with the locale_t opaque type, created
+ * with newlocale() at profiler init, switched to with uselocale() and freed at
+ * exit with freelocale().
+ *
+ * As an exception for Darwin, this comes through the <xlocale.h> header instead
+ * of <locale.h>.
+ *
+ * On Windows, a different _locale_t opaque type does exist, but isn't directly
+ * usable without special-casing all printf() and related calls, which I'm not
+ * motivated to trawl through as I don't even have a Windows box to test on.
+ * (But if you do and are so inclined, be my guest!)
+ * So we just call setlocale(), making it thread-local and restoring the
+ * locale and its thread-locality state on yield.
+ * --------------------------------------------------------------------- */
+
 #if defined(mingw32_HOST_OS)
 static int prof_locale_per_thread = -1;
 static const char *saved_locale = NULL;
 #else
 static locale_t prof_locale = 0, saved_locale = 0;
 #endif
+
+STATIC_INLINE void
+init_prof_locale( void )
+{
+#if !defined(mingw32_HOST_OS)
+    if (! prof_locale) {
+        prof_locale = newlocale(LC_NUMERIC_MASK, "POSIX", 0);
+        if (! prof_locale) {
+            sysErrorBelch("Couldn't allocate heap profiler locale");
+            /* non-fatal: risk using an unknown locale, but won't crash */
+        }
+    }
+#endif
+}
+
+STATIC_INLINE void
+free_prof_locale( void )
+{
+#if !defined(mingw32_HOST_OS)
+    if (prof_locale) {
+        freelocale(prof_locale);
+        prof_locale = 0;
+    }
+#endif
+}
 
 STATIC_INLINE void
 set_prof_locale( void )
@@ -64,6 +113,7 @@ restore_locale( void )
     uselocale(saved_locale);
 #endif
 }
+
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
  * number of censuses that have been performed.
@@ -379,12 +429,7 @@ printSample(bool beginSample, StgDouble sampleValue)
 
 void freeHeapProfiling (void)
 {
-#if !defined(mingw32_HOST_OS)
-    if (prof_locale) {
-        freelocale(prof_locale);
-        prof_locale = 0;
-    }
-#endif
+    free_prof_locale();
 }
 
 /* --------------------------------------------------------------------------
@@ -397,15 +442,7 @@ initHeapProfiling(void)
         return;
     }
 
-#if !defined(mingw32_HOST_OS)
-    if (! prof_locale) {
-        prof_locale = newlocale(LC_NUMERIC_MASK, "POSIX", 0);
-        if (! prof_locale) {
-            sysErrorBelch("Couldn't allocate heap profiler locale");
-            /* non-fatal: risk using an unknown locale, but won't crash */
-        }
-    }
-#endif
+    init_prof_locale();
     set_prof_locale();
 
     char *prog;
