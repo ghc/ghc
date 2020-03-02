@@ -73,7 +73,7 @@ import Outputable
 import SrcLoc
 import Literal             ( inCharRange )
 import TysWiredIn          ( nilDataCon )
-import DataCon
+import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard )

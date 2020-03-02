@@ -38,8 +38,8 @@ import CostCentre
 import Id
 import IdInfo
 import GHC.Types.RepType
-import DataCon
-import TyCon
+import GHC.Core.DataCon
+import GHC.Core.TyCon
 import Module
 import Outputable
 import Stream

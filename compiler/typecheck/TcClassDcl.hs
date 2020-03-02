@@ -32,18 +32,18 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( piResultTys )
-import Predicate
+import GHC.Core.Type     ( piResultTys )
+import GHC.Core.Predicate
 import TcOrigin
 import TcType
 import TcRnMonad
 import GHC.Driver.Phases (HscSource(..))
 import BuildTyCl( TcMethInfo )
-import Class
-import Coercion ( pprCoAxiom )
+import GHC.Core.Class
+import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Driver.Session
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import Id
 import Name
 import NameEnv
@@ -52,7 +52,7 @@ import Var
 import VarEnv
 import Outputable
 import SrcLoc
-import TyCon
+import GHC.Core.TyCon
 import Maybes
 import BasicTypes
 import Bag

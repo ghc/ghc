@@ -37,9 +37,9 @@ import TcOrigin
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
-import InstEnv
+import GHC.Core.InstEnv
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import TcDeriv
 import TcEnv
 import TcHsType
@@ -47,13 +47,13 @@ import TcUnify
 import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
 import GHC.Core.Unfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
-import Type
+import GHC.Core.Type
 import TcEvidence
-import TyCon
-import CoAxiom
-import DataCon
-import ConLike
-import Class
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
+import GHC.Core.DataCon
+import GHC.Core.ConLike
+import GHC.Core.Class
 import Var
 import VarEnv
 import VarSet
@@ -311,7 +311,7 @@ Consider this
 When type-checking the C [a] instance, we need a C [a] dictionary (for
 the call of op2).  If we look up in the instance environment, we find
 an overlap.  And in *general* the right thing is to complain (see Note
-[Overlapping instances] in InstEnv).  But in *this* case it's wrong to
+[Overlapping instances] in GHC.Core.InstEnv).  But in *this* case it's wrong to
 complain, because we just want to delegate to the op2 of this same
 instance.
 
@@ -660,7 +660,7 @@ tcDataFamInstDecl mb_clsinfo
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
-          -- See [Arity of data families] in FamInstEnv
+          -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; (qtvs, pats, res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs
                                     fixity hs_ctxt hs_pats m_ksig hs_cons
@@ -684,7 +684,7 @@ tcDataFamInstDecl mb_clsinfo
        -- kind `TYPE r`, for some `r`. If UnliftedNewtypes is not enabled, we
        -- go one step further and ensure that it has kind `TYPE 'LiftedRep`.
        --
-       -- See also Note [Arity of data families] in FamInstEnv
+       -- See also Note [Arity of data families] in GHC.Core.FamInstEnv
        -- NB: we can do this after eta-reducing the axiom, because if
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
@@ -725,7 +725,7 @@ tcDataFamInstDecl mb_clsinfo
                     parent = DataFamInstTyCon axiom fam_tc all_pats
 
                       -- NB: Use the full ty_binders from the pats. See bullet toward
-                      -- the end of Note [Data type families] in TyCon
+                      -- the end of Note [Data type families] in GHC.Core.TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders final_res_kind
                                           (map (const Nominal) ty_binders)
@@ -759,7 +759,7 @@ tcDataFamInstDecl mb_clsinfo
        ; return (fam_inst, m_deriv_info) }
   where
     eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
-    -- See Note [Eta reduction for data families] in FamInstEnv
+    -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
     -- Splits the incoming patterns into two: the [TyVar]
     -- are the patterns that can be eta-reduced away.
     -- e.g.     T [a] Int a d c   ==>  (T [a] Int a, [d,c])

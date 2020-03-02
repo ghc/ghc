@@ -30,7 +30,7 @@ import GHC.Core.FVs
 import CoreMonad        ( CoreM )
 import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import Var
-import Type
+import GHC.Core.Type
 import VarSet
 import Util
 import GHC.Driver.Session

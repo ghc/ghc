@@ -21,14 +21,14 @@ module GHC.Core.Ppr.TyThing (
 
 import GhcPrelude
 
-import Type    ( Type, ArgFlag(..), TyThing(..), mkTyVarBinders, tidyOpenType )
+import GHC.Core.Type    ( Type, ArgFlag(..), TyThing(..), mkTyVarBinders, tidyOpenType )
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
-import CoAxiom ( coAxiomTyCon )
+import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
 import GHC.Driver.Types( tyThingParent_maybe )
 import GHC.Iface.Make ( tyThingToIfaceDecl )
-import FamInstEnv( FamInst(..), FamFlavor(..) )
-import TyCoPpr ( pprUserForAll, pprTypeApp, pprSigmaType )
+import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
+import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
 import Name
 import VarEnv( emptyTidyEnv )
 import Outputable

@@ -80,11 +80,11 @@ import GhcPrelude
 import {-# SOURCE #-} TcRnTypes ( TcLclEnv, setLclEnvTcLevel, getLclEnvTcLevel
                                 , setLclEnvLoc, getLclEnvLoc )
 
-import Predicate
-import Type
-import Coercion
-import Class
-import TyCon
+import GHC.Core.Predicate
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.Class
+import GHC.Core.TyCon
 import Var
 
 import TcType
@@ -93,7 +93,7 @@ import TcOrigin
 
 import GHC.Core
 
-import TyCoPpr
+import GHC.Core.TyCo.Ppr
 import OccName
 import FV
 import VarSet
@@ -1344,7 +1344,7 @@ data TcEvDest
 
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
-              -- See Note [Coercion holes] in TyCoRep
+              -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals

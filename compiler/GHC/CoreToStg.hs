@@ -23,13 +23,13 @@ import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
 import GHC.Core.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 
-import Type
+import GHC.Core.Type
 import GHC.Types.RepType
-import TyCon
+import GHC.Core.TyCon
 import MkId             ( coercionTokenId )
 import Id
 import IdInfo
-import DataCon
+import GHC.Core.DataCon
 import CostCentre
 import VarEnv
 import Module
@@ -449,7 +449,7 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
-        -- See Note [Nullary unboxed tuple] in Type.hs
+        -- See Note [Nullary unboxed tuple] in GHC.Core.Type
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { rhs2 <- coreToStgExpr rhs
