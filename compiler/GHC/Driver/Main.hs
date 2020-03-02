@@ -94,11 +94,11 @@ import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
 import GHC.Core.Op.Tidy        ( tidyExpr )
-import Type                    ( Type, Kind )
+import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
 import VarEnv                  ( emptyTidyEnv )
 import Panic
-import ConLike
+import GHC.Core.ConLike
 
 import ApiAnnotation
 import Module
@@ -131,7 +131,7 @@ import GHC.Stg.Pipeline ( stg2stg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import CostCentre
 import ProfInit
-import TyCon
+import GHC.Core.TyCon
 import Name
 import NameSet
 import GHC.Cmm
@@ -140,8 +140,8 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Driver.CodeOutput
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import Fingerprint      ( Fingerprint )
 import GHC.Driver.Hooks
 import TcEnv

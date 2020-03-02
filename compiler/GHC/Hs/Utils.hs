@@ -112,12 +112,12 @@ import GHC.Hs.Extension
 import TcEvidence
 import RdrName
 import Var
-import TyCoRep
-import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
 import TcType
-import DataCon
-import ConLike
+import GHC.Core.DataCon
+import GHC.Core.ConLike
 import Id
 import Name
 import NameSet hiding ( unitFV )

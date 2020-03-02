@@ -24,7 +24,7 @@ module TcGenFunctor (
 import GhcPrelude
 
 import Bag
-import DataCon
+import GHC.Core.DataCon
 import FastString
 import GHC.Hs
 import Outputable
@@ -34,9 +34,9 @@ import SrcLoc
 import State
 import TcGenDeriv
 import TcType
-import TyCon
-import TyCoRep
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
 import Util
 import Var
 import VarSet

@@ -17,8 +17,8 @@ import GhcPrelude
 
 import Bag
 import BasicTypes
-import Class
-import DataCon
+import GHC.Core.Class
+import GHC.Core.DataCon
 import ErrUtils
 import Inst
 import Outputable
@@ -33,16 +33,16 @@ import TcMType
 import TcRnMonad
 import TcOrigin
 import Constraint
-import Predicate
+import GHC.Core.Predicate
 import TcType
-import TyCon
-import TyCoPpr (pprTyVars)
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr (pprTyVars)
+import GHC.Core.Type
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor, checkConstraints)
 import TysWiredIn (typeToTypeKind)
-import Unify (tcUnifyTy)
+import GHC.Core.Unify (tcUnifyTy)
 import Util
 import Var
 import VarSet

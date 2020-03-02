@@ -1117,7 +1117,7 @@ data IfaceDeclExtras
   | IfaceDataExtras
        (Maybe Fixity)           -- Fixity of the tycon itself (if it exists)
        [IfaceInstABI]           -- Local class and family instances of this tycon
-                                -- See Note [Orphans] in InstEnv
+                                -- See Note [Orphans] in GHC.Core.InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each constructor: fixity, RULES and annotations
 
@@ -1125,7 +1125,7 @@ data IfaceDeclExtras
        (Maybe Fixity)           -- Fixity of the class itself (if it exists)
        [IfaceInstABI]           -- Local instances of this class *or*
                                 --   of its associated data types
-                                -- See Note [Orphans] in InstEnv
+                                -- See Note [Orphans] in GHC.Core.InstEnv
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each class method: fixity, RULES and annotations
        [IfExtName]              -- Default methods. If a module

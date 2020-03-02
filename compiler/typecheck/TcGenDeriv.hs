@@ -45,7 +45,7 @@ import TcRnMonad
 import GHC.Hs
 import RdrName
 import BasicTypes
-import DataCon
+import GHC.Core.DataCon
 import Name
 import Fingerprint
 import Encoding
@@ -53,21 +53,21 @@ import Encoding
 import GHC.Driver.Session
 import PrelInfo
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import PrelNames
 import THNames
 import MkId ( coerceId )
 import PrimOp
 import SrcLoc
-import TyCon
+import GHC.Core.TyCon
 import TcEnv
 import TcType
 import TcValidity ( checkValidCoAxBranch )
-import CoAxiom    ( coAxiomSingleBranch )
+import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
 import TysPrim
 import TysWiredIn
-import Type
-import Class
+import GHC.Core.Type
+import GHC.Core.Class
 import VarSet
 import VarEnv
 import Util

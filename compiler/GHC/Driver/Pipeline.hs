@@ -2140,7 +2140,7 @@ joinObjectFiles dflags o_files output_fn = do
                        SysTools.Option "-nostdlib",
                        SysTools.Option "-Wl,-r"
                      ]
-                        -- See Note [No PIE while linking] in DynFlags
+                        -- See Note [No PIE while linking] in GHC.Driver.Session
                      ++ (if toolSettings_ccSupportsNoPie toolSettings'
                           then [SysTools.Option "-no-pie"]
                           else [])

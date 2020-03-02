@@ -311,27 +311,28 @@ import GHC.Driver.Monad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load   ( loadSysInterface )
 import TcRnTypes
-import Predicate
+import GHC.Core.Predicate
 import GHC.Driver.Packages
 import NameSet
 import RdrName
 import GHC.Hs
-import Type     hiding( typeKind )
+import GHC.Core.Type  hiding( typeKind )
 import TcType
 import Id
 import TysPrim          ( alphaTyVars )
-import TyCon
-import TyCoPpr          ( pprForAll )
-import Class
-import DataCon
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr   ( pprForAll )
+import GHC.Core.Class
+import GHC.Core.DataCon
+import GHC.Core.FVs        ( orphNamesOfFamInst )
+import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts )
+import GHC.Core.InstEnv
 import Name             hiding ( varName )
 import Avail
-import InstEnv
-import FamInstEnv ( FamInst )
 import SrcLoc
 import GHC.Core
 import GHC.Iface.Tidy
-import GHC.Driver.Phases     ( Phase(..), isHaskellSrcFilename )
+import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename )
 import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.CmdLine
@@ -356,8 +357,6 @@ import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
-import GHC.Core.FVs     ( orphNamesOfFamInst )
-import FamInstEnv       ( famInstEnvElts )
 import TcRnDriver
 import Inst
 import FamInst

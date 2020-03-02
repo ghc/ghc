@@ -60,15 +60,15 @@ import GHC.Core.Make
 import MkId
 import Id
 import Literal
-import TyCon
-import DataCon
-import PatSyn
-import Type
-import Coercion
+import GHC.Core.TyCon
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
+import GHC.Core.Type
+import GHC.Core.Coercion
 import TysPrim
 import TysWiredIn
 import BasicTypes
-import ConLike
+import GHC.Core.ConLike
 import UniqSet
 import UniqSupply
 import Module
@@ -331,7 +331,7 @@ mkPatSynCase var ty alt fail = do
                alt_result = match_result} = alt
     (matcher, needs_void_lam) = patSynMatcher psyn
 
-    -- See Note [Matchers and builders for pattern synonyms] in PatSyns
+    -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
     -- on these extra Void# arguments
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
