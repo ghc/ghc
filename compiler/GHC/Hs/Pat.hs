@@ -61,11 +61,11 @@ import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
 import RdrName ( RdrName )
-import ConLike
-import DataCon
-import TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCon
 import Outputable
-import Type
+import GHC.Core.Type
 import SrcLoc
 import Bag -- collect ev vars from pats
 import Maybes

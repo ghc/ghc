@@ -1,14 +1,14 @@
-module DataCon where
+module GHC.Core.DataCon where
 
 import GhcPrelude
 import Var( TyVar, TyCoVar, TyVarBinder )
 import Name( Name, NamedThing )
-import {-# SOURCE #-} TyCon( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCon( TyCon )
 import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
-import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType )
 
 data DataCon
 data DataConRep
