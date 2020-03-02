@@ -45,7 +45,7 @@ INLINE_HEADER bool         fizzledSpark  (StgClosure *);
 void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
-void         pruneSparkQueue   (Capability *cap);
+void         pruneSparkQueue   (bool nonmovingMarkFinished, Capability *cap);
 
 INLINE_HEADER void discardSparks  (SparkPool *pool);
 INLINE_HEADER long sparkPoolSize  (SparkPool *pool);
