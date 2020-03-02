@@ -204,7 +204,7 @@ import GhcPrelude
 
 import BasicTypes
 import GHC.Core
-import DataCon
+import GHC.Core.DataCon
 import FastString (FastString, mkFastString)
 import Id
 import Literal
@@ -214,7 +214,7 @@ import MonadUtils (mapAccumLM)
 import Outputable
 import GHC.Types.RepType
 import GHC.Stg.Syntax
-import Type
+import GHC.Core.Type
 import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
 import TysWiredIn
 import UniqSupply

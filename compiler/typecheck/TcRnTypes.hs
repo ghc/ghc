@@ -88,17 +88,17 @@ import GhcPrelude
 import GHC.Hs
 import GHC.Driver.Types
 import TcEvidence
-import Type
-import TyCon    ( TyCon, tyConKind )
-import PatSyn   ( PatSyn )
+import GHC.Core.Type
+import GHC.Core.TyCon  ( TyCon, tyConKind )
+import GHC.Core.PatSyn ( PatSyn )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
 import TcType
 import Constraint
 import TcOrigin
 import Annotations
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
 import IOEnv
 import RdrName

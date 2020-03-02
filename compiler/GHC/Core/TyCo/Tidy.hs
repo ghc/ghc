@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 -- | Tidying types and coercions for printing in error messages.
-module TyCoTidy
+module GHC.Core.TyCo.Tidy
   (
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -20,8 +20,8 @@ module TyCoTidy
 
 import GhcPrelude
 
-import TyCoRep
-import TyCoFVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
 import Name hiding (varName)
 import Var

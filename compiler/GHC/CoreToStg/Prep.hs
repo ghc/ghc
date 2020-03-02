@@ -31,11 +31,11 @@ import CoreMonad        ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
-import Type
+import GHC.Core.Type
 import Literal
-import Coercion
+import GHC.Core.Coercion
 import TcEnv
-import TyCon
+import GHC.Core.TyCon
 import Demand
 import Var
 import VarSet
@@ -43,7 +43,7 @@ import VarEnv
 import Id
 import IdInfo
 import TysWiredIn
-import DataCon
+import GHC.Core.DataCon
 import BasicTypes
 import Module
 import UniqSupply

@@ -39,7 +39,7 @@ import TcUnify( tcSkolemise, unifyType )
 import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
-import Type( mkTyVarBinders )
+import GHC.Core.Type ( mkTyVarBinders )
 
 import GHC.Driver.Session
 import Var      ( TyVar, tyVarKind )

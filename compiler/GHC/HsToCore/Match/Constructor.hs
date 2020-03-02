@@ -22,7 +22,7 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 
 import GHC.Hs
 import GHC.HsToCore.Binds
-import ConLike
+import GHC.Core.ConLike
 import BasicTypes ( Origin(..) )
 import TcType
 import GHC.HsToCore.Monad

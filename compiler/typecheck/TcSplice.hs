@@ -51,7 +51,7 @@ import THNames
 import TcUnify
 import TcEnv
 import TcOrigin
-import Coercion( etaExpandCoAxBranch )
+import GHC.Core.Coercion( etaExpandCoAxBranch )
 import FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
@@ -74,15 +74,15 @@ import GHC.Rename.Fixity ( lookupFixityRn_help )
 import GHC.Rename.Types
 import TcHsSyn
 import TcSimplify
-import Type
+import GHC.Core.Type as Type
 import NameSet
 import TcMType
 import TcHsType
 import GHC.IfaceToCore
-import TyCoRep
+import GHC.Core.TyCo.Rep as TyCoRep
 import FamInst
-import FamInstEnv
-import InstEnv
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv as InstEnv
 import Inst
 import NameEnv
 import PrelNames
@@ -92,12 +92,12 @@ import GHC.Driver.Hooks
 import Var
 import Module
 import GHC.Iface.Load
-import Class
-import TyCon
-import CoAxiom
-import PatSyn
-import ConLike
-import DataCon
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
+import GHC.Core.PatSyn
+import GHC.Core.ConLike
+import GHC.Core.DataCon as DataCon
 import TcEvidence
 import Id
 import IdInfo
@@ -1977,7 +1977,7 @@ If you're not careful, reifying these instances might yield this:
 
 We can fix this ambiguity by reifying the instances' explicit return kinds. We
 should only do this if necessary (see
-Note [When does a tycon application need an explicit kind signature?] in Type),
+Note [When does a tycon application need an explicit kind signature?] in GHC.Core.Type),
 but more importantly, we *only* do this if either of the following are true:
 
 1. The data family instance has no constructors.
@@ -2046,7 +2046,7 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
       DataFamilyInst rep_tc ->
         do { let -- eta-expand lhs types, because sometimes data/newtype
                  -- instances are eta-reduced; See #9692
-                 -- See Note [Eta reduction for data families] in FamInstEnv
+                 -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
                  (ee_tvs, ee_lhs, _) = etaExpandCoAxBranch branch
                  fam'     = reifyName fam
                  dataCons = tyConDataCons rep_tc
@@ -2175,7 +2175,7 @@ reify_tc_app tc tys
     r_tc | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
          | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
          | isPromotedTupleTyCon tc        = TH.PromotedTupleT (arity `div` 2)
-             -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+             -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
@@ -2192,7 +2192,7 @@ reify_tc_app tc tys
          | otherwise                      = TH.ConT (reifyName tc)
 
     -- See Note [When does a tycon application need an explicit kind
-    -- signature?] in TyCoRep
+    -- signature?] in GHC.Core.TyCo.Rep
     maybe_sig_t th_type
       | tyConAppNeedsKindSig
           False -- We don't reify types using visible kind applications, so
