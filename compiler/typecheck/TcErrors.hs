@@ -20,25 +20,25 @@ import GhcPrelude
 import TcRnTypes
 import TcRnMonad
 import Constraint
-import Predicate
+import GHC.Core.Predicate
 import TcMType
 import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import TcOrigin
 import GHC.Rename.Unbound ( unknownNameSuggestions )
-import Type
-import TyCoRep
-import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
-import Unify            ( tcMatchTys )
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
+import GHC.Core.Unify     ( tcMatchTys )
 import Module
 import FamInst
-import FamInstEnv       ( flattenTys )
+import GHC.Core.FamInstEnv ( flattenTys )
 import Inst
-import InstEnv
-import TyCon
-import Class
-import DataCon
+import GHC.Core.InstEnv
+import GHC.Core.TyCon
+import GHC.Core.Class
+import GHC.Core.DataCon
 import TcEvidence
 import TcEvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
@@ -53,7 +53,7 @@ import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
-import ConLike          ( ConLike(..))
+import GHC.Core.ConLike ( ConLike(..))
 import Util
 import FastString
 import Outputable

@@ -35,7 +35,7 @@ module GHC.Rename.Names (
 import GhcPrelude
 
 import GHC.Driver.Session
-import TyCoPpr
+import GHC.Core.TyCo.Ppr
 import GHC.Hs
 import TcEnv
 import GHC.Rename.Env
@@ -61,8 +61,8 @@ import Util
 import FastString
 import FastStringEnv
 import Id
-import Type
-import PatSyn
+import GHC.Core.Type
+import GHC.Core.PatSyn
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

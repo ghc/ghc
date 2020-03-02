@@ -36,9 +36,9 @@ import Id               ( Id, mkVanillaGlobalWithInfo )
 import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
 import Name
 import PrelNames        ( gHC_PRIMOPWRAPPERS )
-import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
-import Type
-import GHC.Types.RepType          ( typePrimRep1, tyConPrimRep1 )
+import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
+import GHC.Core.Type
+import GHC.Types.RepType ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
 import SrcLoc           ( wiredInSrcSpan )

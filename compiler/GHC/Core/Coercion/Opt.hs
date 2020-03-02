@@ -2,29 +2,29 @@
 
 {-# LANGUAGE CPP #-}
 
-module OptCoercion ( optCoercion, checkAxInstCo ) where
+module GHC.Core.Coercion.Opt ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import GHC.Driver.Session
-import TyCoRep
-import TyCoSubst
-import Coercion
-import Type hiding( substTyVarBndr, substTy )
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Subst
+import GHC.Core.Coercion
+import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import TcType       ( exactTyCoVarsOfType )
-import TyCon
-import CoAxiom
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
 import VarSet
 import VarEnv
 import Outputable
-import FamInstEnv ( flattenTys )
+import GHC.Core.FamInstEnv ( flattenTys )
 import Pair
 import ListSetOps ( getNth )
 import Util
-import Unify
-import InstEnv
+import GHC.Core.Unify
+import GHC.Core.InstEnv
 import Control.Monad   ( zipWithM )
 
 {-
@@ -75,7 +75,7 @@ If we substitute the *type* tv for the *coercion*
 (g2 ; t2 ~ t2 |> sym h) in g, we'll get this result exactly.
 This is bizarre,
 though, because we're substituting a type variable with a coercion. However,
-this operation already exists: it's called *lifting*, and defined in Coercion.
+this operation already exists: it's called *lifting*, and defined in GHC.Core.Coercion.
 We just need to enhance the lifting operation to be able to deal with
 an ambient substitution, which is why a LiftingContext stores a TCvSubst.
 
@@ -462,7 +462,7 @@ If we have (c :: t~t) we can optimise it to Refl. That increases the
 chances of floating the Refl upwards; e.g. Maybe c --> Refl (Maybe t)
 
 We do so here in optCoercion, not in mkCoVarCo; see Note [mkCoVarCo]
-in Coercion.
+in GHC.Core.Coercion.
 -}
 
 -------------
@@ -930,7 +930,7 @@ First, convince yourself of the following:
 
   (a |> (h -> <Type>)) (b |> h) `eqType` a b
 
-That last fact is due to Note [Non-trivial definitional equality] in TyCoRep,
+That last fact is due to Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep,
 where we ignore coercions in types as long as two types' kinds are the same.
 In our case, we meet this last condition, because
 
@@ -965,7 +965,7 @@ The problem described here was first found in dependent/should_compile/dynamic-p
 -- Returns the conflicting branch, if it exists
 -- See Note [Conflict checking with AxiomInstCo]
 checkAxInstCo :: Coercion -> Maybe CoAxBranch
--- defined here to avoid dependencies in Coercion
+-- defined here to avoid dependencies in GHC.Core.Coercion
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 checkAxInstCo (AxiomInstCo ax ind cos)
@@ -986,7 +986,7 @@ checkAxInstCo (AxiomInstCo ax ind cos)
     check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
-         -- See Note [Apartness] in FamInstEnv
+         -- See Note [Apartness] in GHC.Core.FamInstEnv
       | SurelyApart <- tcUnifyTysFG instanceBindFun flat lhs_incomp
       = check_no_conflict flat rest
       | otherwise
@@ -1162,7 +1162,7 @@ etaTyConAppCo_maybe tc co
   , Just (tc1, tys1)  <- splitTyConApp_maybe ty1
   , Just (tc2, tys2)  <- splitTyConApp_maybe ty2
   , tc1 == tc2
-  , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
+  , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
   , let n = length tys1
   , tys2 `lengthIs` n      -- This can fail in an erroneous program
                            -- E.g. T a ~# T a b

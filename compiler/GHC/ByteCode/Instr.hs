@@ -25,7 +25,7 @@ import Unique
 import Id
 import GHC.Core
 import Literal
-import DataCon
+import GHC.Core.DataCon
 import VarSet
 import PrimOp
 import GHC.Runtime.Heap.Layout

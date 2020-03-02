@@ -59,10 +59,10 @@ import Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
 import TysWiredIn
-import qualified Type
-import Type hiding              ( substTy, substTyVar, substTyVarBndr )
-import qualified Coercion
-import Coercion hiding          ( substCo, substCoVar, substCoVarBndr )
+import qualified GHC.Core.Type as Type
+import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr )
+import qualified GHC.Core.Coercion as Coercion
+import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import BasicTypes
 import MonadUtils
 import Outputable
