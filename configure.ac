@@ -135,13 +135,17 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  dnl infer CC_STAGE0 from `ghc --info` unless explicitly set by user
+  dnl infer {CC,LD,AR}_STAGE0 from `ghc --info` unless explicitly set by user
   if test -z "$CC_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   fi
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
-  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  if test -z "$LD_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
+  fi
+  if test -z "$AR_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  fi
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
 fi
