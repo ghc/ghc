@@ -22,22 +22,22 @@ module Haddock.Convert (
 import Bag ( emptyBag )
 import BasicTypes ( TupleSort(..), SourceText(..), LexicalFixity(..)
                   , PromotionFlag(..), DefMethSpec(..) )
-import Class
-import CoAxiom
-import ConLike
+import GHC.Core.Class
+import GHC.Core.Coercion.Axiom
+import GHC.Core.ConLike
 import Data.Either (lefts, rights)
-import DataCon
-import FamInstEnv
+import GHC.Core.DataCon
+import GHC.Core.FamInstEnv
 import GHC.Hs
 import Name
 import NameSet ( emptyNameSet )
 import RdrName ( mkVarUnqual )
-import PatSyn
+import GHC.Core.PatSyn
 import SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
 import TcType
-import TyCon
-import Type
-import TyCoRep
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
                   , unitTy, promotedNilDataCon, promotedConsDataCon )

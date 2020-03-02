@@ -19,7 +19,7 @@ module Haddock.Backends.Hoogle (
 
 import BasicTypes ( OverlapFlag(..), OverlapMode(..), SourceText(..)
                   , PromotionFlag(..), TopLevelFlag(..) )
-import InstEnv (ClsInst(..))
+import GHC.Core.InstEnv (ClsInst(..))
 import Documentation.Haddock.Markup
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
