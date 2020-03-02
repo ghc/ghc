@@ -1129,6 +1129,23 @@ Some flags only make sense for particular target platforms.
     :ref:`native code generator <native-code-gen>`. The resulting compiled
     code will only run on processors that support BMI2 (Intel Haswell and newer, AMD Excavator, Zen and newer).
 
+Haddock
+-------
+
+.. index::
+   single: haddock
+
+.. ghc-flag:: -haddock
+    :shortdesc: Make the parser more strict about Haddock comments.
+    :type: dynamic
+    :reverse: -no-haddock
+    :category: misc
+
+    By default, GHC ignores Haddock comments (``-- | ...`` and ``-- ^ ...``) and does not
+    check that they're associated with a valid term, such as a top-level type-signature.
+    This flag makes GHC's parser more strict, so that it rejects source files that
+    would be rejected by the ``haddock` program itself.
+
 Miscellaneous flags
 -------------------
 

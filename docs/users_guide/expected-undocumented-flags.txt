@@ -147,6 +147,7 @@
 -no-auto
 -no-auto-all
 -no-caf-all
+-no-haddock
 -no-keep-hi-file
 -no-keep-o-file
 -no-link
