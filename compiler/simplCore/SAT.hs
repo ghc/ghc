@@ -56,8 +56,8 @@ import GhcPrelude
 import Var
 import GHC.Core
 import GHC.Core.Utils
-import Type
-import Coercion
+import GHC.Core.Type
+import GHC.Core.Coercion
 import Id
 import Name
 import VarEnv

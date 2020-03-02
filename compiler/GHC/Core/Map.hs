@@ -41,10 +41,10 @@ import GhcPrelude
 
 import TrieMap
 import GHC.Core
-import Coercion
+import GHC.Core.Coercion
 import Name
-import Type
-import TyCoRep
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import Var
 import FastString(FastString)
 import Util
@@ -475,10 +475,10 @@ data TypeMapX a
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
        }
-    -- Note that there is no tyconapp case; see Note [Equality on AppTys] in Type
+    -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
--- last one? See Note [Equality on AppTys] in Type
+-- last one? See Note [Equality on AppTys] in GHC.Core.Type
 --
 -- Note, however, that we keep Constraint and Type apart here, despite the fact
 -- that they are both synonyms of TYPE 'LiftedRep (see #11715).
@@ -515,7 +515,7 @@ instance Eq (DeBruijn Type) where
                 (Just bv, Just bv') -> bv == bv'
                 (Nothing, Nothing)  -> v == v'
                 _ -> False
-                -- See Note [Equality on AppTys] in Type
+                -- See Note [Equality on AppTys] in GHC.Core.Type
         (AppTy t1 t2, s) | Just (t1', t2') <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s

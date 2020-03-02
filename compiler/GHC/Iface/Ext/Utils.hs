@@ -14,9 +14,9 @@ import Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
 import SrcLoc
 import GHC.CoreToIface
-import TyCon
-import TyCoRep
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
 import Var
 import VarEnv
 
