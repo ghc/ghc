@@ -2571,6 +2571,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
   , make_ord_flag defGhcFlag "haddock"              (NoArg (setGeneralFlag Opt_Haddock))
+  , make_ord_flag defGhcFlag "no-haddock"           (NoArg (unSetGeneralFlag Opt_Haddock))
   , make_ord_flag defGhcFlag "haddock-opts"         (hasArg addHaddockOpts)
   , make_ord_flag defGhcFlag "hpcdir"               (SepArg setOptHpcDir)
   , make_ord_flag defGhciFlag "ghci-script"         (hasArg addGhciScript)

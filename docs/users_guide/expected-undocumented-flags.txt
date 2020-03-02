@@ -127,7 +127,6 @@
 -fuse-rpaths
 -fversion-macros
 -fvia-c
--haddock
 -haddock-opts
 -hpcdir
 -instantiated-with
