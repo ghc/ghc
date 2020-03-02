@@ -43,8 +43,6 @@ ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
 
-ifeq "$(phase)" "final"
-
 ifneq "$(CLEANING)" "YES"
 # Hack. The file config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
@@ -85,20 +83,24 @@ UseIntreeGmp = YES
 endif
 endif
 
-ifeq "$(UseIntreeGmp)" "YES"
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h libraries/integer-gmp/include/ghc-gmp.h
+# wrappers.c includes "ghc-gmp.h"
+libraries/integer-gmp/cbits/wrappers.c: libraries/integer-gmp/include/ghc-gmp.h
 
+ifeq "$(UseIntreeGmp)" "YES"
+
+# Copy header from in-tree build (gmp.h => ghc-gmp.h)
 libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/gmp.h
 	$(CP) $< $@
 
-gmp_CC_OPTS += -Ilibraries/integer-gmp/gmp
-
+# Link in-tree GMP objects
 libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/*.o
-else
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/include/ghc-gmp.h
 
+else
+
+# Copy header from source tree
 libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/ghc-gmp.h
 	$(CP) $< $@
+
 endif
 
 libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
@@ -135,4 +137,3 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
 
 endif # CLEANING
-endif # phase
