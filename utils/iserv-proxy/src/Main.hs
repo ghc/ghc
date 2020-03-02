@@ -77,9 +77,9 @@ dieWithUsage = do
     die $ prog ++ ": " ++ msg
   where
 #if defined(WINDOWS)
-    msg = "usage: iserv <write-handle> <read-handle> <slave ip> [-v]"
+    msg = "usage: iserv <write-handle> <read-handle> <slave ip> <slave port> [-v]"
 #else
-    msg = "usage: iserv <write-fd> <read-fd> <slave ip> [-v]"
+    msg = "usage: iserv <write-fd> <read-fd> <slave ip> <slave port> [-v]"
 #endif
 
 main :: IO ()

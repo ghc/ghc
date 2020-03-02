@@ -3416,10 +3416,10 @@ providing it with a temporary folder (where it will copy the
 necessary libraries to load to) and port it will listen for
 the proxy to connect.
 
-Providing :ghc-flag:`-pgmi /path/to/iserv-proxy <-pgmi ⟨cmd⟩>`,
-:ghc-flag:`-pgmo ⟨option⟩` and :ghc-flag:`-pgmo ⟨port⟩` in addition to
-:ghc-flag:`-fexternal-interpreter` will then make ghc go through the proxy
-instead.
+Providing :ghc-flag:`-pgmi ⟨/path/to/iserv-proxy⟩ <-pgmi ⟨cmd⟩>` and
+:ghc-flag:`-opti ⟨slave-ip⟩ -opti ⟨slave-port⟩ [-opti -v] <-opti ⟨option⟩>` in
+addition to :ghc-flag:`-fexternal-interpreter` will then make ghc go through the
+proxy instead.
 
 There are some limitations when using this. File and process IO
 will be executed on the target. As such packages like ``git-embed``,
