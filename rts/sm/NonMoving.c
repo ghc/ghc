@@ -9,6 +9,7 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "Capability.h"
+#include "Sparks.h"
 #include "Printer.h"
 #include "Storage.h"
 // We call evacuate, which expects the thread-local gc_thread to be valid;
@@ -367,6 +368,24 @@ Mutex concurrent_coll_finished_lock;
  * bitmap to count how many blocks we actually allocated but this too would be
  * approximate due to concurrent collection and ultimately seems more costly
  * than the problem demands.
+ *
+ * Note [Spark management under the nonmoving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Every GC, both minor and major, prunes the spark queue (using
+ * Sparks.c:pruneSparkQueue) of sparks which are no longer reachable.
+ * Doing this with concurrent collection is a tad subtle since the minor
+ * collections cannot rely on the mark bitmap to accurately reflect the
+ * reachability of a spark.
+ *
+ * We use a conservative reachability approximation:
+ *
+ *  - Minor collections assume that all sparks living in the non-moving heap
+ *    are reachable.
+ *
+ *  - Major collections prune the spark queue during the final sync. This pruning
+ *    assumes that all sparks in the young generations are reachable (since the
+ *    BF_EVACUATED flag won't be set on the nursery blocks) and will consequently
+ *    only prune dead sparks living in the non-moving heap.
  *
  */
 
@@ -1055,6 +1074,14 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         nonmoving_weak_ptr_list = NULL;
         nonmoving_old_weak_ptr_list = NULL;
     }
+
+    // Prune spark lists
+    // See Note [Spark management under the nonmoving collector].
+#if defined(THREADED_RTS)
+    for (uint32_t n = 0; n < n_capabilities; n++) {
+        pruneSparkQueue(true, capabilities[n]);
+    }
+#endif
 
     // Everything has been marked; allow the mutators to proceed
 #if defined(THREADED_RTS)

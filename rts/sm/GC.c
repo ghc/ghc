@@ -470,12 +470,12 @@ GarbageCollect (uint32_t collect_gen,
 #if defined(THREADED_RTS)
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          pruneSparkQueue(capabilities[n]);
+          pruneSparkQueue(false, capabilities[n]);
       }
   } else {
       for (n = 0; n < n_capabilities; n++) {
           if (n == cap->no || idle_cap[n]) {
-              pruneSparkQueue(capabilities[n]);
+              pruneSparkQueue(false, capabilities[n]);
          }
       }
   }
@@ -1250,7 +1250,7 @@ gcWorkerThread (Capability *cap)
     // non-deterministic whether a spark will be retained if it is
     // only reachable via weak pointers.  To fix this problem would
     // require another GC barrier, which is too high a price.
-    pruneSparkQueue(cap);
+    pruneSparkQueue(false, cap);
 #endif
 
     // Wait until we're told to continue

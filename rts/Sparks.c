@@ -15,6 +15,7 @@
 #include "Prelude.h"
 #include "Sparks.h"
 #include "ThreadLabels.h"
+#include "sm/NonMovingMark.h"
 #include "sm/HeapAlloc.h"
 
 #if defined(THREADED_RTS)
@@ -86,7 +87,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 void
-pruneSparkQueue (Capability *cap)
+pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
 {
     SparkPool *pool;
     StgClosurePtr spark, tmp, *elements;
@@ -196,7 +197,26 @@ pruneSparkQueue (Capability *cap)
                   traceEventSparkFizzle(cap);
               }
           } else if (HEAP_ALLOCED(spark)) {
-              if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
+              bdescr *spark_bd = Bdescr((P_) spark);
+              bool is_alive = false;
+              if (nonmovingMarkFinished) {
+                  // See Note [Spark management under the nonmoving collector]
+                  // in NonMoving.c.
+                  // If we just concluded concurrent marking then we can rely
+                  // on the mark bitmap to reflect whether sparks living in the
+                  // non-moving heap have died.
+                  if (spark_bd->flags & BF_NONMOVING) {
+                      is_alive = nonmovingIsAlive(spark);
+                  } else {
+                      // The nonmoving collector doesn't collect anything
+                      // outside of the non-moving heap.
+                      is_alive = true;
+                  }
+              } else if (spark_bd->flags & (BF_EVACUATED | BF_NONMOVING)) {
+                  is_alive = true;
+              }
+
+              if (is_alive) {
                   if (closure_SHOULD_SPARK(spark)) {
                       elements[botInd] = spark; // keep entry (new address)
                       botInd++;
