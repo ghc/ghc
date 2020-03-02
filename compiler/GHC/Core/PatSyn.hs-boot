@@ -1,7 +1,7 @@
-module PatSyn where
+module GHC.Core.PatSyn where
 
 import BasicTypes (Arity)
-import {-# SOURCE #-} TyCoRep (Type)
+import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type)
 import Var (TyVar)
 import Name (Name)
 
