@@ -252,19 +252,19 @@ showLinkerState dl dflags
 --
 --  a) Calling the C initialisation procedure,
 --
---  b) Loading any packages specified on the command line,
---
---  c) Loading any packages specified on the command line, now held in the
+--  b) Loading any packages specified on the command line, now held in the
 --     @-l@ options in @v_Opt_l@,
 --
---  d) Loading any @.o\/.dll@ files specified on the command line, now held
+--  c) Loading any @.o\/.dll@ files specified on the command line, now held
 --     in @ldInputs@,
 --
---  e) Loading any MacOS frameworks.
+--  d) Loading any MacOS frameworks.
 --
 -- NOTE: This function is idempotent; if called more than once, it does
 -- nothing.  This is useful in Template Haskell, where we call it before
 -- trying to link.
+--
+-- NOTE: Any Haskell packages will be loaded on-demand.
 --
 initDynLinker :: HscEnv -> IO ()
 initDynLinker hsc_env = do
@@ -278,15 +278,12 @@ reallyInitDynLinker :: HscEnv -> IO PersistentLinkerState
 reallyInitDynLinker hsc_env = do
   -- Initialise the linker state
   let dflags = hsc_dflags hsc_env
-      pls0 = emptyPLS dflags
+      pls = emptyPLS dflags
 
   -- (a) initialise the C dynamic linker
   initObjLinker hsc_env
 
-  -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- linkPackages' hsc_env (preloadPackages (pkgState dflags)) pls0
-
-  -- steps (c), (d) and (e)
+  -- steps (b), (c) and (d)
   linkCmdLineLibs' hsc_env pls
 
 
