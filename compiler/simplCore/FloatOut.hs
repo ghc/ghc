@@ -28,7 +28,7 @@ import Bag
 import Util
 import Maybes
 import Outputable
-import Type
+import GHC.Core.Type
 import qualified Data.IntMap as M
 
 import Data.List        ( partition )
