@@ -1029,7 +1029,7 @@ labelDynamic dflags this_mod lbl =
      externalDynamicRefs && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _ ->
-     isDllName dflags this_mod n
+     isDynLinkName dflags this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.

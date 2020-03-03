@@ -76,7 +76,7 @@ import VarSet
 import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
-import GHC.Driver.Packages    ( isDllName )
+import GHC.Driver.Packages ( isDynLinkName )
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
@@ -127,14 +127,14 @@ data StgArg
 isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags this_mod con args
  | platformOS (targetPlatform dflags) == OSMinGW32
-    = isDllName dflags this_mod (dataConName con) || any is_dll_arg args
+    = isDynLinkName dflags this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
     -- NB: typePrimRep1 is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
-                             && isDllName dflags this_mod (idName v)
+                             && isDynLinkName dflags this_mod (idName v)
     is_dll_arg _             = False
 
 -- True of machine addresses; these are the things that don't work across DLLs.
