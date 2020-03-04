@@ -68,7 +68,7 @@ Interactions between ``safe`` calls and bound threads
 
 A ``safe`` call calling into haskell is run on a bound thread by
 the RTS. This means any nesting of ``safe`` calls will be executed on
-the same operating system thread. *Sequential* ``safe``calls however
+the same operating system thread. *Sequential* ``safe`` calls however
 do not enjoy this luxury and may be run on arbitrary OS threads.
 
 This behaviour is considered an implementation detail and code relying
