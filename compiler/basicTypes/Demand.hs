@@ -940,9 +940,11 @@ lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
-bothDivergence _ Diverges = Diverges
-bothDivergence _ ExnOrDiv = ExnOrDiv
-bothDivergence r Dunno    = r
+bothDivergence _        Diverges = Diverges
+bothDivergence Diverges _        = Diverges
+bothDivergence r        Dunno    = r
+bothDivergence Dunno    r        = r
+bothDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
@@ -976,8 +978,9 @@ isBotDiv _        = False
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
 defaultDmd :: Divergence -> Demand
-defaultDmd Dunno = absDmd
-defaultDmd _     = botDmd  -- Diverges
+defaultDmd Dunno    = absDmd
+defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultDmd Diverges = botDmd -- Diverges
 
 resTypeArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
