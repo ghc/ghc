@@ -62,6 +62,7 @@ struct NonmovingSegment {
 // A non-moving allocator for a particular block size
 struct NonmovingAllocator {
     struct NonmovingSegment *filled;
+    struct NonmovingSegment *saved_filled;
     struct NonmovingSegment *active;
     // indexed by capability number
     struct NonmovingSegment *current[];
@@ -130,6 +131,7 @@ void nonmovingCollect(StgWeak **dead_weaks,
 void *nonmovingAllocate(Capability *cap, StgWord sz);
 void nonmovingAddCapabilities(uint32_t new_n_caps);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
+void nonmovingClearBitmap(struct NonmovingSegment *seg);
 
 
 INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {

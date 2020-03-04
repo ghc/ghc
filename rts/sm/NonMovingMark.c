@@ -1276,9 +1276,19 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
                 // Not in the snapshot
                 return;
             }
-            if (bd->flags & BF_MARKED) {
-                goto done;
+
+            if (! (bd->flags & BF_MARKED)) {
+                dbl_link_remove(bd, &nonmoving_compact_objects);
+                dbl_link_onto(bd, &nonmoving_marked_compact_objects);
+                StgWord blocks = str->totalW / BLOCK_SIZE_W;
+                n_nonmoving_compact_blocks -= blocks;
+                n_nonmoving_marked_compact_blocks += blocks;
+                bd->flags |= BF_MARKED;
             }
+
+            // N.B. the object being marked is in a compact region so by
+            // definition there is no need to do any tracing here.
+            goto done;
         } else if (bd->flags & BF_LARGE) {
             if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
                 // Not in the snapshot
@@ -1611,15 +1621,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
      * the object's pointers since in the case of marking stacks there may be a
      * mutator waiting for us to finish so it can start execution.
      */
-    if (bd->flags & BF_COMPACT) {
-        StgCompactNFData *str = objectGetCompact((StgClosure*)p);
-        dbl_link_remove(bd, &nonmoving_compact_objects);
-        dbl_link_onto(bd, &nonmoving_marked_compact_objects);
-        StgWord blocks = str->totalW / BLOCK_SIZE_W;
-        n_nonmoving_compact_blocks -= blocks;
-        n_nonmoving_marked_compact_blocks += blocks;
-        bd->flags |= BF_MARKED;
-    } else if (bd->flags & BF_LARGE) {
+    if (bd->flags & BF_LARGE) {
         /* Marking a large object isn't idempotent since we move it to
          * nonmoving_marked_large_objects; to ensure that we don't repeatedly
          * mark a large object, we only set BF_MARKED on large objects in the
