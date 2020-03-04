@@ -48,28 +48,28 @@ module GHC.CoreToIface
 import GhcPrelude
 
 import GHC.Iface.Syntax
-import DataCon
+import GHC.Core.DataCon
 import Id
 import IdInfo
 import GHC.Core
-import TyCon hiding ( pprPromotionQuote )
-import CoAxiom
+import GHC.Core.TyCon hiding ( pprPromotionQuote )
+import GHC.Core.Coercion.Axiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
 import TysWiredIn ( heqTyCon )
 import MkId ( noinlineIdName )
 import PrelNames
 import Name
 import BasicTypes
-import Type
-import PatSyn
+import GHC.Core.Type
+import GHC.Core.PatSyn
 import Outputable
 import FastString
 import Util
 import Var
 import VarEnv
 import VarSet
-import TyCoRep
-import TyCoTidy ( tidyCo )
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy ( tidyCo )
 import Demand ( isTopSig )
 import Cpr ( topCprSig )
 
@@ -345,12 +345,12 @@ toIfaceAppArgsX fr kind ty_args
                  VisArg   -> Required
                  InvisArg -> Inferred
                    -- It's rare for a kind to have a constraint argument, but
-                   -- it can happen. See Note [AnonTCB InvisArg] in TyCon.
+                   -- it can happen. See Note [AnonTCB InvisArg] in GHC.Core.TyCon.
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
       = go (zapTCvSubst env) (substTy env ty) ts
-        -- See Note [Care with kind instantiation] in Type.hs
+        -- See Note [Care with kind instantiation] in GHC.Core.Type
 
       | otherwise
       = -- There's a kind error in the type we are trying to print

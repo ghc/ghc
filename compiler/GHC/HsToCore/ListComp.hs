@@ -29,7 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.Driver.Session
 import GHC.Core.Utils
 import Id
-import Type
+import GHC.Core.Type
 import TysWiredIn
 import GHC.HsToCore.Match
 import PrelNames

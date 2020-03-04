@@ -24,14 +24,14 @@ import Outputable
 import VarEnv
 import BasicTypes
 import Data.List        ( mapAccumL )
-import DataCon
+import GHC.Core.DataCon
 import Id
 import IdInfo
 import GHC.Core.Utils
-import TyCon
-import Type
-import Coercion         ( Coercion, coVarsOfCo )
-import FamInstEnv
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.Coercion ( Coercion, coVarsOfCo )
+import GHC.Core.FamInstEnv
 import Util
 import Maybes           ( isJust )
 import TysWiredIn

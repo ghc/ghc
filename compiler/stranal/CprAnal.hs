@@ -23,13 +23,13 @@ import Outputable
 import VarEnv
 import BasicTypes
 import Data.List
-import DataCon
+import GHC.Core.DataCon
 import Id
 import IdInfo
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
-import TyCon
-import Type
-import FamInstEnv
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.FamInstEnv
 import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust, isNothing )
