@@ -524,6 +524,7 @@ stg_block_takemvar_finally
     jump StgReturn [R1];
 }
 
+// Stack useage covered by RESERVED_STACK_WORDS
 stg_block_takemvar /* mvar passed in R1 */
 {
     Sp_adj(-2);
