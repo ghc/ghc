@@ -52,7 +52,7 @@ The Chapter *does* allow for implementations to move objects around during
 ``unsafe`` calls as well. So strictly Haskell 2010-conforming programs
 cannot pass heap-allocated references to ``unsafe`` FFI calls either.
 
-GHC since version 8.4 **guarantees** that garbage collection will never occur
+GHC, since version 8.4, **guarantees** that garbage collection will never occur
 during an ``unsafe`` call, even in the bytecode interpreter, and further guarantees
 that ``unsafe`` calls will be performed in the calling thread. Making it safe to
 pass heap-allocated objects to unsafe functions.
