@@ -45,7 +45,7 @@ This greatly constrains library authors since it implies that it is not safe to
 pass any heap object reference to a ``safe`` foreign function call.  For
 instance, it is often desirable to pass :ref:`unpinned <pinned-byte-arrays>`
 ``ByteArray#``\s directly to native code to avoid making an otherwise-unnecessary
-copy. However, this can not be done safely for ``safe``calls since the array might
+copy. However, this can not be done safely for ``safe`` calls since the array might
 be moved by the garbage collector in the middle of the call.
 
 The Chapter *does* allow for implementations to move objects around during
