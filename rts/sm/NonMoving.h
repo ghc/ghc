@@ -62,6 +62,7 @@ struct NonmovingSegment {
 // A non-moving allocator for a particular block size
 struct NonmovingAllocator {
     struct NonmovingSegment *filled;
+    struct NonmovingSegment *saved_filled;
     struct NonmovingSegment *active;
     // indexed by capability number
     struct NonmovingSegment *current[];
