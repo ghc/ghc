@@ -89,7 +89,6 @@ import Outputable
 import TysPrim
 import GHC.Driver.Session
 import TysWiredIn
-import DynFlags
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
