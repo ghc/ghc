@@ -727,25 +727,10 @@ static void nonmovingPrepareMark(void)
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
 
-        // Update filled segments' snapshot pointers and move to sweep_list
-        uint32_t n_filled = 0;
-        struct NonmovingSegment *const filled = alloca->filled;
+        // Save the filled segments for later processing during the concurrent
+        // mark phase.
+        alloca->saved_filled = alloca->filled;
         alloca->filled = NULL;
-        if (filled) {
-            struct NonmovingSegment *seg = filled;
-            while (true) {
-                // Set snapshot
-                nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
-                n_filled++;
-                if (seg->link)
-                    seg = seg->link;
-                else
-                    break;
-            }
-            // add filled segments to sweep_list
-            seg->link = nonmovingHeap.sweep_list;
-            nonmovingHeap.sweep_list = filled;
-        }
 
         // N.B. It's not necessary to update snapshot pointers of active segments;
         // they were set after they were swept and haven't seen any allocation
@@ -968,6 +953,28 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
     stat_startNonmovingGc();
+
+    // Walk the list of filled segments that we collected during preparation,
+    // updated their snapshot pointers and move them to the sweep list.
+    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+        struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx]->saved_filled;
+        uint32_t n_filled = 0;
+        if (filled) {
+            struct NonmovingSegment *seg = filled;
+            while (true) {
+                // Set snapshot
+                nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+                n_filled++;
+                if (seg->link)
+                    seg = seg->link;
+                else
+                    break;
+            }
+            // add filled segments to sweep_list
+            seg->link = nonmovingHeap.sweep_list;
+            nonmovingHeap.sweep_list = filled;
+        }
+    }
 
     // Do concurrent marking; most of the heap will get marked here.
     nonmovingMarkThreadsWeaks(mark_queue);
