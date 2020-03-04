@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module TyCoFVs
+module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
         tyCoVarsOfType,        tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
@@ -45,11 +45,11 @@ module TyCoFVs
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type   (coreView, partitionInvisibleTypes)
+import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 
 import Data.Monoid as DM ( Endo(..), All(..) )
-import TyCoRep
-import TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon
 import Var
 import FV
 
@@ -314,7 +314,7 @@ deepTcvFolder = TyCoFolder { tcf_view = noView
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole is hole  = do_tcv is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
-                       -- in TyCoRep
+                       -- in GHC.Core.TyCo.Rep
 
 {- *********************************************************************
 *                                                                      *
@@ -427,7 +427,7 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole is hole  = do_covar is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
-                       -- in TyCoRep
+                       -- in GHC.Core.TyCo.Rep
 
 
 {- *********************************************************************
@@ -655,7 +655,7 @@ tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOf
 
 -- | Given a covar and a coercion, returns True if covar is almost devoid in
 -- the coercion. That is, covar can only appear in Refl and GRefl.
--- See last wrinkle in Note [Unused coercion variable in ForAllCo] in Coercion
+-- See last wrinkle in Note [Unused coercion variable in ForAllCo] in GHC.Core.Coercion
 almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
 almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
@@ -829,7 +829,7 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 --   * In the kind of a bound variable in a forall
 --   * In a coercion
 --   * In a Specified or Inferred argument to a function
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
 invisibleVarsOfType :: Type -> FV
 invisibleVarsOfType = go
   where

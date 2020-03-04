@@ -651,7 +651,7 @@ hasOverlappingFlag mode =
     Incoherent   _ -> True
     _              -> False
 
-data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
+data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
   = NoOverlap SourceText
                   -- See Note [Pragma source text]
     -- ^ This instance must not overlap another `NoOverlap` instance.
@@ -703,7 +703,7 @@ data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
     -- instance                   Foo [a]
     -- Without the Incoherent flag, we'd complain that
     -- instantiating 'b' would change which instance
-    -- was chosen. See also note [Incoherent instances] in InstEnv
+    -- was chosen. See also note [Incoherent instances] in GHC.Core.InstEnv
 
   deriving (Eq, Data)
 

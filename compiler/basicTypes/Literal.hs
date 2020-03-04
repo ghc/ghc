@@ -54,8 +54,8 @@ import GhcPrelude
 
 import TysPrim
 import PrelNames
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import Outputable
 import FastString
 import BasicTypes

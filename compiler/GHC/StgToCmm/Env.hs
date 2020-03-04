@@ -26,7 +26,7 @@ module GHC.StgToCmm.Env (
 
 import GhcPrelude
 
-import TyCon
+import GHC.Core.TyCon
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
@@ -42,7 +42,7 @@ import GHC.Cmm.Graph
 import Name
 import Outputable
 import GHC.Stg.Syntax
-import Type
+import GHC.Core.Type
 import TysPrim
 import UniqFM
 import Util

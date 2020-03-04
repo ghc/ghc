@@ -29,7 +29,7 @@ module TcSimplify(
 import GhcPrelude
 
 import Bag
-import Class         ( Class, classKey, classTyCon )
+import GHC.Core.Class ( Class, classKey, classTyCon )
 import GHC.Driver.Session
 import Id            ( idType, mkLocalId )
 import Inst
@@ -46,12 +46,12 @@ import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
 import Constraint
-import Predicate
+import GHC.Core.Predicate
 import TcOrigin
 import TcType
-import Type
-import TysWiredIn    ( liftedRepTy )
-import Unify         ( tcMatchTyKi )
+import GHC.Core.Type
+import TysWiredIn     ( liftedRepTy )
+import GHC.Core.Unify ( tcMatchTyKi )
 import Util
 import Var
 import VarSet

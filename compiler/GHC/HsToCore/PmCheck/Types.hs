@@ -46,12 +46,12 @@ import VarEnv
 import UniqDSet
 import UniqDFM
 import Name
-import DataCon
-import ConLike
+import GHC.Core.DataCon
+import GHC.Core.ConLike
 import Outputable
 import Maybes
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import Literal
 import GHC.Core
 import GHC.Core.Map

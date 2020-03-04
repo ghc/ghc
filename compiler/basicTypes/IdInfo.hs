@@ -88,15 +88,15 @@ import GhcPrelude
 
 import GHC.Core
 
-import Class
+import GHC.Core.Class
 import {-# SOURCE #-} PrimOp (PrimOp)
 import Name
 import VarSet
 import BasicTypes
-import DataCon
-import TyCon
-import PatSyn
-import Type
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.PatSyn
+import GHC.Core.Type
 import ForeignCall
 import Outputable
 import Module

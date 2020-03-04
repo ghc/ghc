@@ -81,10 +81,10 @@ import GHC.Hs.Extension
 import Id ( Id )
 import Name( Name, NamedThing(getName) )
 import RdrName ( RdrName )
-import DataCon( HsSrcBang(..), HsImplBang(..),
-                SrcStrictness(..), SrcUnpackedness(..) )
+import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
+                         SrcStrictness(..), SrcUnpackedness(..) )
 import TysWiredIn( mkTupleStr )
-import Type
+import GHC.Core.Type
 import GHC.Hs.Doc
 import BasicTypes
 import SrcLoc
