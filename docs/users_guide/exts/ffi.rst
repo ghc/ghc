@@ -71,7 +71,7 @@ the RTS. This means any nesting of ``safe`` calls will be executed on
 the same operating system thread. *Sequential* ``safe`` calls however
 do not enjoy this luxury and may be run on arbitrary OS threads.
 
-This behaviour is considered an implementation detail and code relying
+This behaviour is considered an implementation detail and code relying on
 thread local state should instead use one of the interfaces provided
 in :base-ref:`Control.Concurrent.` to make this explicit.
 
