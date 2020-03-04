@@ -63,7 +63,7 @@ the bytecode interpreter. This meant that some packages which worked when
 compiled would fail under GHCi (e.g. :ghc-ticket:`13730`). But this is no
 longer the case in recent releases.
 
-Interactions between ``safe`` calls and bound threads.
+Interactions between ``safe`` calls and bound threads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A ``safe`` call calling into haskell is run on a bound thread by
