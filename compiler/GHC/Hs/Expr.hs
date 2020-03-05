@@ -2216,7 +2216,7 @@ pprStmt :: forall idL idR body . (OutputableBndrId idL,
 pprStmt (LastStmt _ expr ret_stripped _)
   = whenPprDebug (text "[last]") <+>
        (if ret_stripped then text "return" else empty) <+>
-       ppr expr
+       (if ret_stripped then parens else id) (ppr expr)
 pprStmt (BindStmt _ pat expr _ _) = hsep [ppr pat, larrow, ppr expr]
 pprStmt (LetStmt _ (L _ binds))   = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt _ expr _ _)     = ppr expr
