@@ -55,7 +55,7 @@ import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust)
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
@@ -2273,9 +2273,8 @@ pprStmt (ApplicativeStmt _ args mb_join)
      let
          ap_expr = sep (punctuate (text " |") (map pp_arg args))
      in
-       if isNothing mb_join
-          then ap_expr
-          else text "join" <+> parens ap_expr
+       whenPprDebug (if isJust mb_join then text "[join]" else empty) <+>
+       (if lengthAtLeast args 2 then parens else id) ap_expr
 
    pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
    pp_arg (_, ApplicativeArgOne _ pat expr isBody _)
