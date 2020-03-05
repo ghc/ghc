@@ -105,7 +105,7 @@ loadFrontendPlugin hsc_env mod_name = do
 -- #14335
 checkExternalInterpreter :: HscEnv -> IO ()
 checkExternalInterpreter hsc_env
-  | Just (ExternalInterp _) <- hsc_interp hsc_env
+  | Just (ExternalInterp {}) <- hsc_interp hsc_env
   = throwIO (InstallationError "Plugins require -fno-external-interpreter")
   | otherwise
   = pure ()

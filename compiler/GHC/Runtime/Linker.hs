@@ -578,7 +578,7 @@ dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mk
 
 checkNonStdWay :: HscEnv -> SrcSpan -> IO (Maybe FilePath)
 checkNonStdWay hsc_env srcspan
-  | Just (ExternalInterp _) <- hsc_interp hsc_env = return Nothing
+  | Just (ExternalInterp {}) <- hsc_interp hsc_env = return Nothing
     -- with -fexternal-interpreter we load the .o files, whatever way
     -- they were built.  If they were built for a non-std way, then
     -- we will use the appropriate variant of the iserv binary to load them.
@@ -885,7 +885,7 @@ dynLinkObjs hsc_env pls objs = do
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if interpreterDynamic (hsc_dflags hsc_env)
+        if interpreterDynamic (hscInterp hsc_env)
             then do pls2 <- dynLoadObjs hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
             else do mapM_ (loadObj hsc_env) wanted_objs
@@ -1270,7 +1270,7 @@ linkPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
-            is_dyn = interpreterDynamic dflags
+            is_dyn    = interpreterDynamic (hscInterp hsc_env)
             dirs | is_dyn    = Packages.libraryDynDirs pkg
                  | otherwise = Packages.libraryDirs pkg
 
@@ -1486,6 +1486,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
 
    where
      dflags = hsc_dflags hsc_env
+     interp = hscInterp hsc_env
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
      user   = True
@@ -1500,8 +1501,8 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                   ]
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
-     loading_profiled_hs_libs = interpreterProfiled dflags
-     loading_dynamic_hs_libs  = interpreterDynamic dflags
+     loading_profiled_hs_libs = interpreterProfiled interp
+     loading_dynamic_hs_libs  = interpreterDynamic  interp
 
      import_libs  = [ lib <.> "lib"           , "lib" ++ lib <.> "lib"
                     , "lib" ++ lib <.> "dll.a", lib <.> "dll.a"
@@ -1547,7 +1548,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
      assumeDll
       | is_hs
       , not loading_dynamic_hs_libs
-      , interpreterProfiled dflags
+      , interpreterProfiled interp
       = do
           warningMsg dflags
             (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$

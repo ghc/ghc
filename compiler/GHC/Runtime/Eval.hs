@@ -273,7 +273,7 @@ withVirtualCWD m = do
     -- a virtual CWD is only necessary when we're running interpreted code in
     -- the same process as the compiler.
   case hsc_interp hsc_env of
-    Just (ExternalInterp _) -> m
+    Just (ExternalInterp {}) -> m
     _ -> do
       let ic = hsc_IC hsc_env
       let set_cwd = do
@@ -1247,11 +1247,11 @@ moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
 obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
 #if defined(HAVE_INTERNAL_INTERPRETER)
 obtainTermFromVal hsc_env bound force ty x = withInterp hsc_env $ \case
-  InternalInterp   -> cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
+  InternalInterp    -> cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
 #else
 obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
 #endif
-  ExternalInterp _ -> throwIO (InstallationError
+  ExternalInterp {} -> throwIO (InstallationError
                         "this operation requires -fno-external-interpreter")
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
