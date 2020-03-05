@@ -34,7 +34,6 @@ import TcEnv
 import TcMType
 import TcValidity( arityErr )
 import TyCoPpr ( pprTyVars )
-import TyCoSubst ( composeTCvSubst )
 import TcType
 import TcUnify
 import TcHsType
@@ -758,10 +757,10 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty
                   -- NB: Do not use zipTvSubst!  See #14154
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
-        ; forM (zip type_args' ctxt_res_tys) $ \(arg,ty) -> do
+        ; forM_ (zip type_args' ctxt_res_tys) $ \(arg,ty) -> do
             tcSubTypeET PatOrigin GenSigCtxt (Check ty) arg
             -- TODO: Probably this Origin and Ctxt aren't quite right, maybe need new constructors there.
-            -- TODO: Can we use the wrapper we get from this?
+            -- TODO: Can we use the wrapper result we get from this in some fashion?
 
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
                      -- Get location from monad, not from ex_tvs
