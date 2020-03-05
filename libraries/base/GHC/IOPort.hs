@@ -13,11 +13,13 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- The IOPort type. This is a synchronization primitive similar to IOVar but
--- without any of the deadlock guarantees that IOVar provides.  The ports are
--- single write/multiple wait.  Writing to an already full Port will not queue
--- the value but instead will discard it.
+-- The IOPort type. This is a facility used by the Windows IO subsystem.
+-- We have strict rules with an I/O Port:
+-- * writing more than once is an error
+-- * reading more than once is an error
 --
+-- It gives us the ability to have one thread to block, wait for a result from
+-- another thread and then being woken up. *Nothing* more.
 --
 -----------------------------------------------------------------------------
 
@@ -28,20 +30,41 @@ module GHC.IOPort (
         , newEmptyIOPort
         , readIOPort
         , writeIOPort
+        , doubleReadException
     ) where
 
 import GHC.Base
+import GHC.IO.Exception
+import GHC.Exception
+import Text.Show
+
+data IOPortException = IOPortException deriving Show
+
+instance Exception IOPortException where
+    displayException IOPortException = "IOPortException"
+
+
+doubleReadException :: SomeException
+doubleReadException = toException IOPortException
 
 data IOPort a = IOPort (IOPort# RealWorld a)
 {- ^
 An 'IOPort' is a synchronising variable, used
-for communication between concurrent threads, where it one of the threads is
+for communication between concurrent threads, where one of the threads is
 controlled by an external state. e.g. by an I/O action that is serviced by the
 runtime.  It can be thought of as a box, which may be empty or full.
 
 It is mostly similar to the behavior of MVar except writeIOPort doesn't block if
 the variable is full and the GC won't forcibly release the lock if it thinks
 there's a deadlock.
+
+The properties of IOPorts are:
+* Writing to an empty IOPort will not block.
+* Writing to an full  IOPort will not block and throw an exception.
+* Reading from an IOPort for the second time will throw an exception.
+* Reading from a full IOPort will not block, return the value and empty the port.
+* Reading from an empty IOPort will block until a write.
+
 -}
 
 -- | @since 4.1.0.0
@@ -49,15 +72,7 @@ instance Eq (IOPort a) where
         (IOPort ioport1#) == (IOPort ioport2#) =
             isTrue# (sameIOPort# ioport1# ioport2#)
 
-{-
-M-Vars are rendezvous points for concurrent threads.  They begin
-empty, and any attempt to read an empty M-Var blocks.  When an M-Var
-is written, a single blocked thread may be freed.  Reading an M-Var
-toggles its state from full back to empty.  Therefore, any value
-written to an M-Var may only be read once.  Multiple reads and writes
-are allowed, but there must be at least one read between any two
-writes.
--}
+
 
 -- |Create an 'IOPort' which is initially empty.
 newEmptyIOPort  :: IO (IOPort a)
