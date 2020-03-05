@@ -754,14 +754,16 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty
 
         ; type_args' <- zipWithM (\var arg -> tcHsTypeApp arg (varType var))
                                  univ_tvs type_args
-        ; tenv1 <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+        ; tenv' <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
                   -- NB: Do not use zipTvSubst!  See #14154
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
-        ; tenv2 <- instTyVarsWith PatOrigin (zipWith const univ_tvs type_args') type_args'
-        ; let tenv = composeTCvSubst tenv1 tenv2
+        ; forM (zip type_args' ctxt_res_tys) $ \(arg,ty) -> do
+            tcSubTypeET PatOrigin GenSigCtxt (Check ty) arg
+            -- TODO: Probably this Origin and Ctxt aren't quite right, maybe need new constructors there.
+            -- TODO: Can we use the wrapper we get from this?
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys

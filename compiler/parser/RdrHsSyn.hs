@@ -602,7 +602,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                         pat@(L _ (ConPat ln@(L _ name) tyargs details NoExtField))
+                         pat@(L _ (ConPat ln@(L _ name) [] details NoExtField))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
@@ -1076,11 +1076,11 @@ checkLPat e@(L l _) = checkPat l e [] []
 checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LHsWcType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
-  | isRdrDataCon c = return (L loc (ConPat (L l c) [] (PrefixCon args) NoExtField))
+  | isRdrDataCon c = return (L loc (ConPat (L l c) tyargs (PrefixCon args) NoExtField))
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
-checkPat loc (L l e@(PatBuilderAppType f t)) tyargs args = do
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args = do
   checkPat loc f (t : tyargs) args
 checkPat loc (L _ (PatBuilderApp f e)) [] args = do
   p <- checkLPat e
@@ -1874,6 +1874,7 @@ instance DisambECP (HsCmd GhcPs) where
     checkCmdBlockArguments c
     checkExpBlockArguments e
     return $ L l (HsCmdApp noExtField c e)
+  mkHsAppTypePV l c t = cmdFail l (ppr c <+> text "@" <> ppr t)
   mkHsIfPV l c semi1 a semi2 b = do
     checkDoAndIfThenElse c semi1 a semi2 b
     return $ L l (mkHsCmdIf c a b)
