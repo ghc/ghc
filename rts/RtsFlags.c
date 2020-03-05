@@ -932,6 +932,9 @@ error = true;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
+                  else if (strequal("no-aging", &rts_argv[arg][2])) {
+                      RtsFlags.GcFlags.noAging = true;
+                  }
                   else if (strequal("nonmoving-gc",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;

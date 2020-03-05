@@ -72,6 +72,13 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
     StgPtr to;
     gen_workspace *ws;
 
+    if (major_gc && RtsFlags.GcFlags.noAging) {
+        // unconditionally promote to non-moving heap in major gc
+        gct->copied += size;
+        return nonmovingAllocate(gct->cap, size);
+    }
+
+
     /* Find out where we're going, using the handy "to" pointer in
      * the gen of the source object.  If it turns out we need to
      * evacuate to an older generation, adjust it here (see comment
@@ -483,7 +490,9 @@ evacuate_compact (StgPtr p)
      */
     new_gen_no = bd->dest_no;
 
-    if (new_gen_no < gct->evac_gen_no) {
+    if (major_gc && RtsFlags.GcFlags.noAging) {
+        new_gen_no = oldest_gen->no;
+    } else if (new_gen_no < gct->evac_gen_no) {
         if (gct->eager_promotion) {
             new_gen_no = gct->evac_gen_no;
         } else {

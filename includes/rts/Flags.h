@@ -88,6 +88,7 @@ typedef struct _GC_FLAGS {
                                  */
 
     bool numa;                   /* Use NUMA */
+    bool noAging;
     StgWord numaMask;
 } GC_FLAGS;
 
