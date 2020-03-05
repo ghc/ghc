@@ -66,6 +66,7 @@ import FileCleanup
 -- Standard libraries
 import Control.Monad
 
+import qualified Data.Set as Set
 import Data.Char (isSpace)
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
@@ -592,7 +593,7 @@ checkNonStdWay hsc_env srcspan
 
   | otherwise = return (Just (hostWayTag ++ "o"))
   where
-    targetFullWays = filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
+    targetFullWays = Set.filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
     hostWayTag = case waysTag hostFullWays of
                   "" -> ""
                   tag -> tag ++ "_"
@@ -949,8 +950,8 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
-                      ways = [WayDyn],
-                      buildTag = waysTag [WayDyn],
+                      ways = Set.singleton WayDyn,
+                      buildTag = waysTag (Set.singleton WayDyn),
                       outputFile = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
