@@ -1498,7 +1498,7 @@ ApplicativeDo touches a few phases in the compiler:
   scheduled as outlined above and transformed into applicative
   combinators.  However, the code is still represented as a do-block
   with special forms of applicative statements. This allows us to
-  recover the original do-block when e.g.  printing type errors, where
+  recover the original do-block when e.g. printing type errors, where
   we don't want to show any of the applicative combinators since they
   don't exist in the source code.
   See ApplicativeStmt and ApplicativeArg in HsExpr.
@@ -1682,7 +1682,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ fail_op
                             , is_body_stmt     = False
                             , fail_operator    = fail_op}]
                       False tail'
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ fail_op),_))
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
                 tail _tail_fvs
   | (False,tail') <- needJoin monad_names tail
   = mkApplicativeStmt ctxt
@@ -1691,7 +1691,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ fail_op),_)
        , app_arg_pattern  = nlWildPatName
        , arg_expr         = rhs
        , is_body_stmt     = True
-       , fail_operator    = fail_op}] False tail'
+       , fail_operator    = noSyntaxExpr}] False tail'
 
 stmtTreeToStmts _monad_names _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
   return (s : tail, emptyNameSet)
@@ -1706,7 +1706,8 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
-         if any hasStrictPattern trees
+     -- See Note [ApplicativeDo and refutable patterns]
+         if any hasRefutablePattern stmts'
          then (True, tail)
          else needJoin monad_names tail
 
@@ -1721,13 +1722,13 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
                , is_body_stmt     = False
                , fail_operator    = fail_op
                }, emptyFVs)
-   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ fail_op), _)) =
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ _), _)) =
      return (ApplicativeArgOne
              { xarg_app_arg_one = noExtField
              , app_arg_pattern  = nlWildPatName
              , arg_expr         = exp
              , is_body_stmt     = True
-             , fail_operator    = fail_op
+             , fail_operator    = noSyntaxExpr
              }, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
@@ -1854,12 +1855,19 @@ isStrictPattern lpat =
     SplicePat{}     -> True
     _otherwise -> panic "isStrictPattern"
 
-hasStrictPattern :: ExprStmtTree -> Bool
-hasStrictPattern (StmtTreeOne (L _ (BindStmt _ pat _ _ _), _)) = isStrictPattern pat
-hasStrictPattern (StmtTreeOne _) = False
-hasStrictPattern (StmtTreeBind a b) = hasStrictPattern a || hasStrictPattern b
-hasStrictPattern (StmtTreeApplicative trees) = any hasStrictPattern trees
+{-
+Note [ApplicativeDo and refutable patterns]
 
+Refutable patterns in do blocks are desugared to use the monadic 'fail' operation.
+This means that sometimes an applicative block needs to be wrapped in 'join' simply because
+of a refutable pattern, in order for the types to work out.
+
+-}
+
+hasRefutablePattern :: ApplicativeArg GhcRn -> Bool
+hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
+                                       , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
+hasRefutablePattern _ = False
 
 isLetStmt :: LStmt a b -> Bool
 isLetStmt (L _ LetStmt{}) = True

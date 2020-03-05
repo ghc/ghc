@@ -32,10 +32,15 @@ T13242a.hs:13:11: error:
         ...plus 21 others
         ...plus six instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the first argument of ‘return’, namely ‘(x == x)’
       In a stmt of a 'do' block: return (x == x)
       In the expression:
         do A x <- undefined
            _ <- return 'a'
            _ <- return 'b'
            return (x == x)
+      In an equation for ‘test’:
+          test
+            = do A x <- undefined
+                 _ <- return 'a'
+                 _ <- return 'b'
+                 return (x == x)
