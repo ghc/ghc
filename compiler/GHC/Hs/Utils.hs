@@ -316,7 +316,7 @@ mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = s
 mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u }
 mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
 
-mkLastStmt body = LastStmt noExtField body False noSyntaxExpr
+mkLastStmt body = LastStmt noExtField body Nothing noSyntaxExpr
 mkBodyStmt body
   = BodyStmt noExtField body noSyntaxExpr noSyntaxExpr
 mkBindStmt pat body

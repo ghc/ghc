@@ -1827,7 +1827,10 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
           (XLastStmt idL idR body)
           body
-          Bool               -- True <=> return was stripped by ApplicativeDo
+          (Maybe Bool)  -- Whether return was stripped
+            -- Just True <=> return with a dollar was stripped by ApplicativeDo
+            -- Just False <=> return without a dollar was stripped by ApplicativeDo
+            -- Nothing <=> Nothing was stripped
           (SyntaxExpr idR)   -- The return operator
             -- The return operator is used only for MonadComp
             -- For ListComp we use the baked-in 'return'
@@ -2213,10 +2216,13 @@ pprStmt :: forall idL idR body . (OutputableBndrId idL,
                                   OutputableBndrId idR,
                                   Outputable body)
         => (StmtLR (GhcPass idL) (GhcPass idR) body) -> SDoc
-pprStmt (LastStmt _ expr ret_stripped _)
+pprStmt (LastStmt _ expr m_dollar_stripped _)
   = whenPprDebug (text "[last]") <+>
-       (if ret_stripped then text "return" else empty) <+>
-       ppr expr
+      (case m_dollar_stripped of
+        Just True -> text "return $"
+        Just False -> text "return"
+        Nothing -> empty) <+>
+      ppr expr
 pprStmt (BindStmt _ pat expr _ _) = hsep [ppr pat, larrow, ppr expr]
 pprStmt (LetStmt _ (L _ binds))   = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt _ expr _ _)     = ppr expr
@@ -2284,7 +2290,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
      text "<-" <+>
      ppr (HsDo (panic "pprStmt") DoExpr (noLoc
                (stmts ++
-                   [noLoc (LastStmt noExtField (noLoc return) False noSyntaxExpr)])))
+                   [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)])))
    pp_arg (_, XApplicativeArg x) = ppr x
 
 pprStmt (XStmtLR x) = ppr x

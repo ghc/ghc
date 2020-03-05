@@ -638,7 +638,7 @@ dsInnerMonadComp :: [ExprLStmt GhcTc]
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++
-                 [noLoc (LastStmt noExtField (mkBigLHsVarTupId bndrs) False ret_op)])
+                 [noLoc (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
 
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions

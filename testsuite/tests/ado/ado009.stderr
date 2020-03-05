@@ -1,0 +1,8 @@
+
+==================== Renamer ====================
+Test.q :: IO ()
+Test.q
+  = do a <- return ()
+       return $ (\ _ -> ()) a
+
+
