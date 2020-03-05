@@ -64,8 +64,7 @@ module GHC.Driver.Session (
         optimisationFlags,
         setFlagsFromEnvFile,
 
-        Way(..), waysTag, wayRTSOnly, addWay', updateWays,
-        wayGeneralFlags, wayUnsetGeneralFlags,
+        addWay', updateWays,
 
         thisPackage, thisComponentId, thisUnitIdInsts,
 
@@ -533,7 +532,7 @@ data DynFlags = DynFlags {
   thisUnitIdInsts_      :: Maybe [(ModuleName, Module)],
 
   -- ways
-  ways                  :: [Way],       -- ^ Way flags from the command line
+  ways                  :: Set Way,     -- ^ Way flags from the command line
   buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
 
   -- For object splitting
@@ -1495,10 +1494,10 @@ defaultDynFlags mySettings llvmConfig =
         cfgWeightInfo = defaultCfgWeights
       }
 
-defaultWays :: Settings -> [Way]
+defaultWays :: Settings -> Set Way
 defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-                       then [WayDyn]
-                       else []
+                       then Set.singleton WayDyn
+                       else Set.empty
 
 --------------------------------------------------------------------------
 --
@@ -2156,7 +2155,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   unless (allowed_combination theWays) $ liftIO $
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
-                               intercalate "/" (map wayDesc theWays)))
+                               intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
   let chooseOutput
         | isJust (outputFile dflags3)          -- Only iff user specified -o ...
@@ -2189,11 +2188,9 @@ putLogMsg dflags = log_action dflags dflags
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
-    = let theWays = sort $ nub $ ways dflags
-      in dflags {
-             ways        = theWays,
-             buildTag    = waysTag (filter (not . wayRTSOnly) theWays)
-         }
+    = dflags {
+        buildTag = waysTag (Set.filter (not . wayRTSOnly) (ways dflags))
+      }
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
@@ -4401,7 +4398,7 @@ addWay w = upd (addWay' w)
 
 addWay' :: Way -> DynFlags -> DynFlags
 addWay' w dflags0 = let platform = targetPlatform dflags0
-                        dflags1 = dflags0 { ways = w : ways dflags0 }
+                        dflags1 = dflags0 { ways = Set.insert w (ways dflags0) }
                         dflags2 = foldr setGeneralFlag' dflags1
                                         (wayGeneralFlags platform w)
                         dflags3 = foldr unSetGeneralFlag' dflags2
@@ -4409,7 +4406,7 @@ addWay' w dflags0 = let platform = targetPlatform dflags0
                     in dflags3
 
 removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { ways = filter (WayDyn /=) (ways dfs) })
+removeWayDyn = upd (\dfs -> dfs { ways = Set.filter (WayDyn /=) (ways dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
@@ -4832,7 +4829,7 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
-       | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
+       | gopt Opt_PIC dflags || WayDyn `Set.member` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
       -- gcc may be configured to have PIC on by default, let's be
       -- explicit here, see #15847
@@ -5032,8 +5029,8 @@ makeDynFlagsConsistent dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
  , isObjectTarget (hscTarget dflags)
- , WayProf `notElem` ways dflags
-    = loop dflags{ways = WayProf : ways dflags}
+ , WayProf `Set.notMember` ways dflags
+    = loop dflags{ways = Set.insert WayProf (ways dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
 
  | otherwise = (dflags, [])
