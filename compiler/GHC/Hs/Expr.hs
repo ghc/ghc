@@ -2267,9 +2267,8 @@ pprStmt (ApplicativeStmt _ args mb_join)
      let
          ap_expr = sep (punctuate (text " |") (map pp_arg args))
      in
-       if isNothing mb_join
-          then ap_expr
-          else text "join" <+> parens ap_expr
+       whenPprDebug (if isJust mb_join then text "[join]" else empty) <+>
+       (if length args > 1 then parens else id) ap_expr
 
    pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
    pp_arg (_, ApplicativeArgOne _ pat expr isBody _)
