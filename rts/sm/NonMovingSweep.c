@@ -26,7 +26,8 @@ enum SweepResult {
 };
 
 // Determine which list a marked segment should be placed on and initialize
-// next_free indices as appropriate.
+// next_free indices as appropriate. Additionally, we must clear the mark
+// bitmap entries associated with swept blocks.
 GNUC_ATTR_HOT static enum SweepResult
 nonmovingSweepSegment(struct NonmovingSegment *seg)
 {
@@ -40,6 +41,8 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
         if (seg->bitmap[i] == nonmovingMarkEpoch) {
             found_live = true;
         } else if (!found_free) {
+            // This is the first free block we've found; set next_free,
+            // next_free_snap, and the scan pointer.
             found_free = true;
             seg->next_free = i;
             nonmovingSegmentInfo(seg)->next_free_snap = i;
@@ -65,7 +68,6 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
     } else {
         ASSERT(seg->next_free == 0);
         ASSERT(nonmovingSegmentInfo(seg)->next_free_snap == 0);
-        nonmovingClearBitmap(seg);
         return SEGMENT_FREE;
     }
 }
