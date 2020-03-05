@@ -51,6 +51,7 @@ import Maybes
 import OrdList
 import ErrUtils
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import Util
 import Outputable
 import FastString
@@ -183,7 +184,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
     let cost_centres
-          | WayProf `elem` ways dflags
+          | WayProf `S.member` ways dflags
           = collectCostCentres this_mod binds
           | otherwise
           = S.empty

@@ -82,6 +82,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
 import Data.List ( isPrefixOf, partition, intercalate )
+import qualified Data.Set as Set
 import Data.Maybe
 import Prelude
 
@@ -349,12 +350,12 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (notNull (filter wayRTSOnly (ways dflags))
+   when (not (Set.null (Set.filter wayRTSOnly (ways dflags)))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
+   when ((Set.filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError

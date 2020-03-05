@@ -14,6 +14,7 @@ module GHC.HsToCore.Usage (
 import GhcPrelude
 
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import GHC.Driver.Types
 import TcRnTypes
 import Name

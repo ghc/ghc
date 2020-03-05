@@ -40,9 +40,9 @@ where
 import GhcPrelude
 import GHC.Platform
 import GHC.Driver.Flags
-import Util (nubSort)
 
 import qualified Data.Set as Set
+import Data.Set (Set)
 import Data.List (intersperse)
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 
@@ -61,19 +61,18 @@ data Way
 
 
 -- | Check if a combination of ways is allowed
-allowed_combination :: [Way] -> Bool
+allowed_combination :: Set Way -> Bool
 allowed_combination ways = not disallowed
   where
-   s          = Set.fromList ways
-   disallowed = or [ Set.member s x && Set.member s y
+   disallowed = or [ Set.member ways x && Set.member ways y
                    | (x,y) <- couples
                    ]
    -- List of disallowed couples of ways
    couples = [] -- we don't have any disallowed combination of ways nowadays
 
 -- | Unique build-tag associated to a list of ways
-waysTag :: [Way] -> String
-waysTag = concat . intersperse "_" . map wayTag . nubSort
+waysTag :: Set Way -> String
+waysTag = concat . intersperse "_" . map wayTag . Set.toAscList
 
 -- | Unique build-tag associated to a way
 wayTag :: Way -> String
@@ -184,8 +183,8 @@ foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO Int
 -- | Return host "full" ways (i.e. ways that have an impact on the compilation,
 -- not RTS only ways). These ways must be used when compiling codes targeting
 -- the internal interpreter.
-hostFullWays :: [Way]
-hostFullWays = mconcat
-   [ if hostIsDynamic  then [WayDyn] else []
-   , if hostIsProfiled then [WayProf] else []
+hostFullWays :: Set Way
+hostFullWays = Set.unions
+   [ if hostIsDynamic  then Set.singleton WayDyn  else Set.empty
+   , if hostIsProfiled then Set.singleton WayProf else Set.empty
    ]

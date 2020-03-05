@@ -20,6 +20,7 @@ import GhcPrelude
 import qualified GHC
 import GHC.Driver.Monad
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import Util
 import GHC.Driver.Types
 import qualified SysTools
@@ -43,6 +44,7 @@ import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when )
 import Data.Maybe       ( isJust )
 import Data.IORef
+import qualified Data.Set as Set
 
 -----------------------------------------------------------------
 --
@@ -62,8 +64,8 @@ doMkDependHS srcs = do
     -- way and .o/.hi extensions, regardless of any flags that might
     -- be specified.
     let dflags = dflags0 {
-                     ways = [],
-                     buildTag = waysTag [],
+                     ways = Set.empty,
+                     buildTag = waysTag Set.empty,
                      hiSuf = "hi",
                      objectSuf = "o"
                  }

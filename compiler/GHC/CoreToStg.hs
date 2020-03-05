@@ -42,6 +42,7 @@ import MonadUtils
 import FastString
 import Util
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
@@ -51,6 +52,7 @@ import PrelNames        ( unsafeEqualityProofName )
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
 import Control.Monad (ap)
+import qualified Data.Set as Set
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -230,7 +232,7 @@ coreToStg dflags this_mod pgm
     (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
 
-    prof = WayProf `elem` ways dflags
+    prof = WayProf `Set.member` ways dflags
 
     final_ccs
       | prof && gopt Opt_AutoSccsOnIndividualCafs dflags
