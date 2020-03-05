@@ -738,11 +738,13 @@ GarbageCollect (uint32_t collect_gen,
     }
   } // for all generations
 
-  // Flush the update remembered set. See Note [Eager update remembered set
+  // Flush the update remembered sets. See Note [Eager update remembered set
   // flushing] in NonMovingMark.c
   if (RtsFlags.GcFlags.useNonmoving) {
       RELEASE_SM_LOCK;
-      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      for (n = 0; n < n_capabilities; n++) {
+          nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
+      }
       ACQUIRE_SM_LOCK;
   }
 
