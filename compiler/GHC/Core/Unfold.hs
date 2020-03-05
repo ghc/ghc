@@ -51,6 +51,7 @@ import GHC.Core
 import OccurAnal          ( occurAnalyseExpr )
 import GHC.Core.SimpleOpt
 import GHC.Core.Arity     ( manifestArity )
+import GHC.Core.Utils
 import Id
 import Demand          ( StrictSig, isBottomingSig )
 import DataCon
