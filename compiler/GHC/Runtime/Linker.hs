@@ -43,6 +43,7 @@ import GHC.Driver.Packages as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types
+import GHC.Driver.Ways
 import Name
 import NameEnv
 import Module
@@ -492,7 +493,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
     preload_statics _paths names
        = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
-                     else if dynamicGhc
+                     else if hostIsDynamic
                              then  do pls1 <- dynLoadObjs hsc_env pls names
                                       return (True, pls1)
                              else  do mapM_ (loadObj hsc_env) names
@@ -501,7 +502,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if dynamicGhc
+                     else do if hostIsDynamic
                                  then throwGhcExceptionIO $
                                       CmdLineError dynamic_msg
                                  else loadArchive hsc_env name
@@ -582,17 +583,17 @@ checkNonStdWay hsc_env srcspan
     -- they were built.  If they were built for a non-std way, then
     -- we will use the appropriate variant of the iserv binary to load them.
 
-  | interpWays == haskellWays = return Nothing
+  | hostFullWays == targetFullWays = return Nothing
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
 
-  | objectSuf (hsc_dflags hsc_env) == normalObjectSuffix && not (null haskellWays)
+  | objectSuf (hsc_dflags hsc_env) == normalObjectSuffix && not (null targetFullWays)
   = failNonStd (hsc_dflags hsc_env) srcspan
 
-  | otherwise = return (Just (interpTag ++ "o"))
+  | otherwise = return (Just (hostWayTag ++ "o"))
   where
-    haskellWays = filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
-    interpTag = case mkBuildTag interpWays of
+    targetFullWays = filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
+    hostWayTag = case waysTag hostFullWays of
                   "" -> ""
                   tag -> tag ++ "_"
 
@@ -614,8 +615,8 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             | WayProf `elem` ways dflags = text "-prof"
             | otherwise = text "normal"
           ghciWay
-            | dynamicGhc = text "with -dynamic"
-            | rtsIsProfiled = text "with -prof"
+            | hostIsDynamic = text "with -dynamic"
+            | hostIsProfiled = text "with -prof"
             | otherwise = text "the normal way"
 
 getLinkDeps :: HscEnv -> HomePackageTable
@@ -949,7 +950,7 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
                       ways = [WayDyn],
-                      buildTag = mkBuildTag [WayDyn],
+                      buildTag = waysTag [WayDyn],
                       outputFile = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
@@ -1141,7 +1142,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
   where
     unloadObjs :: Linkable -> IO ()
     unloadObjs lnk
-      | dynamicGhc = return ()
+      | hostIsDynamic = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.

@@ -28,6 +28,7 @@ import GHC.Driver.Main      ( newHscEnv )
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
+import GHC.Driver.Ways
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
@@ -197,13 +198,13 @@ main' postLoadMode dflags0 args flagWarnings = do
   let dflags4 = case lang of
                 HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
-                        dflags3a = updateWays $ dflags3 { ways = interpWays }
+                        dflags3a = updateWays $ dflags3 { ways = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
                                  $ concatMap (wayGeneralFlags platform)
-                                             interpWays
+                                             hostFullWays
                         dflags3c = foldl gopt_unset dflags3b
                                  $ concatMap (wayUnsetGeneralFlags platform)
-                                             interpWays
+                                             hostFullWays
                     in dflags3c
                 _ ->
                     dflags3
@@ -353,7 +354,7 @@ checkOptions mode dflags srcs objs = do
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
+   when ((filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError

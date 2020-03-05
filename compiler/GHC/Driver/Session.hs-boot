@@ -5,8 +5,6 @@ import GHC.Platform
 import {-# SOURCE #-} Outputable
 
 data DynFlags
-data DumpFlag
-data GeneralFlag
 
 targetPlatform           :: DynFlags -> Platform
 pprUserLength            :: DynFlags -> Int

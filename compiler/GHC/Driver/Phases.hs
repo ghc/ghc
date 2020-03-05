@@ -41,7 +41,6 @@ module GHC.Driver.Phases (
 
 import GhcPrelude
 
-import {-# SOURCE #-} GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import System.FilePath
@@ -198,15 +197,15 @@ use of -C with registerised builds (in Main.checkOptions), it is still
 possible for a ghc-api user to do so. So be careful when using the function
 happensBefore, and don't think that `not (a <= b)` implies `b < a`.
 -}
-happensBefore :: DynFlags -> Phase -> Phase -> Bool
-happensBefore dflags p1 p2 = p1 `happensBefore'` p2
+happensBefore :: Platform -> Phase -> Phase -> Bool
+happensBefore platform p1 p2 = p1 `happensBefore'` p2
     where StopLn `happensBefore'` _ = False
           x      `happensBefore'` y = after_x `eqPhase` y
                                    || after_x `happensBefore'` y
-              where after_x = nextPhase dflags x
+              where after_x = nextPhase platform x
 
-nextPhase :: DynFlags -> Phase -> Phase
-nextPhase dflags p
+nextPhase :: Platform -> Phase -> Phase
+nextPhase platform p
     -- A conservative approximation to the next phase, used in happensBefore
     = case p of
       Unlit sf   -> Cpp  sf
@@ -226,7 +225,7 @@ nextPhase dflags p
       HCc        -> As False
       MergeForeign -> StopLn
       StopLn     -> panic "nextPhase: nothing after StopLn"
-    where maybeHCc = if platformUnregisterised (targetPlatform dflags)
+    where maybeHCc = if platformUnregisterised platform
                      then HCc
                      else As False
 

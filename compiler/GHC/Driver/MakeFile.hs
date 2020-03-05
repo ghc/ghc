@@ -63,7 +63,7 @@ doMkDependHS srcs = do
     -- be specified.
     let dflags = dflags0 {
                      ways = [],
-                     buildTag = mkBuildTag [],
+                     buildTag = waysTag [],
                      hiSuf = "hi",
                      objectSuf = "o"
                  }

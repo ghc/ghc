@@ -40,6 +40,7 @@ import GhcPrelude
 
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Packages
+import GHC.Driver.Ways
 import HeaderInfo
 import GHC.Driver.Phases
 import SysTools
@@ -288,7 +289,7 @@ compileOne' m_tc_result mHscMessage
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
        -- the linker can correctly load the object files.  This isn't necessary
        -- when using -fexternal-interpreter.
-       dflags1 = if dynamicGhc && internalInterpreter &&
+       dflags1 = if hostIsDynamic && internalInterpreter &&
                     not isDynWay && not isProfWay && needsLinker
                   then gopt_set dflags0 Opt_BuildDynamicToo
                   else dflags0
@@ -650,7 +651,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          -- We want to catch cases of "you can't get there from here" before
          -- we start the pipeline, because otherwise it will just run off the
          -- end.
-         let happensBefore' = happensBefore dflags
+         let happensBefore' = happensBefore (targetPlatform dflags)
          case start_phase of
              RealPhase start_phase' ->
                  -- See Note [Partial ordering on phases]
@@ -722,7 +723,7 @@ pipeLoop phase input_fn = do
   env <- getPipeEnv
   dflags <- getDynFlags
   -- See Note [Partial ordering on phases]
-  let happensBefore' = happensBefore dflags
+  let happensBefore' = happensBefore (targetPlatform dflags)
       stopPhase = stop_phase env
   case phase of
    RealPhase realPhase | realPhase `eqPhase` stopPhase            -- All done
