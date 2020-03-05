@@ -20,20 +20,20 @@ module BuildTyCl (
 import GhcPrelude
 
 import GHC.Iface.Env
-import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
+import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import TysWiredIn( isCTupleTyConName )
 import TysPrim ( voidPrimTy )
-import DataCon
-import PatSyn
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import Var
 import VarSet
 import BasicTypes
 import Name
 import NameEnv
 import MkId
-import Class
-import TyCon
-import Type
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Type
 import Id
 import TcType
 

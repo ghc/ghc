@@ -16,27 +16,27 @@ module FamInst (
 import GhcPrelude
 
 import GHC.Driver.Types
-import FamInstEnv
-import InstEnv( roughMatchTcs )
-import Coercion
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv( roughMatchTcs )
+import GHC.Core.Coercion
 import GHC.Core.Lint
 import TcEvidence
 import GHC.Iface.Load
 import TcRnMonad
 import SrcLoc
-import TyCon
+import GHC.Core.TyCon
 import TcType
-import CoAxiom
+import GHC.Core.Coercion.Axiom
 import GHC.Driver.Session
 import Module
 import Outputable
 import Util
 import RdrName
-import DataCon ( dataConName )
+import GHC.Core.DataCon ( dataConName )
 import Maybes
-import TyCoRep
-import TyCoFVs
-import TyCoPpr ( pprWithExplicitKindsWhen )
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
 import TcMType
 import Name
 import Panic
@@ -524,7 +524,7 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   , let rep_tc = dataFamInstRepTyCon rep_fam
         co     = mkUnbranchedAxInstCo Representational ax rep_args
                                       (mkCoVarCos cvs)
-  = ASSERT( null rep_cos ) -- See Note [Constrained family instances] in FamInstEnv
+  = ASSERT( null rep_cos ) -- See Note [Constrained family instances] in GHC.Core.FamInstEnv
     Just (rep_tc, rep_args, co)
 
   | otherwise
@@ -659,7 +659,7 @@ the current module.
 -- Check that the proposed new instance is OK,
 -- and then add it to the home inst env
 -- This must be lazy in the fam_inst arguments, see Note [Lazy axiom match]
--- in FamInstEnv.hs
+-- in GHC.Core.FamInstEnv
 addLocalFamInst :: (FamInstEnv,[FamInst])
                 -> FamInst
                 -> TcM (FamInstEnv, [FamInst])
@@ -719,7 +719,7 @@ checkForConflicts inst_envs fam_inst
        ; reportConflictInstErr fam_inst conflicts }
 
 checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM ()
-  -- see Note [Verifying injectivity annotation] in FamInstEnv, check 1B1.
+  -- see Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv, check 1B1.
 checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon   -- as opposed to data family tycon
     , Injective inj <- tyConInjectivityInfo tycon
@@ -736,7 +736,7 @@ checkForInjectivityConflicts instEnvs famInst
 -- this is possible and False if adding this equation would violate injectivity
 -- annotation. This looks only at the one equation; it does not look for
 -- interaction between equations. Use checkForInjectivityConflicts for that.
--- Does checks (2)-(4) of Note [Verifying injectivity annotation] in FamInstEnv.
+-- Does checks (2)-(4) of Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv.
 checkInjectiveEquation :: FamInst -> TcM ()
 checkInjectiveEquation famInst
     | isTypeFamilyTyCon tycon
@@ -744,7 +744,7 @@ checkInjectiveEquation famInst
     , Injective inj <- tyConInjectivityInfo tycon = do
     { dflags <- getDynFlags
     ; let axiom = coAxiomSingleBranch fi_ax
-          -- see Note [Verifying injectivity annotation] in FamInstEnv
+          -- see Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv
     ; reportInjectivityErrors dflags fi_ax axiom inj
     }
 
@@ -921,7 +921,7 @@ unusedInjTvsInRHS :: DynFlags
                   -> ( TyVarSet
                      , Bool   -- True <=> one or more variable is used invisibly
                      , Bool ) -- True <=> suggest -XUndecidableInstances
--- See Note [Verifying injectivity annotation] in FamInstEnv.
+-- See Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv.
 -- This function implements check (4) described there, further
 -- described in Note [Coverage condition for injective type families].
 -- In theory (and modulo the -XUndecidableInstances wrinkle),

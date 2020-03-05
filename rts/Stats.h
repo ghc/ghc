@@ -30,12 +30,20 @@ void      stat_endInit(void);
 
 void      stat_startGCSync(struct gc_thread_ *_gct);
 void      stat_startGC(Capability *cap, struct gc_thread_ *_gct);
-void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct, W_ live,
-                       W_ copied, W_ slop, uint32_t gen, uint32_t n_gc_threads,
+void      stat_startGCWorker (Capability *cap, struct gc_thread_ *_gct);
+void      stat_endGCWorker (Capability *cap, struct gc_thread_ *_gct);
+void      stat_endGC  (Capability *cap, struct gc_thread_ *initiating_gct, W_ live,
+                       W_ copied, W_ slop, uint32_t gen,
+                       uint32_t n_gc_threads, struct gc_thread_ **gc_threads,
                        W_ par_max_copied, W_ par_balanced_copied,
                        W_ gc_spin_spin, W_ gc_spin_yield, W_ mut_spin_spin,
                        W_ mut_spin_yield, W_ any_work, W_ no_work,
                        W_ scav_find_work);
+
+void      stat_startNonmovingGcSync(void);
+void      stat_endNonmovingGcSync(void);
+void      stat_startNonmovingGc (void);
+void      stat_endNonmovingGc (void);
 
 #if defined(PROFILING)
 void      stat_startRP(void);

@@ -72,7 +72,7 @@ module GHC.Cmm.Utils(
 
 import GhcPrelude
 
-import TyCon    ( PrimRep(..), PrimElemRep(..) )
+import GHC.Core.TyCon     ( PrimRep(..), PrimElemRep(..) )
 import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
 
 import GHC.Runtime.Heap.Layout

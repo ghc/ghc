@@ -164,8 +164,8 @@ import GHC.Hs
 import RdrName
 import Avail
 import Module
-import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
-import FamInstEnv
+import GHC.Core.InstEnv ( InstEnv, ClsInst, identicalClsInstHead )
+import GHC.Core.FamInstEnv
 import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
@@ -173,24 +173,25 @@ import VarSet
 import Var
 import Id
 import IdInfo           ( IdDetails(..), RecSelParent(..))
-import Type
+import GHC.Core.Type
 
 import ApiAnnotation    ( ApiAnns )
 import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
-import Class
-import TyCon
-import CoAxiom
-import ConLike
-import DataCon
-import PatSyn
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import TysWiredIn
 import GHC.Driver.Packages hiding  ( Version(..) )
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
-import GHC.Runtime.Linker.Types      ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
-import GHC.Driver.Phases     ( Phase, HscSource(..), hscSourceString
-                        , isHsBootOrSig, isHsigFile )
+import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
+import GHC.Driver.Phases
+   ( Phase, HscSource(..), hscSourceString
+   , isHsBootOrSig, isHsigFile )
 import qualified GHC.Driver.Phases as Phase
 import BasicTypes
 import GHC.Iface.Syntax

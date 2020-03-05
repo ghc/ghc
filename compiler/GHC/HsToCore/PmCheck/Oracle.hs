@@ -53,22 +53,22 @@ import FastString
 import SrcLoc
 import ListSetOps (unionLists)
 import Maybes
-import ConLike
-import DataCon
-import PatSyn
-import TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
+import GHC.Core.TyCon
 import TysWiredIn
 import TysPrim (tYPETyCon)
-import TyCoRep
-import Type
-import TcSimplify    (tcNormalise, tcCheckSatisfiability)
-import Unify         (tcMatchTy)
-import TcRnTypes     (completeMatchConLikes)
-import Coercion
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
+import TcSimplify     (tcNormalise, tcCheckSatisfiability)
+import GHC.Core.Unify (tcMatchTy)
+import TcRnTypes      (completeMatchConLikes)
+import GHC.Core.Coercion
 import MonadUtils hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 
 import Control.Monad (guard, mzero, when)
 import Control.Monad.Trans.Class (lift)
@@ -985,7 +985,7 @@ storing required arguments along with the PmAltConLike in 'vi_neg'.
 
 -- | Guess the universal argument types of a ConLike from an instantiation of
 -- its result type. Rather easy for DataCons, but not so much for PatSynCons.
--- See Note [Pattern synonym result type] in PatSyn.hs.
+-- See Note [Pattern synonym result type] in GHC.Core.PatSyn.
 guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> Type -> ConLike -> Maybe [Type]
 guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = do
   (tc, tc_args) <- splitTyConApp_maybe res_ty
@@ -997,7 +997,7 @@ guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = do
 guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   -- We are successful if we managed to instantiate *every* univ_tv of con.
   -- This is difficult and bound to fail in some cases, see
-  -- Note [Pattern synonym result type] in PatSyn.hs. So we just try our best
+  -- Note [Pattern synonym result type] in GHC.Core.PatSyn. So we just try our best
   -- here and be sure to return an instantiation when we can substitute every
   -- universally quantified type variable.
   -- We *could* instantiate all the other univ_tvs just to fresh variables, I
