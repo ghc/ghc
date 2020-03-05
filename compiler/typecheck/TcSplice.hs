@@ -776,9 +776,9 @@ convertAnnotationWrapper :: ForeignHValue -> TcM (Either MsgDoc Serialized)
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
   case interp of
-    ExternalInterp _ -> Right <$> runTH THAnnWrapper fhv
+    ExternalInterp {} -> Right <$> runTH THAnnWrapper fhv
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp   -> do
+    InternalInterp    -> do
       annotation_wrapper <- liftIO $ wormhole InternalInterp fhv
       return $ Right $
         case unsafeCoerce annotation_wrapper of
@@ -821,7 +821,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
       runQuasi $ sequence_ qs
 #endif
 
-    ExternalInterp iserv -> withIServ_ iserv $ \i -> do
+    ExternalInterp conf iserv -> withIServ_ conf iserv $ \i -> do
       tcg <- getGblEnv
       th_state <- readTcRef (tcg_th_remote_state tcg)
       case th_state of
@@ -1215,11 +1215,11 @@ finishTH :: TcM ()
 finishTH = do
   hsc_env <- getTopEnv
   case hsc_interp hsc_env of
-    Nothing                 -> pure ()
+    Nothing                  -> pure ()
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    Just InternalInterp     -> pure ()
+    Just InternalInterp      -> pure ()
 #endif
-    Just (ExternalInterp _) -> do
+    Just (ExternalInterp {}) -> do
       tcg <- getGblEnv
       writeTcRef (tcg_th_remote_state tcg) Nothing
 
@@ -1248,11 +1248,11 @@ runTH ty fhv = do
       return r
 #endif
 
-    ExternalInterp iserv ->
+    ExternalInterp conf iserv ->
       -- Run it on the server.  For an overview of how TH works with
       -- Remote GHCi, see Note [Remote Template Haskell] in
       -- libraries/ghci/GHCi/TH.hs.
-      withIServ_ iserv $ \i -> do
+      withIServ_ conf iserv $ \i -> do
         rstate <- getTHState i
         loc <- TH.qLocation
         liftIO $

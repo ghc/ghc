@@ -19,12 +19,10 @@ import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 import GHCi.FFI
 import GHCi.RemoteTypes
 import BasicTypes
 import GHC.Driver.Session
-import GHC.Driver.Ways
 import Outputable
 import GHC.Platform
 import Name
@@ -418,8 +416,10 @@ schemeER_wrk d p rhs
                         , cgb_resty = exprType (deAnnotate' newRhs)
                         }
         newBreakInfo tick_no breakInfo
-        dflags <- getDynFlags
-        let cc | interpreterProfiled dflags = cc_arr ! tick_no
+        hsc_env <- getHscEnv
+        let cc | Just interp <- hsc_interp hsc_env
+               , interpreterProfiled interp
+               = cc_arr ! tick_no
                | otherwise = toRemotePtr nullPtr
         let breakInstr = BRK_FUN (fromIntegral tick_no) (getUnique this_mod) cc
         return $ breakInstr `consOL` code
@@ -996,8 +996,9 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
      hsc_env <- getHscEnv
      let
         profiling
-          | Just (ExternalInterp _) <- hsc_interp hsc_env = gopt Opt_SccProfilingOn dflags
-          | otherwise = hostIsProfiled
+          | Just interp <- hsc_interp hsc_env
+          = interpreterProfiled interp
+          | otherwise = False
 
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.

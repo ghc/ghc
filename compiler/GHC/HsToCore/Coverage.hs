@@ -157,13 +157,13 @@ mkCCSArray
   :: HscEnv -> Module -> Int -> [MixEntry_]
   -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
 mkCCSArray hsc_env modul count entries = do
-  if interpreterProfiled dflags
-    then do
+  case hsc_interp hsc_env of
+    Just interp | GHCi.interpreterProfiled interp -> do
       let module_str = moduleNameString (moduleName modul)
       costcentres <- GHCi.mkCostCentres hsc_env module_str (map mk_one entries)
       return (listArray (0,count-1) costcentres)
-    else do
-      return (listArray (0,-1) [])
+
+    _ -> return (listArray (0,-1) [])
  where
     dflags = hsc_dflags hsc_env
     mk_one (srcspan, decl_path, _, _) = (name, src)

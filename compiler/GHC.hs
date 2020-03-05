@@ -614,13 +614,15 @@ setSessionDynFlags dflags = do
                 else return (pure ())
          let
           conf = IServConfig
-            { iservConfProgram = prog
-            , iservConfOpts    = getOpts dflags opt_i
-            , iservConfHook    = createIservProcessHook (hooks dflags)
-            , iservConfTrace   = tr
+            { iservConfProgram  = prog
+            , iservConfOpts     = getOpts dflags opt_i
+            , iservConfProfiled = gopt Opt_SccProfilingOn dflags
+            , iservConfDynamic  = WayDyn `elem` ways dflags
+            , iservConfHook     = createIservProcessHook (hooks dflags)
+            , iservConfTrace    = tr
             }
-         s <- liftIO $ newMVar (IServPending conf)
-         return (Just (ExternalInterp (IServ s)))
+         s <- liftIO $ newMVar IServPending
+         return (Just (ExternalInterp conf (IServ s)))
     else
 #if defined(HAVE_INTERNAL_INTERPRETER)
       return (Just InternalInterp)

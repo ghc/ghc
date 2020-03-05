@@ -25,6 +25,8 @@ module GHC.Runtime.Interpreter
   , getClosure
   , getModBreaks
   , seqHValue
+  , interpreterDynamic
+  , interpreterProfiled
 
   -- * The object-code linker
   , initObjLinker
@@ -41,7 +43,7 @@ module GHC.Runtime.Interpreter
 
   -- * Lower-level API using messages
   , iservCmd, Message(..), withIServ, withIServ_
-  , withInterp, stopInterp
+  , withInterp, hscInterp, stopInterp
   , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
   , freeHValueRefs
@@ -55,9 +57,6 @@ import GhcPrelude
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
-#if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.Run
-#endif
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
@@ -77,6 +76,11 @@ import Maybes
 import Module
 import GHC.ByteCode.Types
 import Unique
+
+#if defined(HAVE_INTERNAL_INTERPRETER)
+import GHCi.Run
+import GHC.Driver.Ways
+#endif
 
 import Control.Concurrent
 import Control.Monad
@@ -176,7 +180,7 @@ iservCmd hsc_env msg = withInterp hsc_env $ \case
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> run msg -- Just run it directly
 #endif
-  (ExternalInterp i) -> withIServ_ i $ \iserv ->
+  (ExternalInterp c i) -> withIServ_ c i $ \iserv ->
     uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
       iservCall iserv msg
 
@@ -185,9 +189,15 @@ iservCmd hsc_env msg = withInterp hsc_env $ \case
 --
 -- Fails if no target code interpreter is available
 withInterp :: HscEnv -> (Interp -> IO a) -> IO a
-withInterp hsc_env action = case hsc_interp hsc_env of
-   Nothing -> throwIO (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
-   Just i  -> action i
+withInterp hsc_env action = action (hscInterp hsc_env)
+
+-- | Retreive the targe code interpreter
+--
+-- Fails if no target code interpreter is available
+hscInterp :: HscEnv -> Interp
+hscInterp hsc_env = case hsc_interp hsc_env of
+   Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
+   Just i  -> i
 
 -- Note [uninterruptibleMask_ and iservCmd]
 --
@@ -202,14 +212,14 @@ withInterp hsc_env action = case hsc_interp hsc_env of
 -- Overloaded because this is used from TcM as well as IO.
 withIServ
   :: (MonadIO m, ExceptionMonad m)
-  => IServ -> (IServInstance -> m (IServInstance, a)) -> m a
-withIServ (IServ mIServState) action = do
+  => IServConfig -> IServ -> (IServInstance -> m (IServInstance, a)) -> m a
+withIServ conf (IServ mIServState) action = do
   gmask $ \restore -> do
     state <- liftIO $ takeMVar mIServState
 
     iserv <- case state of
       -- start the external iserv process if we haven't done so yet
-      IServPending conf ->
+      IServPending ->
          liftIO (spawnIServ conf)
            `gonException` (liftIO $ putMVar mIServState state)
 
@@ -230,8 +240,8 @@ withIServ (IServ mIServState) action = do
 
 withIServ_
   :: (MonadIO m, ExceptionMonad m)
-  => IServ -> (IServInstance -> m a) -> m a
-withIServ_ iserv action = withIServ iserv $ \inst ->
+  => IServConfig -> IServ -> (IServInstance -> m a) -> m a
+withIServ_ conf iserv action = withIServ conf iserv $ \inst ->
    (inst,) <$> action inst
 
 -- -----------------------------------------------------------------------------
@@ -432,7 +442,7 @@ lookupSymbol hsc_env str = withInterp hsc_env $ \case
   InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #endif
 
-  ExternalInterp i -> withIServ i $ \iserv -> do
+  ExternalInterp c i -> withIServ c i $ \iserv -> do
     -- Profiling of GHCi showed a lot of time and allocation spent
     -- making cross-process LookupSymbol calls, so I added a GHC-side
     -- cache which sped things up quite a lot.  We have to be careful
@@ -461,9 +471,9 @@ purgeLookupSymbolCache hsc_env = case hsc_interp hsc_env of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   Just InternalInterp -> pure ()
 #endif
-  Just (ExternalInterp (IServ mstate)) ->
+  Just (ExternalInterp _ (IServ mstate)) ->
     modifyMVar_ mstate $ \state -> pure $ case state of
-      IServPending {}    -> state
+      IServPending       -> state
       IServRunning iserv -> IServRunning
         (iserv { iservLookupSymbolCache = emptyUFM })
 
@@ -564,7 +574,6 @@ spawnIServ conf = do
     , iservProcess           = ph
     , iservLookupSymbolCache = emptyUFM
     , iservPendingFrees      = []
-    , iservConfig            = conf
     }
 
 -- | Stop the interpreter
@@ -574,16 +583,16 @@ stopInterp hsc_env = case hsc_interp hsc_env of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   Just InternalInterp -> pure ()
 #endif
-  Just (ExternalInterp (IServ mstate)) ->
+  Just (ExternalInterp _ (IServ mstate)) ->
     gmask $ \_restore -> modifyMVar_ mstate $ \state -> do
       case state of
-        IServPending {} -> pure state -- already stopped
+        IServPending    -> pure state -- already stopped
         IServRunning i  -> do
           ex <- getProcessExitCode (iservProcess i)
           if isJust ex
              then pure ()
              else iservCall i Shutdown
-          pure (IServPending (iservConfig i))
+          pure IServPending
 
 runWithPipes :: (CreateProcess -> IO ProcessHandle)
              -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
@@ -669,11 +678,11 @@ mkFinalizedHValue hsc_env rref = do
    let hvref = toHValueRef rref
 
    free <- case hsc_interp hsc_env of
-     Nothing                         -> return (pure ())
+     Nothing                           -> return (pure ())
 #if defined(HAVE_INTERNAL_INTERPRETER)
-     Just InternalInterp             -> return (freeRemoteRef hvref)
+     Just InternalInterp               -> return (freeRemoteRef hvref)
 #endif
-     Just (ExternalInterp (IServ i)) -> return $ modifyMVar_ i $ \state ->
+     Just (ExternalInterp _ (IServ i)) -> return $ modifyMVar_ i $ \state ->
        case state of
          IServPending {}   -> pure state -- already shut down
          IServRunning inst -> do
@@ -698,9 +707,9 @@ wormhole interp r = wormholeRef interp (unsafeForeignRefToRemoteRef r)
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
 wormholeRef :: Interp -> RemoteRef a -> IO a
 #if defined(HAVE_INTERNAL_INTERPRETER)
-wormholeRef InternalInterp     _r = localRef _r
+wormholeRef InternalInterp      _r = localRef _r
 #endif
-wormholeRef (ExternalInterp _) _r
+wormholeRef (ExternalInterp {}) _r
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
 
@@ -726,3 +735,17 @@ getModBreaks hmi
   = fromMaybe emptyModBreaks (bc_breaks cbc)
   | otherwise
   = emptyModBreaks -- probably object code
+
+-- | Interpreter uses Profiling way
+interpreterProfiled :: Interp -> Bool
+#if defined(HAVE_INTERNAL_INTERPRETER)
+interpreterProfiled InternalInterp       = hostIsProfiled
+#endif
+interpreterProfiled (ExternalInterp c _) = iservConfProfiled c
+
+-- | Interpreter uses Dynamic way
+interpreterDynamic :: Interp -> Bool
+#if defined(HAVE_INTERNAL_INTERPRETER)
+interpreterDynamic InternalInterp       = hostIsDynamic
+#endif
+interpreterDynamic (ExternalInterp c _) = iservConfDynamic c

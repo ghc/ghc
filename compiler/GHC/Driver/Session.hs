@@ -162,7 +162,6 @@ module GHC.Driver.Session (
         addPluginModuleName,
         defaultDynFlags,                -- Settings -> DynFlags
         defaultWays,
-        interpreterProfiled, interpreterDynamic,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultLogAction,
@@ -1500,16 +1499,6 @@ defaultWays :: Settings -> [Way]
 defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then [WayDyn]
                        else []
-
-interpreterProfiled :: DynFlags -> Bool
-interpreterProfiled dflags
-  | gopt Opt_ExternalInterpreter dflags = gopt Opt_SccProfilingOn dflags
-  | otherwise = hostIsProfiled
-
-interpreterDynamic :: DynFlags -> Bool
-interpreterDynamic dflags
-  | gopt Opt_ExternalInterpreter dflags = WayDyn `elem` ways dflags
-  | otherwise = hostIsDynamic
 
 --------------------------------------------------------------------------
 --

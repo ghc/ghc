@@ -22,9 +22,9 @@ import System.Process   ( ProcessHandle, CreateProcess )
 
 -- | Runtime interpreter
 data Interp
-   = ExternalInterp !IServ -- ^ External interpreter
+   = ExternalInterp !IServConfig !IServ -- ^ External interpreter
 #if defined(HAVE_INTERNAL_INTERPRETER)
-   | InternalInterp        -- ^ Internal interpreter
+   | InternalInterp                     -- ^ Internal interpreter
 #endif
 
 -- | External interpreter
@@ -36,15 +36,17 @@ newtype IServ = IServ (MVar IServState)
 
 -- | State of an external interpreter
 data IServState
-   = IServPending !IServConfig    -- ^ Not spawned yet
+   = IServPending                 -- ^ Not spawned yet
    | IServRunning !IServInstance  -- ^ Running
 
 -- | Configuration needed to spawn an external interpreter
 data IServConfig = IServConfig
-  { iservConfProgram :: !String   -- ^ External program to run
-  , iservConfOpts    :: ![String] -- ^ Command-line options
-  , iservConfHook    :: !(Maybe (CreateProcess -> IO ProcessHandle)) -- ^ Hook
-  , iservConfTrace   :: IO ()   -- ^ Trace action executed after spawn
+  { iservConfProgram  :: !String   -- ^ External program to run
+  , iservConfOpts     :: ![String] -- ^ Command-line options
+  , iservConfProfiled :: !Bool     -- ^ Use Profiling way
+  , iservConfDynamic  :: !Bool     -- ^ Use Dynamic way
+  , iservConfHook     :: !(Maybe (CreateProcess -> IO ProcessHandle)) -- ^ Hook
+  , iservConfTrace    :: IO ()     -- ^ Trace action executed after spawn
   }
 
 -- | External interpreter instance
@@ -56,8 +58,5 @@ data IServInstance = IServInstance
       -- ^ Values that need to be freed before the next command is sent.
       -- Threads can append values to this list asynchronously (by modifying the
       -- IServ state MVar).
-
-  , iservConfig            :: !IServConfig
-      -- ^ Config used to spawn the external interpreter
   }
 
