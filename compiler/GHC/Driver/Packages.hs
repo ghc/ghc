@@ -71,6 +71,7 @@ import GhcPrelude
 import GHC.PackageDb
 import UnitInfo
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import Name             ( Name, nameModule_maybe )
 import UniqFM
 import UniqDFM
@@ -1839,22 +1840,22 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
         ways0 = ways dflags
 
-        ways1 = filter (/= WayDyn) ways0
+        ways1 = Set.filter (/= WayDyn) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
         -- debug and profiled RTSs include support for -eventlog
-        ways2 | WayDebug `elem` ways1 || WayProf `elem` ways1
-              = filter (/= WayEventLog) ways1
+        ways2 | WayDebug `Set.member` ways1 || WayProf `Set.member` ways1
+              = Set.filter (/= WayEventLog) ways1
               | otherwise
               = ways1
 
-        tag     = waysTag (filter (not . wayRTSOnly) ways2)
+        tag     = waysTag (Set.filter (not . wayRTSOnly) ways2)
         rts_tag = waysTag ways2
 
         mkDynName x
-         | WayDyn `notElem` ways dflags = x
-         | "HS" `isPrefixOf` x          =
+         | WayDyn `Set.notMember` ways dflags = x
+         | "HS" `isPrefixOf` x                =
               x ++ '-':programName dflags ++ projectVersion dflags
            -- For non-Haskell libraries, we use the name "Cfoo". The .a
            -- file is libCfoo.a, and the .so is libfoo.so. That way the
