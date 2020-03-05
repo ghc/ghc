@@ -18,4 +18,4 @@ fun2 x = (fun1 Foo1,  -- Keep -ddump-simpl output
                       -- in a predictable order
          case x of
           [] -> L.length x
-          (_:_) -> L.length x)
+          (_:_) -> id (L.length x))

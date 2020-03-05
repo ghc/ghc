@@ -1312,7 +1312,7 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b)               bs = get_bind b                 : bs
-    get (FloatCase var body _ _ _) bs = get_bind (NonRec var body) : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
