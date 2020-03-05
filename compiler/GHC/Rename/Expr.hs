@@ -1956,19 +1956,20 @@ needJoin :: MonadNames
          -> (Bool, [ExprLStmt GhcRn])
 needJoin _monad_names [] = (False, [])  -- we're in an ApplicativeArg
 needJoin monad_names  [L loc (LastStmt _ e _ t)]
- | Just arg <- isReturnApp monad_names e =
-       (False, [L loc (LastStmt noExtField arg True t)])
+ | Just (arg, wasDollar) <- isReturnApp monad_names e =
+       (False, [L loc (LastStmt noExtField arg (Just wasDollar) t)])
 needJoin _monad_names stmts = (True, stmts)
 
--- | @Just e@, if the expression is @return e@ or @return $ e@,
--- otherwise @Nothing@
+-- | @(Just e, False)@, if the expression is @return e@
+--   @(Just e, True)@ if the expression is @return $ e@,
+--   otherwise @Nothing@.
 isReturnApp :: MonadNames
             -> LHsExpr GhcRn
-            -> Maybe (LHsExpr GhcRn)
+            -> Maybe (LHsExpr GhcRn, Bool)
 isReturnApp monad_names (L _ (HsPar _ expr)) = isReturnApp monad_names expr
 isReturnApp monad_names (L _ e) = case e of
-  OpApp _ l op r | is_return l, is_dollar op -> Just r
-  HsApp _ f arg  | is_return f               -> Just arg
+  OpApp _ l op r | is_return l, is_dollar op -> Just (r, True)
+  HsApp _ f arg  | is_return f               -> Just (arg, False)
   _otherwise -> Nothing
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
