@@ -131,8 +131,8 @@ import GHC.Driver.Session
 -- Turgid imports for showTypeCategory
 import PrelNames
 import TcType
-import TyCon
-import Predicate
+import GHC.Core.TyCon
+import GHC.Core.Predicate
 
 import Data.Maybe
 import qualified Data.Char

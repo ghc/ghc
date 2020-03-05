@@ -37,15 +37,15 @@ import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
 import GHC.Core
-import DataCon
-import GHC.Driver.Session         ( mAX_PTR_TAG )
+import GHC.Core.DataCon
+import GHC.Driver.Session ( mAX_PTR_TAG )
 import ForeignCall
 import Id
 import PrimOp
-import TyCon
-import Type             ( isUnliftedType )
-import GHC.Types.RepType          ( isVoidTy, countConRepArgs )
-import CostCentre       ( CostCentreStack, currentCCS )
+import GHC.Core.TyCon
+import GHC.Core.Type      ( isUnliftedType )
+import GHC.Types.RepType  ( isVoidTy, countConRepArgs )
+import CostCentre         ( CostCentreStack, currentCCS )
 import Maybes
 import Util
 import FastString

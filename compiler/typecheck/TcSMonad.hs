@@ -132,9 +132,9 @@ import GhcPrelude
 import GHC.Driver.Types
 
 import qualified Inst as TcM
-import InstEnv
+import GHC.Core.InstEnv
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
@@ -144,14 +144,14 @@ import qualified TcEnv as TcM
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
 import GHC.Driver.Session
-import Type
-import Coercion
-import Unify
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.Unify
 
 import ErrUtils
 import TcEvidence
-import Class
-import TyCon
+import GHC.Core.Class
+import GHC.Core.TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
 import Name
@@ -168,7 +168,7 @@ import Util
 import TcRnTypes
 import TcOrigin
 import Constraint
-import Predicate
+import GHC.Core.Predicate
 
 import Unique
 import UniqFM

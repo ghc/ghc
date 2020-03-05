@@ -22,8 +22,8 @@ import GHC.Core.Seq ( seqUnfolding )
 import Id
 import IdInfo
 import Demand ( zapUsageEnvSig )
-import Type( tidyType, tidyVarBndr )
-import Coercion( tidyCo )
+import GHC.Core.Type     ( tidyType, tidyVarBndr )
+import GHC.Core.Coercion ( tidyCo )
 import Var
 import VarEnv
 import UniqFM

@@ -37,7 +37,7 @@ import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
 import TcSigs           ( tcUserTypeSig, tcInstSig )
 import TcSimplify       ( simplifyInfer, InferMode(..) )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import FamInstEnv       ( FamInstEnvs )
+import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Rename.Env   ( addUsedGRE )
 import GHC.Rename.Utils ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
@@ -51,18 +51,18 @@ import TcOrigin
 import TcType
 import Id
 import IdInfo
-import ConLike
-import DataCon
-import PatSyn
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import Name
 import NameEnv
 import NameSet
 import RdrName
-import TyCon
-import TyCoRep
-import TyCoPpr
-import TyCoSubst (substTyWithInScope)
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Subst (substTyWithInScope)
+import GHC.Core.Type
 import TcEvidence
 import VarSet
 import TysWiredIn
@@ -78,7 +78,7 @@ import Maybes
 import Outputable
 import FastString
 import Control.Monad
-import Class(classTyCon)
+import GHC.Core.Class(classTyCon)
 import UniqSet ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -445,7 +445,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
                            -- Unboxed tuples have RuntimeRep vars, which we
                            -- don't care about here
-                           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                           -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
        ; tup_args1 <- tcTupArgs tup_args arg_tys'
@@ -1313,7 +1313,7 @@ We want to reject this type application to Int, but in earlier
 GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
-in TyCoRep.
+in GHC.Core.TyCo.Rep.
 
 Note [VTA for out-of-scope functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
