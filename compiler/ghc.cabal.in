@@ -203,6 +203,8 @@ Library
         FieldLabel
         GHC.Driver.Monad
         GHC.Driver.Hooks
+        GHC.Driver.Flags
+        GHC.Driver.Ways
         Id
         IdInfo
         Predicate
