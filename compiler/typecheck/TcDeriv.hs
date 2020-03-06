@@ -42,7 +42,6 @@ import TyCoPpr    ( pprTyVars )
 import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
 import GHC.Rename.Binds
 import GHC.Rename.Env
-import GHC.Rename.Utils  ( bindLocalNamesFV )
 import GHC.Rename.Source ( addTcgDUs )
 import Avail
 
@@ -315,12 +314,11 @@ renameDeriv inst_infos bagBinds
                             , ib_pragmas = sigs
                             , ib_extensions = exts -- Only for type-checking
                             , ib_derived = sa } })
-        =  ASSERT( null sigs )
-           bindLocalNamesFV tyvars $
-           do { (rn_binds,_, fvs) <- rnMethodBinds False (is_cls_nm inst) [] binds []
+        =  do { (rn_binds, rn_sigs, fvs) <- rnMethodBinds False (is_cls_nm inst)
+                                                          tyvars binds sigs
               ; let binds' = InstBindings { ib_binds = rn_binds
                                           , ib_tyvars = tyvars
-                                          , ib_pragmas = []
+                                          , ib_pragmas = rn_sigs
                                           , ib_extensions = exts
                                           , ib_derived = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
@@ -1846,7 +1844,7 @@ genInst :: DerivSpec theta
 genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
                  , ds_tys = tys, ds_cls = clas, ds_loc = loc
                  , ds_standalone_wildcard = wildcard })
-  = do (meth_binds, deriv_stuff, unusedNames)
+  = do (meth_binds, meth_sigs, deriv_stuff, unusedNames)
          <- set_span_and_ctxt $
             genDerivStuff mechanism loc clas tys tvs
        let mk_inst_info theta = set_span_and_ctxt $ do
@@ -1858,7 +1856,7 @@ genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
                        , iBinds  = InstBindings
                                      { ib_binds = meth_binds
                                      , ib_tyvars = map Var.varName tvs
-                                     , ib_pragmas = []
+                                     , ib_pragmas = meth_sigs
                                      , ib_extensions = extensions
                                      , ib_derived = True } }
        return (mk_inst_info, deriv_stuff, unusedNames)
@@ -1866,9 +1864,14 @@ genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
     extensions :: [LangExt.Extension]
     extensions
       | isDerivSpecNewtype mechanism || isDerivSpecVia mechanism
-        -- Both these flags are needed for higher-rank uses of coerce
-        -- See Note [Newtype-deriving instances] in TcGenDeriv
-      = [LangExt.ImpredicativeTypes, LangExt.RankNTypes]
+      = [
+          -- Both these flags are needed for higher-rank uses of coerce...
+          LangExt.ImpredicativeTypes, LangExt.RankNTypes
+          -- ...and this flag is needed to support the instance signatures
+          -- that bring type variables into scope.
+          -- See Note [Newtype-deriving instances] in TcGenDeriv
+        , LangExt.InstanceSigs
+        ]
       | otherwise
       = []
 
@@ -2035,7 +2038,7 @@ derivingThingFailWith newtype_deriving msg = do
 
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> [Type] -> [TyVar]
-              -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
+              -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
 genDerivStuff mechanism loc clas inst_tys tyvars
   = case mechanism of
       -- See Note [Bindings for Generalised Newtype Deriving]
@@ -2045,7 +2048,8 @@ genDerivStuff mechanism loc clas inst_tys tyvars
       -- Try a stock deriver
       DerivSpecStock { dsm_stock_dit    = DerivInstTys{dit_rep_tc = rep_tc}
                      , dsm_stock_gen_fn = gen_fn }
-        -> gen_fn loc rep_tc inst_tys
+        -> do (binds, faminsts, field_names) <- gen_fn loc rep_tc inst_tys
+              pure (binds, [], faminsts, field_names)
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do
@@ -2059,7 +2063,7 @@ genDerivStuff mechanism loc clas inst_tys tyvars
                  , ppr "genDerivStuff: bad derived class" <+> ppr clas )
           mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
-        return ( emptyBag -- No method bindings are needed...
+        return ( emptyBag, [] -- No method bindings are needed...
                , listToBag (map DerivFamInst (concat tyfam_insts))
                -- ...but we may need to generate binding for associated type
                -- family default instances.
@@ -2071,8 +2075,8 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         -> gen_newtype_or_via via_ty
   where
     gen_newtype_or_via ty = do
-      (binds, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys ty
-      return (binds, faminsts, [])
+      (binds, sigs, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys ty
+      return (binds, sigs, faminsts, [])
 
 {-
 Note [Bindings for Generalised Newtype Deriving]
