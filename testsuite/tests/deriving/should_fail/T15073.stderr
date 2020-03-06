@@ -2,20 +2,9 @@
 T15073.hs:8:12: error:
     • Illegal unboxed tuple type as function argument: (# Foo a #)
       Perhaps you intended to use UnboxedTuples
-    • In an expression type signature:
-        Foo a -> Unit# @GHC.Types.LiftedRep (Foo a)
-      In the expression:
-          GHC.Prim.coerce
-            @(a -> Unit# @GHC.Types.LiftedRep a)
-            @(Foo a -> Unit# @GHC.Types.LiftedRep (Foo a))
-            (p @a) ::
-            Foo a -> Unit# @GHC.Types.LiftedRep (Foo a)
-      In an equation for ‘p’:
-          p = GHC.Prim.coerce
-                @(a -> Unit# @GHC.Types.LiftedRep a)
-                @(Foo a -> Unit# @GHC.Types.LiftedRep (Foo a))
-                (p @a) ::
-                Foo a -> Unit# @GHC.Types.LiftedRep (Foo a)
+    • In the type signature:
+        p :: Foo a -> Unit# @GHC.Types.LiftedRep (Foo a)
       When typechecking the code for ‘p’
         in a derived instance for ‘P (Foo a)’:
         To see the code I am typechecking, use -ddump-deriv
+      In the instance declaration for ‘P (Foo a)’
