@@ -1610,9 +1610,10 @@ coercing from.  So from, say,
   newtype T x = MkT <rep-ty>
 
   instance C a <rep-ty> => C a (T x) where
+    op :: forall c. a -> [T x] -> c -> Int
     op = coerce @ (a -> [<rep-ty>] -> c -> Int)
                 @ (a -> [T x]      -> c -> Int)
-                op :: forall c. a -> [T x] -> c -> Int
+                op
 
 In addition to the type applications, we also have an explicit
 type signature on the entire RHS. This brings the method-bound variable
@@ -1632,16 +1633,17 @@ a polytype.  E.g.
    class C a where op :: a -> forall b. b -> b
    newtype T x = MkT <rep-ty>
    instance C <rep-ty> => C (T x) where
+     op :: T x -> forall b. b -> b
      op = coerce @ (<rep-ty> -> forall b. b -> b)
                  @ (T x      -> forall b. b -> b)
-                op :: T x -> forall b. b -> b
+                op
 
 The use of type applications is crucial here. If we had tried using only
 explicit type signatures, like so:
 
    instance C <rep-ty> => C (T x) where
+     op :: T x -> forall b. b -> b
      op = coerce (op :: <rep-ty> -> forall b. b -> b)
-                     :: T x      -> forall b. b -> b
 
 Then GHC will attempt to deeply skolemize the two type signatures, which will
 wreak havoc with the Coercible solver. Therefore, we instead use type
@@ -1721,23 +1723,23 @@ See Note [Instances in no-evidence implications] in TcInteract.
 But this isn't the death knell for combining QuantifiedConstraints with GND.
 On the contrary, if we generate GND bindings in a slightly different way, then
 we can avoid this situation altogether. Instead of applying `coerce` to two
-polymorphic types, we instead let an explicit type signature do the polymorphic
+polymorphic types, we instead let an instance signature do the polymorphic
 instantiation, and omit the `forall`s in the type applications.
 More concretely, we generate the following code instead:
 
   instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
       C (T m) where
+    join :: forall a. T m (T m a) -> T m a
     join = coerce @(  m   (m a) ->   m a)
                   @(T m (T m a) -> T m a)
-                  join :: forall a. T m (T m a) -> T m a
+                  join
 
 Now the visible type arguments are both monotypes, so we need do any of this
 funny quantified constraint instantiation business.
 
 You might think that that second @(T m (T m a) -> T m a) argument is redundant
-in the presence of the explicit `:: forall a. T m (T m a) -> T m a` type
-signature, but in fact leaving it off will break this example (from the
-T15290d test case):
+in the presence of the instance signature, but in fact leaving it off will
+break this example (from the T15290d test case):
 
   class C a where
     c :: Int -> forall b. b -> a
@@ -1745,14 +1747,15 @@ T15290d test case):
   instance C Int
 
   instance C Age where
+    c :: Int -> forall b. b -> Age
     c = coerce @(Int -> forall b. b -> Int)
-               c :: Int -> forall b. b -> Age
+               c
 
-That is because the explicit type signature deeply skolemizes the forall-bound
+That is because the instance signature deeply skolemizes the forall-bound
 `b`, which wreaks havoc with the `Coercible` solver. An additional visible type
 argument of @(Int -> forall b. b -> Age) is enough to prevent this.
 
-Be aware that the use of an explicit type signature doesn't /solve/ this
+Be aware that the use of an instance signature doesn't /solve/ this
 problem; it just makes it less likely to occur. For example, if a class has
 a truly higher-rank type like so:
 
@@ -1775,8 +1778,8 @@ ambiguous type variables. As one example, consider the following example
 A naïve attempt and generating a C T instance would be:
 
   instance C T where
+    f :: String
     f = coerce @String @String f
-          :: String
 
 This isn't going to typecheck, however, since GHC doesn't know what to
 instantiate the type variable `a` with in the call to `f` in the method body.
@@ -1784,8 +1787,8 @@ instantiate the type variable `a` with in the call to `f` in the method body.
 ambiguity here, we explicitly instantiate `a` like so:
 
   instance C T where
+    f :: String
     f = coerce @String @String (f @())
-          :: String
 
 All better now.
 -}
@@ -1797,32 +1800,37 @@ gen_Newtype_binds :: SrcSpan
                              -- newtype itself)
                   -> [Type]  -- instance head parameters (incl. newtype)
                   -> Type    -- the representation type
-                  -> TcM (LHsBinds GhcPs, BagDerivStuff)
+                  -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff)
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
   = do let ats = classATs cls
+           (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
        atf_insts <- ASSERT( all (not . isDataFamilyTyCon) ats )
                     mapM mk_atf_inst ats
-       return ( listToBag $ map mk_bind (classMethods cls)
+       return ( listToBag binds
+              , sigs
               , listToBag $ map DerivFamInst atf_insts )
   where
-    mk_bind :: Id -> LHsBind GhcPs
-    mk_bind meth_id
-      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
-                                          (mkPrefixFunRhs (L loc meth_RDR))
-                                          [] rhs_expr]
+    mk_bind_and_sig :: Id -> (LHsBind GhcPs, LSig GhcPs)
+    mk_bind_and_sig meth_id
+      = ( mkRdrFunBind loc_meth_RDR [mkSimpleMatch
+                                        (mkPrefixFunRhs loc_meth_RDR)
+                                        [] rhs_expr]
+        , L loc $ ClassOpSig noExtField False [loc_meth_RDR]
+                $ mkLHsSigType $ typeToLHsType to_ty
+        )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
         (_, _, from_tau) = tcSplitSigmaTy from_ty
         (_, _, to_tau)   = tcSplitSigmaTy to_ty
 
         meth_RDR = getRdrName meth_id
+        loc_meth_RDR = L loc meth_RDR
 
         rhs_expr = nlHsVar (getRdrName coerceId)
                                       `nlHsAppType`     from_tau
                                       `nlHsAppType`     to_tau
                                       `nlHsApp`         meth_app
-                                      `nlExprWithTySig` to_ty
 
         -- The class method, applied to all of the class instance types
         -- (including the representation type) to avoid potential ambiguity.
