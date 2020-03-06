@@ -93,7 +93,7 @@ Derived class instances:
       = GenDerivOutput.Cons (f a1) (GHC.Base.fmap f a2)
     (GHC.Base.<$) z GenDerivOutput.Nil = GenDerivOutput.Nil
     (GHC.Base.<$) z (GenDerivOutput.Cons a1 a2)
-      = GenDerivOutput.Cons ((\ b1 -> z) a1) ((GHC.Base.<$) z a2)
+      = GenDerivOutput.Cons z ((GHC.Base.<$) z a2)
   
 
 Derived type family instances:
