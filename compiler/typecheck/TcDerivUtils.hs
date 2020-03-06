@@ -968,7 +968,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
                       , ft_fun = \x y -> if allowFunctions then x `andValid` y
                                                            else NotValid (badCon con functions)
                       , ft_tup = \_ xs  -> allValid xs
-                      , ft_ty_app = \_ x   -> x
+                      , ft_ty_app = \_ _ x -> x
                       , ft_bad_app = NotValid (badCon con wrong_arg)
                       , ft_forall = \_ x   -> x }
 
