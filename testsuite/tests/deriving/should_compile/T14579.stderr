@@ -2,36 +2,40 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Classes.Eq a => GHC.Classes.Eq (T14579.Glurp a) where
+    (GHC.Classes.==) ::
+      T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
+    (GHC.Classes./=) ::
+      T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
     (GHC.Classes.==)
       = GHC.Prim.coerce
           @(T14579.Wat @a (Data.Proxy.Proxy @a)
             -> T14579.Wat @a (Data.Proxy.Proxy @a) -> GHC.Types.Bool)
           @(T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool)
-          ((GHC.Classes.==) @(T14579.Wat @a (Data.Proxy.Proxy @a))) ::
-          T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
+          ((GHC.Classes.==) @(T14579.Wat @a (Data.Proxy.Proxy @a)))
     (GHC.Classes./=)
       = GHC.Prim.coerce
           @(T14579.Wat @a (Data.Proxy.Proxy @a)
             -> T14579.Wat @a (Data.Proxy.Proxy @a) -> GHC.Types.Bool)
           @(T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool)
-          ((GHC.Classes./=) @(T14579.Wat @a (Data.Proxy.Proxy @a))) ::
-          T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
+          ((GHC.Classes./=) @(T14579.Wat @a (Data.Proxy.Proxy @a)))
   
   instance forall a (x :: Data.Proxy.Proxy a).
            GHC.Classes.Eq a =>
            GHC.Classes.Eq (T14579.Wat x) where
+    (GHC.Classes.==) ::
+      T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool
+    (GHC.Classes./=) ::
+      T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool
     (GHC.Classes.==)
       = GHC.Prim.coerce
           @(GHC.Maybe.Maybe a -> GHC.Maybe.Maybe a -> GHC.Types.Bool)
           @(T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool)
-          ((GHC.Classes.==) @(GHC.Maybe.Maybe a)) ::
-          T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool
+          ((GHC.Classes.==) @(GHC.Maybe.Maybe a))
     (GHC.Classes./=)
       = GHC.Prim.coerce
           @(GHC.Maybe.Maybe a -> GHC.Maybe.Maybe a -> GHC.Types.Bool)
           @(T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool)
-          ((GHC.Classes./=) @(GHC.Maybe.Maybe a)) ::
-          T14579.Wat @a x -> T14579.Wat @a x -> GHC.Types.Bool
+          ((GHC.Classes./=) @(GHC.Maybe.Maybe a))
   
 
 Derived type family instances:

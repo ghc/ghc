@@ -952,7 +952,8 @@ pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))
   where
-    details (InstBindings { ib_binds = b }) = pprLHsBinds b
+    details (InstBindings { ib_pragmas = p, ib_binds = b }) =
+      pprDeclList (pprLHsBindsForUser b p)
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of
