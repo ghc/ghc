@@ -279,7 +279,7 @@ canDoGenerics1 rep_tc =
 
       -- (ty arg), where head of ty is neither (->) nor a tuple constructor and
       -- the parameter of interest does not occur in ty
-      , ft_ty_app = \_ arg -> arg
+      , ft_ty_app = \_ _ arg -> arg
 
       , ft_bad_app = bmbad con wrong_arg
       , ft_forall  = \_ body -> body -- polytypes are handled elsewhere
