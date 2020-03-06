@@ -6,6 +6,7 @@ The deriving code for the Functor, Foldable, and Traversable classes
 (equivalent to the code in TcGenDeriv, for other classes)
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -18,13 +19,15 @@ module TcGenFunctor (
         gen_Functor_binds, gen_Foldable_binds, gen_Traversable_binds
     ) where
 
+#include "HsVersions.h"
+
 import GhcPrelude
 
 import Bag
 import DataCon
 import FastString
 import GHC.Hs
-import Panic
+import Outputable
 import PrelNames
 import RdrName
 import SrcLoc
@@ -83,50 +86,66 @@ However, we have special cases for
          - functions
 
 More formally, we write the derivation of fmap code over type variable
-'a for type 'b as ($fmap 'a 'b).  In this general notation the derived
+'a for type 'b as ($fmap 'a 'b x).  In this general notation the derived
 instance for T is:
 
   instance Functor T where
       fmap f (T1 x1 x2) = T1 ($(fmap 'a 'b1) x1) ($(fmap 'a 'a) x2)
       fmap f (T2 x1)    = T2 ($(fmap 'a '(T a)) x1)
 
-  $(fmap 'a 'b)          =  \x -> x     -- when b does not contain a
-  $(fmap 'a 'a)          =  f
-  $(fmap 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
-  $(fmap 'a '(T b1 b2))  =  fmap $(fmap 'a 'b2)   -- when a only occurs in the last parameter, b2
-  $(fmap 'a '(b -> c))   =  \x b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
+  $(fmap 'a 'b x)          = x     -- when b does not contain a
+  $(fmap 'a 'a x)          = f x
+  $(fmap 'a '(b1,b2) x)    = case x of (x1,x2) -> ($(fmap 'a 'b1 x1), $(fmap 'a 'b2 x2))
+  $(fmap 'a '(T b1 a) x)   = fmap f x -- when a only occurs directly as the last argument of T
+  $(fmap 'a '(T b1 b2) x)  = fmap (\y. $(fmap 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+  $(fmap 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(fmap 'a' 'tc' (x $(cofmap 'a 'tb y)))
 
 For functions, the type parameter 'a can occur in a contravariant position,
 which means we need to derive a function like:
 
   cofmap :: (a -> b) -> (f b -> f a)
 
-This is pretty much the same as $fmap, only without the $(cofmap 'a 'a) case:
+This is pretty much the same as $fmap, only without the $(cofmap 'a 'a x) and
+$(cofmap 'a '(T b1 a) x) cases:
 
-  $(cofmap 'a 'b)          =  \x -> x     -- when b does not contain a
-  $(cofmap 'a 'a)          =  error "type variable in contravariant position"
-  $(cofmap 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
-  $(cofmap 'a '[b])        =  map $(cofmap 'a 'b)
-  $(cofmap 'a '(T b1 b2))  =  fmap $(cofmap 'a 'b2)   -- when a only occurs in the last parameter, b2
-  $(cofmap 'a '(b -> c))   =  \x b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+  $(cofmap 'a 'b x)          = x     -- when b does not contain a
+  $(cofmap 'a 'a x)          = error "type variable in contravariant position"
+  $(cofmap 'a '(b1,b2) x)    = case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
+  $(cofmap 'a '(T b1 a) x)   = error "type variable in contravariant position" -- when a only occurs directly as the last argument of T
+  $(cofmap 'a '(T b1 b2) x)  = fmap (\y. $(cofmap 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+  $(cofmap 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(cofmap 'a' 'tc' (x $(fmap 'a 'tb y)))
 
-Note that the code produced by $(fmap _ _) is always a higher order function,
-with type `(a -> b) -> (g a -> g b)` for some g. When we need to do pattern
-matching on the type, this means create a lambda function (see the (,) case above).
-The resulting code for fmap can look a bit weird, for example:
+Note that the code produced by $(fmap _ _ _) is always a higher order function,
+with type `(a -> b) -> (g a -> g b)` for some g.
 
-  data X a = X (a,Int)
-  -- generated instance
-  instance Functor X where
-      fmap f (X x) = (\y -> case y of (x1,x2) -> X (f x1, (\z -> z) x2)) x
+Note that there are two distinct cases in $fmap (and $cofmap) that match on an
+application of some type constructor T (where T is not a tuple type
+constructor):
 
-The optimizer should be able to simplify this code by simple inlining.
+  $(fmap 'a '(T b1 a) x)  = fmap f x -- when a only occurs directly as the last argument of T
+  $(fmap 'a '(T b1 b2) x) = fmap (\y. $(fmap 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
 
-An older version of the deriving code tried to avoid these applied
-lambda functions by producing a meta level function. But the function to
-be mapped, `f`, is a function on the code level, not on the meta level,
-so it was eta expanded to `\x -> [| f $x |]`. This resulted in too much eta expansion.
-It is better to produce too many lambdas than to eta expand, see ticket #7436.
+While the latter case technically subsumes the former case, it is important to
+give special treatment to the former case to avoid unnecessary eta expansion.
+See Note [Avoid unnecessary eta expansion in derived fmap implementations].
+
+We also generate code for (<$) in addition to fmap—see Note [Deriving <$] for
+an explanation of why this is important. Just like $fmap/$cofmap above, there
+is a similar algorithm for generating `p <$ x` (for some constant `p`):
+
+  $(replace 'a 'b x)          = x      -- when b does not contain a
+  $(replace 'a 'a x)          = p
+  $(replace 'a '(b1,b2) x)    = case x of (x1,x2) -> ($(replace 'a 'b1 x1), $(replace 'a 'b2 x2))
+  $(replace 'a '(T b1 a) x)   = p <$ x -- when a only occurs directly as the last argument of T
+  $(replace 'a '(T b1 b2) x)  = fmap (\y. $(replace 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+  $(replace 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(replace 'a' 'tc' (x $(coreplace 'a 'tb y)))
+
+  $(coreplace 'a 'b x)          = x      -- when b does not contain a
+  $(coreplace 'a 'a x)          = error "type variable in contravariant position"
+  $(coreplace 'a '(b1,b2) x)    = case x of (x1,x2) -> ($(coreplace 'a 'b1 x1), $(coreplace 'a 'b2 x2))
+  $(coreplace 'a '(T b1 a) x)   = error "type variable in contravariant position" -- when a only occurs directly as the last argument of T
+  $(coreplace 'a '(T b1 b2) x)  = fmap (\y. $(coreplace 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+  $(coreplace 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(coreplace 'a' 'tc' (x $(replace 'a 'tb y)))
 -}
 
 gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
@@ -154,30 +173,34 @@ gen_Functor_binds loc tycon
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
     fmap_eqn con = flip evalState bs_RDRs $
-                     match_for_con fmap_match_ctxt [f_Pat] con =<< parts
+                     match_for_con fmap_match_ctxt [f_Pat] con parts
       where
-        parts = sequence $ foldDataConArgs ft_fmap con
+        parts = foldDataConArgs ft_fmap con
 
     fmap_eqns = map fmap_eqn data_cons
 
-    ft_fmap :: FFoldType (State [RdrName] (LHsExpr GhcPs))
-    ft_fmap = FT { ft_triv = mkSimpleLam $ \x -> return x
-                   -- fmap f = \x -> x
-                 , ft_var  = return f_Expr
-                   -- fmap f = f
-                 , ft_fun  = \g h -> do
-                     gg <- g
-                     hh <- h
-                     mkSimpleLam2 $ \x b -> return $
-                       nlHsApp hh (nlHsApp x (nlHsApp gg b))
-                   -- fmap f = \x b -> h (x (g b))
-                 , ft_tup = \t gs -> do
-                     gg <- sequence gs
-                     mkSimpleLam $ mkSimpleTupleCase (match_for_con CaseAlt) t gg
-                   -- fmap f = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
-                 , ft_ty_app = \_ g -> nlHsApp fmap_Expr <$> g
-                   -- fmap f = fmap g
-                 , ft_forall = \_ g -> g
+    ft_fmap :: FFoldType (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
+    ft_fmap = FT { ft_triv = \x -> pure x
+                   -- fmap f x = x
+                 , ft_var  = \x -> pure $ nlHsApp f_Expr x
+                   -- fmap f x = f x
+                 , ft_fun  = \g h x -> mkSimpleLam $ \b -> do
+                     gg <- g b
+                     h $ nlHsApp x gg
+                   -- fmap f x = \b -> h (x (g b))
+                 , ft_tup = mkSimpleTupleCase (match_for_con CaseAlt)
+                   -- fmap f x = case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+                 , ft_ty_app = \_ arg_ty g x ->
+                     -- If the argument type is a bare occurrence of the
+                     -- data type's last type variable, then we can generate
+                     -- more efficient code.
+                     -- See Note [Avoid unnecessary eta expansion in derived fmap implementations]
+                     if tcIsTyVarTy arg_ty
+                       then pure $ nlHsApps fmap_RDR [f_Expr,x]
+                       else do gg <- mkSimpleLam g
+                               pure $ nlHsApps fmap_RDR [gg,x]
+                   -- fmap f x = fmap g x
+                 , ft_forall = \_ g x -> g x
                  , ft_bad_app = panic "in other argument in ft_fmap"
                  , ft_co_var = panic "contravariant in ft_fmap" }
 
@@ -189,53 +212,157 @@ gen_Functor_binds loc tycon
     replace_match_ctxt = mkPrefixFunRhs replace_name
 
     replace_eqn con = flip evalState bs_RDRs $
-        match_for_con replace_match_ctxt [z_Pat] con =<< parts
+        match_for_con replace_match_ctxt [z_Pat] con parts
       where
-        parts = traverse (fmap replace) $ foldDataConArgs ft_replace con
+        parts = foldDataConArgs ft_replace con
 
     replace_eqns = map replace_eqn data_cons
 
-    ft_replace :: FFoldType (State [RdrName] Replacer)
-    ft_replace = FT { ft_triv = fmap Nested $ mkSimpleLam $ \x -> return x
-                   -- (p <$) = \x -> x
-                 , ft_var  = fmap Immediate $ mkSimpleLam $ \_ -> return z_Expr
-                   -- (p <$) = const p
-                 , ft_fun  = \g h -> do
-                     gg <- replace <$> g
-                     hh <- replace <$> h
-                     fmap Nested $ mkSimpleLam2 $ \x b -> return $
-                       nlHsApp hh (nlHsApp x (nlHsApp gg b))
-                   -- (<$) p = \x b -> h (x (g b))
-                 , ft_tup = \t gs -> do
-                     gg <- traverse (fmap replace) gs
-                     fmap Nested . mkSimpleLam $
-                          mkSimpleTupleCase (match_for_con CaseAlt) t gg
-                   -- (p <$) = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
-                 , ft_ty_app = \_ gm -> do
-                       g <- gm
-                       case g of
-                         Nested g' -> pure . Nested $
-                                          nlHsApp fmap_Expr $ g'
-                         Immediate _ -> pure . Nested $
-                                          nlHsApp replace_Expr z_Expr
-                   -- (p <$) = fmap (p <$)
-                 , ft_forall = \_ g -> g
+    ft_replace :: FFoldType (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
+    ft_replace = FT { ft_triv = \x -> pure x
+                   -- p <$ x = x
+                 , ft_var  = \_ -> pure z_Expr
+                   -- p <$ _ = p
+                 , ft_fun  = \g h x -> mkSimpleLam $ \b -> do
+                     gg <- g b
+                     h $ nlHsApp x gg
+                   -- p <$ x = \b -> h (x (g b))
+                 , ft_tup = mkSimpleTupleCase (match_for_con CaseAlt)
+                   -- p <$ x = case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+                 , ft_ty_app = \_ arg_ty g x ->
+                       -- If the argument type is a bare occurrence of the
+                       -- data type's last type variable, then we can generate
+                       -- more efficient code.
+                       -- See [Deriving <$]
+                       if tcIsTyVarTy arg_ty
+                         then pure $ nlHsApps replace_RDR [z_Expr,x]
+                         else do gg <- mkSimpleLam g
+                                 pure $ nlHsApps fmap_RDR [gg,x]
+                   -- p <$ x = fmap (p <$) x
+                 , ft_forall = \_ g x -> g x
                  , ft_bad_app = panic "in other argument in ft_replace"
                  , ft_co_var = panic "contravariant in ft_replace" }
 
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
-    match_for_con :: HsMatchContext GhcPs
-                  -> [LPat GhcPs] -> DataCon -> [LHsExpr GhcPs]
-                  -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
+    match_for_con :: Monad m
+                  => HsMatchContext GhcPs
+                  -> [LPat GhcPs] -> DataCon
+                  -> [LHsExpr GhcPs -> m (LHsExpr GhcPs)]
+                  -> m (LMatch GhcPs (LHsExpr GhcPs))
     match_for_con ctxt = mkSimpleConMatch ctxt $
-        \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
+        \con_name xsM -> do xs <- sequence xsM
+                            pure $ nlHsApps con_name xs  -- Con x1 x2 ..
 
--- See Note [Deriving <$]
-data Replacer = Immediate {replace :: LHsExpr GhcPs}
-              | Nested {replace :: LHsExpr GhcPs}
+{-
+Note [Avoid unnecessary eta expansion in derived fmap implementations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the sake of simplicity, the algorithm that derived implementations of
+fmap used to have a single case that dealt with applications of some type
+constructor T (where T is not a tuple type constructor):
 
-{- Note [Deriving <$]
-   ~~~~~~~~~~~~~~~~~~
+  $(fmap 'a '(T b1 b2) x) = fmap (\y. $(fmap 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+
+This generated less than optimal code in certain situations, however. Consider
+this example:
+
+  data List a = Nil | Cons a (List a) deriving Functor
+
+This would generate the following Functor instance:
+
+  instance Functor List where
+    fmap f Nil = Nil
+    fmap f (Cons x xs) = Cons (f x) (fmap (\y -> f y) xs)
+
+The code `fmap (\y -> f y) xs` is peculiar, since it eta expands an application
+of `f`. What's worse, this eta expansion actually degrades performance! To see
+why, we can trace an invocation of fmap on a small List:
+
+  fmap id     $ Cons 0 $ Cons 0 $ Cons 0 $ Cons 0 Nil
+
+  Cons (id 0) $ fmap (\y -> id y)
+              $ Cons 0 $ Cons 0 $ Cons 0 Nil
+
+  Cons (id 0) $ Cons ((\y -> id y) 0)
+              $ fmap (\y' -> (\y -> id y) y')
+              $ Cons 0 $ Cons 0 Nil
+
+  Cons (id 0) $ Cons ((\y -> id y) 0)
+              $ Cons ((\y' -> (\y -> id y) y') 0)
+              $ fmap (\y'' -> (\y' -> (\y -> id y) y') y'')
+              $ Cons 0 Nil
+
+  Cons (id 0) $ Cons ((\y -> id y) 0)
+              $ Cons ((\y' -> (\y -> id y) y') 0)
+              $ Cons ((\y'' -> (\y' -> (\y -> id y) y') y'') 0)
+              $ fmap (\y''' -> (\y'' -> (\y' -> (\y -> id y) y') y'') y''')
+              $ Nil
+
+  Cons (id 0) $ Cons ((\y -> id y) 0)
+              $ Cons ((\y' -> (\y -> id y) y') 0)
+              $ Cons ((\y'' -> (\y' -> (\y -> id y) y') y'') 0)
+              $ Nil
+
+Notice how the number of lambdas—and hence, the number of closures—one
+needs to evaluate grows very quickly. In general, a List with N cons cells will
+require (1 + 2 + ... (N-1)) beta reductions, which takes O(N^2) time! This is
+what caused the performance issues observed in #7436.
+
+But hold on a second: shouldn't GHC's optimizer be able to eta reduce
+`\y -> f y` to `f` and avoid these beta reductions? Unfortunately, this is not
+the case. In general, eta reduction can change the semantics of a program. For
+instance, (\x -> ⊥) `seq` () converges, but ⊥ `seq` () diverges. It just so
+happens that the fmap implementation above would have the same semantics
+regardless of whether or not `\y -> f y` or `f` is used, but GHC's optimizer is
+not yet smart enough to realize this (see #17881).
+
+To avoid this quadratic blowup, we add a special case to $fmap that applies
+`fmap f` directly:
+
+  $(fmap 'a '(T b1 a) x)  = fmap f x -- when a only occurs directly as the last argument of T
+  $(fmap 'a '(T b1 b2) x) = fmap (\y. $(fmap 'a 'b2 y)) x -- when a only occurs in the last parameter, b2
+
+With this modified algorithm, the derived Functor List instance becomes:
+
+  instance Functor List where
+    fmap f Nil = Nil
+    fmap f (Cons x xs) = Cons (f x) (fmap f xs)
+
+No lambdas in sight, just the way we like it.
+
+This special case does not prevent all sources quadratic closure buildup,
+however. In this example:
+
+  data PolyList a = PLNil | PLCons a (PolyList (PolyList a))
+    deriving Functor
+
+We would derive the following code:
+
+  instance Functor PolyList where
+    fmap f PLNil = PLNil
+    fmap f (PLCons x xs) = PLCons (f x) (fmap (\y -> fmap f y) xs)
+
+The use of `fmap (\y -> fmap f y) xs` builds up closures in much the same way
+as `fmap (\y -> f y) xs`. The difference here is that even if we eta reduced
+to `fmap (fmap f) xs`, GHC would /still/ build up a closure, since we are
+recursively invoking fmap with a different argument (fmap f). Since we end up
+paying the price of building a closure either way, we do not extend the special
+case in $fmap any further, since it wouldn't buy us anything.
+
+The ft_ty_app field of FFoldType distinguishes between these two $fmap cases by
+inspecting the argument type. If the argument type is a bare type variable,
+then we can conclude the type variable /must/ be the same as the data type's
+last type parameter. We know that this must be the case since there is an
+invariant that the argument type in ft_ty_app will always contain the last
+type parameter somewhere (see Note [FFoldType and functorLikeTraverse]), so
+if the argument type is a bare variable, then that must be exactly the last
+type parameter.
+
+Note that the ft_ty_app case of ft_replace (which derives implementations of
+(<$)) also inspects the argument type to generate more efficient code.
+See Note [Deriving <$].
+
+Note [Deriving <$]
+~~~~~~~~~~~~~~~~~~
 
 We derive the definition of <$. Allowing this to take the default definition
 can lead to memory leaks: mapping over a structure with a constant function can
@@ -298,9 +425,15 @@ Then we want to define
 
 x <$ Nes q = Nes (fmap (x <$) q)
 
-We use the Replacer type to tag whether the expression derived for applying
-<$ to the last type variable was the ft_var case (immediate) or one of the
-others (letting ft_forall pass through as usual).
+We inspect the argument type in ft_ty_app
+(see Note [FFoldType and functorLikeTraverse]) to distinguish between these
+two cases. If the argument type is a bare type variable, then we know that it
+must be the same variable as the data type's last type parameter.
+This is very similar to a trick that derived fmap implementations
+use in their own ft_ty_app case.
+See Note [Avoid unnecessary eta expansion in derived fmap implementations],
+which explains why checking if the argument type is a bare variable is
+the right thing to do.
 
 We could, but do not, give tuples special treatment to improve efficiency
 in some cases. Suppose we have
@@ -342,9 +475,12 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
         , ft_fun     :: a -> a -> a
           -- ^ Function type
         , ft_tup     :: TyCon -> [a] -> a
-          -- ^ Tuple type
-        , ft_ty_app  :: Type -> a -> a
-          -- ^ Type app, variable only in last argument
+          -- ^ Tuple type. The @[a]@ is the result of folding over the
+          --   arguments of the tuple.
+        , ft_ty_app  :: Type -> Type -> a -> a
+          -- ^ Type app, variable only in last argument. The two 'Type's are
+          --   the function and argument parts of @fun_ty arg_ty@,
+          --   respectively.
         , ft_bad_app :: a
           -- ^ Type app, variable other than in last argument
         , ft_forall  :: TcTyVar -> a -> a
@@ -375,7 +511,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        where (xr,xc) = go (not co) x
              (yr,yc) = go co       y
     go co (AppTy    x y) | xc = (caseWrongArg,   True)
-                         | yc = (caseTyApp x yr, True)
+                         | yc = (caseTyApp x y yr, True)
         where (_, xc) = go co x
               (yr,yc) = go co y
     go co ty@(TyConApp con args)
@@ -384,8 +520,8 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        -- and at least one xr is True
        | isTupleTyCon con = (caseTuple con xrs, True)
        | or (init xcs)    = (caseWrongArg, True)         -- T (..var..)    ty
-       | Just (fun_ty, _) <- splitAppTy_maybe ty         -- T (..no var..) ty
-                          = (caseTyApp fun_ty (last xrs), True)
+       | Just (fun_ty, arg_ty) <- splitAppTy_maybe ty    -- T (..no var..) ty
+                          = (caseTyApp fun_ty arg_ty (last xrs), True)
        | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          -- When folding over an unboxed tuple, we must explicitly drop the
@@ -409,7 +545,7 @@ deepSubtypesContaining tv
             , ft_var = []
             , ft_fun = (++)
             , ft_tup = \_ xs -> concat xs
-            , ft_ty_app = (:)
+            , ft_ty_app = \t _ ts -> t:ts
             , ft_bad_app = panic "in other argument in deepSubtypesContaining"
             , ft_co_var = panic "contravariant in deepSubtypesContaining"
             , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyCoVarsOfType) xs })
@@ -464,10 +600,10 @@ mkSimpleLam2 lam =
 -- and its arguments, applying an expression (from @insides@) to each of the
 -- respective arguments of @con@.
 mkSimpleConMatch :: Monad m => HsMatchContext GhcPs
-                 -> (RdrName -> [LHsExpr GhcPs] -> m (LHsExpr GhcPs))
+                 -> (RdrName -> [a] -> m (LHsExpr GhcPs))
                  -> [LPat GhcPs]
                  -> DataCon
-                 -> [LHsExpr GhcPs]
+                 -> [LHsExpr GhcPs -> a]
                  -> m (LMatch GhcPs (LHsExpr GhcPs))
 mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
@@ -477,7 +613,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
           then bare_pat
           else nlParPat bare_pat
     rhs <- fold con_name
-                (zipWith (\i v -> i `nlHsApp` nlHsVar v) insides vars_needed)
+                (zipWith (\i v -> i $ nlHsVar v) insides vars_needed)
     return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
                      (noLoc emptyLocalBinds)
 
@@ -730,7 +866,7 @@ gen_Foldable_binds loc tycon
                  mkSimpleTupleCase (match_foldr z) t gg x
                return (Just lam)
              -- foldr f = (\x z -> case x of ...)
-           , ft_ty_app  = \_ g -> do
+           , ft_ty_app  = \_ _ g -> do
                gg <- g
                mapM (\gg' -> mkSimpleLam2 $ \x z -> return $
                  nlHsApps foldable_foldr_RDR [gg',z,x]) gg
@@ -740,11 +876,12 @@ gen_Foldable_binds loc tycon
            , ft_fun     = panic "function in ft_foldr"
            , ft_bad_app = panic "in other argument in ft_foldr" }
 
-    match_foldr :: LHsExpr GhcPs
+    match_foldr :: Monad m
+                => LHsExpr GhcPs
                 -> [LPat GhcPs]
                 -> DataCon
                 -> [Maybe (LHsExpr GhcPs)]
-                -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
+                -> m (LMatch GhcPs (LHsExpr GhcPs))
     match_foldr z = mkSimpleConMatch2 LambdaExpr $ \_ xs -> return (mkFoldr xs)
       where
         -- g1 v1 (g2 v2 (.. z))
@@ -763,17 +900,18 @@ gen_Foldable_binds loc tycon
                lam <- mkSimpleLam $ mkSimpleTupleCase match_foldMap t gg
                return (Just lam)
              -- foldMap f = \x -> case x of (..,)
-           , ft_ty_app = \_ g -> fmap (nlHsApp foldMap_Expr) <$> g
+           , ft_ty_app = \_ _ g -> fmap (nlHsApp foldMap_Expr) <$> g
              -- foldMap f = foldMap g
            , ft_forall = \_ g -> g
            , ft_co_var = panic "contravariant in ft_foldMap"
            , ft_fun = panic "function in ft_foldMap"
            , ft_bad_app = panic "in other argument in ft_foldMap" }
 
-    match_foldMap :: [LPat GhcPs]
+    match_foldMap :: Monad m
+                  => [LPat GhcPs]
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
-                  -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LHsExpr GhcPs))
     match_foldMap = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkFoldMap xs)
       where
         -- mappend v1 (mappend v2 ..)
@@ -799,7 +937,7 @@ gen_Foldable_binds loc tycon
                  Just ggg ->
                    NullM <$> (mkSimpleLam $ mkSimpleTupleCase match_null t ggg)
              -- null = \x -> case x of (..,)
-           , ft_ty_app = \_ g -> flip fmap g $ \nestedResult ->
+           , ft_ty_app = \_ _ g -> flip fmap g $ \nestedResult ->
                               case nestedResult of
                                 -- If e definitely contains the parameter,
                                 -- then we can test if (G e) contains it by
@@ -818,10 +956,11 @@ gen_Foldable_binds loc tycon
            , ft_fun = panic "function in ft_null"
            , ft_bad_app = panic "in other argument in ft_null" }
 
-    match_null :: [LPat GhcPs]
-                  -> DataCon
-                  -> [Maybe (LHsExpr GhcPs)]
-                  -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
+    match_null :: Monad m
+               => [LPat GhcPs]
+               -> DataCon
+               -> [Maybe (LHsExpr GhcPs)]
+               -> m (LMatch GhcPs (LHsExpr GhcPs))
     match_null = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkNull xs)
       where
         -- v1 && v2 && ..
@@ -920,7 +1059,7 @@ gen_Traversable_binds loc tycon
                return (Just lam)
              -- traverse f = \x -> case x of (a1,a2,..) ->
              --                           liftA2 (,,) (g1 a1) (g2 a2) <*> ..
-           , ft_ty_app  = \_ g -> fmap (nlHsApp traverse_Expr) <$> g
+           , ft_ty_app  = \_ _ g -> fmap (nlHsApp traverse_Expr) <$> g
              -- traverse f = traverse g
            , ft_forall  = \_ g -> g
            , ft_co_var  = panic "contravariant in ft_trav"
@@ -929,10 +1068,11 @@ gen_Traversable_binds loc tycon
 
     -- Con a1 a2 ... -> liftA2 (\b1 b2 ... -> Con b1 b2 ...) (g1 a1)
     --                    (g2 a2) <*> ...
-    match_for_con :: [LPat GhcPs]
+    match_for_con :: Monad m
+                  => [LPat GhcPs]
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
-                  -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
+                  -> m (LMatch GhcPs (LHsExpr GhcPs))
     match_for_con = mkSimpleConMatch2 CaseAlt $
                                              \con xs -> return (mkApCon con xs)
       where
@@ -946,13 +1086,11 @@ gen_Traversable_binds loc tycon
 
 -----------------------------------------------------------------------
 
-f_Expr, z_Expr, fmap_Expr, replace_Expr, mempty_Expr, foldMap_Expr,
+f_Expr, z_Expr, mempty_Expr, foldMap_Expr,
     traverse_Expr, coerce_Expr, pure_Expr, true_Expr, false_Expr,
     all_Expr, null_Expr :: LHsExpr GhcPs
 f_Expr        = nlHsVar f_RDR
 z_Expr        = nlHsVar z_RDR
-fmap_Expr     = nlHsVar fmap_RDR
-replace_Expr  = nlHsVar replace_RDR
 mempty_Expr   = nlHsVar mempty_RDR
 foldMap_Expr  = nlHsVar foldMap_RDR
 traverse_Expr = nlHsVar traverse_RDR
@@ -1093,11 +1231,20 @@ a is the last type variable in a given datatype):
 
 * ft_ty_app:  A type is being applied to the last type parameter, where the
               applied type does not mention the last type parameter (if it
-              did, it would fall under ft_bad_app). The Type argument to
-              ft_ty_app represents the applied type.
+              did, it would fall under ft_bad_app) and the argument type
+              mentions the last type parameter (if it did not, it would fall
+              under ft_triv). The first two Type arguments to
+              ft_ty_app represent the applied type and argument type,
+              respectively.
+
+              Currently, only DeriveFunctor makes use of the argument type.
+              It inspects the argument type so that it can generate more
+              efficient implementations of fmap
+              (see Note [Avoid unnecessary eta expansion in derived fmap implementations])
+              and (<$) (see Note [Deriving <$]) in certain cases.
 
               Note that functions, tuples, and foralls are distinct cases
-              and take precedence of ft_ty_app. (For example, (Int -> a) would
+              and take precedence over ft_ty_app. (For example, (Int -> a) would
               fall under (ft_fun Int a), not (ft_ty_app ((->) Int) a).
               Examples: Maybe a, Either b a
 

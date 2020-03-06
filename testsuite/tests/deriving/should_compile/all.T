@@ -122,3 +122,4 @@ test('T16518', normal, compile, [''])
 test('T17324', normal, compile, [''])
 test('T17339', normal, compile,
      ['-ddump-simpl -dsuppress-idinfo -dno-typeable-binds'])
+test('T17880', normal, compile, [''])
