@@ -702,11 +702,11 @@ release-x86_64-linux-deb8:
   # There are currently a few failing tests
   allow_failure: true
   variables:
-    BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-alpine"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     # encoding004 due to lack of locale support
     # T10458 due to fact that dynamic linker tries to reload libAS
     BROKEN_TESTS: "encoding004 T10458"
