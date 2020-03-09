@@ -206,7 +206,6 @@ module GHC.Driver.Session (
 
 #include "GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
-        wORD_SIZE_IN_BITS,
         wordAlignment,
         tAG_MASK,
         mAX_PTR_TAG,
@@ -5601,9 +5600,6 @@ compilerInfo dflags
 
 bLOCK_SIZE_W :: DynFlags -> Int
 bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
-
-wORD_SIZE_IN_BITS :: DynFlags -> Int
-wORD_SIZE_IN_BITS dflags = wORD_SIZE dflags * 8
 
 wordAlignment :: DynFlags -> Alignment
 wordAlignment dflags = alignmentOf (wORD_SIZE dflags)
