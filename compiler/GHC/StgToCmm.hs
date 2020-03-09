@@ -26,6 +26,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -47,7 +48,7 @@ import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
 import UniqFM
-import Name
+import NameEnv
 
 import OrdList
 import GHC.Cmm.Graph
@@ -63,7 +64,7 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup [(Name, LambdaFormInfo)]
+        -> Stream IO CmmGroup ModuleLFInfos
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
@@ -117,9 +118,9 @@ codeGen dflags this_mod data_tycons
                   !name = idName id
                   lf = cg_lf info
 
-        ; let generatedInfo = mapMaybe extractInfo (eltsUFM cg_id_infos)
+        ; let !generatedInfo = mkNameEnv (mapMaybe extractInfo (eltsUFM cg_id_infos))
 
-        ; return $! seqList generatedInfo generatedInfo
+        ; return $! generatedInfo
         }
 
 ---------------------------------------------------------------

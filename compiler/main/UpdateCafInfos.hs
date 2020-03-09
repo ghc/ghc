@@ -16,15 +16,14 @@ import NameSet
 import Util
 import Var
 import Outputable
-import Name (Name)
-import GHC.StgToCmm.Closure (LambdaFormInfo)
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 #include "HsVersions.h"
 
 -- | Update CafInfos of all occurences (in rules, unfoldings, class instances)
 updateModDetailsCafInfos
   :: NameSet -- ^ Non-CAFFY names in the module. Names not in this set are CAFFY.
-  -> [(Name, LambdaFormInfo)]
+  -> ModuleLFInfos
   -> ModDetails -- ^ ModDetails to update
   -> ModDetails
 updateModDetailsCafInfos non_cafs lf_infos mod_details =
@@ -59,7 +58,7 @@ updateRuleCafInfos type_env Rule{ .. } = Rule { ru_rhs = updateGlobalIds type_en
 -- Instances
 --------------------------------------------------------------------------------
 
-updateInstCafInfos :: TypeEnv -> NameSet -> [(Name, LambdaFormInfo)] -> ClsInst -> ClsInst
+updateInstCafInfos :: TypeEnv -> NameSet -> ModuleLFInfos -> ClsInst -> ClsInst
 updateInstCafInfos type_env non_cafs lf_infos =
     updateClsInstDFun (updateIdUnfolding type_env . updateIdCafInfo non_cafs lf_infos)
 
@@ -67,7 +66,7 @@ updateInstCafInfos type_env non_cafs lf_infos =
 -- TyThings
 --------------------------------------------------------------------------------
 
-updateTyThingCafInfos :: TypeEnv -> NameSet -> [(Name, LambdaFormInfo)] -> TyThing -> TyThing
+updateTyThingCafInfos :: TypeEnv -> NameSet -> ModuleLFInfos -> TyThing -> TyThing
 
 updateTyThingCafInfos type_env non_cafs lf_infos (AnId id) =
     AnId (updateIdUnfolding type_env (updateIdCafInfo non_cafs lf_infos id))
@@ -91,11 +90,11 @@ updateIdUnfolding type_env id =
 -- Expressions
 --------------------------------------------------------------------------------
 
-updateIdCafInfo :: NameSet -> [(Name, LambdaFormInfo)] -> Id -> Id
+updateIdCafInfo :: NameSet -> ModuleLFInfos -> Id -> Id
 updateIdCafInfo non_cafs lf_infos id =
     let
       not_caffy = elemNameSet (idName id) non_cafs
-      mb_lf_info = lookup (idName id) lf_infos
+      mb_lf_info = lookupNameEnv lf_infos (idName id)
 
       id1 = if not_caffy then setIdCafInfo id NoCafRefs else id
       id2 = case mb_lf_info of

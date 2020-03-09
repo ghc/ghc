@@ -123,7 +123,7 @@ import System.FilePath
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
-import GHC.StgToCmm.Types (LambdaFormInfo (..))
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
@@ -162,7 +162,7 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameSet, [(Name, LambdaFormInfo)]) -> IO ModIface
+mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameSet, ModuleLFInfos) -> IO ModIface
 mkFullIface hsc_env partial_iface mb_id_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
@@ -179,13 +179,13 @@ mkFullIface hsc_env partial_iface mb_id_infos = do
 
     return full_iface
 
-updateDecl :: [IfaceDecl] -> Maybe (NameSet, [(Name, LambdaFormInfo)]) -> [IfaceDecl]
+updateDecl :: [IfaceDecl] -> Maybe (NameSet, ModuleLFInfos) -> [IfaceDecl]
 updateDecl decls Nothing = decls
 updateDecl decls (Just (non_cafs, lf_infos)) = map update_decl decls
   where
     update_decl (IfaceId nm ty details infos)
       | let not_caffy = elemNameSet nm non_cafs
-      , let mb_lf_info = lookup nm lf_infos
+      , let mb_lf_info = lookupNameEnv lf_infos nm
       , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy

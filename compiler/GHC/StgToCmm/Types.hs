@@ -3,19 +3,19 @@
 module GHC.StgToCmm.Types
   ( WordOff
   , LambdaFormInfo (..)
+  , ModuleLFInfos
   , Liveness
   , ArgDescr (..)
   , StandardFormInfo (..)
   ) where
 
-
-
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import DataCon
 import BasicTypes
+import DataCon
+import NameEnv
 import Outputable
 
 -- | Word offset, or word count
@@ -24,6 +24,9 @@ type WordOff = Int
 --------------------------------------------------------------------------------
 --                LambdaFormInfo
 --------------------------------------------------------------------------------
+
+-- | Maps names in the current module to their LambdaFormInfos
+type ModuleLFInfos = NameEnv LambdaFormInfo
 
 -- Information about an identifier, from the code generator's point of view.
 -- Every identifier is bound to a LambdaFormInfo in the environment, which gives

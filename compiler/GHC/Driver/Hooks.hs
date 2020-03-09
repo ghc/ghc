@@ -55,7 +55,7 @@ import GHC.Stg.Syntax
 import Stream
 import GHC.Cmm
 import GHC.Hs.Extension
-import GHC.StgToCmm.Closure (LambdaFormInfo)
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 import Data.Maybe
 
@@ -110,7 +110,7 @@ data Hooks = Hooks
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
   , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup [(Name, LambdaFormInfo)])
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos)
   , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a))
   }
