@@ -507,11 +507,8 @@ pprAlignForSection platform seg =
            _                 -> int 8
 
 pprDataItem :: Config -> CmmLit -> SDoc
-pprDataItem config lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags config lit
-
-pprDataItem' :: DynFlags -> Config -> CmmLit -> SDoc
-pprDataItem' dflags config lit
-  = vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
+pprDataItem config lit
+  = vcat (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
         platform = configPlatform config
         imm = litToImm lit
