@@ -138,7 +138,7 @@ cpsTop hsc_env proc =
 
        ------------- Populate info tables with stack info -----------------
        g <- {-# SCC "setInfoTableStackMap" #-}
-            return $ map (setInfoTableStackMap dflags stackmaps) g
+            return $ map (setInfoTableStackMap platform stackmaps) g
        dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" g
 
        ----------- Control-flow optimisations -----------------------------

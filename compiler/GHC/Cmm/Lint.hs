@@ -13,6 +13,7 @@ module GHC.Cmm.Lint (
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
@@ -91,27 +92,27 @@ lintCmmExpr (CmmLoad expr rep) = do
   --   cmmCheckWordAddress expr
   return rep
 lintCmmExpr expr@(CmmMachOp op args) = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   tys <- mapM lintCmmExpr args
-  if map (typeWidth . cmmExprType dflags) args == machOpArgReps dflags op
+  if map (typeWidth . cmmExprType platform) args == machOpArgReps platform op
         then cmmCheckMachOp op args tys
-        else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps dflags op)
+        else cmmLintMachOpErr expr (map (cmmExprType platform) args) (machOpArgReps platform op)
 lintCmmExpr (CmmRegOff reg offset)
-  = do dflags <- getDynFlags
-       let rep = typeWidth (cmmRegType dflags reg)
+  = do platform <- getPlatform
+       let rep = typeWidth (cmmRegType platform reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
                 [CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
 lintCmmExpr expr =
-  do dflags <- getDynFlags
-     return (cmmExprType dflags expr)
+  do platform <- getPlatform
+     return (cmmExprType platform expr)
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
 cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
 cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
   = cmmCheckMachOp op [reg, lit] tys
 cmmCheckMachOp op _ tys
-  = do dflags <- getDynFlags
-       return (machOpResultType dflags op tys)
+  = do platform <- getPlatform
+       return (machOpResultType platform op tys)
 
 {-
 isOffsetOp :: MachOp -> Bool
@@ -145,9 +146,9 @@ lintCmmMiddle node = case node of
   CmmUnwind{}  -> return ()
 
   CmmAssign reg expr -> do
-            dflags <- getDynFlags
+            platform <- getPlatform
             erep <- lintCmmExpr expr
-            let reg_ty = cmmRegType dflags reg
+            let reg_ty = cmmRegType platform reg
             if (erep `cmmEqType_ignoring_ptrhood` reg_ty)
                 then return ()
                 else cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
@@ -167,16 +168,16 @@ lintCmmLast labels node = case node of
   CmmBranch id -> checkTarget id
 
   CmmCondBranch e t f _ -> do
-            dflags <- getDynFlags
+            platform <- getPlatform
             mapM_ checkTarget [t,f]
             _ <- lintCmmExpr e
-            checkCond dflags e
+            checkCond platform e
 
   CmmSwitch e ids -> do
-            dflags <- getDynFlags
+            platform <- getPlatform
             mapM_ checkTarget $ switchTargetsToList ids
             erep <- lintCmmExpr e
-            if (erep `cmmEqType_ignoring_ptrhood` bWord dflags)
+            if (erep `cmmEqType_ignoring_ptrhood` bWord platform)
               then return ()
               else cmmLintErr (text "switch scrutinee is not a word: " <>
                                ppr e <> text " :: " <> ppr erep)
@@ -200,9 +201,9 @@ lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
 lintTarget (PrimTarget {})     = return ()
 
 
-checkCond :: DynFlags -> CmmExpr -> CmmLint ()
+checkCond :: Platform -> CmmExpr -> CmmLint ()
 checkCond _ (CmmMachOp mop _) | isComparisonMachOp mop = return ()
-checkCond dflags (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth dflags = return () -- constant values
+checkCond platform (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth platform = return () -- constant values
 checkCond _ expr
     = cmmLintErr (hang (text "expression is not a conditional:") 2
                          (ppr expr))
@@ -227,6 +228,9 @@ instance Monad CmmLint where
 
 instance HasDynFlags CmmLint where
     getDynFlags = CmmLint (\dflags -> Right dflags)
+
+getPlatform :: CmmLint Platform
+getPlatform = targetPlatform <$> getDynFlags
 
 cmmLintErr :: SDoc -> CmmLint a
 cmmLintErr msg = CmmLint (\_ -> Left msg)

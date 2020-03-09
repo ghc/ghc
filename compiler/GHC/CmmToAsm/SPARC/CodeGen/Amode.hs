@@ -27,8 +27,8 @@ getAmode
         -> NatM Amode
 
 getAmode tree@(CmmRegOff _ _)
-    = do dflags <- getDynFlags
-         getAmode (mangleIndexTree dflags tree)
+    = do platform <- getPlatform
+         getAmode (mangleIndexTree platform tree)
 
 getAmode (CmmMachOp (MO_Sub _) [x, CmmLit (CmmInt i _)])
   | fits13Bits (-i)

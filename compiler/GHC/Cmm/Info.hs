@@ -194,7 +194,7 @@ mkInfoTableContents dflags
     -- (which in turn came from a handwritten .cmm file)
 
   | StackRep frame <- smrep
-  = do { (prof_lits, prof_data) <- mkProfLits dflags prof
+  = do { (prof_lits, prof_data) <- mkProfLits platform prof
        ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits dflags frame
        ; let
@@ -207,7 +207,7 @@ mkInfoTableContents dflags
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
   = do { let layout  = packIntsCLit dflags ptrs nonptrs
-       ; (prof_lits, prof_data) <- mkProfLits dflags prof
+       ; (prof_lits, prof_data) <- mkProfLits platform prof
        ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
@@ -217,6 +217,7 @@ mkInfoTableContents dflags
                                        (mb_layout    `orElse` layout)
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
   where
+    platform = targetPlatform dflags
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
               -> UniqSM ( Maybe CmmLit  -- Override the SRT field with this
                         , Maybe CmmLit  -- Override the layout field with this
@@ -225,15 +226,15 @@ mkInfoTableContents dflags
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
            ; return ( Just (CmmInt (fromIntegral con_tag)
-                                   (halfWordWidth dflags))
+                                   (halfWordWidth platform))
                     , Nothing, [descr_lit], [decl]) }
 
     mk_pieces Thunk srt_label
       = return (Nothing, Nothing, srt_label, [])
 
     mk_pieces (ThunkSelector offset) _no_srt
-      = return (Just (CmmInt 0 (halfWordWidth dflags)),
-                Just (mkWordCLit dflags (fromIntegral offset)), [], [])
+      = return (Just (CmmInt 0 (halfWordWidth platform)),
+                Just (mkWordCLit platform (fromIntegral offset)), [], [])
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label
@@ -251,7 +252,7 @@ mkInfoTableContents dflags
       where
         slow_entry = CmmLabel (toSlowEntryLbl info_lbl)
         srt_lit = case srt_label of
-                    []          -> mkIntCLit dflags 0
+                    []          -> mkIntCLit platform 0
                     (lit:_rest) -> ASSERT( null _rest ) lit
 
     mk_pieces other _ = pprPanic "mk_pieces" (ppr other)
@@ -260,8 +261,9 @@ mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt 
 
 packIntsCLit :: DynFlags -> Int -> Int -> CmmLit
 packIntsCLit dflags a b = packHalfWordsCLit dflags
-                           (toStgHalfWord dflags (fromIntegral a))
-                           (toStgHalfWord dflags (fromIntegral b))
+                           (toStgHalfWord platform (fromIntegral a))
+                           (toStgHalfWord platform (fromIntegral b))
+                          where platform = targetPlatform dflags
 
 
 mkSRTLit :: DynFlags
@@ -271,9 +273,9 @@ mkSRTLit :: DynFlags
              CmmLit)      -- srt_bitmap
 mkSRTLit dflags info_lbl (Just lbl)
   | inlineSRT dflags
-  = ([], CmmLabelDiffOff lbl info_lbl 0 (halfWordWidth dflags))
-mkSRTLit dflags _ Nothing    = ([], CmmInt 0 (halfWordWidth dflags))
-mkSRTLit dflags _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth dflags))
+  = ([], CmmLabelDiffOff lbl info_lbl 0 (halfWordWidth (targetPlatform dflags)))
+mkSRTLit dflags _ Nothing    = ([], CmmInt 0 (halfWordWidth (targetPlatform dflags)))
+mkSRTLit dflags _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth (targetPlatform dflags)))
 
 
 -- | Is the SRT offset field inline in the info table on this platform?
@@ -314,10 +316,10 @@ makeRelativeRefTo :: DynFlags -> CLabel -> CmmLit -> CmmLit
 
 makeRelativeRefTo dflags info_lbl (CmmLabel lbl)
   | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl 0 (wordWidth dflags)
+  = CmmLabelDiffOff lbl info_lbl 0 (wordWidth (targetPlatform dflags))
 makeRelativeRefTo dflags info_lbl (CmmLabelOff lbl off)
   | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl off (wordWidth dflags)
+  = CmmLabelDiffOff lbl info_lbl off (wordWidth (targetPlatform dflags))
 makeRelativeRefTo _ _ lit = lit
 
 
@@ -347,29 +349,30 @@ mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
               --   2. Large bitmap CmmData if needed
 
 mkLivenessBits dflags liveness
-  | n_bits > mAX_SMALL_BITMAP_SIZE dflags -- does not fit in one word
+  | n_bits > mAX_SMALL_BITMAP_SIZE platform -- does not fit in one word
   = do { uniq <- getUniqueM
        ; let bitmap_lbl = mkBitmapLabel uniq
        ; return (CmmLabel bitmap_lbl,
                  [mkRODataLits bitmap_lbl lits]) }
 
   | otherwise -- Fits in one word
-  = return (mkStgWordCLit dflags bitmap_word, [])
+  = return (mkStgWordCLit platform bitmap_word, [])
   where
+    platform = targetPlatform dflags
     n_bits = length liveness
 
     bitmap :: Bitmap
-    bitmap = mkBitmap dflags liveness
+    bitmap = mkBitmap platform liveness
 
     small_bitmap = case bitmap of
-                     []  -> toStgWord dflags 0
+                     []  -> toStgWord platform 0
                      [b] -> b
                      _   -> panic "mkLiveness"
-    bitmap_word = toStgWord dflags (fromIntegral n_bits)
+    bitmap_word = toStgWord platform (fromIntegral n_bits)
               .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT dflags)
 
-    lits = mkWordCLit dflags (fromIntegral n_bits)
-         : map (mkStgWordCLit dflags) bitmap
+    lits = mkWordCLit platform (fromIntegral n_bits)
+         : map (mkStgWordCLit platform) bitmap
       -- The first word is the size.  The structure must match
       -- StgLargeBitmap in includes/rts/storage/InfoTable.h
 
@@ -402,11 +405,12 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
  ++ [layout_lit, tag, srt]
 
  where
+    platform = targetPlatform dflags
     prof_info
         | gopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
         | otherwise = []
 
-    tag = CmmInt (fromIntegral cl_type) (halfWordWidth dflags)
+    tag = CmmInt (fromIntegral cl_type) (halfWordWidth platform)
 
 -------------------------------------------------------------------------
 --
@@ -414,8 +418,8 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
 --
 -------------------------------------------------------------------------
 
-mkProfLits :: DynFlags -> ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDecl])
-mkProfLits dflags NoProfilingInfo       = return ((zeroCLit dflags, zeroCLit dflags), [])
+mkProfLits :: Platform -> ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDecl])
+mkProfLits platform NoProfilingInfo = return ((zeroCLit platform, zeroCLit platform), [])
 mkProfLits _ (ProfilingInfo td cd)
   = do { (td_lit, td_decl) <- newStringLit td
        ; (cd_lit, cd_decl) <- newStringLit cd
@@ -430,8 +434,8 @@ newStringLit bytes
 -- Misc utils
 
 -- | Value of the srt field of an info table when using an StgLargeSRT
-srtEscape :: DynFlags -> StgHalfWord
-srtEscape dflags = toStgHalfWord dflags (-1)
+srtEscape :: Platform -> StgHalfWord
+srtEscape platform = toStgHalfWord platform (-1)
 
 -------------------------------------------------------------------------
 --
@@ -444,21 +448,22 @@ srtEscape dflags = toStgHalfWord dflags (-1)
 wordAligned :: DynFlags -> CmmExpr -> CmmExpr
 wordAligned dflags e
   | gopt Opt_AlignmentSanitisation dflags
-  = CmmMachOp (MO_AlignmentCheck (wORD_SIZE dflags) (wordWidth dflags)) [e]
+  = CmmMachOp (MO_AlignmentCheck (platformWordSizeInBytes platform) (wordWidth platform)) [e]
   | otherwise
   = e
+  where platform = targetPlatform dflags
 
 closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer and returns the info table pointer
 closureInfoPtr dflags e =
-    CmmLoad (wordAligned dflags e) (bWord dflags)
+    CmmLoad (wordAligned dflags e) (bWord (targetPlatform dflags))
 
 entryCode :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns its entry code
 entryCode dflags e
  | tablesNextToCode dflags = e
- | otherwise               = CmmLoad e (bWord dflags)
+ | otherwise               = CmmLoad e (bWord (targetPlatform dflags))
 
 getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the *zero-indexed*
@@ -466,25 +471,28 @@ getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
 getConstrTag dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableConstrTag dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableConstrTag dflags info_table]
   where
     info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
+    platform = targetPlatform dflags
 
 cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the closure type
 -- obtained from the info table
 cmmGetClosureType dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableClosureType dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableClosureType dflags info_table]
   where
     info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
+    platform = targetPlatform dflags
 
 infoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns a pointer to the first word of the standard-form
 -- info table, excluding the entry-code word (if present)
 infoTable dflags info_ptr
-  | tablesNextToCode dflags = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags)
-  | otherwise               = cmmOffsetW dflags info_ptr 1 -- Past the entry code pointer
+  | tablesNextToCode dflags = cmmOffsetB platform info_ptr (- stdInfoTableSizeB dflags)
+  | otherwise               = cmmOffsetW platform info_ptr 1 -- Past the entry code pointer
+  where platform = targetPlatform dflags
 
 infoTableConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the constr tag
@@ -495,21 +503,25 @@ infoTableSrtBitmap :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the srt_bitmap
 -- field of the info table
 infoTableSrtBitmap dflags info_tbl
-  = CmmLoad (cmmOffsetB dflags info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord dflags)
+  = CmmLoad (cmmOffsetB platform info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord platform)
+    where platform = targetPlatform dflags
 
 infoTableClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the closure type
 -- field of the info table.
 infoTableClosureType dflags info_tbl
-  = CmmLoad (cmmOffsetB dflags info_tbl (stdClosureTypeOffset dflags)) (bHalfWord dflags)
+  = CmmLoad (cmmOffsetB platform info_tbl (stdClosureTypeOffset dflags)) (bHalfWord platform)
+    where platform = targetPlatform dflags
 
 infoTablePtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTablePtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB dflags info_tbl (stdPtrsOffset dflags)) (bHalfWord dflags)
+  = CmmLoad (cmmOffsetB platform info_tbl (stdPtrsOffset dflags)) (bHalfWord platform)
+    where platform = targetPlatform dflags
 
 infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTableNonPtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB dflags info_tbl (stdNonPtrsOffset dflags)) (bHalfWord dflags)
+  = CmmLoad (cmmOffsetB platform info_tbl (stdNonPtrsOffset dflags)) (bHalfWord platform)
+    where platform = targetPlatform dflags
 
 funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the info pointer of a function,
@@ -517,16 +529,19 @@ funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- in the info table.
 funInfoTable dflags info_ptr
   | tablesNextToCode dflags
-  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
+  = cmmOffsetB platform info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
   | otherwise
-  = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
-                                -- Past the entry code pointer
+  = cmmOffsetW platform info_ptr (1 + stdInfoTableSizeW dflags)
+                                  -- Past the entry code pointer
+  where
+    platform = targetPlatform dflags
 
 -- Takes the info pointer of a function, returns the function's arity
 funInfoArity :: DynFlags -> CmmExpr -> CmmExpr
 funInfoArity dflags iptr
-  = cmmToWord dflags (cmmLoadIndex dflags rep fun_info (offset `div` rep_bytes))
+  = cmmToWord platform (cmmLoadIndex platform rep fun_info (offset `div` rep_bytes))
   where
+   platform = targetPlatform dflags
    fun_info = funInfoTable dflags iptr
    rep = cmmBits (widthFromBytes rep_bytes)
 
@@ -572,20 +587,27 @@ maxRetInfoTableSizeW =
   + 1 {- srt label -}
 
 stdInfoTableSizeB  :: DynFlags -> ByteOff
-stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
+stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * platformWordSizeInBytes platform
+   where platform = targetPlatform dflags
 
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is
 -- in the *higher-addressed* part of the type_lit
-stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - halfWordSize dflags
+stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - halfWordSize platform
+   where platform = targetPlatform dflags
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word
-stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
+stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - platformWordSizeInBytes platform
+   where platform = targetPlatform dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
-stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + halfWordSize dflags
+stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * platformWordSizeInBytes platform
+   where platform = targetPlatform dflags
+
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * platformWordSizeInBytes platform + halfWordSize platform
+   where platform = targetPlatform dflags
 
 conInfoTableSizeB :: DynFlags -> Int
-conInfoTableSizeB dflags = stdInfoTableSizeB dflags + wORD_SIZE dflags
+conInfoTableSizeB dflags = stdInfoTableSizeB dflags + platformWordSizeInBytes platform
+   where platform = targetPlatform dflags

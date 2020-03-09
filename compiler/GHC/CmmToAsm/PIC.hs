@@ -120,10 +120,12 @@ cmmMakeDynamicReference dflags referenceKind lbl
 
   | otherwise
   = do this_mod <- getThisModule
+       let config   = initConfig dflags
+           platform = ncgPlatform config
        case howToAccessLabel
                 dflags
-                (platformArch $ targetPlatform dflags)
-                (platformOS   $ targetPlatform dflags)
+                (platformArch platform)
+                (platformOS   platform)
                 this_mod
                 referenceKind lbl of
 
@@ -135,11 +137,11 @@ cmmMakeDynamicReference dflags referenceKind lbl
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
-              return $ CmmLoad (cmmMakePicReference dflags symbolPtr) (bWord dflags)
+              return $ CmmLoad (cmmMakePicReference config symbolPtr) (bWord platform)
 
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
-              DataReference -> return $ cmmMakePicReference dflags lbl
+              DataReference -> return $ cmmMakePicReference config lbl
                 -- all currently supported processors support
                 -- PC-relative branch and call instructions,
                 -- so just jump there if it's a call or a jump
@@ -153,42 +155,44 @@ cmmMakeDynamicReference dflags referenceKind lbl
 -- offset to our base register; this offset is calculated by
 -- the function picRelative in the platform-dependent part below.
 
-cmmMakePicReference :: DynFlags -> CLabel -> CmmExpr
-cmmMakePicReference dflags lbl
+cmmMakePicReference :: NCGConfig -> CLabel -> CmmExpr
+cmmMakePicReference config lbl
+  -- Windows doesn't need PIC,
+  -- everything gets relocated at runtime
+  | OSMinGW32 <- platformOS platform
+  = CmmLit $ CmmLabel lbl
 
-        -- Windows doesn't need PIC,
-        -- everything gets relocated at runtime
-        | OSMinGW32 <- platformOS $ targetPlatform dflags
-        = CmmLit $ CmmLabel lbl
+  | OSAIX <- platformOS platform
+  = CmmMachOp (MO_Add W32)
+          [ CmmReg (CmmGlobal PicBaseReg)
+          , CmmLit $ picRelative (wordWidth platform)
+                          (platformArch platform)
+                          (platformOS   platform)
+                          lbl ]
 
-        | OSAIX <- platformOS $ targetPlatform dflags
-        = CmmMachOp (MO_Add W32)
-                [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative (wordWidth dflags)
-                                (platformArch   $ targetPlatform dflags)
-                                (platformOS     $ targetPlatform dflags)
-                                lbl ]
+  -- both ABI versions default to medium code model
+  | ArchPPC_64 _ <- platformArch platform
+  = CmmMachOp (MO_Add W32) -- code model medium
+          [ CmmReg (CmmGlobal PicBaseReg)
+          , CmmLit $ picRelative (wordWidth platform)
+                          (platformArch platform)
+                          (platformOS   platform)
+                          lbl ]
 
-        -- both ABI versions default to medium code model
-        | ArchPPC_64 _ <- platformArch $ targetPlatform dflags
-        = CmmMachOp (MO_Add W32) -- code model medium
-                [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative (wordWidth dflags)
-                                (platformArch   $ targetPlatform dflags)
-                                (platformOS     $ targetPlatform dflags)
-                                lbl ]
+  | (ncgPIC config || ncgExternalDynamicRefs config)
+      && absoluteLabel lbl
+  = CmmMachOp (MO_Add (wordWidth platform))
+          [ CmmReg (CmmGlobal PicBaseReg)
+          , CmmLit $ picRelative (wordWidth platform)
+                          (platformArch platform)
+                          (platformOS   platform)
+                          lbl ]
 
-        | (positionIndependent dflags || gopt Opt_ExternalDynamicRefs dflags)
-            && absoluteLabel lbl
-        = CmmMachOp (MO_Add (wordWidth dflags))
-                [ CmmReg (CmmGlobal PicBaseReg)
-                , CmmLit $ picRelative (wordWidth dflags)
-                                (platformArch   $ targetPlatform dflags)
-                                (platformOS     $ targetPlatform dflags)
-                                lbl ]
+  | otherwise
+  = CmmLit $ CmmLabel lbl
+  where
+    platform = ncgPlatform config
 
-        | otherwise
-        = CmmLit $ CmmLabel lbl
 
 
 absoluteLabel :: CLabel -> Bool

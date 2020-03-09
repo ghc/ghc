@@ -31,6 +31,7 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Driver.Session
 import FastString
 import Outputable
@@ -120,14 +121,14 @@ f32    = cmmFloat W32
 f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
-bWord :: DynFlags -> CmmType
-bWord dflags = cmmBits (wordWidth dflags)
+bWord :: Platform -> CmmType
+bWord platform = cmmBits (wordWidth platform)
 
-bHalfWord :: DynFlags -> CmmType
-bHalfWord dflags = cmmBits (halfWordWidth dflags)
+bHalfWord :: Platform -> CmmType
+bHalfWord platform = cmmBits (halfWordWidth platform)
 
-gcWord :: DynFlags -> CmmType
-gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
+gcWord :: Platform -> CmmType
+gcWord platform = CmmType GcPtrCat (wordWidth platform)
 
 cInt :: DynFlags -> CmmType
 cInt dflags = cmmBits (cIntWidth  dflags)
@@ -179,23 +180,20 @@ mrStr = sLit . show
 
 
 -------- Common Widths  ------------
-wordWidth :: DynFlags -> Width
-wordWidth dflags
- | wORD_SIZE dflags == 4 = W32
- | wORD_SIZE dflags == 8 = W64
- | otherwise             = panic "MachOp.wordRep: Unknown word size"
+wordWidth :: Platform -> Width
+wordWidth platform = case platformWordSize platform of
+ PW4 -> W32
+ PW8 -> W64
 
-halfWordWidth :: DynFlags -> Width
-halfWordWidth dflags
- | wORD_SIZE dflags == 4 = W16
- | wORD_SIZE dflags == 8 = W32
- | otherwise             = panic "MachOp.halfWordRep: Unknown word size"
+halfWordWidth :: Platform -> Width
+halfWordWidth platform = case platformWordSize platform of
+ PW4 -> W16
+ PW8 -> W32
 
-halfWordMask :: DynFlags -> Integer
-halfWordMask dflags
- | wORD_SIZE dflags == 4 = 0xFFFF
- | wORD_SIZE dflags == 8 = 0xFFFFFFFF
- | otherwise             = panic "MachOp.halfWordMask: Unknown word size"
+halfWordMask :: Platform -> Integer
+halfWordMask platform = case platformWordSize platform of
+ PW4 -> 0xFFFF
+ PW8 -> 0xFFFFFFFF
 
 -- cIntRep is the Width for a C-language 'int'
 cIntWidth :: DynFlags -> Width

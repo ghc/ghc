@@ -6,6 +6,7 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -36,18 +37,18 @@ cmmImplementSwitchPlans dflags g
     -- Switch generation done by backend (LLVM/C)
     | targetSupportsSwitch (hscTarget dflags) = return g
     | otherwise = do
-    blocks' <- concatMapM (visitSwitches dflags) (toBlockList g)
+    blocks' <- concatMapM (visitSwitches (targetPlatform dflags)) (toBlockList g)
     return $ ofBlockList (g_entry g) blocks'
 
-visitSwitches :: DynFlags -> CmmBlock -> UniqSM [CmmBlock]
-visitSwitches dflags block
+visitSwitches :: Platform -> CmmBlock -> UniqSM [CmmBlock]
+visitSwitches platform block
   | (entry@(CmmEntry _ scope), middle, CmmSwitch vanillaExpr ids) <- blockSplit block
   = do
     let plan = createSwitchPlan ids
     -- See Note [Floating switch expressions]
-    (assignSimple, simpleExpr) <- floatSwitchExpr dflags vanillaExpr
+    (assignSimple, simpleExpr) <- floatSwitchExpr platform vanillaExpr
 
-    (newTail, newBlocks) <- implementSwitchPlan dflags scope simpleExpr plan
+    (newTail, newBlocks) <- implementSwitchPlan platform scope simpleExpr plan
 
     let block' = entry `blockJoinHead` middle `blockAppend` assignSimple `blockAppend` newTail
 
@@ -71,16 +72,16 @@ visitSwitches dflags block
 -- This happened in parts of the handwritten RTS Cmm code. See also #16933
 
 -- See Note [Floating switch expressions]
-floatSwitchExpr :: DynFlags -> CmmExpr -> UniqSM (Block CmmNode O O, CmmExpr)
-floatSwitchExpr _      reg@(CmmReg {})  = return (emptyBlock, reg)
-floatSwitchExpr dflags expr             = do
-  (assign, expr') <- cmmMkAssign dflags expr <$> getUniqueM
+floatSwitchExpr :: Platform -> CmmExpr -> UniqSM (Block CmmNode O O, CmmExpr)
+floatSwitchExpr _        reg@(CmmReg {})  = return (emptyBlock, reg)
+floatSwitchExpr platform expr             = do
+  (assign, expr') <- cmmMkAssign platform expr <$> getUniqueM
   return (BMiddle assign, expr')
 
 
 -- Implementing a switch plan (returning a tail block)
-implementSwitchPlan :: DynFlags -> CmmTickScope -> CmmExpr -> SwitchPlan -> UniqSM (Block CmmNode O C, [CmmBlock])
-implementSwitchPlan dflags scope expr = go
+implementSwitchPlan :: Platform -> CmmTickScope -> CmmExpr -> SwitchPlan -> UniqSM (Block CmmNode O C, [CmmBlock])
+implementSwitchPlan platform scope expr = go
   where
     go (Unconditionally l)
       = return (emptyBlock `blockJoinTail` CmmBranch l, [])
@@ -93,7 +94,7 @@ implementSwitchPlan dflags scope expr = go
 
         let lt | signed    = cmmSLtWord
                | otherwise = cmmULtWord
-            scrut = lt dflags expr $ CmmLit $ mkWordCLit dflags i
+            scrut = lt platform expr $ CmmLit $ mkWordCLit platform i
             lastNode = CmmCondBranch scrut bid1 bid2 Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks1++newBlocks2)
@@ -101,7 +102,7 @@ implementSwitchPlan dflags scope expr = go
       = do
         (bid2, newBlocks2) <- go' ids2
 
-        let scrut = cmmNeWord dflags expr $ CmmLit $ mkWordCLit dflags i
+        let scrut = cmmNeWord platform expr $ CmmLit $ mkWordCLit platform i
             lastNode = CmmCondBranch scrut bid2 l Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks2)

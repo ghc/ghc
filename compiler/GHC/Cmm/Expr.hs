@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -32,6 +33,7 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
@@ -209,37 +211,39 @@ data CmmLit
                      -- of bytes used
   deriving Eq
 
-cmmExprType :: DynFlags -> CmmExpr -> CmmType
-cmmExprType dflags (CmmLit lit)        = cmmLitType dflags lit
-cmmExprType _      (CmmLoad _ rep)     = rep
-cmmExprType dflags (CmmReg reg)        = cmmRegType dflags reg
-cmmExprType dflags (CmmMachOp op args) = machOpResultType dflags op (map (cmmExprType dflags) args)
-cmmExprType dflags (CmmRegOff reg _)   = cmmRegType dflags reg
-cmmExprType dflags (CmmStackSlot _ _)  = bWord dflags -- an address
--- Careful though: what is stored at the stack slot may be bigger than
--- an address
+cmmExprType :: Platform -> CmmExpr -> CmmType
+cmmExprType platform = \case
+   (CmmLit lit)        -> cmmLitType platform lit
+   (CmmLoad _ rep)     -> rep
+   (CmmReg reg)        -> cmmRegType platform reg
+   (CmmMachOp op args) -> machOpResultType platform op (map (cmmExprType platform) args)
+   (CmmRegOff reg _)   -> cmmRegType platform reg
+   (CmmStackSlot _ _)  -> bWord platform -- an address
+   -- Careful though: what is stored at the stack slot may be bigger than
+   -- an address
 
-cmmLitType :: DynFlags -> CmmLit -> CmmType
-cmmLitType _      (CmmInt _ width)     = cmmBits  width
-cmmLitType _      (CmmFloat _ width)   = cmmFloat width
-cmmLitType _      (CmmVec [])          = panic "cmmLitType: CmmVec []"
-cmmLitType cflags (CmmVec (l:ls))      = let ty = cmmLitType cflags l
-                                         in if all (`cmmEqType` ty) (map (cmmLitType cflags) ls)
-                                            then cmmVec (1+length ls) ty
-                                            else panic "cmmLitType: CmmVec"
-cmmLitType dflags (CmmLabel lbl)       = cmmLabelType dflags lbl
-cmmLitType dflags (CmmLabelOff lbl _)  = cmmLabelType dflags lbl
-cmmLitType _      (CmmLabelDiffOff _ _ _ width) = cmmBits width
-cmmLitType dflags (CmmBlock _)         = bWord dflags
-cmmLitType dflags (CmmHighStackMark)   = bWord dflags
+cmmLitType :: Platform -> CmmLit -> CmmType
+cmmLitType platform = \case
+   (CmmInt _ width)     -> cmmBits  width
+   (CmmFloat _ width)   -> cmmFloat width
+   (CmmVec [])          -> panic "cmmLitType: CmmVec []"
+   (CmmVec (l:ls))      -> let ty = cmmLitType platform l
+                          in if all (`cmmEqType` ty) (map (cmmLitType platform) ls)
+                               then cmmVec (1+length ls) ty
+                               else panic "cmmLitType: CmmVec"
+   (CmmLabel lbl)       -> cmmLabelType platform lbl
+   (CmmLabelOff lbl _)  -> cmmLabelType platform lbl
+   (CmmLabelDiffOff _ _ _ width) -> cmmBits width
+   (CmmBlock _)         -> bWord platform
+   (CmmHighStackMark)   -> bWord platform
 
-cmmLabelType :: DynFlags -> CLabel -> CmmType
-cmmLabelType dflags lbl
- | isGcPtrLabel lbl = gcWord dflags
- | otherwise        = bWord dflags
+cmmLabelType :: Platform -> CLabel -> CmmType
+cmmLabelType platform lbl
+ | isGcPtrLabel lbl = gcWord platform
+ | otherwise        = bWord platform
 
-cmmExprWidth :: DynFlags -> CmmExpr -> Width
-cmmExprWidth dflags e = typeWidth (cmmExprType dflags e)
+cmmExprWidth :: Platform -> CmmExpr -> Width
+cmmExprWidth platform e = typeWidth (cmmExprType platform e)
 
 -- | Returns an alignment in bytes of a CmmExpr when it's a statically
 -- known integer constant, otherwise returns an alignment of 1 byte.
@@ -278,12 +282,12 @@ instance Ord LocalReg where
 instance Uniquable LocalReg where
   getUnique (LocalReg uniq _) = uniq
 
-cmmRegType :: DynFlags -> CmmReg -> CmmType
-cmmRegType _      (CmmLocal  reg) = localRegType reg
-cmmRegType dflags (CmmGlobal reg) = globalRegType dflags reg
+cmmRegType :: Platform -> CmmReg -> CmmType
+cmmRegType _        (CmmLocal  reg) = localRegType reg
+cmmRegType platform (CmmGlobal reg) = globalRegType platform reg
 
-cmmRegWidth :: DynFlags -> CmmReg -> Width
-cmmRegWidth dflags = typeWidth . cmmRegType dflags
+cmmRegWidth :: Platform -> CmmReg -> Width
+cmmRegWidth platform = typeWidth . cmmRegType platform
 
 localRegType :: LocalReg -> CmmType
 localRegType (LocalReg _ rep) = rep
@@ -590,23 +594,23 @@ cccsReg = CmmGlobal CCCS
 node :: GlobalReg
 node = VanillaReg 1 VGcPtr
 
-globalRegType :: DynFlags -> GlobalReg -> CmmType
-globalRegType dflags (VanillaReg _ VGcPtr)    = gcWord dflags
-globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
-globalRegType _      (FloatReg _)      = cmmFloat W32
-globalRegType _      (DoubleReg _)     = cmmFloat W64
-globalRegType _      (LongReg _)       = cmmBits W64
--- TODO: improve the internal model of SIMD/vectorized registers
--- the right design SHOULd improve handling of float and double code too.
--- see remarks in "NOTE [SIMD Design for the future]"" in GHC.StgToCmm.Prim
-globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
-globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
-globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)
+globalRegType :: Platform -> GlobalReg -> CmmType
+globalRegType platform = \case
+   (VanillaReg _ VGcPtr)    -> gcWord platform
+   (VanillaReg _ VNonGcPtr) -> bWord platform
+   (FloatReg _)             -> cmmFloat W32
+   (DoubleReg _)            -> cmmFloat W64
+   (LongReg _)              -> cmmBits W64
+   -- TODO: improve the internal model of SIMD/vectorized registers
+   -- the right design SHOULd improve handling of float and double code too.
+   -- see remarks in "NOTE [SIMD Design for the future]"" in GHC.StgToCmm.Prim
+   (XmmReg _) -> cmmVec 4 (cmmBits W32)
+   (YmmReg _) -> cmmVec 8 (cmmBits W32)
+   (ZmmReg _) -> cmmVec 16 (cmmBits W32)
 
-globalRegType dflags Hp                = gcWord dflags
-                                            -- The initialiser for all
-                                            -- dynamically allocated closures
-globalRegType dflags _                 = bWord dflags
+   Hp         -> gcWord platform -- The initialiser for all
+                                 -- dynamically allocated closures
+   _          -> bWord platform
 
 isArgReg :: GlobalReg -> Bool
 isArgReg (VanillaReg {}) = True

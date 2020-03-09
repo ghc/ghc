@@ -100,8 +100,8 @@ cgOpApp (StgPrimOp primop) args res_ty = do
                 emitReturn []
 
           | ReturnsPrim rep <- result_info
-          -> do dflags <- getDynFlags
-                res <- newTemp (primRepCmmType dflags rep)
+          -> do platform <- getPlatform
+                res <- newTemp (primRepCmmType platform rep)
                 f [res]
                 emitReturn [CmmReg (CmmLocal res)]
 
@@ -176,11 +176,11 @@ emitPrimOp dflags = \case
 
   NewArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \[res] -> doNewArrayOp res (arrPtrsRep dflags (fromInteger n)) mkMAP_DIRTY_infoLabel
-        [ (mkIntExpr dflags (fromInteger n),
+        [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags)
-        , (mkIntExpr dflags (nonHdrSizeW (arrPtrsRep dflags (fromInteger n))),
+        , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromInteger n))),
            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
         ]
         (fromInteger n) init
@@ -208,34 +208,34 @@ emitPrimOp dflags = \case
 
   CloneArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   CloneMutableArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   FreezeArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   ThawArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   NewSmallArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] ->
         doNewArrayOp res (smallArrPtrsRep (fromInteger n)) mkSMAP_DIRTY_infoLabel
-        [ (mkIntExpr dflags (fromInteger n),
+        [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
         ]
         (fromInteger n) init
@@ -253,25 +253,25 @@ emitPrimOp dflags = \case
 
   CloneSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   CloneSmallMutableArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   FreezeSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   ThawSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opAllDone $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
@@ -290,7 +290,7 @@ emitPrimOp dflags = \case
     -- refer to arg twice (once to pass to newSpark(), and once to
     -- assign to res), so put it in a temporary.
     tmp <- assignTemp arg
-    tmp2 <- newTemp (bWord dflags)
+    tmp2 <- newTemp (bWord platform)
     emitCCall
         [(tmp2,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
@@ -301,7 +301,7 @@ emitPrimOp dflags = \case
     let
       val
        | gopt Opt_SccProfilingOn dflags = costCentreFrom dflags (cmmUntag dflags arg)
-       | otherwise                      = CmmLit (zeroCLit dflags)
+       | otherwise                      = CmmLit (zeroCLit platform)
     emitAssign (CmmLocal res) val
 
   GetCurrentCCSOp -> \[_] -> opAllDone $ \[res] -> do
@@ -311,11 +311,11 @@ emitPrimOp dflags = \case
     emitAssign (CmmLocal res) currentTSOExpr
 
   ReadMutVarOp -> \[mutv] -> opAllDone $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform mutv (fixedHdrSizeW dflags) (gcWord platform))
 
   WriteMutVarOp -> \[mutv, var] -> opAllDone $ \res@[] -> do
-    old_val <- CmmLocal <$> newTemp (cmmExprType dflags var)
-    emitAssign old_val (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
+    old_val <- CmmLocal <$> newTemp (cmmExprType platform var)
+    emitAssign old_val (cmmLoadIndexW platform mutv (fixedHdrSizeW dflags) (gcWord platform))
 
     -- Without this write barrier, other CPUs may see this pointer before
     -- the writes for the closure it points to have occurred.
@@ -323,7 +323,7 @@ emitPrimOp dflags = \case
     -- that the read of old_val comes before another core's write to the
     -- MutVar's value.
     emitPrimCall res MO_WriteBarrier []
-    emitStore (cmmOffsetW dflags mutv (fixedHdrSizeW dflags)) var
+    emitStore (cmmOffsetW platform mutv (fixedHdrSizeW dflags)) var
     emitCCall
             [{-no results-}]
             (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
@@ -332,7 +332,7 @@ emitPrimOp dflags = \case
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
   SizeofByteArrayOp -> \[arg] -> opAllDone $ \[res] -> do
-    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
@@ -341,7 +341,7 @@ emitPrimOp dflags = \case
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
   GetSizeofMutableByteArrayOp -> \[arg] -> opAllDone $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
 
 
 --  #define touchzh(o)                  /* nothing */
@@ -350,14 +350,14 @@ emitPrimOp dflags = \case
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
   ByteArrayContents_Char -> \[arg] -> opAllDone $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
+    emitAssign (CmmLocal res) (cmmOffsetB platform arg (arrWordsHdrSize dflags))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
   StableNameToIntOp -> \[arg] -> opAllDone $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
 
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opAllDone $ \[res] -> do
-    emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [arg1,arg2])
+    emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
 
 --  #define addrToHValuezh(r,a) r=(P_)a
   AddrToAnyOp -> \[arg] -> opAllDone $ \[res] -> do
@@ -434,17 +434,17 @@ emitPrimOp dflags = \case
 -- Getting the size of pointer arrays
 
   SizeofArrayOp -> \[arg] -> opAllDone $ \[res] -> do
-    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
-      (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
-        (bWord dflags))
+    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg
+      (fixedHdrSizeW dflags + bytesToWordsRoundUp platform (oFFSET_StgMutArrPtrs_ptrs dflags))
+        (bWord platform))
   SizeofMutableArrayOp -> emitPrimOp dflags SizeofArrayOp
   SizeofArrayArrayOp -> emitPrimOp dflags SizeofArrayOp
   SizeofMutableArrayArrayOp -> emitPrimOp dflags SizeofArrayOp
   SizeofSmallArrayOp -> \[arg] -> opAllDone $ \[res] -> do
     emit $ mkAssign (CmmLocal res)
-     (cmmLoadIndexW dflags arg
-     (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
-        (bWord dflags))
+     (cmmLoadIndexW platform arg
+     (fixedHdrSizeW dflags + bytesToWordsRoundUp platform (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+        (bWord platform))
 
   SizeofSmallMutableArrayOp -> emitPrimOp dflags SizeofSmallArrayOp
   GetSizeofSmallMutableArrayOp -> emitPrimOp dflags SizeofSmallArrayOp
@@ -452,281 +452,281 @@ emitPrimOp dflags = \case
 -- IndexXXXoffAddr
 
   IndexOffAddrOp_Char -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
+    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8 res args
   IndexOffAddrOp_WideChar -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
   IndexOffAddrOp_Int -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   IndexOffAddrOp_Word -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   IndexOffAddrOp_Addr -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   IndexOffAddrOp_Float -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing f32 res args
   IndexOffAddrOp_Double -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing f64 res args
   IndexOffAddrOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   IndexOffAddrOp_Int8 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
+    doIndexOffAddrOp   (Just (mo_s_8ToWord platform)) b8  res args
   IndexOffAddrOp_Int16 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
+    doIndexOffAddrOp   (Just (mo_s_16ToWord platform)) b16 res args
   IndexOffAddrOp_Int32 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_s_32ToWord platform)) b32 res args
   IndexOffAddrOp_Int64 -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing b64 res args
   IndexOffAddrOp_Word8 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
+    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8  res args
   IndexOffAddrOp_Word16 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
+    doIndexOffAddrOp   (Just (mo_u_16ToWord platform)) b16 res args
   IndexOffAddrOp_Word32 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
   IndexOffAddrOp_Word64 -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing b64 res args
 
 -- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
 
   ReadOffAddrOp_Char -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
+    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8 res args
   ReadOffAddrOp_WideChar -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
   ReadOffAddrOp_Int -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   ReadOffAddrOp_Word -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   ReadOffAddrOp_Addr -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   ReadOffAddrOp_Float -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing f32 res args
   ReadOffAddrOp_Double -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing f64 res args
   ReadOffAddrOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   Nothing (bWord dflags) res args
+    doIndexOffAddrOp   Nothing (bWord platform) res args
   ReadOffAddrOp_Int8 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
+    doIndexOffAddrOp   (Just (mo_s_8ToWord platform)) b8  res args
   ReadOffAddrOp_Int16 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
+    doIndexOffAddrOp   (Just (mo_s_16ToWord platform)) b16 res args
   ReadOffAddrOp_Int32 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_s_32ToWord platform)) b32 res args
   ReadOffAddrOp_Int64 -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing b64 res args
   ReadOffAddrOp_Word8 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
+    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8  res args
   ReadOffAddrOp_Word16 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
+    doIndexOffAddrOp   (Just (mo_u_16ToWord platform)) b16 res args
   ReadOffAddrOp_Word32 -> \args -> opAllDone $ \res -> do
-    doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
   ReadOffAddrOp_Word64 -> \args -> opAllDone $ \res -> do
     doIndexOffAddrOp   Nothing b64 res args
 
 -- IndexXXXArray
 
   IndexByteArrayOp_Char -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
+    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8 res args
   IndexByteArrayOp_WideChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32 res args
   IndexByteArrayOp_Int -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   IndexByteArrayOp_Word -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   IndexByteArrayOp_Addr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   IndexByteArrayOp_Float -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing f32 res args
   IndexByteArrayOp_Double -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing f64 res args
   IndexByteArrayOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   IndexByteArrayOp_Int8 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
+    doIndexByteArrayOp   (Just (mo_s_8ToWord platform)) b8  res args
   IndexByteArrayOp_Int16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
+    doIndexByteArrayOp   (Just (mo_s_16ToWord platform)) b16  res args
   IndexByteArrayOp_Int32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
+    doIndexByteArrayOp   (Just (mo_s_32ToWord platform)) b32  res args
   IndexByteArrayOp_Int64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing b64  res args
   IndexByteArrayOp_Word8 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
+    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8  res args
   IndexByteArrayOp_Word16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
+    doIndexByteArrayOp   (Just (mo_u_16ToWord platform)) b16  res args
   IndexByteArrayOp_Word32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
+    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32  res args
   IndexByteArrayOp_Word64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing b64  res args
 
 -- ReadXXXArray, identical to IndexXXXArray.
 
   ReadByteArrayOp_Char -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
+    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8 res args
   ReadByteArrayOp_WideChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
+    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32 res args
   ReadByteArrayOp_Int -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   ReadByteArrayOp_Word -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   ReadByteArrayOp_Addr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   ReadByteArrayOp_Float -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing f32 res args
   ReadByteArrayOp_Double -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing f64 res args
   ReadByteArrayOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   Nothing (bWord dflags) res args
+    doIndexByteArrayOp   Nothing (bWord platform) res args
   ReadByteArrayOp_Int8 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
+    doIndexByteArrayOp   (Just (mo_s_8ToWord platform)) b8  res args
   ReadByteArrayOp_Int16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
+    doIndexByteArrayOp   (Just (mo_s_16ToWord platform)) b16  res args
   ReadByteArrayOp_Int32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
+    doIndexByteArrayOp   (Just (mo_s_32ToWord platform)) b32  res args
   ReadByteArrayOp_Int64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing b64  res args
   ReadByteArrayOp_Word8 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
+    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8  res args
   ReadByteArrayOp_Word16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
+    doIndexByteArrayOp   (Just (mo_u_16ToWord platform)) b16  res args
   ReadByteArrayOp_Word32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
+    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32  res args
   ReadByteArrayOp_Word64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOp   Nothing b64  res args
 
 -- IndexWord8ArrayAsXXX
 
   IndexByteArrayOp_Word8AsChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
   IndexByteArrayOp_Word8AsWideChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
   IndexByteArrayOp_Word8AsInt -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsWord -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsAddr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsFloat -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing f32 b8 res args
   IndexByteArrayOp_Word8AsDouble -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing f64 b8 res args
   IndexByteArrayOp_Word8AsStablePtr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsInt16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_s_16ToWord platform)) b16 b8 res args
   IndexByteArrayOp_Word8AsInt32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_s_32ToWord platform)) b32 b8 res args
   IndexByteArrayOp_Word8AsInt64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing b64 b8 res args
   IndexByteArrayOp_Word8AsWord16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_16ToWord platform)) b16 b8 res args
   IndexByteArrayOp_Word8AsWord32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
   IndexByteArrayOp_Word8AsWord64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing b64 b8 res args
 
 -- ReadInt8ArrayAsXXX, identical to IndexInt8ArrayAsXXX
 
   ReadByteArrayOp_Word8AsChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_8ToWord platform)) b8 b8 res args
   ReadByteArrayOp_Word8AsWideChar -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
   ReadByteArrayOp_Word8AsInt -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsWord -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsAddr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsFloat -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing f32 b8 res args
   ReadByteArrayOp_Word8AsDouble -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing f64 b8 res args
   ReadByteArrayOp_Word8AsStablePtr -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+    doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsInt16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_s_16ToWord platform)) b16 b8 res args
   ReadByteArrayOp_Word8AsInt32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_s_32ToWord platform)) b32 b8 res args
   ReadByteArrayOp_Word8AsInt64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing b64 b8 res args
   ReadByteArrayOp_Word8AsWord16 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_16ToWord platform)) b16 b8 res args
   ReadByteArrayOp_Word8AsWord32 -> \args -> opAllDone $ \res -> do
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
   ReadByteArrayOp_Word8AsWord64 -> \args -> opAllDone $ \res -> do
     doIndexByteArrayOpAs   Nothing b64 b8 res args
 
 -- WriteXXXoffAddr
 
   WriteOffAddrOp_Char -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
   WriteOffAddrOp_WideChar -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b32 res args
   WriteOffAddrOp_Int -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp Nothing (bWord dflags) res args
+    doWriteOffAddrOp Nothing (bWord platform) res args
   WriteOffAddrOp_Word -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp Nothing (bWord dflags) res args
+    doWriteOffAddrOp Nothing (bWord platform) res args
   WriteOffAddrOp_Addr -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp Nothing (bWord dflags) res args
+    doWriteOffAddrOp Nothing (bWord platform) res args
   WriteOffAddrOp_Float -> \args -> opAllDone $ \res -> do
     doWriteOffAddrOp Nothing f32 res args
   WriteOffAddrOp_Double -> \args -> opAllDone $ \res -> do
     doWriteOffAddrOp Nothing f64 res args
   WriteOffAddrOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp Nothing (bWord dflags) res args
+    doWriteOffAddrOp Nothing (bWord platform) res args
   WriteOffAddrOp_Int8 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
   WriteOffAddrOp_Int16 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteOffAddrOp (Just (mo_WordTo16 platform)) b16 res args
   WriteOffAddrOp_Int32 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b32 res args
   WriteOffAddrOp_Int64 -> \args -> opAllDone $ \res -> do
     doWriteOffAddrOp Nothing b64 res args
   WriteOffAddrOp_Word8 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
   WriteOffAddrOp_Word16 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteOffAddrOp (Just (mo_WordTo16 platform)) b16 res args
   WriteOffAddrOp_Word32 -> \args -> opAllDone $ \res -> do
-    doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b32 res args
   WriteOffAddrOp_Word64 -> \args -> opAllDone $ \res -> do
     doWriteOffAddrOp Nothing b64 res args
 
 -- WriteXXXArray
 
   WriteByteArrayOp_Char -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
   WriteByteArrayOp_WideChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
   WriteByteArrayOp_Int -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (bWord platform) res args
   WriteByteArrayOp_Word -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (bWord platform) res args
   WriteByteArrayOp_Addr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (bWord platform) res args
   WriteByteArrayOp_Float -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing f32 res args
   WriteByteArrayOp_Double -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing f64 res args
   WriteByteArrayOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (bWord platform) res args
   WriteByteArrayOp_Int8 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
   WriteByteArrayOp_Int16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b16 res args
   WriteByteArrayOp_Int32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
   WriteByteArrayOp_Int64 -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b64 res args
   WriteByteArrayOp_Word8 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8  res args
+    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8  res args
   WriteByteArrayOp_Word16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b16 res args
   WriteByteArrayOp_Word32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
   WriteByteArrayOp_Word64 -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b64 res args
 
 -- WriteInt8ArrayAsXXX
 
   WriteByteArrayOp_Word8AsChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
   WriteByteArrayOp_Word8AsWideChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
   WriteByteArrayOp_Word8AsInt -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsWord -> \args -> opAllDone $ \res -> do
@@ -740,15 +740,15 @@ emitPrimOp dflags = \case
   WriteByteArrayOp_Word8AsStablePtr -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsInt16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b8 res args
   WriteByteArrayOp_Word8AsInt32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
   WriteByteArrayOp_Word8AsInt64 -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsWord16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b8 res args
   WriteByteArrayOp_Word8AsWord32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
   WriteByteArrayOp_Word8AsWord64 -> \args -> opAllDone $ \res -> do
     doWriteByteArrayOp Nothing b8 res args
 
@@ -777,7 +777,7 @@ emitPrimOp dflags = \case
   BSwap64Op -> \[w] -> opAllDone $ \[res] -> do
     emitBSwapCall res w W64
   BSwapOp -> \[w] -> opAllDone $ \[res] -> do
-    emitBSwapCall res w (wordWidth dflags)
+    emitBSwapCall res w (wordWidth platform)
 
   BRev8Op -> \[w] -> opAllDone $ \[res] -> do
     emitBRevCall res w W8
@@ -788,7 +788,7 @@ emitPrimOp dflags = \case
   BRev64Op -> \[w] -> opAllDone $ \[res] -> do
     emitBRevCall res w W64
   BRevOp -> \[w] -> opAllDone $ \[res] -> do
-    emitBRevCall res w (wordWidth dflags)
+    emitBRevCall res w (wordWidth platform)
 
 -- Population count
   PopCnt8Op -> \[w] -> opAllDone $ \[res] -> do
@@ -800,7 +800,7 @@ emitPrimOp dflags = \case
   PopCnt64Op -> \[w] -> opAllDone $ \[res] -> do
     emitPopCntCall res w W64
   PopCntOp -> \[w] -> opAllDone $ \[res] -> do
-    emitPopCntCall res w (wordWidth dflags)
+    emitPopCntCall res w (wordWidth platform)
 
 -- Parallel bit deposit
   Pdep8Op -> \[src, mask] -> opAllDone $ \[res] -> do
@@ -812,7 +812,7 @@ emitPrimOp dflags = \case
   Pdep64Op -> \[src, mask] -> opAllDone $ \[res] -> do
     emitPdepCall res src mask W64
   PdepOp -> \[src, mask] -> opAllDone $ \[res] -> do
-    emitPdepCall res src mask (wordWidth dflags)
+    emitPdepCall res src mask (wordWidth platform)
 
 -- Parallel bit extract
   Pext8Op -> \[src, mask] -> opAllDone $ \[res] -> do
@@ -824,7 +824,7 @@ emitPrimOp dflags = \case
   Pext64Op -> \[src, mask] -> opAllDone $ \[res] -> do
     emitPextCall res src mask W64
   PextOp -> \[src, mask] -> opAllDone $ \[res] -> do
-    emitPextCall res src mask (wordWidth dflags)
+    emitPextCall res src mask (wordWidth platform)
 
 -- count leading zeros
   Clz8Op -> \[w] -> opAllDone $ \[res] -> do
@@ -836,7 +836,7 @@ emitPrimOp dflags = \case
   Clz64Op -> \[w] -> opAllDone $ \[res] -> do
     emitClzCall res w W64
   ClzOp -> \[w] -> opAllDone $ \[res] -> do
-    emitClzCall res w (wordWidth dflags)
+    emitClzCall res w (wordWidth platform)
 
 -- count trailing zeros
   Ctz8Op -> \[w] -> opAllDone $ \[res] -> do
@@ -848,7 +848,7 @@ emitPrimOp dflags = \case
   Ctz64Op -> \[w] -> opAllDone $ \[res] -> do
     emitCtzCall res w W64
   CtzOp -> \[w] -> opAllDone $ \[res] -> do
-    emitCtzCall res w (wordWidth dflags)
+    emitCtzCall res w (wordWidth platform)
 
 -- Unsigned int to floating point conversions
   Word2FloatOp -> \[w] -> opAllDone $ \[res] -> do
@@ -859,7 +859,7 @@ emitPrimOp dflags = \case
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opAllDone $ \[res] -> do
     checkVecCompatibility dflags vcat n w
-    doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros (replicate n e) res
+    doVecPackOp (vecElemInjectCast platform vcat w) ty zeros (replicate n e) res
    where
     zeros :: CmmExpr
     zeros = CmmLit $ CmmVec (replicate n zero)
@@ -877,7 +877,7 @@ emitPrimOp dflags = \case
     checkVecCompatibility dflags vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
-    doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros es res
+    doVecPackOp (vecElemInjectCast platform vcat w) ty zeros es res
    where
     zeros :: CmmExpr
     zeros = CmmLit $ CmmVec (replicate n zero)
@@ -895,14 +895,14 @@ emitPrimOp dflags = \case
     checkVecCompatibility dflags vcat n w
     when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
-    doVecUnpackOp (vecElemProjectCast dflags vcat w) ty arg res
+    doVecUnpackOp (vecElemProjectCast platform vcat w) ty arg res
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecInsertOp vcat n w) -> \[v,e,i] -> opAllDone $ \[res] -> do
     checkVecCompatibility dflags vcat n w
-    doVecInsertOp (vecElemInjectCast dflags vcat w) ty v e i res
+    doVecInsertOp (vecElemInjectCast platform vcat w) ty v e i res
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -1041,23 +1041,23 @@ emitPrimOp dflags = \case
 
 -- Atomic read-modify-write
   FetchAddByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_Add mba ix (bWord dflags) n
+    doAtomicRMW res AMO_Add mba ix (bWord platform) n
   FetchSubByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_Sub mba ix (bWord dflags) n
+    doAtomicRMW res AMO_Sub mba ix (bWord platform) n
   FetchAndByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_And mba ix (bWord dflags) n
+    doAtomicRMW res AMO_And mba ix (bWord platform) n
   FetchNandByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_Nand mba ix (bWord dflags) n
+    doAtomicRMW res AMO_Nand mba ix (bWord platform) n
   FetchOrByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_Or mba ix (bWord dflags) n
+    doAtomicRMW res AMO_Or mba ix (bWord platform) n
   FetchXorByteArrayOp_Int -> \[mba, ix, n] -> opAllDone $ \[res] -> do
-    doAtomicRMW res AMO_Xor mba ix (bWord dflags) n
+    doAtomicRMW res AMO_Xor mba ix (bWord platform) n
   AtomicReadByteArrayOp_Int -> \[mba, ix] -> opAllDone $ \[res] -> do
-    doAtomicReadByteArray res mba ix (bWord dflags)
+    doAtomicReadByteArray res mba ix (bWord platform)
   AtomicWriteByteArrayOp_Int -> \[mba, ix, val] -> opAllDone $ \[] -> do
-    doAtomicWriteByteArray mba ix (bWord dflags) val
+    doAtomicWriteByteArray mba ix (bWord platform) val
   CasByteArrayOp_Int -> \[mba, ix, old, new] -> opAllDone $ \[res] -> do
-    doCasByteArray res mba ix (bWord dflags) old new
+    doCasByteArray res mba ix (bWord platform) old new
 
 -- The rest just translate straightforwardly
 
@@ -1068,12 +1068,12 @@ emitPrimOp dflags = \case
   ChrOp           -> \args -> opNop args  -- Int# and Char# are rep'd the same
   OrdOp           -> \args -> opNop args
 
-  Narrow8IntOp   -> \args -> opNarrow dflags args (MO_SS_Conv, W8)
-  Narrow16IntOp  -> \args -> opNarrow dflags args (MO_SS_Conv, W16)
-  Narrow32IntOp  -> \args -> opNarrow dflags args (MO_SS_Conv, W32)
-  Narrow8WordOp  -> \args -> opNarrow dflags args (MO_UU_Conv, W8)
-  Narrow16WordOp -> \args -> opNarrow dflags args (MO_UU_Conv, W16)
-  Narrow32WordOp -> \args -> opNarrow dflags args (MO_UU_Conv, W32)
+  Narrow8IntOp   -> \args -> opNarrow platform args (MO_SS_Conv, W8)
+  Narrow16IntOp  -> \args -> opNarrow platform args (MO_SS_Conv, W16)
+  Narrow32IntOp  -> \args -> opNarrow platform args (MO_SS_Conv, W32)
+  Narrow8WordOp  -> \args -> opNarrow platform args (MO_UU_Conv, W8)
+  Narrow16WordOp -> \args -> opNarrow platform args (MO_UU_Conv, W16)
+  Narrow32WordOp -> \args -> opNarrow platform args (MO_UU_Conv, W32)
 
   DoublePowerOp  -> \args -> opCallish args MO_F64_Pwr
   DoubleSinOp    -> \args -> opCallish args MO_F64_Sin
@@ -1115,70 +1115,70 @@ emitPrimOp dflags = \case
 
 -- Native word signless ops
 
-  IntAddOp       -> \args -> opTranslate args (mo_wordAdd dflags)
-  IntSubOp       -> \args -> opTranslate args (mo_wordSub dflags)
-  WordAddOp      -> \args -> opTranslate args (mo_wordAdd dflags)
-  WordSubOp      -> \args -> opTranslate args (mo_wordSub dflags)
-  AddrAddOp      -> \args -> opTranslate args (mo_wordAdd dflags)
-  AddrSubOp      -> \args -> opTranslate args (mo_wordSub dflags)
+  IntAddOp       -> \args -> opTranslate args (mo_wordAdd platform)
+  IntSubOp       -> \args -> opTranslate args (mo_wordSub platform)
+  WordAddOp      -> \args -> opTranslate args (mo_wordAdd platform)
+  WordSubOp      -> \args -> opTranslate args (mo_wordSub platform)
+  AddrAddOp      -> \args -> opTranslate args (mo_wordAdd platform)
+  AddrSubOp      -> \args -> opTranslate args (mo_wordSub platform)
 
-  IntEqOp        -> \args -> opTranslate args (mo_wordEq dflags)
-  IntNeOp        -> \args -> opTranslate args (mo_wordNe dflags)
-  WordEqOp       -> \args -> opTranslate args (mo_wordEq dflags)
-  WordNeOp       -> \args -> opTranslate args (mo_wordNe dflags)
-  AddrEqOp       -> \args -> opTranslate args (mo_wordEq dflags)
-  AddrNeOp       -> \args -> opTranslate args (mo_wordNe dflags)
+  IntEqOp        -> \args -> opTranslate args (mo_wordEq platform)
+  IntNeOp        -> \args -> opTranslate args (mo_wordNe platform)
+  WordEqOp       -> \args -> opTranslate args (mo_wordEq platform)
+  WordNeOp       -> \args -> opTranslate args (mo_wordNe platform)
+  AddrEqOp       -> \args -> opTranslate args (mo_wordEq platform)
+  AddrNeOp       -> \args -> opTranslate args (mo_wordNe platform)
 
-  AndOp          -> \args -> opTranslate args (mo_wordAnd dflags)
-  OrOp           -> \args -> opTranslate args (mo_wordOr dflags)
-  XorOp          -> \args -> opTranslate args (mo_wordXor dflags)
-  NotOp          -> \args -> opTranslate args (mo_wordNot dflags)
-  SllOp          -> \args -> opTranslate args (mo_wordShl dflags)
-  SrlOp          -> \args -> opTranslate args (mo_wordUShr dflags)
+  AndOp          -> \args -> opTranslate args (mo_wordAnd platform)
+  OrOp           -> \args -> opTranslate args (mo_wordOr platform)
+  XorOp          -> \args -> opTranslate args (mo_wordXor platform)
+  NotOp          -> \args -> opTranslate args (mo_wordNot platform)
+  SllOp          -> \args -> opTranslate args (mo_wordShl platform)
+  SrlOp          -> \args -> opTranslate args (mo_wordUShr platform)
 
-  AddrRemOp      -> \args -> opTranslate args (mo_wordURem dflags)
+  AddrRemOp      -> \args -> opTranslate args (mo_wordURem platform)
 
 -- Native word signed ops
 
-  IntMulOp        -> \args -> opTranslate args (mo_wordMul dflags)
-  IntMulMayOfloOp -> \args -> opTranslate args (MO_S_MulMayOflo (wordWidth dflags))
-  IntQuotOp       -> \args -> opTranslate args (mo_wordSQuot dflags)
-  IntRemOp        -> \args -> opTranslate args (mo_wordSRem dflags)
-  IntNegOp        -> \args -> opTranslate args (mo_wordSNeg dflags)
+  IntMulOp        -> \args -> opTranslate args (mo_wordMul platform)
+  IntMulMayOfloOp -> \args -> opTranslate args (MO_S_MulMayOflo (wordWidth platform))
+  IntQuotOp       -> \args -> opTranslate args (mo_wordSQuot platform)
+  IntRemOp        -> \args -> opTranslate args (mo_wordSRem platform)
+  IntNegOp        -> \args -> opTranslate args (mo_wordSNeg platform)
 
-  IntGeOp        -> \args -> opTranslate args (mo_wordSGe dflags)
-  IntLeOp        -> \args -> opTranslate args (mo_wordSLe dflags)
-  IntGtOp        -> \args -> opTranslate args (mo_wordSGt dflags)
-  IntLtOp        -> \args -> opTranslate args (mo_wordSLt dflags)
+  IntGeOp        -> \args -> opTranslate args (mo_wordSGe platform)
+  IntLeOp        -> \args -> opTranslate args (mo_wordSLe platform)
+  IntGtOp        -> \args -> opTranslate args (mo_wordSGt platform)
+  IntLtOp        -> \args -> opTranslate args (mo_wordSLt platform)
 
-  AndIOp         -> \args -> opTranslate args (mo_wordAnd dflags)
-  OrIOp          -> \args -> opTranslate args (mo_wordOr dflags)
-  XorIOp         -> \args -> opTranslate args (mo_wordXor dflags)
-  NotIOp         -> \args -> opTranslate args (mo_wordNot dflags)
-  ISllOp         -> \args -> opTranslate args (mo_wordShl dflags)
-  ISraOp         -> \args -> opTranslate args (mo_wordSShr dflags)
-  ISrlOp         -> \args -> opTranslate args (mo_wordUShr dflags)
+  AndIOp         -> \args -> opTranslate args (mo_wordAnd platform)
+  OrIOp          -> \args -> opTranslate args (mo_wordOr platform)
+  XorIOp         -> \args -> opTranslate args (mo_wordXor platform)
+  NotIOp         -> \args -> opTranslate args (mo_wordNot platform)
+  ISllOp         -> \args -> opTranslate args (mo_wordShl platform)
+  ISraOp         -> \args -> opTranslate args (mo_wordSShr platform)
+  ISrlOp         -> \args -> opTranslate args (mo_wordUShr platform)
 
 -- Native word unsigned ops
 
-  WordGeOp       -> \args -> opTranslate args (mo_wordUGe dflags)
-  WordLeOp       -> \args -> opTranslate args (mo_wordULe dflags)
-  WordGtOp       -> \args -> opTranslate args (mo_wordUGt dflags)
-  WordLtOp       -> \args -> opTranslate args (mo_wordULt dflags)
+  WordGeOp       -> \args -> opTranslate args (mo_wordUGe platform)
+  WordLeOp       -> \args -> opTranslate args (mo_wordULe platform)
+  WordGtOp       -> \args -> opTranslate args (mo_wordUGt platform)
+  WordLtOp       -> \args -> opTranslate args (mo_wordULt platform)
 
-  WordMulOp      -> \args -> opTranslate args (mo_wordMul dflags)
-  WordQuotOp     -> \args -> opTranslate args (mo_wordUQuot dflags)
-  WordRemOp      -> \args -> opTranslate args (mo_wordURem dflags)
+  WordMulOp      -> \args -> opTranslate args (mo_wordMul platform)
+  WordQuotOp     -> \args -> opTranslate args (mo_wordUQuot platform)
+  WordRemOp      -> \args -> opTranslate args (mo_wordURem platform)
 
-  AddrGeOp       -> \args -> opTranslate args (mo_wordUGe dflags)
-  AddrLeOp       -> \args -> opTranslate args (mo_wordULe dflags)
-  AddrGtOp       -> \args -> opTranslate args (mo_wordUGt dflags)
-  AddrLtOp       -> \args -> opTranslate args (mo_wordULt dflags)
+  AddrGeOp       -> \args -> opTranslate args (mo_wordUGe platform)
+  AddrLeOp       -> \args -> opTranslate args (mo_wordULe platform)
+  AddrGtOp       -> \args -> opTranslate args (mo_wordUGt platform)
+  AddrLtOp       -> \args -> opTranslate args (mo_wordULt platform)
 
 -- Int8# signed ops
 
-  Int8Extend     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth dflags))
-  Int8Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth dflags) W8)
+  Int8Extend     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
+  Int8Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
   Int8NegOp      -> \args -> opTranslate args (MO_S_Neg W8)
   Int8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Int8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1195,8 +1195,8 @@ emitPrimOp dflags = \case
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth dflags))
-  Word8Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth dflags) W8)
+  Word8Extend     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
+  Word8Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
   Word8NotOp      -> \args -> opTranslate args (MO_Not W8)
   Word8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Word8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1213,8 +1213,8 @@ emitPrimOp dflags = \case
 
 -- Int16# signed ops
 
-  Int16Extend     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth dflags))
-  Int16Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth dflags) W16)
+  Int16Extend     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
+  Int16Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
   Int16NegOp      -> \args -> opTranslate args (MO_S_Neg W16)
   Int16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Int16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1231,8 +1231,8 @@ emitPrimOp dflags = \case
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth dflags))
-  Word16Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth dflags) W16)
+  Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
+  Word16Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
   Word16NotOp      -> \args -> opTranslate args (MO_Not W16)
   Word16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Word16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1249,12 +1249,12 @@ emitPrimOp dflags = \case
 
 -- Char# ops
 
-  CharEqOp       -> \args -> opTranslate args (MO_Eq (wordWidth dflags))
-  CharNeOp       -> \args -> opTranslate args (MO_Ne (wordWidth dflags))
-  CharGeOp       -> \args -> opTranslate args (MO_U_Ge (wordWidth dflags))
-  CharLeOp       -> \args -> opTranslate args (MO_U_Le (wordWidth dflags))
-  CharGtOp       -> \args -> opTranslate args (MO_U_Gt (wordWidth dflags))
-  CharLtOp       -> \args -> opTranslate args (MO_U_Lt (wordWidth dflags))
+  CharEqOp       -> \args -> opTranslate args (MO_Eq (wordWidth platform))
+  CharNeOp       -> \args -> opTranslate args (MO_Ne (wordWidth platform))
+  CharGeOp       -> \args -> opTranslate args (MO_U_Ge (wordWidth platform))
+  CharLeOp       -> \args -> opTranslate args (MO_U_Le (wordWidth platform))
+  CharGtOp       -> \args -> opTranslate args (MO_U_Gt (wordWidth platform))
+  CharLtOp       -> \args -> opTranslate args (MO_U_Lt (wordWidth platform))
 
 -- Double ops
 
@@ -1314,32 +1314,32 @@ emitPrimOp dflags = \case
 
 -- Conversions
 
-  Int2DoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth dflags) W64)
-  Double2IntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth dflags))
+  Int2DoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W64)
+  Double2IntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth platform))
 
-  Int2FloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth dflags) W32)
-  Float2IntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth dflags))
+  Int2FloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W32)
+  Float2IntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth platform))
 
   Float2DoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
   Double2FloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
 
 -- Word comparisons masquerading as more exotic things.
 
-  SameMutVarOp            -> \args -> opTranslate args (mo_wordEq dflags)
-  SameMVarOp              -> \args -> opTranslate args (mo_wordEq dflags)
-  SameMutableArrayOp      -> \args -> opTranslate args (mo_wordEq dflags)
-  SameMutableByteArrayOp  -> \args -> opTranslate args (mo_wordEq dflags)
-  SameMutableArrayArrayOp -> \args -> opTranslate args (mo_wordEq dflags)
-  SameSmallMutableArrayOp -> \args -> opTranslate args (mo_wordEq dflags)
-  SameTVarOp              -> \args -> opTranslate args (mo_wordEq dflags)
-  EqStablePtrOp           -> \args -> opTranslate args (mo_wordEq dflags)
+  SameMutVarOp            -> \args -> opTranslate args (mo_wordEq platform)
+  SameMVarOp              -> \args -> opTranslate args (mo_wordEq platform)
+  SameMutableArrayOp      -> \args -> opTranslate args (mo_wordEq platform)
+  SameMutableByteArrayOp  -> \args -> opTranslate args (mo_wordEq platform)
+  SameMutableArrayArrayOp -> \args -> opTranslate args (mo_wordEq platform)
+  SameSmallMutableArrayOp -> \args -> opTranslate args (mo_wordEq platform)
+  SameTVarOp              -> \args -> opTranslate args (mo_wordEq platform)
+  EqStablePtrOp           -> \args -> opTranslate args (mo_wordEq platform)
 -- See Note [Comparing stable names]
-  EqStableNameOp          -> \args -> opTranslate args (mo_wordEq dflags)
+  EqStableNameOp          -> \args -> opTranslate args (mo_wordEq platform)
 
   IntQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
-    then Left (MO_S_QuotRem  (wordWidth dflags))
-    else Right (genericIntQuotRemOp (wordWidth dflags))
+    then Left (MO_S_QuotRem  (wordWidth platform))
+    else Right (genericIntQuotRemOp (wordWidth platform))
 
   Int8QuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
@@ -1353,13 +1353,13 @@ emitPrimOp dflags = \case
 
   WordQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
-    then Left (MO_U_QuotRem  (wordWidth dflags))
-    else Right (genericWordQuotRemOp (wordWidth dflags))
+    then Left (MO_U_QuotRem  (wordWidth platform))
+    else Right (genericWordQuotRemOp (wordWidth platform))
 
   WordQuotRem2Op -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_U_QuotRem2 (wordWidth dflags))
-    else Right (genericWordQuotRem2Op dflags)
+    then Left (MO_U_QuotRem2 (wordWidth platform))
+    else Right (genericWordQuotRem2Op platform)
 
   Word8QuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
@@ -1373,37 +1373,37 @@ emitPrimOp dflags = \case
 
   WordAdd2Op -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_Add2       (wordWidth dflags))
+    then Left (MO_Add2       (wordWidth platform))
     else Right genericWordAdd2Op
 
   WordAddCOp -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_AddWordC   (wordWidth dflags))
+    then Left (MO_AddWordC   (wordWidth platform))
     else Right genericWordAddCOp
 
   WordSubCOp -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_SubWordC   (wordWidth dflags))
+    then Left (MO_SubWordC   (wordWidth platform))
     else Right genericWordSubCOp
 
   IntAddCOp -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_AddIntC    (wordWidth dflags))
+    then Left (MO_AddIntC    (wordWidth platform))
     else Right genericIntAddCOp
 
   IntSubCOp -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
-    then Left (MO_SubIntC    (wordWidth dflags))
+    then Left (MO_SubIntC    (wordWidth platform))
     else Right genericIntSubCOp
 
   WordMul2Op -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) || llvm
-    then Left (MO_U_Mul2     (wordWidth dflags))
+    then Left (MO_U_Mul2     (wordWidth platform))
     else Right genericWordMul2Op
 
   IntMul2Op  -> \args -> opCallishHandledLater args $
     if ncg && x86ish
-    then Left (MO_S_Mul2     (wordWidth dflags))
+    then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
   FloatFabsOp -> \args -> opCallishHandledLater args $
@@ -1426,8 +1426,8 @@ emitPrimOp dflags = \case
     -- That won't work.
     let tycon = tyConAppTyCon res_ty
     MASSERT(isEnumerationTyCon tycon)
-    dflags <- getDynFlags
-    pure [tagToClosure dflags tycon amode]
+    platform <- getPlatform
+    pure [tagToClosure platform tycon amode]
 
 -- Out of line primops.
 -- TODO compiler need not know about these
@@ -1523,6 +1523,7 @@ emitPrimOp dflags = \case
   SetThreadAllocationCounter -> alwaysExternal
 
  where
+  platform = targetPlatform dflags
   alwaysExternal = \_ -> PrimopCmmEmit_External
   -- Note [QuotRem optimization]
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1549,11 +1550,11 @@ emitPrimOp dflags = \case
   llvm = case hscTarget dflags of
            HscLlvm -> True
            _       -> False
-  x86ish = case platformArch (targetPlatform dflags) of
+  x86ish = case platformArch platform of
              ArchX86    -> True
              ArchX86_64 -> True
              _          -> False
-  ppc = case platformArch (targetPlatform dflags) of
+  ppc = case platformArch platform of
           ArchPPC      -> True
           ArchPPC_64 _ -> True
           _            -> False
@@ -1573,12 +1574,12 @@ opNop args = PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) arg
   where [arg] = args
 
 opNarrow
-  :: DynFlags
+  :: Platform
   -> [CmmExpr]
   -> (Width -> Width -> MachOp, Width)
   -> PrimopCmmEmit
-opNarrow dflags args (mop, rep) = PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) $
-  CmmMachOp (mop rep (wordWidth dflags)) [CmmMachOp (mop (wordWidth dflags) rep) [arg]]
+opNarrow platform args (mop, rep) = PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) $
+  CmmMachOp (mop rep (wordWidth platform)) [CmmMachOp (mop (wordWidth platform) rep) [arg]]
   where [arg] = args
 
 -- | These primops are implemented by CallishMachOps, because they sometimes
@@ -1626,21 +1627,21 @@ genericWordQuotRemOp width [res_q, res_r] [arg_x, arg_y]
                (CmmMachOp (MO_U_Rem  width) [arg_x, arg_y])
 genericWordQuotRemOp _ _ _ = panic "genericWordQuotRemOp"
 
-genericWordQuotRem2Op :: DynFlags -> GenericOp
-genericWordQuotRem2Op dflags [res_q, res_r] [arg_x_high, arg_x_low, arg_y]
-    = emit =<< f (widthInBits (wordWidth dflags)) zero arg_x_high arg_x_low
-    where    ty = cmmExprType dflags arg_x_high
-             shl   x i = CmmMachOp (MO_Shl   (wordWidth dflags)) [x, i]
-             shr   x i = CmmMachOp (MO_U_Shr (wordWidth dflags)) [x, i]
-             or    x y = CmmMachOp (MO_Or    (wordWidth dflags)) [x, y]
-             ge    x y = CmmMachOp (MO_U_Ge  (wordWidth dflags)) [x, y]
-             ne    x y = CmmMachOp (MO_Ne    (wordWidth dflags)) [x, y]
-             minus x y = CmmMachOp (MO_Sub   (wordWidth dflags)) [x, y]
-             times x y = CmmMachOp (MO_Mul   (wordWidth dflags)) [x, y]
+genericWordQuotRem2Op :: Platform -> GenericOp
+genericWordQuotRem2Op platform [res_q, res_r] [arg_x_high, arg_x_low, arg_y]
+    = emit =<< f (widthInBits (wordWidth platform)) zero arg_x_high arg_x_low
+    where    ty = cmmExprType platform arg_x_high
+             shl   x i = CmmMachOp (MO_Shl   (wordWidth platform)) [x, i]
+             shr   x i = CmmMachOp (MO_U_Shr (wordWidth platform)) [x, i]
+             or    x y = CmmMachOp (MO_Or    (wordWidth platform)) [x, y]
+             ge    x y = CmmMachOp (MO_U_Ge  (wordWidth platform)) [x, y]
+             ne    x y = CmmMachOp (MO_Ne    (wordWidth platform)) [x, y]
+             minus x y = CmmMachOp (MO_Sub   (wordWidth platform)) [x, y]
+             times x y = CmmMachOp (MO_Mul   (wordWidth platform)) [x, y]
              zero   = lit 0
              one    = lit 1
-             negone = lit (fromIntegral (widthInBits (wordWidth dflags)) - 1)
-             lit i = CmmLit (CmmInt i (wordWidth dflags))
+             negone = lit (fromIntegral (platformWordSizeInBits platform) - 1)
+             lit i = CmmLit (CmmInt i (wordWidth platform))
 
              f :: Int -> CmmExpr -> CmmExpr -> CmmExpr -> FCode CmmAGraph
              f 0 acc high _ = return (mkAssign (CmmLocal res_q) acc <*>
@@ -1677,17 +1678,17 @@ genericWordQuotRem2Op _ _ _ = panic "genericWordQuotRem2Op"
 
 genericWordAdd2Op :: GenericOp
 genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
-  = do dflags <- getDynFlags
-       r1 <- newTemp (cmmExprType dflags arg_x)
-       r2 <- newTemp (cmmExprType dflags arg_x)
-       let topHalf x = CmmMachOp (MO_U_Shr (wordWidth dflags)) [x, hww]
-           toTopHalf x = CmmMachOp (MO_Shl (wordWidth dflags)) [x, hww]
-           bottomHalf x = CmmMachOp (MO_And (wordWidth dflags)) [x, hwm]
-           add x y = CmmMachOp (MO_Add (wordWidth dflags)) [x, y]
-           or x y = CmmMachOp (MO_Or (wordWidth dflags)) [x, y]
-           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth dflags)))
-                                (wordWidth dflags))
-           hwm = CmmLit (CmmInt (halfWordMask dflags) (wordWidth dflags))
+  = do platform <- getPlatform
+       r1 <- newTemp (cmmExprType platform arg_x)
+       r2 <- newTemp (cmmExprType platform arg_x)
+       let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) [x, hww]
+           toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) [x, hww]
+           bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) [x, hwm]
+           add x y = CmmMachOp (MO_Add (wordWidth platform)) [x, y]
+           or x y = CmmMachOp (MO_Or (wordWidth platform)) [x, y]
+           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
+                                (wordWidth platform))
+           hwm = CmmLit (CmmInt (halfWordMask platform) (wordWidth platform))
        emit $ catAGraphs
           [mkAssign (CmmLocal r1)
                (add (bottomHalf arg_x) (bottomHalf arg_y)),
@@ -1711,19 +1712,19 @@ genericWordAdd2Op _ _ = panic "genericWordAdd2Op"
 -- https://brodowsky.it-sky.net/2015/04/02/how-to-recover-the-carry-bit/
 genericWordAddCOp :: GenericOp
 genericWordAddCOp [res_r, res_c] [aa, bb]
- = do dflags <- getDynFlags
+ = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-            CmmMachOp (mo_wordOr dflags) [
-              CmmMachOp (mo_wordAnd dflags) [aa,bb],
-              CmmMachOp (mo_wordAnd dflags) [
-                CmmMachOp (mo_wordOr dflags) [aa,bb],
-                CmmMachOp (mo_wordNot dflags) [CmmReg (CmmLocal res_r)]
+          CmmMachOp (mo_wordUShr platform) [
+            CmmMachOp (mo_wordOr platform) [
+              CmmMachOp (mo_wordAnd platform) [aa,bb],
+              CmmMachOp (mo_wordAnd platform) [
+                CmmMachOp (mo_wordOr platform) [aa,bb],
+                CmmMachOp (mo_wordNot platform) [CmmReg (CmmLocal res_r)]
               ]
             ],
-            mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+            mkIntExpr platform (platformWordSizeInBits platform - 1)
           ]
         ]
 genericWordAddCOp _ _ = panic "genericWordAddCOp"
@@ -1738,25 +1739,25 @@ genericWordAddCOp _ _ = panic "genericWordAddCOp"
 -- https://brodowsky.it-sky.net/2015/04/02/how-to-recover-the-carry-bit/
 genericWordSubCOp :: GenericOp
 genericWordSubCOp [res_r, res_c] [aa, bb]
- = do dflags <- getDynFlags
+ = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-            CmmMachOp (mo_wordOr dflags) [
-              CmmMachOp (mo_wordAnd dflags) [
-                CmmMachOp (mo_wordNot dflags) [aa],
+          CmmMachOp (mo_wordUShr platform) [
+            CmmMachOp (mo_wordOr platform) [
+              CmmMachOp (mo_wordAnd platform) [
+                CmmMachOp (mo_wordNot platform) [aa],
                 bb
               ],
-              CmmMachOp (mo_wordAnd dflags) [
-                CmmMachOp (mo_wordOr dflags) [
-                  CmmMachOp (mo_wordNot dflags) [aa],
+              CmmMachOp (mo_wordAnd platform) [
+                CmmMachOp (mo_wordOr platform) [
+                  CmmMachOp (mo_wordNot platform) [aa],
                   bb
                 ],
                 CmmReg (CmmLocal res_r)
               ]
             ],
-            mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+            mkIntExpr platform (platformWordSizeInBits platform - 1)
           ]
         ]
 genericWordSubCOp _ _ = panic "genericWordSubCOp"
@@ -1783,16 +1784,16 @@ genericIntAddCOp [res_r, res_c] [aa, bb]
    c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
 
 -}
- = do dflags <- getDynFlags
+ = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd platform) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+          CmmMachOp (mo_wordUShr platform) [
+                CmmMachOp (mo_wordAnd platform) [
+                    CmmMachOp (mo_wordNot platform) [CmmMachOp (mo_wordXor platform) [aa,bb]],
+                    CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+                mkIntExpr platform (platformWordSizeInBits platform - 1)
           ]
         ]
 genericIntAddCOp _ _ = panic "genericIntAddCOp"
@@ -1808,40 +1809,40 @@ genericIntSubCOp [res_r, res_c] [aa, bb]
 
    c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
 -}
- = do dflags <- getDynFlags
+ = do platform <- getPlatform
       emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub platform) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordXor dflags) [aa,bb],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+          CmmMachOp (mo_wordUShr platform) [
+                CmmMachOp (mo_wordAnd platform) [
+                    CmmMachOp (mo_wordXor platform) [aa,bb],
+                    CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+                mkIntExpr platform (platformWordSizeInBits platform - 1)
           ]
         ]
 genericIntSubCOp _ _ = panic "genericIntSubCOp"
 
 genericWordMul2Op :: GenericOp
 genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
- = do dflags <- getDynFlags
-      let t = cmmExprType dflags arg_x
+ = do platform <- getPlatform
+      let t = cmmExprType platform arg_x
       xlyl <- liftM CmmLocal $ newTemp t
       xlyh <- liftM CmmLocal $ newTemp t
       xhyl <- liftM CmmLocal $ newTemp t
       r    <- liftM CmmLocal $ newTemp t
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
-      let topHalf x = CmmMachOp (MO_U_Shr (wordWidth dflags)) [x, hww]
-          toTopHalf x = CmmMachOp (MO_Shl (wordWidth dflags)) [x, hww]
-          bottomHalf x = CmmMachOp (MO_And (wordWidth dflags)) [x, hwm]
-          add x y = CmmMachOp (MO_Add (wordWidth dflags)) [x, y]
+      let topHalf x = CmmMachOp (MO_U_Shr (wordWidth platform)) [x, hww]
+          toTopHalf x = CmmMachOp (MO_Shl (wordWidth platform)) [x, hww]
+          bottomHalf x = CmmMachOp (MO_And (wordWidth platform)) [x, hwm]
+          add x y = CmmMachOp (MO_Add (wordWidth platform)) [x, y]
           sum = foldl1 add
-          mul x y = CmmMachOp (MO_Mul (wordWidth dflags)) [x, y]
-          or x y = CmmMachOp (MO_Or (wordWidth dflags)) [x, y]
-          hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth dflags)))
-                               (wordWidth dflags))
-          hwm = CmmLit (CmmInt (halfWordMask dflags) (wordWidth dflags))
+          mul x y = CmmMachOp (MO_Mul (wordWidth platform)) [x, y]
+          or x y = CmmMachOp (MO_Or (wordWidth platform)) [x, y]
+          hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
+                               (wordWidth platform))
+          hwm = CmmLit (CmmInt (halfWordMask platform) (wordWidth platform))
       emit $ catAGraphs
              [mkAssign xlyl
                   (mul (bottomHalf arg_x) (bottomHalf arg_y)),
@@ -1866,8 +1867,9 @@ genericWordMul2Op _ _ = panic "genericWordMul2Op"
 genericIntMul2Op :: GenericOp
 genericIntMul2Op [res_c, res_h, res_l] [arg_x, arg_y]
  = do dflags <- getDynFlags
+      platform <- getPlatform
       -- Implement algorithm from Hacker's Delight, 2nd edition, p.174
-      let t = cmmExprType dflags arg_x
+      let t = cmmExprType platform arg_x
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
       let wordMul2 = case emitPrimOp dflags WordMul2Op [arg_x,arg_y] of
@@ -1883,7 +1885,7 @@ genericIntMul2Op [res_c, res_h, res_l] [arg_x, arg_y]
           f   x y     = (carryFill x) `and` y
           wwm1        = CmmLit (CmmInt (fromIntegral (widthInBits ww - 1)) ww)
           rl x        = CmmReg (CmmLocal x)
-          ww          = wordWidth dflags
+          ww          = wordWidth platform
       emit $ catAGraphs
              [ mkAssign (CmmLocal res_h) (rl p `sub` f arg_x arg_y `sub` f arg_y arg_x)
              , mkAssign (CmmLocal res_c) (rl res_h `neq` carryFill (rl res_l))
@@ -1897,7 +1899,7 @@ genericIntMul2Op _ _ = panic "genericIntMul2Op"
 --             | otherwise = negateFloat x
 genericFabsOp :: Width -> GenericOp
 genericFabsOp w [res_r] [aa]
- = do dflags <- getDynFlags
+ = do platform <- getPlatform
       let zero   = CmmLit (CmmFloat 0 w)
 
           eq x y = CmmMachOp (MO_F_Eq w) [x, y]
@@ -1908,7 +1910,7 @@ genericFabsOp w [res_r] [aa]
           g1 = catAGraphs [mkAssign (CmmLocal res_r) zero]
           g2 = catAGraphs [mkAssign (CmmLocal res_r) aa]
 
-      res_t <- CmmLocal <$> newTemp (cmmExprType dflags aa)
+      res_t <- CmmLocal <$> newTemp (cmmExprType platform aa)
       let g3 = catAGraphs [mkAssign res_t aa,
                            mkAssign (CmmLocal res_r) (neg (CmmReg res_t))]
 
@@ -1982,7 +1984,8 @@ doReadPtrArrayOp :: LocalReg
                  -> FCode ()
 doReadPtrArrayOp res addr idx
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr (gcWord dflags) idx
+        platform <- getPlatform
+        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord platform) res addr (gcWord platform) idx
 
 doWriteOffAddrOp :: Maybe MachOp
                  -> CmmType
@@ -2011,11 +2014,12 @@ doWritePtrArrayOp :: CmmExpr
                   -> FCode ()
 doWritePtrArrayOp addr idx val
   = do dflags <- getDynFlags
-       let ty = cmmExprType dflags val
+       platform <- getPlatform
+       let ty = cmmExprType platform val
            hdr_size = arrPtrsHdrSize dflags
        -- Update remembered set for non-moving collector
-       whenUpdRemSetEnabled dflags
-           $ emitUpdRemSetPush (cmmLoadIndexOffExpr dflags hdr_size ty addr ty idx)
+       whenUpdRemSetEnabled
+           $ emitUpdRemSetPush (cmmLoadIndexOffExpr platform hdr_size ty addr ty idx)
        -- This write barrier is to ensure that the heap writes to the object
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
@@ -2025,16 +2029,17 @@ doWritePtrArrayOp addr idx val
        -- the write barrier.  We must write a byte into the mark table:
        -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
        emit $ mkStore (
-         cmmOffsetExpr dflags
-          (cmmOffsetExprW dflags (cmmOffsetB dflags addr hdr_size)
+         cmmOffsetExpr platform
+          (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
                          (loadArrPtrsSize dflags addr))
-          (CmmMachOp (mo_wordUShr dflags) [idx,
-                                           mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags)])
+          (CmmMachOp (mo_wordUShr platform) [idx,
+                                           mkIntExpr platform (mUT_ARR_PTRS_CARD_BITS dflags)])
          ) (CmmLit (CmmInt 1 W8))
 
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
-loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
+loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB platform addr off) (bWord platform)
  where off = fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags
+       platform = targetPlatform dflags
 
 mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
                    -> Maybe MachOp -- Optional result cast
@@ -2045,12 +2050,12 @@ mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
                    -> CmmExpr      -- Index
                    -> FCode ()
 mkBasicIndexedRead off Nothing ty res base idx_ty idx
-   = do dflags <- getDynFlags
-        emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
+   = do platform <- getPlatform
+        emitAssign (CmmLocal res) (cmmLoadIndexOffExpr platform off ty base idx_ty idx)
 mkBasicIndexedRead off (Just cast) ty res base idx_ty idx
-   = do dflags <- getDynFlags
+   = do platform <- getPlatform
         emitAssign (CmmLocal res) (CmmMachOp cast [
-                                   cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
+                                   cmmLoadIndexOffExpr platform off ty base idx_ty idx])
 
 mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
                     -> Maybe MachOp -- Optional value cast
@@ -2060,32 +2065,32 @@ mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
                     -> CmmExpr      -- Value to write
                     -> FCode ()
 mkBasicIndexedWrite off Nothing base idx_ty idx val
-   = do dflags <- getDynFlags
-        emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
+   = do platform <- getPlatform
+        emitStore (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) val
 mkBasicIndexedWrite off (Just cast) base idx_ty idx val
    = mkBasicIndexedWrite off Nothing base idx_ty idx (CmmMachOp cast [val])
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
 
-cmmIndexOffExpr :: DynFlags
+cmmIndexOffExpr :: Platform
                 -> ByteOff  -- Initial offset in bytes
                 -> Width    -- Width of element by which we are indexing
                 -> CmmExpr  -- Base address
                 -> CmmExpr  -- Index
                 -> CmmExpr
-cmmIndexOffExpr dflags off width base idx
-   = cmmIndexExpr dflags width (cmmOffsetB dflags base off) idx
+cmmIndexOffExpr platform off width base idx
+   = cmmIndexExpr platform width (cmmOffsetB platform base off) idx
 
-cmmLoadIndexOffExpr :: DynFlags
+cmmLoadIndexOffExpr :: Platform
                     -> ByteOff  -- Initial offset in bytes
                     -> CmmType  -- Type of element we are accessing
                     -> CmmExpr  -- Base address
                     -> CmmType  -- Type of element by which we are indexing
                     -> CmmExpr  -- Index
                     -> CmmExpr
-cmmLoadIndexOffExpr dflags off ty base idx_ty idx
-   = CmmLoad (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) ty
+cmmLoadIndexOffExpr platform off ty base idx_ty idx
+   = CmmLoad (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) ty
 
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
@@ -2101,29 +2106,29 @@ vecCmmCat IntVec   = cmmBits
 vecCmmCat WordVec  = cmmBits
 vecCmmCat FloatVec = cmmFloat
 
-vecElemInjectCast :: DynFlags -> PrimOpVecCat -> Width -> Maybe MachOp
-vecElemInjectCast _      FloatVec _   =  Nothing
-vecElemInjectCast dflags IntVec   W8  =  Just (mo_WordTo8  dflags)
-vecElemInjectCast dflags IntVec   W16 =  Just (mo_WordTo16 dflags)
-vecElemInjectCast dflags IntVec   W32 =  Just (mo_WordTo32 dflags)
-vecElemInjectCast _      IntVec   W64 =  Nothing
-vecElemInjectCast dflags WordVec  W8  =  Just (mo_WordTo8  dflags)
-vecElemInjectCast dflags WordVec  W16 =  Just (mo_WordTo16 dflags)
-vecElemInjectCast dflags WordVec  W32 =  Just (mo_WordTo32 dflags)
-vecElemInjectCast _      WordVec  W64 =  Nothing
-vecElemInjectCast _      _        _   =  Nothing
+vecElemInjectCast :: Platform -> PrimOpVecCat -> Width -> Maybe MachOp
+vecElemInjectCast _        FloatVec _   =  Nothing
+vecElemInjectCast platform   IntVec   W8  =  Just (mo_WordTo8  platform)
+vecElemInjectCast platform   IntVec   W16 =  Just (mo_WordTo16 platform)
+vecElemInjectCast platform   IntVec   W32 =  Just (mo_WordTo32 platform)
+vecElemInjectCast _        IntVec   W64 =  Nothing
+vecElemInjectCast platform   WordVec  W8  =  Just (mo_WordTo8  platform)
+vecElemInjectCast platform   WordVec  W16 =  Just (mo_WordTo16 platform)
+vecElemInjectCast platform   WordVec  W32 =  Just (mo_WordTo32 platform)
+vecElemInjectCast _        WordVec  W64 =  Nothing
+vecElemInjectCast _        _        _   =  Nothing
 
-vecElemProjectCast :: DynFlags -> PrimOpVecCat -> Width -> Maybe MachOp
-vecElemProjectCast _      FloatVec _   =  Nothing
-vecElemProjectCast dflags IntVec   W8  =  Just (mo_s_8ToWord  dflags)
-vecElemProjectCast dflags IntVec   W16 =  Just (mo_s_16ToWord dflags)
-vecElemProjectCast dflags IntVec   W32 =  Just (mo_s_32ToWord dflags)
-vecElemProjectCast _      IntVec   W64 =  Nothing
-vecElemProjectCast dflags WordVec  W8  =  Just (mo_u_8ToWord  dflags)
-vecElemProjectCast dflags WordVec  W16 =  Just (mo_u_16ToWord dflags)
-vecElemProjectCast dflags WordVec  W32 =  Just (mo_u_32ToWord dflags)
-vecElemProjectCast _      WordVec  W64 =  Nothing
-vecElemProjectCast _      _        _   =  Nothing
+vecElemProjectCast :: Platform -> PrimOpVecCat -> Width -> Maybe MachOp
+vecElemProjectCast _        FloatVec _   =  Nothing
+vecElemProjectCast platform   IntVec   W8  =  Just (mo_s_8ToWord  platform)
+vecElemProjectCast platform   IntVec   W16 =  Just (mo_s_16ToWord platform)
+vecElemProjectCast platform   IntVec   W32 =  Just (mo_s_32ToWord platform)
+vecElemProjectCast _        IntVec   W64 =  Nothing
+vecElemProjectCast platform   WordVec  W8  =  Just (mo_u_8ToWord  platform)
+vecElemProjectCast platform   WordVec  W16 =  Just (mo_u_16ToWord platform)
+vecElemProjectCast platform   WordVec  W32 =  Just (mo_u_32ToWord platform)
+vecElemProjectCast _        WordVec  W64 =  Nothing
+vecElemProjectCast _        _        _   =  Nothing
 
 
 -- NOTE [SIMD Design for the future]
@@ -2267,10 +2272,10 @@ doVecInsertOp :: Maybe MachOp  -- Cast from element to vector component
               -> CmmFormal     -- Destination for result
               -> FCode ()
 doVecInsertOp maybe_pre_write_cast ty src e idx res = do
-    dflags <- getDynFlags
+    platform <- getPlatform
     -- vector indices are always 32-bits
     let idx' :: CmmExpr
-        idx' = CmmMachOp (MO_SS_Conv (wordWidth dflags) W32) [idx]
+        idx' = CmmMachOp (MO_SS_Conv (wordWidth platform) W32) [idx]
     if isFloatType (vecElemType ty)
       then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, cast e, idx'])
       else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, cast e, idx'])
@@ -2324,8 +2329,8 @@ doPrefetchValueOp :: Int
                  -> [CmmExpr]
                  -> FCode ()
 doPrefetchValueOp  locality   [addr]
-  =  do dflags <- getDynFlags
-        mkBasicPrefetch locality 0 addr  (CmmLit (CmmInt 0 (wordWidth dflags)))
+  =  do platform <- getPlatform
+        mkBasicPrefetch locality 0 addr  (CmmLit (CmmInt 0 (wordWidth platform)))
 doPrefetchValueOp _ _
   = panic "GHC.StgToCmm.Prim: doPrefetchValueOp"
 
@@ -2336,8 +2341,8 @@ mkBasicPrefetch :: Int          -- Locality level 0-3
                 -> CmmExpr      -- Index
                 -> FCode ()
 mkBasicPrefetch locality off base idx
-   = do dflags <- getDynFlags
-        emitPrimCall [] (MO_Prefetch_Data locality) [cmmIndexExpr dflags W8 (cmmOffsetB dflags base off) idx]
+   = do platform <- getPlatform
+        emitPrimCall [] (MO_Prefetch_Data locality) [cmmIndexExpr platform W8 (cmmOffsetB platform base off) idx]
         return ()
 
 -- ----------------------------------------------------------------------------
@@ -2349,18 +2354,19 @@ mkBasicPrefetch locality off base idx
 doNewByteArrayOp :: CmmFormal -> ByteOff -> FCode ()
 doNewByteArrayOp res_r n = do
     dflags <- getDynFlags
+    platform <- getPlatform
 
     let info_ptr = mkLblExpr mkArrWords_infoLabel
-        rep = arrWordsRep dflags n
+        rep = arrWordsRep platform n
 
-    tickyAllocPrim (mkIntExpr dflags (arrWordsHdrSize dflags))
-        (mkIntExpr dflags (nonHdrSize dflags rep))
-        (zeroExpr dflags)
+    tickyAllocPrim (mkIntExpr platform (arrWordsHdrSize dflags))
+        (mkIntExpr platform (nonHdrSize platform rep))
+        (zeroExpr platform)
 
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr cccsExpr
-                     [ (mkIntExpr dflags n,
+                     [ (mkIntExpr platform n,
                         hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
 
@@ -2373,8 +2379,9 @@ doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr ->
                      -> FCode ()
 doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
     dflags <- getDynFlags
-    ba1_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
-    ba2_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba2 (arrWordsHdrSize dflags)) ba2_off
+    platform <- getPlatform
+    ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize dflags)) ba1_off
+    ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize dflags)) ba2_off
 
     -- short-cut in case of equal pointers avoiding a costly
     -- subroutine call to the memcmp(3) routine; the Cmm logic below
@@ -2411,8 +2418,8 @@ doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
     l_ptr_eq <- newBlockId
     l_ptr_ne <- newBlockId
 
-    emit (mkAssign (CmmLocal res) (zeroExpr dflags))
-    emit (mkCbranch (cmmEqWord dflags ba1_p ba2_p)
+    emit (mkAssign (CmmLocal res) (zeroExpr platform))
+    emit (mkCbranch (cmmEqWord platform ba1_p ba2_p)
                     l_ptr_eq l_ptr_ne (Just False))
 
     emitLabel l_ptr_ne
@@ -2449,11 +2456,11 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
     -- we were provided are the same array!
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes align = do
-        dflags <- getDynFlags
+        platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
             (getCode $ emitMemmoveCall dst_p src_p bytes align)
             (getCode $ emitMemcpyCall  dst_p src_p bytes align)
-        emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
+        emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> Alignment -> FCode ())
@@ -2461,12 +2468,13 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let byteArrayAlignment = wordAlignment dflags
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
         align = minimum [byteArrayAlignment, srcOffAlignment, dstOffAlignment]
-    dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
-    src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
+    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize dflags)) dst_off
+    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize dflags)) src_off
     copy src dst dst_p src_p n align
 
 -- | Takes a source 'ByteArray#', an offset in the source array, a
@@ -2476,7 +2484,8 @@ doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
-    src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
+    platform <- getPlatform
+    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize dflags)) src_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source array, a
@@ -2493,7 +2502,8 @@ doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
-    dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
+    platform <- getPlatform
+    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize dflags)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 
@@ -2507,12 +2517,13 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
 doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
+    platform <- getPlatform
 
     let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
 
-    p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
+    p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba (arrWordsHdrSize dflags)) off
     emitMemsetCall p c len align
 
 -- ----------------------------------------------------------------------------
@@ -2528,20 +2539,21 @@ doNewArrayOp :: CmmFormal             -- ^ return register
              -> FCode ()
 doNewArrayOp res_r rep info payload n init = do
     dflags <- getDynFlags
+    platform <- getPlatform
 
     let info_ptr = mkLblExpr info
 
-    tickyAllocPrim (mkIntExpr dflags (hdrSize dflags rep))
-        (mkIntExpr dflags (nonHdrSize dflags rep))
-        (zeroExpr dflags)
+    tickyAllocPrim (mkIntExpr platform (hdrSize dflags rep))
+        (mkIntExpr platform (nonHdrSize platform rep))
+        (zeroExpr platform)
 
     base <- allocHeapClosure rep info_ptr cccsExpr payload
 
-    arr <- CmmLocal `fmap` newTemp (bWord dflags)
+    arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
 
     -- Initialise all elements of the array
-    let mkOff off = cmmOffsetW dflags (CmmReg arr) (hdrSizeW dflags rep + off)
+    let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
         initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
     emit (catAGraphs initialization)
 
@@ -2576,7 +2588,8 @@ doCopyArrayOp = emitCopyArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
-           emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
+           platform <- getPlatform
+           emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
                (wordAlignment dflags)
 
 
@@ -2593,12 +2606,13 @@ doCopyMutableArrayOp = emitCopyArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
+        platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
-            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
              (wordAlignment dflags))
-            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
              (wordAlignment dflags))
-        emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
+        emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
 emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                   -> FCode ())  -- ^ copy function
@@ -2611,6 +2625,7 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
 emitCopyArray copy src0 src_off dst0 dst_off0 n =
     when (n /= 0) $ do
         dflags <- getDynFlags
+        platform <- getPlatform
 
         -- Passed as arguments (be careful)
         src     <- assignTempE src0
@@ -2618,22 +2633,22 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst_off <- assignTempE dst_off0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush dflags (arrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush platform (arrPtrsHdrSizeW dflags) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
-        dst_elems_p <- assignTempE $ cmmOffsetB dflags dst
+        dst_elems_p <- assignTempE $ cmmOffsetB platform dst
                        (arrPtrsHdrSize dflags)
-        dst_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p dst_off
-        src_p <- assignTempE $ cmmOffsetExprW dflags
-                 (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
-        let bytes = wordsToBytes dflags n
+        dst_p <- assignTempE $ cmmOffsetExprW platform dst_elems_p dst_off
+        src_p <- assignTempE $ cmmOffsetExprW platform
+                 (cmmOffsetB platform src (arrPtrsHdrSize dflags)) src_off
+        let bytes = wordsToBytes platform n
 
         copy src dst dst_p src_p bytes
 
         -- The base address of the destination card table
-        dst_cards_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p
+        dst_cards_p <- assignTempE $ cmmOffsetExprW platform dst_elems_p
                        (loadArrPtrsSize dflags dst)
 
         emitSetCards dst_off dst_cards_p n
@@ -2646,7 +2661,8 @@ doCopySmallArrayOp = emitCopySmallArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
-           emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
+           platform <- getPlatform
+           emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
                (wordAlignment dflags)
 
 
@@ -2659,12 +2675,13 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
+        platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
-            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
              (wordAlignment dflags))
-            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
              (wordAlignment dflags))
-        emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
+        emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
 emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                        -> FCode ())  -- ^ copy function
@@ -2677,22 +2694,23 @@ emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
 emitCopySmallArray copy src0 src_off dst0 dst_off n =
     when (n /= 0) $ do
         dflags <- getDynFlags
+        platform <- getPlatform
 
         -- Passed as arguments (be careful)
         src     <- assignTempE src0
         dst     <- assignTempE dst0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush dflags (smallArrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush platform (smallArrPtrsHdrSizeW dflags) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
-        dst_p <- assignTempE $ cmmOffsetExprW dflags
-                 (cmmOffsetB dflags dst (smallArrPtrsHdrSize dflags)) dst_off
-        src_p <- assignTempE $ cmmOffsetExprW dflags
-                 (cmmOffsetB dflags src (smallArrPtrsHdrSize dflags)) src_off
-        let bytes = wordsToBytes dflags n
+        dst_p <- assignTempE $ cmmOffsetExprW platform
+                 (cmmOffsetB platform dst (smallArrPtrsHdrSize dflags)) dst_off
+        src_p <- assignTempE $ cmmOffsetExprW platform
+                 (cmmOffsetB platform src (smallArrPtrsHdrSize dflags)) src_off
+        let bytes = wordsToBytes platform n
 
         copy src dst dst_p src_p bytes
 
@@ -2704,33 +2722,34 @@ emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> WordOff
                -> FCode ()
 emitCloneArray info_p res_r src src_off n = do
     dflags <- getDynFlags
+    platform <- getPlatform
 
     let info_ptr = mkLblExpr info_p
         rep = arrPtrsRep dflags n
 
-    tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags))
-        (mkIntExpr dflags (nonHdrSize dflags rep))
-        (zeroExpr dflags)
+    tickyAllocPrim (mkIntExpr platform (arrPtrsHdrSize dflags))
+        (mkIntExpr platform (nonHdrSize platform rep))
+        (zeroExpr platform)
 
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr cccsExpr
-                     [ (mkIntExpr dflags n,
+                     [ (mkIntExpr platform n,
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
-                     , (mkIntExpr dflags (nonHdrSizeW rep),
+                     , (mkIntExpr platform (nonHdrSizeW rep),
                         hdr_size + oFFSET_StgMutArrPtrs_size dflags)
                      ]
 
-    arr <- CmmLocal `fmap` newTemp (bWord dflags)
+    arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
 
-    dst_p <- assignTempE $ cmmOffsetB dflags (CmmReg arr)
+    dst_p <- assignTempE $ cmmOffsetB platform (CmmReg arr)
              (arrPtrsHdrSize dflags)
-    src_p <- assignTempE $ cmmOffsetExprW dflags src
-             (cmmAddWord dflags
-              (mkIntExpr dflags (arrPtrsHdrSizeW dflags)) src_off)
+    src_p <- assignTempE $ cmmOffsetExprW platform src
+             (cmmAddWord platform
+              (mkIntExpr platform (arrPtrsHdrSizeW dflags)) src_off)
 
-    emitMemcpyCall dst_p src_p (mkIntExpr dflags (wordsToBytes dflags n))
+    emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
         (wordAlignment dflags)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
@@ -2743,31 +2762,32 @@ emitCloneSmallArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> WordOff
                     -> FCode ()
 emitCloneSmallArray info_p res_r src src_off n = do
     dflags <- getDynFlags
+    platform <- getPlatform
 
     let info_ptr = mkLblExpr info_p
         rep = smallArrPtrsRep n
 
-    tickyAllocPrim (mkIntExpr dflags (smallArrPtrsHdrSize dflags))
-        (mkIntExpr dflags (nonHdrSize dflags rep))
-        (zeroExpr dflags)
+    tickyAllocPrim (mkIntExpr platform (smallArrPtrsHdrSize dflags))
+        (mkIntExpr platform (nonHdrSize platform rep))
+        (zeroExpr platform)
 
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr cccsExpr
-                     [ (mkIntExpr dflags n,
+                     [ (mkIntExpr platform n,
                         hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
                      ]
 
-    arr <- CmmLocal `fmap` newTemp (bWord dflags)
+    arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
 
-    dst_p <- assignTempE $ cmmOffsetB dflags (CmmReg arr)
+    dst_p <- assignTempE $ cmmOffsetB platform (CmmReg arr)
              (smallArrPtrsHdrSize dflags)
-    src_p <- assignTempE $ cmmOffsetExprW dflags src
-             (cmmAddWord dflags
-              (mkIntExpr dflags (smallArrPtrsHdrSizeW dflags)) src_off)
+    src_p <- assignTempE $ cmmOffsetExprW platform src
+             (cmmAddWord platform
+              (mkIntExpr platform (smallArrPtrsHdrSizeW dflags)) src_off)
 
-    emitMemcpyCall dst_p src_p (mkIntExpr dflags (wordsToBytes dflags n))
+    emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
         (wordAlignment dflags)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
@@ -2779,20 +2799,22 @@ emitCloneSmallArray info_p res_r src src_off n = do
 emitSetCards :: CmmExpr -> CmmExpr -> WordOff -> FCode ()
 emitSetCards dst_start dst_cards_start n = do
     dflags <- getDynFlags
+    platform <- getPlatform
     start_card <- assignTempE $ cardCmm dflags dst_start
     let end_card = cardCmm dflags
-                   (cmmSubWord dflags
-                    (cmmAddWord dflags dst_start (mkIntExpr dflags n))
-                    (mkIntExpr dflags 1))
-    emitMemsetCall (cmmAddWord dflags dst_cards_start start_card)
-        (mkIntExpr dflags 1)
-        (cmmAddWord dflags (cmmSubWord dflags end_card start_card) (mkIntExpr dflags 1))
+                   (cmmSubWord platform
+                    (cmmAddWord platform dst_start (mkIntExpr platform n))
+                    (mkIntExpr platform 1))
+    emitMemsetCall (cmmAddWord platform dst_cards_start start_card)
+        (mkIntExpr platform 1)
+        (cmmAddWord platform (cmmSubWord platform end_card start_card) (mkIntExpr platform 1))
         (mkAlignment 1) -- no alignment (1 byte)
 
 -- Convert an element index to a card index
 cardCmm :: DynFlags -> CmmExpr -> CmmExpr
 cardCmm dflags i =
-    cmmUShrWord dflags i (mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags))
+    cmmUShrWord platform i (mkIntExpr platform (mUT_ARR_PTRS_CARD_BITS dflags))
+    where platform = targetPlatform dflags
 
 ------------------------------------------------------------------------------
 -- SmallArray PrimOp implementations
@@ -2803,8 +2825,9 @@ doReadSmallPtrArrayOp :: LocalReg
                       -> FCode ()
 doReadSmallPtrArrayOp res addr idx = do
     dflags <- getDynFlags
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr
-        (gcWord dflags) idx
+    platform <- getPlatform
+    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing (gcWord platform) res addr
+        (gcWord platform) idx
 
 doWriteSmallPtrArrayOp :: CmmExpr
                        -> CmmExpr
@@ -2812,12 +2835,13 @@ doWriteSmallPtrArrayOp :: CmmExpr
                        -> FCode ()
 doWriteSmallPtrArrayOp addr idx val = do
     dflags <- getDynFlags
-    let ty = cmmExprType dflags val
+    platform <- getPlatform
+    let ty = cmmExprType platform val
 
     -- Update remembered set for non-moving collector
     tmp <- newTemp ty
     mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing ty tmp addr ty idx
-    whenUpdRemSetEnabled dflags $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
+    whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     emitPrimCall [] MO_WriteBarrier [] -- #12469
     mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
@@ -2838,8 +2862,9 @@ doAtomicRMW :: LocalReg      -- ^ Result reg
             -> FCode ()
 doAtomicRMW res amop mba idx idx_ty n = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
                 width mba idx
     emitPrimCall
         [ res ]
@@ -2855,8 +2880,9 @@ doAtomicReadByteArray
     -> FCode ()
 doAtomicReadByteArray res mba idx idx_ty = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
                 width mba idx
     emitPrimCall
         [ res ]
@@ -2872,8 +2898,9 @@ doAtomicWriteByteArray
     -> FCode ()
 doAtomicWriteByteArray mba idx idx_ty val = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
                 width mba idx
     emitPrimCall
         [ {- no results -} ]
@@ -2890,8 +2917,9 @@ doCasByteArray
     -> FCode ()
 doCasByteArray res mba idx idx_ty old new = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let width = (typeWidth idx_ty)
-        addr = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+        addr = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
                width mba idx
     emitPrimCall
         [ res ]
@@ -2932,7 +2960,7 @@ emitMemcmpCall res ptr1 ptr2 n align = do
     -- code-gens currently call out to the @memcmp(3)@ C function.
     -- This was easier than moving the sign-extensions into
     -- all the code-gens.
-    dflags <- getDynFlags
+    platform <- getPlatform
     let is32Bit = typeWidth (localRegType res) == W32
 
     cres <- if is32Bit
@@ -2947,7 +2975,7 @@ emitMemcmpCall res ptr1 ptr2 n align = do
     unless is32Bit $ do
       emit $ mkAssign (CmmLocal res)
                       (CmmMachOp
-                         (mo_s_32ToWord dflags)
+                         (mo_s_32ToWord platform)
                          [(CmmReg (CmmLocal cres))])
 
 emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
@@ -3005,15 +3033,15 @@ emitCtzCall res x width = do
 
 -- | Push a range of pointer-array elements that are about to be copied over to
 -- the update remembered set.
-emitCopyUpdRemSetPush :: DynFlags
+emitCopyUpdRemSetPush :: Platform
                       -> WordOff    -- ^ array header size
                       -> CmmExpr    -- ^ destination array
                       -> CmmExpr    -- ^ offset in destination array (in words)
                       -> Int        -- ^ number of elements to copy
                       -> FCode ()
-emitCopyUpdRemSetPush _dflags _hdr_size _dst _dst_off 0 = return ()
-emitCopyUpdRemSetPush dflags hdr_size dst dst_off n =
-    whenUpdRemSetEnabled dflags $ do
+emitCopyUpdRemSetPush _platform _hdr_size _dst _dst_off 0 = return ()
+emitCopyUpdRemSetPush platform hdr_size dst dst_off n =
+    whenUpdRemSetEnabled $ do
         updfr_off <- getUpdFrameOff
         graph <- mkCall lbl (NativeNodeCall,NativeReturn) [] args updfr_off []
         emit graph
@@ -3021,8 +3049,8 @@ emitCopyUpdRemSetPush dflags hdr_size dst dst_off n =
     lbl = mkLblExpr $ mkPrimCallLabel
           $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnitId
     args =
-      [ mkIntExpr dflags hdr_size
+      [ mkIntExpr platform hdr_size
       , dst
       , dst_off
-      , mkIntExpr dflags n
+      , mkIntExpr platform n
       ]

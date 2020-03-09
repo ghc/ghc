@@ -198,7 +198,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
               val_int = fromIntegral val :: Int
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
-              intlike_amode = cmmLabelOffW dflags intlike_lbl offsetW
+              intlike_amode = cmmLabelOffW (targetPlatform dflags) intlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
@@ -212,7 +212,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
   = do  { let charlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_CHARLIKE")
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
-              charlike_amode = cmmLabelOffW dflags charlike_lbl offsetW
+              charlike_amode = cmmLabelOffW (targetPlatform dflags) charlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
                  , return mkNop) }
 
@@ -256,6 +256,7 @@ bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
     do dflags <- getDynFlags
+       platform <- getPlatform
        let (_, _, args_w_offsets) = mkVirtConstrOffsets dflags (addIdReps args)
            tag = tagForCon dflags con
 
@@ -266,7 +267,7 @@ bindConArgs (DataAlt con) base args
              | isDeadBinder b  -- See Note [Dead-binder optimisation] in GHC.StgToCmm.Expr
              = return Nothing
              | otherwise
-             = do { emit $ mkTaggedObjectLoad dflags (idToReg dflags arg)
+             = do { emit $ mkTaggedObjectLoad platform (idToReg platform arg)
                                               base offset tag
                   ; Just <$> bindArgToReg arg }
 

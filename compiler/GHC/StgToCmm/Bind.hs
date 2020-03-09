@@ -274,7 +274,7 @@ mkRhsClosure    dflags bndr _cc
                                    -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
   , Just the_offset <- assocMaybe params_w_offsets (NonVoid selectee)
 
-  , let offset_into_int = bytesToWordsRoundUp dflags the_offset
+  , let offset_into_int = bytesToWordsRoundUp (targetPlatform dflags) the_offset
                           - fixedHdrSizeW dflags
   , offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
@@ -479,6 +479,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode bndr cl_info arg_regs
                 ; dflags <- getDynFlags
+                ; platform <- getPlatform
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
                 ; loop_header_id <- newBlockId
@@ -494,9 +495,9 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- ticky after heap check to avoid double counting
                 ; tickyEnterFun cl_info
                 ; enterCostCentreFun cc
-                    (CmmMachOp (mo_wordSub dflags)
+                    (CmmMachOp (mo_wordSub platform)
                          [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]
-                         , mkIntExpr dflags (funTag dflags cl_info) ])
+                         , mkIntExpr platform (funTag dflags cl_info) ])
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
@@ -526,8 +527,9 @@ bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, ByteOff)] -> FCode ()
 load_fvs node lf_info = mapM_ (\ (reg, off) ->
    do dflags <- getDynFlags
+      platform <- getPlatform
       let tag = lfDynTag dflags lf_info
-      emit $ mkTaggedObjectLoad dflags reg node off tag)
+      emit $ mkTaggedObjectLoad platform reg node off tag)
 
 -----------------------------------------
 -- The "slow entry" code for a function.  This entry point takes its
@@ -545,14 +547,15 @@ mkSlowEntryCode :: Id -> ClosureInfo -> [LocalReg] -> FCode ()
 mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
   = do dflags <- getDynFlags
-       let node = idToReg dflags (NonVoid bndr)
+       platform <- getPlatform
+       let node = idToReg platform (NonVoid bndr)
            slow_lbl = closureSlowEntryLabel  cl_info
            fast_lbl = closureLocalEntryLabel dflags cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump dflags NativeNodeCall
                                 (mkLblExpr fast_lbl)
                                 (map (CmmReg . CmmLocal) (node : arg_regs))
-                                (initUpdFrameOff dflags)
+                                (initUpdFrameOff platform)
        tscope <- getTickScope
        emitProcWithConvention Slow Nothing slow_lbl
          (node : arg_regs) (jump, tscope)
@@ -601,6 +604,7 @@ blackHoleIt node_reg
 emitBlackHoleCode :: CmmExpr -> FCode ()
 emitBlackHoleCode node = do
   dflags <- getDynFlags
+  let platform = targetPlatform dflags
 
   -- Eager blackholing is normally disabled, but can be turned on with
   -- -feager-blackholing.  When it is on, we replace the info pointer
@@ -627,8 +631,8 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
-    whenUpdRemSetEnabled dflags $ emitUpdRemSetPushThunk node
-    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
+    whenUpdRemSetEnabled $ emitUpdRemSetPushThunk node
+    emitStore (cmmOffsetW platform node (fixedHdrSizeW dflags)) currentTSOExpr
     -- See Note [Heap memory barriers] in SMP.h.
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -691,9 +695,10 @@ emitUpdateFrame dflags frame lbl updatee = do
   let
            hdr         = fixedHdrSize dflags
            off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
+           platform    = targetPlatform dflags
   --
   emitStore frame (mkLblExpr lbl)
-  emitStore (cmmOffset dflags frame off_updatee) updatee
+  emitStore (cmmOffset platform frame off_updatee) updatee
   initUpdFrameProf frame
 
 -----------------------------------------------------------------------------
@@ -711,7 +716,8 @@ link_caf node = do
         -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
                                     ForeignLabelInExternalPackage IsFunction
-  ; bh <- newTemp (bWord dflags)
+  ; let platform = targetPlatform dflags
+  ; bh <- newTemp (bWord platform)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
       [ (baseExpr,  AddrHint),
         (CmmReg (CmmLocal node), AddrHint) ]
@@ -721,7 +727,7 @@ link_caf node = do
   ; updfr  <- getUpdFrameOff
   ; let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node)))
   ; emit =<< mkCmmIfThen
-      (cmmEqWord dflags (CmmReg (CmmLocal bh)) (zeroExpr dflags))
+      (cmmEqWord platform (CmmReg (CmmLocal bh)) (zeroExpr platform))
         -- re-enter the CAF
        (mkJump dflags NativeNodeCall target [] updfr)
 

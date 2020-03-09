@@ -72,8 +72,9 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 -- See Note [dataToTag#] in primops.txt.pp
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   dflags <- getDynFlags
+  platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
-  tmp <- newTemp (bWord dflags)
+  tmp <- newTemp (bWord platform)
   _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
   -- TODO: For small types look at the tag bits instead of reading info table
   emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
@@ -175,8 +176,8 @@ cgLetNoEscapeClosure
         -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
-  = do dflags <- getDynFlags
-       return ( lneIdInfo dflags bndr args
+  = do platform <- getPlatform
+       return ( lneIdInfo platform bndr args
               , code )
   where
    code = forkLneBody $ do {
@@ -365,11 +366,12 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
+       ; platform <- getPlatform
        ; unless (reps_compatible dflags) $
            pprPanic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
                     (pp_bndr v $$ pp_bndr bndr)
        ; v_info <- getCgIdInfo v
-       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
+       ; emitAssign (CmmLocal (idToReg platform (NonVoid bndr)))
                     (idInfoToAmode v_info)
        -- Add bndr to the environment
        ; _ <- bindArgToReg (NonVoid bndr)
@@ -390,10 +392,10 @@ type-correct assignment, albeit bogus.  The (dead) continuation loops;
 it would be better to invoke some kind of panic function here.
 -}
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
-  = do { dflags <- getDynFlags
+  = do { platform <- getPlatform
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel
-                  (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+                  (AssignTo [idToReg platform (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newBlockId
@@ -425,10 +427,10 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
 
 cgCase scrut bndr alt_type alts
   = -- the general case
-    do { dflags <- getDynFlags
+    do { platform <- getPlatform
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
-             alt_regs  = map (idToReg dflags) ret_bndrs
+             alt_regs  = map (idToReg platform) ret_bndrs
        ; simple_scrut <- isSimpleScrut scrut alt_type
        ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
                     | not simple_scrut = True
@@ -548,11 +550,11 @@ cgAlts gc_plan _bndr (MultiValAlt _) [(_, _, rhs)]
         -- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
-  = do  { dflags <- getDynFlags
+  = do  { platform <- getPlatform
 
         ; tagged_cmms <- cgAltRhss gc_plan bndr alts
 
-        ; let bndr_reg = CmmLocal (idToReg dflags bndr)
+        ; let bndr_reg = CmmLocal (idToReg platform bndr)
               (DEFAULT,deflt) = head tagged_cmms
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
@@ -564,11 +566,12 @@ cgAlts gc_plan bndr (PrimAlt _) alts
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do  { dflags <- getDynFlags
+        ; platform <- getPlatform
 
         ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
         ; let !fam_sz   = tyConFamilySize tycon
-              !bndr_reg = CmmLocal (idToReg dflags bndr)
+              !bndr_reg = CmmLocal (idToReg platform bndr)
               !ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               !branches' = first succ <$> branches
               !maxpt = mAX_PTR_TAG dflags
@@ -807,9 +810,9 @@ cgAlgAltRhss gc_plan bndr alts
 cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(AltCon, CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   let
-    base_reg = idToReg dflags bndr
+    base_reg = idToReg platform bndr
     cg_alt :: CgStgAlt -> FCode (AltCon, CmmAGraphScoped)
     cg_alt (con, bndrs, rhs)
       = getCodeScoped             $
@@ -1083,10 +1086,10 @@ emitEnter fun = do
 -- simply pass on the annotation as a @CmmTickish@.
 cgTick :: Tickish Id -> FCode ()
 cgTick tick
-  = do { dflags <- getDynFlags
+  = do { platform <- getPlatform
        ; case tick of
            ProfNote   cc t p -> emitSetCCC cc t p
-           HpcTick    m n    -> emit (mkTickBox dflags m n)
+           HpcTick    m n    -> emit (mkTickBox platform m n)
            SourceNote s n    -> emitTick $ SourceNote s n
            _other            -> return () -- ignore
        }

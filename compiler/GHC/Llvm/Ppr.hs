@@ -30,6 +30,7 @@ import GhcPrelude
 import GHC.Llvm.Syntax
 import GHC.Llvm.MetaData
 import GHC.Llvm.Types
+import GHC.Platform
 
 import Data.List ( intersperse )
 import Outputable
@@ -41,14 +42,14 @@ import FastString ( sLit )
 --------------------------------------------------------------------------------
 
 -- | Print out a whole LLVM module.
-ppLlvmModule :: LlvmModule -> SDoc
-ppLlvmModule (LlvmModule comments aliases meta globals decls funcs)
+ppLlvmModule :: Platform -> LlvmModule -> SDoc
+ppLlvmModule platform (LlvmModule comments aliases meta globals decls funcs)
   = ppLlvmComments comments $+$ newLine
     $+$ ppLlvmAliases aliases $+$ newLine
     $+$ ppLlvmMetas meta $+$ newLine
     $+$ ppLlvmGlobals globals $+$ newLine
     $+$ ppLlvmFunctionDecls decls $+$ newLine
-    $+$ ppLlvmFunctions funcs
+    $+$ ppLlvmFunctions platform funcs
 
 -- | Print out a multi-line comment, can be inside a function or on its own
 ppLlvmComments :: [LMString] -> SDoc
@@ -117,12 +118,12 @@ ppLlvmMeta (MetaNamed n m)
 
 
 -- | Print out a list of function definitions.
-ppLlvmFunctions :: LlvmFunctions -> SDoc
-ppLlvmFunctions funcs = vcat $ map ppLlvmFunction funcs
+ppLlvmFunctions :: Platform -> LlvmFunctions -> SDoc
+ppLlvmFunctions platform funcs = vcat $ map (ppLlvmFunction platform) funcs
 
 -- | Print out a function definition.
-ppLlvmFunction :: LlvmFunction -> SDoc
-ppLlvmFunction fun =
+ppLlvmFunction :: Platform -> LlvmFunction -> SDoc
+ppLlvmFunction platform fun =
     let attrDoc = ppSpaceJoin (funcAttrs fun)
         secDoc = case funcSect fun of
                       Just s' -> text "section" <+> (doubleQuotes $ ftext s')
@@ -133,7 +134,7 @@ ppLlvmFunction fun =
     in text "define" <+> ppLlvmFunctionHeader (funcDecl fun) (funcArgs fun)
         <+> attrDoc <+> secDoc <+> prefixDoc
         $+$ lbrace
-        $+$ ppLlvmBlocks (funcBody fun)
+        $+$ ppLlvmBlocks platform (funcBody fun)
         $+$ rbrace
         $+$ newLine
         $+$ newLine
@@ -177,21 +178,21 @@ ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
 
 
 -- | Print out a list of LLVM blocks.
-ppLlvmBlocks :: LlvmBlocks -> SDoc
-ppLlvmBlocks blocks = vcat $ map ppLlvmBlock blocks
+ppLlvmBlocks :: Platform -> LlvmBlocks -> SDoc
+ppLlvmBlocks platform blocks = vcat $ map (ppLlvmBlock platform) blocks
 
 -- | Print out an LLVM block.
 -- It must be part of a function definition.
-ppLlvmBlock :: LlvmBlock -> SDoc
-ppLlvmBlock (LlvmBlock blockId stmts) =
+ppLlvmBlock :: Platform -> LlvmBlock -> SDoc
+ppLlvmBlock platform (LlvmBlock blockId stmts) =
   let isLabel (MkLabel _) = True
       isLabel _           = False
       (block, rest)       = break isLabel stmts
       ppRest = case rest of
-        MkLabel id:xs -> ppLlvmBlock (LlvmBlock id xs)
+        MkLabel id:xs -> ppLlvmBlock platform (LlvmBlock id xs)
         _             -> empty
   in ppLlvmBlockLabel blockId
-           $+$ (vcat $ map ppLlvmStatement block)
+           $+$ (vcat $ map (ppLlvmStatement platform) block)
            $+$ newLine
            $+$ ppRest
 
@@ -201,11 +202,11 @@ ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 
 
 -- | Print out an LLVM statement.
-ppLlvmStatement :: LlvmStatement -> SDoc
-ppLlvmStatement stmt =
+ppLlvmStatement :: Platform -> LlvmStatement -> SDoc
+ppLlvmStatement platform stmt =
   let ind = (text "  " <>)
   in case stmt of
-        Assignment  dst expr      -> ind $ ppAssignment dst (ppLlvmExpression expr)
+        Assignment  dst expr      -> ind $ ppAssignment dst (ppLlvmExpression platform expr)
         Fence       st ord        -> ind $ ppFence st ord
         Branch      target        -> ind $ ppBranch target
         BranchIf    cond ifT ifF  -> ind $ ppBranchIf cond ifT ifF
@@ -214,15 +215,15 @@ ppLlvmStatement stmt =
         Store       value ptr     -> ind $ ppStore value ptr
         Switch      scrut def tgs -> ind $ ppSwitch scrut def tgs
         Return      result        -> ind $ ppReturn result
-        Expr        expr          -> ind $ ppLlvmExpression expr
+        Expr        expr          -> ind $ ppLlvmExpression platform expr
         Unreachable               -> ind $ text "unreachable"
         Nop                       -> empty
-        MetaStmt    meta s        -> ppMetaStatement meta s
+        MetaStmt    meta s        -> ppMetaStatement platform meta s
 
 
 -- | Print out an LLVM expression.
-ppLlvmExpression :: LlvmExpression -> SDoc
-ppLlvmExpression expr
+ppLlvmExpression :: Platform -> LlvmExpression -> SDoc
+ppLlvmExpression platform expr
   = case expr of
         Alloca     tp amount        -> ppAlloca tp amount
         LlvmOp     op left right    -> ppMachOp op left right
@@ -235,13 +236,13 @@ ppLlvmExpression expr
         Insert     vec elt idx      -> ppInsert vec elt idx
         GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
         Load       ptr              -> ppLoad ptr
-        ALoad      ord st ptr       -> ppALoad ord st ptr
+        ALoad      ord st ptr       -> ppALoad platform ord st ptr
         Malloc     tp amount        -> ppMalloc tp amount
         AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
         CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
         Phi        tp predecessors  -> ppPhi tp predecessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
-        MExpr      meta expr        -> ppMetaExpr meta expr
+        MExpr      meta expr        -> ppMetaExpr platform meta expr
 
 
 --------------------------------------------------------------------------------
@@ -360,9 +361,9 @@ ppLoad var = text "load" <+> ppr derefType <> comma <+> ppr var <> align
     align | isVector . pLower . getVarType $ var = text ", align 1"
           | otherwise = empty
 
-ppALoad :: LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
-ppALoad ord st var = sdocWithDynFlags $ \dflags ->
-  let alignment = (llvmWidthInBits dflags $ getVarType var) `quot` 8
+ppALoad :: Platform -> LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
+ppALoad platform ord st var =
+  let alignment = (llvmWidthInBits platform $ getVarType var) `quot` 8
       align     = text ", align" <+> ppr alignment
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
@@ -468,11 +469,13 @@ ppInsert vec elt idx =
     <+> ppr idx
 
 
-ppMetaStatement :: [MetaAnnot] -> LlvmStatement -> SDoc
-ppMetaStatement meta stmt = ppLlvmStatement stmt <> ppMetaAnnots meta
+ppMetaStatement :: Platform -> [MetaAnnot] -> LlvmStatement -> SDoc
+ppMetaStatement platform meta stmt =
+   ppLlvmStatement platform stmt <> ppMetaAnnots meta
 
-ppMetaExpr :: [MetaAnnot] -> LlvmExpression -> SDoc
-ppMetaExpr meta expr = ppLlvmExpression expr <> ppMetaAnnots meta
+ppMetaExpr :: Platform -> [MetaAnnot] -> LlvmExpression -> SDoc
+ppMetaExpr platform meta expr =
+   ppLlvmExpression platform expr <> ppMetaAnnots meta
 
 ppMetaAnnots :: [MetaAnnot] -> SDoc
 ppMetaAnnots meta = hcat $ map ppMeta meta

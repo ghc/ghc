@@ -87,15 +87,15 @@ condIntCode cond x y = do
 
 condFltCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 condFltCode cond x y = do
-    dflags <- getDynFlags
+    platform <- getPlatform
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     tmp <- getNewRegNat FF64
     let
         promote x = FxTOy FF32 FF64 x tmp
 
-        pk1   = cmmExprType dflags x
-        pk2   = cmmExprType dflags y
+        pk1   = cmmExprType platform x
+        pk2   = cmmExprType platform y
 
         code__2 =
                 if pk1 `cmmEqType` pk2 then

@@ -55,8 +55,9 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
 
        funDec <- llvmFunSig live lbl link
        dflags <- getDynFlags
+       platform <- getPlatform
        let buildArg = fsLit . showSDoc dflags . ppPlainName
-           funArgs = map buildArg (llvmFunArgs dflags live)
+           funArgs = map buildArg (llvmFunArgs platform live)
            funSect = llvmFunSection dflags (decName funDec)
 
        -- generate the info table
@@ -91,7 +92,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            i8Ptr)
 
-       return (ppLlvmGlobal alias $+$ ppLlvmFunction fun', [])
+       return (ppLlvmGlobal alias $+$ ppLlvmFunction platform fun', [])
 
 
 -- | The section we are putting info tables and their entry code into, should

@@ -158,6 +158,7 @@ dsCImport :: Id
 dsCImport id co (CLabel cid) cconv _ _ = do
    dflags <- getDynFlags
    let ty  = coercionLKind co
+       platform = targetPlatform dflags
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
@@ -168,7 +169,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
     let
         rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
         rhs' = Cast rhs co
-        stdcall_info = fun_type_arg_stdcall_info dflags cconv ty
+        stdcall_info = fun_type_arg_stdcall_info platform cconv ty
     in
     return ([(id, rhs')], empty, empty)
 
@@ -182,14 +183,14 @@ dsCImport id co CWrapper cconv _ _
 -- For stdcall labels, if the type was a FunPtr or newtype thereof,
 -- then we need to calculate the size of the arguments in order to add
 -- the @n suffix to the label.
-fun_type_arg_stdcall_info :: DynFlags -> CCallConv -> Type -> Maybe Int
-fun_type_arg_stdcall_info dflags StdCallConv ty
+fun_type_arg_stdcall_info :: Platform -> CCallConv -> Type -> Maybe Int
+fun_type_arg_stdcall_info platform StdCallConv ty
   | Just (tc,[arg_ty]) <- splitTyConApp_maybe ty,
     tyConUnique tc == funPtrTyConKey
   = let
        (bndrs, _) = tcSplitPiTys arg_ty
        fe_arg_tys = mapMaybe binderRelevantType_maybe bndrs
-    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType dflags . getPrimTyOf) fe_arg_tys)
+    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType platform . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
 
@@ -524,6 +525,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
          -- use that instead.  I hope the two coincide --SDM
     )
  where
+  platform = targetPlatform dflags
+
   -- list the arguments to the C function
   arg_info :: [(SDoc,           -- arg name
                 SDoc,           -- C type
@@ -533,7 +536,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 (arg_cname n stg_type,
                  stg_type,
                  ty,
-                 typeCmmType dflags (getPrimTyOf ty))
+                 typeCmmType platform (getPrimTyOf ty))
               | (ty,n) <- zip arg_htys [1::Int ..] ]
 
   arg_cname n stg_ty
@@ -555,12 +558,12 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   -- add some auxiliary args; the stable ptr in the wrapper case, and
   -- a slot for the dummy return address in the wrapper + ccall case
   aug_arg_info
-    | isNothing maybe_target = stable_ptr_arg : insertRetAddr dflags cc arg_info
+    | isNothing maybe_target = stable_ptr_arg : insertRetAddr platform cc arg_info
     | otherwise              = arg_info
 
   stable_ptr_arg =
         (text "the_stableptr", text "StgStablePtr", undefined,
-         typeCmmType dflags (mkStablePtrPrimTy alphaTy))
+         typeCmmType platform (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `eqType` unitTy     -- Look through any newtypes
@@ -741,10 +744,10 @@ typeTyCon ty
   | otherwise
   = pprPanic "GHC.HsToCore.Foreign.Decl.typeTyCon" (ppr ty)
 
-insertRetAddr :: DynFlags -> CCallConv
+insertRetAddr :: Platform -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
               -> [(SDoc, SDoc, Type, CmmType)]
-insertRetAddr dflags CCallConv args
+insertRetAddr platform CCallConv args
     = case platformArch platform of
       ArchX86_64
        | platformOS platform == OSMinGW32 ->
@@ -754,7 +757,7 @@ insertRetAddr dflags CCallConv args
           -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
-              go 4 args = ret_addr_arg dflags : args
+              go 4 args = ret_addr_arg platform : args
               go n (arg:args) = arg : go (n+1) args
               go _ [] = []
           in go 0 args
@@ -765,20 +768,19 @@ insertRetAddr dflags CCallConv args
           -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
-              go 6 args = ret_addr_arg dflags : args
+              go 6 args = ret_addr_arg platform : args
               go n (arg@(_,_,_,rep):args)
                | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
                | otherwise  = arg : go n     args
               go _ [] = []
           in go 0 args
       _ ->
-          ret_addr_arg dflags : args
-    where platform = targetPlatform dflags
+          ret_addr_arg platform : args
 insertRetAddr _ _ args = args
 
-ret_addr_arg :: DynFlags -> (SDoc, SDoc, Type, CmmType)
-ret_addr_arg dflags = (text "original_return_addr", text "void*", undefined,
-                       typeCmmType dflags addrPrimTy)
+ret_addr_arg :: Platform -> (SDoc, SDoc, Type, CmmType)
+ret_addr_arg platform = (text "original_return_addr", text "void*", undefined,
+                         typeCmmType platform addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).

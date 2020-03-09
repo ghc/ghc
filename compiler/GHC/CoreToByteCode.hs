@@ -204,19 +204,19 @@ newtype ByteOff = ByteOff Int
 newtype WordOff = WordOff Int
     deriving (Enum, Eq, Integral, Num, Ord, Real)
 
-wordsToBytes :: DynFlags -> WordOff -> ByteOff
-wordsToBytes dflags = fromIntegral . (* wORD_SIZE dflags) . fromIntegral
+wordsToBytes :: Platform -> WordOff -> ByteOff
+wordsToBytes platform = fromIntegral . (* platformWordSizeInBytes platform) . fromIntegral
 
 -- Used when we know we have a whole number of words
-bytesToWords :: DynFlags -> ByteOff -> WordOff
-bytesToWords dflags (ByteOff bytes) =
-    let (q, r) = bytes `quotRem` (wORD_SIZE dflags)
+bytesToWords :: Platform -> ByteOff -> WordOff
+bytesToWords platform (ByteOff bytes) =
+    let (q, r) = bytes `quotRem` (platformWordSizeInBytes platform)
     in if r == 0
            then fromIntegral q
            else panic $ "GHC.CoreToByteCode.bytesToWords: bytes=" ++ show bytes
 
-wordSize :: DynFlags -> ByteOff
-wordSize dflags = ByteOff (wORD_SIZE dflags)
+wordSize :: Platform -> ByteOff
+wordSize platform = ByteOff (platformWordSizeInBytes platform)
 
 type Sequel = ByteOff -- back off to this depth before ENTER
 
@@ -381,6 +381,7 @@ schemeR_wrk fvs nm original_body (args, body)
    = do
      dflags <- getDynFlags
      let
+         platform  = targetPlatform dflags
          all_args  = reverse args ++ fvs
          arity     = length all_args
          -- all_args are the args in reverse order.  We're compiling a function
@@ -389,14 +390,14 @@ schemeR_wrk fvs nm original_body (args, body)
 
          -- Stack arguments always take a whole number of words, we never pack
          -- them unlike constructor fields.
-         szsb_args = map (wordsToBytes dflags . idSizeW dflags) all_args
+         szsb_args = map (wordsToBytes platform . idSizeW dflags) all_args
          sum_szsb_args  = sum szsb_args
          p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
          bits = argBits dflags (reverse (map bcIdArgRep all_args))
          bitmap_size = genericLength bits
-         bitmap = mkBitmap dflags bits
+         bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
      emitBc (mkProtoBCO dflags nm body_code (Right original_body)
@@ -410,7 +411,8 @@ schemeER_wrk d p rhs
         cc_arr <- getCCArray
         this_mod <- moduleName <$> getCurrentModule
         dflags <- getDynFlags
-        let idOffSets = getVarOffSets dflags d p fvs
+        let platform = targetPlatform dflags
+        let idOffSets = getVarOffSets platform d p fvs
         let breakInfo = CgBreakInfo
                         { cgb_vars = idOffSets
                         , cgb_resty = exprType (deAnnotate' newRhs)
@@ -425,8 +427,8 @@ schemeER_wrk d p rhs
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs
 
-getVarOffSets :: DynFlags -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
-getVarOffSets dflags depth env = map getOffSet
+getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
+getVarOffSets platform depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
         Nothing     -> Nothing
@@ -439,7 +441,7 @@ getVarOffSets dflags depth env = map getOffSet
             -- BRK_FUN in Interpreter.c In any case, this is used only when
             -- we trigger a breakpoint.
             let !var_depth_ws =
-                    trunc16W $ bytesToWords dflags (depth - offset) + 2
+                    trunc16W $ bytesToWords platform (depth - offset) + 2
             in Just (id, var_depth_ws)
 
 truncIntegral16 :: Integral a => a -> Word16
@@ -482,10 +484,11 @@ returnUnboxedAtom
 -- Heave it on the stack, SLIDE, and RETURN.
 returnUnboxedAtom d s p e e_rep = do
     dflags <- getDynFlags
+    let platform = targetPlatform dflags
     (push, szb) <- pushAtom d p e
-    return (push                                 -- value onto stack
-           `appOL`  mkSlideB dflags szb (d - s)  -- clear to sequel
-           `snocOL` RETURN_UBX e_rep)            -- go
+    return (push                                  -- value onto stack
+           `appOL`  mkSlideB platform szb (d - s) -- clear to sequel
+           `snocOL` RETURN_UBX e_rep)             -- go
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
@@ -516,7 +519,8 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
         -- Just allocate the constructor and carry on
         alloc_code <- mkConAppCode d s p data_con args_r_to_l
         dflags <- getDynFlags
-        let !d2 = d + wordSize dflags
+        let platform = targetPlatform dflags
+        let !d2 = d + wordSize platform
         body_code <- schemeE d2 s (Map.insert x d2 p) body
         return (alloc_code `appOL` body_code)
 
@@ -526,6 +530,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
      dflags <- getDynFlags
      let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
+         platform = targetPlatform dflags
          n_binds = genericLength xs
 
          fvss  = map (fvsToEnv p' . fst) rhss
@@ -544,9 +549,9 @@ schemeE d s p (AnnLet binds (_,body)) = do
          -- are ptrs, so all have size 1 word.  d' and p' reflect the stack
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
-         offsets = mkStackOffsets d (genericReplicate n_binds (wordSize dflags))
+         offsets = mkStackOffsets d (genericReplicate n_binds (wordSize platform))
          p' = Map.insertList (zipE xs' offsets) p
-         d' = d + wordsToBytes dflags n_binds
+         d' = d + wordsToBytes platform n_binds
          zipE = zipEqual "schemeE"
 
          -- ToDo: don't build thunks for things with no free variables
@@ -831,8 +836,9 @@ schemeT d s p app
    | Just con <- maybe_saturated_dcon
    = do alloc_con <- mkConAppCode d s p con args_r_to_l
         dflags <- getDynFlags
+        let platform = targetPlatform dflags
         return (alloc_con         `appOL`
-                mkSlideW 1 (bytesToWords dflags $ d - s) `snocOL`
+                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL`
                 ENTER)
 
    -- Case 4: Tail call of function
@@ -875,6 +881,7 @@ mkConAppCode orig_d _ p con args_r_to_l =
   where
     app_code = do
         dflags <- getDynFlags
+        let platform = targetPlatform dflags
 
         -- The args are initially in reverse order, but mkVirtHeapOffsets
         -- expects them to be left-to-right.
@@ -894,7 +901,7 @@ mkConAppCode orig_d _ p con args_r_to_l =
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
             do_pushery !d [] = do
-                let !n_arg_words = trunc16W $ bytesToWords dflags (d - orig_d)
+                let !n_arg_words = trunc16W $ bytesToWords platform (d - orig_d)
                 return (unitOL (PACK con n_arg_words))
 
         -- Push on the stack in the reverse order.
@@ -928,15 +935,17 @@ doTailCall init_d s p fn args = do_pushes init_d args (map atomRep args)
         ASSERT( null reps ) return ()
         (push_fn, sz) <- pushAtom d p (AnnVar fn)
         dflags <- getDynFlags
-        ASSERT( sz == wordSize dflags ) return ()
-        let slide = mkSlideB dflags (d - init_d + wordSize dflags) (init_d - s)
+        let platform = targetPlatform dflags
+        ASSERT( sz == wordSize platform ) return ()
+        let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
         return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
       (next_d, push_code) <- push_seq d these_args
       dflags <- getDynFlags
-      instrs <- do_pushes (next_d + wordSize dflags) rest_of_args rest_of_reps
+      let platform = targetPlatform dflags
+      instrs <- do_pushes (next_d + wordSize platform) rest_of_args rest_of_reps
       --                          ^^^ for the PUSH_APPLY_ instruction
       return (push_code `appOL` (push_apply `consOL` instrs))
 
@@ -995,6 +1004,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
      dflags <- getDynFlags
      hsc_env <- getHscEnv
      let
+        platform = targetPlatform dflags
         profiling
           | Just interp <- hsc_interp hsc_env
           = interpreterProfiled interp
@@ -1005,21 +1015,21 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl.
         ret_frame_size_b :: StackDepth
-        ret_frame_size_b = 2 * wordSize dflags
+        ret_frame_size_b = 2 * wordSize platform
 
         -- The extra frame we push to save/restore the CCCS when profiling
-        save_ccs_size_b | profiling = 2 * wordSize dflags
+        save_ccs_size_b | profiling = 2 * wordSize platform
                         | otherwise = 0
 
         -- An unlifted value gets an extra info table pushed on top
         -- when it is returned.
         unlifted_itbl_size_b :: StackDepth
         unlifted_itbl_size_b | isAlgCase = 0
-                            | otherwise = wordSize dflags
+                             | otherwise = wordSize platform
 
         -- depth of stack after the return value has been pushed
         d_bndr =
-            d + ret_frame_size_b + wordsToBytes dflags (idSizeW dflags bndr)
+            d + ret_frame_size_b + wordsToBytes platform (idSizeW dflags bndr)
 
         -- depth of stack after the extra info table for an unboxed return
         -- has been pushed, if any.  This is the stack depth at the
@@ -1061,7 +1071,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
                          ]
                  size = WordOff tot_wds
 
-                 stack_bot = d_alts + wordsToBytes dflags size
+                 stack_bot = d_alts + wordsToBytes platform size
 
                  -- convert offsets from Sp into offsets into the virtual stack
                  p' = Map.insertList
@@ -1111,10 +1121,10 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- really want a bitmap up to depth (d-s).  This affects compilation of
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
-        bitmap_size = trunc16W $ bytesToWords dflags (d - s)
+        bitmap_size = trunc16W $ bytesToWords platform (d - s)
         bitmap_size' :: Int
         bitmap_size' = fromIntegral bitmap_size
-        bitmap = intsToReverseBitmap dflags bitmap_size'{-size-}
+        bitmap = intsToReverseBitmap platform bitmap_size'{-size-}
                         (sort (filter (< bitmap_size') rel_slots))
           where
           binds = Map.toList p
@@ -1123,7 +1133,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
           rel_slots = nub $ map fromIntegral $ concatMap spread binds
           spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
                               | otherwise                      = []
-                where rel_offset = trunc16W $ bytesToWords dflags (d - offset)
+                where rel_offset = trunc16W $ bytesToWords platform (d - offset)
 
      alt_stuff <- mapM codeAlt alts
      alt_final <- mkMultiBranch maybe_ncons alt_stuff
@@ -1167,9 +1177,10 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
      dflags <- getDynFlags
 
      let
+         platform = targetPlatform dflags
          -- useful constants
          addr_size_b :: ByteOff
-         addr_size_b = wordSize dflags
+         addr_size_b = wordSize platform
 
          -- Get the args on the stack, with tags and suitably
          -- dereferenced for the CCall.  For each arg, return the
@@ -1228,7 +1239,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          a_reps_sizeW = sum (map (repSizeWords dflags) a_reps_pushed_r_to_l)
 
          push_args    = concatOL pushs_arg
-         !d_after_args = d0 + wordsToBytes dflags a_reps_sizeW
+         !d_after_args = d0 + wordsToBytes platform a_reps_sizeW
          a_reps_pushed_RAW
             | null a_reps_pushed_r_to_l || not (isVoidRep (head a_reps_pushed_r_to_l))
             = panic "GHC.CoreToByteCode.generateCCall: missing or invalid World token?"
@@ -1290,9 +1301,9 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                    Just (LitLabel target mb_size IsFunction)
                    where
                       mb_size
-                          | OSMinGW32 <- platformOS (targetPlatform dflags)
+                          | OSMinGW32 <- platformOS platform
                           , StdCallConv <- cconv
-                          = Just (fromIntegral a_reps_sizeW * wORD_SIZE dflags)
+                          = Just (fromIntegral a_reps_sizeW * platformWordSizeInBytes platform)
                           | otherwise
                           = Nothing
 
@@ -1316,7 +1327,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a V (tag).
          r_sizeW   = repSizeWords dflags r_rep
-         d_after_r = d_after_Addr + wordsToBytes dflags r_sizeW
+         d_after_r = d_after_Addr + wordsToBytes platform r_sizeW
          push_r =
              if returns_void
                 then nilOL
@@ -1328,7 +1339,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- instruction needs to describe the chunk of stack containing
          -- the ccall args to the GC, so it needs to know how large it
          -- is.  See comment in Interpreter.c with the CCALL instruction.
-         stk_offset   = trunc16W $ bytesToWords dflags (d_after_r - s)
+         stk_offset   = trunc16W $ bytesToWords platform (d_after_r - s)
 
          conv = case cconv of
            CCallConv -> FFICCall
@@ -1340,8 +1351,8 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
      -- address of this to the CCALL instruction.
 
 
-     let ffires = primRepToFFIType dflags r_rep
-         ffiargs = map (primRepToFFIType dflags) a_reps
+     let ffires = primRepToFFIType platform r_rep
+         ffiargs = map (primRepToFFIType platform) a_reps
      hsc_env <- getHscEnv
      token <- ioToBc $ iservCmd hsc_env (PrepFFI conv ffiargs ffires)
      recordFFIBc token
@@ -1355,7 +1366,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                            PlayRisky         -> 0x2
 
          -- slide and return
-         d_after_r_min_s = bytesToWords dflags (d_after_r - s)
+         d_after_r_min_s = bytesToWords platform (d_after_r - s)
          wrapup       = mkSlideW (trunc16W r_sizeW) (d_after_r_min_s - r_sizeW)
                         `snocOL` RETURN_UBX (toArgRep r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
@@ -1364,8 +1375,8 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
          )
 
-primRepToFFIType :: DynFlags -> PrimRep -> FFIType
-primRepToFFIType dflags r
+primRepToFFIType :: Platform -> PrimRep -> FFIType
+primRepToFFIType platform r
   = case r of
      VoidRep     -> FFIVoid
      IntRep      -> signed_word
@@ -1377,10 +1388,9 @@ primRepToFFIType dflags r
      DoubleRep   -> FFIDouble
      _           -> panic "primRepToFFIType"
   where
-    (signed_word, unsigned_word)
-       | wORD_SIZE dflags == 4  = (FFISInt32, FFIUInt32)
-       | wORD_SIZE dflags == 8  = (FFISInt64, FFIUInt64)
-       | otherwise              = panic "primTyDescChar"
+    (signed_word, unsigned_word) = case platformWordSize platform of
+       PW4 -> (FFISInt32, FFIUInt32)
+       PW8 -> (FFISInt64, FFIUInt64)
 
 -- Make a dummy literal, to be used as a placeholder for FFI return
 -- values on the stack.
@@ -1506,8 +1516,9 @@ implement_tagToId d s p arg names
        dflags <- getDynFlags
        let infos = zip4 labels (tail labels ++ [label_fail])
                                [0 ..] names
+           platform = targetPlatform dflags
            steps = map (mkStep label_exit) infos
-           slide_ws = bytesToWords dflags (d - s + arg_bytes)
+           slide_ws = bytesToWords platform (d - s + arg_bytes)
 
        return (push_arg
                `appOL` unitOL (PUSH_UBX LitNullAddr 1)
@@ -1564,24 +1575,26 @@ pushAtom d p (AnnVar var)
 
    | Just primop <- isPrimOpId_maybe var
    = do
-       dflags <-getDynFlags
-       return (unitOL (PUSH_PRIMOP primop), wordSize dflags)
+       dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       return (unitOL (PUSH_PRIMOP primop), wordSize platform)
 
    | Just d_v <- lookupBCEnv_maybe var p  -- var is a local variable
    = do dflags <- getDynFlags
+        let platform = targetPlatform dflags
 
         let !szb = idSizeCon dflags var
             with_instr instr = do
                 let !off_b = trunc16B $ d - d_v
-                return (unitOL (instr off_b), wordSize dflags)
+                return (unitOL (instr off_b), wordSize platform)
 
         case szb of
             1 -> with_instr PUSH8_W
             2 -> with_instr PUSH16_W
             4 -> with_instr PUSH32_W
             _ -> do
-                let !szw = bytesToWords dflags szb
-                    !off_w = trunc16W $ bytesToWords dflags (d - d_v) + szw - 1
+                let !szw = bytesToWords platform szb
+                    !off_w = trunc16W $ bytesToWords platform (d - d_v) + szw - 1
                 return (toOL (genericReplicate szw (PUSH_L off_w)), szb)
         -- d - d_v           offset from TOS to the first slot of the object
         --
@@ -1598,16 +1611,18 @@ pushAtom d p (AnnVar var)
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
                 let sz = idSizeCon dflags var
-                MASSERT( sz == wordSize dflags )
+                let platform = targetPlatform dflags
+                MASSERT( sz == wordSize platform )
                 return (unitOL (PUSH_G (getName var)), sz)
 
 
 pushAtom _ _ (AnnLit lit) = do
      dflags <- getDynFlags
+     let platform = targetPlatform dflags
      let code rep
              = let size_words = WordOff (argRepSizeW dflags rep)
                in  return (unitOL (PUSH_UBX lit (trunc16W size_words)),
-                           wordsToBytes dflags size_words)
+                           wordsToBytes platform size_words)
 
      case lit of
         LitLabel _ _ _   -> code N
@@ -1858,11 +1873,11 @@ unsupportedCConvException = throwGhcException (ProgramError
   ("Error: bytecode compiler can't handle some foreign calling conventions\n"++
    "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
-mkSlideB :: DynFlags -> ByteOff -> ByteOff -> OrdList BCInstr
-mkSlideB dflags !nb !db = mkSlideW n d
+mkSlideB :: Platform -> ByteOff -> ByteOff -> OrdList BCInstr
+mkSlideB platform !nb !db = mkSlideW n d
   where
-    !n = trunc16W $ bytesToWords dflags nb
-    !d = bytesToWords dflags db
+    !n = trunc16W $ bytesToWords platform nb
+    !d = bytesToWords platform db
 
 mkSlideW :: Word16 -> WordOff -> OrdList BCInstr
 mkSlideW !n !ws

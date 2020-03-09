@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 
 --------------------------------------------------------------------------------
 -- | The LLVM Type System.
@@ -14,6 +15,7 @@ import Data.Char
 import Data.Int
 import Numeric
 
+import GHC.Platform
 import GHC.Driver.Session
 import FastString
 import Outputable
@@ -351,23 +353,24 @@ isGlobal (LMGlobalVar _ _ _ _ _ _) = True
 isGlobal _                         = False
 
 -- | Width in bits of an 'LlvmType', returns 0 if not applicable
-llvmWidthInBits :: DynFlags -> LlvmType -> Int
-llvmWidthInBits _      (LMInt n)       = n
-llvmWidthInBits _      (LMFloat)       = 32
-llvmWidthInBits _      (LMDouble)      = 64
-llvmWidthInBits _      (LMFloat80)     = 80
-llvmWidthInBits _      (LMFloat128)    = 128
--- Could return either a pointer width here or the width of what
--- it points to. We will go with the former for now.
--- PMW: At least judging by the way LLVM outputs constants, pointers
---      should use the former, but arrays the latter.
-llvmWidthInBits dflags (LMPointer _)   = llvmWidthInBits dflags (llvmWord dflags)
-llvmWidthInBits dflags (LMArray n t)   = n * llvmWidthInBits dflags t
-llvmWidthInBits dflags (LMVector n ty) = n * llvmWidthInBits dflags ty
-llvmWidthInBits _      LMLabel         = 0
-llvmWidthInBits _      LMVoid          = 0
-llvmWidthInBits dflags (LMStruct tys)  = sum $ map (llvmWidthInBits dflags) tys
-llvmWidthInBits _      (LMStructU _)   =
+llvmWidthInBits :: Platform -> LlvmType -> Int
+llvmWidthInBits platform = \case
+   (LMInt n)       -> n
+   (LMFloat)       -> 32
+   (LMDouble)      -> 64
+   (LMFloat80)     -> 80
+   (LMFloat128)    -> 128
+   -- Could return either a pointer width here or the width of what
+   -- it points to. We will go with the former for now.
+   -- PMW: At least judging by the way LLVM outputs constants, pointers
+   --      should use the former, but arrays the latter.
+   (LMPointer _)   -> llvmWidthInBits platform (llvmWord platform)
+   (LMArray n t)   -> n * llvmWidthInBits platform t
+   (LMVector n ty) -> n * llvmWidthInBits platform ty
+   LMLabel         -> 0
+   LMVoid          -> 0
+   (LMStruct tys)  -> sum $ map (llvmWidthInBits platform) tys
+   (LMStructU _)   ->
     -- It's not trivial to calculate the bit width of the unpacked structs,
     -- since they will be aligned depending on the specified datalayout (
     -- http://llvm.org/docs/LangRef.html#data-layout ). One way we could support
@@ -377,9 +380,9 @@ llvmWidthInBits _      (LMStructU _)   =
     -- llvm.sadd.with.overflow.*), so we don't actually need to compute their
     -- bit width.
     panic "llvmWidthInBits: not implemented for LMStructU"
-llvmWidthInBits _      (LMFunction  _) = 0
-llvmWidthInBits dflags (LMAlias (_,t)) = llvmWidthInBits dflags t
-llvmWidthInBits _      LMMetadata      = panic "llvmWidthInBits: Meta-data has no runtime representation!"
+   (LMFunction  _) -> 0
+   (LMAlias (_,t)) -> llvmWidthInBits platform t
+   LMMetadata      -> panic "llvmWidthInBits: Meta-data has no runtime representation!"
 
 
 -- -----------------------------------------------------------------------------
@@ -396,9 +399,9 @@ i1    = LMInt   1
 i8Ptr = pLift i8
 
 -- | The target architectures word size
-llvmWord, llvmWordPtr :: DynFlags -> LlvmType
-llvmWord    dflags = LMInt (wORD_SIZE dflags * 8)
-llvmWordPtr dflags = pLift (llvmWord dflags)
+llvmWord, llvmWordPtr :: Platform -> LlvmType
+llvmWord    platform = LMInt (platformWordSizeInBytes platform * 8)
+llvmWordPtr platform = pLift (llvmWord platform)
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Function Types

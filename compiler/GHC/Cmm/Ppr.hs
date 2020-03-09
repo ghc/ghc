@@ -42,6 +42,8 @@ where
 
 import GhcPrelude hiding (succ)
 
+import GHC.Platform
+import GHC.Driver.Session (targetPlatform)
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
@@ -67,7 +69,8 @@ instance Outputable CmmTopInfo where
 
 
 instance Outputable (CmmNode e x) where
-    ppr = pprNode
+    ppr e = sdocWithDynFlags $ \dflags ->
+            pprNode (targetPlatform dflags) e
 
 instance Outputable Convention where
     ppr = pprConvention
@@ -177,8 +180,8 @@ pprForeignTarget (PrimTarget op)
                          (mkFastString (show op))
                          Nothing ForeignLabelInThisPackage IsFunction))
 
-pprNode :: CmmNode e x -> SDoc
-pprNode node = pp_node <+> pp_debug
+pprNode :: Platform -> CmmNode e x -> SDoc
+pprNode platform node = pp_node <+> pp_debug
   where
     pp_node :: SDoc
     pp_node = case node of
@@ -209,8 +212,7 @@ pprNode node = pp_node <+> pp_debug
       -- rep[lv] = expr;
       CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
           where
-            rep = sdocWithDynFlags $ \dflags ->
-                  ppr ( cmmExprType dflags expr )
+            rep = ppr ( cmmExprType platform expr )
 
       -- call "ccall" foo(x, y)[r1, r2];
       -- ToDo ppr volatile

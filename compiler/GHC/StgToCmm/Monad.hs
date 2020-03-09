@@ -22,7 +22,7 @@ module GHC.StgToCmm.Monad (
         emitOutOfLine, emitAssign, emitStore,
         emitComment, emitTick, emitUnwind,
 
-        getCmm, aGraphToGraph,
+        getCmm, aGraphToGraph, getPlatform,
         getCodeR, getCode, getCodeScoped, getHeapUsage,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
@@ -61,6 +61,7 @@ module GHC.StgToCmm.Monad (
 
 import GhcPrelude hiding( sequence, succ )
 
+import GHC.Platform
 import GHC.Cmm
 import GHC.StgToCmm.Closure
 import GHC.Driver.Session
@@ -276,7 +277,7 @@ initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
   = MkCgInfoDown { cgd_dflags    = dflags
                  , cgd_mod       = mod
-                 , cgd_updfr_off = initUpdFrameOff dflags
+                 , cgd_updfr_off = initUpdFrameOff (targetPlatform dflags)
                  , cgd_ticky     = mkTopTickyCtrLabel
                  , cgd_sequel    = initSequel
                  , cgd_self_loop = Nothing
@@ -285,8 +286,8 @@ initCgInfoDown dflags mod
 initSequel :: Sequel
 initSequel = Return
 
-initUpdFrameOff :: DynFlags -> UpdFrameOffset
-initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
+initUpdFrameOff :: Platform -> UpdFrameOffset
+initUpdFrameOff platform = platformWordSizeInBytes platform -- space for the RA
 
 
 --------------------------------------------------------
@@ -470,6 +471,9 @@ withSelfLoop self_loop code = do
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
 
+getPlatform :: FCode Platform
+getPlatform = targetPlatform <$> getDynFlags
+
 getThisPackage :: FCode UnitId
 getThisPackage = liftM thisPackage getDynFlags
 
@@ -562,12 +566,12 @@ forkClosureBody :: FCode () -> FCode ()
 --     re-bind the free variables to a field of the closure.
 
 forkClosureBody body_code
-  = do  { dflags <- getDynFlags
+  = do  { platform <- getPlatform
         ; info   <- getInfoDown
         ; us     <- newUniqSupply
         ; state  <- getState
         ; let body_info_down = info { cgd_sequel    = initSequel
-                                    , cgd_updfr_off = initUpdFrameOff dflags
+                                    , cgd_updfr_off = initUpdFrameOff platform
                                     , cgd_self_loop = Nothing }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
               ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
@@ -736,8 +740,8 @@ emitProcWithStackFrame
    -> FCode ()
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
-  = do  { dflags <- getDynFlags
-        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
+  = do  { platform <- getPlatform
+        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth platform)) False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
@@ -758,7 +762,7 @@ emitProcWithConvention conv mb_info lbl args blocks
 emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
 emitProc mb_info lbl live blocks offset do_layout
-  = do  { dflags <- getDynFlags
+  = do  { platform <- getPlatform
         ; l <- newBlockId
         ; let
               blks :: CmmGraph
@@ -768,7 +772,7 @@ emitProc mb_info lbl live blocks offset do_layout
                     | otherwise            = mapEmpty
 
               sinfo = StackInfo { arg_space = offset
-                                , updfr_space = Just (initUpdFrameOff dflags)
+                                , updfr_space = Just (initUpdFrameOff platform)
                                 , do_layout = do_layout }
 
               tinfo = TopInfo { info_tbls = infos

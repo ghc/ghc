@@ -72,8 +72,8 @@ type ByteOff = Int
 
 -- | Round up the given byte count to the next byte count that's a
 -- multiple of the machine's word size.
-roundUpToWords :: DynFlags -> ByteOff -> ByteOff
-roundUpToWords dflags n = roundUpTo n (wORD_SIZE dflags)
+roundUpToWords :: Platform -> ByteOff -> ByteOff
+roundUpToWords platform n = roundUpTo n (platformWordSizeInBytes platform)
 
 -- | Round up @base@ to a multiple of @size@.
 roundUpTo :: ByteOff -> ByteOff -> ByteOff
@@ -83,17 +83,17 @@ roundUpTo base size = (base + (size - 1)) .&. (complement (size - 1))
 --
 -- This function morally has type @WordOff -> ByteOff@, but uses @Num
 -- a@ to allow for overloading.
-wordsToBytes :: Num a => DynFlags -> a -> a
-wordsToBytes dflags n = fromIntegral (wORD_SIZE dflags) * n
-{-# SPECIALIZE wordsToBytes :: DynFlags -> Int -> Int #-}
-{-# SPECIALIZE wordsToBytes :: DynFlags -> Word -> Word #-}
-{-# SPECIALIZE wordsToBytes :: DynFlags -> Integer -> Integer #-}
+wordsToBytes :: Num a => Platform -> a -> a
+wordsToBytes platform n = fromIntegral (platformWordSizeInBytes platform) * n
+{-# SPECIALIZE wordsToBytes :: Platform -> Int -> Int #-}
+{-# SPECIALIZE wordsToBytes :: Platform -> Word -> Word #-}
+{-# SPECIALIZE wordsToBytes :: Platform -> Integer -> Integer #-}
 
 -- | First round the given byte count up to a multiple of the
 -- machine's word size and then convert the result to words.
-bytesToWordsRoundUp :: DynFlags -> ByteOff -> WordOff
-bytesToWordsRoundUp dflags n = (n + word_size - 1) `quot` word_size
- where word_size = wORD_SIZE dflags
+bytesToWordsRoundUp :: Platform -> ByteOff -> WordOff
+bytesToWordsRoundUp platform n = (n + word_size - 1) `quot` word_size
+ where word_size = platformWordSizeInBytes platform
 -- StgWord is a type representing an StgWord on the target platform.
 -- A Word64 is large enough to hold a Word for either a 32bit or 64bit platform
 newtype StgWord = StgWord Word64
@@ -102,9 +102,9 @@ newtype StgWord = StgWord Word64
 fromStgWord :: StgWord -> Integer
 fromStgWord (StgWord i) = toInteger i
 
-toStgWord :: DynFlags -> Integer -> StgWord
-toStgWord dflags i
-    = case platformWordSize (targetPlatform dflags) of
+toStgWord :: Platform -> Integer -> StgWord
+toStgWord platform i
+    = case platformWordSize platform of
       -- These conversions mean that things like toStgWord (-1)
       -- do the right thing
       PW4 -> StgWord (fromIntegral (fromInteger i :: Word32))
@@ -123,9 +123,9 @@ newtype StgHalfWord = StgHalfWord Word32
 fromStgHalfWord :: StgHalfWord -> Integer
 fromStgHalfWord (StgHalfWord w) = toInteger w
 
-toStgHalfWord :: DynFlags -> Integer -> StgHalfWord
-toStgHalfWord dflags i
-    = case platformWordSize (targetPlatform dflags) of
+toStgHalfWord :: Platform -> Integer -> StgHalfWord
+toStgHalfWord platform i
+    = case platformWordSize platform of
       -- These conversions mean that things like toStgHalfWord (-1)
       -- do the right thing
       PW4 -> StgHalfWord (fromIntegral (fromInteger i :: Word16))
@@ -135,11 +135,11 @@ instance Outputable StgHalfWord where
     ppr (StgHalfWord w) = integer (toInteger w)
 
 -- | Half word size in bytes
-halfWordSize :: DynFlags -> ByteOff
-halfWordSize dflags = platformWordSizeInBytes (targetPlatform dflags) `div` 2
+halfWordSize :: Platform -> ByteOff
+halfWordSize platform = platformWordSizeInBytes platform `div` 2
 
-halfWordSizeInBits :: DynFlags -> Int
-halfWordSizeInBits dflags = platformWordSizeInBits (targetPlatform dflags) `div` 2
+halfWordSizeInBits :: Platform -> Int
+halfWordSizeInBits platform = platformWordSizeInBits platform `div` 2
 
 {-
 ************************************************************************
@@ -255,8 +255,8 @@ arrPtrsRep dflags elems = ArrayPtrsRep elems (cardTableSizeW dflags elems)
 smallArrPtrsRep :: WordOff -> SMRep
 smallArrPtrsRep elems = SmallArrayPtrsRep elems
 
-arrWordsRep :: DynFlags -> ByteOff -> SMRep
-arrWordsRep dflags bytes = ArrayWordsRep (bytesToWordsRoundUp dflags bytes)
+arrWordsRep :: Platform -> ByteOff -> SMRep
+arrWordsRep platform bytes = ArrayWordsRep (bytesToWordsRoundUp platform bytes)
 
 -----------------------------------------------------------------------------
 -- Predicates
@@ -297,7 +297,7 @@ isStaticNoCafCon _                        = False
 -- Size-related things
 
 fixedHdrSize :: DynFlags -> ByteOff
-fixedHdrSize dflags = wordsToBytes dflags (fixedHdrSizeW dflags)
+fixedHdrSize dflags = wordsToBytes (targetPlatform dflags) (fixedHdrSizeW dflags)
 
 -- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
 fixedHdrSizeW :: DynFlags -> WordOff
@@ -322,7 +322,8 @@ arrWordsHdrSize dflags
 arrWordsHdrSizeW :: DynFlags -> WordOff
 arrWordsHdrSizeW dflags =
     fixedHdrSizeW dflags +
-    (sIZEOF_StgArrBytes_NoHdr dflags `quot` wORD_SIZE dflags)
+    (sIZEOF_StgArrBytes_NoHdr dflags `quot`
+      platformWordSizeInBytes (targetPlatform dflags))
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags
@@ -331,7 +332,8 @@ arrPtrsHdrSize dflags
 arrPtrsHdrSizeW :: DynFlags -> WordOff
 arrPtrsHdrSizeW dflags =
     fixedHdrSizeW dflags +
-    (sIZEOF_StgMutArrPtrs_NoHdr dflags `quot` wORD_SIZE dflags)
+    (sIZEOF_StgMutArrPtrs_NoHdr dflags `quot`
+      platformWordSizeInBytes (targetPlatform dflags))
 
 smallArrPtrsHdrSize :: DynFlags -> ByteOff
 smallArrPtrsHdrSize dflags
@@ -340,16 +342,18 @@ smallArrPtrsHdrSize dflags
 smallArrPtrsHdrSizeW :: DynFlags -> WordOff
 smallArrPtrsHdrSizeW dflags =
     fixedHdrSizeW dflags +
-    (sIZEOF_StgSmallMutArrPtrs_NoHdr dflags `quot` wORD_SIZE dflags)
+    (sIZEOF_StgSmallMutArrPtrs_NoHdr dflags `quot`
+      platformWordSizeInBytes (targetPlatform dflags))
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: DynFlags -> WordOff
 thunkHdrSize dflags = fixedHdrSizeW dflags + smp_hdr
-        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE dflags
+        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot`
+                         platformWordSizeInBytes (targetPlatform dflags)
 
 hdrSize :: DynFlags -> SMRep -> ByteOff
-hdrSize dflags rep = wordsToBytes dflags (hdrSizeW dflags rep)
+hdrSize dflags rep = wordsToBytes (targetPlatform dflags) (hdrSizeW dflags rep)
 
 hdrSizeW :: DynFlags -> SMRep -> WordOff
 hdrSizeW dflags (HeapRep _ _ _ ty)    = closureTypeHdrSize dflags ty
@@ -358,8 +362,8 @@ hdrSizeW dflags (SmallArrayPtrsRep _) = smallArrPtrsHdrSizeW dflags
 hdrSizeW dflags (ArrayWordsRep _)     = arrWordsHdrSizeW dflags
 hdrSizeW _ _                          = panic "SMRep.hdrSizeW"
 
-nonHdrSize :: DynFlags -> SMRep -> ByteOff
-nonHdrSize dflags rep = wordsToBytes dflags (nonHdrSizeW rep)
+nonHdrSize :: Platform -> SMRep -> ByteOff
+nonHdrSize platform rep = wordsToBytes platform (nonHdrSizeW rep)
 
 nonHdrSizeW :: SMRep -> WordOff
 nonHdrSizeW (HeapRep _ p np _) = p + np
@@ -413,7 +417,8 @@ cardTableSizeB dflags elems = cardRoundUp dflags elems
 -- | The size of a card table, in words
 cardTableSizeW :: DynFlags -> Int -> WordOff
 cardTableSizeW dflags elems =
-  bytesToWordsRoundUp dflags (cardTableSizeB dflags elems)
+  bytesToWordsRoundUp (targetPlatform dflags)
+                      (cardTableSizeB dflags elems)
 
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep

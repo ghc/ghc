@@ -43,6 +43,7 @@ assignArgumentsPos :: DynFlags
 
 assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
     where
+      platform = targetPlatform dflags
       regs = case (reps, conv) of
                (_,   NativeNodeCall)   -> getRegsWithNode dflags
                (_,   NativeDirectCall) -> getRegsWithoutNode dflags
@@ -57,7 +58,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
       -- different type).  When returning an unboxed tuple, we also
       -- separate the stack arguments by pointerhood.
       (reg_assts, stk_args)  = assign_regs [] reps regs
-      (stk_off,   stk_assts) = assignStack dflags off arg_ty stk_args
+      (stk_off,   stk_assts) = assignStack platform off arg_ty stk_args
       assignments = reg_assts ++ stk_assts
 
       assign_regs assts []     _    = (assts, [])
@@ -84,9 +85,9 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
-                      (_, (v:vs, fs, ds, ls, ss)) | widthInBits w <= widthInBits (wordWidth dflags)
+                      (_, (v:vs, fs, ds, ls, ss)) | widthInBits w <= widthInBits (wordWidth platform)
                           -> k (RegisterParam (v gcp), (vs, fs, ds, ls, ss))
-                      (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth dflags)
+                      (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth platform)
                           -> k (RegisterParam l, (vs, fs, ds, ls, ss))
                       _   -> (assts, (r:rs))
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
@@ -94,10 +95,10 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise      = VNonGcPtr
-              passFloatInXmm = passFloatArgsInXmm dflags
+              passFloatInXmm = passFloatArgsInXmm platform
 
-passFloatArgsInXmm :: DynFlags -> Bool
-passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
+passFloatArgsInXmm :: Platform -> Bool
+passFloatArgsInXmm platform = case platformArch platform of
                               ArchX86_64 -> True
                               ArchX86    -> False
                               _          -> False
@@ -109,12 +110,12 @@ passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
 passVectorInReg :: Width -> DynFlags -> Bool
 passVectorInReg _ _ = True
 
-assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
+assignStack :: Platform -> ByteOff -> (a -> CmmType) -> [a]
             -> (
                  ByteOff              -- bytes of stack args
                , [(a, ParamLocation)] -- args and locations
                )
-assignStack dflags offset arg_ty args = assign_stk offset [] (reverse args)
+assignStack platform offset arg_ty args = assign_stk offset [] (reverse args)
  where
       assign_stk offset assts [] = (offset, assts)
       assign_stk offset assts (r:rs)
@@ -123,7 +124,7 @@ assignStack dflags offset arg_ty args = assign_stk offset [] (reverse args)
               off' = offset + size
               -- Stack arguments always take a whole number of words, we never
               -- pack them unlike constructor fields.
-              size = roundUpToWords dflags (widthInBytes w)
+              size = roundUpToWords platform (widthInBytes w)
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available
@@ -202,9 +203,10 @@ nodeOnly = ([VanillaReg 1], [], [], [], [])
 -- only use this functionality in hand-written C-- code in the RTS.
 realArgRegsCover :: DynFlags -> [GlobalReg]
 realArgRegsCover dflags
-    | passFloatArgsInXmm dflags = map ($VGcPtr) (realVanillaRegs dflags) ++
-                                  realLongRegs dflags ++
-                                  map XmmReg (realXmmRegNos dflags)
+    | passFloatArgsInXmm (targetPlatform dflags)
+    = map ($VGcPtr) (realVanillaRegs dflags) ++
+      realLongRegs dflags ++
+      map XmmReg (realXmmRegNos dflags)
     | otherwise                 = map ($VGcPtr) (realVanillaRegs dflags) ++
                                   realFloatRegs dflags ++
                                   realDoubleRegs dflags ++

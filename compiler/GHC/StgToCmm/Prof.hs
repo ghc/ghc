@@ -25,6 +25,7 @@ module GHC.StgToCmm.Prof (
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
@@ -51,10 +52,10 @@ import Data.Char (ord)
 -----------------------------------------------------------------------------
 
 -- Expression representing the current cost centre stack
-ccsType :: DynFlags -> CmmType -- Type of a cost-centre stack
+ccsType :: Platform -> CmmType -- Type of a cost-centre stack
 ccsType = bWord
 
-ccType :: DynFlags -> CmmType -- Type of a cost centre
+ccType :: Platform -> CmmType -- Type of a cost centre
 ccType = bWord
 
 storeCurCCS :: CmmExpr -> CmmAGraph
@@ -69,23 +70,29 @@ mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 costCentreFrom :: DynFlags
                -> CmmExpr         -- A closure pointer
                -> CmmExpr        -- The cost centre from that closure
-costCentreFrom dflags cl = CmmLoad (cmmOffsetB dflags cl (oFFSET_StgHeader_ccs dflags)) (ccsType dflags)
+costCentreFrom dflags cl = CmmLoad (cmmOffsetB platform cl (oFFSET_StgHeader_ccs dflags)) (ccsType platform)
+  where platform = targetPlatform dflags
 
 -- | The profiling header words in a static closure
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 staticProfHdr dflags ccs
- = ifProfilingL dflags [mkCCostCentreStack ccs, staticLdvInit dflags]
+  | gopt Opt_SccProfilingOn dflags = [mkCCostCentreStack ccs, staticLdvInit platform]
+  | otherwise                      = []
+  where platform = targetPlatform dflags
 
 -- | Profiling header words in a dynamic closure
 dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
-dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit dflags]
+dynProfHdr dflags ccs
+  | gopt Opt_SccProfilingOn dflags = [ccs, dynLdvInit dflags]
+  | otherwise                      = []
 
 -- | Initialise the profiling field of an update frame
 initUpdFrameProf :: CmmExpr -> FCode ()
 initUpdFrameProf frame
   = ifProfiling $        -- frame->header.prof.ccs = CCCS
     do dflags <- getDynFlags
-       emitStore (cmmOffset dflags frame (oFFSET_StgHeader_ccs dflags)) cccsExpr
+       platform <- getPlatform
+       emitStore (cmmOffset platform frame (oFFSET_StgHeader_ccs dflags)) cccsExpr
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 
@@ -122,9 +129,10 @@ saveCurrentCostCentre :: FCode (Maybe LocalReg)
         -- Returns Nothing if profiling is off
 saveCurrentCostCentre
   = do dflags <- getDynFlags
+       platform <- getPlatform
        if not (gopt Opt_SccProfilingOn dflags)
            then return Nothing
-           else do local_cc <- newTemp (ccType dflags)
+           else do local_cc <- newTemp (ccType platform)
                    emitAssign (CmmLocal local_cc) cccsExpr
                    return (Just local_cc)
 
@@ -145,7 +153,8 @@ profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
     do dflags <- getDynFlags
-       profAlloc (mkIntExpr dflags (heapClosureSizeW dflags rep)) ccs
+       platform <- getPlatform
+       profAlloc (mkIntExpr platform (heapClosureSizeW dflags rep)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -154,12 +163,13 @@ profAlloc :: CmmExpr -> CmmExpr -> FCode ()
 profAlloc words ccs
   = ifProfiling $
         do dflags <- getDynFlags
+           platform <- getPlatform
            let alloc_rep = rEP_CostCentreStack_mem_alloc dflags
            emit (addToMemE alloc_rep
-                       (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_mem_alloc dflags))
-                       (CmmMachOp (MO_UU_Conv (wordWidth dflags) (typeWidth alloc_rep)) $
-                         [CmmMachOp (mo_wordSub dflags) [words,
-                                                         mkIntExpr dflags (profHdrSize dflags)]]))
+                       (cmmOffsetB platform ccs (oFFSET_CostCentreStack_mem_alloc dflags))
+                       (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep)) $
+                         [CmmMachOp (mo_wordSub platform) [words,
+                                                           mkIntExpr platform (profHdrSize dflags)]]))
                        -- subtract the "profiling overhead", which is the
                        -- profiling header in a closure.
 
@@ -189,12 +199,6 @@ ifProfiling code
            then code
            else return ()
 
-ifProfilingL :: DynFlags -> [a] -> [a]
-ifProfilingL dflags xs
-  | gopt Opt_SccProfilingOn dflags = xs
-  | otherwise                      = []
-
-
 ---------------------------------------------------------------
 --        Initialising Cost Centres & CCSs
 ---------------------------------------------------------------
@@ -211,8 +215,9 @@ initCostCentres (local_CCs, singleton_CCSs)
 emitCostCentreDecl :: CostCentre -> FCode ()
 emitCostCentreDecl cc = do
   { dflags <- getDynFlags
-  ; let is_caf | isCafCC cc = mkIntCLit dflags (ord 'c') -- 'c' == is a CAF
-               | otherwise  = zero dflags
+  ; platform <- getPlatform
+  ; let is_caf | isCafCC cc = mkIntCLit platform (ord 'c') -- 'c' == is a CAF
+               | otherwise  = zero platform
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   ; label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
   ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
@@ -222,14 +227,14 @@ emitCostCentreDecl cc = do
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
-     lits = [ zero dflags,           -- StgInt ccID,
-              label,        -- char *label,
-              modl,        -- char *module,
-              loc,      -- char *srcloc,
-              zero64,   -- StgWord64 mem_alloc
-              zero dflags,     -- StgWord time_ticks
-              is_caf,   -- StgInt is_caf
-              zero dflags      -- struct _CostCentre *link
+     lits = [ zero platform,  -- StgInt ccID,
+              label,          -- char *label,
+              modl,           -- char *module,
+              loc,            -- char *srcloc,
+              zero64,         -- StgWord64 mem_alloc
+              zero platform,  -- StgWord time_ticks
+              is_caf,         -- StgInt is_caf
+              zero platform   -- struct _CostCentre *link
             ]
   ; emitRawDataLits (mkCCLabel cc) lits
   }
@@ -239,9 +244,10 @@ emitCostCentreStackDecl ccs
   = case maybeSingletonCCS ccs of
     Just cc ->
         do dflags <- getDynFlags
-           let mk_lits cc = zero dflags :
+           platform <- getPlatform
+           let mk_lits cc = zero platform :
                             mkCCostCentre cc :
-                            replicate (sizeof_ccs_words dflags - 2) (zero dflags)
+                            replicate (sizeof_ccs_words dflags - 2) (zero platform)
                 -- Note: to avoid making any assumptions about how the
                 -- C compiler (that compiles the RTS, in particular) does
                 -- layouts of structs containing long-longs, simply
@@ -250,8 +256,8 @@ emitCostCentreStackDecl ccs
            emitRawDataLits (mkCCSLabel ccs) (mk_lits cc)
     Nothing -> pprPanic "emitCostCentreStackDecl" (ppr ccs)
 
-zero :: DynFlags -> CmmLit
-zero dflags = mkIntCLit dflags 0
+zero :: Platform -> CmmLit
+zero platform = mkIntCLit platform 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
@@ -261,7 +267,8 @@ sizeof_ccs_words dflags
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   (ws,ms) = sIZEOF_CostCentreStack dflags `divMod` wORD_SIZE dflags
+   platform = targetPlatform dflags
+   (ws,ms) = sIZEOF_CostCentreStack dflags `divMod` platformWordSizeInBytes platform
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
@@ -269,9 +276,10 @@ sizeof_ccs_words dflags
 emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
+      platform <- getPlatform
       if not (gopt Opt_SccProfilingOn dflags)
           then return ()
-          else do tmp <- newTemp (ccsType dflags)
+          else do tmp <- newTemp (ccsType platform)
                   pushCostCentre tmp cccsExpr cc
                   when tick $ emit (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
                   when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
@@ -287,7 +295,8 @@ pushCostCentre result ccs cc
 bumpSccCount :: DynFlags -> CmmExpr -> CmmAGraph
 bumpSccCount dflags ccs
   = addToMem (rEP_CostCentreStack_scc_count dflags)
-         (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
+         (cmmOffsetB platform ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
+  where platform = targetPlatform dflags
 
 -----------------------------------------------------------------------------
 --
@@ -298,7 +307,7 @@ bumpSccCount dflags ccs
 --
 -- Initial value for the LDV field in a static closure
 --
-staticLdvInit :: DynFlags -> CmmLit
+staticLdvInit :: Platform -> CmmLit
 staticLdvInit = zeroCLit
 
 --
@@ -306,10 +315,12 @@ staticLdvInit = zeroCLit
 --
 dynLdvInit :: DynFlags -> CmmExpr
 dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
-  CmmMachOp (mo_wordOr dflags) [
-      CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags (lDV_SHIFT dflags)],
-      CmmLit (mkWordCLit dflags (iLDV_STATE_CREATE dflags))
+  CmmMachOp (mo_wordOr platform) [
+      CmmMachOp (mo_wordShl platform) [loadEra dflags, mkIntExpr platform (lDV_SHIFT dflags)],
+      CmmLit (mkWordCLit platform (iLDV_STATE_CREATE dflags))
   ]
+  where
+   platform = targetPlatform dflags
 
 --
 -- Initialise the LDV word of a new closure
@@ -327,34 +338,39 @@ ldvRecordCreate closure = do
 ldvEnterClosure :: ClosureInfo -> CmmReg -> FCode ()
 ldvEnterClosure closure_info node_reg = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let tag = funTag dflags closure_info
     -- don't forget to subtract node's tag
-    ldvEnter (cmmOffsetB dflags (CmmReg node_reg) (-tag))
+    ldvEnter (cmmOffsetB platform (CmmReg node_reg) (-tag))
 
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer
 ldvEnter cl_ptr = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let -- don't forget to subtract node's tag
         ldv_wd = ldvWord dflags cl_ptr
-        new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
-                                                         (CmmLit (mkWordCLit dflags (iLDV_CREATE_MASK dflags))))
-                                      (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (iLDV_STATE_USE dflags))))
+        new_ldv_wd = cmmOrWord platform
+                        (cmmAndWord platform (CmmLoad ldv_wd (bWord platform))
+                                             (CmmLit (mkWordCLit platform (iLDV_CREATE_MASK dflags))))
+                        (cmmOrWord platform (loadEra dflags) (CmmLit (mkWordCLit platform (iLDV_STATE_USE dflags))))
     ifProfiling $
          -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
          --                era | LDV_STATE_USE }
-        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt dflags) [loadEra dflags, CmmLit (zeroCLit dflags)])
+        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra dflags, CmmLit (zeroCLit platform)])
                      (mkStore ldv_wd new_ldv_wd)
                      mkNop
 
 loadEra :: DynFlags -> CmmExpr
-loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth dflags))
+loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth platform))
     [CmmLoad (mkLblExpr (mkCmmDataLabel rtsUnitId (fsLit "era")))
              (cInt dflags)]
+    where platform = targetPlatform dflags
 
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
 ldvWord dflags closure_ptr
-    = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
+    = cmmOffsetB platform closure_ptr (oFFSET_StgHeader_ldvw dflags)
+    where platform = targetPlatform dflags

@@ -30,9 +30,9 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.Type
 import Outputable
-import GHC.Driver.Session
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -172,60 +172,60 @@ mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
     , mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
-    :: DynFlags -> MachOp
+    :: Platform -> MachOp
 
 mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_32To8, mo_32To16
     :: MachOp
 
-mo_wordAdd      dflags = MO_Add (wordWidth dflags)
-mo_wordSub      dflags = MO_Sub (wordWidth dflags)
-mo_wordEq       dflags = MO_Eq  (wordWidth dflags)
-mo_wordNe       dflags = MO_Ne  (wordWidth dflags)
-mo_wordMul      dflags = MO_Mul (wordWidth dflags)
-mo_wordSQuot    dflags = MO_S_Quot (wordWidth dflags)
-mo_wordSRem     dflags = MO_S_Rem (wordWidth dflags)
-mo_wordSNeg     dflags = MO_S_Neg (wordWidth dflags)
-mo_wordUQuot    dflags = MO_U_Quot (wordWidth dflags)
-mo_wordURem     dflags = MO_U_Rem (wordWidth dflags)
+mo_wordAdd      platform = MO_Add (wordWidth platform)
+mo_wordSub      platform = MO_Sub (wordWidth platform)
+mo_wordEq       platform = MO_Eq  (wordWidth platform)
+mo_wordNe       platform = MO_Ne  (wordWidth platform)
+mo_wordMul      platform = MO_Mul (wordWidth platform)
+mo_wordSQuot    platform = MO_S_Quot (wordWidth platform)
+mo_wordSRem     platform = MO_S_Rem (wordWidth platform)
+mo_wordSNeg     platform = MO_S_Neg (wordWidth platform)
+mo_wordUQuot    platform = MO_U_Quot (wordWidth platform)
+mo_wordURem     platform = MO_U_Rem (wordWidth platform)
 
-mo_wordSGe      dflags = MO_S_Ge  (wordWidth dflags)
-mo_wordSLe      dflags = MO_S_Le  (wordWidth dflags)
-mo_wordSGt      dflags = MO_S_Gt  (wordWidth dflags)
-mo_wordSLt      dflags = MO_S_Lt  (wordWidth dflags)
+mo_wordSGe      platform = MO_S_Ge  (wordWidth platform)
+mo_wordSLe      platform = MO_S_Le  (wordWidth platform)
+mo_wordSGt      platform = MO_S_Gt  (wordWidth platform)
+mo_wordSLt      platform = MO_S_Lt  (wordWidth platform)
 
-mo_wordUGe      dflags = MO_U_Ge  (wordWidth dflags)
-mo_wordULe      dflags = MO_U_Le  (wordWidth dflags)
-mo_wordUGt      dflags = MO_U_Gt  (wordWidth dflags)
-mo_wordULt      dflags = MO_U_Lt  (wordWidth dflags)
+mo_wordUGe      platform = MO_U_Ge  (wordWidth platform)
+mo_wordULe      platform = MO_U_Le  (wordWidth platform)
+mo_wordUGt      platform = MO_U_Gt  (wordWidth platform)
+mo_wordULt      platform = MO_U_Lt  (wordWidth platform)
 
-mo_wordAnd      dflags = MO_And (wordWidth dflags)
-mo_wordOr       dflags = MO_Or  (wordWidth dflags)
-mo_wordXor      dflags = MO_Xor (wordWidth dflags)
-mo_wordNot      dflags = MO_Not (wordWidth dflags)
-mo_wordShl      dflags = MO_Shl (wordWidth dflags)
-mo_wordSShr     dflags = MO_S_Shr (wordWidth dflags)
-mo_wordUShr     dflags = MO_U_Shr (wordWidth dflags)
+mo_wordAnd      platform = MO_And (wordWidth platform)
+mo_wordOr       platform = MO_Or  (wordWidth platform)
+mo_wordXor      platform = MO_Xor (wordWidth platform)
+mo_wordNot      platform = MO_Not (wordWidth platform)
+mo_wordShl      platform = MO_Shl (wordWidth platform)
+mo_wordSShr     platform = MO_S_Shr (wordWidth platform)
+mo_wordUShr     platform = MO_U_Shr (wordWidth platform)
 
-mo_u_8To32             = MO_UU_Conv W8 W32
-mo_s_8To32             = MO_SS_Conv W8 W32
-mo_u_16To32            = MO_UU_Conv W16 W32
-mo_s_16To32            = MO_SS_Conv W16 W32
+mo_u_8To32               = MO_UU_Conv W8 W32
+mo_s_8To32               = MO_SS_Conv W8 W32
+mo_u_16To32              = MO_UU_Conv W16 W32
+mo_s_16To32              = MO_SS_Conv W16 W32
 
-mo_u_8ToWord    dflags = MO_UU_Conv W8  (wordWidth dflags)
-mo_s_8ToWord    dflags = MO_SS_Conv W8  (wordWidth dflags)
-mo_u_16ToWord   dflags = MO_UU_Conv W16 (wordWidth dflags)
-mo_s_16ToWord   dflags = MO_SS_Conv W16 (wordWidth dflags)
-mo_s_32ToWord   dflags = MO_SS_Conv W32 (wordWidth dflags)
-mo_u_32ToWord   dflags = MO_UU_Conv W32 (wordWidth dflags)
+mo_u_8ToWord    platform = MO_UU_Conv W8  (wordWidth platform)
+mo_s_8ToWord    platform = MO_SS_Conv W8  (wordWidth platform)
+mo_u_16ToWord   platform = MO_UU_Conv W16 (wordWidth platform)
+mo_s_16ToWord   platform = MO_SS_Conv W16 (wordWidth platform)
+mo_s_32ToWord   platform = MO_SS_Conv W32 (wordWidth platform)
+mo_u_32ToWord   platform = MO_UU_Conv W32 (wordWidth platform)
 
-mo_WordTo8      dflags = MO_UU_Conv (wordWidth dflags) W8
-mo_WordTo16     dflags = MO_UU_Conv (wordWidth dflags) W16
-mo_WordTo32     dflags = MO_UU_Conv (wordWidth dflags) W32
-mo_WordTo64     dflags = MO_UU_Conv (wordWidth dflags) W64
+mo_WordTo8      platform = MO_UU_Conv (wordWidth platform) W8
+mo_WordTo16     platform = MO_UU_Conv (wordWidth platform) W16
+mo_WordTo32     platform = MO_UU_Conv (wordWidth platform) W32
+mo_WordTo64     platform = MO_UU_Conv (wordWidth platform) W64
 
-mo_32To8               = MO_UU_Conv W32 W8
-mo_32To16              = MO_UU_Conv W32 W16
+mo_32To8                 = MO_UU_Conv W32 W8
+mo_32To16                = MO_UU_Conv W32 W16
 
 
 -- ----------------------------------------------------------------------------
@@ -365,8 +365,8 @@ maybeInvertComparison op
 {- |
 Returns the MachRep of the result of a MachOp.
 -}
-machOpResultType :: DynFlags -> MachOp -> [CmmType] -> CmmType
-machOpResultType dflags mop tys =
+machOpResultType :: Platform -> MachOp -> [CmmType] -> CmmType
+machOpResultType platform mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
     MO_Sub {}           -> ty1  -- of first arg
@@ -379,29 +379,29 @@ machOpResultType dflags mop tys =
     MO_U_Quot r         -> cmmBits r
     MO_U_Rem  r         -> cmmBits r
 
-    MO_Eq {}            -> comparisonResultRep dflags
-    MO_Ne {}            -> comparisonResultRep dflags
-    MO_S_Ge {}          -> comparisonResultRep dflags
-    MO_S_Le {}          -> comparisonResultRep dflags
-    MO_S_Gt {}          -> comparisonResultRep dflags
-    MO_S_Lt {}          -> comparisonResultRep dflags
+    MO_Eq {}            -> comparisonResultRep platform
+    MO_Ne {}            -> comparisonResultRep platform
+    MO_S_Ge {}          -> comparisonResultRep platform
+    MO_S_Le {}          -> comparisonResultRep platform
+    MO_S_Gt {}          -> comparisonResultRep platform
+    MO_S_Lt {}          -> comparisonResultRep platform
 
-    MO_U_Ge {}          -> comparisonResultRep dflags
-    MO_U_Le {}          -> comparisonResultRep dflags
-    MO_U_Gt {}          -> comparisonResultRep dflags
-    MO_U_Lt {}          -> comparisonResultRep dflags
+    MO_U_Ge {}          -> comparisonResultRep platform
+    MO_U_Le {}          -> comparisonResultRep platform
+    MO_U_Gt {}          -> comparisonResultRep platform
+    MO_U_Lt {}          -> comparisonResultRep platform
 
     MO_F_Add r          -> cmmFloat r
     MO_F_Sub r          -> cmmFloat r
     MO_F_Mul r          -> cmmFloat r
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
-    MO_F_Eq  {}         -> comparisonResultRep dflags
-    MO_F_Ne  {}         -> comparisonResultRep dflags
-    MO_F_Ge  {}         -> comparisonResultRep dflags
-    MO_F_Le  {}         -> comparisonResultRep dflags
-    MO_F_Gt  {}         -> comparisonResultRep dflags
-    MO_F_Lt  {}         -> comparisonResultRep dflags
+    MO_F_Eq  {}         -> comparisonResultRep platform
+    MO_F_Ne  {}         -> comparisonResultRep platform
+    MO_F_Ge  {}         -> comparisonResultRep platform
+    MO_F_Le  {}         -> comparisonResultRep platform
+    MO_F_Gt  {}         -> comparisonResultRep platform
+    MO_F_Lt  {}         -> comparisonResultRep platform
 
     MO_And {}           -> ty1  -- Used for pointer masking
     MO_Or {}            -> ty1
@@ -445,7 +445,7 @@ machOpResultType dflags mop tys =
   where
     (ty1:_) = tys
 
-comparisonResultRep :: DynFlags -> CmmType
+comparisonResultRep :: Platform -> CmmType
 comparisonResultRep = bWord  -- is it?
 
 
@@ -457,8 +457,8 @@ comparisonResultRep = bWord  -- is it?
 -- its arguments are the same as the MachOp expects.  This is used when
 -- linting a CmmExpr.
 
-machOpArgReps :: DynFlags -> MachOp -> [Width]
-machOpArgReps dflags op =
+machOpArgReps :: Platform -> MachOp -> [Width]
+machOpArgReps platform op =
   case op of
     MO_Add    r         -> [r,r]
     MO_Sub    r         -> [r,r]
@@ -499,9 +499,9 @@ machOpArgReps dflags op =
     MO_Or    r          -> [r,r]
     MO_Xor   r          -> [r,r]
     MO_Not   r          -> [r]
-    MO_Shl   r          -> [r, wordWidth dflags]
-    MO_U_Shr r          -> [r, wordWidth dflags]
-    MO_S_Shr r          -> [r, wordWidth dflags]
+    MO_Shl   r          -> [r, wordWidth platform]
+    MO_U_Shr r          -> [r, wordWidth platform]
+    MO_S_Shr r          -> [r, wordWidth platform]
 
     MO_SS_Conv from _   -> [from]
     MO_UU_Conv from _   -> [from]
@@ -510,8 +510,8 @@ machOpArgReps dflags op =
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]
 
-    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth dflags]
-    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth dflags]
+    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth platform]
+    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth platform]
 
     MO_V_Add _ r        -> [r,r]
     MO_V_Sub _ r        -> [r,r]
@@ -524,8 +524,8 @@ machOpArgReps dflags op =
     MO_VU_Quot _ r      -> [r,r]
     MO_VU_Rem  _ r      -> [r,r]
 
-    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
-    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth platform]
+    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth platform]
 
     MO_VF_Add  _ r      -> [r,r]
     MO_VF_Sub  _ r      -> [r,r]

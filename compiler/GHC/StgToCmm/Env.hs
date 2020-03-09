@@ -27,6 +27,7 @@ module GHC.StgToCmm.Env (
 import GhcPrelude
 
 import GHC.Core.TyCon
+import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
@@ -60,14 +61,15 @@ mkCgIdInfo id lf expr
 litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) }
+             , cg_loc = CmmLoc (addDynTag platform (CmmLit lit) tag) }
   where
     tag = lfDynTag dflags lf
+    platform = targetPlatform dflags
 
-lneIdInfo :: DynFlags -> Id -> [NonVoid Id] -> CgIdInfo
-lneIdInfo dflags id regs
+lneIdInfo :: Platform -> Id -> [NonVoid Id] -> CgIdInfo
+lneIdInfo platform id regs
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = LneLoc blk_id (map (idToReg dflags) regs) }
+             , cg_loc = LneLoc blk_id (map (idToReg platform) regs) }
   where
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
@@ -75,13 +77,14 @@ lneIdInfo dflags id regs
 
 rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
-  = do dflags <- getDynFlags
-       reg <- newTemp (gcWord dflags)
+  = do platform <- getPlatform
+       reg <- newTemp (gcWord platform)
        return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
 mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit dflags reg lf_info expr
-  = mkAssign (CmmLocal reg) (addDynTag dflags expr (lfDynTag dflags lf_info))
+  = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag dflags lf_info))
+  where platform = targetPlatform dflags
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
@@ -89,9 +92,9 @@ idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e }) = e
 idInfoToAmode cg_info
   = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))        -- LneLoc
 
-addDynTag :: DynFlags -> CmmExpr -> DynTag -> CmmExpr
--- A tag adds a byte offset to the pointer
-addDynTag dflags expr tag = cmmOffsetB dflags expr tag
+-- | A tag adds a byte offset to the pointer
+addDynTag :: Platform -> CmmExpr -> DynTag -> CmmExpr
+addDynTag platform expr tag = cmmOffsetB platform expr tag
 
 maybeLetNoEscape :: CgIdInfo -> Maybe (BlockId, [LocalReg])
 maybeLetNoEscape (CgIdInfo { cg_loc = LneLoc blk_id args}) = Just (blk_id, args)
@@ -177,8 +180,8 @@ getNonVoidArgAmodes (arg:args)
 bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
 bindToReg nvid@(NonVoid id) lf_info
-  = do dflags <- getDynFlags
-       let reg = idToReg dflags nvid
+  = do platform <- getPlatform
+       let reg = idToReg platform nvid
        addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
@@ -195,7 +198,7 @@ bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
 bindArgsToRegs args = mapM bindArgToReg args
 
-idToReg :: DynFlags -> NonVoid Id -> LocalReg
+idToReg :: Platform -> NonVoid Id -> LocalReg
 -- Make a register from an Id, typically a function argument,
 -- free variable, or case binder
 --
@@ -203,6 +206,6 @@ idToReg :: DynFlags -> NonVoid Id -> LocalReg
 --
 -- By now the Ids should be uniquely named; else one would worry
 -- about accidental collision
-idToReg dflags (NonVoid id)
+idToReg platform (NonVoid id)
              = LocalReg (idUnique id)
-                        (primRepCmmType dflags (idPrimRep id))
+                        (primRepCmmType platform (idPrimRep id))

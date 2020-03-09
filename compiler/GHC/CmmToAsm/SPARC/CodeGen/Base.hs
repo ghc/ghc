@@ -23,7 +23,6 @@ import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
-import GHC.Driver.Session
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Platform
@@ -109,11 +108,11 @@ getRegisterReg platform (CmmGlobal mid)
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
 -- CmmExprs into CmmRegOff?
-mangleIndexTree :: DynFlags -> CmmExpr -> CmmExpr
+mangleIndexTree :: Platform -> CmmExpr -> CmmExpr
 
-mangleIndexTree dflags (CmmRegOff reg off)
+mangleIndexTree platform (CmmRegOff reg off)
         = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-        where width = typeWidth (cmmRegType dflags reg)
+        where width = typeWidth (cmmRegType platform reg)
 
 mangleIndexTree _ _
         = panic "SPARC.CodeGen.Base.mangleIndexTree: no match"

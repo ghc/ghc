@@ -98,7 +98,7 @@ pprBasicBlock platform info_env (BasicBlock blockid instrs)
        Nothing   -> empty
        Just (RawCmmStatics info_lbl info) ->
            pprAlignForSection Text $$
-           vcat (map pprData info) $$
+           vcat (map (pprData platform) info) $$
            pprLabel platform info_lbl
 
 
@@ -113,12 +113,12 @@ pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map pprData dats)
+pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: CmmStatic -> SDoc
-pprData (CmmString str)          = pprBytes str
-pprData (CmmUninitialised bytes) = text ".skip " <> int bytes
-pprData (CmmStaticLit lit)       = pprDataItem lit
+pprData :: Platform -> CmmStatic -> SDoc
+pprData _ (CmmString str)           = pprBytes str
+pprData _ (CmmUninitialised bytes)  = text ".skip " <> int bytes
+pprData platform (CmmStaticLit lit) = pprDataItem platform lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
@@ -345,10 +345,9 @@ pprAlignForSection seg =
       OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section")
 
 -- | Pretty print a data item.
-pprDataItem :: CmmLit -> SDoc
-pprDataItem lit
-  = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
+pprDataItem :: Platform -> CmmLit -> SDoc
+pprDataItem platform lit
+  = vcat (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
         imm = litToImm lit
 
