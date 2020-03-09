@@ -102,7 +102,7 @@ T4201:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4201.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi > T4201.list
 	# poor man idea about how to replace GNU grep -B2 "Sym" invocation with pure POSIX tools
-	for i in `grep -n "Sym" T4201.list |cut -d ':' -f -1`; do head -$$i T4201.list | tail -3 ; done
+	for i in `grep -n "Sym" T4201.list | cut -d ':' -f -1`; do head -$$i T4201.list | tail -4; done
 	$(RM) -f T4201.list
 
 # This one looped as a result of bogus specialisation
