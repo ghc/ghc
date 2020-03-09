@@ -539,7 +539,7 @@ toIfaceExpr (Var v)         = toIfaceVar v
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
-toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
+toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIdIfaceOneShot x) (toIfaceExpr b)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
@@ -550,12 +550,16 @@ toIfaceExpr (Tick t e)
   | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
   | otherwise                   = toIfaceExpr e
 
-toIfaceOneShot :: Id -> IfaceOneShot
-toIfaceOneShot id | isId id
-                  , OneShotLam <- oneShotInfo (idInfo id)
-                  = IfaceOneShot
-                  | otherwise
-                  = IfaceNoOneShot
+toIdIfaceOneShot :: Id -> IfaceOneShot
+toIdIfaceOneShot id
+  | isId id
+  = toIfaceOneShot (oneShotInfo (idInfo id))
+  | otherwise
+  = IfaceNoOneShot
+
+toIfaceOneShot :: OneShotInfo -> IfaceOneShot
+toIfaceOneShot OneShotLam = IfaceOneShot
+toIfaceOneShot NoOneShotInfo = IfaceNoOneShot
 
 ---------------------
 toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
@@ -624,7 +628,7 @@ toIfaceVar v
 ---------------------
 toIfaceLFInfo :: LambdaFormInfo -> IfaceLFInfo
 toIfaceLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
-    IfLFReEntrant oneshot rep fvs_flag
+    IfLFReEntrant (toIfaceOneShot oneshot) rep fvs_flag
 toIfaceLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
    -- Assert that arity fits in 14 bits
    ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
