@@ -2669,6 +2669,9 @@ Hence the slightly mysterious call:
     candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
 
 Simple, neat, but a little non-obvious!
+
+See also Note [Re-quantify type variables in rules] in TcRules, which explains
+a very similar design when generalising over the type of a rewrite rule.
 -}
 
 --------------------------
