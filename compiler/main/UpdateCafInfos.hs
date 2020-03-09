@@ -16,15 +16,17 @@ import NameSet
 import Util
 import Var
 import Outputable
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 #include "HsVersions.h"
 
 -- | Update CafInfos of all occurences (in rules, unfoldings, class instances)
 updateModDetailsCafInfos
   :: NameSet -- ^ Non-CAFFY names in the module. Names not in this set are CAFFY.
+  -> ModuleLFInfos
   -> ModDetails -- ^ ModDetails to update
   -> ModDetails
-updateModDetailsCafInfos non_cafs mod_details =
+updateModDetailsCafInfos non_cafs lf_infos mod_details =
   {- pprTrace "updateModDetailsCafInfos" (text "non_cafs:" <+> ppr non_cafs) $ -}
   let
     ModDetails{ md_types = type_env -- for unfoldings
@@ -33,10 +35,10 @@ updateModDetailsCafInfos non_cafs mod_details =
               } = mod_details
 
     -- type TypeEnv = NameEnv TyThing
-    ~type_env' = mapNameEnv (updateTyThingCafInfos type_env' non_cafs) type_env
+    ~type_env' = mapNameEnv (updateTyThingCafInfos type_env' non_cafs lf_infos) type_env
     -- Not strict!
 
-    !insts' = strictMap (updateInstCafInfos type_env' non_cafs) insts
+    !insts' = strictMap (updateInstCafInfos type_env' non_cafs lf_infos) insts
     !rules' = strictMap (updateRuleCafInfos type_env') rules
   in
     mod_details{ md_types = type_env'
@@ -56,20 +58,20 @@ updateRuleCafInfos type_env Rule{ .. } = Rule { ru_rhs = updateGlobalIds type_en
 -- Instances
 --------------------------------------------------------------------------------
 
-updateInstCafInfos :: TypeEnv -> NameSet -> ClsInst -> ClsInst
-updateInstCafInfos type_env non_cafs =
-    updateClsInstDFun (updateIdUnfolding type_env . updateIdCafInfo non_cafs)
+updateInstCafInfos :: TypeEnv -> NameSet -> ModuleLFInfos -> ClsInst -> ClsInst
+updateInstCafInfos type_env non_cafs lf_infos =
+    updateClsInstDFun (updateIdUnfolding type_env . updateIdCafInfo non_cafs lf_infos)
 
 --------------------------------------------------------------------------------
 -- TyThings
 --------------------------------------------------------------------------------
 
-updateTyThingCafInfos :: TypeEnv -> NameSet -> TyThing -> TyThing
+updateTyThingCafInfos :: TypeEnv -> NameSet -> ModuleLFInfos -> TyThing -> TyThing
 
-updateTyThingCafInfos type_env non_cafs (AnId id) =
-    AnId (updateIdUnfolding type_env (updateIdCafInfo non_cafs id))
+updateTyThingCafInfos type_env non_cafs lf_infos (AnId id) =
+    AnId (updateIdUnfolding type_env (updateIdCafInfo non_cafs lf_infos id))
 
-updateTyThingCafInfos _ _ other = other -- AConLike, ATyCon, ACoAxiom
+updateTyThingCafInfos _ _ _ other = other -- AConLike, ATyCon, ACoAxiom
 
 --------------------------------------------------------------------------------
 -- Unfoldings
@@ -88,13 +90,18 @@ updateIdUnfolding type_env id =
 -- Expressions
 --------------------------------------------------------------------------------
 
-updateIdCafInfo :: NameSet -> Id -> Id
-updateIdCafInfo non_cafs id
-  | idName id `elemNameSet` non_cafs
-  = -- pprTrace "updateIdCafInfo" (text "Marking" <+> ppr id <+> parens (ppr (idName id)) <+> text "as non-CAFFY") $
-    id `setIdCafInfo` NoCafRefs
-  | otherwise
-  = id
+updateIdCafInfo :: NameSet -> ModuleLFInfos -> Id -> Id
+updateIdCafInfo non_cafs lf_infos id =
+    let
+      not_caffy = elemNameSet (idName id) non_cafs
+      mb_lf_info = lookupNameEnv lf_infos (idName id)
+
+      id1 = if not_caffy then setIdCafInfo id NoCafRefs else id
+      id2 = case mb_lf_info of
+              Nothing -> id1
+              Just lf_info -> setIdLFInfo id1 lf_info
+    in
+      id2
 
 --------------------------------------------------------------------------------
 
