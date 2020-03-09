@@ -17,8 +17,8 @@ import GhcPrelude
 
 import GHC.Core.Subst
 import Var              ( Var )
-import VarEnv           ( elemInScopeSet, mkInScopeSet )
-import Id               ( Id, idType, isDeadBinder, idHasRules
+import VarEnv           ( mkInScopeSet )
+import Id               ( Id, idType, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
@@ -31,7 +31,7 @@ import GHC.Core
 import Outputable
 import BasicTypes
 import GHC.Core.Map
-import Util             ( filterOut )
+import Util             ( filterOut, equalLength, debugIsOn )
 import Data.List        ( mapAccumL )
 
 {-
@@ -618,15 +618,8 @@ cseCase env scrut bndr ty alts
     arg_tys :: [OutType]
     arg_tys = tyConAppArgs (idType bndr3)
 
-    -- Given case x of { K y z -> ...K y z... }
-    -- CSE K y z into x...
+    -- See Note [CSE for case alternatives]
     cse_alt (DataAlt con, args, rhs)
-        | not (null args)
-                -- ... but don't try CSE if there are no args; it just increases the number
-                -- of live vars.  E.g.
-                --      case x of { True -> ....True.... }
-                -- Don't replace True by x!
-                -- Hence the 'null args', which also deal with literals and DEFAULT
         = (DataAlt con, args', tryForCSE new_env rhs)
         where
           (env', args') = addBinders alt_env args
@@ -638,21 +631,61 @@ cseCase env scrut bndr ty alts
         where
           (env', args') = addBinders alt_env args
 
-combineAlts :: CSEnv -> [InAlt] -> [InAlt]
+combineAlts :: CSEnv -> [OutAlt] -> [OutAlt]
 -- See Note [Combine case alternatives]
-combineAlts env ((_,bndrs1,rhs1) : rest_alts)
-  | all isDeadBinder bndrs1
-  = (DEFAULT, [], rhs1) : filtered_alts
+combineAlts env alts
+  | (Just alt1, rest_alts) <- find_bndr_free_alt alts
+  , (_,bndrs1,rhs1) <- alt1
+  , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
+  , not (equalLength rest_alts filtered_alts)
+  = ASSERT2( null bndrs1, ppr alts )
+    (DEFAULT, [], rhs1) : filtered_alts
+
+  | otherwise
+  = alts
   where
     in_scope = substInScope (csEnvSubst env)
-    filtered_alts = filterOut identical rest_alts
-    identical (_con, bndrs, rhs) = all ok bndrs && eqExpr in_scope rhs1 rhs
-    ok bndr = isDeadBinder bndr || not (bndr `elemInScopeSet` in_scope)
 
-combineAlts _ alts = alts  -- Default case
+    find_bndr_free_alt :: [CoreAlt] -> (Maybe CoreAlt, [CoreAlt])
+       -- The (Just alt) is a binder-free alt
+       -- See Note [Combine case alts: awkward corner]
+    find_bndr_free_alt []
+      = (Nothing, [])
+    find_bndr_free_alt (alt@(_,bndrs,_) : alts)
+      | null bndrs = (Just alt, alts)
+      | otherwise  = case find_bndr_free_alt alts of
+                       (mb_bf, alts) -> (mb_bf, alt:alts)
 
-{- Note [Combine case alternatives]
+    identical_alt rhs1 (_,_,rhs) = eqExpr in_scope rhs1 rhs
+       -- Even if this alt has binders, they will have been cloned
+       -- If any of these binders are mentioned in 'rhs', then
+       -- 'rhs' won't compare equal to 'rhs1' (which is from an
+       -- alt with no binders).
+
+{- Note [CSE for case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   case e of x
+            K1 y -> ....(K1 y)...
+            K2   -> ....K2....
+
+We definitely want to CSE that (K1 y) into just x.
+
+But what about the lone K2?  At first you would think "no" because
+turning K2 into 'x' increases the number of live variables.  But
+
+* Turning K2 into x increases the chance of combining identical alts.
+  Example      case xs of
+                  (_:_) -> f xs
+                  []    -> f []
+  See #17901 and simplCore/should_compile/T17901 for more examples
+  of this kind.
+
+* The next run of the simplifier will turn 'x' back into K2, so we won't
+  permanently bloat the free-var count.
+
+
+Note [Combine case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 combineAlts is just a more heavyweight version of the use of
 combineIdenticalAlts in SimplUtils.prepareAlts.  The basic idea is
 to transform
@@ -672,6 +705,26 @@ to be doing, which is why I put it here.
 
 I actually saw some examples in the wild, where some inlining made e1 too
 big for cheapEqExpr to catch it.
+
+Note [Combine case alts: awkward corner]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We would really like to check isDeadBinder on the binders in the
+alternative.  But alas, the simplifer zaps occ-info on binders in case
+alternatives; see Note [Case alternative occ info] in Simplify.
+
+* One alternative (perhaps a good one) would be to do OccAnal
+  just before CSE.  Then perhaps we could get rid of combineIdenticalAlts
+  in the Simplifier, which might save work.
+
+* Another would be for CSE to return free vars as it goes.
+
+* But the current solution is to find a nullary alternative (including
+  the DEFAULT alt, if any). This will not catch
+      case x of
+        A y   -> blah
+        B z p -> blah
+  where no alternative is nullary or DEFAULT.  But the current
+  solution is at least cheap.
 
 
 ************************************************************************

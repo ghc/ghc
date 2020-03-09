@@ -1,0 +1,16 @@
+                 (wombat1 [Occ=Once*!] :: T -> p)
+                   A -> wombat1 T17901.A;
+                   B -> wombat1 T17901.B;
+                   C -> wombat1 T17901.C
+  = \ (@p) (wombat1 :: T -> p) (x :: T) ->
+      case x of wild { __DEFAULT -> wombat1 wild }
+                 (wombat2 [Occ=Once*!] :: S -> p)
+                   SA _ [Occ=Dead] -> wombat2 wild;
+                   SB -> wombat2 T17901.SB
+  = \ (@p) (wombat2 :: S -> p) (x :: S) ->
+      case x of wild { __DEFAULT -> wombat2 wild }
+                 (wombat3 [Occ=Once*!] :: W -> p)
+                   WB -> wombat3 T17901.WB;
+                   WA _ [Occ=Dead] -> wombat3 wild
+  = \ (@p) (wombat3 :: W -> p) (x :: W) ->
+      case x of wild { __DEFAULT -> wombat3 wild }
