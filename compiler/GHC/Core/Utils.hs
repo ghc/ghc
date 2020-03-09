@@ -864,10 +864,21 @@ This gave rise to a horrible sequence of cases
 
 and similarly in cascade for all the join points!
 
-NB: it's important that all this is done in [InAlt], *before* we work
-on the alternatives themselves, because Simplify.simplAlt may zap the
-occurrence info on the binders in the alternatives, which in turn
-defeats combineIdenticalAlts (see #7360).
+Note [Combine identical alternatives: wrinkles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* It's important that all this is done in [InAlt], *before* we work
+  on the alternatives themselves, because Simplify.simplAlt may zap the
+  occurrence info on the binders in the alternatives, which in turn
+  defeats combineIdenticalAlts (see #7360).
+
+* combineIdenticalAltts does not work well for nullary constructors
+      case x of y
+         []    -> f []
+         (_:_) -> f y
+  Here we won't see that [] and y are the same.  Sigh! This problem
+  is solved in CSE, in CSE.combineAlts, which does a better version of
+  combineIdenticalAlts. But sadly it doesn't have the occurrence info
+  we have here.  See Note [Combine case alts: awkward corner] in CSE).
 
 Note [Care with impossible-constructors when combining alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
