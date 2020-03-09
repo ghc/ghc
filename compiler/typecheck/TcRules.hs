@@ -60,6 +60,43 @@ Note [TcLevel in type checking rules]
 Bringing type variables into scope naturally bumps the TcLevel. Thus, we type
 check the term-level binders in a bumped level, and we must accordingly bump
 the level whenever these binders are in scope.
+
+Note [Re-quantify type variables in rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example from #17710:
+
+  foo :: forall k (a :: k) (b :: k). Proxy a -> Proxy b
+  foo x = Proxy
+  {-# RULES "foo" forall (x :: Proxy (a :: k)). foo x = Proxy #-}
+
+Written out in more detail, the "foo" rewrite rule looks like this:
+
+  forall k (a :: k). forall (x :: Proxy (a :: k)). foo @k @a @b0 x = Proxy @k @b0
+
+Where b0 is a unification variable. Where should b0 be quantified? We have to
+quantify it after k, since (b0 :: k). But generalization usually puts inferred
+type variables (such as b0) at the /front/ of the telescope! This creates a
+conflict.
+
+One option is to simply throw an error, per the principles of
+Note [Naughty quantification candidates] in TcMType. This is what would happen
+if we were generalising over a normal type signature. On the other hand, the
+types in a rewrite rule aren't quite "normal", since the notions of specified
+and inferred type variables aren't applicable.
+
+A more permissive design (and the design that GHC uses) is to simply requantify
+all of the type variables. That is, we would end up with this:
+
+  forall k (a :: k) (b :: k). forall (x :: Proxy (a :: k)). foo @k @a @b x = Proxy @k @b
+
+It's a bit strange putting the generalized variable `b` after the user-written
+variables `k` and `a`. But again, the notion of specificity is not relevant to
+rewrite rules, since one cannot "visibly apply" a rewrite rule. This design not
+only makes "foo" typecheck, but it also makes the implementation simpler.
+
+See also Note [Generalising in tcTyFamInstEqnGuts] in TcTyClsDecls, which
+explains a very similar design when generalising over a type family instance
+equation.
 -}
 
 tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
@@ -89,8 +126,8 @@ tcRule (HsRule { rd_ext  = ext
        ; (tc_lvl, stuff) <- pushTcLevelM $
                             generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
 
-       ; let (tv_bndrs, id_bndrs, lhs', lhs_wanted
-                                , rhs', rhs_wanted, rule_ty) = stuff
+       ; let (id_bndrs, lhs', lhs_wanted
+                      , rhs', rhs_wanted, rule_ty) = stuff
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
@@ -113,14 +150,13 @@ tcRule (HsRule { rd_ext  = ext
        -- during zonking (see TcHsSyn.zonkRule)
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
-       ; forall_tkvs <- candidateQTyVarsOfTypes $
-                        map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
-                        rule_ty : map idType tpl_ids
+
+       -- See Note [Re-quantify type variables in rules]
+       ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
        ; qtkvs <- quantifyTyVars forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
-                                , ppr tv_bndrs
                                 , ppr rule_ty
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
@@ -130,11 +166,10 @@ tcRule (HsRule { rd_ext  = ext
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; let all_qtkvs = qtkvs ++ tv_bndrs
-             skol_info = RuleSkol name
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
+       ; let skol_info = RuleSkol name
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
@@ -143,15 +178,14 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
                          , rd_tmvs = map (noLoc . RuleBndr noExtField . noLoc)
-                                         (all_qtkvs ++ tpl_ids)
+                                         (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 tcRule (XRuleDecl nec) = noExtCon nec
 
 generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
-                        -> TcM ( [TyVar]
-                               , [TcId]
+                        -> TcM ( [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
                                , TcType )
@@ -170,7 +204,7 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
        ; (rhs',            rhs_wanted) <- captureConstraints $
                                           tcMonoExpr rhs (mkCheckExpType rule_ty)
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
+       ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 
 -- See Note [TcLevel in type checking rules]
 tcRuleBndrs :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
