@@ -19,7 +19,8 @@ module GHC.IfaceToCore (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+        tcIfaceOneShot
  ) where
 
 #include "HsVersions.h"
@@ -1535,7 +1536,7 @@ tcJoinInfo IfaceNotJoinPoint   = Nothing
 
 tcLFInfo :: IfaceLFInfo -> IfL LambdaFormInfo
 tcLFInfo (IfLFReEntrant oneshot rep fvs_flag) =
-    return (LFReEntrant TopLevel oneshot rep fvs_flag ArgUnknown)
+    return (LFReEntrant TopLevel (tcIfaceOneShot oneshot) rep fvs_flag ArgUnknown)
 
 tcLFInfo (IfLFThunk fvs_flag upd_flag sfi fun_flag ) = do
     return (LFThunk TopLevel fvs_flag upd_flag (tcStandardFormInfo sfi) fun_flag)
@@ -1636,6 +1637,10 @@ tcPragExpr is_compulsory toplvl name expr
     bindingsVars ufm = mkVarSet $ nonDetEltsUFM ufm
       -- It's OK to use nonDetEltsUFM here because we immediately forget
       -- the ordering by creating a set
+
+tcIfaceOneShot :: IfaceOneShot -> OneShotInfo
+tcIfaceOneShot IfaceNoOneShot = NoOneShotInfo
+tcIfaceOneShot IfaceOneShot = OneShotLam
 
 {-
 ************************************************************************
