@@ -890,6 +890,13 @@ release-x86_64-windows:
   extends: validate-x86_64-windows
   variables:
     BUILD_FLAVOUR: "perf"
+    #
+release-x86_64-windows-integer-simple:
+  <<: *release
+  extends: validate-x86_64-windows
+  variables:
+    INTEGER_LIBRARY: integer-simple
+    BUILD_FLAVOUR: "perf"
 
 
 .build-i386-windows-make:
