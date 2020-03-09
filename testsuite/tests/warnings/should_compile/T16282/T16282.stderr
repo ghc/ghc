@@ -5,6 +5,5 @@ T16282.hs: warning: [-Wall-missed-specialisations]
     Probable fix: add INLINABLE pragma on ‘Data.Foldable.$wmapM_’
 
 T16282.hs: warning: [-Wall-missed-specialisations]
-    Could not specialise imported function ‘Data.Map.Internal.$w$cshowsPrec’
-      when specialising ‘Data.Map.Internal.$fShowMap_$cshowsPrec’
-    Probable fix: add INLINABLE pragma on ‘Data.Map.Internal.$w$cshowsPrec’
+    Could not specialise imported function ‘Data.Map.Internal.$fShowMap_$cshow’
+    Probable fix: add INLINABLE pragma on ‘Data.Map.Internal.$fShowMap_$cshow’

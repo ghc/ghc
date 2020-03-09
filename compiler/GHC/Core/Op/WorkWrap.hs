@@ -24,6 +24,7 @@ import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Op.WorkWrap.Lib
+import GHC.Types.Unique
 import Util
 import Outputable
 import GHC.Core.FamInstEnv
@@ -203,6 +204,23 @@ unfolding to the *worker*.  So we will get something like this:
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
 in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
 
+Note [No worker-wrapper for record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We sometimes generate a lot of record selectors, and generally the
+don't benefit from worker/wrapper.  Yes, mkWwBodies would find a w/w split,
+but it is then suppressed by the certainlyWillInline test in splitFun.
+
+The wasted effort in mkWwBodies makes a measurable difference in
+compile time (see MR !2873), so although it's a terribly ad-hoc test,
+we just check here for record selectors, and do a no-op in that case.
+
+I did look for a generalisation, so that it's not just record
+selectors that benefit.  But you'd need a cheap test for "this
+function will definitely get a w/w split" and that's hard to predict
+in advance...the logic in mkWwBodies is complex. So I've left the
+super-simple test, with this Note to explain.
+
+
 Note [Worker-wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to disable worker/wrapper for NOINLINE things, but it turns out
@@ -316,8 +334,8 @@ Note [Don't w/w inline small non-loop-breaker things]
 In general, we refrain from w/w-ing *small* functions, which are not
 loop breakers, because they'll inline anyway.  But we must take care:
 it may look small now, but get to be big later after other inlining
-has happened.  So we take the precaution of adding an INLINE pragma to
-any such functions.
+has happened.  So we take the precaution of adding a StableUnfolding
+for any such functions.
 
 I made this change when I observed a big function at the end of
 compilation with a useful strictness signature but no w-w.  (It was
@@ -457,11 +475,6 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker-wrapper for NOINLINE functions]
 
-  | Just stable_unf <- certainlyWillInline dflags fn_info
-  = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
-        -- See Note [Don't w/w INLINE things]
-        -- See Note [Don't w/w inline small non-loop-breaker things]
-
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
@@ -567,105 +580,125 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
-    -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
-    case stuff of
-      Just (work_demands, join_arity, wrap_fn, work_fn) -> do
-        work_uniq <- getUniqueM
-        let work_rhs = work_fn rhs
-            work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                          NoInline -> fn_act
-                          _        -> wrap_act
+  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
+  = return [ (fn_id, rhs ) ]
 
-            work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                     , inl_inline = fn_inline_spec
-                                     , inl_sat    = Nothing
-                                     , inl_act    = work_act
-                                     , inl_rule   = FunLike }
-              -- inl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
-              -- inl_act:    see Note [Worker activation]
-              -- inl_rule:   it does not make sense for workers to be constructorlike.
+  | otherwise
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
+          -- The arity should match the signature
+    do { mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
+       ; case mb_stuff of
+            Nothing -> return [(fn_id, rhs)]
 
-            work_join_arity | isJoinId fn_id = Just join_arity
-                            | otherwise      = Nothing
-              -- worker is join point iff wrapper is join point
-              -- (see Note [Don't w/w join points for CPR])
+            Just stuff
+              | Just stable_unf <- certainlyWillInline dflags fn_info
+              ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+                  -- See Note [Don't w/w INLINE things]
+                  -- See Note [Don't w/w inline small non-loop-breaker things]
 
-            work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
-                        `setIdOccInfo` occInfo fn_info
-                                -- Copy over occurrence info from parent
-                                -- Notably whether it's a loop breaker
-                                -- Doesn't matter much, since we will simplify next, but
-                                -- seems right-er to do so
-
-                        `setInlinePragma` work_prag
-
-                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
-                                -- See Note [Worker-wrapper for INLINABLE functions]
-
-                        `setIdStrictness` mkClosedStrictSig work_demands div
-                                -- Even though we may not be at top level,
-                                -- it's ok to give it an empty DmdEnv
-
-                        `setIdCprInfo` mkCprSig work_arity work_cpr_info
-
-                        `setIdDemandInfo` worker_demand
-
-                        `setIdArity` work_arity
-                                -- Set the arity so that the Core Lint check that the
-                                -- arity is consistent with the demand type goes
-                                -- through
-                        `asJoinId_maybe` work_join_arity
-
-            work_arity = length work_demands
-
-            -- See Note [Demand on the Worker]
-            single_call = saturatedByOneShots arity (demandInfo fn_info)
-            worker_demand | single_call = mkWorkerDemand work_arity
-                          | otherwise   = topDmd
-
-            wrap_rhs  = wrap_fn work_id
-            wrap_act  = case fn_act of  -- See Note [Wrapper activation]
-                           ActiveAfter {} -> fn_act
-                           NeverActive    -> activeDuringFinal
-                           _              -> activeAfterInitial
-            wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                                     , inl_inline = NoUserInline
-                                     , inl_sat    = Nothing
-                                     , inl_act    = wrap_act
-                                     , inl_rule   = rule_match_info }
-                -- inl_act:    see Note [Wrapper activation]
-                -- inl_inline: see Note [Wrapper NoUserInline]
-                -- inl_rule:   RuleMatchInfo is (and must be) unaffected
-
-            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity
-                              `setInlinePragma` wrap_prag
-                              `setIdOccInfo`    noOccInfo
-                                -- Zap any loop-breaker-ness, to avoid bleating from Lint
-                                -- about a loop breaker with an INLINE rule
-
-
-
-        return $ [(work_id, work_rhs), (wrap_id, wrap_rhs)]
-            -- Worker first, because wrapper mentions it
-
-      Nothing -> return [(fn_id, rhs)]
+              | otherwise
+              -> do { work_uniq <- getUniqueM
+                    ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                                           work_uniq div cpr stuff) } }
   where
-    rhs_fvs         = exprFreeVars rhs
-    fn_inl_prag     = inlinePragInfo fn_info
-    fn_inline_spec  = inl_inline fn_inl_prag
-    fn_act          = inl_act fn_inl_prag
-    rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
-    fn_unfolding    = unfoldingInfo fn_info
-    arity           = arityInfo fn_info
-                    -- The arity is set by the simplifier using exprEtaExpandArity
-                    -- So it may be more than the number of top-level-visible lambdas
+    rhs_fvs = exprFreeVars rhs
+    arity   = arityInfo fn_info
+            -- The arity is set by the simplifier using exprEtaExpandArity
+            -- So it may be more than the number of top-level-visible lambdas
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
     use_cpr_info  | isJoinId fn_id = topCpr
                   | otherwise      = cpr
+
+
+mkWWBindPair :: DynFlags -> Id -> IdInfo -> Arity
+             -> CoreExpr -> Unique -> Divergence -> CprResult
+             -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
+             -> [(Id, CoreExpr)]
+mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
+             (work_demands, join_arity, wrap_fn, work_fn)
+  = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
+     -- Worker first, because wrapper mentions it
+  where
+    work_rhs = work_fn rhs
+    work_act = case fn_inline_spec of  -- See Note [Worker activation]
+                   NoInline -> fn_act
+                   _        -> wrap_act
+
+    work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
+                             , inl_inline = fn_inline_spec
+                             , inl_sat    = Nothing
+                             , inl_act    = work_act
+                             , inl_rule   = FunLike }
+      -- inl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
+      -- inl_act:    see Note [Worker activation]
+      -- inl_rule:   it does not make sense for workers to be constructorlike.
+
+    work_join_arity | isJoinId fn_id = Just join_arity
+                    | otherwise      = Nothing
+      -- worker is join point iff wrapper is join point
+      -- (see Note [Don't w/w join points for CPR])
+
+    work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
+                `setIdOccInfo` occInfo fn_info
+                        -- Copy over occurrence info from parent
+                        -- Notably whether it's a loop breaker
+                        -- Doesn't matter much, since we will simplify next, but
+                        -- seems right-er to do so
+
+                `setInlinePragma` work_prag
+
+                `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
+                        -- See Note [Worker-wrapper for INLINABLE functions]
+
+                `setIdStrictness` mkClosedStrictSig work_demands div
+                        -- Even though we may not be at top level,
+                        -- it's ok to give it an empty DmdEnv
+
+                `setIdCprInfo` mkCprSig work_arity work_cpr_info
+
+                `setIdDemandInfo` worker_demand
+
+                `setIdArity` work_arity
+                        -- Set the arity so that the Core Lint check that the
+                        -- arity is consistent with the demand type goes
+                        -- through
+                `asJoinId_maybe` work_join_arity
+
+    work_arity = length work_demands
+
+    -- See Note [Demand on the Worker]
+    single_call = saturatedByOneShots arity (demandInfo fn_info)
+    worker_demand | single_call = mkWorkerDemand work_arity
+                  | otherwise   = topDmd
+
+    wrap_rhs  = wrap_fn work_id
+    wrap_act  = case fn_act of  -- See Note [Wrapper activation]
+                   ActiveAfter {} -> fn_act
+                   NeverActive    -> activeDuringFinal
+                   _              -> activeAfterInitial
+    wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
+                             , inl_inline = NoUserInline
+                             , inl_sat    = Nothing
+                             , inl_act    = wrap_act
+                             , inl_rule   = rule_match_info }
+        -- inl_act:    see Note [Wrapper activation]
+        -- inl_inline: see Note [Wrapper NoUserInline]
+        -- inl_rule:   RuleMatchInfo is (and must be) unaffected
+
+    wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity
+                      `setInlinePragma` wrap_prag
+                      `setIdOccInfo`    noOccInfo
+                        -- Zap any loop-breaker-ness, to avoid bleating from Lint
+                        -- about a loop breaker with an INLINE rule
+
+    fn_inl_prag     = inlinePragInfo fn_info
+    fn_inline_spec  = inl_inline fn_inl_prag
+    fn_act          = inl_act fn_inl_prag
+    rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
+    fn_unfolding    = unfoldingInfo fn_info
+
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
