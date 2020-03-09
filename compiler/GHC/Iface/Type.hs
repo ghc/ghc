@@ -122,6 +122,9 @@ data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
   = IfaceNoOneShot   -- and Note [The oneShot function] in MkId
   | IfaceOneShot
 
+instance Outputable IfaceOneShot where
+  ppr IfaceNoOneShot = text "NoOneShotInfo"
+  ppr IfaceOneShot = text "OneShot"
 
 {-
 %************************************************************************
