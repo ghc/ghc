@@ -66,7 +66,7 @@ module Constraint (
         pprEvVars, pprEvVarWithType,
 
         -- holes
-        HoleSort(..),
+        Hole(..), holeOcc,
 
   )
   where
@@ -78,6 +78,7 @@ import GhcPrelude
 import {-# SOURCE #-} TcRnTypes ( TcLclEnv, setLclEnvTcLevel, getLclEnvTcLevel
                                 , setLclEnvLoc, getLclEnvLoc )
 
+import GHC.Hs.Expr ( UnboundVar(..), unboundVarOcc )
 import Predicate
 import Type
 import Coercion
@@ -209,8 +210,7 @@ data Ct
        -- Treated as an "insoluble" constraint
        -- See Note [Insoluble constraints]
       cc_ev   :: CtEvidence,
-      cc_occ  :: OccName,   -- The name of this hole
-      cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
+      cc_hole :: Hole
     }
 
   | CQuantCan QCInst       -- A quantified constraint
@@ -233,19 +233,27 @@ instance Outputable QCInst where
   ppr (QCI { qci_ev = ev }) = ppr ev
 
 ------------
--- | Used to indicate which sort of hole we have.
-data HoleSort = ExprHole
-                 -- ^ Either an out-of-scope variable or a "true" hole in an
-                 -- expression (TypedHoles)
-              | TypeHole
-                 -- ^ A hole in a type (PartialTypeSignatures)
+-- | An expression or type hole
+data Hole = ExprHole UnboundVar
+            -- ^ Either an out-of-scope variable or a "true" hole in an
+            -- expression (TypedHoles)
+          | TypeHole OccName
+            -- ^ A hole in a type (PartialTypeSignatures)
+
+instance Outputable Hole where
+  ppr (ExprHole ub)  = ppr ub
+  ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
+
+holeOcc :: Hole -> OccName
+holeOcc (ExprHole uv)  = unboundVarOcc uv
+holeOcc (TypeHole occ) = occ
 
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 CHoleCan constraints are used for two kinds of holes,
 distinguished by cc_hole:
 
-  * For holes in expressions
+  * For holes in expressions (includings variables not in scope)
     e.g.   f x = g _ x
 
   * For holes in type signatures
@@ -411,7 +419,7 @@ instance Outputable Ct where
          CIrredCan { cc_insol = insol }
             | insol     -> text "CIrredCan(insol)"
             | otherwise -> text "CIrredCan(sol)"
-         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
+         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr hole
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
@@ -687,18 +695,17 @@ isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
 isOutOfScopeCt :: Ct -> Bool
--- A Hole that does not have a leading underscore is
--- simply an out-of-scope variable, and we treat that
--- a bit differently when it comes to error reporting
-isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+-- We treat expression holes representing out-of-scope variables a bit
+-- differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_hole = ExprHole (OutOfScope {}) }) = True
 isOutOfScopeCt _ = False
 
 isExprHoleCt :: Ct -> Bool
-isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
+isExprHoleCt (CHoleCan { cc_hole = ExprHole {} }) = True
 isExprHoleCt _ = False
 
 isTypeHoleCt :: Ct -> Bool
-isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
+isTypeHoleCt (CHoleCan { cc_hole = TypeHole {} }) = True
 isTypeHoleCt _ = False
 
 
