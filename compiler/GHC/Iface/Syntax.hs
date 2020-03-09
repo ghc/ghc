@@ -389,7 +389,7 @@ data IfaceIdDetails
 
 -- Lambda form info
 data IfaceLFInfo
-  = IfLFReEntrant !OneShotInfo !RepArity !Bool
+  = IfLFReEntrant !IfaceOneShot !RepArity !Bool
   | IfLFThunk !Bool !Bool !IfaceStandardFormInfo !Bool
   | IfLFCon              -- A saturated constructor application
         !Name            -- The constructor Name
@@ -451,16 +451,6 @@ instance Binary IfaceLFInfo where
             3 -> IfLFUnknown <$> get bh
             4 -> pure IfLFUnlifted
             _ -> panic "Invalid byte"
-
-instance Binary OneShotInfo where
-  put_ bh NoOneShotInfo = putByte bh 0
-  put_ bh OneShotLam = putByte bh 1
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> return NoOneShotInfo
-      1 -> return OneShotLam
-      _ -> panic "Binary:Invalid byte"
 
 {-
 Note [Versioning of instances]
