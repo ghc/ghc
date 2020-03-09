@@ -496,7 +496,7 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
-    = id_w_lf_info
+    = id `setIdLFInfo` lf_info
   where
     id | isNewTyCon tycon
        = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
@@ -505,13 +505,13 @@ mkDataConWorkId wkr_name data_con
        | otherwise
        = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
 
-    id_w_lf_info
+    lf_info
       | isNullaryRepDataCon data_con
-      = id `setIdLFInfo` LFCon data_con
+      = LFCon data_con
       | wkr_arity > 0
-      = id `setIdLFInfo` LFReEntrant TopLevel noOneShotInfo wkr_arity True (panic "arg_descr")
+      = LFReEntrant TopLevel noOneShotInfo wkr_arity True (panic "arg_descr")
       | otherwise
-      = id `setIdLFInfo` mkLFArgument id
+      = mkLFArgument id
 
     tycon  = dataConTyCon data_con  -- The representation TyCon
     wkr_ty = dataConRepType data_con
