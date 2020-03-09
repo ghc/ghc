@@ -91,3 +91,4 @@ test('T14373d', [],
      switch_skeleton_and_entries_only])
 
 test('T17648', normal, makefile_test, [])
+test('T17904', normal, compile, ['-O'])
