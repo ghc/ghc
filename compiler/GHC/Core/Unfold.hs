@@ -1147,7 +1147,7 @@ certainlyWillInline :: DynFlags -> IdInfo -> Maybe Unfolding
 -- ^ Sees if the unfolding is pretty certain to inline.
 -- If so, return a *stable* unfolding for it, that will always inline.
 certainlyWillInline dflags fn_info
-  = case unfoldingInfo fn_info of
+  = case fn_unf of
       CoreUnfolding { uf_tmpl = e, uf_guidance = g }
         | loop_breaker -> Nothing      -- Won't inline, so try w/w
         | noinline     -> Nothing      -- See Note [Worker-wrapper for NOINLINE functions]
