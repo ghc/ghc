@@ -26,15 +26,8 @@
 #include <fs_rts.h>
 #include <string.h>
 
-#if defined(darwin_HOST_OS)
-#include <xlocale.h>
-#else
-#include <locale.h>
-#endif
-
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
-static locale_t prof_locale = 0, saved_locale = 0;
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -351,10 +344,6 @@ printSample(bool beginSample, StgDouble sampleValue)
 
 void freeHeapProfiling (void)
 {
-    if (prof_locale) {
-        freelocale(prof_locale);
-        prof_locale = 0;
-    }
 }
 
 /* --------------------------------------------------------------------------
@@ -366,15 +355,6 @@ initHeapProfiling(void)
     if (! RtsFlags.ProfFlags.doHeapProfile) {
         return;
     }
-
-    if (! prof_locale) {
-        prof_locale = newlocale(LC_NUMERIC_MASK, "POSIX", 0);
-        if (! prof_locale) {
-            sysErrorBelch("Couldn't allocate heap profiler locale");
-            /* non-fatal: risk using an unknown locale, but won't crash */
-        }
-    }
-    saved_locale = uselocale(prof_locale);
 
     char *prog;
 
@@ -473,8 +453,6 @@ initHeapProfiling(void)
     }
 #endif
 
-    uselocale(saved_locale);
-
     traceHeapProfBegin(0);
 }
 
@@ -486,8 +464,6 @@ endHeapProfiling(void)
     if (! RtsFlags.ProfFlags.doHeapProfile) {
         return;
     }
-
-    saved_locale = uselocale(prof_locale);
 
 #if defined(PROFILING)
     if (doingRetainerProfiling()) {
@@ -529,8 +505,6 @@ endHeapProfiling(void)
     printSample(true, seconds);
     printSample(false, seconds);
     fclose(hp_file);
-
-    uselocale(saved_locale);
 }
 
 
@@ -785,8 +759,6 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
-    saved_locale = uselocale(prof_locale);
-
     printSample(true, census->time);
 
 
@@ -915,8 +887,6 @@ dumpCensus( Census *census )
 
     traceHeapProfSampleEnd(era);
     printSample(false, census->time);
-
-    uselocale(saved_locale);
 }
 
 
