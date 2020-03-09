@@ -117,9 +117,12 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
-dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
+dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
+dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
+AC_ARG_VAR(LD_STAGE0, [Linker command (bootstrap)])
+AC_ARG_VAR(AR_STAGE0, [Archive command (bootstrap)])
 
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
