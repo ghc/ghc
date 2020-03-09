@@ -20,6 +20,7 @@ test('ghcilink003',
 test('ghcilink004',
      [extra_files(['TestLink.hs', 'f.c']),
       unless(doing_ghci, skip),
+      when(unregisterised(), fragile(16085)),
       req_rts_linker],
      makefile_test, ['ghcilink004'])
 
