@@ -16,25 +16,25 @@ import GhcPrelude
 import GHC.Llvm
 
 import GHC.Cmm.Expr
-import GHC.Driver.Session
+import GHC.Platform
 import FastString
 import Outputable ( panic )
 import Unique
 
 -- | Get the LlvmVar function variable storing the real register
-lmGlobalRegVar :: DynFlags -> GlobalReg -> LlvmVar
-lmGlobalRegVar dflags = pVarLift . lmGlobalReg dflags "_Var"
+lmGlobalRegVar :: Platform -> GlobalReg -> LlvmVar
+lmGlobalRegVar platform = pVarLift . lmGlobalReg platform "_Var"
 
 -- | Get the LlvmVar function argument storing the real register
-lmGlobalRegArg :: DynFlags -> GlobalReg -> LlvmVar
-lmGlobalRegArg dflags = lmGlobalReg dflags "_Arg"
+lmGlobalRegArg :: Platform -> GlobalReg -> LlvmVar
+lmGlobalRegArg platform = lmGlobalReg platform "_Arg"
 
 {- Need to make sure the names here can't conflict with the unique generated
    names. Uniques generated names containing only base62 chars. So using say
    the '_' char guarantees this.
 -}
-lmGlobalReg :: DynFlags -> String -> GlobalReg -> LlvmVar
-lmGlobalReg dflags suf reg
+lmGlobalReg :: Platform -> String -> GlobalReg -> LlvmVar
+lmGlobalReg platform suf reg
   = case reg of
         BaseReg        -> ptrGlobal $ "Base" ++ suf
         Sp             -> ptrGlobal $ "Sp" ++ suf
@@ -84,8 +84,8 @@ lmGlobalReg dflags suf reg
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
         -- EagerBlackholeInfo, GCEnter1, GCFun, BaseReg, PicBaseReg
     where
-        wordGlobal   name = LMNLocalVar (fsLit name) (llvmWord dflags)
-        ptrGlobal    name = LMNLocalVar (fsLit name) (llvmWordPtr dflags)
+        wordGlobal   name = LMNLocalVar (fsLit name) (llvmWord platform)
+        ptrGlobal    name = LMNLocalVar (fsLit name) (llvmWordPtr platform)
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
         xmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 4 (LMInt 32))

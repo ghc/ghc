@@ -12,6 +12,7 @@ import GhcPrelude
 
 import GHC.StgToCmm.Monad
 
+import GHC.Platform
 import GHC.Cmm.Graph
 import GHC.Cmm.Expr
 import GHC.Cmm.CLabel
@@ -23,14 +24,14 @@ import GHC.Driver.Session
 
 import Control.Monad
 
-mkTickBox :: DynFlags -> Module -> Int -> CmmAGraph
-mkTickBox dflags mod n
+mkTickBox :: Platform -> Module -> Int -> CmmAGraph
+mkTickBox platform mod n
   = mkStore tick_box (CmmMachOp (MO_Add W64)
                                 [ CmmLoad tick_box b64
                                 , CmmLit (CmmInt 1 W64)
                                 ])
   where
-    tick_box = cmmIndex dflags W64
+    tick_box = cmmIndex platform W64
                         (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
                         n
 
