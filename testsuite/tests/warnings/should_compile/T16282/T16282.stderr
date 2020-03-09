@@ -6,5 +6,4 @@ T16282.hs: warning: [-Wall-missed-specialisations]
 
 T16282.hs: warning: [-Wall-missed-specialisations]
     Could not specialise imported function ‘Data.Map.Internal.$w$cshowsPrec’
-      when specialising ‘Data.Map.Internal.$fShowMap_$cshowsPrec’
     Probable fix: add INLINABLE pragma on ‘Data.Map.Internal.$w$cshowsPrec’
