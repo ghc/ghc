@@ -588,11 +588,8 @@ tc_rn_src_decls ds
           { Nothing -> return (tcg_env, tcl_env, lie1)
 
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl _ (dL->L _ splice) _, rest_ds) ->
-            do {
-                 -- We need to simplify any constraints from the previous declaration
-                 -- group, or else we might reify metavariables, as in #16980.
-               ; ev_binds1 <- simplifyTop lie1
+          ; Just (SpliceDecl _ (dL->L loc splice) _, rest_ds) ->
+            do { recordTopLevelSpliceLoc loc
 
                  -- Rename the splice expression, and get its supporting decls
                ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
@@ -600,10 +597,9 @@ tc_rn_src_decls ds
                  -- Glue them on the front of the remaining decls and loop
                ; (tcg_env, tcl_env, lie2) <-
                    setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
-                   addTopEvBinds ev_binds1 $
                    tc_rn_src_decls (spliced_decls ++ rest_ds)
 
-               ; return (tcg_env, tcl_env, lie2)
+               ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
                }
           ; Just (XSpliceDecl nec, _) -> noExtCon nec
           }

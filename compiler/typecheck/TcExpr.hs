@@ -25,7 +25,6 @@ import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket
 import THNames( liftStringName, liftName )
 
 import GHC.Hs
-import Constraint       ( HoleSort(..) )
 import TcHsSyn
 import TcRnMonad
 import TcUnify
@@ -1805,7 +1804,7 @@ tc_infer_id lbl id_name
       | otherwise                  = return ()
 
 
-tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcUnboundId :: HsExpr GhcRn -> UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- Typecheck an occurrence of an unbound Id
 --
 -- Some of these started life as a true expression hole "_".
@@ -1814,11 +1813,12 @@ tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
-tcUnboundId rn_expr occ res_ty
+tcUnboundId rn_expr unbound res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
+      ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
-      ; can <- newHoleCt ExprHole ev ty
+      ; can <- newHoleCt (ExprHole unbound) ev ty
       ; emitInsoluble can
       ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
           (HsVar noExtField (noLoc ev)) ty res_ty }

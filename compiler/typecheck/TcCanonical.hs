@@ -34,7 +34,6 @@ import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
 import VarSet( delVarSetList )
-import OccName ( OccName )
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
@@ -137,8 +136,8 @@ canonicalize (CFunEqCan { cc_ev = ev
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
 
-canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
-  = canHole ev occ hole
+canonicalize (CHoleCan { cc_ev = ev, cc_hole = hole })
+  = canHole ev hole
 
 {-
 ************************************************************************
@@ -643,14 +642,13 @@ canIrred ev
            _                     -> continueWith $
                                     mkIrredCt new_ev } }
 
-canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
-canHole ev occ hole_sort
+canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
+canHole ev hole
   = do { let pred = ctEvPred ev
        ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
     do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
-                                             , cc_occ = occ
-                                             , cc_hole = hole_sort }))
+                                             , cc_hole = hole }))
        ; stopWith new_ev "Emit insoluble hole" } }
 
 

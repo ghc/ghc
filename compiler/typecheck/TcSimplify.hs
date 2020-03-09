@@ -31,6 +31,7 @@ import GhcPrelude
 import Bag
 import Class         ( Class, classKey, classTyCon )
 import DynFlags
+import GHC.Hs.Expr   ( UnboundVar(..) )
 import Id            ( idType, mkLocalId )
 import Inst
 import ListSetOps
@@ -38,6 +39,7 @@ import Name
 import Outputable
 import PrelInfo
 import PrelNames
+import RdrName       ( emptyGlobalRdrEnv )
 import TcErrors
 import TcEvidence
 import TcInteract
@@ -658,7 +660,8 @@ tcNormalise given_ids ty
       let occ = mkVarOcc "$tcNorm"
       name <- newSysName occ
       let ev = mkLocalId name ty
-      newHoleCt ExprHole ev ty
+          hole = ExprHole $ OutOfScope occ emptyGlobalRdrEnv
+      newHoleCt hole ev ty
 
 {- Note [Superclasses and satisfiability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

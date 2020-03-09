@@ -1181,7 +1181,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 -- | Name of an operator in an operator application or section
 data OpName = NormalOp Name         -- ^ A normal identifier
             | NegateOp              -- ^ Prefix negation
-            | UnboundOp OccName     -- ^ An unbound indentifier
+            | UnboundOp UnboundVar  -- ^ An unbound indentifier
             | RecFldOp (AmbiguousFieldOcc GhcRn)
               -- ^ A (possibly ambiguous) record field occurrence
 
@@ -1348,7 +1348,7 @@ checkSectionPrec direction section op arg
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName
-lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName u)
+lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (unboundVarOcc u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
 
 
