@@ -240,7 +240,7 @@ sparcNcgImpl dflags
  = NcgImpl {
         ncgConfig                 = config
        ,cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr dflags
+       ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr platform
        ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
        ,canShortcut               = SPARC.ShortcutJump.canShortcut
        ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
@@ -256,6 +256,7 @@ sparcNcgImpl dflags
    }
     where
       config   = initConfig dflags
+      platform = ncgPlatform config
 
 --
 -- Allocating more stack space for spilling is currently only
@@ -1189,7 +1190,8 @@ cmmExprConFold referenceKind expr = do
 cmmExprCon :: DynFlags -> CmmExpr -> CmmExpr
 cmmExprCon dflags (CmmLoad addr rep) = CmmLoad (cmmExprCon dflags addr) rep
 cmmExprCon dflags (CmmMachOp mop args)
-    = cmmMachOpFold dflags mop (map (cmmExprCon dflags) args)
+    = cmmMachOpFold platform mop (map (cmmExprCon dflags) args)
+    where platform = targetPlatform dflags
 cmmExprCon _ other = other
 
 -- handles both PIC and non-PIC cases... a very strange mixture
@@ -1221,9 +1223,9 @@ cmmExprNative referenceKind expr = do
            -> do
                  dynRef <- cmmMakeDynamicReference dflags referenceKind lbl
                  -- need to optimize here, since it's late
-                 return $ cmmMachOpFold dflags (MO_Add (wordWidth dflags)) [
+                 return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
                      dynRef,
-                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth dflags))
+                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
                    ]
 
         -- On powerpc (non-PIC), it's easier to jump directly to a label than

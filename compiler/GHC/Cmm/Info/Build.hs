@@ -1086,12 +1086,13 @@ buildSRT dflags refs = do
   id <- getUniqueM
   let
     lbl = mkSRTLabel id
+    platform = targetPlatform dflags
     srt_n_info = mkSRTInfoLabel (length refs)
     fields =
       mkStaticClosure dflags srt_n_info dontCareCCS
         [ CmmLabel lbl | SRTEntry lbl <- refs ]
         [] -- no padding
-        [mkIntCLit dflags 0] -- link field
+        [mkIntCLit platform 0] -- link field
         [] -- no saved info
   return (mkDataLits (Section Data lbl) lbl fields, SRTEntry lbl)
 
