@@ -19,7 +19,6 @@ module Maybes (
         firstJust, firstJusts,
         whenIsJust,
         expectJust,
-        fromJustErr,
         rightToMaybe,
 
         -- * MaybeT
@@ -33,7 +32,6 @@ import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
 import Data.Maybe
 import Util (HasCallStack)
-import Outputable
 
 infixr 4 `orElse`
 
@@ -57,10 +55,6 @@ expectJust :: HasCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
 expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
-
-fromJustErr :: HasCallStack => SDoc -> Maybe a -> a
-fromJustErr err Nothing = pprPanic "fromJustErr" err
-fromJustErr _ (Just a) = a
 
 whenIsJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
 whenIsJust (Just x) f = f x
