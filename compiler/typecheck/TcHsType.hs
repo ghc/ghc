@@ -32,7 +32,7 @@ module TcHsType (
         ContextKind(..),
 
                 -- Type checking type and class decls
-        kcLookupTcTyCon, bindTyClTyVars,
+        bindTyClTyVars,
         etaExpandAlgTyCon, tcbVisibilities,
 
           -- tyvars
@@ -2753,23 +2753,13 @@ bindTyClTyVars :: Name
 -- in the "kind checking" and "type checking" pass,
 -- but not in the initial-kind run.
 bindTyClTyVars tycon_name thing_inside
-  = do { tycon <- kcLookupTcTyCon tycon_name
+  = do { tycon <- tcLookupTcTyCon tycon_name
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
        ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
        ; tcExtendNameTyVarEnv scoped_prs $
          thing_inside binders res_kind }
-
--- inferInitialKind has made a suitably-shaped kind for the type or class
--- Look it up in the local environment. This is used only for tycons
--- that we're currently type-checking, so we're sure to find a TcTyCon.
-kcLookupTcTyCon :: Name -> TcM TcTyCon
-kcLookupTcTyCon nm
-  = do { tc_ty_thing <- tcLookup nm
-       ; return $ case tc_ty_thing of
-           ATcTyCon tc -> tc
-           _           -> pprPanic "kcLookupTcTyCon" (ppr tc_ty_thing) }
 
 
 {- *********************************************************************

@@ -1503,7 +1503,7 @@ kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- Called only for declarations without a signature (no CUSKs or SAKs here)
 kcLTyClDecl (L loc decl)
   = setSrcSpan loc $
-    do { tycon <- kcLookupTcTyCon tc_name
+    do { tycon <- tcLookupTcTyCon tc_name
        ; traceTc "kcTyClDecl {" (ppr tc_name)
        ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
          addErrCtxt (tcMkDeclCtxt decl) $

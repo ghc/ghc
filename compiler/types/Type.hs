@@ -34,7 +34,7 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
+        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
         tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
@@ -1267,7 +1267,7 @@ tyConAppArgN :: Int -> Type -> Type
 -- Executing Nth
 tyConAppArgN n ty
   = case tyConAppArgs_maybe ty of
-      Just tys -> ASSERT2( tys `lengthExceeds` n, ppr n <+> ppr tys ) tys `getNth` n
+      Just tys -> tys `getNth` n
       Nothing  -> pprPanic "tyConAppArgN" (ppr n <+> ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
@@ -1321,16 +1321,6 @@ splitListTyConApp_maybe :: Type -> Maybe Type
 splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
   Just (tc,[e]) | tc == listTyCon -> Just e
   _other                          -> Nothing
-
-nextRole :: Type -> Role
-nextRole ty
-  | Just (tc, tys) <- splitTyConApp_maybe ty
-  , let num_tys = length tys
-  , num_tys < tyConArity tc
-  = tyConRoles tc `getNth` num_tys
-
-  | otherwise
-  = Nominal
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
