@@ -60,7 +60,22 @@ static Time getClockTime(clockid_t clock)
 
 Time getCurrentThreadCPUTime(void)
 {
-#if defined(HAVE_CLOCK_GETTIME)          &&  \
+    // N.B. Since macOS Catalina, Darwin supports clock_gettime but does not
+    // support clock_getcpuclockid. Hence we prefer to use the Darwin-specific
+    // path on Darwin, even if clock_gettime is available.
+#if defined(darwin_HOST_OS)
+    mach_port_t port = pthread_mach_thread_np(osThreadId());
+    thread_basic_info_data_t info = { 0 };
+    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
+    kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
+                                         (thread_info_t) &info, &info_count);
+    if (kern_err == KERN_SUCCESS) {
+        return SecondsToTime(info.user_time.seconds) + USToTime(info.user_time.microseconds);
+    } else {
+        sysErrorBelch("getThreadCPUTime");
+        stg_exit(EXIT_FAILURE);
+    }
+#elif defined(HAVE_CLOCK_GETTIME)        &&  \
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
        defined(HAVE_SYSCONF)
     static bool have_checked_usability = false;
@@ -77,18 +92,6 @@ Time getCurrentThreadCPUTime(void)
         have_checked_usability = true;
     }
     return getClockTime(CLOCK_THREAD_CPUTIME_ID);
-#elif defined(darwin_HOST_OS)
-    mach_port_t port = pthread_mach_thread_np(osThreadId());
-    thread_basic_info_data_t info = { 0 };
-    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
-    kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
-                                         (thread_info_t) &info, &info_count);
-    if (kern_err == KERN_SUCCESS) {
-        return SecondsToTime(info.user_time.seconds) + USToTime(info.user_time.microseconds);
-    } else {
-        sysErrorBelch("getThreadCPUTime");
-        stg_exit(EXIT_FAILURE);
-    }
 #else
 #error I know of no means to find the CPU time of current thread on this platform.
 #endif
