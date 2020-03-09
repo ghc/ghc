@@ -1,14 +1,6 @@
-                 (wombat1 [Occ=Once*!] :: T -> p)
-                   A -> wombat1 T17901.A;
-                   B -> wombat1 T17901.B;
-                   C -> wombat1 T17901.C
   = \ (@p) (wombat1 :: T -> p) (x :: T) ->
       case x of wild { __DEFAULT -> wombat1 wild }
-         Tmpl= \ (@p) (wombat2 [Occ=Once!] :: S -> p) (x [Occ=Once] :: S) ->
-                 case x of wild [Occ=Once] { __DEFAULT -> wombat2 wild }}]
   = \ (@p) (wombat2 :: S -> p) (x :: S) ->
       case x of wild { __DEFAULT -> wombat2 wild }
-         Tmpl= \ (@p) (wombat3 [Occ=Once!] :: W -> p) (x [Occ=Once] :: W) ->
-                 case x of wild [Occ=Once] { __DEFAULT -> wombat3 wild }}]
   = \ (@p) (wombat3 :: W -> p) (x :: W) ->
       case x of wild { __DEFAULT -> wombat3 wild }
