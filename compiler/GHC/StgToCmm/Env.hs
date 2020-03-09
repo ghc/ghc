@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -30,6 +30,7 @@ import TyCon
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Types
 
 import GHC.Cmm.CLabel
 
@@ -47,6 +48,8 @@ import TysPrim
 import UniqFM
 import Util
 import VarEnv
+import DataCon
+import BasicTypes
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -138,10 +141,31 @@ getCgIdInfo id
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
               in return $
-                  litIdInfo dflags id (idLFInfo id) (CmmLabel ext_lbl)
+                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}
+
+mkLFImported :: Id -> LambdaFormInfo
+mkLFImported id =
+    case idLFInfo_maybe id of
+      Just lf_info ->
+        lf_info
+      Nothing ->
+        WARN( True, text "mkLFImported: Id with unknown LFInfo: " <+> ppr id )
+        if | Just con <- isDataConWorkId_maybe id
+           , isNullaryRepDataCon con
+           -> LFCon con   -- An imported nullary constructor
+                         -- We assume that the constructor is evaluated so that
+                         -- the id really does point directly to the constructor
+
+           | arity > 0
+           -> LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
+
+           | otherwise
+           -> mkLFArgument id -- Not sure of exact arity
+  where
+    arity = idFunRepArity id
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
