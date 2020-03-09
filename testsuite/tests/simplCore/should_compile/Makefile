@@ -266,3 +266,8 @@ T15631:
 T17140:
 	$(RM) -f T17140*.hi T17140*.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O T17140 T17140a -v0
+
+T17901:
+	$(RM) -f T17901.o T17901.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T17901.hs | grep 'wombat'
+        # All three functions should get their case alternatives combined
