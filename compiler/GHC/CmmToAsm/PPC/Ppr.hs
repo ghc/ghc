@@ -294,8 +294,7 @@ pprAlignForSection platform seg =
 
 pprDataItem :: Platform -> CmmLit -> SDoc
 pprDataItem platform lit
-  = sdocWithDynFlags $ \dflags ->
-    vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
+  = vcat (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
         imm = litToImm lit
         archPPC_64 = not $ target32Bit platform
