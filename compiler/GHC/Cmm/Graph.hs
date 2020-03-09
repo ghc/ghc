@@ -310,15 +310,16 @@ copyIn :: DynFlags -> Convention -> Area
 copyIn dflags conv area formals extra_stk
   = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
+    platform = targetPlatform dflags
     -- See Note [Width of parameters]
     ci (reg, RegisterParam r@(VanillaReg {})) =
         let local = CmmLocal reg
             global = CmmReg (CmmGlobal r)
-            width = cmmRegWidth dflags local
+            width = cmmRegWidth platform local
             expr
-                | width == wordWidth dflags = global
-                | width < wordWidth dflags =
-                    CmmMachOp (MO_XX_Conv (wordWidth dflags) width) [global]
+                | width == wordWidth platform = global
+                | width < wordWidth platform =
+                    CmmMachOp (MO_XX_Conv (wordWidth platform) width) [global]
                 | otherwise = panic "Parameter width greater than word width"
 
         in CmmAssign local expr
@@ -329,21 +330,21 @@ copyIn dflags conv area formals extra_stk
 
     ci (reg, StackParam off)
       | isBitsType $ localRegType reg
-      , typeWidth (localRegType reg) < wordWidth dflags =
+      , typeWidth (localRegType reg) < wordWidth platform =
         let
-          stack_slot = (CmmLoad (CmmStackSlot area off) (cmmBits $ wordWidth dflags))
+          stack_slot = (CmmLoad (CmmStackSlot area off) (cmmBits $ wordWidth platform))
           local = CmmLocal reg
-          width = cmmRegWidth dflags local
-          expr  = CmmMachOp (MO_XX_Conv (wordWidth dflags) width) [stack_slot]
+          width = cmmRegWidth platform local
+          expr  = CmmMachOp (MO_XX_Conv (wordWidth platform) width) [stack_slot]
         in CmmAssign local expr
 
       | otherwise =
          CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty)
          where ty = localRegType reg
 
-    init_offset = widthInBytes (wordWidth dflags) -- infotable
+    init_offset = widthInBytes (wordWidth platform) -- infotable
 
-    (stk_off, stk_args) = assignStack dflags init_offset localRegType extra_stk
+    (stk_off, stk_args) = assignStack platform init_offset localRegType extra_stk
 
     (stk_size, args) = assignArgumentsPos dflags stk_off conv
                                           localRegType formals
@@ -370,15 +371,16 @@ copyOutOflow :: DynFlags -> Convention -> Transfer -> Area -> [CmmExpr]
 copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
   = (stk_size, regs, graph)
   where
+    platform = targetPlatform dflags
     (regs, graph) = foldr co ([], mkNop) (setRA ++ args ++ stack_params)
 
     -- See Note [Width of parameters]
     co (v, RegisterParam r@(VanillaReg {})) (rs, ms) =
-        let width = cmmExprWidth dflags v
+        let width = cmmExprWidth platform v
             value
-                | width == wordWidth dflags = v
-                | width < wordWidth dflags =
-                    CmmMachOp (MO_XX_Conv width (wordWidth dflags)) [v]
+                | width == wordWidth platform = v
+                | width < wordWidth platform =
+                    CmmMachOp (MO_XX_Conv width (wordWidth platform)) [v]
                 | otherwise = panic "Parameter width greater than word width"
 
         in (r:rs, mkAssign (CmmGlobal r) value <*> ms)
@@ -391,11 +393,11 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
     co (v, StackParam off)  (rs, ms)
       = (rs, mkStore (CmmStackSlot area off) (value v) <*> ms)
 
-    width v = cmmExprWidth dflags v
+    width v = cmmExprWidth platform v
     value v
-      | isBitsType $ cmmExprType dflags v
-      , width v < wordWidth dflags =
-        CmmMachOp (MO_XX_Conv (width v) (wordWidth dflags)) [v]
+      | isBitsType $ cmmExprType platform v
+      , width v < wordWidth platform =
+        CmmMachOp (MO_XX_Conv (width v) (wordWidth platform)) [v]
       | otherwise = v
 
     (setRA, init_offset) =
@@ -405,20 +407,20 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
                   case transfer of
                      Call ->
                        ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                       widthInBytes (wordWidth dflags))
+                       widthInBytes (wordWidth platform))
                      JumpRet ->
                        ([],
-                       widthInBytes (wordWidth dflags))
+                       widthInBytes (wordWidth platform))
                      _other ->
                        ([], 0)
             Old -> ([], updfr_off)
 
     (extra_stack_off, stack_params) =
-       assignStack dflags init_offset (cmmExprType dflags) extra_stack_stuff
+       assignStack platform init_offset (cmmExprType platform) extra_stack_stuff
 
     args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
     (stk_size, args) = assignArgumentsPos dflags extra_stack_off conv
-                                          (cmmExprType dflags) actuals
+                                          (cmmExprType platform) actuals
 
 
 -- Note [Width of parameters]
