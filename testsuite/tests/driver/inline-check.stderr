@@ -21,6 +21,7 @@ Considering inlining: foo
   some_benefit False
   is exp: True
   is work-free: True
-  guidance ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+  guidance IF_ARGS [0] 30 0
+  discounted size = 20
   ANSWER = NO
 Inactive unfolding: foo1
