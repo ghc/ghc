@@ -917,6 +917,15 @@ release-x86_64-windows:
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
     TEST_ENV: "x86_64-windows"
 
+release-x86_64-windows-integer-simple:
+  <<: *release
+  extends: validate-x86_64-windows
+  variables:
+    INTEGER_LIBRARY: integer-simple
+    BUILD_FLAVOUR: "perf"
+    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
+    TEST_ENV: "x86_64-windows"
+
 release-i386-windows:
   <<: *release
   extends: .build-windows-make
