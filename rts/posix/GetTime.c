@@ -25,18 +25,25 @@
 #error No implementation for getProcessCPUTime() available.
 #endif
 
+#if defined(darwin_HOST_OS)
+#include <mach/mach_time.h>
+#include <mach/mach_init.h>
+#include <mach/thread_act.h>
+#include <mach/mach_port.h>
+#endif
+
 #if defined(HAVE_GETTIMEOFDAY) && defined(HAVE_GETRUSAGE)
 // we'll implement getProcessCPUTime() and getProcessElapsedTime()
 // separately, using getrusage() and gettimeofday() respectively
 
-#if !defined(HAVE_CLOCK_GETTIME) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS)
 static uint64_t timer_scaling_factor_numer = 0;
 static uint64_t timer_scaling_factor_denom = 0;
 #endif
 
 void initializeTimer()
 {
-#if !defined(HAVE_CLOCK_GETTIME) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS)
     mach_timebase_info_data_t info;
     (void) mach_timebase_info(&info);
     timer_scaling_factor_numer = (uint64_t)info.numer;
@@ -60,7 +67,22 @@ static Time getClockTime(clockid_t clock)
 
 Time getCurrentThreadCPUTime(void)
 {
-#if defined(HAVE_CLOCK_GETTIME)          &&  \
+    // N.B. Since macOS Catalina, Darwin supports clock_gettime but does not
+    // support clock_getcpuclockid. Hence we prefer to use the Darwin-specific
+    // path on Darwin, even if clock_gettime is available.
+#if defined(darwin_HOST_OS)
+    mach_port_t port = pthread_mach_thread_np(osThreadId());
+    thread_basic_info_data_t info = { 0 };
+    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
+    kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
+                                         (thread_info_t) &info, &info_count);
+    if (kern_err == KERN_SUCCESS) {
+        return SecondsToTime(info.user_time.seconds) + USToTime(info.user_time.microseconds);
+    } else {
+        sysErrorBelch("getThreadCPUTime");
+        stg_exit(EXIT_FAILURE);
+    }
+#elif defined(HAVE_CLOCK_GETTIME)        &&  \
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
        defined(HAVE_SYSCONF)
     static bool have_checked_usability = false;
@@ -77,18 +99,6 @@ Time getCurrentThreadCPUTime(void)
         have_checked_usability = true;
     }
     return getClockTime(CLOCK_THREAD_CPUTIME_ID);
-#elif defined(darwin_HOST_OS)
-    mach_port_t port = pthread_mach_thread_np(osThreadId());
-    thread_basic_info_data_t info = { 0 };
-    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
-    kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
-                                         (thread_info_t) &info, &info_count);
-    if (kern_err == KERN_SUCCESS) {
-        return SecondsToTime(info.user_time.seconds) + USToTime(info.user_time.microseconds);
-    } else {
-        sysErrorBelch("getThreadCPUTime");
-        stg_exit(EXIT_FAILURE);
-    }
 #else
 #error I know of no means to find the CPU time of current thread on this platform.
 #endif
