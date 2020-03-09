@@ -1,3 +1,3 @@
+  lift :: Foo -> T
   [HasNoCafRefs, Arity: 1, Strictness: <S,1*U>,
-   Unfolding: InlineRule (0, True, True)
-              bof `cast` (Sym (N:Foo[0]) ->_R <T>_R)]
+   Unfolding: (bof `cast` (Sym (N:Foo[0]) ->_R <T>_R))]
