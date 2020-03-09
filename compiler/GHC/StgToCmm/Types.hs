@@ -66,7 +66,6 @@ data LambdaFormInfo
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
-  deriving (Eq)
 
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
