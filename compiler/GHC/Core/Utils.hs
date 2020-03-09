@@ -2065,25 +2065,23 @@ cheapEqExpr = cheapEqExpr' (const False)
 
 -- | Cheap expression equality test, can ignore ticks by type.
 cheapEqExpr' :: (Tickish Id -> Bool) -> Expr b -> Expr b -> Bool
-cheapEqExpr' ignoreTick = go_s
-  where go_s = go `on` stripTicksTopE ignoreTick
-        go (Var v1)   (Var v2)   = v1 == v2
-        go (Lit lit1) (Lit lit2) = lit1 == lit2
-        go (Type t1)  (Type t2)  = t1 `eqType` t2
-        go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
-
-        go (App f1 a1) (App f2 a2)
-          = f1 `go_s` f2 && a1 `go_s` a2
-
-        go (Cast e1 t1) (Cast e2 t2)
-          = e1 `go_s` e2 && t1 `eqCoercion` t2
-
-        go (Tick t1 e1) (Tick t2 e2)
-          = t1 == t2 && e1 `go_s` e2
-
-        go _ _ = False
-        {-# INLINE go #-}
 {-# INLINE cheapEqExpr' #-}
+cheapEqExpr' ignoreTick e1 e2
+  = go e1 e2
+  where
+    go (Var v1)   (Var v2)         = v1 == v2
+    go (Lit lit1) (Lit lit2)       = lit1 == lit2
+    go (Type t1)  (Type t2)        = t1 `eqType` t2
+    go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
+    go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
+    go (Cast e1 t1) (Cast e2 t2)   = e1 `go` e2 && t1 `eqCoercion` t2
+
+    go (Tick t1 e1) e2 | ignoreTick t1 = go e1 e2
+    go e1 (Tick t2 e2) | ignoreTick t2 = go e1 e2
+    go (Tick t1 e1) (Tick t2 e2) = t1 == t2 && e1 `go` e2
+
+    go _ _ = False
+
 
 exprIsBig :: Expr b -> Bool
 -- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
