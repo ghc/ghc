@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module GHC.Event.Windows.Thread (
     ensureIOManagerIsRunning,
     interruptIOManager,
