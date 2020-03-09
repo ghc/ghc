@@ -14,8 +14,8 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
-import GHC.Platform (isARM, platformArch)
 
+import GHC.Platform
 import GHC.Driver.Session
 import Unique
 import UniqFM
@@ -181,6 +181,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
     -- pprTrace "sink" (ppr lbl) $
     blockJoin first final_middle final_last : sink sunk' bs
     where
+      platform = targetPlatform dflags
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
 
@@ -195,7 +196,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
       -- Now sink and inline in this block
       (middle', assigs) = walk dflags ann_middles (mapFindWithDefault [] lbl sunk)
-      fold_last = constantFoldNode dflags last
+      fold_last = constantFoldNode platform last
       (final_last, assigs') = tryToInline dflags live fold_last assigs
 
       -- We cannot sink into join points (successors with more than
@@ -330,12 +331,13 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
-    | shouldDiscard node live           = go ns block as
+    | shouldDiscard node live             = go ns block as
        -- discard dead assignment
-    | Just a <- shouldSink dflags node2 = go ns block (a : as1)
-    | otherwise                         = go ns block' as'
+    | Just a <- shouldSink platform node2 = go ns block (a : as1)
+    | otherwise                           = go ns block' as'
     where
-      node1 = constantFoldNode dflags node
+      platform = targetPlatform dflags
+      node1 = constantFoldNode platform node
 
       (node2, as1) = tryToInline dflags live node1 as
 
@@ -351,8 +353,8 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
 -- be profitable to sink assignments to global regs too, but the
 -- liveness analysis doesn't track those (yet) so we can't.
 --
-shouldSink :: DynFlags -> CmmNode e x -> Maybe Assignment
-shouldSink dflags (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprMem dflags e)
+shouldSink :: Platform -> CmmNode e x -> Maybe Assignment
+shouldSink platform (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprMem platform e)
   where no_local_regs = True -- foldRegsUsed (\_ _ -> False) True e
 shouldSink _ _other = Nothing
 
@@ -430,6 +432,7 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
    | isTrivial dflags rhs    = inline_and_keep
    | otherwise               = dont_inline
    where
+        platform = targetPlatform dflags
         inline_and_discard = go usages' inl_node skipped rest
           where usages' = foldLocalRegsUsed dflags addUsage usages rhs
 
@@ -462,9 +465,9 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
         -- inl_exp is where the inlining actually takes place!
         inl_exp (CmmReg    (CmmLocal l'))     | l == l' = rhs
         inl_exp (CmmRegOff (CmmLocal l') off) | l == l'
-                    = cmmOffset dflags rhs off
+                    = cmmOffset platform rhs off
                     -- re-constant fold after inlining
-        inl_exp (CmmMachOp op args) = cmmMachOpFold dflags op args
+        inl_exp (CmmMachOp op args) = cmmMachOpFold platform op args
         inl_exp other = other
 
 
@@ -588,7 +591,7 @@ conflicts dflags (r, rhs, addr) node
 
   -- (3) a store to an address conflicts with a read of the same memory
   | CmmStore addr' e <- node
-  , memConflicts addr (loadAddr dflags addr' (cmmExprWidth dflags e)) = True
+  , memConflicts addr (loadAddr platform addr' (cmmExprWidth platform e)) = True
 
   -- (4) an assignment to Hp/Sp conflicts with a heap/stack read respectively
   | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
@@ -603,19 +606,21 @@ conflicts dflags (r, rhs, addr) node
 
   -- (7) otherwise, no conflict
   | otherwise = False
+  where
+    platform = targetPlatform dflags
 
 -- Returns True if node defines any global registers that are used in the
 -- Cmm expression
 globalRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
 globalRegistersConflict dflags expr node =
-    foldRegsDefd dflags (\b r -> b || regUsedIn dflags (CmmGlobal r) expr)
+    foldRegsDefd dflags (\b r -> b || regUsedIn (targetPlatform dflags) (CmmGlobal r) expr)
                  False node
 
 -- Returns True if node defines any local registers that are used in the
 -- Cmm expression
 localRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
 localRegistersConflict dflags expr node =
-    foldRegsDefd dflags (\b r -> b || regUsedIn dflags (CmmLocal  r) expr)
+    foldRegsDefd dflags (\b r -> b || regUsedIn (targetPlatform dflags) (CmmLocal  r) expr)
                  False node
 
 -- Note [Sinking and calls]
@@ -745,24 +750,24 @@ memConflicts (SpMem o1 w1) (SpMem o2 w2)
   | otherwise = o2 + w2 > o1
 memConflicts _         _         = True
 
-exprMem :: DynFlags -> CmmExpr -> AbsMem
-exprMem dflags (CmmLoad addr w)  = bothMems (loadAddr dflags addr (typeWidth w)) (exprMem dflags addr)
-exprMem dflags (CmmMachOp _ es)  = foldr bothMems NoMem (map (exprMem dflags) es)
-exprMem _      _                 = NoMem
+exprMem :: Platform -> CmmExpr -> AbsMem
+exprMem platform (CmmLoad addr w)  = bothMems (loadAddr platform addr (typeWidth w)) (exprMem platform addr)
+exprMem platform (CmmMachOp _ es)  = foldr bothMems NoMem (map (exprMem platform) es)
+exprMem _        _                 = NoMem
 
-loadAddr :: DynFlags -> CmmExpr -> Width -> AbsMem
-loadAddr dflags e w =
+loadAddr :: Platform -> CmmExpr -> Width -> AbsMem
+loadAddr platform e w =
   case e of
-   CmmReg r       -> regAddr dflags r 0 w
-   CmmRegOff r i  -> regAddr dflags r i w
-   _other | regUsedIn dflags spReg e -> StackMem
-          | otherwise -> AnyMem
+   CmmReg r       -> regAddr platform r 0 w
+   CmmRegOff r i  -> regAddr platform r i w
+   _other | regUsedIn platform spReg e -> StackMem
+          | otherwise                  -> AnyMem
 
-regAddr :: DynFlags -> CmmReg -> Int -> Width -> AbsMem
+regAddr :: Platform -> CmmReg -> Int -> Width -> AbsMem
 regAddr _      (CmmGlobal Sp) i w = SpMem i (widthInBytes w)
 regAddr _      (CmmGlobal Hp) _ _ = HeapMem
 regAddr _      (CmmGlobal CurrentTSO) _ _ = HeapMem -- important for PrimOps
-regAddr dflags r _ _ | isGcPtrType (cmmRegType dflags r) = HeapMem -- yay! GCPtr pays for itself
+regAddr platform r _ _ | isGcPtrType (cmmRegType platform r) = HeapMem -- yay! GCPtr pays for itself
 regAddr _      _ _ _ = AnyMem
 
 {-

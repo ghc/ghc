@@ -23,7 +23,7 @@ module GHC.CmmToLlvm.Base (
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions,
+        ghcInternalFunctions, getPlatform,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
@@ -134,17 +134,18 @@ llvmFunSig' live lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                       | otherwise   = (x, [])
        dflags <- getDynFlags
+       platform <- getPlatform
        return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
-                                 (map (toParams . getVarType) (llvmFunArgs dflags live))
-                                 (llvmFunAlign dflags)
+                                 (map (toParams . getVarType) (llvmFunArgs platform live))
+                                 (llvmFunAlign platform)
 
 -- | Alignment to use for functions
-llvmFunAlign :: DynFlags -> LMAlign
-llvmFunAlign dflags = Just (wORD_SIZE dflags)
+llvmFunAlign :: Platform -> LMAlign
+llvmFunAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Alignment to use for into tables
-llvmInfAlign :: DynFlags -> LMAlign
-llvmInfAlign dflags = Just (wORD_SIZE dflags)
+llvmInfAlign :: Platform -> LMAlign
+llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
 llvmFunSection :: DynFlags -> LMString -> LMSection
@@ -153,12 +154,11 @@ llvmFunSection dflags lbl
     | otherwise                     = Nothing
 
 -- | A Function's arguments
-llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
-llvmFunArgs dflags live =
-    map (lmGlobalRegArg dflags) (filter isPassed allRegs)
-    where platform = targetPlatform dflags
-          allRegs = activeStgRegs platform
-          paddedLive = map (\(_,r) -> r) $ padLiveArgs dflags live
+llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
+llvmFunArgs platform live =
+    map (lmGlobalRegArg platform) (filter isPassed allRegs)
+    where allRegs = activeStgRegs platform
+          paddedLive = map (\(_,r) -> r) $ padLiveArgs platform live
           isLive r = r `elem` alwaysLive || r `elem` paddedLive
           isPassed r = not (isFPR r) || isLive r
 
@@ -217,14 +217,13 @@ fprRegNum _ = error "fprRegNum expected only FPR regs"
 --
 -- Also, the returned list is not sorted in any particular order.
 --
-padLiveArgs :: DynFlags -> LiveGlobalRegs -> [(Bool, GlobalReg)]
-padLiveArgs dflags live =
+padLiveArgs :: Platform -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+padLiveArgs plat live =
       if platformUnregisterised plat
         then taggedLive -- not using GHC's register convention for platform.
         else padding ++ taggedLive
   where
     taggedLive = map (\x -> (False, x)) live
-    plat = targetPlatform dflags
 
     fprLive = filter isFPR live
     padding = concatMap calcPad $ groupBy sharesClass fprLive
@@ -232,7 +231,7 @@ padLiveArgs dflags live =
     sharesClass :: GlobalReg -> GlobalReg -> Bool
     sharesClass a b = sameFPRClass a b || overlappingClass
       where
-        overlappingClass = regsOverlap dflags (norm a) (norm b)
+        overlappingClass = regsOverlap plat (norm a) (norm b)
         norm = CmmGlobal . normalizeFPRNum
 
     calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
@@ -269,8 +268,8 @@ tysToParams :: [LlvmType] -> [LlvmParameter]
 tysToParams = map (\ty -> (ty, []))
 
 -- | Pointer width
-llvmPtrBits :: DynFlags -> Int
-llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
+llvmPtrBits :: Platform -> Int
+llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 
 -- ----------------------------------------------------------------------------
 -- * Llvm Version
@@ -342,6 +341,9 @@ instance Monad LlvmM where
 
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
+
+getPlatform :: LlvmM Platform
+getPlatform = targetPlatform <$> getDynFlags
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
@@ -484,11 +486,12 @@ getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
 -- 'void *'). Fixes trac #5486.
 ghcInternalFunctions :: LlvmM ()
 ghcInternalFunctions = do
-    dflags <- getDynFlags
-    mk "memcpy" i8Ptr [i8Ptr, i8Ptr, llvmWord dflags]
-    mk "memmove" i8Ptr [i8Ptr, i8Ptr, llvmWord dflags]
-    mk "memset" i8Ptr [i8Ptr, llvmWord dflags, llvmWord dflags]
-    mk "newSpark" (llvmWord dflags) [i8Ptr, i8Ptr]
+    platform <- getPlatform
+    let w = llvmWord platform
+    mk "memcpy" i8Ptr [i8Ptr, i8Ptr, w]
+    mk "memmove" i8Ptr [i8Ptr, i8Ptr, w]
+    mk "memset" i8Ptr [i8Ptr, w, w]
+    mk "newSpark" w [i8Ptr, i8Ptr]
   where
     mk n ret args = do
       let n' = llvmDefLabel $ fsLit n

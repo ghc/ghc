@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -51,6 +52,7 @@ module GHC.StgToCmm.Utils (
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
 import GHC.Cmm
@@ -97,25 +99,26 @@ import Data.Ord
 cgLit :: Literal -> FCode CmmLit
 cgLit (LitString s) = newByteStringCLit s
  -- not unpackFS; we want the UTF-8 byte stream.
-cgLit other_lit     = do dflags <- getDynFlags
-                         return (mkSimpleLit dflags other_lit)
+cgLit other_lit     = do platform <- getPlatform
+                         return (mkSimpleLit platform other_lit)
 
-mkSimpleLit :: DynFlags -> Literal -> CmmLit
-mkSimpleLit dflags (LitChar   c)                = CmmInt (fromIntegral (ord c))
-                                                         (wordWidth dflags)
-mkSimpleLit dflags LitNullAddr                  = zeroCLit dflags
-mkSimpleLit dflags (LitNumber LitNumInt i _)    = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (LitNumber LitNumInt64 i _)  = CmmInt i W64
-mkSimpleLit dflags (LitNumber LitNumWord i _)   = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (LitNumber LitNumWord64 i _) = CmmInt i W64
-mkSimpleLit _      (LitFloat r)                 = CmmFloat r W32
-mkSimpleLit _      (LitDouble r)                = CmmFloat r W64
-mkSimpleLit _      (LitLabel fs ms fod)
-  = let -- TODO: Literal labels might not actually be in the current package...
-        labelSrc = ForeignLabelInThisPackage
-    in CmmLabel (mkForeignLabel fs ms labelSrc fod)
--- NB: LitRubbish should have been lowered in "CoreToStg"
-mkSimpleLit _      other = pprPanic "mkSimpleLit" (ppr other)
+mkSimpleLit :: Platform -> Literal -> CmmLit
+mkSimpleLit platform = \case
+   (LitChar   c)                -> CmmInt (fromIntegral (ord c))
+                                          (wordWidth platform)
+   LitNullAddr                  -> zeroCLit platform
+   (LitNumber LitNumInt i _)    -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumInt64 i _)  -> CmmInt i W64
+   (LitNumber LitNumWord i _)   -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumWord64 i _) -> CmmInt i W64
+   (LitFloat r)                 -> CmmFloat r W32
+   (LitDouble r)                -> CmmFloat r W64
+   (LitLabel fs ms fod)
+     -> let -- TODO: Literal labels might not actually be in the current package...
+            labelSrc = ForeignLabelInThisPackage
+        in CmmLabel (mkForeignLabel fs ms labelSrc fod)
+   -- NB: LitRubbish should have been lowered in "CoreToStg"
+   other -> pprPanic "mkSimpleLit" (ppr other)
 
 --------------------------------------------------------------------------
 --
@@ -151,13 +154,13 @@ addToMemE rep ptr n
 -------------------------------------------------------------------------
 
 mkTaggedObjectLoad
-  :: DynFlags -> LocalReg -> LocalReg -> ByteOff -> DynTag -> CmmAGraph
+  :: Platform -> LocalReg -> LocalReg -> ByteOff -> DynTag -> CmmAGraph
 -- (loadTaggedObjectField reg base off tag) generates assignment
 --      reg = bitsK[ base + off - tag ]
 -- where K is fixed by 'reg'
-mkTaggedObjectLoad dflags reg base offset tag
+mkTaggedObjectLoad platform reg base offset tag
   = mkAssign (CmmLocal reg)
-             (CmmLoad (cmmOffsetB dflags
+             (CmmLoad (cmmOffsetB platform
                                   (CmmReg (CmmLocal base))
                                   (offset - tag))
                       (localRegType reg))
@@ -169,9 +172,9 @@ mkTaggedObjectLoad dflags reg base offset tag
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
-tagToClosure dflags tycon tag
-  = CmmLoad (cmmOffsetExprW dflags closure_tbl tag) (bWord dflags)
+tagToClosure :: Platform -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure platform tycon tag
+  = CmmLoad (cmmOffsetExprW platform closure_tbl tag) (bWord platform)
   where closure_tbl = CmmLit (CmmLabel lbl)
         lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 
@@ -264,7 +267,7 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 
     callerRestoreGlobalReg reg
         = mkAssign (CmmGlobal reg)
-                   (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType dflags reg))
+                   (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType platform reg))
 
 
 -------------------------------------------------------------------------
@@ -338,9 +341,9 @@ assignTemp :: CmmExpr -> FCode LocalReg
 -- due to them being trashed on foreign calls--though it means
 -- the optimization pass doesn't have to do as much work)
 assignTemp (CmmReg (CmmLocal reg)) = return reg
-assignTemp e = do { dflags <- getDynFlags
+assignTemp e = do { platform <- getPlatform
                   ; uniq <- newUnique
-                  ; let reg = LocalReg uniq (cmmExprType dflags e)
+                  ; let reg = LocalReg uniq (cmmExprType platform e)
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
@@ -355,15 +358,15 @@ newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_ty
   = ASSERT( isUnboxedTupleType res_ty )
-    do  { dflags <- getDynFlags
+    do  { platform <- getPlatform
         ; sequel <- getSequel
-        ; regs <- choose_regs dflags sequel
+        ; regs <- choose_regs platform sequel
         ; ASSERT( regs `equalLength` reps )
           return (regs, map primRepForeignHint reps) }
   where
     reps = typePrimRep res_ty
     choose_regs _ (AssignTo regs _) = return regs
-    choose_regs dflags _            = mapM (newTemp . primRepCmmType dflags) reps
+    choose_regs platform _          = mapM (newTemp . primRepCmmType platform) reps
 
 
 
@@ -389,12 +392,12 @@ type Stmt = (LocalReg, CmmExpr) -- r := e
 emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   ASSERT2( equalLength regs rhss, ppr regs $$ ppr rhss )
-    unscramble dflags ([1..] `zip` (regs `zip` rhss))
+    unscramble platform ([1..] `zip` (regs `zip` rhss))
 
-unscramble :: DynFlags -> [Vrtx] -> FCode ()
-unscramble dflags vertices = mapM_ do_component components
+unscramble :: Platform -> [Vrtx] -> FCode ()
+unscramble platform vertices = mapM_ do_component components
   where
         edges :: [ Node Key Vrtx ]
         edges = [ DigraphNode vertex key1 (edges_from stmt1)
@@ -417,25 +420,24 @@ unscramble dflags vertices = mapM_ do_component components
                 -- Cyclic?  Then go via temporaries.  Pick one to
                 -- break the loop and try again with the rest.
         do_component (CyclicSCC ((_,first_stmt) : rest)) = do
-            dflags <- getDynFlags
             u <- newUnique
-            let (to_tmp, from_tmp) = split dflags u first_stmt
+            let (to_tmp, from_tmp) = split u first_stmt
             mk_graph to_tmp
-            unscramble dflags rest
+            unscramble platform rest
             mk_graph from_tmp
 
-        split :: DynFlags -> Unique -> Stmt -> (Stmt, Stmt)
-        split dflags uniq (reg, rhs)
+        split :: Unique -> Stmt -> (Stmt, Stmt)
+        split uniq (reg, rhs)
           = ((tmp, rhs), (reg, CmmReg (CmmLocal tmp)))
           where
-            rep = cmmExprType dflags rhs
+            rep = cmmExprType platform rhs
             tmp = LocalReg uniq rep
 
         mk_graph :: Stmt -> FCode ()
         mk_graph (reg, rhs) = emitAssign (CmmLocal reg) rhs
 
         mustFollow :: Stmt -> Stmt -> Bool
-        (reg, _) `mustFollow` (_, rhs) = regUsedIn dflags (CmmLocal reg) rhs
+        (reg, _) `mustFollow` (_, rhs) = regUsedIn platform (CmmLocal reg) rhs
 
 -------------------------------------------------------------------------
 --      mkSwitch
@@ -519,7 +521,8 @@ emitCmmLitSwitch scrut  branches deflt = do
     branches_lbls <- label_branches join_lbl branches
 
     dflags <- getDynFlags
-    let cmm_ty = cmmExprType dflags scrut
+    platform <- getPlatform
+    let cmm_ty = cmmExprType platform scrut
         rep = typeWidth cmm_ty
 
     -- We find the necessary type information in the literals in the branches
@@ -551,28 +554,28 @@ mk_float_switch :: Width -> CmmExpr -> BlockId
               -> [(Literal,BlockId)]
               -> FCode CmmAGraph
 mk_float_switch rep scrut deflt _bounds [(lit,blk)]
-  = do dflags <- getDynFlags
-       return $ mkCbranch (cond dflags) deflt blk Nothing
+  = do platform <- getPlatform
+       return $ mkCbranch (cond platform) deflt blk Nothing
   where
-    cond dflags = CmmMachOp ne [scrut, CmmLit cmm_lit]
+    cond platform = CmmMachOp ne [scrut, CmmLit cmm_lit]
       where
-        cmm_lit = mkSimpleLit dflags lit
+        cmm_lit = mkSimpleLit platform lit
         ne      = MO_F_Ne rep
 
 mk_float_switch rep scrut deflt_blk_id (lo_bound, hi_bound) branches
-  = do dflags <- getDynFlags
+  = do platform <- getPlatform
        lo_blk <- mk_float_switch rep scrut deflt_blk_id bounds_lo lo_branches
        hi_blk <- mk_float_switch rep scrut deflt_blk_id bounds_hi hi_branches
-       mkCmmIfThenElse (cond dflags) lo_blk hi_blk
+       mkCmmIfThenElse (cond platform) lo_blk hi_blk
   where
     (lo_branches, mid_lit, hi_branches) = divideBranches branches
 
     bounds_lo = (lo_bound, Just mid_lit)
     bounds_hi = (Just mid_lit, hi_bound)
 
-    cond dflags = CmmMachOp lt [scrut, CmmLit cmm_lit]
+    cond platform = CmmMachOp lt [scrut, CmmLit cmm_lit]
       where
-        cmm_lit = mkSimpleLit dflags mid_lit
+        cmm_lit = mkSimpleLit platform mid_lit
         lt      = MO_F_Lt rep
 
 
@@ -609,8 +612,8 @@ assignTemp' :: CmmExpr -> FCode CmmExpr
 assignTemp' e
   | isTrivialCmmExpr e = return e
   | otherwise = do
-       dflags <- getDynFlags
-       lreg <- newTemp (cmmExprType dflags e)
+       platform <- getPlatform
+       lreg <- newTemp (cmmExprType platform e)
        let reg = CmmLocal lreg
        emitAssign reg e
        return (CmmReg reg)
@@ -620,15 +623,16 @@ assignTemp' e
 -- Pushing to the update remembered set
 ---------------------------------------------------------------------------
 
-whenUpdRemSetEnabled :: DynFlags -> FCode a -> FCode ()
-whenUpdRemSetEnabled dflags code = do
+whenUpdRemSetEnabled :: FCode a -> FCode ()
+whenUpdRemSetEnabled code = do
+    platform <- getPlatform
     do_it <- getCode code
+    let
+      enabled = CmmLoad (CmmLit $ CmmLabel mkNonmovingWriteBarrierEnabledLabel) (bWord platform)
+      zero = zeroExpr platform
+      is_enabled = cmmNeWord platform enabled zero
     the_if <- mkCmmIfThenElse' is_enabled do_it mkNop (Just False)
     emit the_if
-  where
-    enabled = CmmLoad (CmmLit $ CmmLabel mkNonmovingWriteBarrierEnabledLabel) (bWord dflags)
-    zero = zeroExpr dflags
-    is_enabled = cmmNeWord dflags enabled zero
 
 -- | Emit code to add an entry to a now-overwritten pointer to the update
 -- remembered set.
