@@ -1323,8 +1323,6 @@ zonk_pat env (ParPat x p)
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
-        ; ensureNotLevPoly ty'
-            (text "In a wildcard pattern")
         ; return (env, WildPat ty') }
 
 zonk_pat env (VarPat x (L l v))
@@ -1377,18 +1375,9 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys
                           , pat_dicts = evs
                           , pat_binds = binds
                           , pat_args = args
-                          , pat_wrap = wrapper
-                          , pat_con = L _ con })
+                          , pat_wrap = wrapper })
   = ASSERT( all isImmutableTyVar tyvars )
     do  { new_tys <- mapM (zonkTcTypeToTypeX env) tys
-
-          -- an unboxed tuple pattern (but only an unboxed tuple pattern)
-          -- might have levity-polymorphic arguments. Check for this badness.
-        ; case con of
-            RealDataCon dc
-              | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
-            _ -> return ()
 
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
           -- Must zonk the existential variables, because their
@@ -1404,8 +1393,6 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys
                             pat_binds = new_binds,
                             pat_args = new_args,
                             pat_wrap = new_wrapper}) }
-  where
-    doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
 zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
 

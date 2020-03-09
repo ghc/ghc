@@ -434,11 +434,6 @@ tcPatSynSig name sig_ty
        ; checkValidType ctxt $
          build_patsyn_type kvs implicit_tvs' univ_tvs' req' ex_tvs' prov' body_ty'
 
-       -- arguments become the types of binders. We thus cannot allow
-       -- levity polymorphism here
-       ; let (arg_tys, _) = tcSplitFunTys body_ty'
-       ; mapM_ (checkForLevPoly empty) arg_tys
-
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
               , text "kvs" <+> ppr_tvs kvs

@@ -3952,13 +3952,6 @@ checkValidClass cls
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
 
-           -- a method cannot be levity polymorphic, as we have to store the
-           -- method in a dictionary
-           -- example of what this prevents:
-           --   class BoundedX (a :: TYPE r) where minBound :: a
-           -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
-        ; checkForLevPoly empty tau1
-
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (cls_pred:op_theta))
 
