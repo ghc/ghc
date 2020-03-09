@@ -106,6 +106,7 @@ module GHC.StgToCmm.Ticky (
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
@@ -211,6 +212,7 @@ emitTickyCounter cloType name args
     (>> return ctr_lbl) $
     ifTicky $ do
         { dflags <- getDynFlags
+        ; platform <- getPlatform
         ; parent <- getTickyCtrLabel
         ; mod_name <- getModuleName
 
@@ -246,14 +248,14 @@ emitTickyCounter cloType name args
         -- krc: note that all the fields are I32 now; some were I16
         -- before, but the code generator wasn't handling that
         -- properly and it led to chaos, panic and disorder.
-            [ mkIntCLit dflags 0,               -- registered?
-              mkIntCLit dflags (length args),   -- Arity
-              mkIntCLit dflags 0,               -- Heap allocated for this thing
+            [ mkIntCLit platform 0,               -- registered?
+              mkIntCLit platform (length args),   -- Arity
+              mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
-              zeroCLit dflags,          -- Entries into this thing
-              zeroCLit dflags,          -- Heap allocated by this thing
-              zeroCLit dflags                   -- Link to next StgEntCounter
+              zeroCLit platform,          -- Entries into this thing
+              zeroCLit platform,          -- Heap allocated by this thing
+              zeroCLit platform                   -- Link to next StgEntCounter
             ]
         }
 
@@ -353,19 +355,20 @@ registerTickyCtr :: CLabel -> FCode ()
 --          f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl = do
   dflags <- getDynFlags
+  platform <- getPlatform
   let
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq (wordWidth dflags))
+    test = CmmMachOp (MO_Eq (wordWidth platform))
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
-                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord dflags),
-               zeroExpr dflags]
+                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord platform),
+               zeroExpr platform]
     register_stmts
       = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
-                   (CmmLoad ticky_entry_ctrs (bWord dflags))
+                   (CmmLoad ticky_entry_ctrs (bWord platform))
         , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
                                 (oFFSET_StgEntCounter_registeredp dflags)))
-                   (mkIntExpr dflags 1) ]
+                   (mkIntExpr platform 1) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsUnitId (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 
@@ -493,24 +496,25 @@ tickyAllocHeap ::
 tickyAllocHeap genuine hp
   = ifTicky $
     do  { dflags <- getDynFlags
+        ; platform <- getPlatform
         ; ticky_ctr <- getTickyCtrLabel
         ; emit $ catAGraphs $
             -- only test hp from within the emit so that the monadic
             -- computation itself is not strict in hp (cf knot in
             -- GHC.StgToCmm.Monad.getHeapUsage)
           if hp == 0 then []
-          else let !bytes = wORD_SIZE dflags * hp in [
+          else let !bytes = platformWordSizeInBytes platform * hp in [
             -- Bump the allocation total in the closure's StgEntCounter
             addToMem (rEP_StgEntCounter_allocs dflags)
                      (CmmLit (cmmLabelOffB ticky_ctr (oFFSET_StgEntCounter_allocs dflags)))
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
-            addToMemLbl (bWord dflags)
+            addToMemLbl (bWord platform)
                         (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_tot"))
                         bytes,
             -- Bump the global allocation counter ALLOC_HEAP_ctr
             if not genuine then mkNop
-            else addToMemLbl (bWord dflags)
+            else addToMemLbl (bWord platform)
                              (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_ctr"))
                              1
             ]}
@@ -607,23 +611,24 @@ bumpTickyLit lhs = bumpTickyLitBy lhs 1
 
 bumpTickyLitBy :: CmmLit -> Int -> FCode ()
 bumpTickyLitBy lhs n = do
-  dflags <- getDynFlags
-  emit (addToMem (bWord dflags) (CmmLit lhs) n)
+  platform <- getPlatform
+  emit (addToMem (bWord platform) (CmmLit lhs) n)
 
 bumpTickyLitByE :: CmmLit -> CmmExpr -> FCode ()
 bumpTickyLitByE lhs e = do
-  dflags <- getDynFlags
-  emit (addToMemE (bWord dflags) (CmmLit lhs) e)
+  platform <- getPlatform
+  emit (addToMemE (bWord platform) (CmmLit lhs) e)
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
     dflags <- getDynFlags
+    platform <- getPlatform
     let offset = n `min` (tICKY_BIN_COUNT dflags - 1)
-    emit (addToMem (bWord dflags)
-           (cmmIndexExpr dflags
-                (wordWidth dflags)
+    emit (addToMem (bWord platform)
+           (cmmIndexExpr platform
+                (wordWidth platform)
                 (CmmLit (CmmLabel (mkCmmDataLabel rtsUnitId lbl)))
-                (CmmLit (CmmInt (fromIntegral offset) (wordWidth dflags))))
+                (CmmLit (CmmInt (fromIntegral offset) (wordWidth platform))))
            1)
 
 ------------------------------------------------------------------

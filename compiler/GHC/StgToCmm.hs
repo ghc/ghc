@@ -188,6 +188,7 @@ cgDataCon :: DataCon -> FCode ()
 -- the static closure, for a constructor.
 cgDataCon data_con
   = do  { dflags <- getDynFlags
+        ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds) --  #ptr_wds
@@ -216,7 +217,7 @@ cgDataCon data_con
             do { tickyEnterDynCon
                ; ldvEnter (CmmReg nodeReg)
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg) (tagForCon dflags data_con)]
+               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon dflags data_con)]
                }
                     -- The case continuation code expects a tagged pointer
         }

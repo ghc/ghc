@@ -18,7 +18,6 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.Runtime.Heap.Layout
-import GHC.Driver.Session
 
 import Data.Bits
 
@@ -30,32 +29,32 @@ generated code which need to be emitted as sequences of StgWords.
 type Bitmap = [StgWord]
 
 -- | Make a bitmap from a sequence of bits
-mkBitmap :: DynFlags -> [Bool] -> Bitmap
+mkBitmap :: Platform -> [Bool] -> Bitmap
 mkBitmap _ [] = []
-mkBitmap dflags stuff = chunkToBitmap dflags chunk : mkBitmap dflags rest
-  where (chunk, rest) = splitAt (wORD_SIZE_IN_BITS dflags) stuff
+mkBitmap platform stuff = chunkToBitmap platform chunk : mkBitmap platform rest
+  where (chunk, rest) = splitAt (platformWordSizeInBits platform) stuff
 
-chunkToBitmap :: DynFlags -> [Bool] -> StgWord
-chunkToBitmap dflags chunk =
-  foldl' (.|.) (toStgWord dflags 0) [ oneAt n | (True,n) <- zip chunk [0..] ]
+chunkToBitmap :: Platform -> [Bool] -> StgWord
+chunkToBitmap platform chunk =
+  foldl' (.|.) (toStgWord platform 0) [ oneAt n | (True,n) <- zip chunk [0..] ]
   where
     oneAt :: Int -> StgWord
-    oneAt i = toStgWord dflags 1 `shiftL` i
+    oneAt i = toStgWord platform 1 `shiftL` i
 
 -- | Make a bitmap where the slots specified are the /zeros/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
 -- just to make the bitmap easier to read).
 --
 -- The list of @Int@s /must/ be already sorted and duplicate-free.
-intsToReverseBitmap :: DynFlags
+intsToReverseBitmap :: Platform
                     -> Int      -- ^ size in bits
                     -> [Int]    -- ^ sorted indices of zeros free of duplicates
                     -> Bitmap
-intsToReverseBitmap dflags size = go 0
+intsToReverseBitmap platform size = go 0
   where
-    word_sz = wORD_SIZE_IN_BITS dflags
+    word_sz = platformWordSizeInBits platform
     oneAt :: Int -> StgWord
-    oneAt i = toStgWord dflags 1 `shiftL` i
+    oneAt i = toStgWord platform 1 `shiftL` i
 
     -- It is important that we maintain strictness here.
     -- See Note [Strictness when building Bitmaps].
@@ -63,7 +62,7 @@ intsToReverseBitmap dflags size = go 0
     go !pos slots
       | size <= pos = []
       | otherwise =
-        (foldl' xor (toStgWord dflags init) (map (\i->oneAt (i - pos)) these)) :
+        (foldl' xor (toStgWord platform init) (map (\i->oneAt (i - pos)) these)) :
           go (pos + word_sz) rest
       where
         (these,rest) = span (< (pos + word_sz)) slots
@@ -98,8 +97,8 @@ possible, or fall back to an external pointer when the bitmap is too
 large.  This value represents the largest size of bitmap that can be
 packed into a single word.
 -}
-mAX_SMALL_BITMAP_SIZE :: DynFlags -> Int
-mAX_SMALL_BITMAP_SIZE dflags =
-    case platformWordSize (targetPlatform dflags) of
+mAX_SMALL_BITMAP_SIZE :: Platform -> Int
+mAX_SMALL_BITMAP_SIZE platform =
+    case platformWordSize platform of
       PW4 -> 27 -- On 32-bit: 5 bits for size, 27 bits for bitmap
       PW8 -> 58 -- On 64-bit: 6 bits for size, 58 bits for bitmap

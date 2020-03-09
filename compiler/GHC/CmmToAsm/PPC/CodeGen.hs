@@ -33,7 +33,7 @@ import GHC.CmmToAsm.CPrim
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat
    , getBlockIdNat, getPicBaseNat, getNewRegPairNat
-   , getPicBaseMaybeNat, getPlatform
+   , getPicBaseMaybeNat, getPlatform, initConfig
    )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -161,7 +161,7 @@ stmtToInstrs stmt = do
       | target32Bit platform &&
         isWord64 ty    -> assignReg_I64Code      reg src
       | otherwise      -> assignReg_IntCode format reg src
-        where ty = cmmRegType dflags reg
+        where ty = cmmRegType platform reg
               format = cmmTypeFormat ty
 
     CmmStore addr src
@@ -169,7 +169,7 @@ stmtToInstrs stmt = do
       | target32Bit platform &&
         isWord64 ty    -> assignMem_I64Code      addr src
       | otherwise      -> assignMem_IntCode format addr src
-        where ty = cmmExprType dflags src
+        where ty = cmmExprType platform src
               format = cmmTypeFormat ty
 
     CmmUnsafeForeignCall target result_regs args
@@ -240,10 +240,10 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
 -- CmmExprs into CmmRegOff?
-mangleIndexTree :: DynFlags -> CmmExpr -> CmmExpr
-mangleIndexTree dflags (CmmRegOff reg off)
+mangleIndexTree :: Platform -> CmmExpr -> CmmExpr
+mangleIndexTree platform (CmmRegOff reg off)
   = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-  where width = typeWidth (cmmRegType dflags reg)
+  where width = typeWidth (cmmRegType platform reg)
 
 mangleIndexTree _ _
         = panic "PPC.CodeGen.mangleIndexTree: no match"
@@ -397,67 +397,68 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
 iselExpr64 expr
-   = pprPanic "iselExpr64(powerpc)" (pprExpr expr)
+   = do
+     platform <- getPlatform
+     pprPanic "iselExpr64(powerpc)" (pprExpr platform expr)
 
 
 
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do dflags <- getDynFlags
-                   getRegister' dflags e
+                   getRegister' dflags (targetPlatform dflags) e
 
-getRegister' :: DynFlags -> CmmExpr -> NatM Register
+getRegister' :: DynFlags -> Platform -> CmmExpr -> NatM Register
 
-getRegister' dflags (CmmReg (CmmGlobal PicBaseReg))
-  | OSAIX <- platformOS (targetPlatform dflags) = do
+getRegister' _ platform (CmmReg (CmmGlobal PicBaseReg))
+  | OSAIX <- platformOS platform = do
         let code dst = toOL [ LD II32 dst tocAddr ]
             tocAddr = AddrRegImm toc (ImmLit (text "ghc_toc_table[TC]"))
         return (Any II32 code)
-  | target32Bit (targetPlatform dflags) = do
-      reg <- getPicBaseNat $ archWordFormat (target32Bit (targetPlatform dflags))
-      return (Fixed (archWordFormat (target32Bit (targetPlatform dflags)))
+  | target32Bit platform = do
+      reg <- getPicBaseNat $ archWordFormat (target32Bit platform)
+      return (Fixed (archWordFormat (target32Bit platform))
                     reg nilOL)
   | otherwise = return (Fixed II64 toc nilOL)
 
-getRegister' dflags (CmmReg reg)
-  = return (Fixed (cmmTypeFormat (cmmRegType dflags reg))
-                  (getRegisterReg (targetPlatform dflags) reg) nilOL)
+getRegister' _ platform (CmmReg reg)
+  = return (Fixed (cmmTypeFormat (cmmRegType platform reg))
+                  (getRegisterReg platform reg) nilOL)
 
-getRegister' dflags tree@(CmmRegOff _ _)
-  = getRegister' dflags (mangleIndexTree dflags tree)
+getRegister' dflags platform tree@(CmmRegOff _ _)
+  = getRegister' dflags platform (mangleIndexTree platform tree)
 
     -- for 32-bit architectures, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
-getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)
+getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
- | target32Bit (targetPlatform dflags) = do
+ | target32Bit platform = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32)
+getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
- | target32Bit (targetPlatform dflags) = do
+ | target32Bit platform = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32) [x])
- | target32Bit (targetPlatform dflags) = do
+getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32) [x])
+ | target32Bit platform = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
- | target32Bit (targetPlatform dflags) = do
+getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
+ | target32Bit platform = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' dflags (CmmLoad mem pk)
+getRegister' _ platform (CmmLoad mem pk)
  | not (isWord64 pk) = do
-        let platform = targetPlatform dflags
         Amode addr addr_code <- getAmode D mem
         let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
                        addr_code `snocOL` LD format dst addr
         return (Any format code)
- | not (target32Bit (targetPlatform dflags)) = do
+ | not (target32Bit platform) = do
         Amode addr addr_code <- getAmode DS mem
         let code dst = addr_code `snocOL` LD II64 dst addr
         return (Any II64 code)
@@ -465,50 +466,50 @@ getRegister' dflags (CmmLoad mem pk)
           where format = cmmTypeFormat pk
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
-getRegister' _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
 -- Note: there is no Load Byte Arithmetic instruction, so no signed case here
 
-getRegister' _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister' _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister' _ (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister' _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister' _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LD II32 dst addr))
 
-getRegister' _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _]) = do
     -- lwa is DS-form. See Note [Power instruction format]
     Amode addr addr_code <- getAmode DS mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
 
-getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
+getRegister' dflags platform (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT
 
@@ -538,19 +539,19 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
         triv_ucode_float width instr = trivialUCode (floatFormat  width) instr x
 
         conversionNop new_format expr
-            = do e_code <- getRegister' dflags expr
+            = do e_code <- getRegister' dflags platform expr
                  return (swizzleRegisterRep e_code new_format)
 
         clearLeft from to
             = do (src1, code1) <- getSomeReg x
-                 let arch_fmt  = intFormat (wordWidth dflags)
-                     arch_bits = widthInBits (wordWidth dflags)
+                 let arch_fmt  = intFormat (wordWidth platform)
+                     arch_bits = widthInBits (wordWidth platform)
                      size      = widthInBits from
                      code dst  = code1 `snocOL`
                                  CLRLI arch_fmt dst src1 (arch_bits - size)
                  return (Any (intFormat to) code)
 
-getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
+getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
       MO_F_Eq _ -> condFltReg EQQ x y
       MO_F_Ne _ -> condFltReg NE  x y
@@ -654,16 +655,15 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       return (Any fmt code)
 
 
-getRegister' _ (CmmLit (CmmInt i rep))
+getRegister' _ _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
   = let
         code dst = unitOL (LI dst imm)
     in
         return (Any (intFormat rep) code)
 
-getRegister' _ (CmmLit (CmmFloat f frep)) = do
+getRegister' dflags _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    dflags <- getDynFlags
     dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
     let format = floatFormat frep
@@ -673,9 +673,9 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 
-getRegister' dflags (CmmLit lit)
-  | target32Bit (targetPlatform dflags)
-  = let rep = cmmLitType dflags lit
+getRegister' dflags platform (CmmLit lit)
+  | target32Bit platform
+  = let rep = cmmLitType platform lit
         imm = litToImm lit
         code dst = toOL [
               LIS dst (HA imm),
@@ -684,17 +684,16 @@ getRegister' dflags (CmmLit lit)
     in return (Any (cmmTypeFormat rep) code)
   | otherwise
   = do lbl <- getNewLabelNat
-       dflags <- getDynFlags
        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
        Amode addr addr_code <- getAmode D dynRef
-       let rep = cmmLitType dflags lit
+       let rep = cmmLitType platform lit
            format = cmmTypeFormat rep
            code dst =
             LDATA (Section ReadOnlyData lbl) (RawCmmStatics lbl [CmmStaticLit lit])
             `consOL` (addr_code `snocOL` LD format dst addr)
        return (Any format code)
 
-getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
+getRegister' _ platform other = pprPanic "getRegister(ppc)" (pprExpr platform other)
 
     -- extend?Rep: wrap integer expression of type `from`
     -- in a conversion to `to`
@@ -740,8 +739,8 @@ data InstrForm = D | DS
 
 getAmode :: InstrForm -> CmmExpr -> NatM Amode
 getAmode inf tree@(CmmRegOff _ _)
-  = do dflags <- getDynFlags
-       getAmode inf (mangleIndexTree dflags tree)
+  = do platform <- getPlatform
+       getAmode inf (mangleIndexTree platform tree)
 
 getAmode _ (CmmMachOp (MO_Sub W32) [x, CmmLit (CmmInt i _)])
   | Just off <- makeImmediate W32 True (-i)
@@ -1706,12 +1705,13 @@ genCCall' dflags gcp target dest_regs args
                        `snocOL` BCTRL usedRegs
                        `appOL`  codeAfter)
     where
-        platform = targetPlatform dflags
+        config   = initConfig dflags
+        platform = ncgPlatform config
 
         uses_pic_base_implicitly = do
             -- See Note [implicit register in PPC PIC code]
             -- on why we claim to use PIC register here
-            when (positionIndependent dflags && target32Bit platform) $ do
+            when (ncgPIC config && target32Bit platform) $ do
                 _ <- getPicBaseNat $ archWordFormat True
                 return ()
 
@@ -1737,7 +1737,7 @@ genCCall' dflags gcp target dest_regs args
                                         argReps
                                 _ -> panic "genCall': unknown calling conv."
 
-        argReps = map (cmmExprType dflags) args
+        argReps = map (cmmExprType platform) args
         (argHints, _) = foreignTargetHints target
 
         roundTo a x | x `mod` a == 0 = x
@@ -1849,10 +1849,10 @@ genCCall' dflags gcp target dest_regs args
                               accumUsed
             where
                 arg_pro
-                   | isBitsType rep = CmmMachOp (conv_op (typeWidth rep) (wordWidth dflags)) [arg]
+                   | isBitsType rep = CmmMachOp (conv_op (typeWidth rep) (wordWidth platform)) [arg]
                    | otherwise      = arg
                 format_pro
-                   | isBitsType rep = intFormat (wordWidth dflags)
+                   | isBitsType rep = intFormat (wordWidth platform)
                    | otherwise      = cmmTypeFormat rep
                 conv_op = case hint of
                             SignedHint -> MO_SS_Conv
@@ -1935,11 +1935,11 @@ genCCall' dflags gcp target dest_regs args
                 [dest]
                     | reduceToFF32 && isFloat32 rep   -> unitOL (FRSP r_dest f1)
                     | isFloat32 rep || isFloat64 rep -> unitOL (MR r_dest f1)
-                    | isWord64 rep && target32Bit (targetPlatform dflags)
+                    | isWord64 rep && target32Bit platform
                        -> toOL [MR (getHiVRegFromLo r_dest) r3,
                                 MR r_dest r4]
                     | otherwise -> unitOL (MR r_dest r3)
-                    where rep = cmmRegType dflags (CmmLocal dest)
+                    where rep = cmmRegType platform (CmmLocal dest)
                           r_dest = getRegisterReg platform (CmmLocal dest)
                 _ -> panic "genCCall' moveResult: Bad dest_regs"
 
@@ -2043,11 +2043,11 @@ genCCall' dflags gcp target dest_regs args
 
 genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch dflags expr targets
-  | OSAIX <- platformOS (targetPlatform dflags)
+  | OSAIX <- platformOS platform
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
-        let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
-            sha = if target32Bit $ targetPlatform dflags then 2 else 3
+        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        let fmt = archWordFormat $ target32Bit platform
+            sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
@@ -2060,11 +2060,11 @@ genSwitch dflags expr targets
                     ]
         return code
 
-  | (positionIndependent dflags) || (not $ target32Bit $ targetPlatform dflags)
+  | (ncgPIC config) || (not $ target32Bit platform)
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
-        let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
-            sha = if target32Bit $ targetPlatform dflags then 2 else 3
+        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        let fmt = archWordFormat $ target32Bit platform
+            sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
@@ -2079,9 +2079,9 @@ genSwitch dflags expr targets
         return code
   | otherwise
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
-        let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
-            sha = if target32Bit $ targetPlatform dflags then 2 else 3
+        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        let fmt = archWordFormat $ target32Bit platform
+            sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         let code = e_code `appOL` toOL [
@@ -2092,7 +2092,10 @@ genSwitch dflags expr targets
                             BCTR ids (Just lbl) []
                     ]
         return code
-  where (offset, ids) = switchTargetsToTable targets
+  where
+    (offset, ids) = switchTargetsToTable targets
+    platform      = ncgPlatform config
+    config        = initConfig dflags
 
 generateJumpTableForInstr :: NCGConfig -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
