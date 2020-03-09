@@ -936,11 +936,21 @@ certainlyWillInline :: UnfoldingOpts -> IdInfo -> Maybe Unfolding
 -- ^ Sees if the unfolding is pretty certain to inline.
 -- If so, return a *stable* unfolding for it, that will always inline.
 certainlyWillInline opts fn_info
-  = case unfoldingInfo fn_info of
-      CoreUnfolding { uf_tmpl = e, uf_guidance = g }
-        | loop_breaker -> Nothing      -- Won't inline, so try w/w
-        | noinline     -> Nothing      -- See Note [Worker-wrapper for NOINLINE functions]
-        | otherwise    -> do_cunf e g  -- Depends on size, so look at that
+  = case fn_unf of
+      CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
+        | loop_breaker -> Nothing       -- Won't inline, so try w/w
+        | noinline     -> Nothing       -- See Note [Worker-wrapper for NOINLINE functions]
+        | otherwise
+        -> case guidance of
+             UnfNever  -> Nothing
+             UnfWhen {} -> Just (fn_unf { uf_src = src' })
+                             -- INLINE functions have UnfWhen
+             UnfIfGoodArgs { ug_size = size, ug_args = args }
+               -> do_cunf expr size args src'
+        where
+          src' = case src of
+                   InlineRhs -> InlineStable
+                   _         -> src  -- Do not change InlineCompulsory!
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
                                        -- to do so, and even if it is currently a
@@ -953,17 +963,12 @@ certainlyWillInline opts fn_info
     noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
     fn_unf       = unfoldingInfo fn_info
 
-    do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding
-    do_cunf _ UnfNever     = Nothing
-    do_cunf _ (UnfWhen {}) = Just (fn_unf { uf_src = InlineStable })
-                             -- INLINE functions have UnfWhen
-
         -- The UnfIfGoodArgs case seems important.  If we w/w small functions
         -- binary sizes go up by 10%!  (This is with SplitObjs.)
         -- I'm not totally sure why.
         -- INLINABLE functions come via this path
         --    See Note [certainlyWillInline: INLINABLE]
-    do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
+    do_cunf expr size args src'
       | arityInfo fn_info > 0  -- See Note [certainlyWillInline: be careful of thunks]
       , not (isDeadEndSig (strictnessInfo fn_info))
               -- Do not unconditionally inline a bottoming functions even if
@@ -971,7 +976,7 @@ certainlyWillInline opts fn_info
               -- so we don't want to re-inline it.
       , let unf_arity = length args
       , size - (10 * (unf_arity + 1)) <= unfoldingUseThreshold opts
-      = Just (fn_unf { uf_src      = InlineStable
+      = Just (fn_unf { uf_src      = src'
                      , uf_guidance = UnfWhen { ug_arity     = unf_arity
                                              , ug_unsat_ok  = unSaturatedOk
                                              , ug_boring_ok = inlineBoringOk expr } })
