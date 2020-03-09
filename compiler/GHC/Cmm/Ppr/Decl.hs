@@ -40,6 +40,7 @@ where
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
@@ -76,7 +77,8 @@ instance Outputable RawCmmStatics where
     ppr = pprRawStatics
 
 instance Outputable CmmStatic where
-    ppr = pprStatic
+    ppr e = sdocWithDynFlags $ \dflags ->
+            pprStatic (targetPlatform dflags) e
 
 instance Outputable CmmInfoTable where
     ppr = pprInfoTable
@@ -148,9 +150,9 @@ pprStatics (CmmStaticsRaw lbl ds) = pprRawStatics (RawCmmStatics lbl ds)
 pprRawStatics :: RawCmmStatics -> SDoc
 pprRawStatics (RawCmmStatics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
-pprStatic :: CmmStatic -> SDoc
-pprStatic s = case s of
-    CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit lit <> semi
+pprStatic :: Platform -> CmmStatic -> SDoc
+pprStatic platform s = case s of
+    CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit platform lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 

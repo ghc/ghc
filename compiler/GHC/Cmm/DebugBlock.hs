@@ -27,6 +27,7 @@ module GHC.Cmm.DebugBlock (
 
 import GhcPrelude
 
+import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
@@ -525,14 +526,14 @@ instance Outputable UnwindExpr where
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as
 -- possible.
-toUnwindExpr :: CmmExpr -> UnwindExpr
-toUnwindExpr (CmmLit (CmmInt i _))       = UwConst (fromIntegral i)
-toUnwindExpr (CmmLit (CmmLabel l))       = UwLabel l
-toUnwindExpr (CmmRegOff (CmmGlobal g) i) = UwReg g i
-toUnwindExpr (CmmReg (CmmGlobal g))      = UwReg g 0
-toUnwindExpr (CmmLoad e _)               = UwDeref (toUnwindExpr e)
-toUnwindExpr e@(CmmMachOp op [e1, e2])   =
-  case (op, toUnwindExpr e1, toUnwindExpr e2) of
+toUnwindExpr :: Platform -> CmmExpr -> UnwindExpr
+toUnwindExpr _ (CmmLit (CmmInt i _))       = UwConst (fromIntegral i)
+toUnwindExpr _ (CmmLit (CmmLabel l))       = UwLabel l
+toUnwindExpr _ (CmmRegOff (CmmGlobal g) i) = UwReg g i
+toUnwindExpr _ (CmmReg (CmmGlobal g))      = UwReg g 0
+toUnwindExpr platform (CmmLoad e _)               = UwDeref (toUnwindExpr platform e)
+toUnwindExpr platform e@(CmmMachOp op [e1, e2])   =
+  case (op, toUnwindExpr platform e1, toUnwindExpr platform e2) of
     (MO_Add{}, UwReg r x, UwConst y) -> UwReg r (x + y)
     (MO_Sub{}, UwReg r x, UwConst y) -> UwReg r (x - y)
     (MO_Add{}, UwConst x, UwReg r y) -> UwReg r (x + y)
@@ -543,6 +544,6 @@ toUnwindExpr e@(CmmMachOp op [e1, e2])   =
     (MO_Sub{}, u1,        u2       ) -> UwMinus u1 u2
     (MO_Mul{}, u1,        u2       ) -> UwTimes u1 u2
     _otherwise -> pprPanic "Unsupported operator in unwind expression!"
-                           (pprExpr e)
-toUnwindExpr e
+                           (pprExpr platform e)
+toUnwindExpr _ e
   = pprPanic "Unsupported unwind expression!" (ppr e)

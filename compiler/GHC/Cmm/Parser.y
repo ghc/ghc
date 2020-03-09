@@ -770,7 +770,7 @@ expr0   :: { CmmParse CmmExpr }
 
 -- leaving out the type of a literal gives you the native word size in C--
 maybe_ty :: { CmmType }
-        : {- empty -}                   {% do dflags <- getDynFlags; return $ bWord dflags }
+        : {- empty -}                   {% do dflags <- getDynFlags; return $ bWord (targetPlatform dflags) }
         | '::' type                     { $2 }
 
 cmm_hint_exprs0 :: { [CmmParse (CmmExpr, ForeignHint)] }
@@ -859,7 +859,7 @@ typenot8 :: { CmmType }
         | 'bits512'             { b512 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
-        | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
+        | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord (targetPlatform dflags) }
 
 {
 section :: String -> SectionType
@@ -880,8 +880,9 @@ mkString s = CmmString (BS8.pack s)
 mkMachOp :: (Width -> MachOp) -> [CmmParse CmmExpr] -> CmmParse CmmExpr
 mkMachOp fn args = do
   dflags <- getDynFlags
+  let platform = targetPlatform dflags
   arg_exprs <- sequence args
-  return (CmmMachOp (fn (typeWidth (cmmExprType dflags (head arg_exprs)))) arg_exprs)
+  return (CmmMachOp (fn (typeWidth (cmmExprType platform (head arg_exprs)))) arg_exprs)
 
 getLit :: CmmExpr -> CmmLit
 getLit (CmmLit l) = l
@@ -1147,7 +1148,8 @@ reserveStackFrame psize preg body = do
   old_updfr_off <- getUpdFrameOff
   reg <- preg
   esize <- psize
-  let size = case constantFoldExpr dflags esize of
+  let platform = targetPlatform dflags
+  let size = case constantFoldExpr platform esize of
                CmmLit (CmmInt n _) -> n
                _other -> pprPanic "CmmParse: not a compile-time integer: "
                             (ppr esize)
@@ -1205,7 +1207,8 @@ mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple dflags actuals updfr_off =
   mkReturn dflags e actuals updfr_off
   where e = entryCode dflags (CmmLoad (CmmStackSlot Old updfr_off)
-                             (gcWord dflags))
+                             (gcWord platform))
+        platform = targetPlatform dflags
 
 doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
 doRawJump expr_code vols = do
@@ -1240,10 +1243,11 @@ adjCallTarget :: DynFlags -> CCallConv -> CmmExpr -> [(CmmExpr, ForeignHint) ]
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
 adjCallTarget dflags StdCallConv (CmmLit (CmmLabel lbl)) args
- | platformOS (targetPlatform dflags) == OSMinGW32
+ | platformOS platform == OSMinGW32
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (e, _) = max (wORD_SIZE dflags) (widthInBytes (typeWidth (cmmExprType dflags e)))
+  where size (e, _) = max (wORD_SIZE dflags) (widthInBytes (typeWidth (cmmExprType platform e)))
                  -- c.f. CgForeignCall.emitForeignCall
+        platform = targetPlatform dflags
 adjCallTarget _ _ expr _
   = expr
 
@@ -1271,8 +1275,9 @@ doStore rep addr_code val_code
         -- mismatch to be flagged by cmm-lint.  If we don't do this, then
         -- the store will happen at the wrong type, and the error will not
         -- be noticed.
-       let val_width = typeWidth (cmmExprType dflags val)
+       let val_width = typeWidth (cmmExprType platform val)
            rep_width = typeWidth rep
+           platform  = targetPlatform dflags
        let coerce_val
                 | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
                 | otherwise              = val
@@ -1402,10 +1407,11 @@ forkLabelledCode p = do
 initEnv :: DynFlags -> Env
 initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags)) (wordWidth dflags)) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags)) (wordWidth platform)) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth platform)) ))
   ]
+  where platform = targetPlatform dflags
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
 parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
