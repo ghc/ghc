@@ -31,10 +31,10 @@ type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/InfoTables.h>
 -- for more details on this data structure.
 data StgInfoTable = StgInfoTable {
-   entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode
+   entry  :: Maybe EntryFunPtr, -- Just <=> not TABLES_NEXT_TO_CODE
    ptrs   :: HalfWord,
    nptrs  :: HalfWord,
    tipe   :: ClosureType,
    srtlen :: HalfWord,
-   code   :: Maybe ItblCodes -- Just <=> ghciTablesNextToCode
+   code   :: Maybe ItblCodes -- Just <=> TABLES_NEXT_TO_CODE
   } deriving (Show, Generic)
