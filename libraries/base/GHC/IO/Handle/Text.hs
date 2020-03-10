@@ -713,8 +713,9 @@ commitBuffer
 commitBuffer hdl !raw !sz !count flush release =
   wantWritableHandle "commitBuffer" hdl $ \h_@Handle__{..} -> do
       debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
-            ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
+            ++ ", flush=" ++ show flush ++ ", release=" ++ show release ++ ", handle=" ++ show hdl)
 
+      -- Offset taken from handle
       writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer, bufOffset=0,
                                  bufL=0, bufR=count, bufSize=sz }
 
@@ -728,6 +729,8 @@ commitBuffer hdl !raw !sz !count flush release =
                spare_bufs <- readIORef haBuffers
                writeIORef haBuffers (BufferListCons raw spare_bufs)
 
+      -- bb <- readIORef haByteBuffer
+      -- debugIO ("commitBuffer: buffer=" ++ summaryBuffer bb ++ ", handle=" ++ show hdl)
       return ()
 
 -- backwards compatibility; the text package uses this

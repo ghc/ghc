@@ -68,6 +68,7 @@ test('openFile005', [], compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', [], compile_and_run, [''])
 test('openFile008', cmd_prefix('ulimit -n 2048; '), compile_and_run, [''])
+test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001', [], compile_and_run, [''])
