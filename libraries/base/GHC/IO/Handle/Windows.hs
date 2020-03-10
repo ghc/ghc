@@ -212,8 +212,7 @@ mkHandleFromHANDLE dev hw_type filepath iomode mb_codec
                 mkDuplexHandle dev filepath mb_codec nl
 
 
-        _other ->
-           mkFileHandle dev filepath iomode mb_codec nl
+        _other -> mkFileHandle dev filepath iomode mb_codec nl
 
 -- | Turn an existing Handle into a Win32 HANDLE. This function throws an
 -- IOError if the Handle does not reference a HANDLE
