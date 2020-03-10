@@ -41,14 +41,14 @@ infixl 7 <!>
 -- If POSIX then execute first action, if Windows then execute second.
 -- On POSIX systems but NATIVE and POSIX will execute the first action.
 conditional :: a -> a -> a
+#if defined(mingw32_HOST_OS)
 conditional posix windows = withIoSubSystem' sub
   where
     sub = \s -> case s of
                   IoPOSIX -> posix
-#if defined(mingw32_HOST_OS)
                   IoNative -> windows
 #else
-                  IoNative -> posix
+conditional posix _       = posix
 #endif
 
 -- | Infix version of `conditional`.
@@ -82,4 +82,5 @@ withIoSubSystem' f = unsafePerformIO inner
 whenIoSubSystem :: IoSubSystem -> IO () -> IO ()
 whenIoSubSystem m f = do sub <- getIoSubSystem
                          when (sub == m) f
+
 
