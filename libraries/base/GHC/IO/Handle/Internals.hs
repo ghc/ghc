@@ -63,7 +63,7 @@ import GHC.IO.Buffer
 import GHC.IO.BufferedIO (BufferedIO)
 import GHC.IO.Exception
 import GHC.IO.Device (IODevice, RawIO, SeekMode(..))
-import GHC.IO.SubSystem ((<!>))
+import GHC.IO.SubSystem ((<!>), isWindowsNativeIO)
 import qualified GHC.IO.Device as IODevice
 import qualified GHC.IO.BufferedIO as Buffered
 
@@ -81,6 +81,8 @@ import Foreign
 import System.Posix.Internals hiding (FD)
 
 import Foreign.C
+
+import {-# SOURCE #-} Debug.Trace (traceEventIO)
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
@@ -548,6 +550,7 @@ writeCharBuffer h_@Handle__{..} !cbuf = do
     then do
       bbuf'' <- Buffered.flushWriteBuffer haDevice bbuf'
       writeIORef haByteBuffer bbuf''
+      debugIO ("writeCharBuffer after flushing: cbuf=" ++ summaryBuffer bbuf'')
     else
       writeIORef haByteBuffer bbuf'
 
@@ -633,6 +636,18 @@ flushByteReadBuffer h_@Handle__{..} = do
 -- ----------------------------------------------------------------------------
 -- Making Handles
 
+{- Note [Making offsets for append]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  The WINIO subysstem keeps track of offsets for handles
+  on the Haskell side of things instead of letting the OS
+  handle it. This requires us to establish the correct offset
+  for a handle on creation. This is usually zero but slightly
+  more tedious for append modes. There we fall back on IODevice
+  functionality to establish the size of the file and then set
+  the offset accordingly. This is only required for WINIO.
+-}
+
 mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
          -> FilePath
          -> HandleType
@@ -645,8 +660,11 @@ mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
 mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
    openTextEncoding mb_codec ha_type $ \ mb_encoder mb_decoder -> do
 
-   let buf_state = initBufferState ha_type
-   bbuf <- Buffered.newBuffer dev buf_state
+   let !buf_state = initBufferState ha_type
+   !bbuf_no_offset <- (Buffered.newBuffer dev buf_state)
+   !buf_offset <- initHandleOffset
+   let !bbuf = bbuf_no_offset { bufOffset = buf_offset}
+
    bbufref <- newIORef bbuf
    last_decode <- newIORef (errorWithoutStackTrace "codec_state", bbuf)
 
@@ -671,6 +689,14 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
                         haOutputNL = outputNL nl,
                         haOtherSide = other_side
                       })
+  where
+    -- See Note [Making offsets for append]
+    initHandleOffset
+      | isAppendHandleType ha_type
+      , isWindowsNativeIO = do
+          size <- IODevice.getSize dev
+          return (fromIntegral size :: Word64)
+      | otherwise = return 0
 
 -- | makes a new 'Handle'
 mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
@@ -826,6 +852,7 @@ hLookAhead_ handle_@Handle__{..} = do
 -- debugging
 
 debugIO :: String -> IO ()
+-- debugIO s = traceEventIO s
 debugIO s
  | c_DEBUG_DUMP
     = do _ <- withCStringLen (s ++ "\n") $
