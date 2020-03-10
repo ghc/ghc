@@ -577,13 +577,13 @@ only _ = panic "Util: only"
 
 -- Debugging/specialising versions of \tr{elem} and \tr{notElem}
 
-isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
-
 # if !defined(DEBUG)
+isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 isIn    _msg x ys = x `elem` ys
 isn'tIn _msg x ys = x `notElem` ys
 
 # else /* DEBUG */
+isIn, isn'tIn :: (HasDebugCallStack, Eq a) => String -> a -> [a] -> Bool
 isIn msg x ys
   = elem100 0 x ys
   where
