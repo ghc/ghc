@@ -1058,7 +1058,7 @@ and emits a warning.
 
 tagToEnumRule :: RuleM CoreExpr
 -- If     data T a = A | B | C
--- then   tag2Enum# (T ty) 2# -->  B ty
+-- then   tagToEnum# (T ty) 2# -->  B ty
 tagToEnumRule = do
   [Type ty, Lit (LitNumber LitNumInt i _)] <- getArgs
   case splitTyConApp_maybe ty of

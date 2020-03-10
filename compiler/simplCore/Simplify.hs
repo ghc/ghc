@@ -585,7 +585,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
               var  = mkLocalIdWithInfo name expr_ty info
 
         -- Now something very like completeBind,
-        -- but without the postInlineUnconditinoally part
+        -- but without the postInlineUnconditionally part
         ; (arity, is_bot, expr2) <- tryEtaExpandRhs mode var expr1
         ; unf <- mkLetUnfolding (sm_dflags mode) top_lvl InlineRhs var expr2
 
@@ -1025,7 +1025,7 @@ work. T5631 is a good example of this.
 -- Context goes *inside* the lambdas. IOW, if the join point has arity n, we do:
 --   \x1 .. xn -> e => \x1 .. xn -> E[e]
 -- Note that we need the arity of the join point, since e may be a lambda
--- (though this is unlikely). See Note [Case-of-case and join points].
+-- (though this is unlikely). See Note [Join points and case-of-case].
 simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
              -> SimplM OutExpr
 simplJoinRhs env bndr expr cont
@@ -1572,7 +1572,7 @@ Simplifying rules and stable-unfoldings happens a bit after
 simplifying the right-hand side, so we remember whether or not it
 is a join point, and what 'cont' is, in a value of type MaybeJoinCont
 
-#13900 wsa caused by forgetting to push 'cont' into the RHS
+#13900 was caused by forgetting to push 'cont' into the RHS
 of a SpecConstr-generated RULE for a join point.
 -}
 
@@ -1693,7 +1693,7 @@ We need to be very careful here to remain consistent---neither part is
 optional!
 
 We need do make the continuation E duplicable (since we are duplicating it)
-with mkDuableCont.
+with mkDupableCont.
 
 
 Note [Join points with -fno-case-of-case]
@@ -2424,7 +2424,7 @@ Note [FloatBinds from constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have FloatBinds coming from the constructor wrapper
 (as in Note [exprIsConApp_maybe on data constructors with wrappers]),
-ew cannot float past them. We'd need to float the FloatBind
+we cannot float past them. We'd need to float the FloatBind
 together with the simplify floats, unfortunately the
 simplifier doesn't have case-floats. The simplest thing we can
 do is to wrap all the floats here. The next iteration of the
@@ -2757,7 +2757,7 @@ We really must record that b is already evaluated so that we don't
 go and re-evaluate it when constructing the result.
 See Note [Data-con worker strictness] in MkId.hs
 
-NB: simplLamBinders preserves this eval info
+NB: simplLamBndrs preserves this eval info
 
 In addition to handling data constructor fields with !s, addEvals
 also records the fact that the result of seq# is always in WHNF.

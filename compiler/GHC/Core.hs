@@ -783,8 +783,8 @@ is crucial for understanding how case-of-case interacts with join points:
     "" -> True
     _  -> False
 
-The simplifier will pull the case into the join point (see Note [Case-of-case
-and join points] in Simplify):
+The simplifier will pull the case into the join point (see Note [Join points
+and case-of-case] in Simplify):
 
   join
     j :: Int -> Bool -> Bool -- changed!
@@ -879,7 +879,7 @@ transformation universally. This transformation would do:
  ===>
 
   join go @a n f x = case n of 0 -> case x of True -> e1; False -> e2
-                          n -> go @a (n-1) f (f x)
+                               n -> go @a (n-1) f (f x)
   in go @Bool n neg True
 
 but that is ill-typed, as `x` is type `a`, not `Bool`.

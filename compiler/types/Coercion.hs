@@ -2403,7 +2403,7 @@ mkPrimEqPredRole Nominal          = mkPrimEqPred
 mkPrimEqPredRole Representational = mkReprPrimEqPred
 mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
 
--- | Creates a primite type equality predicate with explicit kinds
+-- | Creates a primitive type equality predicate with explicit kinds
 mkHeteroPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
 mkHeteroPrimEqPred k1 k2 ty1 ty2 = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
 

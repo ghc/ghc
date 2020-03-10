@@ -934,7 +934,7 @@ There are several fiddly subtleties lurking here
 
 * Although we eta-reduce the axiom, we eta-/expand/ the representation
   tycon Drep.  The kind of D says it takses four arguments, but the
-  data instance header only supplies three.  But the AlgTyCOn for Drep
+  data instance header only supplies three.  But the AlgTyCon for Drep
   itself must have enough TyConBinders so that its result kind is Type.
   So, with etaExpandAlgTyCon we make up some extra TyConBinders
 

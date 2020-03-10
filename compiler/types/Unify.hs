@@ -768,7 +768,7 @@ P2. match (F1 a Bool) (F1 Double String)
 In case P1, we must find (a ↦ Int) to satisfy M2.
 In case P2, we must /not/ find (a ↦ Double), in order to satisfy I2. (Note
 that the correct mapping for I2 is (a ↦ Int). There is no way to discover
-this, but we musn't map a to anything else!)
+this, but we mustn't map a to anything else!)
 
 We thus must parameterize the algorithm over whether it's being used
 for an injectivity check (refrain from looking at non-injective arguments

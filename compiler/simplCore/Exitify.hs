@@ -146,7 +146,7 @@ exitifyRec in_scope pairs
         , disjointVarSet fvs recursive_calls
         = go_exit captured (deAnnotate ann_e) fvs
 
-    -- We could not turn it into a exit joint point. So now recurse
+    -- We could not turn it into a exit join point. So now recurse
     -- into all expression where eligible exit join points might sit,
     -- i.e. into all tail-call positions:
 

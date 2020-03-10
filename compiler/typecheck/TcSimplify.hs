@@ -1708,7 +1708,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
   where
     -- TcLevels must be strictly increasing (see (ImplicInv) in
     -- Note [TcLevel and untouchable type variables] in TcType),
-    -- and in fact I thinkthey should always increase one level at a time.
+    -- and in fact I think they should always increase one level at a time.
 
     -- Though sensible, this check causes lots of testsuite failures. It is
     -- remaining commented out for now.

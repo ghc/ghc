@@ -1651,7 +1651,7 @@ There are wrinkles, of course:
    larger in-scope set than strictly necessary is always OK, as in-scope sets
    are only ever used to avoid collisions.
 
-   Sadly, the freshening substitution described in (1) really musn't bind
+   Sadly, the freshening substitution described in (1) really mustn't bind
    variables outside of their scope: note that its domain is the *unrenamed*
    variables. This means that the substitution gets "pushed down" (like a
    reader monad) while the in-scope set gets threaded (like a state monad).
