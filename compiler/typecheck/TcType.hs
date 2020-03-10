@@ -2445,13 +2445,26 @@ this actually is. There are two main tricks:
 NB: we don't want to detect PredTypes in sizeType (and then call
 sizePred on them), or we might get an infinite loop if that PredType
 is irreducible. See #5581.
+
+Note [Invisible arguments and termination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking the ​Paterson conditions for termination an instance
+declaration, we check for the number of "constructors and variables"
+in the instance head and constraints. Question: Do we look at
+
+ (1) All the arguments, visible or invisible?
+ (2) Just the visible arguments?
+
+Because it seems easier for the user to reason about, we choose (2),
+implemented with the use of filterOutInvisibleTypes near the places
+that refer to this Note.
 -}
 
 type TypeSize = IntWithInf
 
 sizeType :: Type -> TypeSize
 -- Size of a type: the number of variables and constructors
--- Ignore kinds altogether
+-- Ignore kinds altogether; See Note [Invisible arguments and termination]
 sizeType = go
   where
     go ty | Just exp_ty <- tcView ty = go exp_ty

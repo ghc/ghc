@@ -33,7 +33,7 @@ import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocI
 import TyCoFVs
 import TyCoRep
 import TyCoPpr
-import TcType hiding ( sizeType, sizeTypes )
+import TcType
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
 import Type
@@ -69,6 +69,7 @@ import Outputable
 import Unique      ( mkAlphaTyVarUnique )
 import Bag         ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
+import BasicTypes  ( subWithInf )
 
 import Control.Monad
 import Data.Foldable
@@ -1779,8 +1780,9 @@ validDerivPred tv_set (UserPred pred@(ClassPred cls tys))
   where
     check_tys cls tys
               = hasNoDups fvs
-                   -- use sizePred to ignore implicit args
-                && lengthIs fvs (sizeUserPred pred)
+                   -- use sizeUserPred to ignore implicit args
+                   -- "- 1" to skip counting the class itself; look only at args
+                && genericLengthIs fvs (sizeUserPred pred `subWithInf` 1)
                 && all (`elemVarSet` tv_set) fvs
       where tys' = filterOutInvisibleTypes (classTyCon cls) tys
             fvs  = fvTypes tys'
@@ -1909,18 +1911,18 @@ checkInstTermination theta head_pred
      = check_preds foralld_tvs (map classifyUserPredType tys)
 
      | otherwise          -- Other ClassPreds
-     = check2 foralld_tvs pred bogus_size
+     = check2 foralld_tvs pred pred_size
 
      where
-       bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
-                               -- See Note [Invisible arguments and termination]
+       pred_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
+                               -- See Note [Invisible arguments and termination] in TcType
 
    check foralld_tvs (ForAllPred tvs _ head_pred')
      = check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 
-   check2 :: VarSet -> UserPred -> Int -> TcM ()
+   check2 :: VarSet -> UserPred -> TypeSize -> TcM ()
    check2 foralld_tvs pred pred_size
      | not (null bad_tvs)             = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
      | not (isTyFamFreeUserPred pred) = failWithTc (nestedMsg what)
@@ -1966,20 +1968,6 @@ No: the type family in the instance head might blow up to an
 arbitrarily large type, depending on how 'a' is instantiated.
 So we require UndecidableInstances if we have a type family
 in the instance head.  #15172.
-
-Note [Invisible arguments and termination]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When checking the ​Paterson conditions for termination an instance
-declaration, we check for the number of "constructors and variables"
-in the instance head and constraints. Question: Do we look at
-
- * All the arguments, visible or invisible?
- * Just the visible arguments?
-
-I think both will ensure termination, provided we are consistent.
-Currently we are /not/ consistent, which is really a bug.  It's
-described in #15177, which contains a number of examples.
-The suspicious bits are the calls to filterOutInvisibleTypes.
 -}
 
 
@@ -2106,7 +2094,7 @@ checkFamInstRhs :: TyCon -> [Type]         -- LHS
 checkFamInstRhs lhs_tc lhs_tys famInsts
   = mapMaybe check famInsts
   where
-   lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
+   lhs_size  = sizeType (mkTyConApp lhs_tc lhs_tys)
    inst_head = pprType (TyConApp lhs_tc lhs_tys)
    lhs_fvs   = fvTypes lhs_tys
    check (tc, tys)
@@ -2117,7 +2105,7 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
       where
         what = text "type family application"
                <+> quotes (pprType (TyConApp tc tys))
-        fam_app_size = sizeTyConAppArgs tc tys
+        fam_app_size = sizeType (mkTyConApp tc tys)
         bad_tvs      = fvTypes tys \\ lhs_fvs
                        -- The (\\) is list difference; e.g.
                        --   [a,b,a,a] \\ [a,a] = [b,a]
@@ -2829,39 +2817,20 @@ fvTypes tys                = concat (map fvType tys)
 fvUserPred :: UserPred -> [TyVar]
 fvUserPred = fvType . userPredType
 
-sizeType :: Type -> Int
--- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
-sizeType (TyVarTy {})      = 1
-sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
-sizeType (LitTy {})        = 1
-sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
-sizeType (ForAllTy _ ty)   = sizeType ty
-sizeType (CastTy ty _)     = sizeType ty
-sizeType (CoercionTy _)    = 0
-
-sizeTypes :: [Type] -> Int
-sizeTypes = foldr ((+) . sizeType) 0
-
-sizeTyConAppArgs :: TyCon -> [Type] -> Int
-sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
-                           -- See Note [Invisible arguments and termination]
-
 -- Size of a predicate
 --
 -- We are considering whether class constraints terminate.
 -- Equality constraints and constraints for the implicit
 -- parameter class always terminate so it is safe to say "size 0".
 -- See #4200.
-sizeUserPred :: UserPred -> Int
-sizeUserPred = go
+sizeUserPred :: UserPred -> TypeSize
+sizeUserPred pred = go pred
   where
     go (ClassPred cls tys')
       | isTerminatingClass cls = 0
-      | otherwise = sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
-                    -- The filtering looks bogus
-                    -- See Note [Invisible arguments and termination]
+      | otherwise = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
+                    -- See Note [Invisible arguments and termination] in TcType
+                    -- The "1 +" accounts for the class tycon
     go (IrredPred ty)        = sizeType ty
     go (ForAllPred _ _ pred) = go pred
 

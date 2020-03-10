@@ -107,6 +107,7 @@ module BasicTypes(
         SourceText(..), pprWithSourceText,
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
+        subWithInf,
 
         SpliceExplicitFlag(..),
 
@@ -1689,6 +1690,11 @@ plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf
 plusWithInf Infinity _        = Infinity
 plusWithInf _        Infinity = Infinity
 plusWithInf (Int a)  (Int b)  = Int (a + b)
+
+-- | Subtract an 'Int' from an 'IntWithInf'
+subWithInf :: IntWithInf -> Int -> IntWithInf
+subWithInf Infinity _ = Infinity
+subWithInf (Int a)  b = Int (a - b)
 
 -- | Multiply two 'IntWithInf's
 mulWithInf :: IntWithInf -> IntWithInf -> IntWithInf

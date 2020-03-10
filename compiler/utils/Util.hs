@@ -37,7 +37,7 @@ module Util (
 
         foldl1', foldl2, count, countWhile, all2,
 
-        lengthExceeds, lengthIs, lengthIsNot,
+        lengthExceeds, genericLengthIs, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
         listLengthCmp, atLength,
         equalLength, compareLength, leLength, ltLength,
@@ -466,11 +466,12 @@ mapAccumL2 f s1 s2 xs = (s1', s2', ys)
 --   | length ls < n = atEndPred (n - length ls)
 --   | otherwise     = atLenPred (drop n ls)
 -- @
-atLength :: ([a] -> b)   -- Called when length ls >= n, passed (drop n ls)
+atLength :: (Ord num, Num num)
+         => ([a] -> b)   -- Called when length ls >= n, passed (drop n ls)
                          --    NB: arg passed to this function may be []
          -> b            -- Called when length ls <  n
          -> [a]
-         -> Int
+         -> num
          -> b
 atLength atLenPred atEnd ls0 n0
   | n0 < 0    = atLenPred ls0
@@ -480,6 +481,7 @@ atLength atLenPred atEnd ls0 n0
     go 0 ls     = atLenPred ls
     go _ []     = atEnd           -- n > 0 here
     go n (_:xs) = go (n-1) xs
+{-# SPECIALISE atLength :: ([a] -> b) -> b -> [a] -> Int -> b #-}
 
 -- Some special cases of atLength:
 
@@ -497,11 +499,16 @@ lengthAtLeast = atLength (const True) False
 
 -- | @(lengthIs xs n) = (length xs == n)@
 lengthIs :: [a] -> Int -> Bool
-lengthIs lst n
+lengthIs = genericLengthIs
+
+-- | @(genericLengthIs xs n) = (genericLength xs == n)@
+genericLengthIs :: (Ord num, Num num) => [a] -> num -> Bool
+genericLengthIs lst n
   | n < 0
   = False
   | otherwise
   = atLength null False lst n
+{-# SPECIALISE genericLengthIs :: [a] -> Int -> Bool #-}
 
 -- | @(lengthIsNot xs n) = (length xs /= n)@
 lengthIsNot :: [a] -> Int -> Bool

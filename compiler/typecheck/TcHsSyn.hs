@@ -868,18 +868,12 @@ zonkExpr env (HsCase x expr ms)
        new_ms <- zonkMatchGroup env zonkLExpr ms
        return (HsCase x new_expr new_ms)
 
-zonkExpr env (HsIf x Nothing e1 e2 e3)
-  = do new_e1 <- zonkLExpr env e1
-       new_e2 <- zonkLExpr env e2
-       new_e3 <- zonkLExpr env e3
-       return (HsIf x Nothing new_e1 new_e2 new_e3)
-
-zonkExpr env (HsIf x (Just fun) e1 e2 e3)
+zonkExpr env (HsIf x fun e1 e2 e3)
   = do (env1, new_fun) <- zonkSyntaxExpr env fun
        new_e1 <- zonkLExpr env1 e1
        new_e2 <- zonkLExpr env1 e2
        new_e3 <- zonkLExpr env1 e3
-       return (HsIf x (Just new_fun) new_e1 new_e2 new_e3)
+       return (HsIf x new_fun new_e1 new_e2 new_e3)
 
 zonkExpr env (HsMultiIf ty alts)
   = do { alts' <- mapM (wrapLocM zonk_alt) alts
@@ -1043,14 +1037,11 @@ zonkCmd env (HsCmdCase x expr ms)
        return (HsCmdCase x new_expr new_ms)
 
 zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
-  = do { (env1, new_eCond) <- zonkWit env eCond
+  = do { (env1, new_eCond) <- zonkSyntaxExpr env eCond
        ; new_ePred <- zonkLExpr env1 ePred
        ; new_cThen <- zonkLCmd env1 cThen
        ; new_cElse <- zonkLCmd env1 cElse
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
-  where
-    zonkWit env Nothing  = return (env, Nothing)
-    zonkWit env (Just w) = second Just <$> zonkSyntaxExpr env w
 
 zonkCmd env (HsCmdLet x (L l binds) cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds

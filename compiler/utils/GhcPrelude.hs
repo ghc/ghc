@@ -31,3 +31,18 @@ NoImplicitPrelude. There are two motivations for this:
     giving a smoother development experience when adding new
     extensions.
 -}
+{-
+Note [Depend on GhcPrelude]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As detailed in Note [Depend on GHC.Integer], Note [Depend on GHC.Tuple], and
+Note [Depend on GHC.Natural] (all in GHC.Base), we must be careful when
+compiling any module before GHC.Base. We thus require every module not the
+GHC.Base does not depend on to depend on GHC.Base. Normally, this dependency
+happens naturally, but very small files might not otherwise depend on
+GHC.Base. In particular, hs-boot files within GHC proper might have no
+dependencies.
+
+However, if we depend on GHC.Base directly, then we might try to build
+even before the `base` package has been installed. Easiest is just to
+depend here on GhcPrelude.
+-}
