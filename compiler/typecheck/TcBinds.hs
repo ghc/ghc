@@ -35,7 +35,7 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import FamInstEnv( normaliseType )
+import FamInstEnv( normaliseTypeIfPoss )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
@@ -893,15 +893,13 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
                    -- a duplicate ambiguity error.  There is a similar
                    -- checkNoErrs for complete type signatures too.
     do { fam_envs <- tcGetFamInstEnvs
-       ; let (_co, mono_ty') = normaliseType fam_envs Nominal mono_ty
+
                -- Unification may not have normalised the type,
                -- (see Note [Lazy flattening] in TcFlatten) so do it
                -- here to make it as uncomplicated as possible.
                -- Example: f :: [F Int] -> Bool
                -- should be rewritten to f :: [Char] -> Bool, if possible
-               --
-               -- We can discard the coercion _co, because we'll reconstruct
-               -- it in the call to tcSubType below
+       ; let mono_ty' = normaliseTypeIfPoss fam_envs mono_ty
 
        ; (binders, theta') <- chooseInferredQuantifiers inferred_theta
                                 (tyCoVarsOfType mono_ty') qtvs mb_sig_inst

@@ -33,7 +33,7 @@ module FamInstEnv (
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp, normaliseTcArgs,
-        reduceTyFamApp_maybe,
+        reduceTyFamApp_maybe, normaliseTypeIfPoss,
 
         -- Flattening
         flattenTys
@@ -1303,16 +1303,19 @@ topNormaliseType_maybe env ty
       -- to the normalised type's kind
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
-      = let (args_co, ntys, res_co) = normaliseTcArgs env Representational tc tys in
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co, MCo res_co)
-          _              -> NS_Done
+      = case normaliseTcArgs rec_nts env Representational tc tys of
+          Just (args_co, ntys, res_co) ->
+            case reduceTyFamApp_maybe env Representational tc ntys of
+              Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co, MCo res_co)
+              _              -> NS_Done
+          Nothing -> NS_Abort -- infinite recursion
 
 ---------------
-normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
+-- fails if we hit infinite recursion (#17306)
+normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
-  = initNormM env role (tyCoVarsOfTypes tys) $
+  = initNormM initRecTc env role (tyCoVarsOfTypes tys) $
     normalise_tc_app tc tys
 
 -- See Note [Normalising types] about the LiftingContext
@@ -1332,7 +1335,8 @@ normalise_tc_app tc tys
        ; (args_co, ntys, res_co) <- normalise_tc_args tc tys
        ; case reduceTyFamApp_maybe env role tc ntys of
            Just (first_co, ty')
-             -> do { (rest_co,nty) <- normalise_type ty'
+             -> checkRecursion tc $
+                do { (rest_co,nty) <- normalise_type ty'
                    ; return (assemble_result role nty
                                              (args_co `mkTransCo` first_co `mkTransCo` rest_co)
                                              res_co) }
@@ -1361,17 +1365,18 @@ normalise_tc_app tc tys
         final_co     = mkCoherenceRightCo r nty (mkSymCo kind_co) orig_to_nty
 
 ---------------
--- | Normalise arguments to a tycon
-normaliseTcArgs :: FamInstEnvs          -- ^ env't with family instances
+-- | Normalise arguments to a tycon; fails in the case of infinite recursion (#17306)
+normaliseTcArgs :: RecTcChecker         -- ^ keeps us from looping
+                -> FamInstEnvs          -- ^ env't with family instances
                 -> Role                 -- ^ desired role of output coercion
                 -> TyCon                -- ^ tc
                 -> [Type]               -- ^ tys
-                -> (Coercion, [Type], CoercionN)
+                -> Maybe (Coercion, [Type], CoercionN)
                                         -- ^ co :: tc tys ~ tc new_tys
                                         -- NB: co might not be homogeneous
                                         -- last coercion :: kind(tc tys) ~ kind(tc new_tys)
-normaliseTcArgs env role tc tys
-  = initNormM env role (tyCoVarsOfTypes tys) $
+normaliseTcArgs rec_nts env role tc tys
+  = initNormM rec_nts env role (tyCoVarsOfTypes tys) $
     normalise_tc_args tc tys
 
 normalise_tc_args :: TyCon -> [Type]             -- tc tys
@@ -1385,11 +1390,21 @@ normalise_tc_args tc tys
        ; return (mkTyConAppCo role tc args_cos, nargs, res_co) }
 
 ---------------
+-- like normaliseType (w.r.t. Nominal), but in the case of unbounded recursion, just returns
+-- the original type
+normaliseTypeIfPoss :: FamInstEnvs -> Type -> Type
+normaliseTypeIfPoss envs ty
+  | Just (_co, norm_ty) <- normaliseType envs Nominal ty
+  = norm_ty
+  | otherwise
+  = ty
+
+-- fails in the case of unbounded recursion (#17306)
 normaliseType :: FamInstEnvs
               -> Role  -- desired role of coercion
-              -> Type -> (Coercion, Type)
+              -> Type -> Maybe (Coercion, Type)
 normaliseType env role ty
-  = initNormM env role (tyCoVarsOfType ty) $ normalise_type ty
+  = initNormM initRecTc env role (tyCoVarsOfType ty) $ normalise_type ty
 
 normalise_type :: Type                     -- old type
                -> NormM (Coercion, Type)   -- (coercion, new type), where
@@ -1501,48 +1516,61 @@ normalise_tyvar tv
 normalise_var_bndr :: TyCoVar -> NormM (LiftingContext, TyCoVar, Coercion, Kind)
 normalise_var_bndr tcvar
   -- works for both tvar and covar
-  = do { lc1 <- getLC
-       ; env <- getEnv
-       ; let callback lc ki = runNormM (normalise_type ki) env lc Nominal
-       ; return $ liftCoSubstVarBndrUsing callback lc1 tcvar }
+  = do { (ki_co, norm_ki) <- normalise_type (varType tcvar)
+       ; lc1 <- getLC
+       ; let (lc, tcvar', co) = liftCoSubstVarBndrX lc1 tcvar ki_co
+       ; return (lc, tcvar', co, norm_ki) }
 
 -- | a monad for the normalisation functions, reading 'FamInstEnvs',
--- a 'LiftingContext', and a 'Role'.
-newtype NormM a = NormM { runNormM ::
-                            FamInstEnvs -> LiftingContext -> Role -> a }
+-- a 'LiftingContext', and a 'Role'. It is partial to account for the
+-- possibility of unbounded recursion, as detected by the RecTcChecker.
+newtype NormM a
+  = NormM { runNormM :: RecTcChecker
+                     -> FamInstEnvs
+                     -> LiftingContext
+                     -> Role
+                     -> Maybe a }
     deriving (Functor)
 
-initNormM :: FamInstEnvs -> Role
+initNormM :: RecTcChecker
+          -> FamInstEnvs -> Role
           -> TyCoVarSet   -- the in-scope variables
-          -> NormM a -> a
-initNormM env role vars (NormM thing_inside)
-  = thing_inside env lc role
+          -> NormM a -> Maybe a
+initNormM rec_nts env role vars (NormM thing_inside)
+  = thing_inside rec_nts env lc role
   where
     in_scope = mkInScopeSet vars
     lc       = emptyLiftingContext in_scope
 
 getRole :: NormM Role
-getRole = NormM (\ _ _ r -> r)
+getRole = NormM (\ _ _ _ r -> Just r)
 
 getLC :: NormM LiftingContext
-getLC = NormM (\ _ lc _ -> lc)
+getLC = NormM (\ _ _ lc _ -> Just lc)
 
 getEnv :: NormM FamInstEnvs
-getEnv = NormM (\ env _ _ -> env)
+getEnv = NormM (\ _ env _ _ -> Just env)
 
 withRole :: Role -> NormM a -> NormM a
-withRole r thing = NormM $ \ envs lc _old_r -> runNormM thing envs lc r
+withRole r thing = NormM $ \ rec_nts envs lc _old_r -> runNormM thing rec_nts envs lc r
 
 withLC :: LiftingContext -> NormM a -> NormM a
-withLC lc thing = NormM $ \ envs _old_lc r -> runNormM thing envs lc r
+withLC lc thing = NormM $ \ rec_nts envs _old_lc r -> runNormM thing rec_nts envs lc r
+
+checkRecursion :: TyCon -> NormM a -> NormM a
+checkRecursion tc thing_inside
+  = NormM $ \ rec_nts envs lc r -> case checkRecTc rec_nts tc of
+      Just new_rec_nts -> runNormM thing_inside new_rec_nts envs lc r
+      Nothing          -> Nothing
 
 instance Monad NormM where
-  ma >>= fmb = NormM $ \env lc r ->
-               let a = runNormM ma env lc r in
-               runNormM (fmb a) env lc r
+  ma >>= fmb = NormM $ \ rec_nts env lc r ->
+               case runNormM ma rec_nts env lc r of
+                 Just a  -> runNormM (fmb a) rec_nts env lc r
+                 Nothing -> Nothing
 
 instance Applicative NormM where
-  pure x = NormM $ \ _ _ _ -> x
+  pure x = NormM $ \ _ _ _ _ -> Just x
   (<*>)  = ap
 
 {-

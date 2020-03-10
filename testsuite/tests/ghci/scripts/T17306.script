@@ -1,0 +1,3 @@
+:set -XTypeFamilies -XUndecidableInstances
+type family F where F = [F]
+:kind! F

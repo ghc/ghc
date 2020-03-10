@@ -85,7 +85,7 @@ module Coercion (
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
-        liftCoSubstVarBndrUsing, isMappedByLC,
+        liftCoSubstVarBndrX, isMappedByLC,
 
         mkSubstLiftingContext, zapLiftingContext,
         substForAllCoBndrUsingLC, lcTCvSubst, lcInScopeSet,
@@ -1929,13 +1929,11 @@ liftCoSubstTyVar (LC subst env) r v
   = Just $ mkReflCo r (substTyVar subst v)
 
 {- Note [liftCoSubstVarBndr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-callback:
-  We want 'liftCoSubstVarBndrUsing' to be general enough to be reused in
-  FamInstEnv, therefore the input arg 'fun' returns a pair with polymorphic type
-  in snd.
-  However in 'liftCoSubstVarBndr', we don't need the snd, so we use unit and
-  ignore the fourth component of the return value.
+  We want liftCoSubstVarBndrX to be general enough to be reused in
+  FamInstEnv. Thus, we pass in the result of substing in the variable's
+  kind.
 
 liftCoSubstTyVarBndrUsing:
   Given
@@ -1969,32 +1967,26 @@ liftCoSubstCoVarBndrUsing:
 liftCoSubstVarBndr :: LiftingContext -> TyCoVar
                    -> (LiftingContext, TyCoVar, Coercion)
 liftCoSubstVarBndr lc tv
-  = let (lc', tv', h, _) = liftCoSubstVarBndrUsing callback lc tv in
-    (lc', tv', h)
-  where
-    callback lc' ty' = (ty_co_subst lc' Nominal ty', ())
+  = liftCoSubstVarBndrX lc tv (ty_co_subst lc Nominal (varType tv))
 
--- the callback must produce a nominal coercion
-liftCoSubstVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyCoVar
-                           -> (LiftingContext, TyCoVar, CoercionN, a)
-liftCoSubstVarBndrUsing fun lc old_var
+liftCoSubstVarBndrX :: LiftingContext -> TyCoVar
+                    -> CoercionN    -- result of substing the var's kind
+                    -> (LiftingContext, TyCoVar, Coercion)
+liftCoSubstVarBndrX lc old_var co
   | isTyVar old_var
-  = liftCoSubstTyVarBndrUsing fun lc old_var
+  = liftCoSubstTyVarBndr lc old_var co
   | otherwise
-  = liftCoSubstCoVarBndrUsing fun lc old_var
+  = liftCoSubstCoVarBndr lc old_var co
 
 -- Works for tyvar binder
-liftCoSubstTyVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyVar
-                           -> (LiftingContext, TyVar, CoercionN, a)
-liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
+liftCoSubstTyVarBndr :: LiftingContext -> TyVar
+                     -> CoercionN   -- result of substing the var's kind
+                     -> (LiftingContext, TyVar, CoercionN)
+liftCoSubstTyVarBndr (LC subst cenv) old_var eta
   = ASSERT( isTyVar old_var )
     ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, eta, stuff )
+    , new_var, eta )
   where
-    old_kind     = tyVarKind old_var
-    (eta, stuff) = fun lc old_kind
     k1           = coercionLKind eta
     new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
@@ -2003,16 +1995,14 @@ liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
     new_cenv = extendVarEnv cenv old_var lifted
 
 -- Works for covar binder
-liftCoSubstCoVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> CoVar
-                           -> (LiftingContext, CoVar, CoercionN, a)
-liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
+liftCoSubstCoVarBndr :: LiftingContext -> CoVar
+                     -> CoercionN   -- result of substing the var's kind
+                     -> (LiftingContext, CoVar, CoercionN)
+liftCoSubstCoVarBndr (LC subst cenv) old_var eta
   = ASSERT( isCoVar old_var )
     ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, kind_co, stuff )
+    , new_var, kind_co )
   where
-    old_kind     = coVarKind old_var
-    (eta, stuff) = fun lc old_kind
     k1           = coercionLKind eta
     new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 

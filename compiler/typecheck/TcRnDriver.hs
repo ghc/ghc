@@ -84,8 +84,7 @@ import GHC.Core.Ppr.TyThing ( pprTyThingInContext )
 import GHC.Core.FVs         ( orphNamesOfFamInst )
 import FamInst
 import InstEnv
-import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
-                 , famInstEnvElts, extendFamInstEnvList, normaliseType )
+import FamInstEnv
 import TcAnnotations
 import TcBinds
 import GHC.Iface.Utils  ( coAxiomToIfaceDecl )
@@ -2408,9 +2407,7 @@ tcRnExpr hsc_env mode rdr_expr
     -- same as of a bound expression (TcBinds.mkInferredPolyId). See Trac
     -- #10321 for further discussion.
     fam_envs <- tcGetFamInstEnvs ;
-    -- normaliseType returns a coercion which we discard, so the Role is
-    -- irrelevant
-    return (snd (normaliseType fam_envs Nominal ty))
+    return $ normaliseTypeIfPoss fam_envs ty
     }
   where
     -- See Note [TcRnExprMode]
@@ -2473,12 +2470,16 @@ tcRnType hsc_env flexi normalise rdr_type
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
-                        ; let (_, ty')
-                                = normaliseType fam_envs Nominal ty
-                        ; return ty' }
+                        ; case normaliseType fam_envs Nominal ty of
+                            Just (_co, ty') -> return ty'
+                            Nothing         -> failWithTc $
+                                               unbounded_recursion ty }
                 else return ty ;
 
        ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
+  where
+    unbounded_recursion ty = hang (text "Unbounded recursion detected while reducing")
+                                2 (quotes (ppr ty))
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~
