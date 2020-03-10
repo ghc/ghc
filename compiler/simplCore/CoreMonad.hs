@@ -351,7 +351,7 @@ refrain from bumping the overall tick-count for such innocuous
 transformations, and perhaps terminate the simplifier one pass
 earlier.
 
-BUt alas I found that virtually nothing was innocuous!  This Note
+But alas I found that virtually nothing was innocuous!  This Note
 just records what I learned, in case anyone wants to try again.
 
 These transformations are not innocuous:
