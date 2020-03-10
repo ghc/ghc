@@ -840,7 +840,7 @@ lintVarOcc var nargs
                  (text "Non term variable" <+> ppr var)
                  -- See GHC.Core Note [Variable occurrences in Core]
 
-        -- Cneck that the type of the occurrence is the same
+        -- Check that the type of the occurrence is the same
         -- as the type of the binding site
         ; ty   <- applySubstTy (idType var)
         ; var' <- lookupIdInScope var
@@ -1509,7 +1509,7 @@ lintArrow :: SDoc -> LintedKind -> LintedKind -> LintM LintedKind
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintArrow what k1 k2   -- Eg lintArrow "type or kind `blah'" k1 k2
-                       -- or lintarrow "coercion `blah'" k1 k2
+                       -- or lintArrow "coercion `blah'" k1 k2
   = do { unless (classifiesTypeWithValues k1) (addErrL (msg (text "argument") k1))
        ; unless (classifiesTypeWithValues k2) (addErrL (msg (text "result")   k2))
        ; return liftedTypeKind }

@@ -200,7 +200,7 @@ type CmdSyntaxTable p = [(Name, HsExpr p)]
 -- See Note [CmdSyntaxTable]
 
 {-
-Note [CmdSyntaxtable]
+Note [CmdSyntaxTable]
 ~~~~~~~~~~~~~~~~~~~~~
 Used only for arrow-syntax stuff (HsCmdTop), the CmdSyntaxTable keeps
 track of the methods needed for a Cmd.

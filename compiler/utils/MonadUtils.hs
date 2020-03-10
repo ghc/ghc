@@ -88,7 +88,7 @@ zipWith4M f xs ys ws zs = sequenceA (zipWith4 f xs ys ws zs)
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
 {-# INLINABLE zipWithAndUnzipM #-}
--- See Note [flatten_many performance] in TcFlatten for why this
+-- See Note [flatten_args performance] in TcFlatten for why this
 -- pragma is essential.
 zipWithAndUnzipM f (x:xs) (y:ys)
   = do { (c, d) <- f x y

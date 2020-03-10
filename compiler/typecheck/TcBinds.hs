@@ -679,7 +679,7 @@ tcPolyCheck :: TcPragEnv
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTcId, [TcId])
 -- There is just one binding,
---   it is a Funbind
+--   it is a FunBind
 --   it has a complete type signature,
 tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id

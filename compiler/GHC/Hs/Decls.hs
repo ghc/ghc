@@ -898,9 +898,9 @@ NOTE THAT
 
   * The CUSK completely fixes the kind of the type constructor, forever.
 
-  * The precise rules, for each declaration form, for whethher a declaration
+  * The precise rules, for each declaration form, for whether a declaration
     has a CUSK are given in the user manual section "Complete user-supplied
-    kind signatures and polymorphic recursion".  BUt they simply implement
+    kind signatures and polymorphic recursion".  But they simply implement
     PRINCIPLE above.
 
   * Open type families are interesting:

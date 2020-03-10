@@ -2322,7 +2322,7 @@ There are some particularly delicate points here:
   says f=bottom, and replaces the (f `seq` True) with just
   (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
   *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands
-  the definition again, so that it does not termninate after all.
+  the definition again, so that it does not terminate after all.
   Result: seg-fault because the boolean case actually gets a function value.
   See #1947.
 

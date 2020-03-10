@@ -280,7 +280,7 @@ less to gain by trying to CSE them. (#13219)
 
 Note [Look inside join-point binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Another way how CSE for joint points is tricky is
+Another way how CSE for join points is tricky is
 
   let join foo x = (x, 42)
       join bar x = (x, 42)

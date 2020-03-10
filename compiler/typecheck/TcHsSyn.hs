@@ -273,7 +273,7 @@ There are three possibilities:
   See Note [Zonking the LHS of a RULE]
 
 * RuntimeUnkFlexi: is a special case for the GHCi debugger.
-  It's a way to have a variable that is not a mutuable
+  It's a way to have a variable that is not a mutable
   unification variable, but doesn't have a binding site
   either.
 -}
