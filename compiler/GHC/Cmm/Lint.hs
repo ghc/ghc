@@ -88,7 +88,7 @@ lintCmmExpr (CmmLoad expr rep) = do
   _ <- lintCmmExpr expr
   -- Disabled, if we have the inlining phase before the lint phase,
   -- we can have funny offsets due to pointer tagging. -- EZY
-  -- when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
+  -- when (widthInBytes (typeWidth rep) >= platformWordSizeInBytes platform) $
   --   cmmCheckWordAddress expr
   return rep
 lintCmmExpr expr@(CmmMachOp op args) = do
@@ -124,10 +124,10 @@ isOffsetOp _ = False
 -- check for funny-looking sub-word offsets.
 _cmmCheckWordAddress :: CmmExpr -> CmmLint ()
 _cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (platformWordSizeInBytes platform) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (platformWordSizeInBytes platform) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress _
   = return ()

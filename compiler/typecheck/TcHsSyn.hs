@@ -74,8 +74,7 @@ import Name
 import NameEnv
 import Var
 import VarEnv
-import GHC.Driver.Session
-import Literal
+import GHC.Platform
 import BasicTypes
 import Maybes
 import SrcLoc
@@ -146,12 +145,12 @@ hsLitType (XLit nec)         = noExtCon nec
 
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
-shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
-shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit noExtField (HsInt noExtField int))
-  | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim src i))
+shortCutLit :: Platform -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
+shortCutLit platform (HsIntegral int@(IL src neg i)) ty
+  | isIntTy ty  && platformInIntRange  platform i = Just (HsLit noExtField (HsInt noExtField int))
+  | isWordTy ty && platformInWordRange platform i = Just (mkLit wordDataCon (HsWordPrim src i))
   | isIntegerTy ty = Just (HsLit noExtField (HsInteger src i ty))
-  | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit neg i)) ty
+  | otherwise = shortCutLit platform (HsFractional (integralFractionalLit neg i)) ty
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
         -- so we'll call shortCutIntLit, but of course it's a float

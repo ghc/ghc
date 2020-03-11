@@ -296,11 +296,11 @@ mkProtoBCO dflags nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
         peep []
            = []
 
-argBits :: DynFlags -> [ArgRep] -> [Bool]
-argBits _      [] = []
-argBits dflags (rep : args)
-  | isFollowableArg rep  = False : argBits dflags args
-  | otherwise = take (argRepSizeW dflags rep) (repeat True) ++ argBits dflags args
+argBits :: Platform -> [ArgRep] -> [Bool]
+argBits _        [] = []
+argBits platform (rep : args)
+  | isFollowableArg rep  = False : argBits platform args
+  | otherwise = take (argRepSizeW platform rep) (repeat True) ++ argBits platform args
 
 -- -----------------------------------------------------------------------------
 -- schemeTopBind
@@ -390,12 +390,12 @@ schemeR_wrk fvs nm original_body (args, body)
 
          -- Stack arguments always take a whole number of words, we never pack
          -- them unlike constructor fields.
-         szsb_args = map (wordsToBytes platform . idSizeW dflags) all_args
+         szsb_args = map (wordsToBytes platform . idSizeW platform) all_args
          sum_szsb_args  = sum szsb_args
          p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
-         bits = argBits dflags (reverse (map bcIdArgRep all_args))
+         bits = argBits platform (reverse (map bcIdArgRep all_args))
          bitmap_size = genericLength bits
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
@@ -518,8 +518,7 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
         -- saturated constructor application.
         -- Just allocate the constructor and carry on
         alloc_code <- mkConAppCode d s p data_con args_r_to_l
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- targetPlatform <$> getDynFlags
         let !d2 = d + wordSize platform
         body_code <- schemeE d2 s (Map.insert x d2 p) body
         return (alloc_code `appOL` body_code)
@@ -527,10 +526,9 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
 -- General case for let.  Generates correct, if inefficient, code in
 -- all situations.
 schemeE d s p (AnnLet binds (_,body)) = do
-     dflags <- getDynFlags
+     platform <- targetPlatform <$> getDynFlags
      let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
-         platform = targetPlatform dflags
          n_binds = genericLength xs
 
          fvss  = map (fvsToEnv p' . fst) rhss
@@ -539,7 +537,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
          (xs',rhss') = zipWithAndUnzip protectNNLJoinPointBind xs rhss
 
          -- Sizes of free vars
-         size_w = trunc16W . idSizeW dflags
+         size_w = trunc16W . idSizeW platform
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
@@ -1029,7 +1027,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
         -- depth of stack after the return value has been pushed
         d_bndr =
-            d + ret_frame_size_b + wordsToBytes platform (idSizeW dflags bndr)
+            d + ret_frame_size_b + wordsToBytes platform (idSizeW platform bndr)
 
         -- depth of stack after the extra info table for an unboxed return
         -- has been pushed, if any.  This is the stack depth at the
@@ -1236,7 +1234,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
      code_n_reps <- pargs d0 args_r_to_l
      let
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
-         a_reps_sizeW = sum (map (repSizeWords dflags) a_reps_pushed_r_to_l)
+         a_reps_sizeW = sum (map (repSizeWords platform) a_reps_pushed_r_to_l)
 
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes platform a_reps_sizeW
@@ -1326,12 +1324,12 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a V (tag).
-         r_sizeW   = repSizeWords dflags r_rep
+         r_sizeW   = repSizeWords platform r_rep
          d_after_r = d_after_Addr + wordsToBytes platform r_sizeW
          push_r =
              if returns_void
                 then nilOL
-                else unitOL (PUSH_UBX (mkDummyLiteral dflags r_rep) (trunc16W r_sizeW))
+                else unitOL (PUSH_UBX (mkDummyLiteral platform r_rep) (trunc16W r_sizeW))
 
          -- generate the marshalling code we're going to call
 
@@ -1394,11 +1392,11 @@ primRepToFFIType platform r
 
 -- Make a dummy literal, to be used as a placeholder for FFI return
 -- values on the stack.
-mkDummyLiteral :: DynFlags -> PrimRep -> Literal
-mkDummyLiteral dflags pr
+mkDummyLiteral :: Platform -> PrimRep -> Literal
+mkDummyLiteral platform pr
    = case pr of
-        IntRep    -> mkLitInt dflags 0
-        WordRep   -> mkLitWord dflags 0
+        IntRep    -> mkLitInt  platform 0
+        WordRep   -> mkLitWord platform 0
         Int64Rep  -> mkLitInt64 0
         Word64Rep -> mkLitWord64 0
         AddrRep   -> LitNullAddr
@@ -1575,15 +1573,13 @@ pushAtom d p (AnnVar var)
 
    | Just primop <- isPrimOpId_maybe var
    = do
-       dflags <- getDynFlags
-       let platform = targetPlatform dflags
+       platform <- targetPlatform <$> getDynFlags
        return (unitOL (PUSH_PRIMOP primop), wordSize platform)
 
    | Just d_v <- lookupBCEnv_maybe var p  -- var is a local variable
-   = do dflags <- getDynFlags
-        let platform = targetPlatform dflags
+   = do platform <- targetPlatform <$> getDynFlags
 
-        let !szb = idSizeCon dflags var
+        let !szb = idSizeCon platform var
             with_instr instr = do
                 let !off_b = trunc16B $ d - d_v
                 return (unitOL (instr off_b), wordSize platform)
@@ -1605,22 +1601,20 @@ pushAtom d p (AnnVar var)
 
    | otherwise  -- var must be a global variable
    = do topStrings <- getTopStrings
-        dflags <- getDynFlags
+        platform <- targetPlatform <$> getDynFlags
         case lookupVarEnv topStrings var of
-            Just ptr -> pushAtom d p $ AnnLit $ mkLitWord dflags $
+            Just ptr -> pushAtom d p $ AnnLit $ mkLitWord platform $
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
-                let sz = idSizeCon dflags var
-                let platform = targetPlatform dflags
+                let sz = idSizeCon platform var
                 MASSERT( sz == wordSize platform )
                 return (unitOL (PUSH_G (getName var)), sz)
 
 
 pushAtom _ _ (AnnLit lit) = do
-     dflags <- getDynFlags
-     let platform = targetPlatform dflags
+     platform <- targetPlatform <$> getDynFlags
      let code rep
-             = let size_words = WordOff (argRepSizeW dflags rep)
+             = let size_words = WordOff (argRepSizeW platform rep)
                in  return (unitOL (PUSH_UBX lit (trunc16W size_words)),
                            wordsToBytes platform size_words)
 
@@ -1659,8 +1653,8 @@ pushConstrAtom _ _ (AnnLit lit@(LitFloat _)) =
 
 pushConstrAtom d p (AnnVar v)
     | Just d_v <- lookupBCEnv_maybe v p = do  -- v is a local variable
-        dflags <- getDynFlags
-        let !szb = idSizeCon dflags v
+        platform <- targetPlatform <$> getDynFlags
+        let !szb = idSizeCon platform v
             done instr = do
                 let !off = trunc16B $ d - d_v
                 return (unitOL (instr off), szb)
@@ -1824,11 +1818,11 @@ instance Outputable Discr where
 lookupBCEnv_maybe :: Id -> BCEnv -> Maybe ByteOff
 lookupBCEnv_maybe = Map.lookup
 
-idSizeW :: DynFlags -> Id -> WordOff
-idSizeW dflags = WordOff . argRepSizeW dflags . bcIdArgRep
+idSizeW :: Platform -> Id -> WordOff
+idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep
 
-idSizeCon :: DynFlags -> Id -> ByteOff
-idSizeCon dflags = ByteOff . primRepSizeB dflags . bcIdPrimRep
+idSizeCon :: Platform -> Id -> ByteOff
+idSizeCon platform = ByteOff . primRepSizeB platform . bcIdPrimRep
 
 bcIdArgRep :: Id -> ArgRep
 bcIdArgRep = toArgRep . bcIdPrimRep
@@ -1840,8 +1834,8 @@ bcIdPrimRep id
   | otherwise
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
 
-repSizeWords :: DynFlags -> PrimRep -> WordOff
-repSizeWords dflags rep = WordOff $ argRepSizeW dflags (toArgRep rep)
+repSizeWords :: Platform -> PrimRep -> WordOff
+repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep rep)
 
 isFollowableArg :: ArgRep -> Bool
 isFollowableArg P = True
