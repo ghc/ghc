@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE LambdaCase #-}
+
 module GHC.StgToCmm.ArgRep (
         ArgRep(..), toArgRep, argRepSizeW,
 
@@ -16,6 +18,7 @@ module GHC.StgToCmm.ArgRep (
         ) where
 
 import GhcPrelude
+import GHC.Platform
 
 import GHC.StgToCmm.Closure ( idPrimRep )
 
@@ -23,8 +26,7 @@ import GHC.Runtime.Heap.Layout ( WordOff )
 import Id               ( Id )
 import GHC.Core.TyCon   ( PrimRep(..), primElemRepSizeB )
 import BasicTypes       ( RepArity )
-import Constants        ( wORD64_SIZE )
-import GHC.Driver.Session
+import Constants        ( wORD64_SIZE, dOUBLE_SIZE )
 
 import Outputable
 import FastString
@@ -91,16 +93,19 @@ isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
 
-argRepSizeW :: DynFlags -> ArgRep -> WordOff                -- Size in words
-argRepSizeW _      N   = 1
-argRepSizeW _      P   = 1
-argRepSizeW _      F   = 1
-argRepSizeW dflags L   = wORD64_SIZE        `quot` wORD_SIZE dflags
-argRepSizeW dflags D   = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-argRepSizeW _      V   = 0
-argRepSizeW dflags V16 = 16                 `quot` wORD_SIZE dflags
-argRepSizeW dflags V32 = 32                 `quot` wORD_SIZE dflags
-argRepSizeW dflags V64 = 64                 `quot` wORD_SIZE dflags
+argRepSizeW :: Platform -> ArgRep -> WordOff -- Size in words
+argRepSizeW platform = \case
+   N   -> 1
+   P   -> 1
+   F   -> 1
+   L   -> wORD64_SIZE `quot` ws
+   D   -> dOUBLE_SIZE `quot` ws
+   V   -> 0
+   V16 -> 16          `quot` ws
+   V32 -> 32          `quot` ws
+   V64 -> 64          `quot` ws
+  where
+   ws       = platformWordSizeInBytes platform
 
 idArgRep :: Id -> ArgRep
 idArgRep = toArgRep . idPrimRep

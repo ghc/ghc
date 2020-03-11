@@ -514,10 +514,11 @@ translatePat fam_insts x pat = case pat of
     -- type of the scrutinee, so info on both pattern and scrutinee (for which
     -- short cutting in dsOverLit works properly) is overloaded iff either is.
     dflags <- getDynFlags
+    let platform = targetPlatform dflags
     core_expr <- case olit of
       OverLit{ ol_val = val, ol_ext = OverLitTc rebindable _ }
         | not rebindable
-        , Just expr <- shortCutLit dflags val ty
+        , Just expr <- shortCutLit platform val ty
         -> dsExpr expr
       _ -> dsOverLit olit
     let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
