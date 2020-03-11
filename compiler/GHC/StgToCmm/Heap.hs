@@ -144,7 +144,8 @@ allocHeapClosure rep info_ptr use_cc payload = do
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs
   = do dflags <- getDynFlags
-       hpStore base (zip (header dflags) [0, wORD_SIZE dflags ..])
+       let platform = targetPlatform dflags
+       hpStore base (zip (header dflags) [0, platformWordSizeInBytes platform ..])
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs

@@ -2,6 +2,7 @@
 module GHC.CmmToAsm.Config
    ( NCGConfig(..)
    , ncgWordWidth
+   , platformWordWidth
    )
 where
 
@@ -27,6 +28,10 @@ data NCGConfig = NCGConfig
 
 -- | Return Word size
 ncgWordWidth :: NCGConfig -> Width
-ncgWordWidth config = case platformWordSize (ncgPlatform config) of
+ncgWordWidth config = platformWordWidth (ncgPlatform config)
+
+-- | Return Word size
+platformWordWidth :: Platform -> Width
+platformWordWidth platform = case platformWordSize platform of
    PW4 -> W32
    PW8 -> W64

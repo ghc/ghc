@@ -365,9 +365,8 @@ assignment.
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   = -- assignment suffices for unlifted types
-    do { dflags <- getDynFlags
-       ; platform <- getPlatform
-       ; unless (reps_compatible dflags) $
+    do { platform <- getPlatform
+       ; unless (reps_compatible platform) $
            pprPanic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
                     (pp_bndr v $$ pp_bndr bndr)
        ; v_info <- getCgIdInfo v
@@ -377,7 +376,7 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
-    reps_compatible dflags = primRepCompatible dflags (idPrimRep v) (idPrimRep bndr)
+    reps_compatible platform = primRepCompatible platform (idPrimRep v) (idPrimRep bndr)
 
     pp_bndr id = ppr id <+> dcolon <+> ppr (idType id) <+> parens (ppr (idPrimRep id))
 
