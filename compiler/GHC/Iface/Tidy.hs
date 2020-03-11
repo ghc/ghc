@@ -317,6 +317,28 @@ binder
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
+
+Note [Always expose compulsory unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must make absolutely sure that unsafeCoerce# is inlined. You might
+think that giving it a compulsory unfolding is enough. However,
+unsafeCoerce# is put in an interface file just like any other definition.
+So, unless we take special precuations
+- If we compiled Unsafe.Coerce with -O0, we might not put the unfolding
+  into the interface file.
+- If we compile a module M, that imports Unsafe.Coerce, with -O0 we might
+  not read the unfolding out of the interface file.
+
+So we need to take care, to ensure that Compulsory unfoldings are written
+and read.  That makes sense: they are compulsory, after all. There are
+three places this is actioned:
+
+* GHC.Iface.Tidy.addExternal.  Export end: expose compulsory
+  unfoldings, even with -O0.
+
+* GHC.IfaceToCore.tcIdInfo.  Import end: when reading in from
+  interface file, even with -O0 (fignore-interface-pragmas.)  we must
+  load a compulsory unfolding
 -}
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
@@ -379,7 +401,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               -- exported Ids and things needed from them, which saves space
               --
               -- See Note [Don't attempt to trim data types]
-              ; final_ids  = [ if omit_prags then trimId id else id
+              ; final_ids  = [ trimId omit_prags id
                              | id <- bindersOfBinds tidy_binds
                              , isExternalName (idName id)
                              , not (isWiredIn id)
@@ -450,19 +472,21 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
     dflags = hsc_dflags hsc_env
 
 --------------------------
-trimId :: Id -> Id
-trimId id
-  | not (isImplicitId id)
-  = id `setIdInfo` vanillaIdInfo
-       `setIdUnfolding` unfolding
-  | otherwise
+trimId :: Bool -> Id -> Id
+-- With -O0 we now trim off the arity, one-shot-ness, strictness
+-- etc which tidyTopIdInfo retains for the benefit of the code generator
+-- but which we don't want in the interface file or ModIface for
+-- downstream compilations
+trimId omit_prags id
+  | omit_prags, not (isImplicitId id)
+  = id `setIdInfo`      vanillaIdInfo
+       `setIdUnfolding` idUnfolding id
+       -- We respect the final unfolding chosen by tidyTopIdInfo.
+       -- We have already trimmed it if we don't want it for -O0;
+       -- see also Note [Always expose compulsory unfoldings]
+
+  | otherwise   -- No trimming
   = id
-  where
-    unfolding
-      | isCompulsoryUnfolding (idUnfolding id)
-      = idUnfolding id
-      | otherwise
-      = noUnfolding
 
 {- Note [Drop wired-in things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -663,9 +687,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
     | otherwise = do
       (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
       let
-          (new_ids, show_unfold)
-                | omit_prags = ([], False)
-                | otherwise  = addExternal expose_all refined_id
+          (new_ids, show_unfold) = addExternal omit_prags expose_all refined_id
 
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
@@ -687,12 +709,21 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: Bool -> Id -> ([Id], Bool)
-addExternal expose_all id = (new_needed_ids, show_unfold)
+addExternal :: Bool -> Bool -> Id -> ([Id], Bool)
+addExternal omit_prags expose_all id
+  | omit_prags
+  , not (isCompulsoryUnfolding unfolding)
+  = ([], False)  -- See Note [Always expose compulsory unfoldings]
+                 -- in GHC.HsToCore
+
+  | otherwise
+  = (new_needed_ids, show_unfold)
+
   where
     new_needed_ids = bndrFvsInOrder show_unfold id
     idinfo         = idInfo id
-    show_unfold    = show_unfolding (unfoldingInfo idinfo)
+    unfolding      = unfoldingInfo idinfo
+    show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
