@@ -608,11 +608,11 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
 
-    dflags <- getDynFlags
+    platform <- targetPlatform <$> getDynFlags
     let
         arg_rep = typePrimRep (exprType arg)
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
-        bad_args = not (primRepsCompatible dflags arg_rep stg_arg_rep)
+        bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, ticks ++ aticks)

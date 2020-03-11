@@ -21,6 +21,11 @@ module GHC.Platform (
         platformUsesFrameworks,
         platformWordSizeInBytes,
         platformWordSizeInBits,
+        platformMinInt,
+        platformMaxInt,
+        platformMaxWord,
+        platformInIntRange,
+        platformInWordRange,
 
         PlatformMisc(..),
         IntegerLibrary(..),
@@ -33,6 +38,8 @@ where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 import GHC.Read
+import Data.Word
+import Data.Int
 
 -- | Contains the bare-bones arch and os information. This isn't enough for
 -- code gen, but useful for tasks where we can fall back upon the host
@@ -305,3 +312,29 @@ data IntegerLibrary
     = IntegerGMP
     | IntegerSimple
     deriving (Read, Show, Eq)
+
+-- | Minimum representable Int value for the given platform
+platformMinInt :: Platform -> Integer
+platformMinInt p = case platformWordSize p of
+   PW4 -> toInteger (minBound :: Int32)
+   PW8 -> toInteger (minBound :: Int64)
+
+-- | Maximum representable Int value for the given platform
+platformMaxInt :: Platform -> Integer
+platformMaxInt p = case platformWordSize p of
+   PW4 -> toInteger (maxBound :: Int32)
+   PW8 -> toInteger (maxBound :: Int64)
+
+-- | Maximum representable Word value for the given platform
+platformMaxWord :: Platform -> Integer
+platformMaxWord p = case platformWordSize p of
+   PW4 -> toInteger (maxBound :: Word32)
+   PW8 -> toInteger (maxBound :: Word64)
+
+-- | Test if the given Integer is representable with a platform Int
+platformInIntRange :: Platform -> Integer -> Bool
+platformInIntRange platform x = x >= platformMinInt platform && x <= platformMaxInt platform
+
+-- | Test if the given Integer is representable with a platform Word
+platformInWordRange :: Platform -> Integer -> Bool
+platformInWordRange platform x = x >= 0 && x <= platformMaxWord platform
