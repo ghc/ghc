@@ -282,7 +282,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                                         , sig_loc   = getLoc (hsSigType hs_ty) }
 
        ; (ev_binds, (tc_bind, _))
-               <- checkConstraints (TyConSkol ClassFlavour (getName clas)) tyvars [this_dict] $
+               <- checkConstraints skol_info tyvars [this_dict] $
                   tcPolyCheck no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
@@ -303,6 +303,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
+    skol_info = TyConSkol ClassFlavour (getName clas)
     sel_name = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
