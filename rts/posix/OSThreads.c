@@ -398,6 +398,14 @@ interruptOSThread (OSThreadId id)
     pthread_kill(id, SIGPIPE);
 }
 
+void
+joinOSThread (OSThreadId id)
+{
+    if (pthread_join(id, NULL) != 0) {
+        sysErrorBelch("joinOSThread: error %d", errno);
+    }
+}
+
 KernelThreadId kernelThreadId (void)
 {
 #if defined(linux_HOST_OS)
