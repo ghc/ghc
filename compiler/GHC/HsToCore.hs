@@ -639,18 +639,7 @@ The solution is documented in Note [Patching magic definitions]. We now
 simply look up the UnsafeEquality GADT in the environment, leaving us
 only to wire in unsafeCoerce# directly.
 
-Wrinkle:
---------
-We must make absolutely sure that unsafeCoerce# is inlined. You might
-think that giving it a compulsory unfolding is enough. However,
-unsafeCoerce# is put in an interface file like any other definition.
-At optimization level 0, we enable -fignore-interface-pragmas, which
-ignores pragmas in interface files. We thus must check to see whether
-there is a compulsory unfolding, even with -fignore-interface-pragmas.
-This is done in TcIface.tcIdInfo.
-
-Test case: ghci/linker/dyn/T3372
-
+Wrinkle: see Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
 -}
 
 

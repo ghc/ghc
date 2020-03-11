@@ -1474,8 +1474,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
       | otherwise        = filter need_prag items
 
     need_prag :: IfaceInfoItem -> Bool
-      -- compulsory unfoldings are really compulsory.
-      -- See wrinkle in Note [Wiring in unsafeCoerce#] in Desugar
+      -- Always read in compulsory unfoldings
+      -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCompulsory {})) = True
     need_prag _                              = False
 
