@@ -14,6 +14,7 @@ ToDo:
 
 {-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards,
     DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
 
 module GHC.Core.Op.ConstantFold
@@ -53,7 +54,6 @@ import Name        ( Name, nameOccName )
 import Outputable
 import FastString
 import BasicTypes
-import GHC.Driver.Session
 import GHC.Platform
 import Util
 import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
@@ -85,229 +85,228 @@ where the (+#) on the rhs is done at compile time
 That is why these rules are built in here.
 -}
 
-primOpRules :: Name -> PrimOp -> Maybe CoreRule
-    -- ToDo: something for integer-shift ops?
-    --       NotOp
-primOpRules nm TagToEnumOp = mkPrimOpRule nm 2 [ tagToEnumRule ]
-primOpRules nm DataToTagOp = mkPrimOpRule nm 2 [ dataToTagRule ]
+primOpRules ::  Name -> PrimOp -> Maybe CoreRule
+primOpRules nm = \case
+   TagToEnumOp -> mkPrimOpRule nm 2 [ tagToEnumRule ]
+   DataToTagOp -> mkPrimOpRule nm 2 [ dataToTagRule ]
 
--- Int operations
-primOpRules nm IntAddOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
-                                               , identityDynFlags zeroi
-                                               , numFoldingRules IntAddOp intPrimOps
-                                               ]
-primOpRules nm IntSubOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
-                                               , rightIdentityDynFlags zeroi
-                                               , equalArgs >> retLit zeroi
-                                               , numFoldingRules IntSubOp intPrimOps
-                                               ]
-primOpRules nm IntAddCOp   = mkPrimOpRule nm 2 [ binaryLit (intOpC2 (+))
-                                               , identityCDynFlags zeroi ]
-primOpRules nm IntSubCOp   = mkPrimOpRule nm 2 [ binaryLit (intOpC2 (-))
-                                               , rightIdentityCDynFlags zeroi
-                                               , equalArgs >> retLitNoC zeroi ]
-primOpRules nm IntMulOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
-                                               , zeroElem zeroi
-                                               , identityDynFlags onei
-                                               , numFoldingRules IntMulOp intPrimOps
-                                               ]
-primOpRules nm IntQuotOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
-                                               , leftZero zeroi
-                                               , rightIdentityDynFlags onei
-                                               , equalArgs >> retLit onei ]
-primOpRules nm IntRemOp    = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 rem)
-                                               , leftZero zeroi
-                                               , do l <- getLiteral 1
-                                                    dflags <- getDynFlags
-                                                    guard (l == onei dflags)
-                                                    retLit zeroi
-                                               , equalArgs >> retLit zeroi
-                                               , equalArgs >> retLit zeroi ]
-primOpRules nm AndIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
-                                               , idempotent
-                                               , zeroElem zeroi ]
-primOpRules nm OrIOp       = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
-                                               , idempotent
-                                               , identityDynFlags zeroi ]
-primOpRules nm XorIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
-                                               , identityDynFlags zeroi
-                                               , equalArgs >> retLit zeroi ]
-primOpRules nm NotIOp      = mkPrimOpRule nm 1 [ unaryLit complementOp
-                                               , inversePrimOp NotIOp ]
-primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
-                                               , inversePrimOp IntNegOp ]
-primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
-                                               , rightIdentityDynFlags zeroi ]
-primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
-                                               , rightIdentityDynFlags zeroi ]
-primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
-                                               , rightIdentityDynFlags zeroi ]
+   -- Int operations
+   IntAddOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
+                                    , identityPlatform zeroi
+                                    , numFoldingRules IntAddOp intPrimOps
+                                    ]
+   IntSubOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
+                                    , rightIdentityPlatform zeroi
+                                    , equalArgs >> retLit zeroi
+                                    , numFoldingRules IntSubOp intPrimOps
+                                    ]
+   IntAddCOp   -> mkPrimOpRule nm 2 [ binaryLit (intOpC2 (+))
+                                    , identityCPlatform zeroi ]
+   IntSubCOp   -> mkPrimOpRule nm 2 [ binaryLit (intOpC2 (-))
+                                    , rightIdentityCPlatform zeroi
+                                    , equalArgs >> retLitNoC zeroi ]
+   IntMulOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
+                                    , zeroElem zeroi
+                                    , identityPlatform onei
+                                    , numFoldingRules IntMulOp intPrimOps
+                                    ]
+   IntQuotOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
+                                    , leftZero zeroi
+                                    , rightIdentityPlatform onei
+                                    , equalArgs >> retLit onei ]
+   IntRemOp    -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 rem)
+                                    , leftZero zeroi
+                                    , do l <- getLiteral 1
+                                         platform <- getPlatform
+                                         guard (l == onei platform)
+                                         retLit zeroi
+                                    , equalArgs >> retLit zeroi
+                                    , equalArgs >> retLit zeroi ]
+   AndIOp      -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
+                                    , idempotent
+                                    , zeroElem zeroi ]
+   OrIOp       -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
+                                    , idempotent
+                                    , identityPlatform zeroi ]
+   XorIOp      -> mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
+                                    , identityPlatform zeroi
+                                    , equalArgs >> retLit zeroi ]
+   NotIOp      -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , inversePrimOp NotIOp ]
+   IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                    , inversePrimOp IntNegOp ]
+   ISllOp      -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
+                                    , rightIdentityPlatform zeroi ]
+   ISraOp      -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
+                                    , rightIdentityPlatform zeroi ]
+   ISrlOp      -> mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
+                                    , rightIdentityPlatform zeroi ]
 
--- Word operations
-primOpRules nm WordAddOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
-                                               , identityDynFlags zerow
-                                               , numFoldingRules WordAddOp wordPrimOps
-                                               ]
-primOpRules nm WordSubOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
-                                               , rightIdentityDynFlags zerow
-                                               , equalArgs >> retLit zerow
-                                               , numFoldingRules WordSubOp wordPrimOps
-                                               ]
-primOpRules nm WordAddCOp  = mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (+))
-                                               , identityCDynFlags zerow ]
-primOpRules nm WordSubCOp  = mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (-))
-                                               , rightIdentityCDynFlags zerow
-                                               , equalArgs >> retLitNoC zerow ]
-primOpRules nm WordMulOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
-                                               , identityDynFlags onew
-                                               , numFoldingRules WordMulOp wordPrimOps
-                                               ]
-primOpRules nm WordQuotOp  = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
-                                               , rightIdentityDynFlags onew ]
-primOpRules nm WordRemOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
-                                               , leftZero zerow
-                                               , do l <- getLiteral 1
-                                                    dflags <- getDynFlags
-                                                    guard (l == onew dflags)
-                                                    retLit zerow
-                                               , equalArgs >> retLit zerow ]
-primOpRules nm AndOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
-                                               , idempotent
-                                               , zeroElem zerow ]
-primOpRules nm OrOp        = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
-                                               , idempotent
-                                               , identityDynFlags zerow ]
-primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
-                                               , identityDynFlags zerow
-                                               , equalArgs >> retLit zerow ]
-primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
-                                               , inversePrimOp NotOp ]
-primOpRules nm SllOp       = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
-primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
+   -- Word operations
+   WordAddOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
+                                    , identityPlatform zerow
+                                    , numFoldingRules WordAddOp wordPrimOps
+                                    ]
+   WordSubOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
+                                    , rightIdentityPlatform zerow
+                                    , equalArgs >> retLit zerow
+                                    , numFoldingRules WordSubOp wordPrimOps
+                                    ]
+   WordAddCOp  -> mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (+))
+                                    , identityCPlatform zerow ]
+   WordSubCOp  -> mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (-))
+                                    , rightIdentityCPlatform zerow
+                                    , equalArgs >> retLitNoC zerow ]
+   WordMulOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
+                                    , identityPlatform onew
+                                    , numFoldingRules WordMulOp wordPrimOps
+                                    ]
+   WordQuotOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
+                                    , rightIdentityPlatform onew ]
+   WordRemOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
+                                    , leftZero zerow
+                                    , do l <- getLiteral 1
+                                         platform <- getPlatform
+                                         guard (l == onew platform)
+                                         retLit zerow
+                                    , equalArgs >> retLit zerow ]
+   AndOp       -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
+                                    , idempotent
+                                    , zeroElem zerow ]
+   OrOp        -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
+                                    , idempotent
+                                    , identityPlatform zerow ]
+   XorOp       -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
+                                    , identityPlatform zerow
+                                    , equalArgs >> retLit zerow ]
+   NotOp       -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , inversePrimOp NotOp ]
+   SllOp       -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
+   SrlOp       -> mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
 
--- coercions
-primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLitDynFlags word2IntLit
-                                                  , inversePrimOp Int2WordOp ]
-primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLitDynFlags int2WordLit
-                                                  , inversePrimOp Word2IntOp ]
-primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit
-                                                  , subsumedByPrimOp Narrow8IntOp
-                                                  , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
-                                                  , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
-                                                  , narrowSubsumesAnd AndIOp Narrow8IntOp 8 ]
-primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit
-                                                  , subsumedByPrimOp Narrow8IntOp
-                                                  , subsumedByPrimOp Narrow16IntOp
-                                                  , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
-                                                  , narrowSubsumesAnd AndIOp Narrow16IntOp 16 ]
-primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit
-                                                  , subsumedByPrimOp Narrow8IntOp
-                                                  , subsumedByPrimOp Narrow16IntOp
-                                                  , subsumedByPrimOp Narrow32IntOp
-                                                  , removeOp32
-                                                  , narrowSubsumesAnd AndIOp Narrow32IntOp 32 ]
-primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit
-                                                  , subsumedByPrimOp Narrow8WordOp
-                                                  , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
-                                                  , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
-                                                  , narrowSubsumesAnd AndOp Narrow8WordOp 8 ]
-primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit
-                                                  , subsumedByPrimOp Narrow8WordOp
-                                                  , subsumedByPrimOp Narrow16WordOp
-                                                  , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
-                                                  , narrowSubsumesAnd AndOp Narrow16WordOp 16 ]
-primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit
-                                                  , subsumedByPrimOp Narrow8WordOp
-                                                  , subsumedByPrimOp Narrow16WordOp
-                                                  , subsumedByPrimOp Narrow32WordOp
-                                                  , removeOp32
-                                                  , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
-primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit
-                                                  , inversePrimOp ChrOp ]
-primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
-                                                       guard (litFitsInChar lit)
-                                                       liftLit int2CharLit
-                                                  , inversePrimOp OrdOp ]
-primOpRules nm Float2IntOp    = mkPrimOpRule nm 1 [ liftLit float2IntLit ]
-primOpRules nm Int2FloatOp    = mkPrimOpRule nm 1 [ liftLit int2FloatLit ]
-primOpRules nm Double2IntOp   = mkPrimOpRule nm 1 [ liftLit double2IntLit ]
-primOpRules nm Int2DoubleOp   = mkPrimOpRule nm 1 [ liftLit int2DoubleLit ]
--- SUP: Not sure what the standard says about precision in the following 2 cases
-primOpRules nm Float2DoubleOp = mkPrimOpRule nm 1 [ liftLit float2DoubleLit ]
-primOpRules nm Double2FloatOp = mkPrimOpRule nm 1 [ liftLit double2FloatLit ]
+   -- coercions
+   Word2IntOp     -> mkPrimOpRule nm 1 [ liftLitPlatform word2IntLit
+                                       , inversePrimOp Int2WordOp ]
+   Int2WordOp     -> mkPrimOpRule nm 1 [ liftLitPlatform int2WordLit
+                                       , inversePrimOp Word2IntOp ]
+   Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLit narrow8IntLit
+                                       , subsumedByPrimOp Narrow8IntOp
+                                       , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
+                                       , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
+                                       , narrowSubsumesAnd AndIOp Narrow8IntOp 8 ]
+   Narrow16IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow16IntLit
+                                       , subsumedByPrimOp Narrow8IntOp
+                                       , subsumedByPrimOp Narrow16IntOp
+                                       , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
+                                       , narrowSubsumesAnd AndIOp Narrow16IntOp 16 ]
+   Narrow32IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow32IntLit
+                                       , subsumedByPrimOp Narrow8IntOp
+                                       , subsumedByPrimOp Narrow16IntOp
+                                       , subsumedByPrimOp Narrow32IntOp
+                                       , removeOp32
+                                       , narrowSubsumesAnd AndIOp Narrow32IntOp 32 ]
+   Narrow8WordOp  -> mkPrimOpRule nm 1 [ liftLit narrow8WordLit
+                                       , subsumedByPrimOp Narrow8WordOp
+                                       , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
+                                       , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
+                                       , narrowSubsumesAnd AndOp Narrow8WordOp 8 ]
+   Narrow16WordOp -> mkPrimOpRule nm 1 [ liftLit narrow16WordLit
+                                       , subsumedByPrimOp Narrow8WordOp
+                                       , subsumedByPrimOp Narrow16WordOp
+                                       , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
+                                       , narrowSubsumesAnd AndOp Narrow16WordOp 16 ]
+   Narrow32WordOp -> mkPrimOpRule nm 1 [ liftLit narrow32WordLit
+                                       , subsumedByPrimOp Narrow8WordOp
+                                       , subsumedByPrimOp Narrow16WordOp
+                                       , subsumedByPrimOp Narrow32WordOp
+                                       , removeOp32
+                                       , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
+   OrdOp          -> mkPrimOpRule nm 1 [ liftLit char2IntLit
+                                       , inversePrimOp ChrOp ]
+   ChrOp          -> mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
+                                            guard (litFitsInChar lit)
+                                            liftLit int2CharLit
+                                       , inversePrimOp OrdOp ]
+   Float2IntOp    -> mkPrimOpRule nm 1 [ liftLit float2IntLit ]
+   Int2FloatOp    -> mkPrimOpRule nm 1 [ liftLit int2FloatLit ]
+   Double2IntOp   -> mkPrimOpRule nm 1 [ liftLit double2IntLit ]
+   Int2DoubleOp   -> mkPrimOpRule nm 1 [ liftLit int2DoubleLit ]
+   -- SUP: Not sure what the standard says about precision in the following 2 cases
+   Float2DoubleOp -> mkPrimOpRule nm 1 [ liftLit float2DoubleLit ]
+   Double2FloatOp -> mkPrimOpRule nm 1 [ liftLit double2FloatLit ]
 
--- Float
-primOpRules nm FloatAddOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
-                                                , identity zerof ]
-primOpRules nm FloatSubOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
-                                                , rightIdentity zerof ]
-primOpRules nm FloatMulOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
-                                                , identity onef
-                                                , strengthReduction twof FloatAddOp  ]
-                         -- zeroElem zerof doesn't hold because of NaN
-primOpRules nm FloatDivOp   = mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
-                                                , rightIdentity onef ]
-primOpRules nm FloatNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp
-                                                , inversePrimOp FloatNegOp ]
+   -- Float
+   FloatAddOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
+                                     , identity zerof ]
+   FloatSubOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
+                                     , rightIdentity zerof ]
+   FloatMulOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
+                                     , identity onef
+                                     , strengthReduction twof FloatAddOp  ]
+             -- zeroElem zerof doesn't hold because of NaN
+   FloatDivOp   -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
+                                     , rightIdentity onef ]
+   FloatNegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                     , inversePrimOp FloatNegOp ]
 
--- Double
-primOpRules nm DoubleAddOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
-                                                 , identity zerod ]
-primOpRules nm DoubleSubOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
-                                                 , rightIdentity zerod ]
-primOpRules nm DoubleMulOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
-                                                 , identity oned
-                                                 , strengthReduction twod DoubleAddOp  ]
-                          -- zeroElem zerod doesn't hold because of NaN
-primOpRules nm DoubleDivOp   = mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
-                                                 , rightIdentity oned ]
-primOpRules nm DoubleNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp
-                                                 , inversePrimOp DoubleNegOp ]
+   -- Double
+   DoubleAddOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
+                                      , identity zerod ]
+   DoubleSubOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
+                                      , rightIdentity zerod ]
+   DoubleMulOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
+                                      , identity oned
+                                      , strengthReduction twod DoubleAddOp  ]
+              -- zeroElem zerod doesn't hold because of NaN
+   DoubleDivOp   -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
+                                      , rightIdentity oned ]
+   DoubleNegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                      , inversePrimOp DoubleNegOp ]
 
--- Relational operators
+   -- Relational operators
 
-primOpRules nm IntEqOp    = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm IntNeOp    = mkRelOpRule nm (/=) [ litEq False ]
-primOpRules nm CharEqOp   = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm CharNeOp   = mkRelOpRule nm (/=) [ litEq False ]
+   IntEqOp    -> mkRelOpRule nm (==) [ litEq True ]
+   IntNeOp    -> mkRelOpRule nm (/=) [ litEq False ]
+   CharEqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   CharNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
 
-primOpRules nm IntGtOp    = mkRelOpRule nm (>)  [ boundsCmp Gt ]
-primOpRules nm IntGeOp    = mkRelOpRule nm (>=) [ boundsCmp Ge ]
-primOpRules nm IntLeOp    = mkRelOpRule nm (<=) [ boundsCmp Le ]
-primOpRules nm IntLtOp    = mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm CharGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
-primOpRules nm CharGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
-primOpRules nm CharLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
-primOpRules nm CharLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   CharLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   CharLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm FloatGtOp  = mkFloatingRelOpRule nm (>)
-primOpRules nm FloatGeOp  = mkFloatingRelOpRule nm (>=)
-primOpRules nm FloatLeOp  = mkFloatingRelOpRule nm (<=)
-primOpRules nm FloatLtOp  = mkFloatingRelOpRule nm (<)
-primOpRules nm FloatEqOp  = mkFloatingRelOpRule nm (==)
-primOpRules nm FloatNeOp  = mkFloatingRelOpRule nm (/=)
+   FloatGtOp  -> mkFloatingRelOpRule nm (>)
+   FloatGeOp  -> mkFloatingRelOpRule nm (>=)
+   FloatLeOp  -> mkFloatingRelOpRule nm (<=)
+   FloatLtOp  -> mkFloatingRelOpRule nm (<)
+   FloatEqOp  -> mkFloatingRelOpRule nm (==)
+   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
 
-primOpRules nm DoubleGtOp = mkFloatingRelOpRule nm (>)
-primOpRules nm DoubleGeOp = mkFloatingRelOpRule nm (>=)
-primOpRules nm DoubleLeOp = mkFloatingRelOpRule nm (<=)
-primOpRules nm DoubleLtOp = mkFloatingRelOpRule nm (<)
-primOpRules nm DoubleEqOp = mkFloatingRelOpRule nm (==)
-primOpRules nm DoubleNeOp = mkFloatingRelOpRule nm (/=)
+   DoubleGtOp -> mkFloatingRelOpRule nm (>)
+   DoubleGeOp -> mkFloatingRelOpRule nm (>=)
+   DoubleLeOp -> mkFloatingRelOpRule nm (<=)
+   DoubleLtOp -> mkFloatingRelOpRule nm (<)
+   DoubleEqOp -> mkFloatingRelOpRule nm (==)
+   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
 
-primOpRules nm WordGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
-primOpRules nm WordGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
-primOpRules nm WordLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
-primOpRules nm WordLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
-primOpRules nm WordEqOp   = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq False ]
+   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
 
-primOpRules nm AddrAddOp  = mkPrimOpRule nm 2 [ rightIdentityDynFlags zeroi ]
+   AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
-primOpRules nm SeqOp      = mkPrimOpRule nm 4 [ seqRule ]
-primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
+   SeqOp      -> mkPrimOpRule nm 4 [ seqRule ]
+   SparkOp    -> mkPrimOpRule nm 4 [ sparkRule ]
 
-primOpRules _  _          = Nothing
+   _          -> Nothing
 
 {-
 ************************************************************************
@@ -331,10 +330,10 @@ mkRelOpRule nm cmp extra
         -- compute it for the arbitrary value 'True'
         -- and use that result
     equal_rule = do { equalArgs
-                    ; dflags <- getDynFlags
+                    ; platform <- getPlatform
                     ; return (if cmp True True
-                              then trueValInt  dflags
-                              else falseValInt dflags) }
+                              then trueValInt  platform
+                              else falseValInt platform) }
 
 {- Note [Rules for floating-point comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,11 +368,11 @@ mkFloatingRelOpRule nm cmp
   = mkPrimOpRule nm 2 [binaryCmpLit cmp]
 
 -- common constants
-zeroi, onei, zerow, onew :: DynFlags -> Literal
-zeroi dflags = mkLitInt  dflags 0
-onei  dflags = mkLitInt  dflags 1
-zerow dflags = mkLitWord dflags 0
-onew  dflags = mkLitWord dflags 1
+zeroi, onei, zerow, onew :: Platform -> Literal
+zeroi platform = mkLitInt  platform 0
+onei  platform = mkLitInt  platform 1
+zerow platform = mkLitWord platform 0
+onew  platform = mkLitWord platform 1
 
 zerof, onef, twof, zerod, oned, twod :: Literal
 zerof = mkLitFloat 0.0
@@ -383,12 +382,12 @@ zerod = mkLitDouble 0.0
 oned  = mkLitDouble 1.0
 twod  = mkLitDouble 2.0
 
-cmpOp :: DynFlags -> (forall a . Ord a => a -> a -> Bool)
+cmpOp :: Platform -> (forall a . Ord a => a -> a -> Bool)
       -> Literal -> Literal -> Maybe CoreExpr
-cmpOp dflags cmp = go
+cmpOp platform cmp = go
   where
-    done True  = Just $ trueValInt  dflags
-    done False = Just $ falseValInt dflags
+    done True  = Just $ trueValInt  platform
+    done False = Just $ falseValInt platform
 
     -- These compares are at different types
     go (LitChar i1)   (LitChar i2)   = done (i1 `cmp` i2)
@@ -401,117 +400,115 @@ cmpOp dflags cmp = go
 
 --------------------------
 
-negOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Negate
-negOp _      (LitFloat 0.0)  = Nothing  -- can't represent -0.0 as a Rational
-negOp dflags (LitFloat f)    = Just (mkFloatVal dflags (-f))
-negOp _      (LitDouble 0.0) = Nothing
-negOp dflags (LitDouble d)   = Just (mkDoubleVal dflags (-d))
-negOp dflags (LitNumber nt i t)
-   | litNumIsSigned nt = Just (Lit (mkLitNumberWrap dflags nt (-i) t))
-negOp _      _                = Nothing
+negOp :: RuleOpts -> Literal -> Maybe CoreExpr  -- Negate
+negOp env = \case
+   (LitFloat 0.0)  -> Nothing  -- can't represent -0.0 as a Rational
+   (LitFloat f)    -> Just (mkFloatVal env (-f))
+   (LitDouble 0.0) -> Nothing
+   (LitDouble d)   -> Just (mkDoubleVal env (-d))
+   (LitNumber nt i t)
+      | litNumIsSigned nt -> Just (Lit (mkLitNumberWrap (roPlatform env) nt (-i) t))
+   _ -> Nothing
 
-complementOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Binary complement
-complementOp dflags (LitNumber nt i t) =
-   Just (Lit (mkLitNumberWrap dflags nt (complement i) t))
+complementOp :: RuleOpts -> Literal -> Maybe CoreExpr  -- Binary complement
+complementOp env (LitNumber nt i t) =
+   Just (Lit (mkLitNumberWrap (roPlatform env) nt (complement i) t))
 complementOp _      _            = Nothing
 
 --------------------------
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
-       -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
+       -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
 intOp2 = intOp2' . const
 
 intOp2' :: (Integral a, Integral b)
-        => (DynFlags -> a -> b -> Integer)
-        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
-intOp2' op dflags (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) =
-  let o = op dflags
-  in  intResult dflags (fromInteger i1 `o` fromInteger i2)
+        => (RuleOpts -> a -> b -> Integer)
+        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+intOp2' op env (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) =
+  let o = op env
+  in  intResult (roPlatform env) (fromInteger i1 `o` fromInteger i2)
 intOp2' _  _      _            _            = Nothing  -- Could find LitLit
 
 intOpC2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
-        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
-intOpC2 op dflags (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) = do
-  intCResult dflags (fromInteger i1 `op` fromInteger i2)
+        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+intOpC2 op env (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) = do
+  intCResult (roPlatform env) (fromInteger i1 `op` fromInteger i2)
 intOpC2 _  _      _            _            = Nothing  -- Could find LitLit
 
-shiftRightLogical :: DynFlags -> Integer -> Int -> Integer
+shiftRightLogical :: Platform -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
 -- Do this by converting to Word and back.  Obviously this won't work for big
 -- values, but its ok as we use it here
-shiftRightLogical dflags x n =
-    case platformWordSize (targetPlatform dflags) of
+shiftRightLogical platform x n =
+    case platformWordSize platform of
       PW4 -> fromIntegral (fromInteger x `shiftR` n :: Word32)
       PW8 -> fromIntegral (fromInteger x `shiftR` n :: Word64)
 
 --------------------------
-retLit :: (DynFlags -> Literal) -> RuleM CoreExpr
-retLit l = do dflags <- getDynFlags
-              return $ Lit $ l dflags
+retLit :: (Platform -> Literal) -> RuleM CoreExpr
+retLit l = do platform <- getPlatform
+              return $ Lit $ l platform
 
-retLitNoC :: (DynFlags -> Literal) -> RuleM CoreExpr
-retLitNoC l = do dflags <- getDynFlags
-                 let lit = l dflags
+retLitNoC :: (Platform -> Literal) -> RuleM CoreExpr
+retLitNoC l = do platform <- getPlatform
+                 let lit = l platform
                  let ty = literalType lit
-                 return $ mkCoreUbxTup [ty, ty] [Lit lit, Lit (zeroi dflags)]
+                 return $ mkCoreUbxTup [ty, ty] [Lit lit, Lit (zeroi platform)]
 
 wordOp2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
-        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
-wordOp2 op dflags (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _)
-    = wordResult dflags (fromInteger w1 `op` fromInteger w2)
+        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+wordOp2 op env (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _)
+    = wordResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
 wordOp2 _ _ _ _ = Nothing  -- Could find LitLit
 
 wordOpC2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
-        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
-wordOpC2 op dflags (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _) =
-  wordCResult dflags (fromInteger w1 `op` fromInteger w2)
+        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+wordOpC2 op env (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _) =
+  wordCResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
 wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
 
-shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
+shiftRule :: (Platform -> Integer -> Int -> Integer) -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
 --    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
 --    SllOp, SrlOp           :: Word# -> Int# -> Word#
 shiftRule shift_op
-  = do { dflags <- getDynFlags
+  = do { platform <- getPlatform
        ; [e1, Lit (LitNumber LitNumInt shift_len _)] <- getArgs
        ; case e1 of
            _ | shift_len == 0
              -> return e1
              -- See Note [Guarding against silly shifts]
-             | shift_len < 0 || shift_len > wordSizeInBits dflags
-             -> return $ Lit $ mkLitNumberWrap dflags LitNumInt 0 (exprType e1)
+             | shift_len < 0 || shift_len > toInteger (platformWordSizeInBits platform)
+             -> return $ Lit $ mkLitNumberWrap platform LitNumInt 0 (exprType e1)
 
            -- Do the shift at type Integer, but shift length is Int
            Lit (LitNumber nt x t)
              | 0 < shift_len
-             , shift_len <= wordSizeInBits dflags
-             -> let op = shift_op dflags
+             , shift_len <= toInteger (platformWordSizeInBits platform)
+             -> let op = shift_op platform
                     y  = x `op` fromInteger shift_len
-                in  liftMaybe $ Just (Lit (mkLitNumberWrap dflags nt y t))
+                in  liftMaybe $ Just (Lit (mkLitNumberWrap platform nt y t))
 
            _ -> mzero }
 
-wordSizeInBits :: DynFlags -> Integer
-wordSizeInBits dflags = toInteger (platformWordSizeInBits (targetPlatform dflags))
-
 --------------------------
 floatOp2 :: (Rational -> Rational -> Rational)
-         -> DynFlags -> Literal -> Literal
+         -> RuleOpts -> Literal -> Literal
          -> Maybe (Expr CoreBndr)
-floatOp2 op dflags (LitFloat f1) (LitFloat f2)
-  = Just (mkFloatVal dflags (f1 `op` f2))
+floatOp2 op env (LitFloat f1) (LitFloat f2)
+  = Just (mkFloatVal env (f1 `op` f2))
 floatOp2 _ _ _ _ = Nothing
 
 --------------------------
 doubleOp2 :: (Rational -> Rational -> Rational)
-          -> DynFlags -> Literal -> Literal
+          -> RuleOpts -> Literal -> Literal
           -> Maybe (Expr CoreBndr)
-doubleOp2 op dflags (LitDouble f1) (LitDouble f2)
-  = Just (mkDoubleVal dflags (f1 `op` f2))
+doubleOp2 op env (LitDouble f1) (LitDouble f2)
+  = Just (mkDoubleVal env (f1 `op` f2))
 doubleOp2 _ _ _ _ = Nothing
 
 --------------------------
@@ -541,22 +538,22 @@ litEq :: Bool  -- True <=> equality, False <=> inequality
       -> RuleM CoreExpr
 litEq is_eq = msum
   [ do [Lit lit, expr] <- getArgs
-       dflags <- getDynFlags
-       do_lit_eq dflags lit expr
+       platform <- getPlatform
+       do_lit_eq platform lit expr
   , do [expr, Lit lit] <- getArgs
-       dflags <- getDynFlags
-       do_lit_eq dflags lit expr ]
+       platform <- getPlatform
+       do_lit_eq platform lit expr ]
   where
-    do_lit_eq dflags lit expr = do
+    do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
       return (mkWildCase expr (literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
       where
-        val_if_eq  | is_eq     = trueValInt  dflags
-                   | otherwise = falseValInt dflags
-        val_if_neq | is_eq     = falseValInt dflags
-                   | otherwise = trueValInt  dflags
+        val_if_eq  | is_eq     = trueValInt  platform
+                   | otherwise = falseValInt platform
+        val_if_neq | is_eq     = falseValInt platform
+                   | otherwise = trueValInt  platform
 
 
 -- | Check if there is comparison with minBound or maxBound, that is
@@ -564,80 +561,80 @@ litEq is_eq = msum
 -- minBound, so we can replace such comparison with False.
 boundsCmp :: Comparison -> RuleM CoreExpr
 boundsCmp op = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   [a, b] <- getArgs
-  liftMaybe $ mkRuleFn dflags op a b
+  liftMaybe $ mkRuleFn platform op a b
 
 data Comparison = Gt | Ge | Lt | Le
 
-mkRuleFn :: DynFlags -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
-mkRuleFn dflags Gt (Lit lit) _ | isMinBound dflags lit = Just $ falseValInt dflags
-mkRuleFn dflags Le (Lit lit) _ | isMinBound dflags lit = Just $ trueValInt  dflags
-mkRuleFn dflags Ge _ (Lit lit) | isMinBound dflags lit = Just $ trueValInt  dflags
-mkRuleFn dflags Lt _ (Lit lit) | isMinBound dflags lit = Just $ falseValInt dflags
-mkRuleFn dflags Ge (Lit lit) _ | isMaxBound dflags lit = Just $ trueValInt  dflags
-mkRuleFn dflags Lt (Lit lit) _ | isMaxBound dflags lit = Just $ falseValInt dflags
-mkRuleFn dflags Gt _ (Lit lit) | isMaxBound dflags lit = Just $ falseValInt dflags
-mkRuleFn dflags Le _ (Lit lit) | isMaxBound dflags lit = Just $ trueValInt  dflags
-mkRuleFn _ _ _ _                                       = Nothing
+mkRuleFn :: Platform -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
+mkRuleFn platform Gt (Lit lit) _ | isMinBound platform lit = Just $ falseValInt platform
+mkRuleFn platform Le (Lit lit) _ | isMinBound platform lit = Just $ trueValInt  platform
+mkRuleFn platform Ge _ (Lit lit) | isMinBound platform lit = Just $ trueValInt  platform
+mkRuleFn platform Lt _ (Lit lit) | isMinBound platform lit = Just $ falseValInt platform
+mkRuleFn platform Ge (Lit lit) _ | isMaxBound platform lit = Just $ trueValInt  platform
+mkRuleFn platform Lt (Lit lit) _ | isMaxBound platform lit = Just $ falseValInt platform
+mkRuleFn platform Gt _ (Lit lit) | isMaxBound platform lit = Just $ falseValInt platform
+mkRuleFn platform Le _ (Lit lit) | isMaxBound platform lit = Just $ trueValInt  platform
+mkRuleFn _ _ _ _                                           = Nothing
 
-isMinBound :: DynFlags -> Literal -> Bool
-isMinBound _      (LitChar c)        = c == minBound
-isMinBound dflags (LitNumber nt i _) = case nt of
-   LitNumInt     -> i == tARGET_MIN_INT dflags
+isMinBound :: Platform -> Literal -> Bool
+isMinBound _        (LitChar c)        = c == minBound
+isMinBound platform (LitNumber nt i _) = case nt of
+   LitNumInt     -> i == platformMinInt platform
    LitNumInt64   -> i == toInteger (minBound :: Int64)
    LitNumWord    -> i == 0
    LitNumWord64  -> i == 0
    LitNumNatural -> i == 0
    LitNumInteger -> False
-isMinBound _      _                  = False
+isMinBound _        _                  = False
 
-isMaxBound :: DynFlags -> Literal -> Bool
-isMaxBound _      (LitChar c)       = c == maxBound
-isMaxBound dflags (LitNumber nt i _) = case nt of
-   LitNumInt     -> i == tARGET_MAX_INT dflags
+isMaxBound :: Platform -> Literal -> Bool
+isMaxBound _        (LitChar c)        = c == maxBound
+isMaxBound platform (LitNumber nt i _) = case nt of
+   LitNumInt     -> i == platformMaxInt platform
    LitNumInt64   -> i == toInteger (maxBound :: Int64)
-   LitNumWord    -> i == tARGET_MAX_WORD dflags
+   LitNumWord    -> i == platformMaxWord platform
    LitNumWord64  -> i == toInteger (maxBound :: Word64)
    LitNumNatural -> False
    LitNumInteger -> False
-isMaxBound _      _                  = False
+isMaxBound _        _                  = False
 
 -- | Create an Int literal expression while ensuring the given Integer is in the
 -- target Int range
-intResult :: DynFlags -> Integer -> Maybe CoreExpr
-intResult dflags result = Just (intResult' dflags result)
+intResult :: Platform -> Integer -> Maybe CoreExpr
+intResult platform result = Just (intResult' platform result)
 
-intResult' :: DynFlags -> Integer -> CoreExpr
-intResult' dflags result = Lit (mkLitIntWrap dflags result)
+intResult' :: Platform -> Integer -> CoreExpr
+intResult' platform result = Lit (mkLitIntWrap platform result)
 
 -- | Create an unboxed pair of an Int literal expression, ensuring the given
 -- Integer is in the target Int range and the corresponding overflow flag
 -- (@0#@/@1#@) if it wasn't.
-intCResult :: DynFlags -> Integer -> Maybe CoreExpr
-intCResult dflags result = Just (mkPair [Lit lit, Lit c])
+intCResult :: Platform -> Integer -> Maybe CoreExpr
+intCResult platform result = Just (mkPair [Lit lit, Lit c])
   where
     mkPair = mkCoreUbxTup [intPrimTy, intPrimTy]
-    (lit, b) = mkLitIntWrapC dflags result
-    c = if b then onei dflags else zeroi dflags
+    (lit, b) = mkLitIntWrapC platform result
+    c = if b then onei platform else zeroi platform
 
 -- | Create a Word literal expression while ensuring the given Integer is in the
 -- target Word range
-wordResult :: DynFlags -> Integer -> Maybe CoreExpr
-wordResult dflags result = Just (wordResult' dflags result)
+wordResult :: Platform -> Integer -> Maybe CoreExpr
+wordResult platform result = Just (wordResult' platform result)
 
-wordResult' :: DynFlags -> Integer -> CoreExpr
-wordResult' dflags result = Lit (mkLitWordWrap dflags result)
+wordResult' :: Platform -> Integer -> CoreExpr
+wordResult' platform result = Lit (mkLitWordWrap platform result)
 
 -- | Create an unboxed pair of a Word literal expression, ensuring the given
 -- Integer is in the target Word range and the corresponding carry flag
 -- (@0#@/@1#@) if it wasn't.
-wordCResult :: DynFlags -> Integer -> Maybe CoreExpr
-wordCResult dflags result = Just (mkPair [Lit lit, Lit c])
+wordCResult :: Platform -> Integer -> Maybe CoreExpr
+wordCResult platform result = Just (mkPair [Lit lit, Lit c])
   where
     mkPair = mkCoreUbxTup [wordPrimTy, intPrimTy]
-    (lit, b) = mkLitWordWrapC dflags result
-    c = if b then onei dflags else zeroi dflags
+    (lit, b) = mkLitWordWrapC platform result
+    c = if b then onei platform else zeroi platform
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
 inversePrimOp primop = do
@@ -785,7 +782,7 @@ mkBasicRule op_name n_args rm
                   ru_try   = runRuleM rm }
 
 newtype RuleM r = RuleM
-  { runRuleM :: DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r }
+  { runRuleM :: RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r }
   deriving (Functor)
 
 instance Applicative RuleM where
@@ -794,10 +791,10 @@ instance Applicative RuleM where
 
 instance Monad RuleM where
   RuleM f >>= g
-    = RuleM $ \dflags iu fn args ->
-              case f dflags iu fn args of
+    = RuleM $ \env iu fn args ->
+              case f env iu fn args of
                 Nothing -> Nothing
-                Just r  -> runRuleM (g r) dflags iu fn args
+                Just r  -> runRuleM (g r) env iu fn args
 
 #if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
@@ -808,31 +805,34 @@ instance MonadFail.MonadFail RuleM where
 
 instance Alternative RuleM where
   empty = RuleM $ \_ _ _ _ -> Nothing
-  RuleM f1 <|> RuleM f2 = RuleM $ \dflags iu fn args ->
-    f1 dflags iu fn args <|> f2 dflags iu fn args
+  RuleM f1 <|> RuleM f2 = RuleM $ \env iu fn args ->
+    f1 env iu fn args <|> f2 env iu fn args
 
 instance MonadPlus RuleM
 
-instance HasDynFlags RuleM where
-    getDynFlags = RuleM $ \dflags _ _ _ -> Just dflags
+getPlatform :: RuleM Platform
+getPlatform = roPlatform <$> getEnv
+
+getEnv :: RuleM RuleOpts
+getEnv = RuleM $ \env _ _ _ -> Just env
 
 liftMaybe :: Maybe a -> RuleM a
 liftMaybe Nothing = mzero
 liftMaybe (Just x) = return x
 
 liftLit :: (Literal -> Literal) -> RuleM CoreExpr
-liftLit f = liftLitDynFlags (const f)
+liftLit f = liftLitPlatform (const f)
 
-liftLitDynFlags :: (DynFlags -> Literal -> Literal) -> RuleM CoreExpr
-liftLitDynFlags f = do
-  dflags <- getDynFlags
+liftLitPlatform :: (Platform -> Literal -> Literal) -> RuleM CoreExpr
+liftLitPlatform f = do
+  platform <- getPlatform
   [Lit lit] <- getArgs
-  return $ Lit (f dflags lit)
+  return $ Lit (f platform lit)
 
 removeOp32 :: RuleM CoreExpr
 removeOp32 = do
-  dflags <- getDynFlags
-  case platformWordSize (targetPlatform dflags) of
+  platform <- getPlatform
+  case platformWordSize platform of
     PW4 -> do
       [e] <- getArgs
       return e
@@ -855,91 +855,91 @@ getLiteral n = RuleM $ \_ _ _ exprs -> case drop n exprs of
   (Lit l:_) -> Just l
   _ -> Nothing
 
-unaryLit :: (DynFlags -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
+unaryLit :: (RuleOpts -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 unaryLit op = do
-  dflags <- getDynFlags
+  env <- getEnv
   [Lit l] <- getArgs
-  liftMaybe $ op dflags (convFloating dflags l)
+  liftMaybe $ op env (convFloating env l)
 
-binaryLit :: (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
+binaryLit :: (RuleOpts -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 binaryLit op = do
-  dflags <- getDynFlags
+  env <- getEnv
   [Lit l1, Lit l2] <- getArgs
-  liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
+  liftMaybe $ op env (convFloating env l1) (convFloating env l2)
 
 binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
 binaryCmpLit op = do
-  dflags <- getDynFlags
-  binaryLit (\_ -> cmpOp dflags op)
+  platform <- getPlatform
+  binaryLit (\_ -> cmpOp platform op)
 
 leftIdentity :: Literal -> RuleM CoreExpr
-leftIdentity id_lit = leftIdentityDynFlags (const id_lit)
+leftIdentity id_lit = leftIdentityPlatform (const id_lit)
 
 rightIdentity :: Literal -> RuleM CoreExpr
-rightIdentity id_lit = rightIdentityDynFlags (const id_lit)
+rightIdentity id_lit = rightIdentityPlatform (const id_lit)
 
 identity :: Literal -> RuleM CoreExpr
 identity lit = leftIdentity lit `mplus` rightIdentity lit
 
-leftIdentityDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-leftIdentityDynFlags id_lit = do
-  dflags <- getDynFlags
+leftIdentityPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+leftIdentityPlatform id_lit = do
+  platform <- getPlatform
   [Lit l1, e2] <- getArgs
-  guard $ l1 == id_lit dflags
+  guard $ l1 == id_lit platform
   return e2
 
 -- | Left identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in
 -- addition to the result, we have to indicate that no carry/overflow occurred.
-leftIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-leftIdentityCDynFlags id_lit = do
-  dflags <- getDynFlags
+leftIdentityCPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+leftIdentityCPlatform id_lit = do
+  platform <- getPlatform
   [Lit l1, e2] <- getArgs
-  guard $ l1 == id_lit dflags
-  let no_c = Lit (zeroi dflags)
+  guard $ l1 == id_lit platform
+  let no_c = Lit (zeroi platform)
   return (mkCoreUbxTup [exprType e2, intPrimTy] [e2, no_c])
 
-rightIdentityDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-rightIdentityDynFlags id_lit = do
-  dflags <- getDynFlags
+rightIdentityPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+rightIdentityPlatform id_lit = do
+  platform <- getPlatform
   [e1, Lit l2] <- getArgs
-  guard $ l2 == id_lit dflags
+  guard $ l2 == id_lit platform
   return e1
 
 -- | Right identity rule for PrimOps like 'IntSubC' and 'WordSubC', where, in
 -- addition to the result, we have to indicate that no carry/overflow occurred.
-rightIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-rightIdentityCDynFlags id_lit = do
-  dflags <- getDynFlags
+rightIdentityCPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+rightIdentityCPlatform id_lit = do
+  platform <- getPlatform
   [e1, Lit l2] <- getArgs
-  guard $ l2 == id_lit dflags
-  let no_c = Lit (zeroi dflags)
+  guard $ l2 == id_lit platform
+  let no_c = Lit (zeroi platform)
   return (mkCoreUbxTup [exprType e1, intPrimTy] [e1, no_c])
 
-identityDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-identityDynFlags lit =
-  leftIdentityDynFlags lit `mplus` rightIdentityDynFlags lit
+identityPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+identityPlatform lit =
+  leftIdentityPlatform lit `mplus` rightIdentityPlatform lit
 
 -- | Identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in addition
 -- to the result, we have to indicate that no carry/overflow occurred.
-identityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-identityCDynFlags lit =
-  leftIdentityCDynFlags lit `mplus` rightIdentityCDynFlags lit
+identityCPlatform :: (Platform -> Literal) -> RuleM CoreExpr
+identityCPlatform lit =
+  leftIdentityCPlatform lit `mplus` rightIdentityCPlatform lit
 
-leftZero :: (DynFlags -> Literal) -> RuleM CoreExpr
+leftZero :: (Platform -> Literal) -> RuleM CoreExpr
 leftZero zero = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   [Lit l1, _] <- getArgs
-  guard $ l1 == zero dflags
+  guard $ l1 == zero platform
   return $ Lit l1
 
-rightZero :: (DynFlags -> Literal) -> RuleM CoreExpr
+rightZero :: (Platform -> Literal) -> RuleM CoreExpr
 rightZero zero = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   [_, Lit l2] <- getArgs
-  guard $ l2 == zero dflags
+  guard $ l2 == zero platform
   return $ Lit l2
 
-zeroElem :: (DynFlags -> Literal) -> RuleM CoreExpr
+zeroElem :: (Platform -> Literal) -> RuleM CoreExpr
 zeroElem lit = leftZero lit `mplus` rightZero lit
 
 equalArgs :: RuleM ()
@@ -953,10 +953,10 @@ nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
 -- and target architecture here, but it's convenient (and wrong :-).
-convFloating :: DynFlags -> Literal -> Literal
-convFloating dflags (LitFloat  f) | not (gopt Opt_ExcessPrecision dflags) =
+convFloating :: RuleOpts -> Literal -> Literal
+convFloating env (LitFloat  f) | not (roExcessRationalPrecision env) =
    LitFloat  (toRational (fromRational f :: Float ))
-convFloating dflags (LitDouble d) | not (gopt Opt_ExcessPrecision dflags) =
+convFloating env (LitDouble d) | not (roExcessRationalPrecision env) =
    LitDouble (toRational (fromRational d :: Double))
 convFloating _ l = l
 
@@ -1003,9 +1003,9 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- We still need Bool data constructors (True and False) to use in a rule
 -- for constant folding of equal Strings
 
-trueValInt, falseValInt :: DynFlags -> Expr CoreBndr
-trueValInt  dflags = Lit $ onei  dflags -- see Note [What's true and false]
-falseValInt dflags = Lit $ zeroi dflags
+trueValInt, falseValInt :: Platform -> Expr CoreBndr
+trueValInt  platform = Lit $ onei  platform -- see Note [What's true and false]
+falseValInt platform = Lit $ zeroi platform
 
 trueValBool, falseValBool :: Expr CoreBndr
 trueValBool   = Var trueDataConId -- see Note [What's true and false]
@@ -1016,12 +1016,12 @@ ltVal = Var ordLTDataConId
 eqVal = Var ordEQDataConId
 gtVal = Var ordGTDataConId
 
-mkIntVal :: DynFlags -> Integer -> Expr CoreBndr
-mkIntVal dflags i = Lit (mkLitInt dflags i)
-mkFloatVal :: DynFlags -> Rational -> Expr CoreBndr
-mkFloatVal dflags f = Lit (convFloating dflags (LitFloat  f))
-mkDoubleVal :: DynFlags -> Rational -> Expr CoreBndr
-mkDoubleVal dflags d = Lit (convFloating dflags (LitDouble d))
+mkIntVal :: Platform -> Integer -> Expr CoreBndr
+mkIntVal platform i = Lit (mkLitInt platform i)
+mkFloatVal :: RuleOpts -> Rational -> Expr CoreBndr
+mkFloatVal env f = Lit (convFloating env (LitFloat  f))
+mkDoubleVal :: RuleOpts -> Rational -> Expr CoreBndr
+mkDoubleVal env d = Lit (convFloating env (LitDouble d))
 
 matchPrimOpId :: PrimOp -> Id -> RuleM ()
 matchPrimOpId op id = do
@@ -1091,7 +1091,7 @@ dataToTagRule = a `mplus` b
     --   dataToTag x
     -- where x's unfolding is a constructor application
     b = do
-      dflags <- getDynFlags
+      dflags <- getPlatform
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
       (_,floats, dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
@@ -1275,8 +1275,8 @@ builtinRules
         , do
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just n <- return $ exactLog2 d
-          dflags <- getDynFlags
-          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal dflags n
+          platform <- getPlatform
+          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal platform n
         ],
 
      mkBasicRule modIntName 2 $ msum
@@ -1285,9 +1285,9 @@ builtinRules
         , do
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just _ <- return $ exactLog2 d
-          dflags <- getDynFlags
+          platform <- getPlatform
           return $ Var (mkPrimOpId AndIOp)
-            `App` arg `App` mkIntVal dflags (d - 1)
+            `App` arg `App` mkIntVal platform (d - 1)
         ]
      ]
  ++ builtinIntegerRules
@@ -1609,10 +1609,10 @@ warning in this case.
 
 match_bitInteger :: RuleFun
 -- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
-match_bitInteger dflags id_unf fn [arg]
+match_bitInteger env id_unf fn [arg]
   | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf arg
   , x >= 0
-  , x <= (wordSizeInBits dflags - 1)
+  , x <= (toInteger (platformWordSizeInBits (roPlatform env)) - 1)
     -- Make sure x is small enough to yield a decently small integer
     -- Attempting to construct the Integer for
     --    (bitInteger 9223372036854775807#)
@@ -1628,11 +1628,11 @@ match_bitInteger _ _ _ _ = Nothing
 
 -------------------------------------------------
 match_Integer_convert :: Num a
-                      => (DynFlags -> a -> Expr CoreBndr)
+                      => (Platform -> a -> Expr CoreBndr)
                       -> RuleFun
-match_Integer_convert convert dflags id_unf _ [xl]
+match_Integer_convert convert env id_unf _ [xl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert dflags (fromInteger x))
+  = Just (convert (roPlatform env) (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
@@ -1707,10 +1707,10 @@ match_Integer_shift_op binop _ id_unf _ [xl,yl]
 match_Integer_shift_op _ _ _ _ _ = Nothing
 
 match_Integer_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
-match_Integer_binop_Prim binop dflags id_unf _ [xl, yl]
+match_Integer_binop_Prim binop env id_unf _ [xl, yl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
-  = Just (if x `binop` y then trueValInt dflags else falseValInt dflags)
+  = Just (if x `binop` y then trueValInt (roPlatform env) else falseValInt (roPlatform env))
 match_Integer_binop_Prim _ _ _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
@@ -1753,7 +1753,7 @@ match_rationalTo mkLit _ id_unf _ [xl, yl]
 match_rationalTo _ _ _ _ _ = Nothing
 
 match_decodeDouble :: RuleFun
-match_decodeDouble dflags id_unf fn [xl]
+match_decodeDouble env id_unf fn [xl]
   | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
     Just (_, res)
@@ -1762,7 +1762,7 @@ match_decodeDouble dflags id_unf fn [xl]
            (y, z) ->
              Just $ mkCoreUbxTup [integerTy, intHashTy]
                                  [Lit (mkLitInteger y integerTy),
-                                  Lit (mkLitInt dflags (toInteger z))]
+                                  Lit (mkLitInt (roPlatform env) (toInteger z))]
     _ ->
         pprPanic "match_decodeDouble: Id has the wrong type"
           (ppr fn <+> dcolon <+> ppr (idType fn))
@@ -1880,14 +1880,16 @@ match_smallIntegerTo _ _ _ _ _ = Nothing
 -- | Rules to perform constant folding into nested expressions
 --
 --See Note [Constant folding through nested expressions]
-numFoldingRules :: PrimOp -> (DynFlags -> PrimOps) -> RuleM CoreExpr
+numFoldingRules :: PrimOp -> (Platform -> PrimOps) -> RuleM CoreExpr
 numFoldingRules op dict = do
-  [e1,e2] <- getArgs
-  dflags <- getDynFlags
-  let PrimOps{..} = dict dflags
-  if not (gopt Opt_NumConstantFolding dflags)
-    then mzero
-    else case BinOpApp e1 op e2 of
+  env <- getEnv
+  if not (roNumConstantFolding env)
+   then mzero
+   else do
+    [e1,e2] <- getArgs
+    platform <- getPlatform
+    let PrimOps{..} = dict platform
+    case BinOpApp e1 op e2 of
      -- R1) +/- simplification
      x    :++: (y :++: v)          -> return $ mkL (x+y)   `add` v
      x    :++: (L y :-: v)         -> return $ mkL (x+y)   `sub` v
@@ -2026,7 +2028,7 @@ isMulOp _         = False
 
 -- | Explicit "type-class"-like dictionary for numeric primops
 --
--- Depends on DynFlags because creating a literal value depends on DynFlags
+-- Depends on Platform because creating a literal value depends on Platform
 data PrimOps = PrimOps
    { add :: CoreExpr -> CoreExpr -> CoreExpr -- ^ Add two numbers
    , sub :: CoreExpr -> CoreExpr -> CoreExpr -- ^ Sub two numbers
@@ -2034,20 +2036,20 @@ data PrimOps = PrimOps
    , mkL :: Integer -> CoreExpr              -- ^ Create a literal value
    }
 
-intPrimOps :: DynFlags -> PrimOps
-intPrimOps dflags = PrimOps
+intPrimOps :: Platform -> PrimOps
+intPrimOps platform = PrimOps
    { add = \x y -> BinOpApp x IntAddOp y
    , sub = \x y -> BinOpApp x IntSubOp y
    , mul = \x y -> BinOpApp x IntMulOp y
-   , mkL = intResult' dflags
+   , mkL = intResult' platform
    }
 
-wordPrimOps :: DynFlags -> PrimOps
-wordPrimOps dflags = PrimOps
+wordPrimOps :: Platform -> PrimOps
+wordPrimOps platform = PrimOps
    { add = \x y -> BinOpApp x WordAddOp y
    , sub = \x y -> BinOpApp x WordSubOp y
    , mul = \x y -> BinOpApp x WordMulOp y
-   , mkL = wordResult' dflags
+   , mkL = wordResult' platform
    }
 
 
@@ -2059,7 +2061,7 @@ wordPrimOps dflags = PrimOps
 
 -- | Match the scrutinee of a case and potentially return a new scrutinee and a
 -- function to apply to each literal alternative.
-caseRules :: DynFlags
+caseRules :: Platform
           -> CoreExpr                       -- Scrutinee
           -> Maybe ( CoreExpr               -- New scrutinee
                    , AltCon -> Maybe AltCon -- How to fix up the alt pattern
@@ -2077,31 +2079,31 @@ caseRules :: DynFlags
 --         fixup_altcon[con] bs -> let b = mk_orig[b] in rhs;
 --         ... }
 
-caseRules dflags (App (App (Var f) v) (Lit l))   -- v `op` x#
+caseRules platform (App (App (Var f) v) (Lit l))   -- v `op` x#
   | Just op <- isPrimOpId_maybe f
   , Just x  <- isLitValue_maybe l
   , Just adjust_lit <- adjustDyadicRight op x
-  = Just (v, tx_lit_con dflags adjust_lit
+  = Just (v, tx_lit_con platform adjust_lit
            , \v -> (App (App (Var f) (Var v)) (Lit l)))
 
-caseRules dflags (App (App (Var f) (Lit l)) v)   -- x# `op` v
+caseRules platform (App (App (Var f) (Lit l)) v)   -- x# `op` v
   | Just op <- isPrimOpId_maybe f
   , Just x  <- isLitValue_maybe l
   , Just adjust_lit <- adjustDyadicLeft x op
-  = Just (v, tx_lit_con dflags adjust_lit
+  = Just (v, tx_lit_con platform adjust_lit
            , \v -> (App (App (Var f) (Lit l)) (Var v)))
 
 
-caseRules dflags (App (Var f) v              )   -- op v
+caseRules platform (App (Var f) v              )   -- op v
   | Just op <- isPrimOpId_maybe f
   , Just adjust_lit <- adjustUnary op
-  = Just (v, tx_lit_con dflags adjust_lit
+  = Just (v, tx_lit_con platform adjust_lit
            , \v -> App (Var f) (Var v))
 
 -- See Note [caseRules for tagToEnum]
-caseRules dflags (App (App (Var f) type_arg) v)
+caseRules platform (App (App (Var f) type_arg) v)
   | Just TagToEnumOp <- isPrimOpId_maybe f
-  = Just (v, tx_con_tte dflags
+  = Just (v, tx_con_tte platform
            , \v -> (App (App (Var f) type_arg) (Var v)))
 
 -- See Note [caseRules for dataToTag]
@@ -2115,10 +2117,10 @@ caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
 caseRules _ _ = Nothing
 
 
-tx_lit_con :: DynFlags -> (Integer -> Integer) -> AltCon -> Maybe AltCon
-tx_lit_con _      _      DEFAULT    = Just DEFAULT
-tx_lit_con dflags adjust (LitAlt l) = Just $ LitAlt (mapLitValue dflags adjust l)
-tx_lit_con _      _      alt        = pprPanic "caseRules" (ppr alt)
+tx_lit_con :: Platform -> (Integer -> Integer) -> AltCon -> Maybe AltCon
+tx_lit_con _        _      DEFAULT    = Just DEFAULT
+tx_lit_con platform adjust (LitAlt l) = Just $ LitAlt (mapLitValue platform adjust l)
+tx_lit_con _        _      alt        = pprPanic "caseRules" (ppr alt)
    -- NB: mapLitValue uses mkLitIntWrap etc, to ensure that the
    -- literal alternatives remain in Word/Int target ranges
    -- (See Note [Word/Int underflow/overflow] in Literal and #13172).
@@ -2157,11 +2159,11 @@ adjustUnary op
          IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 
-tx_con_tte :: DynFlags -> AltCon -> Maybe AltCon
-tx_con_tte _      DEFAULT         = Just DEFAULT
-tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
-tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
-  = Just $ LitAlt $ mkLitInt dflags $ toInteger $ dataConTagZ dc
+tx_con_tte :: Platform -> AltCon -> Maybe AltCon
+tx_con_tte _        DEFAULT         = Just DEFAULT
+tx_con_tte _        alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
+tx_con_tte platform (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+  = Just $ LitAlt $ mkLitInt platform $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: Type -> AltCon -> Maybe AltCon
 tx_con_dtt _  DEFAULT = Just DEFAULT

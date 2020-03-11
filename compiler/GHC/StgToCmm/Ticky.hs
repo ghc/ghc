@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -453,8 +454,10 @@ tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
 -- used to distinguish between closure types
 --
 -- TODO what else to count while we're here?
-tickyDynAlloc mb_id rep lf = ifTicky $ getDynFlags >>= \dflags ->
-  let bytes = wORD_SIZE dflags * heapClosureSizeW dflags rep
+tickyDynAlloc mb_id rep lf = ifTicky $ do
+  dflags <- getDynFlags
+  let platform = targetPlatform dflags
+      bytes = platformWordSizeInBytes platform * heapClosureSizeW dflags rep
 
       countGlobal tot ctr = do
         bumpTickyCounterBy tot bytes
@@ -471,19 +474,18 @@ tickyDynAlloc mb_id rep lf = ifTicky $ getDynFlags >>= \dflags ->
   -- for now, since I don't currently know neither if we do nor how to
   -- distinguish. NSF Mar 2013
 
-  in case () of
-    _ | isConRep rep   ->
-          ifTickyDynThunk countSpecific >>
-          countGlobal (fsLit "ALLOC_CON_gds") (fsLit "ALLOC_CON_ctr")
-      | isThunkRep rep ->
-          ifTickyDynThunk countSpecific >>
-          if lfUpdatable lf
-          then countGlobal (fsLit "ALLOC_THK_gds") (fsLit "ALLOC_UP_THK_ctr")
-          else countGlobal (fsLit "ALLOC_THK_gds") (fsLit "ALLOC_SE_THK_ctr")
-      | isFunRep   rep ->
-          countSpecific >>
-          countGlobal (fsLit "ALLOC_FUN_gds") (fsLit "ALLOC_FUN_ctr")
-      | otherwise      -> panic "How is this heap object not a con, thunk, or fun?"
+  if | isConRep rep   ->
+         ifTickyDynThunk countSpecific >>
+         countGlobal (fsLit "ALLOC_CON_gds") (fsLit "ALLOC_CON_ctr")
+     | isThunkRep rep ->
+         ifTickyDynThunk countSpecific >>
+         if lfUpdatable lf
+         then countGlobal (fsLit "ALLOC_THK_gds") (fsLit "ALLOC_UP_THK_ctr")
+         else countGlobal (fsLit "ALLOC_THK_gds") (fsLit "ALLOC_SE_THK_ctr")
+     | isFunRep   rep ->
+         countSpecific >>
+         countGlobal (fsLit "ALLOC_FUN_gds") (fsLit "ALLOC_FUN_ctr")
+     | otherwise      -> panic "How is this heap object not a con, thunk, or fun?"
 
 
 

@@ -18,6 +18,7 @@ module GHC.CoreToStg.Prep (
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import GHC.Core.Op.OccurAnal
 
@@ -574,10 +575,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
 cpeRhsE env (Lit (LitNumber LitNumInteger i _))
-    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env)
+    = cpeRhsE env (cvtLitInteger (targetPlatform (cpe_dynFlags env)) (getMkIntegerId env)
                    (cpe_integerSDataCon env) i)
 cpeRhsE env (Lit (LitNumber LitNumNatural i _))
-    = cpeRhsE env (cvtLitNatural (cpe_dynFlags env) (getMkNaturalId env)
+    = cpeRhsE env (cvtLitNatural (targetPlatform (cpe_dynFlags env)) (getMkNaturalId env)
                    (cpe_naturalSDataCon env) i)
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
@@ -652,17 +653,17 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
+cvtLitInteger :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
 -- representation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
 -- See Note [Integer literals] in Literal
-cvtLitInteger dflags _ (Just sdatacon) i
-  | inIntRange dflags i -- Special case for small integers
-    = mkConApp sdatacon [Lit (mkLitInt dflags i)]
+cvtLitInteger platform _ (Just sdatacon) i
+  | platformInIntRange platform i -- Special case for small integers
+    = mkConApp sdatacon [Lit (mkLitInt platform i)]
 
-cvtLitInteger dflags mk_integer _ i
+cvtLitInteger platform mk_integer _ i
     = mkApps (Var mk_integer) [isNonNegative, ints]
   where isNonNegative = if i < 0 then mkConApp falseDataCon []
                                  else mkConApp trueDataCon  []
@@ -670,25 +671,25 @@ cvtLitInteger dflags mk_integer _ i
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkLitInt dflags low)] : f high
+              in mkConApp intDataCon [Lit (mkLitInt platform low)] : f high
         bits = 31
         mask = 2 ^ bits - 1
 
-cvtLitNatural :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
+cvtLitNatural :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Natural to the low-level
 -- representation.
 -- See Note [Natural literals] in Literal
-cvtLitNatural dflags _ (Just sdatacon) i
-  | inWordRange dflags i -- Special case for small naturals
-    = mkConApp sdatacon [Lit (mkLitWord dflags i)]
+cvtLitNatural platform _ (Just sdatacon) i
+  | platformInWordRange platform i -- Special case for small naturals
+    = mkConApp sdatacon [Lit (mkLitWord platform i)]
 
-cvtLitNatural dflags mk_natural _ i
+cvtLitNatural platform mk_natural _ i
     = mkApps (Var mk_natural) [words]
   where words = mkListExpr wordTy (f i)
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp wordDataCon [Lit (mkLitWord dflags low)] : f high
+              in mkConApp wordDataCon [Lit (mkLitWord platform low)] : f high
         bits = 32
         mask = 2 ^ bits - 1
 

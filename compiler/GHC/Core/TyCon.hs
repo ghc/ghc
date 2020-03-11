@@ -7,6 +7,7 @@ The @TyCon@ datatype
 -}
 
 {-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Core.TyCon(
         -- * Main TyCon data types
@@ -134,6 +135,7 @@ module GHC.Core.TyCon(
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
@@ -152,7 +154,6 @@ import Var
 import VarSet
 import GHC.Core.Class
 import BasicTypes
-import GHC.Driver.Session
 import ForeignCall
 import Name
 import NameEnv
@@ -1474,20 +1475,20 @@ isGcPtrRep _           = False
 
 -- A PrimRep is compatible with another iff one can be coerced to the other.
 -- See Note [bad unsafe coercion] in GHC.Core.Lint for when are two types coercible.
-primRepCompatible :: DynFlags -> PrimRep -> PrimRep -> Bool
-primRepCompatible dflags rep1 rep2 =
+primRepCompatible :: Platform -> PrimRep -> PrimRep -> Bool
+primRepCompatible platform rep1 rep2 =
     (isUnboxed rep1 == isUnboxed rep2) &&
-    (primRepSizeB dflags rep1 == primRepSizeB dflags rep2) &&
+    (primRepSizeB platform rep1 == primRepSizeB platform rep2) &&
     (primRepIsFloat rep1 == primRepIsFloat rep2)
   where
     isUnboxed = not . isGcPtrRep
 
 -- More general version of `primRepCompatible` for types represented by zero or
 -- more than one PrimReps.
-primRepsCompatible :: DynFlags -> [PrimRep] -> [PrimRep] -> Bool
-primRepsCompatible dflags reps1 reps2 =
+primRepsCompatible :: Platform -> [PrimRep] -> [PrimRep] -> Bool
+primRepsCompatible platform reps1 reps2 =
     length reps1 == length reps2 &&
-    and (zipWith (primRepCompatible dflags) reps1 reps2)
+    and (zipWith (primRepCompatible platform) reps1 reps2)
 
 -- | The size of a 'PrimRep' in bytes.
 --
@@ -1496,24 +1497,25 @@ primRepsCompatible dflags reps1 reps2 =
 -- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
 -- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
 -- laid out.
-primRepSizeB :: DynFlags -> PrimRep -> Int
-primRepSizeB dflags IntRep           = wORD_SIZE dflags
-primRepSizeB dflags WordRep          = wORD_SIZE dflags
-primRepSizeB _      Int8Rep          = 1
-primRepSizeB _      Int16Rep         = 2
-primRepSizeB _      Int32Rep         = 4
-primRepSizeB _      Int64Rep         = wORD64_SIZE
-primRepSizeB _      Word8Rep         = 1
-primRepSizeB _      Word16Rep        = 2
-primRepSizeB _      Word32Rep        = 4
-primRepSizeB _      Word64Rep        = wORD64_SIZE
-primRepSizeB _      FloatRep         = fLOAT_SIZE
-primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
-primRepSizeB dflags AddrRep          = wORD_SIZE dflags
-primRepSizeB dflags LiftedRep        = wORD_SIZE dflags
-primRepSizeB dflags UnliftedRep      = wORD_SIZE dflags
-primRepSizeB _      VoidRep          = 0
-primRepSizeB _      (VecRep len rep) = len * primElemRepSizeB rep
+primRepSizeB :: Platform -> PrimRep -> Int
+primRepSizeB platform = \case
+   IntRep           -> platformWordSizeInBytes platform
+   WordRep          -> platformWordSizeInBytes platform
+   Int8Rep          -> 1
+   Int16Rep         -> 2
+   Int32Rep         -> 4
+   Int64Rep         -> wORD64_SIZE
+   Word8Rep         -> 1
+   Word16Rep        -> 2
+   Word32Rep        -> 4
+   Word64Rep        -> wORD64_SIZE
+   FloatRep         -> fLOAT_SIZE
+   DoubleRep        -> dOUBLE_SIZE
+   AddrRep          -> platformWordSizeInBytes platform
+   LiftedRep        -> platformWordSizeInBytes platform
+   UnliftedRep      -> platformWordSizeInBytes platform
+   VoidRep          -> 0
+   (VecRep len rep) -> len * primElemRepSizeB rep
 
 primElemRepSizeB :: PrimElemRep -> Int
 primElemRepSizeB Int8ElemRep   = 1
