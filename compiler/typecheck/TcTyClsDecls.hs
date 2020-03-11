@@ -39,7 +39,7 @@ import TcTyDecls
 import TcClassDcl
 import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo(..))
-import TcUnify ( unifyKind )
+import TcUnify ( unifyKind, checkTvConstraints )
 import TcHsType
 import ClsInst( AssocInstInfo(..) )
 import TcMType
@@ -2026,6 +2026,9 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        ; (ctxt, fds, sig_stuff, at_stuff)
             <- pushTcLevelM_   $
                solveEqualities $
+               checkTvConstraints skol_info (binderVars binders) $
+               -- The checkTvConstraints is needed bring into scope the
+               -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocM tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
@@ -2058,6 +2061,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                                 ppr fds)
        ; return clas }
   where
+    skol_info = TyConSkol ClassFlavour class_name
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
                                 ; tvs2' <- mapM (tcLookupTyVar . unLoc) tvs2 ;
                                 ; return (tvs1', tvs2') }
