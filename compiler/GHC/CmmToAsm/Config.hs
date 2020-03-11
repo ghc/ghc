@@ -2,13 +2,13 @@
 module GHC.CmmToAsm.Config
    ( Config(..)
    , configWordWidth
+   , platformWordWidth
    )
 where
 
 import GhcPrelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
-import Outputable
 
 -- | Native code generator configuration
 data Config = Config
@@ -17,7 +17,6 @@ data Config = Config
    , configDebugLevel          :: !Int         -- ^ Debug level
    , configExternalDynamicRefs :: !Bool        -- ^ Generate code to link against dynamic libraries
    , configPIC                 :: !Bool        -- ^ Enable Position-Independent Code
-   , configWordSize            :: !Int         -- ^ Word size in bytes
    , configSplitSections       :: !Bool        -- ^ Split sections
    , configSpillPreallocSize   :: !Int         -- ^ Size in bytes of the pre-allocated spill space on the C stack
    , configRegsIterative       :: !Bool
@@ -29,7 +28,10 @@ data Config = Config
 
 -- | Return Word size
 configWordWidth :: Config -> Width
-configWordWidth config = case configWordSize config of
-   4 -> W32
-   8 -> W64
-   _ -> panic "configWordWidth: unknown word size"
+configWordWidth config = platformWordWidth (configPlatform config)
+
+-- | Return Word size
+platformWordWidth :: Platform -> Width
+platformWordWidth platform = case platformWordSize platform of
+   PW4 -> W32
+   PW8 -> W64

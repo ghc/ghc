@@ -23,6 +23,7 @@ where
 
 
 import GhcPrelude
+import GHC.Platform
 
 import GHC.Core
 
@@ -152,9 +153,10 @@ unboxArg arg
   | Just tc <- tyConAppTyCon_maybe arg_ty,
     tc `hasKey` boolTyConKey
   = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
        prim_arg <- newSysLocalDs intPrimTy
        return (Var prim_arg,
-              \ body -> Case (mkIfThenElse arg (mkIntLit dflags 1) (mkIntLit dflags 0))
+              \ body -> Case (mkIfThenElse arg (mkIntLit platform 1) (mkIntLit platform 0))
                              prim_arg
                              (exprType body)
                              [(DEFAULT,[],body)])
@@ -326,10 +328,11 @@ resultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app
   , tc `hasKey` boolTyConKey
   = do { dflags <- getDynFlags
+       ; let platform = targetPlatform dflags
        ; let marshal_bool e
                = mkWildCase e intPrimTy boolTy
-                   [ (DEFAULT                   ,[],Var trueDataConId )
-                   , (LitAlt (mkLitInt dflags 0),[],Var falseDataConId)]
+                   [ (DEFAULT                     ,[],Var trueDataConId )
+                   , (LitAlt (mkLitInt platform 0),[],Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }
 
   -- Newtypes
@@ -349,8 +352,9 @@ resultWrapper result_ty
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
   , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
+       ; let platform = targetPlatform dflags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
-       ; let narrow_wrapper = maybeNarrow dflags tycon
+       ; let narrow_wrapper = maybeNarrow platform tycon
              marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys
                               `App` wrapper (narrow_wrapper e)
@@ -366,15 +370,17 @@ resultWrapper result_ty
 -- standard appears to say that this is the responsibility of the
 -- caller, not the callee.
 
-maybeNarrow :: DynFlags -> TyCon -> (CoreExpr -> CoreExpr)
-maybeNarrow dflags tycon
+maybeNarrow :: Platform -> TyCon -> (CoreExpr -> CoreExpr)
+maybeNarrow platform tycon
   | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
   | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
   | tycon `hasKey` int32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
+  , platformWordSizeInBytes platform > 4
+  = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
 
   | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
   | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
   | tycon `hasKey` word32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
+  , platformWordSizeInBytes platform > 4
+  = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
   | otherwise                     = id
