@@ -2152,7 +2152,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       [(DEFAULT,_,_)] -> False
       _               -> True
   , gopt Opt_CaseFolding dflags
-  , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
+  , Just (scrut', tx_con, mk_orig) <- caseRules (targetPlatform dflags) scrut
   = do { bndr' <- newId (fsLit "lwild") (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts

@@ -2469,7 +2469,7 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
     platform <- getPlatform
-    let byteArrayAlignment = wordAlignment dflags
+    let byteArrayAlignment = wordAlignment platform
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
         align = minimum [byteArrayAlignment, srcOffAlignment, dstOffAlignment]
@@ -2519,7 +2519,7 @@ doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
     platform <- getPlatform
 
-    let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
+    let byteArrayAlignment = wordAlignment platform -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
 
@@ -2587,10 +2587,9 @@ doCopyArrayOp = emitCopyArray copy
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
-        do dflags <- getDynFlags
-           platform <- getPlatform
+        do platform <- getPlatform
            emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
-               (wordAlignment dflags)
+               (wordAlignment platform)
 
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
@@ -2605,13 +2604,12 @@ doCopyMutableArrayOp = emitCopyArray copy
     -- we were provided are the same array!
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
-        dflags <- getDynFlags
         platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
             (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
-             (wordAlignment dflags))
+             (wordAlignment platform))
             (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
-             (wordAlignment dflags))
+             (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
 emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
@@ -2660,10 +2658,9 @@ doCopySmallArrayOp = emitCopySmallArray copy
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
-        do dflags <- getDynFlags
-           platform <- getPlatform
+        do platform <- getPlatform
            emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
-               (wordAlignment dflags)
+               (wordAlignment platform)
 
 
 doCopySmallMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
@@ -2674,13 +2671,12 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
     -- we were provided are the same array!
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
-        dflags <- getDynFlags
         platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
             (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
-             (wordAlignment dflags))
+             (wordAlignment platform))
             (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
-             (wordAlignment dflags))
+             (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
 emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
@@ -2750,7 +2746,7 @@ emitCloneArray info_p res_r src src_off n = do
               (mkIntExpr platform (arrPtrsHdrSizeW dflags)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
-        (wordAlignment dflags)
+        (wordAlignment platform)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
@@ -2788,7 +2784,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
               (mkIntExpr platform (smallArrPtrsHdrSizeW dflags)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
-        (wordAlignment dflags)
+        (wordAlignment platform)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 

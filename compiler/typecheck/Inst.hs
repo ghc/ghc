@@ -530,7 +530,8 @@ newOverloadedLit
     -- tauify the ExpType
   = do { res_ty <- expTypeToType res_ty
        ; dflags <- getDynFlags
-       ; case shortCutLit dflags val res_ty of
+       ; let platform = targetPlatform dflags
+       ; case shortCutLit platform val res_ty of
         -- Do not generate a LitInst for rebindable syntax.
         -- Reason: If we do, tcSimplify will call lookupInst, which
         --         will call tcSyntaxName, which does unification,

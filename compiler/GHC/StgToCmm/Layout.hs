@@ -463,7 +463,7 @@ mkVirtHeapOffsetsWithPadding dflags header things =
         (rep, thing) = fromNonVoid nv_thing
 
         -- Size of the field in bytes.
-        !sizeB = primRepSizeB dflags rep
+        !sizeB = primRepSizeB platform rep
 
         -- Align the start offset (eg, 2-byte value should be 2-byte aligned).
         -- But not more than to a word.
@@ -532,20 +532,20 @@ mkVirtConstrSizes dflags field_reps
 -- bring in ARG_P, ARG_N, etc.
 #include "../includes/rts/storage/FunTypes.h"
 
-mkArgDescr :: DynFlags -> [Id] -> ArgDescr
-mkArgDescr dflags args
-  = let arg_bits = argBits dflags arg_reps
+mkArgDescr :: Platform -> [Id] -> ArgDescr
+mkArgDescr platform args
+  = let arg_bits = argBits platform arg_reps
         arg_reps = filter isNonV (map idArgRep args)
            -- Getting rid of voids eases matching of standard patterns
     in case stdPattern arg_reps of
          Just spec_id -> ArgSpec spec_id
          Nothing      -> ArgGen  arg_bits
 
-argBits :: DynFlags -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
-argBits _      []           = []
-argBits dflags (P   : args) = False : argBits dflags args
-argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
-                    ++ argBits dflags args
+argBits :: Platform -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
+argBits _         []           = []
+argBits platform (P   : args) = False : argBits platform args
+argBits platform (arg : args) = take (argRepSizeW platform arg) (repeat True)
+                                 ++ argBits platform args
 
 ----------------------
 stdPattern :: [ArgRep] -> Maybe Int

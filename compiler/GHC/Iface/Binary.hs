@@ -133,9 +133,9 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- should be).  Also, the serialisation of value of type "Bin
     -- a" used to depend on the word size of the machine, now they
     -- are always 32 bits.
-    if wORD_SIZE dflags == 4
-        then do _ <- Binary.get bh :: IO Word32; return ()
-        else do _ <- Binary.get bh :: IO Word64; return ()
+    case platformWordSize (targetPlatform dflags) of
+      PW4 -> do _ <- Binary.get bh :: IO Word32; return ()
+      PW8 -> do _ <- Binary.get bh :: IO Word64; return ()
 
     -- Check the interface file version and ways.
     check_ver  <- get bh
@@ -191,9 +191,9 @@ writeBinIface dflags hi_path mod_iface = do
    -- dummy 32/64-bit field before the version/way for
    -- compatibility with older interface file formats.
    -- See Note [dummy iface field] above.
-    if wORD_SIZE dflags == 4
-        then Binary.put_ bh (0 :: Word32)
-        else Binary.put_ bh (0 :: Word64)
+    case platformWordSize (targetPlatform dflags) of
+      PW4 -> Binary.put_ bh (0 :: Word32)
+      PW8 -> Binary.put_ bh (0 :: Word64)
 
     -- The version and way descriptor go next
     put_ bh (show hiVersion)

@@ -488,6 +488,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
     makeStaticId <- dsLookupGlobalId makeStaticName
 
     dflags <- getDynFlags
+    let platform = targetPlatform dflags
     let (line, col) = case loc of
            RealSrcSpan r _ ->
                             ( srcLocLine $ realSrcSpanStart r
@@ -496,7 +497,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
            _             -> (0, 0)
         srcLoc = mkCoreConApps (tupleDataCon Boxed 2)
                      [ Type intTy              , Type intTy
-                     , mkIntExprInt dflags line, mkIntExprInt dflags col
+                     , mkIntExprInt platform line, mkIntExprInt platform col
                      ]
 
     putSrcSpanDs loc $ return $
@@ -890,7 +891,8 @@ dsExplicitList elt_ty Nothing xs
 dsExplicitList elt_ty (Just fln) xs
   = do { list <- dsExplicitList elt_ty Nothing xs
        ; dflags <- getDynFlags
-       ; dsSyntaxExpr fln [mkIntExprInt dflags (length xs), list] }
+       ; let platform = targetPlatform dflags
+       ; dsSyntaxExpr fln [mkIntExprInt platform (length xs), list] }
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)

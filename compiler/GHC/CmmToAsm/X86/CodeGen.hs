@@ -2185,11 +2185,12 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
             go dst_r src_r tmp_r (fromInteger n)
   where
+    platform = targetPlatform dflags
     -- The number of instructions we will generate (approx). We need 2
     -- instructions per move.
     insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
 
-    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
 
@@ -2241,7 +2242,8 @@ genCCall' dflags _ (PrimTarget (MO_Memset align)) _
           return $ code_dst dst_r `appOL`
                    go4 dst_r (fromInteger n)
   where
-    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    platform = targetPlatform dflags
+    maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
     c2 = c `shiftL` 8 .|. c
@@ -2884,8 +2886,7 @@ genCCall64' :: ForeignTarget      -- function to call
             -> [CmmActual]        -- arguments (of mixed type)
             -> NatM InstrBlock
 genCCall64' target dest_regs args = do
-    config <- getConfig
-    let platform = ncgPlatform config
+    platform <- getPlatform
     -- load up the register arguments
     let prom_args = map (maybePromoteCArg platform W32) args
 
@@ -3046,7 +3047,7 @@ genCCall64' target dest_regs args = do
     -- Align stack to 16n for calls, assuming a starting stack
     -- alignment of 16n - word_size on procedure entry. Which we
     -- maintain. See Note [rts/StgCRun.c : Stack Alignment on X86]
-    let word_size = platformWordSizeInBytes (ncgPlatform config)
+    let word_size = platformWordSizeInBytes platform
     (real_size, adjust_rsp) <-
         if (tot_arg_size + word_size) `rem` 16 == 0
             then return (tot_arg_size, nilOL)
@@ -3097,7 +3098,7 @@ genCCall64' target dest_regs args = do
                     -- stdcall has callee do it, but is not supported on
                     -- x86_64 target (see #3336)
                   (if real_size==0 then [] else
-                   [ADD (intFormat (ncgWordWidth config)) (OpImm (ImmInt real_size)) (OpReg esp)])
+                   [ADD (intFormat (platformWordWidth platform)) (OpImm (ImmInt real_size)) (OpReg esp)])
                   ++
                   [DELTA (delta + real_size)]
                )
@@ -3276,10 +3277,10 @@ genSwitch expr targets = do
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
 
-        offsetReg <- getNewRegNat (intFormat (ncgWordWidth config))
+        offsetReg <- getNewRegNat (intFormat (platformWordWidth platform))
         return $ if is32bit || os == OSDarwin
                  then e_code `appOL` t_code `appOL` toOL [
-                                ADD (intFormat (ncgWordWidth config)) op (OpReg tableReg),
+                                ADD (intFormat (platformWordWidth platform)) op (OpReg tableReg),
                                 JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
                  else -- HACK: On x86_64 binutils<2.17 is only able to generate
@@ -3290,7 +3291,7 @@ genSwitch expr targets = do
                       -- PprMach.hs/pprDataItem once binutils 2.17 is standard.
                       e_code `appOL` t_code `appOL` toOL [
                                MOVSxL II32 op (OpReg offsetReg),
-                               ADD (intFormat (ncgWordWidth config))
+                               ADD (intFormat (platformWordWidth platform))
                                    (OpReg offsetReg)
                                    (OpReg tableReg),
                                JMP_TBL (OpReg tableReg) ids rosection lbl

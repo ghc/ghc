@@ -89,7 +89,7 @@ module GHC.Core (
         -- * Core rule data types
         CoreRule(..), RuleBase,
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
-        RuleEnv(..), mkRuleEnv, emptyRuleEnv,
+        RuleEnv(..), RuleOpts(..), mkRuleEnv, emptyRuleEnv,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -100,6 +100,7 @@ module GHC.Core (
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import CostCentre
 import VarEnv( InScopeSet )
@@ -113,7 +114,6 @@ import Literal
 import GHC.Core.DataCon
 import Module
 import BasicTypes
-import GHC.Driver.Session
 import Outputable
 import Util
 import UniqSet
@@ -1384,7 +1384,14 @@ data CoreRule
     }
                 -- See Note [Extra args in rule matching] in GHC.Core.Rules
 
-type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+-- | Rule options
+data RuleOpts = RuleOpts
+   { roPlatform                :: !Platform -- ^ Target platform
+   , roNumConstantFolding      :: !Bool     -- ^ Enable more advanced numeric constant folding
+   , roExcessRationalPrecision :: !Bool     -- ^ Cut down precision of Rational values to that of Float/Double if disabled
+   }
+
+type RuleFun = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
 type InScopeEnv = (InScopeSet, IdUnfoldingFun)
 
 type IdUnfoldingFun = Id -> Unfolding
@@ -1963,23 +1970,23 @@ mkTyArg ty
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLit      :: DynFlags -> Integer -> Expr b
+mkIntLit      :: Platform -> Integer -> Expr b
 -- | Create a machine integer literal expression of type @Int#@ from an @Int@.
 -- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLitInt   :: DynFlags -> Int     -> Expr b
+mkIntLitInt   :: Platform -> Int     -> Expr b
 
-mkIntLit    dflags n = Lit (mkLitInt dflags n)
-mkIntLitInt dflags n = Lit (mkLitInt dflags (toInteger n))
+mkIntLit    platform n = Lit (mkLitInt platform n)
+mkIntLitInt platform n = Lit (mkLitInt platform (toInteger n))
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLit     :: DynFlags -> Integer -> Expr b
+mkWordLit     :: Platform -> Integer -> Expr b
 -- | Create a machine word literal expression of type  @Word#@ from a @Word@.
 -- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLitWord :: DynFlags -> Word -> Expr b
+mkWordLitWord :: Platform -> Word -> Expr b
 
-mkWordLit     dflags w = Lit (mkLitWord dflags w)
-mkWordLitWord dflags w = Lit (mkLitWord dflags (toInteger w))
+mkWordLit     platform w = Lit (mkLitWord platform w)
+mkWordLitWord platform w = Lit (mkLitWord platform (toInteger w))
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))

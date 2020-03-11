@@ -520,7 +520,6 @@ emitCmmLitSwitch scrut  branches deflt = do
     deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
 
-    dflags <- getDynFlags
     platform <- getPlatform
     let cmm_ty = cmmExprType platform scrut
         rep = typeWidth cmm_ty
@@ -530,8 +529,8 @@ emitCmmLitSwitch scrut  branches deflt = do
                     (LitNumber nt _ _, _) -> litNumIsSigned nt
                     _ -> False
 
-    let range | signed    = (tARGET_MIN_INT dflags, tARGET_MAX_INT dflags)
-              | otherwise = (0, tARGET_MAX_WORD dflags)
+    let range | signed    = (platformMinInt platform, platformMaxInt platform)
+              | otherwise = (0, platformMaxWord platform)
 
     if isFloatType cmm_ty
     then emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls

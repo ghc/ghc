@@ -63,6 +63,7 @@ import GHC.Core
 import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
 import Literal
 import GHC.Driver.Types
+import GHC.Platform
 
 import TysWiredIn
 import PrelNames
@@ -81,7 +82,6 @@ import FastString
 import UniqSupply
 import BasicTypes
 import Util
-import GHC.Driver.Session
 import Data.List
 
 import Data.Char        ( ord )
@@ -250,20 +250,20 @@ castBottomExpr e res_ty
 -}
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
-mkIntExpr dflags i = mkCoreConApps intDataCon  [mkIntLit dflags i]
+mkIntExpr :: Platform -> Integer -> CoreExpr        -- Result = I# i :: Int
+mkIntExpr platform i = mkCoreConApps intDataCon  [mkIntLit platform i]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExprInt :: DynFlags -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt dflags i = mkCoreConApps intDataCon  [mkIntLitInt dflags i]
+mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
+mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLitInt platform i]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
-mkWordExpr :: DynFlags -> Integer -> CoreExpr
-mkWordExpr dflags w = mkCoreConApps wordDataCon [mkWordLit dflags w]
+mkWordExpr :: Platform -> Integer -> CoreExpr
+mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: DynFlags -> Word -> CoreExpr
-mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
+mkWordExprWord :: Platform -> Word -> CoreExpr
+mkWordExprWord platform w = mkCoreConApps wordDataCon [mkWordLitWord platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer

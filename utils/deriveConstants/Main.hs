@@ -661,9 +661,6 @@ wanteds os = concat
           -- Size of a word, in bytes
           ,constantWord Haskell "WORD_SIZE" "SIZEOF_HSWORD"
 
-          -- Size of a double in StgWords.
-          ,constantWord Haskell "DOUBLE_SIZE" "SIZEOF_DOUBLE"
-
           -- Size of a C int, in bytes. May be smaller than wORD_SIZE.
           ,constantWord Haskell "CINT_SIZE"       "SIZEOF_INT"
           ,constantWord Haskell "CLONG_SIZE"      "SIZEOF_LONG"

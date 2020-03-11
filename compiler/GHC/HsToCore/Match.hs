@@ -24,6 +24,7 @@ where
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
@@ -186,11 +187,12 @@ match [] ty eqns
 match (v:vs) ty eqns    -- Eqns *can* be empty
   = ASSERT2( all (isInternalName . idName) vars, ppr vars )
     do  { dflags <- getDynFlags
+        ; let platform = targetPlatform dflags
                 -- Tidy the first pattern, generating
                 -- auxiliary bindings if necessary
         ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
                 -- Group the equations and match each group in turn
-        ; let grouped = groupEquations dflags tidy_eqns
+        ; let grouped = groupEquations platform tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
@@ -910,13 +912,13 @@ the PgN constructor as a Rational if numeric, and add a PgOverStr constructor
 for overloaded strings.
 -}
 
-groupEquations :: DynFlags -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInfo)]
+groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInfo)]
 -- If the result is of form [g1, g2, g3],
 -- (a) all the (pg,eq) pairs in g1 have the same pg
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
-groupEquations dflags eqns
-  = NEL.groupBy same_gp $ [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+groupEquations platform eqns
+  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
@@ -1117,7 +1119,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list _  (_:_)  []     = False
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
-patGroup :: DynFlags -> Pat GhcTc -> PatGroup
+patGroup :: Platform -> Pat GhcTc -> PatGroup
 patGroup _ (ConPatOut { pat_con = L _ con
                       , pat_arg_tys = tys })
  | RealDataCon dcon <- con              = PgCon dcon
@@ -1140,7 +1142,7 @@ patGroup _ (CoPat _ _ p _)              = PgCo  (hsPatType p)
                                                     -- Type of innelexp pattern
 patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList
-patGroup dflags (LitPat _ lit)          = PgLit (hsLitKey dflags lit)
+patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-

@@ -489,13 +489,14 @@ regUsedIn platform = regUsedIn_ where
 --
 ---------------------------------------------
 
-mkLiveness :: DynFlags -> [LocalReg] -> Liveness
+mkLiveness :: Platform -> [LocalReg] -> Liveness
 mkLiveness _      [] = []
-mkLiveness dflags (reg:regs)
-  = bits ++ mkLiveness dflags regs
+mkLiveness platform (reg:regs)
+  = bits ++ mkLiveness platform regs
   where
-    sizeW = (widthInBytes (typeWidth (localRegType reg)) + wORD_SIZE dflags - 1)
-            `quot` wORD_SIZE dflags
+    word_size = platformWordSizeInBytes platform
+    sizeW = (widthInBytes (typeWidth (localRegType reg)) + word_size - 1)
+            `quot` word_size
             -- number of words, rounded up
     bits = replicate sizeW is_non_ptr -- True <=> Non Ptr
 

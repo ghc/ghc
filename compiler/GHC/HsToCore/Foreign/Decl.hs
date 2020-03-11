@@ -423,6 +423,7 @@ dsFExportDynamic :: Id
 dsFExportDynamic id co0 cconv = do
     mod <- getModule
     dflags <- getDynFlags
+    let platform = targetPlatform dflags
     let fe_nm = mkFastString $ zEncodeString
             (moduleStableString mod ++ "$" ++ toCName dflags id)
         -- Construct the label based on the passed id, don't use names
@@ -444,7 +445,7 @@ dsFExportDynamic id co0 cconv = do
           to be entered using an external calling convention
           (stdcall, ccall).
          -}
-        adj_args      = [ mkIntLitInt dflags (ccallConvToInt cconv)
+        adj_args      = [ mkIntLitInt platform (ccallConvToInt cconv)
                         , Var stbl_value
                         , Lit (LitLabel fe_nm mb_sz_args IsFunction)
                         , Lit (mkLitString typestring)
@@ -549,10 +550,10 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   type_string
       -- libffi needs to know the result type too:
-      | libffi    = primTyDescChar dflags res_hty : arg_type_string
+      | libffi    = primTyDescChar platform res_hty : arg_type_string
       | otherwise = arg_type_string
 
-  arg_type_string = [primTyDescChar dflags ty | (_,_,ty,_) <- arg_info]
+  arg_type_string = [primTyDescChar platform ty | (_,_,ty,_) <- arg_info]
                 -- just the real args
 
   -- add some auxiliary args; the stable ptr in the wrapper case, and
@@ -802,8 +803,8 @@ getPrimTyOf ty
 -- represent a primitive type as a Char, for building a string that
 -- described the foreign function type.  The types are size-dependent,
 -- e.g. 'W' is a signed 32-bit integer.
-primTyDescChar :: DynFlags -> Type -> Char
-primTyDescChar dflags ty
+primTyDescChar :: Platform -> Type -> Char
+primTyDescChar platform ty
  | ty `eqType` unitTy = 'v'
  | otherwise
  = case typePrimRep1 (getPrimTyOf ty) of
@@ -816,7 +817,6 @@ primTyDescChar dflags ty
      DoubleRep   -> 'd'
      _           -> pprPanic "primTyDescChar" (ppr ty)
   where
-    (signed_word, unsigned_word)
-       | wORD_SIZE dflags == 4  = ('W','w')
-       | wORD_SIZE dflags == 8  = ('L','l')
-       | otherwise              = panic "primTyDescChar"
+    (signed_word, unsigned_word) = case platformWordSize platform of
+      PW4 -> ('W','w')
+      PW8 -> ('L','l')

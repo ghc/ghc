@@ -542,10 +542,11 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                 -- closure type, live regs
                 {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
+                      let platform = targetPlatform dflags
                       live <- sequence $7
                       let prof = NoProfilingInfo
                           -- drop one for the info pointer
-                          bitmap = mkLiveness dflags (drop 1 live)
+                          bitmap = mkLiveness platform (drop 1 live)
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
@@ -1145,15 +1146,15 @@ reserveStackFrame
   -> CmmParse ()
 reserveStackFrame psize preg body = do
   dflags <- getDynFlags
+  let platform = targetPlatform dflags
   old_updfr_off <- getUpdFrameOff
   reg <- preg
   esize <- psize
-  let platform = targetPlatform dflags
   let size = case constantFoldExpr platform esize of
                CmmLit (CmmInt n _) -> n
                _other -> pprPanic "CmmParse: not a compile-time integer: "
                             (ppr esize)
-  let frame = old_updfr_off + wORD_SIZE dflags * fromIntegral size
+  let frame = old_updfr_off + platformWordSizeInBytes platform * fromIntegral size
   emitAssign reg (CmmStackSlot Old frame)
   withUpdFrameOff frame body
 
@@ -1187,7 +1188,8 @@ foreignCall conv_string results_code expr_code args_code safety ret
           expr <- expr_code
           args <- sequence args_code
           let
-                  expr' = adjCallTarget dflags conv expr args
+                  platform = targetPlatform dflags
+                  expr' = adjCallTarget platform conv expr args
                   (arg_exprs, arg_hints) = unzip args
                   (res_regs,  res_hints) = unzip results
                   fc = ForeignConvention conv arg_hints res_hints ret
@@ -1230,7 +1232,6 @@ doJumpWithStack expr_code stk_code args_code = do
 doCall :: CmmParse CmmExpr -> [CmmParse LocalReg] -> [CmmParse CmmExpr]
        -> CmmParse ()
 doCall expr_code res_code args_code = do
-  dflags <- getDynFlags
   expr <- expr_code
   args <- sequence args_code
   ress <- sequence res_code
@@ -1238,16 +1239,15 @@ doCall expr_code res_code args_code = do
   c <- code $ mkCall expr (NativeNodeCall,NativeReturn) ress args updfr_off []
   emit c
 
-adjCallTarget :: DynFlags -> CCallConv -> CmmExpr -> [(CmmExpr, ForeignHint) ]
+adjCallTarget :: Platform -> CCallConv -> CmmExpr -> [(CmmExpr, ForeignHint) ]
               -> CmmExpr
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
-adjCallTarget dflags StdCallConv (CmmLit (CmmLabel lbl)) args
+adjCallTarget platform StdCallConv (CmmLit (CmmLabel lbl)) args
  | platformOS platform == OSMinGW32
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (e, _) = max (wORD_SIZE dflags) (widthInBytes (typeWidth (cmmExprType platform e)))
+  where size (e, _) = max (platformWordSizeInBytes platform) (widthInBytes (typeWidth (cmmExprType platform e)))
                  -- c.f. CgForeignCall.emitForeignCall
-        platform = targetPlatform dflags
 adjCallTarget _ _ expr _
   = expr
 
@@ -1380,7 +1380,8 @@ doSwitch mb_range scrut arms deflt
         let table = M.fromList (concat table_entries)
 
         dflags <- getDynFlags
-        let range = fromMaybe (0, tARGET_MAX_WORD dflags) mb_range
+        let platform = targetPlatform dflags
+        let range = fromMaybe (0, platformMaxWord platform) mb_range
 
         expr <- scrut
         -- ToDo: check for out of range and jump to default if necessary

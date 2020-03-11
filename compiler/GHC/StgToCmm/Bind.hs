@@ -14,6 +14,7 @@ module GHC.StgToCmm.Bind (
   ) where
 
 import GhcPrelude hiding ((<*>))
+import GHC.Platform
 
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
@@ -69,9 +70,10 @@ cgTopRhsClosure :: DynFlags
                 -> (CgIdInfo, FCode ())
 
 cgTopRhsClosure dflags rec id ccs upd_flag args body =
-  let closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
+  let platform      = targetPlatform dflags
+      closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
       cg_id_info    = litIdInfo dflags id lf_info (CmmLabel closure_label)
-      lf_info       = mkClosureLFInfo dflags id TopLevel [] upd_flag args
+      lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
   in (cg_id_info, gen_code dflags lf_info closure_label)
   where
   -- special case for a indirection (f = g).  We create an IND_STATIC
@@ -323,10 +325,11 @@ mkRhsClosure    dflags bndr _cc
 
 ---------- Default case ------------------
 mkRhsClosure dflags bndr cc fvs upd_flag args body
-  = do  { let lf_info = mkClosureLFInfo dflags bndr NotTopLevel fvs upd_flag args
+  = do  { let lf_info = mkClosureLFInfo platform bndr NotTopLevel fvs upd_flag args
         ; (id_info, reg) <- rhsIdInfo bndr lf_info
         ; return (id_info, gen_code lf_info reg) }
  where
+ platform = targetPlatform dflags
  gen_code lf_info reg
   = do  {       -- LAY OUT THE OBJECT
         -- If the binder is itself a free variable, then don't store
@@ -340,7 +343,6 @@ mkRhsClosure dflags bndr cc fvs upd_flag args body
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
-        ; dflags <- getDynFlags
         ; let   name  = idName bndr
                 descr = closureDescription dflags mod_name name
                 fv_details :: [(NonVoid Id, ByteOff)]
@@ -412,18 +414,18 @@ cgRhsStdThunk bndr lf_info payload
   ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
 
 
-mkClosureLFInfo :: DynFlags
+mkClosureLFInfo :: Platform
                 -> Id           -- The binder
                 -> TopLevelFlag -- True of top level
                 -> [NonVoid Id] -- Free vars
                 -> UpdateFlag   -- Update flag
                 -> [Id]         -- Args
                 -> LambdaFormInfo
-mkClosureLFInfo dflags bndr top fvs upd_flag args
+mkClosureLFInfo platform bndr top fvs upd_flag args
   | null args =
         mkLFThunk (idType bndr) top (map fromNonVoid fvs) upd_flag
   | otherwise =
-        mkLFReEntrant top (map fromNonVoid fvs) args (mkArgDescr dflags args)
+        mkLFReEntrant top (map fromNonVoid fvs) args (mkArgDescr platform args)
 
 
 ------------------------------------------------------------------------

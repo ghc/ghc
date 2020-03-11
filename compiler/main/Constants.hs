@@ -42,5 +42,9 @@ wORD64_SIZE = 8
 fLOAT_SIZE :: Int
 fLOAT_SIZE = 4
 
+-- Size of double in bytes.
+dOUBLE_SIZE :: Int
+dOUBLE_SIZE = 8
+
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff

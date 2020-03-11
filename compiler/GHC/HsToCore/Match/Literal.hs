@@ -24,6 +24,7 @@ where
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsExpr, dsSyntaxExpr )
@@ -88,19 +89,20 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 dsLit :: HsLit GhcRn -> DsM CoreExpr
 dsLit l = do
   dflags <- getDynFlags
+  let platform = targetPlatform dflags
   case l of
     HsStringPrim _ s -> return (Lit (LitString s))
     HsCharPrim   _ c -> return (Lit (LitChar c))
-    HsIntPrim    _ i -> return (Lit (mkLitIntWrap dflags i))
-    HsWordPrim   _ w -> return (Lit (mkLitWordWrap dflags w))
-    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap dflags i))
-    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap dflags w))
+    HsIntPrim    _ i -> return (Lit (mkLitIntWrap platform i))
+    HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
+    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap platform i))
+    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap platform w))
     HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
     HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> mkIntegerExpr i
-    HsInt _ i        -> return (mkIntExpr dflags (il_value i))
+    HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit nec         -> noExtCon nec
     HsRat _ (FL _ _ val) ty -> do
       num   <- mkIntegerExpr (numerator val)
@@ -119,7 +121,8 @@ dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 dsOverLit (OverLit { ol_val = val, ol_ext = OverLitTc rebindable ty
                    , ol_witness = witness }) = do
   dflags <- getDynFlags
-  case shortCutLit dflags val ty of
+  let platform = targetPlatform dflags
+  case shortCutLit platform val ty of
     Just expr | not rebindable -> dsExpr expr        -- Note [Literal short cut]
     _                          -> dsExpr witness
 dsOverLit (XOverLit nec) = noExtCon nec
@@ -426,9 +429,10 @@ matchLiterals (var :| vars) ty sub_groups
     match_group :: NonEmpty EquationInfo -> DsM (Literal, MatchResult)
     match_group eqns@(firstEqn :| _)
         = do { dflags <- getDynFlags
+             ; let platform = targetPlatform dflags
              ; let LitPat _ hs_lit = firstPat firstEqn
              ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
-             ; return (hsLitKey dflags hs_lit, match_result) }
+             ; return (hsLitKey platform hs_lit, match_result) }
 
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
         -- Equality check for string literals
@@ -443,7 +447,7 @@ matchLiterals (var :| vars) ty sub_groups
 
 
 ---------------------------
-hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
+hsLitKey :: Platform -> HsLit GhcTc -> Literal
 -- Get the Core literal corresponding to a HsLit.
 -- It only works for primitive types and strings;
 -- others have been removed by tidy
@@ -453,15 +457,15 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- In the case of the fixed-width numeric types, we need to wrap here
 -- because Literal has an invariant that the literal is in range, while
 -- HsLit does not.
-hsLitKey dflags (HsIntPrim    _ i) = mkLitIntWrap  dflags i
-hsLitKey dflags (HsWordPrim   _ w) = mkLitWordWrap dflags w
-hsLitKey dflags (HsInt64Prim  _ i) = mkLitInt64Wrap  dflags i
-hsLitKey dflags (HsWord64Prim _ w) = mkLitWord64Wrap dflags w
-hsLitKey _      (HsCharPrim   _ c) = mkLitChar            c
-hsLitKey _      (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
-hsLitKey _      (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
-hsLitKey _      (HsString _ s)     = LitString (bytesFS s)
-hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
+hsLitKey platform (HsIntPrim    _ i) = mkLitIntWrap  platform i
+hsLitKey platform (HsWordPrim   _ w) = mkLitWordWrap platform w
+hsLitKey platform (HsInt64Prim  _ i) = mkLitInt64Wrap  platform i
+hsLitKey platform (HsWord64Prim _ w) = mkLitWord64Wrap platform w
+hsLitKey _        (HsCharPrim   _ c) = mkLitChar            c
+hsLitKey _        (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
+hsLitKey _        (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
+hsLitKey _        (HsString _ s)     = LitString (bytesFS s)
+hsLitKey _        l                  = pprPanic "hsLitKey" (ppr l)
 
 {-
 ************************************************************************

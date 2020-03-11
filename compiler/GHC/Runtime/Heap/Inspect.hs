@@ -26,6 +26,7 @@ module GHC.Runtime.Heap.Inspect(
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
@@ -380,7 +381,7 @@ cPprTermBase y =
                 alloca $ \p -> poke p w >> peek (castPtr p)
       return (Just (Ppr.double f))
    -- let's assume that if we get two words, we're on a 32-bit
-   -- machine. There's no good way to get a DynFlags to check the word
+   -- machine. There's no good way to get a Platform to check the word
    -- size here.
    ppr_double  _ Term{subTerms=[Prim{valRaw=[w1,w2]}]} = do
       let f = unsafeDupablePerformIO $
@@ -865,9 +866,10 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
           -- within a single word. See also
           -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding
           dflags <- getDynFlags
-          let word_size = wORD_SIZE dflags
+          let platform = targetPlatform dflags
+              word_size = platformWordSizeInBytes platform
               big_endian = wORDS_BIGENDIAN dflags
-              size_b = primRepSizeB dflags rep
+              size_b = primRepSizeB platform rep
               -- Align the start offset (eg, 2-byte value should be 2-byte
               -- aligned). But not more than to a word. The offset calculation
               -- should be the same with the offset calculation in

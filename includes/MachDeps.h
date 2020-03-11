@@ -32,9 +32,7 @@
  *
  * To get target's values it is preferred to use runtime target
  * configuration from 'targetPlatform :: DynFlags -> Platform'
- * record. A few wrappers are already defined and used throughout GHC:
- *    wORD_SIZE :: DynFlags -> Int
- *    wORD_SIZE dflags = pc_WORD_SIZE (platformConstants dflags)
+ * record.
  *
  * Hence we hide these macros from GHC_STAGE=1
  */

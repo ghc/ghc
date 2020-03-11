@@ -1912,11 +1912,11 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
-       = do { dflags <- getDynFlags
+       = do { platform <- targetPlatform <$> getDynFlags
             ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
                          (report "between unboxed and boxed value")
-            ; checkWarnL (TyCon.primRepSizeB dflags rep1
-                           == TyCon.primRepSizeB dflags rep2)
+            ; checkWarnL (TyCon.primRepSizeB platform rep1
+                           == TyCon.primRepSizeB platform rep2)
                          (report "between unboxed values of different size")
             ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
                                    (TyCon.primRepIsFloat rep2)

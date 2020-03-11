@@ -203,7 +203,6 @@ module GHC.Driver.Session (
         wordAlignment,
         tAG_MASK,
         mAX_PTR_TAG,
-        tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
 
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
@@ -292,13 +291,11 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Bits
 import Data.Char
-import Data.Int
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Word
 import System.FilePath
 import System.Directory
 import System.Environment (lookupEnv)
@@ -4915,32 +4912,17 @@ compilerInfo dflags
 #include "GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
-bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
+bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` platformWordSizeInBytes platform
+   where platform = targetPlatform dflags
 
-wordAlignment :: DynFlags -> Alignment
-wordAlignment dflags = alignmentOf (wORD_SIZE dflags)
+wordAlignment :: Platform -> Alignment
+wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
 
 tAG_MASK :: DynFlags -> Int
 tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
 
 mAX_PTR_TAG :: DynFlags -> Int
 mAX_PTR_TAG = tAG_MASK
-
--- Might be worth caching these in targetPlatform?
-tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
-tARGET_MIN_INT dflags
-    = case platformWordSize (targetPlatform dflags) of
-      PW4 -> toInteger (minBound :: Int32)
-      PW8 -> toInteger (minBound :: Int64)
-tARGET_MAX_INT dflags
-    = case platformWordSize (targetPlatform dflags) of
-      PW4 -> toInteger (maxBound :: Int32)
-      PW8 -> toInteger (maxBound :: Int64)
-tARGET_MAX_WORD dflags
-    = case platformWordSize (targetPlatform dflags) of
-      PW4 -> toInteger (maxBound :: Word32)
-      PW8 -> toInteger (maxBound :: Word64)
-
 
 {- -----------------------------------------------------------------------------
 Note [DynFlags consistency]
