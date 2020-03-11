@@ -766,7 +766,6 @@ registerTimeout mgr@Manager{..} relTime cb = do
       editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
       debugIO $ "preWakeupIOManager:: expTime:" ++ show expTime ++ " now:" ++ show now
       wakeupIOManager
-    traceEventIO "Woke up io manager"
     return $ TK key
 
 -- | Update an active timeout to fire in the given number of seconds (from the
