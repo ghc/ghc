@@ -153,7 +153,6 @@ initConfig dflags = Config
    , configDebugLevel          = debugLevel dflags
    , configExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
    , configPIC                 = positionIndependent dflags
-   , configWordSize            = wORD_SIZE dflags
    , configSplitSections       = gopt Opt_SplitSections dflags
    , configSpillPreallocSize   = rESERVED_C_STACK_BYTES dflags
    , configRegsIterative       = gopt Opt_RegsIterative dflags

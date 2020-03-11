@@ -96,7 +96,7 @@ assembleBCOs
   -> IO CompiledByteCode
 assembleBCOs hsc_env proto_bcos tycons top_strs modbreaks = do
   itblenv <- mkITbls hsc_env tycons
-  bcos    <- mapM (assembleBCO (hsc_dflags hsc_env)) proto_bcos
+  bcos    <- mapM (assembleBCO (targetPlatform (hsc_dflags hsc_env))) proto_bcos
   (bcos',ptrs) <- mallocStrings hsc_env bcos
   return CompiledByteCode
     { bc_bcos = bcos'
@@ -151,20 +151,19 @@ mallocStrings hsc_env ulbcos = do
 
 assembleOneBCO :: HscEnv -> ProtoBCO Name -> IO UnlinkedBCO
 assembleOneBCO hsc_env pbco = do
-  ubco <- assembleBCO (hsc_dflags hsc_env) pbco
+  ubco <- assembleBCO (targetPlatform (hsc_dflags hsc_env)) pbco
   ([ubco'], _ptrs) <- mallocStrings hsc_env [ubco]
   return ubco'
 
-assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO dflags (ProtoBCO { protoBCOName       = nm
+assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
+assembleBCO platform (ProtoBCO { protoBCOName       = nm
                              , protoBCOInstrs     = instrs
                              , protoBCOBitmap     = bitmap
                              , protoBCOBitmapSize = bsize
                              , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
-  let asm = mapM_ (assembleI dflags) instrs
+  let asm = mapM_ (assembleI platform) instrs
 
-      platform = targetPlatform dflags
       initial_offset = 0
 
       -- Jump instructions are variable-sized, there are long and short variants
@@ -347,10 +346,10 @@ largeArg16s platform = case platformWordSize platform of
    PW8 -> 4
    PW4 -> 2
 
-assembleI :: DynFlags
+assembleI :: Platform
           -> BCInstr
           -> Assembler ()
-assembleI dflags i = case i of
+assembleI platform i = case i of
   STKCHECK n               -> emit bci_STKCHECK [Op n]
   PUSH_L o1                -> emit bci_PUSH_L [SmallOp o1]
   PUSH_LL o1 o2            -> emit bci_PUSH_LL [SmallOp o1, SmallOp o2]
@@ -365,14 +364,14 @@ assembleI dflags i = case i of
                                  emit bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
                                  emit bci_PUSH_G [Op p]
-  PUSH_BCO proto           -> do let ul_bco = assembleBCO dflags proto
+  PUSH_BCO proto           -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit bci_PUSH_G [Op p]
-  PUSH_ALTS proto          -> do let ul_bco = assembleBCO dflags proto
+  PUSH_ALTS proto          -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit bci_PUSH_ALTS [Op p]
   PUSH_ALTS_UNLIFTED proto pk
-                           -> do let ul_bco = assembleBCO dflags proto
+                           -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
   PUSH_PAD8                -> emit bci_PUSH_PAD8 []
@@ -443,7 +442,7 @@ assembleI dflags i = case i of
 
   where
     literal (LitLabel fs (Just sz) _)
-     | platformOS (targetPlatform dflags) == OSMinGW32
+     | platformOS platform == OSMinGW32
          = litlabel (appendFS fs (mkFastString ('@':show sz)))
      -- On Windows, stdcall labels have a suffix indicating the no. of
      -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
@@ -469,9 +468,9 @@ assembleI dflags i = case i of
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]
     float = words . mkLitF
-    double = words . mkLitD dflags
+    double = words . mkLitD platform
     int = words . mkLitI
-    int64 = words . mkLitI64 dflags
+    int64 = words . mkLitI64 platform
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]
 
@@ -505,8 +504,8 @@ return_ubx V64 = error "return_ubx: vector"
 -- bit pattern is correct for the host's word size and endianness.
 mkLitI   ::             Int    -> [Word]
 mkLitF   ::             Float  -> [Word]
-mkLitD   :: DynFlags -> Double -> [Word]
-mkLitI64 :: DynFlags -> Int64  -> [Word]
+mkLitD   :: Platform -> Double -> [Word]
+mkLitI64 :: Platform -> Int64  -> [Word]
 
 mkLitF f
    = runST (do
@@ -517,9 +516,8 @@ mkLitF f
         return [w0 :: Word]
      )
 
-mkLitD dflags d
-   | wORD_SIZE dflags == 4
-   = runST (do
+mkLitD platform d = case platformWordSize platform of
+   PW4 -> runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 d
         d_arr <- castSTUArray arr
@@ -527,20 +525,16 @@ mkLitD dflags d
         w1 <- readArray d_arr 1
         return [w0 :: Word, w1]
      )
-   | wORD_SIZE dflags == 8
-   = runST (do
+   PW8 -> runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 d
         d_arr <- castSTUArray arr
         w0 <- readArray d_arr 0
         return [w0 :: Word]
      )
-   | otherwise
-   = panic "mkLitD: Bad wORD_SIZE"
 
-mkLitI64 dflags ii
-   | wORD_SIZE dflags == 4
-   = runST (do
+mkLitI64 platform ii = case platformWordSize platform of
+   PW4 -> runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 ii
         d_arr <- castSTUArray arr
@@ -548,16 +542,13 @@ mkLitI64 dflags ii
         w1 <- readArray d_arr 1
         return [w0 :: Word,w1]
      )
-   | wORD_SIZE dflags == 8
-   = runST (do
+   PW8 -> runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 ii
         d_arr <- castSTUArray arr
         w0 <- readArray d_arr 0
         return [w0 :: Word]
      )
-   | otherwise
-   = panic "mkLitI64: Bad wORD_SIZE"
 
 mkLitI i = [fromIntegral i :: Word]
 
