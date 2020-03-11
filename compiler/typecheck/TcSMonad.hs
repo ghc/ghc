@@ -9,17 +9,17 @@ module TcSMonad (
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt,
     extendWorkListCts, extendWorkListEq, extendWorkListFunEq,
-    appendWorkList, extendWorkListImplic,
+    appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
-    getWorkList, updWorkListTcS,
+    getWorkList, updWorkListTcS, pushLevelNoWorkList,
 
     -- The TcS monad
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
-    checkConstraintsTcS, checkTvConstraintsTcS,
+    emitImplicationTcS, emitTvImplicationTcS,
 
     runTcPluginTcS, addUsedGRE, addUsedGREs, keepAlive,
     matchGlobalInst, TcM.ClsInstResult(..),
@@ -319,8 +319,8 @@ extendWorkListDeriveds :: [CtEvidence] -> WorkList -> WorkList
 extendWorkListDeriveds evs wl
   = extendWorkListCts (map mkNonCanonical evs) wl
 
-extendWorkListImplic :: Bag Implication -> WorkList -> WorkList
-extendWorkListImplic implics wl = wl { wl_implics = implics `unionBags` wl_implics wl }
+extendWorkListImplic :: Implication -> WorkList -> WorkList
+extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
@@ -2905,85 +2905,48 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-checkTvConstraintsTcS :: SkolemInfo
-                      -> [TcTyVar]        -- Skolems
-                      -> TcS (result, Cts)
-                      -> TcS result
--- Just like TcUnify.checkTvConstraints, but
---   - In the TcS monnad
---   - The thing-inside should not put things in the work-list
---     Instead, it returns the Wanted constraints it needs
---   - No 'givens', and no TcEvBinds; this is type-level constraints only
-checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
-  = TcS $ \ tcs_env ->
-    do { let wl_panic  = pprPanic "TcSMonad.buildImplication" $
-                         ppr skol_info $$ ppr skol_tvs
-                         -- This panic checks that the thing-inside
-                         -- does not emit any work-list constraints
-             new_tcs_env = tcs_env { tcs_worklist = wl_panic }
+emitImplicationTcS :: TcLevel -> SkolemInfo
+                   -> [TcTyVar]        -- Skolems
+                   -> [EvVar]          -- Givens
+                   -> Cts              -- Wanteds
+                   -> TcS TcEvBinds
+-- Add an implication to the TcS monad work-list
+emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
+  = do { let wc = emptyWC { wc_simple = wanteds }
+       ; imp <- wrapTcS $
+                do { ev_binds_var <- TcM.newTcEvBinds
+                   ; imp <- TcM.newImplication
+                   ; return (imp { ic_tclvl  = new_tclvl
+                                 , ic_skols  = skol_tvs
+                                 , ic_given  = givens
+                                 , ic_wanted = wc
+                                 , ic_binds  = ev_binds_var
+                                 , ic_info   = skol_info }) }
 
-       ; (new_tclvl, (res, wanteds)) <- TcM.pushTcLevelM $
-                                        thing_inside new_tcs_env
+       ; emitImplication imp
+       ; return (TcEvBinds (ic_binds imp)) }
 
-       ; unless (null wanteds) $
-         do { ev_binds_var <- TcM.newNoTcEvBinds
-            ; imp <- TcM.newImplication
-            ; let wc = emptyWC { wc_simple = wanteds }
-                  imp' = imp { ic_tclvl  = new_tclvl
-                             , ic_skols  = skol_tvs
-                             , ic_wanted = wc
-                             , ic_binds  = ev_binds_var
-                             , ic_info   = skol_info }
+emitTvImplicationTcS :: TcLevel -> SkolemInfo
+                     -> [TcTyVar]        -- Skolems
+                     -> Cts              -- Wanteds
+                     -> TcS ()
+-- Just like emitImplicationTcS but no givens and no bindings
+emitTvImplicationTcS new_tclvl skol_info skol_tvs wanteds
+  = do { let wc = emptyWC { wc_simple = wanteds }
+       ; imp <- wrapTcS $
+                do { ev_binds_var <- TcM.newNoTcEvBinds
+                   ; imp <- TcM.newImplication
+                   ; return (imp { ic_tclvl  = new_tclvl
+                                 , ic_skols  = skol_tvs
+                                 , ic_wanted = wc
+                                 , ic_binds  = ev_binds_var
+                                 , ic_info   = skol_info }) }
 
-           -- Add the implication to the work-list
-           ; TcM.updTcRef (tcs_worklist tcs_env)
-                          (extendWorkListImplic (unitBag imp')) }
+       ; emitImplication imp }
 
-      ; return res }
 
-checkConstraintsTcS :: SkolemInfo
-                    -> [TcTyVar]        -- Skolems
-                    -> [EvVar]          -- Givens
-                    -> TcS (result, Cts)
-                    -> TcS (result, TcEvBinds)
--- Just like checkConstraintsTcS, but
---   - In the TcS monnad
---   - The thing-inside should not put things in the work-list
---     Instead, it returns the Wanted constraints it needs
---   - I did not bother to put in the fast-path for
---     empty-skols/empty-givens, or for empty-wanteds, because
---     this function is used only for "quantified constraints" in
---     with both tests are pretty much guaranteed to fail
-checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
-  = TcS $ \ tcs_env ->
-    do { let wl_panic  = pprPanic "TcSMonad.buildImplication" $
-                         ppr skol_info $$ ppr skol_tvs
-                         -- This panic checks that the thing-inside
-                         -- does not emit any work-list constraints
-             new_tcs_env = tcs_env { tcs_worklist = wl_panic }
-
-       ; (new_tclvl, (res, wanteds)) <- TcM.pushTcLevelM $
-                                        thing_inside new_tcs_env
-
-       ; ev_binds_var <- TcM.newTcEvBinds
-       ; imp <- TcM.newImplication
-       ; let wc = emptyWC { wc_simple = wanteds }
-             imp' = imp { ic_tclvl  = new_tclvl
-                        , ic_skols  = skol_tvs
-                        , ic_given  = given
-                        , ic_wanted = wc
-                        , ic_binds  = ev_binds_var
-                        , ic_info   = skol_info }
-
-           -- Add the implication to the work-list
-       ; TcM.updTcRef (tcs_worklist tcs_env)
-                      (extendWorkListImplic (unitBag imp'))
-
-       ; return (res, TcEvBinds ev_binds_var) }
-
-{-
-Note [Propagate the solved dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Propagate the solved dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's really quite important that nestTcS does not discard the solved
 dictionaries from the thing_inside.
 Consider
@@ -3017,6 +2980,23 @@ getWorkListImplics
        ; wl_curr <- readTcRef wl_var
        ; return (wl_implics wl_curr) }
 
+pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
+-- Push the level and run thing_inside
+-- However, thing_inside should not generate any work items
+#if defined(DEBUG)
+pushLevelNoWorkList err_doc (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM $
+                 thing_inside (env { tcs_worklist = wl_panic })
+        )
+  where
+    wl_panic  = pprPanic "TcSMonad.buildImplication" err_doc
+                         -- This panic checks that the thing-inside
+                         -- does not emit any work-list constraints
+#else
+pushLevelNoWorkList _ (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM (thing_inside env))  -- Don't check
+#endif
+
 updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
 updWorkListTcS f
   = do { wl_var <- getTcSWorkListRef
@@ -3034,6 +3014,10 @@ emitWork [] = return ()   -- avoid printing, among other work
 emitWork cts
   = do { traceTcS "Emitting fresh work" (vcat (map ppr cts))
        ; updWorkListTcS (extendWorkListCts cts) }
+
+emitImplication :: Implication -> TcS ()
+emitImplication implic
+  = updWorkListTcS (extendWorkListImplic implic)
 
 newTcRef :: a -> TcS (TcRef a)
 newTcRef x = wrapTcS (TcM.newTcRef x)
