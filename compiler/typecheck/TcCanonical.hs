@@ -852,12 +852,15 @@ solveForAll ev tvs theta pred pend_sc
        ; (subst, skol_tvs) <- tcInstSkolTyVarsX empty_subst tvs
        ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
 
-       ; (w_id, ev_binds)
-             <- checkConstraintsTcS skol_info skol_tvs given_ev_vars $
+       ; (lvl, (w_id, wanteds))
+             <- pushLevelNoWorkList (ppr skol_info) $
                 do { wanted_ev <- newWantedEvVarNC loc $
                                   substTy subst pred
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
+
+      ; ev_binds <- emitImplicationTcS lvl skol_info skol_tvs
+                                       given_ev_vars wanteds
 
       ; setWantedEvTerm dest $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
@@ -1118,8 +1121,9 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             empty_subst2 = mkEmptyTCvSubst (getTCvInScope subst1)
 
-      ; all_co <- checkTvConstraintsTcS skol_info skol_tvs $
-                  go skol_tvs empty_subst2 bndrs2
+      ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info) $
+                                    go skol_tvs empty_subst2 bndrs2
+      ; emitTvImplicationTcS lvl skol_info skol_tvs wanteds
 
       ; setWantedEq orig_dest all_co
       ; stopWith ev "Deferred polytype equality" } }
