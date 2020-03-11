@@ -829,18 +829,27 @@ update_bkwd_compact( generation *gen )
     for (; bd != NULL; bd = bd->link) {
         P_ p = bd->start;
 
-        while (p < bd->free ) {
+        while (p < bd->free) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while (p < bd->free && !is_marked(p,bd)) {
                 p++;
             }
+
             if (p >= bd->free) {
                 break;
             }
 
             if (is_marked(p+1,bd)) {
-                // don't forget to update the free ptr in the block desc.
+                // Don't forget to update the free ptr in the block desc
                 free_bd->free = free;
+
+                // Zero the remaining bytes of this block before moving on to
+                // the next block
+                IF_DEBUG(zero_on_gc, {
+                    memset(free_bd->free, 0xaa,
+                           BLOCK_SIZE - ((W_)(free_bd->free - free_bd->start) * sizeof(W_)));
+                });
+
                 free_bd = free_bd->link;
                 free = free_bd->start;
                 free_blocks++;
@@ -867,12 +876,20 @@ update_bkwd_compact( generation *gen )
         }
     }
 
-    // free the remaining blocks and count what's left.
+    // Free the remaining blocks and count what's left.
     free_bd->free = free;
     if (free_bd->link != NULL) {
         freeChain(free_bd->link);
         free_bd->link = NULL;
     }
+
+    // Zero the free bits of the last used block.
+    IF_DEBUG(zero_on_gc, {
+        W_ block_size_bytes = free_bd->blocks * BLOCK_SIZE;
+        W_ block_in_use_bytes = (free_bd->free - free_bd->start) * sizeof(W_);
+        W_ block_free_bytes = block_size_bytes - block_in_use_bytes;
+        memset(free_bd->free, 0xaa, block_free_bytes);
+    });
 
     return free_blocks;
 }
