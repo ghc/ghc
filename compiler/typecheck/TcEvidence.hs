@@ -442,8 +442,7 @@ use CoEvBindsVar (see newCoTcEvBinds) to signal that no term-level
 evidence bindings are allowed.  Notebly ():
 
   - Places in types where we are solving kind constraints (all of which
-    are equalities); see solveEqualities, solveLocalEqualities,
-    checkTvConstraints
+    are equalities); see solveEqualities, solveLocalEqualities
 
   - When unifying forall-types
 -}
