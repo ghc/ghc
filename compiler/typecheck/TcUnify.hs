@@ -1195,18 +1195,14 @@ checkConstraints skol_info skol_tvs given thing_inside
                  ; return (emptyTcEvBinds, res) } }
 
 checkTvConstraints :: SkolemInfo
-                   -> Maybe SDoc  -- User-written telescope, if present
-                   -> TcM ([TcTyVar], result)
-                   -> TcM ([TcTyVar], result)
+                   -> [TcTyVar]          -- Skolem tyvars
+                   -> TcM result
+                   -> TcM result
 
-checkTvConstraints skol_info m_telescope thing_inside
-  = do { (tclvl, wanted, (skol_tvs, result))
-             <- pushLevelAndCaptureConstraints thing_inside
-
-       ; emitResidualTvConstraint skol_info m_telescope
-                                  skol_tvs tclvl wanted
-
-       ; return (skol_tvs, result) }
+checkTvConstraints skol_info skol_tvs thing_inside
+  = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+       ; emitResidualTvConstraint skol_info Nothing skol_tvs tclvl wanted
+       ; return result }
 
 emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()

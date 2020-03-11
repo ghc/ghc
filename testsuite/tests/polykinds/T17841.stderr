@@ -1,0 +1,13 @@
+
+T17841.hs:7:40: error:
+    • Couldn't match kind ‘k’ with ‘*’
+      ‘k’ is a rigid type variable bound by
+        the class declaration for ‘Foo’
+        at T17841.hs:7:17
+      When matching kinds
+        k0 :: *
+        t :: k
+      Expected kind ‘t’, but ‘a’ has kind ‘k0’
+    • In the first argument of ‘Proxy’, namely ‘(a :: t)’
+      In the type signature: foo :: Proxy (a :: t)
+      In the class declaration for ‘Foo’
