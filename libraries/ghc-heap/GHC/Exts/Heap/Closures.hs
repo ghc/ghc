@@ -347,7 +347,8 @@ allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
 
 #if __GLASGOW_HASKELL__ >= 809
--- | Get the size of a closure in words.
+-- | Get the size of the top-level closure in words.
+-- Includes header and payload. Does not follow pointers.
 --
 -- @since 8.10.1
 closureSize :: Box -> Int
