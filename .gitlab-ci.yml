@@ -51,7 +51,8 @@ stages:
     when: always
     expire_in: 1 year
   only:
-    - tags
+    variables:
+      - $RELEASE == "yes"
 
 ############################################################
 # Runner Tags
