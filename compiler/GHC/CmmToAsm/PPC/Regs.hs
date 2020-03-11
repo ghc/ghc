@@ -54,7 +54,6 @@ import GhcPrelude
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
@@ -199,11 +198,11 @@ addrOffset addr off
 -- temporaries and for excess call arguments.  @fpRel@, where
 -- applicable, is the same but for the frame pointer.
 
-spRel :: Config
+spRel :: Platform
       -> Int    -- desired stack offset in words, positive or negative
       -> AddrMode
 
-spRel config n = AddrRegImm sp (ImmInt (n * configWordSize config))
+spRel platform n = AddrRegImm sp (ImmInt (n * platformWordSizeInBytes platform))
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.

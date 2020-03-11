@@ -57,7 +57,7 @@ import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
 import BasicTypes
-import GHC.Driver.Session         ( DynFlags )
+import GHC.Driver.Session hiding (ruleCheck)
 import Outputable
 import FastString
 import Maybes
@@ -509,7 +509,12 @@ matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
 matchRule dflags rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = case match_fn dflags rule_env fn args of
+  = let env = RuleOpts
+               { roPlatform = targetPlatform dflags
+               , roNumConstantFolding = gopt Opt_NumConstantFolding dflags
+               , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
+               }
+    in case match_fn env rule_env fn args of
         Nothing   -> Nothing
         Just expr -> Just expr
 

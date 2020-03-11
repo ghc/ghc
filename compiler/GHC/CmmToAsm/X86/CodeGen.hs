@@ -2185,11 +2185,12 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
             go dst_r src_r tmp_r (fromInteger n)
   where
+    platform = targetPlatform dflags
     -- The number of instructions we will generate (approx). We need 2
     -- instructions per move.
     insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
 
-    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
 
@@ -2241,7 +2242,8 @@ genCCall' dflags _ (PrimTarget (MO_Memset align)) _
           return $ code_dst dst_r `appOL`
                    go4 dst_r (fromInteger n)
   where
-    maxAlignment = wordAlignment dflags -- only machine word wide MOVs are supported
+    platform = targetPlatform dflags
+    maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
     c2 = c `shiftL` 8 .|. c
@@ -2884,8 +2886,7 @@ genCCall64' :: ForeignTarget      -- function to call
             -> [CmmActual]        -- arguments (of mixed type)
             -> NatM InstrBlock
 genCCall64' target dest_regs args = do
-    config <- getConfig
-    let platform = configPlatform config
+    platform <- getPlatform
     -- load up the register arguments
     let prom_args = map (maybePromoteCArg platform W32) args
 
@@ -3046,7 +3047,7 @@ genCCall64' target dest_regs args = do
     -- Align stack to 16n for calls, assuming a starting stack
     -- alignment of 16n - word_size on procedure entry. Which we
     -- maintain. See Note [rts/StgCRun.c : Stack Alignment on X86]
-    let word_size = configWordSize config
+    let word_size = platformWordSizeInBytes platform
     (real_size, adjust_rsp) <-
         if (tot_arg_size + word_size) `rem` 16 == 0
             then return (tot_arg_size, nilOL)
@@ -3097,7 +3098,7 @@ genCCall64' target dest_regs args = do
                     -- stdcall has callee do it, but is not supported on
                     -- x86_64 target (see #3336)
                   (if real_size==0 then [] else
-                   [ADD (intFormat (configWordWidth config)) (OpImm (ImmInt real_size)) (OpReg esp)])
+                   [ADD (intFormat (platformWordWidth platform)) (OpImm (ImmInt real_size)) (OpReg esp)])
                   ++
                   [DELTA (delta + real_size)]
                )
@@ -3258,8 +3259,8 @@ genSwitch expr targets = do
         (reg,e_code) <- getNonClobberedReg (cmmOffset platform expr offset)
            -- getNonClobberedReg because it needs to survive across t_code
         lbl <- getNewLabelNat
-        let is32bit = target32Bit (configPlatform config)
-            os = platformOS (configPlatform config)
+        let is32bit = target32Bit platform
+            os = platformOS platform
             -- Might want to use .rodata.<function we're in> instead, but as
             -- long as it's something unique it'll work out since the
             -- references to the jump table are in the appropriate section.
@@ -3274,12 +3275,12 @@ genSwitch expr targets = do
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
-                                       (EAIndex reg (configWordSize config)) (ImmInt 0))
+                                       (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
 
-        offsetReg <- getNewRegNat (intFormat (configWordWidth config))
+        offsetReg <- getNewRegNat (intFormat (platformWordWidth platform))
         return $ if is32bit || os == OSDarwin
                  then e_code `appOL` t_code `appOL` toOL [
-                                ADD (intFormat (configWordWidth config)) op (OpReg tableReg),
+                                ADD (intFormat (platformWordWidth platform)) op (OpReg tableReg),
                                 JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
                  else -- HACK: On x86_64 binutils<2.17 is only able to generate
@@ -3290,7 +3291,7 @@ genSwitch expr targets = do
                       -- PprMach.hs/pprDataItem once binutils 2.17 is standard.
                       e_code `appOL` t_code `appOL` toOL [
                                MOVSxL II32 op (OpReg offsetReg),
-                               ADD (intFormat (configWordWidth config))
+                               ADD (intFormat (platformWordWidth platform))
                                    (OpReg offsetReg)
                                    (OpReg tableReg),
                                JMP_TBL (OpReg tableReg) ids rosection lbl
@@ -3298,7 +3299,7 @@ genSwitch expr targets = do
   else do
         (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
         lbl <- getNewLabelNat
-        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (configWordSize config)) (ImmCLbl lbl))
+        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
                     JMP_TBL op ids (Section ReadOnlyData lbl) lbl
                  ]

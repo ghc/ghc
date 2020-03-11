@@ -33,7 +33,7 @@ import GHC.CmmToAsm.CPrim
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat
    , getBlockIdNat, getPicBaseNat, getNewRegPairNat
-   , getPicBaseMaybeNat, getConfig, getPlatform, initConfig
+   , getPicBaseMaybeNat, getPlatform, initConfig
    )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -2335,7 +2335,7 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
     itmp <- getNewRegNat II32
     ftmp <- getNewRegNat FF64
     dflags <- getDynFlags
-    config <- getConfig
+    platform <- getPlatform
     dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
     let
@@ -2344,10 +2344,10 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
                                  [CmmStaticLit (CmmInt 0x43300000 W32),
                                   CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),
-                ST II32 itmp (spRel config 3),
+                ST II32 itmp (spRel platform 3),
                 LIS itmp (ImmInt 0x4330),
-                ST II32 itmp (spRel config 2),
-                LD FF64 ftmp (spRel config 2)
+                ST II32 itmp (spRel platform 2),
+                LD FF64 ftmp (spRel platform 2)
             ] `appOL` addr_code `appOL` toOL [
                 LD FF64 dst addr,
                 FSUB FF64 dst ftmp dst
@@ -2373,11 +2373,11 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
 -- So it is fine.
 coerceInt2FP' (ArchPPC_64 _) fromRep toRep x = do
     (src, code) <- getSomeReg x
-    config <- getConfig
+    platform <- getPlatform
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                ST II64 src (spRel config 3),
-                LD FF64 dst (spRel config 3),
+                ST II64 src (spRel platform 3),
+                LD FF64 dst (spRel platform 3),
                 FCFID dst dst
             ] `appOL` maybe_frsp dst
 
@@ -2407,7 +2407,7 @@ coerceFP2Int fromRep toRep x = do
 
 coerceFP2Int' :: Arch -> Width -> Width -> CmmExpr -> NatM Register
 coerceFP2Int' ArchPPC _ toRep x = do
-    config <- getConfig
+    platform <- getPlatform
     -- the reps don't really matter: F*->FF64 and II32->I* are no-ops
     (src, code) <- getSomeReg x
     tmp <- getNewRegNat FF64
@@ -2416,13 +2416,13 @@ coerceFP2Int' ArchPPC _ toRep x = do
                 -- convert to int in FP reg
             FCTIWZ tmp src,
                 -- store value (64bit) from FP to stack
-            ST FF64 tmp (spRel config 2),
+            ST FF64 tmp (spRel platform 2),
                 -- read low word of value (high word is undefined)
-            LD II32 dst (spRel config 3)]
+            LD II32 dst (spRel platform 3)]
     return (Any (intFormat toRep) code')
 
 coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
-    config <- getConfig
+    platform <- getPlatform
     -- the reps don't really matter: F*->FF64 and II64->I* are no-ops
     (src, code) <- getSomeReg x
     tmp <- getNewRegNat FF64
@@ -2431,8 +2431,8 @@ coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
                 -- convert to int in FP reg
             FCTIDZ tmp src,
                 -- store value (64bit) from FP to compiler word on stack
-            ST FF64 tmp (spRel config 3),
-            LD II64 dst (spRel config 3)]
+            ST FF64 tmp (spRel platform 3),
+            LD II64 dst (spRel platform 3)]
     return (Any (intFormat toRep) code')
 
 coerceFP2Int' _ _ _ _ = panic "PPC.CodeGen.coerceFP2Int: unknown arch"
