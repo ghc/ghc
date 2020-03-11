@@ -37,16 +37,17 @@ evCallStack :: (MonadThings m, HasModule m, HasDynFlags m) =>
 -- See Note [Overview of implicit CallStacks] in TcEvidence.hs
 evCallStack cs = do
   df            <- getDynFlags
+  let platform = targetPlatform df
   m             <- getModule
   srcLocDataCon <- lookupDataCon srcLocDataConName
   let mkSrcLoc l = mkCoreConApps srcLocDataCon <$>
                sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
-                        , return $ mkIntExprInt df (srcSpanStartLine l)
-                        , return $ mkIntExprInt df (srcSpanStartCol l)
-                        , return $ mkIntExprInt df (srcSpanEndLine l)
-                        , return $ mkIntExprInt df (srcSpanEndCol l)
+                        , return $ mkIntExprInt platform (srcSpanStartLine l)
+                        , return $ mkIntExprInt platform (srcSpanStartCol l)
+                        , return $ mkIntExprInt platform (srcSpanEndLine l)
+                        , return $ mkIntExprInt platform (srcSpanEndCol l)
                         ]
 
   emptyCS <- Var <$> lookupId emptyCallStackName

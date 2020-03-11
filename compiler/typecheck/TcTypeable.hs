@@ -13,6 +13,7 @@ module TcTypeable(mkTypeableBinds, tyConIsTypeable) where
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
@@ -354,7 +355,7 @@ ghcPrimTypeableTyCons = concat
     ]
 
 data TypeableStuff
-    = Stuff { dflags         :: DynFlags
+    = Stuff { platform       :: Platform        -- ^ Target platform
             , trTyConDataCon :: DataCon         -- ^ of @TyCon@
             , trNameLit      :: FastString -> LHsExpr GhcTc
                                                 -- ^ To construct @TrName@s
@@ -373,7 +374,7 @@ data TypeableStuff
 -- | Collect various tidbits which we'll need to generate TyCon representations.
 collect_stuff :: TcM TypeableStuff
 collect_stuff = do
-    dflags <- getDynFlags
+    platform               <- targetPlatform <$> getDynFlags
     trTyConDataCon         <- tcLookupDataCon trTyConDataConName
     kindRepTyCon           <- tcLookupTyCon   kindRepTyConName
     kindRepTyConAppDataCon <- tcLookupDataCon kindRepTyConAppDataConName
@@ -619,8 +620,8 @@ mkTyConRepTyConRHS :: TypeableStuff -> TypeRepTodo
                    -> LHsExpr GhcTc
 mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
   =           nlHsDataCon trTyConDataCon
-    `nlHsApp` nlHsLit (word64 dflags high)
-    `nlHsApp` nlHsLit (word64 dflags low)
+    `nlHsApp` nlHsLit (word64 platform high)
+    `nlHsApp` nlHsLit (word64 platform low)
     `nlHsApp` mod_rep_expr todo
     `nlHsApp` trNameLit (mkFastString tycon_str)
     `nlHsApp` nlHsLit (int n_kind_vars)
@@ -641,10 +642,10 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
     int :: Int -> HsLit GhcTc
     int n = HsIntPrim (SourceText $ show n) (toInteger n)
 
-word64 :: DynFlags -> Word64 -> HsLit GhcTc
-word64 dflags n
-  | wORD_SIZE dflags == 4 = HsWord64Prim NoSourceText (toInteger n)
-  | otherwise             = HsWordPrim   NoSourceText (toInteger n)
+word64 :: Platform -> Word64 -> HsLit GhcTc
+word64 platform n = case platformWordSize platform of
+   PW4 -> HsWord64Prim NoSourceText (toInteger n)
+   PW8 -> HsWordPrim   NoSourceText (toInteger n)
 
 {-
 Note [Representing TyCon kinds: KindRep]

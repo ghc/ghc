@@ -33,7 +33,7 @@ module Literal
 
         -- ** Predicates on Literals and their contents
         , litIsDupable, litIsTrivial, litIsLifted
-        , inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
+        , inCharRange
         , isZeroLit
         , litFitsInChar
         , litValue, isLitValue, isLitValue_maybe, mapLitValue
@@ -61,7 +61,6 @@ import FastString
 import BasicTypes
 import Binary
 import Constants
-import GHC.Driver.Session
 import GHC.Platform
 import UniqFM
 import Util
@@ -305,12 +304,12 @@ Int/Word range.
 -}
 
 -- | Wrap a literal number according to its type
-wrapLitNumber :: DynFlags -> Literal -> Literal
-wrapLitNumber dflags v@(LitNumber nt i t) = case nt of
-  LitNumInt -> case platformWordSize (targetPlatform dflags) of
+wrapLitNumber :: Platform -> Literal -> Literal
+wrapLitNumber platform v@(LitNumber nt i t) = case nt of
+  LitNumInt -> case platformWordSize platform of
     PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
     PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
-  LitNumWord -> case platformWordSize (targetPlatform dflags) of
+  LitNumWord -> case platformWordSize platform of
     PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
     PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
   LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
@@ -320,35 +319,35 @@ wrapLitNumber dflags v@(LitNumber nt i t) = case nt of
 wrapLitNumber _ x = x
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumberWrap :: DynFlags -> LitNumType -> Integer -> Type -> Literal
-mkLitNumberWrap dflags nt i t = wrapLitNumber dflags (LitNumber nt i t)
+mkLitNumberWrap :: Platform -> LitNumType -> Integer -> Type -> Literal
+mkLitNumberWrap platform nt i t = wrapLitNumber platform (LitNumber nt i t)
 
 -- | Check that a given number is in the range of a numeric literal
-litNumCheckRange :: DynFlags -> LitNumType -> Integer -> Bool
-litNumCheckRange dflags nt i = case nt of
-     LitNumInt     -> inIntRange dflags i
-     LitNumWord    -> inWordRange dflags i
+litNumCheckRange :: Platform -> LitNumType -> Integer -> Bool
+litNumCheckRange platform nt i = case nt of
+     LitNumInt     -> platformInIntRange platform i
+     LitNumWord    -> platformInWordRange platform i
      LitNumInt64   -> inInt64Range i
      LitNumWord64  -> inWord64Range i
      LitNumNatural -> i >= 0
      LitNumInteger -> True
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumber :: DynFlags -> LitNumType -> Integer -> Type -> Literal
-mkLitNumber dflags nt i t =
-  ASSERT2(litNumCheckRange dflags nt i, integer i)
+mkLitNumber :: Platform -> LitNumType -> Integer -> Type -> Literal
+mkLitNumber platform nt i t =
+  ASSERT2(litNumCheckRange platform nt i, integer i)
   (LitNumber nt i t)
 
 -- | Creates a 'Literal' of type @Int#@
-mkLitInt :: DynFlags -> Integer -> Literal
-mkLitInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
+mkLitInt :: Platform -> Integer -> Literal
+mkLitInt platform x = ASSERT2( platformInIntRange platform x,  integer x )
                        (mkLitIntUnchecked x)
 
 -- | Creates a 'Literal' of type @Int#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
-mkLitIntWrap :: DynFlags -> Integer -> Literal
-mkLitIntWrap dflags i = wrapLitNumber dflags $ mkLitIntUnchecked i
+mkLitIntWrap :: Platform -> Integer -> Literal
+mkLitIntWrap platform i = wrapLitNumber platform $ mkLitIntUnchecked i
 
 -- | Creates a 'Literal' of type @Int#@ without checking its range.
 mkLitIntUnchecked :: Integer -> Literal
@@ -358,21 +357,21 @@ mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
 --   overflow. That is, if the argument is out of the (target-dependent) range
 --   the argument is wrapped and the overflow flag will be set.
 --   See Note [Word/Int underflow/overflow]
-mkLitIntWrapC :: DynFlags -> Integer -> (Literal, Bool)
-mkLitIntWrapC dflags i = (n, i /= i')
+mkLitIntWrapC :: Platform -> Integer -> (Literal, Bool)
+mkLitIntWrapC platform i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitIntWrap dflags i
+    n@(LitNumber _ i' _) = mkLitIntWrap platform i
 
 -- | Creates a 'Literal' of type @Word#@
-mkLitWord :: DynFlags -> Integer -> Literal
-mkLitWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
+mkLitWord :: Platform -> Integer -> Literal
+mkLitWord platform x = ASSERT2( platformInWordRange platform x, integer x )
                         (mkLitWordUnchecked x)
 
 -- | Creates a 'Literal' of type @Word#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
-mkLitWordWrap :: DynFlags -> Integer -> Literal
-mkLitWordWrap dflags i = wrapLitNumber dflags $ mkLitWordUnchecked i
+mkLitWordWrap :: Platform -> Integer -> Literal
+mkLitWordWrap platform i = wrapLitNumber platform $ mkLitWordUnchecked i
 
 -- | Creates a 'Literal' of type @Word#@ without checking its range.
 mkLitWordUnchecked :: Integer -> Literal
@@ -382,10 +381,10 @@ mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
 --   carry. That is, if the argument is out of the (target-dependent) range
 --   the argument is wrapped and the carry flag will be set.
 --   See Note [Word/Int underflow/overflow]
-mkLitWordWrapC :: DynFlags -> Integer -> (Literal, Bool)
-mkLitWordWrapC dflags i = (n, i /= i')
+mkLitWordWrapC :: Platform -> Integer -> (Literal, Bool)
+mkLitWordWrapC platform i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitWordWrap dflags i
+    n@(LitNumber _ i' _) = mkLitWordWrap platform i
 
 -- | Creates a 'Literal' of type @Int64#@
 mkLitInt64 :: Integer -> Literal
@@ -393,8 +392,8 @@ mkLitInt64  x = ASSERT2( inInt64Range x, integer x ) (mkLitInt64Unchecked x)
 
 -- | Creates a 'Literal' of type @Int64#@.
 --   If the argument is out of the range, it is wrapped.
-mkLitInt64Wrap :: DynFlags -> Integer -> Literal
-mkLitInt64Wrap dflags i = wrapLitNumber dflags $ mkLitInt64Unchecked i
+mkLitInt64Wrap :: Platform -> Integer -> Literal
+mkLitInt64Wrap platform i = wrapLitNumber platform $ mkLitInt64Unchecked i
 
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
 mkLitInt64Unchecked :: Integer -> Literal
@@ -406,8 +405,8 @@ mkLitWord64 x = ASSERT2( inWord64Range x, integer x ) (mkLitWord64Unchecked x)
 
 -- | Creates a 'Literal' of type @Word64#@.
 --   If the argument is out of the range, it is wrapped.
-mkLitWord64Wrap :: DynFlags -> Integer -> Literal
-mkLitWord64Wrap dflags i = wrapLitNumber dflags $ mkLitWord64Unchecked i
+mkLitWord64Wrap :: Platform -> Integer -> Literal
+mkLitWord64Wrap platform i = wrapLitNumber platform $ mkLitWord64Unchecked i
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
 mkLitWord64Unchecked :: Integer -> Literal
@@ -437,10 +436,6 @@ mkLitInteger x ty = LitNumber LitNumInteger x ty
 mkLitNatural :: Integer -> Type -> Literal
 mkLitNatural x ty = ASSERT2( inNaturalRange x,  integer x )
                     (LitNumber LitNumNatural x ty)
-
-inIntRange, inWordRange :: DynFlags -> Integer -> Bool
-inIntRange  dflags x = x >= tARGET_MIN_INT dflags && x <= tARGET_MAX_INT dflags
-inWordRange dflags x = x >= 0                     && x <= tARGET_MAX_WORD dflags
 
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
@@ -480,12 +475,12 @@ isLitValue_maybe _                 = Nothing
 -- For fixed-size integral literals, the result will be wrapped in accordance
 -- with the semantics of the target type.
 -- See Note [Word/Int underflow/overflow]
-mapLitValue  :: DynFlags -> (Integer -> Integer) -> Literal -> Literal
-mapLitValue _      f (LitChar   c)      = mkLitChar (fchar c)
+mapLitValue  :: Platform -> (Integer -> Integer) -> Literal -> Literal
+mapLitValue _        f (LitChar   c)      = mkLitChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
-mapLitValue dflags f (LitNumber nt i t) = wrapLitNumber dflags
+mapLitValue platform f (LitNumber nt i t) = wrapLitNumber platform
                                                         (LitNumber nt (f i) t)
-mapLitValue _      _ l                  = pprPanic "mapLitValue" (ppr l)
+mapLitValue _        _ l                  = pprPanic "mapLitValue" (ppr l)
 
 -- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
 -- 'Int', 'Word', 'LitInteger' and 'LitNatural'.
@@ -504,21 +499,21 @@ narrow8IntLit, narrow16IntLit, narrow32IntLit,
   float2DoubleLit, double2FloatLit
   :: Literal -> Literal
 
-word2IntLit, int2WordLit :: DynFlags -> Literal -> Literal
-word2IntLit dflags (LitNumber LitNumWord w _)
+word2IntLit, int2WordLit :: Platform -> Literal -> Literal
+word2IntLit platform (LitNumber LitNumWord w _)
   -- Map Word range [max_int+1, max_word]
   -- to Int range   [min_int  , -1]
   -- Range [0,max_int] has the same representation with both Int and Word
-  | w > tARGET_MAX_INT dflags = mkLitInt dflags (w - tARGET_MAX_WORD dflags - 1)
-  | otherwise                 = mkLitInt dflags w
+  | w > platformMaxInt platform = mkLitInt platform (w - platformMaxWord platform - 1)
+  | otherwise                   = mkLitInt platform w
 word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
 
-int2WordLit dflags (LitNumber LitNumInt i _)
+int2WordLit platform (LitNumber LitNumInt i _)
   -- Map Int range [min_int  , -1]
   -- to Word range [max_int+1, max_word]
   -- Range [0,max_int] has the same representation with both Int and Word
-  | i < 0     = mkLitWord dflags (1 + tARGET_MAX_WORD dflags + i)
-  | otherwise = mkLitWord dflags i
+  | i < 0     = mkLitWord platform (1 + platformMaxWord platform + i)
+  | otherwise = mkLitWord platform i
 int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
@@ -611,17 +606,18 @@ litIsTrivial (LitNumber nt _ _) = case nt of
 litIsTrivial _                  = True
 
 -- | True if code space does not go bad if we duplicate this literal
-litIsDupable :: DynFlags -> Literal -> Bool
+litIsDupable :: Platform -> Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsDupable
-litIsDupable _      (LitString _)      = False
-litIsDupable dflags (LitNumber nt i _) = case nt of
-  LitNumInteger -> inIntRange dflags i
-  LitNumNatural -> inIntRange dflags i
-  LitNumInt     -> True
-  LitNumInt64   -> True
-  LitNumWord    -> True
-  LitNumWord64  -> True
-litIsDupable _      _                  = True
+litIsDupable platform x = case x of
+   (LitNumber nt i _) -> case nt of
+      LitNumInteger -> platformInIntRange platform i
+      LitNumNatural -> platformInWordRange platform i
+      LitNumInt     -> True
+      LitNumInt64   -> True
+      LitNumWord    -> True
+      LitNumWord64  -> True
+   (LitString _) -> False
+   _             -> True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
