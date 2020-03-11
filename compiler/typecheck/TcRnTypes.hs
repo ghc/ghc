@@ -384,7 +384,7 @@ data FrontendResult
 --
 --      - For any code involving Names, we want semantic modules.
 --        See lookupIfaceTop in GHC.Iface.Env, mkIface and addFingerprints
---        in GHC.Iface.Utils, and tcLookupGlobal in TcEnv
+--        in GHC.Iface.{Make,Recomp}, and tcLookupGlobal in TcEnv
 --
 --      - When reading interfaces, we want the identity module to
 --        identify the specific interface we want (such interfaces
@@ -664,7 +664,7 @@ We gather three sorts of usage information
       Used (a) to report "defined but not used"
                (see GHC.Rename.Names.reportUnusedNames)
            (b) to generate version-tracking usage info in interface
-               files (see GHC.Iface.Utils.mkUsedNames)
+               files (see GHC.Iface.Make.mkUsedNames)
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
