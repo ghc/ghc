@@ -355,7 +355,8 @@ type CFilePath = CWString
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
-foreign import ccall safe "HsBase.h __hscore_open"
+-- e.g. use `interruptible` rather than `safe` due to #17912.
+foreign import ccall interruptible "HsBase.h __hscore_open"
    c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_fstat"
