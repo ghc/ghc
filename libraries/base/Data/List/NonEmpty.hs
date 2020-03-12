@@ -42,6 +42,7 @@ module Data.List.NonEmpty (
    , tail        -- :: NonEmpty a -> [a]
    , last        -- :: NonEmpty a -> a
    , init        -- :: NonEmpty a -> [a]
+   , singleton   -- :: a -> NonEmpty a
    , (<|), cons  -- :: a -> NonEmpty a -> NonEmpty a
    , uncons      -- :: NonEmpty a -> (a, Maybe (NonEmpty a))
    , unfoldr     -- :: (a -> (b, Maybe a)) -> a -> NonEmpty b
@@ -167,6 +168,12 @@ last ~(a :| as) = List.last (a : as)
 -- | Extract everything except the last element of the stream.
 init :: NonEmpty a -> [a]
 init ~(a :| as) = List.init (a : as)
+
+-- | Construct a 'NonEmpty' list from a single element.
+--
+-- @since 4.15
+singleton :: a -> NonEmpty a
+singleton a = a :| []
 
 -- | Prepend an element to the stream.
 (<|) :: a -> NonEmpty a -> NonEmpty a

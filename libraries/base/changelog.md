@@ -9,6 +9,9 @@
   * Add `hGetContents'`, `getContents'`, and `readFile'` in `System.IO`:
     Strict IO variants of `hGetContents`, `getContents`, and `readFile`.
 
+  * Add `singleton` function for `Data.List.NonEmpty`.
+
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 
