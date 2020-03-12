@@ -865,10 +865,9 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
           -- This is a bit involved since we allow packing multiple fields
           -- within a single word. See also
           -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding
-          dflags <- getDynFlags
-          let platform = targetPlatform dflags
-              word_size = platformWordSizeInBytes platform
-              big_endian = wORDS_BIGENDIAN dflags
+          platform <- targetPlatform <$> getDynFlags
+          let word_size = platformWordSizeInBytes platform
+              endian = platformByteOrder platform
               size_b = primRepSizeB platform rep
               -- Align the start offset (eg, 2-byte value should be 2-byte
               -- aligned). But not more than to a word. The offset calculation
@@ -877,7 +876,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
               !aligned_idx = roundUpTo arr_i (min word_size size_b)
               !new_arr_i = aligned_idx + size_b
               ws | size_b < word_size =
-                     [index size_b aligned_idx word_size big_endian]
+                     [index size_b aligned_idx word_size endian]
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
                      in ASSERT( r == 0 )
@@ -892,7 +891,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
 
     -- Extract a sub-word sized field from a word
-    index item_size_b index_b word_size big_endian =
+    index item_size_b index_b word_size endian =
         (word .&. (mask `shiftL` moveBytes)) `shiftR` moveBytes
       where
         mask :: Word
@@ -903,9 +902,9 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
             _ -> panic ("Weird byte-index: " ++ show index_b)
         (q,r) = index_b `quotRem` word_size
         word = array!!q
-        moveBytes = if big_endian
-                    then word_size - (r + item_size_b) * 8
-                    else r * 8
+        moveBytes = case endian of
+         BigEndian    -> word_size - (r + item_size_b) * 8
+         LittleEndian -> r * 8
 
 
 -- | Fast, breadth-first Type reconstruction
