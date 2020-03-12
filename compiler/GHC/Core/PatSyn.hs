@@ -15,7 +15,8 @@ module GHC.Core.PatSyn (
         patSynName, patSynArity, patSynIsInfix,
         patSynArgs,
         patSynMatcher, patSynBuilder,
-        patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders, patSynSig,
+        patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders,
+        patSynSig, patSynSigBndr,
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
@@ -67,13 +68,13 @@ data PatSyn
                                        -- psArgs
 
         -- Universally-quantified type variables
-        psUnivTyVars  :: [TyVarBinder],
+        psUnivTyVars  :: [InvisTVBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
         psReqTheta    :: ThetaType,
 
         -- Existentially-quantified type vars
-        psExTyVars    :: [TyVarBinder],
+        psExTyVars    :: [InvisTVBinder],
 
         -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
         psProvTheta   :: ThetaType,
@@ -354,10 +355,10 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type
-                                       -- variables and required dicts
-         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type
-                                       -- variables and provided dicts
+         -> ([InvisTVBinder], ThetaType) -- ^ Universially-quantified type
+                                         -- variables and required dicts
+         -> ([InvisTVBinder], ThetaType) -- ^ Existentially-quantified type
+                                         -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
@@ -411,20 +412,24 @@ patSynFieldType ps label
       Just (_, ty) -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
 
-patSynUnivTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynUnivTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynUnivTyVarBinders = psUnivTyVars
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars ps = binderVars (psExTyVars ps)
 
-patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynExTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
-patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
+patSynSigBndr :: PatSyn -> ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Type], Type)
+patSynSigBndr (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psResultTy = res_ty })
-  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
+  = (univ_tvs, req, ex_tvs, prov, arg_tys, res_ty)
+
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig ps = let (u_tvs, req, e_tvs, prov, arg_tys, res_ty) = patSynSigBndr ps
+               in (binderVars u_tvs, req, binderVars e_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher
@@ -473,12 +478,12 @@ pprPatSynType :: PatSyn -> SDoc
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
                         , psArgs       = orig_args, psResultTy = orig_res_ty })
-  = sep [ pprForAll univ_tvs
+  = sep [ pprForAll $ tyVarSpecToBinders univ_tvs
         , pprThetaArrowTy req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]
   where
-    sigma_ty = mkForAllTys ex_tvs  $
+    sigma_ty = mkInvisForAllTys ex_tvs $
                mkInvisFunTys prov_theta $
                mkVisFunTys orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)
