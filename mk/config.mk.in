@@ -494,6 +494,7 @@ HaskellHostArch = @HaskellHostArch@
 HaskellTargetOs = @HaskellTargetOs@
 HaskellTargetArch = @HaskellTargetArch@
 TargetWordSize = @TargetWordSize@
+TargetWordBigEndian = @TargetWordBigEndian@
 TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
 TargetHasIdentDirective = @TargetHasIdentDirective@
 TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
