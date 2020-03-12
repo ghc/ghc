@@ -12,6 +12,7 @@ module GHC.Platform (
         ArmISAExt(..),
         ArmABI(..),
         PPC_64ABI(..),
+        ByteOrder(..),
 
         target32Bit,
         isARM,
@@ -38,6 +39,7 @@ where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 import GHC.Read
+import GHC.ByteOrder (ByteOrder(..))
 import Data.Word
 import Data.Int
 
@@ -53,19 +55,17 @@ data PlatformMini
 
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
-data Platform
-        = Platform {
-              platformMini                     :: PlatformMini,
-              -- Word size in bytes (i.e. normally 4 or 8,
-              -- for 32bit and 64bit platforms respectively)
-              platformWordSize                 :: PlatformWordSize,
-              platformUnregisterised           :: Bool,
-              platformHasGnuNonexecStack       :: Bool,
-              platformHasIdentDirective        :: Bool,
-              platformHasSubsectionsViaSymbols :: Bool,
-              platformIsCrossCompiling         :: Bool
-          }
-        deriving (Read, Show, Eq)
+data Platform = Platform
+   { platformMini                     :: PlatformMini
+   , platformWordSize                 :: PlatformWordSize
+   , platformByteOrder                :: ByteOrder
+   , platformUnregisterised           :: Bool
+   , platformHasGnuNonexecStack       :: Bool
+   , platformHasIdentDirective        :: Bool
+   , platformHasSubsectionsViaSymbols :: Bool
+   , platformIsCrossCompiling         :: Bool
+   }
+   deriving (Read, Show, Eq)
 
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform

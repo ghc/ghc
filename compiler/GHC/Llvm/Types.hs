@@ -225,26 +225,26 @@ ppPlainName (LMLitVar    x          ) = ppLit x
 
 -- | Print a literal value. No type.
 ppLit :: LlvmLit -> SDoc
-ppLit (LMIntLit i (LMInt 32))  = ppr (fromInteger i :: Int32)
-ppLit (LMIntLit i (LMInt 64))  = ppr (fromInteger i :: Int64)
-ppLit (LMIntLit   i _       )  = ppr ((fromInteger i)::Int)
-ppLit (LMFloatLit r LMFloat )  = ppFloat $ narrowFp r
-ppLit (LMFloatLit r LMDouble)  = ppDouble r
-ppLit f@(LMFloatLit _ _)       = pprPanic "ppLit" (text "Can't print this float literal: " <> ppr f)
-ppLit (LMVectorLit ls  )       = char '<' <+> ppCommaJoin ls <+> char '>'
-ppLit (LMNullLit _     )       = text "null"
--- #11487 was an issue where we passed undef for some arguments
--- that were actually live. By chance the registers holding those
--- arguments usually happened to have the right values anyways, but
--- that was not guaranteed. To find such bugs reliably, we set the
--- flag below when validating, which replaces undef literals (at
--- common types) with values that are likely to cause a crash or test
--- failure.
-ppLit (LMUndefLit t    )       = sdocWithDynFlags f
-  where f dflags
-          | gopt Opt_LlvmFillUndefWithGarbage dflags,
-            Just lit <- garbageLit t   = ppLit lit
-          | otherwise                  = text "undef"
+ppLit l = sdocWithDynFlags $ \dflags -> case l of
+   (LMIntLit i (LMInt 32))  -> ppr (fromInteger i :: Int32)
+   (LMIntLit i (LMInt 64))  -> ppr (fromInteger i :: Int64)
+   (LMIntLit   i _       )  -> ppr ((fromInteger i)::Int)
+   (LMFloatLit r LMFloat )  -> ppFloat (targetPlatform dflags) $ narrowFp r
+   (LMFloatLit r LMDouble)  -> ppDouble (targetPlatform dflags) r
+   f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppr f)
+   (LMVectorLit ls  )       -> char '<' <+> ppCommaJoin ls <+> char '>'
+   (LMNullLit _     )       -> text "null"
+   -- #11487 was an issue where we passed undef for some arguments
+   -- that were actually live. By chance the registers holding those
+   -- arguments usually happened to have the right values anyways, but
+   -- that was not guaranteed. To find such bugs reliably, we set the
+   -- flag below when validating, which replaces undef literals (at
+   -- common types) with values that are likely to cause a crash or test
+   -- failure.
+   (LMUndefLit t    )
+      | gopt Opt_LlvmFillUndefWithGarbage dflags
+      , Just lit <- garbageLit t   -> ppLit lit
+      | otherwise                  -> text "undef"
 
 garbageLit :: LlvmType -> Maybe LlvmLit
 garbageLit t@(LMInt w)     = Just (LMIntLit (0xbbbbbbbbbbbbbbb0 `mod` (2^w)) t)
@@ -836,19 +836,20 @@ instance Outputable LlvmCastOp where
 -- regardless of underlying architecture.
 --
 -- See Note [LLVM Float Types].
-ppDouble :: Double -> SDoc
-ppDouble d
+ppDouble :: Platform -> Double -> SDoc
+ppDouble platform d
   = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
-                     []    -> error "dToStr: too few hex digits for float"
-                     [x]   -> ['0',x]
-                     [x,y] -> [x,y]
-                     _     -> error "dToStr: too many hex digits for float"
+            []    -> error "ppDouble: too few hex digits for float"
+            [x]   -> ['0',x]
+            [x,y] -> [x,y]
+            _     -> error "ppDouble: too many hex digits for float"
 
-    in sdocWithDynFlags (\dflags ->
-         let fixEndian = if wORDS_BIGENDIAN dflags then id else reverse
-             str       = map toUpper $ concat $ fixEndian $ map hex bs
-         in text "0x" <> text str)
+        fixEndian = case platformByteOrder platform of
+            BigEndian    -> id
+            LittleEndian -> reverse
+        str       = map toUpper $ concat $ fixEndian $ map hex bs
+    in text "0x" <> text str
 
 -- Note [LLVM Float Types]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -875,8 +876,8 @@ widenFp :: Float -> Double
 {-# NOINLINE widenFp #-}
 widenFp = float2Double
 
-ppFloat :: Float -> SDoc
-ppFloat = ppDouble . widenFp
+ppFloat :: Platform -> Float -> SDoc
+ppFloat platform = ppDouble platform . widenFp
 
 
 --------------------------------------------------------------------------------

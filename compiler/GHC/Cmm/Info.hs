@@ -206,7 +206,7 @@ mkInfoTableContents dflags
        ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
-  = do { let layout  = packIntsCLit dflags ptrs nonptrs
+  = do { let layout  = packIntsCLit platform ptrs nonptrs
        ; (prof_lits, prof_data) <- mkProfLits platform prof
        ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
@@ -238,14 +238,14 @@ mkInfoTableContents dflags
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label
-      = do { let extra_bits = packIntsCLit dflags fun_type arity : srt_label
+      = do { let extra_bits = packIntsCLit platform fun_type arity : srt_label
            ; return (Nothing, Nothing,  extra_bits, []) }
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
       = do { (liveness_lit, liveness_data) <- mkLivenessBits dflags arg_bits
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
-                 extra_bits = [ packIntsCLit dflags fun_type arity ]
+                 extra_bits = [ packIntsCLit platform fun_type arity ]
                            ++ (if inlineSRT dflags then [] else [ srt_lit ])
                            ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
@@ -259,11 +259,10 @@ mkInfoTableContents dflags
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
-packIntsCLit :: DynFlags -> Int -> Int -> CmmLit
-packIntsCLit dflags a b = packHalfWordsCLit dflags
+packIntsCLit :: Platform -> Int -> Int -> CmmLit
+packIntsCLit platform a b = packHalfWordsCLit platform
                            (toStgHalfWord platform (fromIntegral a))
                            (toStgHalfWord platform (fromIntegral b))
-                          where platform = targetPlatform dflags
 
 
 mkSRTLit :: DynFlags

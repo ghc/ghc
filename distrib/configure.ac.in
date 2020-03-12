@@ -177,6 +177,17 @@ fi
 TargetWordSize=$ac_cv_sizeof_void_p
 AC_SUBST(TargetWordSize)
 
+dnl TargetWordBigEndian for settings file
+AC_C_BIGENDIAN([TargetWordBigEndian=YES],[TargetWordBigEndian=NO])
+dnl Check that the toolchain we have is consistent with what the compiler expects
+if test "x$TargetWordBigEndian" != "x@TargetWordBigEndian@"; then
+    AC_MSG_ERROR([This binary distribution produces binaries for a target with
+                  a different byte order than your target toolchain.
+                  Are you sure your toolchain targets the intended target platform
+                  of this compiler?])
+fi
+AC_SUBST(TargetWordBigEndian)
+
 #
 dnl ** how to invoke `ar' and `ranlib'
 #

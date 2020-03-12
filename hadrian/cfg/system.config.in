@@ -146,6 +146,7 @@ settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 
 target-word-size = @TargetWordSize@
+target-word-big-endian = @TargetWordBigEndian@
 target-has-gnu-nonexec-stack = @TargetHasGnuNonexecStack@
 target-has-ident-directive = @TargetHasIdentDirective@
 target-has-subsections-via-symbols = @TargetHasSubsectionsViaSymbols@

@@ -672,7 +672,6 @@ wanteds os = concat
           -- Amount of pointer bits used for semi-tagging constructor closures
           ,constantWord Haskell "TAG_BITS" "TAG_BITS"
 
-          ,constantBool Haskell "WORDS_BIGENDIAN"    "defined(WORDS_BIGENDIAN)"
           ,constantBool Haskell "DYNAMIC_BY_DEFAULT" "defined(DYNAMIC_BY_DEFAULT)"
 
           ,constantWord    Haskell "LDV_SHIFT"         "LDV_SHIFT"
