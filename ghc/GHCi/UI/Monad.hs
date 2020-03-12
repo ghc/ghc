@@ -364,7 +364,7 @@ instance MonadMask GHCi where
 
 instance ExceptionMonad (InputT GHCi) where
   gcatch = catch
-  gmask = mask
+  gmask f = mask $ \x -> f x
 
 isOptionSet :: GhciMonad m => GHCiOption -> m Bool
 isOptionSet opt
