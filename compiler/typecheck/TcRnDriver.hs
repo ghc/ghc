@@ -2333,7 +2333,7 @@ getGhciStepIO = do
 
         step_ty = noLoc $ HsForAllTy
                      { hst_fvf = ForallInvis
-                     , hst_bndrs = [noLoc $ UserTyVar noExtField (noLoc a_tv)]
+                     , hst_bndrs = [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
                      , hst_xforall = noExtField
                      , hst_body  = nlHsFunTy ghciM ioM }
 
@@ -2400,7 +2400,7 @@ tcRnExpr hsc_env mode rdr_expr
     _ <- perhaps_disable_default_warnings $
          simplifyInteractive residual ;
 
-    let { all_expr_ty = mkInvForAllTys qtvs $
+    let { all_expr_ty = mkInfForAllTys qtvs $
                         mkPhiTy (map idType dicts) res_ty } ;
     ty <- zonkTcType all_expr_ty ;
 
@@ -2478,7 +2478,7 @@ tcRnType hsc_env flexi normalise rdr_type
                         ; return ty' }
                 else return ty ;
 
-       ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
+       ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~

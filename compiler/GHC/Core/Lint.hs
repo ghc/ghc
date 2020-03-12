@@ -1763,7 +1763,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
     do {
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; in_scope <- getInScope
-       ; let tyl = mkInvForAllTy tv1 t1
+       ; let tyl = mkInfForAllTy tv1 t1
              subst = mkTvSubst in_scope $
                      -- We need both the free vars of the `t2` and the
                      -- free vars of the range of the substitution in
@@ -1772,7 +1772,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
                      -- linted and `tv2` has the same unique as `tv1`.
                      -- See Note [The substitution invariant] in TyCoSubst.
                      unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
-             tyr = mkInvForAllTy tv2 $
+             tyr = mkInfForAllTy tv2 $
                    substTy subst t2
        ; return (k3, k4, tyl, tyr, r) } }
 

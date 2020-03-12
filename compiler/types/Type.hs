@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, PatternSynonyms #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -16,6 +16,7 @@ module Type (
 
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
+        Specificity(..),
         KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
         KnotTied,
@@ -39,10 +40,10 @@ module Type (
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
-        mkForAllTy, mkForAllTys, mkTyCoInvForAllTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
-        mkInvForAllTy, mkInvForAllTys,
+        mkInfForAllTy, mkInfForAllTys,
         splitForAllTys, splitForAllTysSameVis,
         splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
@@ -92,6 +93,7 @@ module Type (
         sameVis,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinders,
+        tyVarSpecToBinders,
         mkAnonBinder,
         isAnonTyCoBinder,
         binderVar, binderVars, binderType, binderArgFlag,
@@ -1453,8 +1455,8 @@ mkTyCoInvForAllTy tv ty
   = ForAllTy (Bndr tv Inferred) ty
 
 -- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
-mkInvForAllTy :: TyVar -> Type -> Type
-mkInvForAllTy tv ty = ASSERT( isTyVar tv )
+mkInfForAllTy :: TyVar -> Type -> Type
+mkInfForAllTy tv ty = ASSERT( isTyVar tv )
                       ForAllTy (Bndr tv Inferred) ty
 
 -- | Like 'mkForAllTys', but assumes all variables are dependent and
@@ -1463,8 +1465,8 @@ mkTyCoInvForAllTys :: [TyCoVar] -> Type -> Type
 mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 
 -- | Like 'mkTyCoInvForAllTys', but tvs should be a list of tyvar
-mkInvForAllTys :: [TyVar] -> Type -> Type
-mkInvForAllTys tvs ty = foldr mkInvForAllTy ty tvs
+mkInfForAllTys :: [TyVar] -> Type -> Type
+mkInfForAllTys tvs ty = foldr mkInfForAllTy ty tvs
 
 -- | Like 'mkForAllTy', but assumes the variable is dependent and 'Specified',
 -- a common case
@@ -1577,12 +1579,13 @@ splitForAllTys ty = split ty ty []
 -- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
 -- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
 -- as an argument to this function.
-splitForAllTysSameVis :: ArgFlag -> Type -> ([TyCoVar], Type)
+-- Furthermore, each returned tyvar is annotated with its argf.
+splitForAllTysSameVis :: ArgFlag -> Type -> ([TyCoVarBinder], Type)
 splitForAllTysSameVis supplied_argf ty = split ty ty []
   where
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split _       (ForAllTy (Bndr tv argf) ty) tvs
-      | argf `sameVis` supplied_argf               = split ty ty (tv:tvs)
+      | argf `sameVis` supplied_argf               = split ty ty ((Bndr tv argf):tvs)
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like splitForAllTys, but split only for tyvars.
@@ -2993,10 +2996,21 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
         _              -> emptyFV
 
     source_of_injectivity Required  = True
-    source_of_injectivity Specified = spec_inj_pos
-    source_of_injectivity Inferred  = False
+    -- See Note [Explicit Case Statement for Specificity]
+    source_of_injectivity (Invisible spec) = case spec of
+      SpecifiedSpec -> spec_inj_pos
+      InferredSpec  -> False
 
 {-
+Note [Explicit Case Statement for Specificity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When pattern matching against an `ArgFlag`, you should not pattern match against
+the pattern synonyms 'Specified' or 'Inferred', as this results in a
+non-exhaustive pattern match warning.
+Instead, pattern match against 'Invisible spec' and do another case analysis on
+this specificity argument.
+This is discussed in GHC issue #17876.
+
 Note [When does a tycon application need an explicit kind signature?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a couple of places in GHC where we convert Core Types into forms that
