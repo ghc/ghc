@@ -604,18 +604,8 @@ checkSTACK (StgStack *stack)
 void
 checkTSO(StgTSO *tso)
 {
-    StgTSO *next;
-    const StgInfoTable *info;
-
-    if (tso->what_next == ThreadKilled) {
-      /* The garbage collector doesn't bother following any pointers
-       * from dead threads, so don't check sanity here.
-       */
-      return;
-    }
-
-    next = tso->_link;
-    info = (const StgInfoTable*) tso->_link->header.info;
+    StgTSO *next = tso->_link;
+    const StgInfoTable *info = (const StgInfoTable*)tso->_link->header.info;
     load_load_barrier();
 
     ASSERT(next == END_TSO_QUEUE ||
@@ -639,6 +629,10 @@ checkTSO(StgTSO *tso)
 
     // XXX are we checking the stack twice?
     checkSTACK(tso->stackobj);
+
+    ASSERT(tso->global_link == END_TSO_QUEUE ||
+            (LOOKS_LIKE_CLOSURE_PTR(tso->global_link) &&
+             get_itbl((StgClosure *)tso->global_link)->type == TSO));
 }
 
 /*

@@ -125,6 +125,8 @@ scavengeTSO (StgTSO *tso)
     evacuate((StgClosure **)&tso->stackobj);
 
     evacuate((StgClosure **)&tso->_link);
+    evacuate((StgClosure **)&tso->global_link);
+
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole

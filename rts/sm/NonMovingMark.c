@@ -964,6 +964,7 @@ mark_tso (MarkQueue *queue, StgTSO *tso)
     mark_trec_header(queue, tso->trec);
     markQueuePushClosure_(queue, (StgClosure *) tso->stackobj);
     markQueuePushClosure_(queue, (StgClosure *) tso->_link);
+    markQueuePushClosure_(queue, (StgClosure *) tso->global_link);
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole
