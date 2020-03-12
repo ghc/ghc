@@ -51,6 +51,8 @@
 
   * Add `IsList` instance for `ZipList`.
 
+  * Add `singleton` function for `Data.List.NonEmpty`.
+
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
 
