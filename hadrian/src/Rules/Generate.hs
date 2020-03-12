@@ -301,6 +301,7 @@ generateSettings = do
         , ("target os", getSetting TargetOsHaskell)
         , ("target arch", getSetting TargetArchHaskell)
         , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
+        , ("target word big endian", expr $ lookupValueOrError configFile "target-word-big-endian")
         , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "target-has-gnu-nonexec-stack")
         , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
