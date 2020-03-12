@@ -520,41 +520,41 @@ pprStatics dflags = pprStatics'
       (CmmStaticLit (CmmFloat f W32) : rest)
         -- odd numbers of floats are padded to a word by mkVirtHeapOffsetsWithPadding
         | wordWidth platform == W64, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
-        -> pprLit1 dflags (floatToWord dflags f) : pprStatics' rest'
+        -> pprLit1 dflags (floatToWord platform f) : pprStatics' rest'
         -- adjacent floats aren't padded but combined into a single word
         | wordWidth platform == W64, CmmStaticLit (CmmFloat g W32) : rest' <- rest
-        -> pprLit1 dflags (floatPairToWord dflags f g) : pprStatics' rest'
+        -> pprLit1 dflags (floatPairToWord platform f g) : pprStatics' rest'
         | wordWidth platform == W32
-        -> pprLit1 dflags (floatToWord dflags f) : pprStatics' rest
+        -> pprLit1 dflags (floatToWord platform f) : pprStatics' rest
         | otherwise
         -> pprPanic "pprStatics: float" (vcat (map ppr' rest))
           where ppr' (CmmStaticLit l) = ppr (cmmLitType platform l)
                 ppr' _other           = text "bad static!"
 
       (CmmStaticLit (CmmFloat f W64) : rest)
-        -> map (pprLit1 dflags) (doubleToWords dflags f) ++ pprStatics' rest
+        -> map (pprLit1 dflags) (doubleToWords platform f) ++ pprStatics' rest
 
       (CmmStaticLit (CmmInt i W64) : rest)
         | wordWidth platform == W32
-        -> if wORDS_BIGENDIAN dflags
-           then pprStatics' (CmmStaticLit (CmmInt q W32) :
-                             CmmStaticLit (CmmInt r W32) : rest)
-           else pprStatics' (CmmStaticLit (CmmInt r W32) :
-                             CmmStaticLit (CmmInt q W32) : rest)
+        -> case platformByteOrder platform of
+            BigEndian    -> pprStatics' (CmmStaticLit (CmmInt q W32) :
+                                         CmmStaticLit (CmmInt r W32) : rest)
+            LittleEndian -> pprStatics' (CmmStaticLit (CmmInt r W32) :
+                                         CmmStaticLit (CmmInt q W32) : rest)
            where r = i .&. 0xffffffff
                  q = i `shiftR` 32
 
       (CmmStaticLit (CmmInt a W32) : CmmStaticLit (CmmInt b W32) : rest)
         | wordWidth platform == W64
-        -> if wORDS_BIGENDIAN dflags
-           then pprStatics' (CmmStaticLit (CmmInt ((shiftL a 32) .|. b) W64) : rest)
-           else pprStatics' (CmmStaticLit (CmmInt ((shiftL b 32) .|. a) W64) : rest)
+        -> case platformByteOrder platform of
+             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 32) .|. b) W64) : rest)
+             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 32) .|. a) W64) : rest)
 
       (CmmStaticLit (CmmInt a W16) : CmmStaticLit (CmmInt b W16) : rest)
         | wordWidth platform == W32
-        -> if wORDS_BIGENDIAN dflags
-           then pprStatics' (CmmStaticLit (CmmInt ((shiftL a 16) .|. b) W32) : rest)
-           else pprStatics' (CmmStaticLit (CmmInt ((shiftL b 16) .|. a) W32) : rest)
+        -> case platformByteOrder platform of
+             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 16) .|. b) W32) : rest)
+             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 16) .|. a) W32) : rest)
 
       (CmmStaticLit (CmmInt _ w) : _)
         | w /= wordWidth platform
@@ -1271,8 +1271,8 @@ castFloatToWord32Array = U.castSTUArray
 castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
 castDoubleToWord64Array = U.castSTUArray
 
-floatToWord :: DynFlags -> Rational -> CmmLit
-floatToWord dflags r
+floatToWord :: Platform -> Rational -> CmmLit
+floatToWord platform r
   = runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 (fromRational r)
@@ -1281,12 +1281,13 @@ floatToWord dflags r
         return (CmmInt (toInteger w32 `shiftL` wo) (wordWidth platform))
     )
     where wo | wordWidth platform == W64
-             , wORDS_BIGENDIAN dflags    = 32
-             | otherwise                 = 0
-          platform = targetPlatform dflags
+             , BigEndian <- platformByteOrder platform
+             = 32
+             | otherwise
+             = 0
 
-floatPairToWord :: DynFlags -> Rational -> Rational -> CmmLit
-floatPairToWord dflags r1 r2
+floatPairToWord :: Platform -> Rational -> Rational -> CmmLit
+floatPairToWord platform r1 r2
   = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 (fromRational r1)
@@ -1297,15 +1298,15 @@ floatPairToWord dflags r1 r2
         return (pprWord32Pair w32_1 w32_2)
     )
     where pprWord32Pair w32_1 w32_2
-              | wORDS_BIGENDIAN dflags =
+              | BigEndian <- platformByteOrder platform =
                   CmmInt ((shiftL i1 32) .|. i2) W64
               | otherwise =
                   CmmInt ((shiftL i2 32) .|. i1) W64
               where i1 = toInteger w32_1
                     i2 = toInteger w32_2
 
-doubleToWords :: DynFlags -> Rational -> [CmmLit]
-doubleToWords dflags r
+doubleToWords :: Platform -> Rational -> [CmmLit]
+doubleToWords platform r
   = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 (fromRational r)
@@ -1314,8 +1315,6 @@ doubleToWords dflags r
         return (pprWord64 w64)
     )
     where targetWidth = wordWidth platform
-          platform    = targetPlatform dflags
-          targetBE    = wORDS_BIGENDIAN dflags
           pprWord64 w64
               | targetWidth == W64 =
                   [ CmmInt (toInteger w64) targetWidth ]
@@ -1324,9 +1323,9 @@ doubleToWords dflags r
                   , CmmInt (toInteger targetW2) targetWidth
                   ]
               | otherwise = panic "doubleToWords.pprWord64"
-              where (targetW1, targetW2)
-                        | targetBE  = (wHi, wLo)
-                        | otherwise = (wLo, wHi)
+              where (targetW1, targetW2) = case platformByteOrder platform of
+                        BigEndian    -> (wHi, wLo)
+                        LittleEndian -> (wLo, wHi)
                     wHi = w64 `shiftR` 32
                     wLo = w64 .&. 0xFFFFffff
 

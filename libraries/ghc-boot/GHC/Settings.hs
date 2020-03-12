@@ -36,6 +36,7 @@ getTargetPlatform settingsFile mySettings = do
   targetArch <- readSetting "target arch"
   targetOS <- readSetting "target os"
   targetWordSize <- readSetting "target word size"
+  targetWordBigEndian <- getBooleanSetting "target word big endian"
   targetUnregisterised <- getBooleanSetting "Unregisterised"
   targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
   targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
@@ -48,6 +49,7 @@ getTargetPlatform settingsFile mySettings = do
       , platformMini_os = targetOS
       }
     , platformWordSize = targetWordSize
+    , platformByteOrder = if targetWordBigEndian then BigEndian else LittleEndian
     , platformUnregisterised = targetUnregisterised
     , platformHasGnuNonexecStack = targetHasGnuNonexecStack
     , platformHasIdentDirective = targetHasIdentDirective

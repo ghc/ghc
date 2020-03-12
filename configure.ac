@@ -952,6 +952,10 @@ else
   AC_SUBST([Cabal64bit],[False])
 fi
 AC_SUBST(TargetWordSize)
+
+AC_C_BIGENDIAN([TargetWordBigEndian=YES],[TargetWordBigEndian=NO])
+AC_SUBST(TargetWordBigEndian)
+
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
