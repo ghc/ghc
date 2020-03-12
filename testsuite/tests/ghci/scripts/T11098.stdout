@@ -1,3 +1,3 @@
 [SigD foo_1 (AppT (AppT ArrowT (VarT a_0)) (VarT a_0)),FunD foo_1 [Clause [VarP x_2] (NormalB (VarE x_2)) []]]
 "[SigD foo_ (AppT (AppT ArrowT (VarT _a_)) (VarT _a_)),FunD foo_ [Clause [VarP x_] (NormalB (VarE x_)) []]]"
-[SigD foo_6 (ForallT [PlainTV _a_5] [] (AppT (AppT ArrowT (VarT _a_5)) (VarT _a_5))),FunD foo_6 [Clause [VarP x_7] (NormalB (VarE x_7)) []]]
+[SigD foo_6 (ForallT [PlainTV _a_5 SpecifiedSpec] [] (AppT (AppT ArrowT (VarT _a_5)) (VarT _a_5))),FunD foo_6 [Clause [VarP x_7] (NormalB (VarE x_7)) []]]

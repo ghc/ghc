@@ -72,6 +72,7 @@
         [({ KindSigs.hs:11:17 }
           (UserTyVar
            (NoExtField)
+           (())
            ({ KindSigs.hs:11:17 }
             (Unqual
              {OccName: a}))))])
@@ -93,6 +94,7 @@
        [({ KindSigs.hs:15:10 }
          (UserTyVar
           (NoExtField)
+          (())
           ({ KindSigs.hs:15:10 }
            (Unqual
             {OccName: a}))))])
@@ -165,6 +167,7 @@
        [({ KindSigs.hs:16:11 }
          (UserTyVar
           (NoExtField)
+          (())
           ({ KindSigs.hs:16:11 }
            (Unqual
             {OccName: a}))))])
@@ -458,6 +461,7 @@
        [({ KindSigs.hs:28:12 }
          (UserTyVar
           (NoExtField)
+          (())
           ({ KindSigs.hs:28:12 }
            (Unqual
             {OccName: b}))))])
