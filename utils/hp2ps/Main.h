@@ -24,7 +24,7 @@ void _stgAssert PROTO((char *, unsigned int));
 
 /* partain: some ubiquitous types: floatish & intish.
    Dubious to use float/int, but that is what it used to be...
-   (WDP 95/03)   
+   (WDP 95/03)
 */
 typedef double	floatish;
 typedef double  doublish; /* higher precision, if anything; little used */
