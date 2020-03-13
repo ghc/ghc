@@ -117,7 +117,7 @@ printClosure( const StgClosure *obj )
     const StgInfoTable* info = get_itbl(obj);
 
     while (IS_FORWARDING_PTR(info)) {
-        obj = (StgClosure*)UN_FORWARDING_PTR(obj);
+        obj = (StgClosure*)UN_FORWARDING_PTR(info);
         debugBelch("(forwarding to %p) ", (void*)obj);
         info = get_itbl(obj);
     }
