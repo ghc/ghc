@@ -553,13 +553,12 @@ zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
                        , pat_ext = NPatBindTc fvs new_ty }) }
 
 zonk_bind env (VarBind { var_ext = x
-                       , var_id = var, var_rhs = expr, var_inline = inl })
+                       , var_id = var, var_rhs = expr })
   = do { new_var  <- zonkIdBndr env var
        ; new_expr <- zonkLExpr env expr
        ; return (VarBind { var_ext = x
                          , var_id = new_var
-                         , var_rhs = new_expr
-                         , var_inline = inl }) }
+                         , var_rhs = new_expr }) }
 
 zonk_bind env bind@(FunBind { fun_id = L loc var
                             , fun_matches = ms

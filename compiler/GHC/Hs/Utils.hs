@@ -824,7 +824,7 @@ mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
 mkVarBind :: IdP (GhcPass p) -> LHsExpr (GhcPass p) -> LHsBind (GhcPass p)
 mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
-                              var_id = var, var_rhs = rhs, var_inline = False }
+                              var_id = var, var_rhs = rhs }
 
 mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
              -> LPat GhcPs -> HsPatSynDir GhcPs -> HsBind GhcPs
