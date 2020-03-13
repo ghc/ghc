@@ -1,5 +1,4 @@
 
 T14048c.hs:9:1: error:
-    • Kind signature on data instance declaration has non-*
-      return kind ‘Constraint’
+    • Data instance has non-* return kind ‘Constraint’
     • In the data instance declaration for ‘Foo’
