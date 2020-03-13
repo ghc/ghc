@@ -654,14 +654,14 @@ instance HasType (LHsExpr GhcTc) where
       -- performance before marking more things as 'True'.
       skipDesugaring :: HsExpr GhcTc -> Bool
       skipDesugaring e = case e of
-        HsVar{}          -> False
-        HsUnboundVar{}   -> False
-        HsConLikeOut{}   -> False
-        HsRecFld{}       -> False
-        HsOverLabel{}    -> False
-        HsIPVar{}        -> False
-        XExpr (HsWrap{}) -> False
-        _                -> True
+        HsVar{}                 -> False
+        HsUnboundVar{}          -> False
+        HsConLikeOut{}          -> False
+        HsRecFld{}              -> False
+        HsOverLabel{}           -> False
+        HsIPVar{}               -> False
+        XExpr (Left (HsWrap{})) -> False
+        _                       -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
@@ -957,7 +957,7 @@ instance ( a ~ GhcPass p
         [ toHie expr
         , toHie matches
         ]
-      HsIf _ _ a b c ->
+      HsIf _ a b c ->
         [ toHie a
         , toHie b
         , toHie c
@@ -1024,8 +1024,10 @@ instance ( a ~ GhcPass p
         ]
       XExpr x
         | GhcTc <- ghcPass @p
-        , HsWrap _ a <- x
-        -> [ toHie $ L mspan a ]
+        -> [ toHie $ L mspan $ case x of
+               Left (HsWrap _ a) -> a
+               Right (HsExpanded _ b) -> unLoc b
+           ]
 
         | otherwise
         -> []

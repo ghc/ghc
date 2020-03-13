@@ -79,7 +79,7 @@ module TcRnMonad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
-  addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
+  addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
   addErrTc, addErrsTc,
@@ -1010,7 +1010,8 @@ addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
+addErrCtxtM ctxt
+  = updLclEnv (\ env -> env { tcl_ctxt = (False, ctxt) : tcl_ctxt env })
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1022,9 +1023,10 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
+addLandmarkErrCtxtM ctxt
+  = updLclEnv (\ env -> env { tcl_ctxt = (True, ctxt) : tcl_ctxt env })
 
--- Helper function for the above
+-- Helper function for the two functions below
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
                            env { tcl_ctxt = upd ctxt })
