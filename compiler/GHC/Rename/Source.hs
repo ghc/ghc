@@ -1291,11 +1291,11 @@ rnTyClDecls :: [TyClGroup GhcPs]
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
-       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (concatMap tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
-       ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
-       ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (concatMap tyClGroupKindSigs tycl_ds)
+       ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (concatMap tyClGroupInstDecls tycl_ds)
+       ; role_annots  <- rnRoleAnnots tc_names (concatMap tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
@@ -1308,11 +1308,10 @@ rnTyClDecls tycl_ds
 
              first_group
                | null init_inst_ds = []
-               | otherwise = [TyClGroup { group_ext    = noExtField
-                                        , group_tyclds = []
-                                        , group_kisigs = []
-                                        , group_roles  = []
-                                        , group_instds = init_inst_ds }]
+               | otherwise = [TcgRn { tcg_rn_tyclds = []
+                                    , tcg_rn_kisigs = []
+                                    , tcg_rn_roles  = []
+                                    , tcg_rn_instds = init_inst_ds }]
 
              (final_inst_ds, groups)
                 = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
@@ -1342,11 +1341,10 @@ rnTyClDecls tycl_ds
         roles                = getRoleAnnots bndrs role_env
         kisigs               = getKindSigs   bndrs kisig_env
         (inst_ds, inst_map') = getInsts      bndrs inst_map
-        group = TyClGroup { group_ext    = noExtField
-                          , group_tyclds = tycl_ds
-                          , group_kisigs = kisigs
-                          , group_roles  = roles
-                          , group_instds = inst_ds }
+        group = TcgRn { tcg_rn_tyclds = tycl_ds
+                      , tcg_rn_kisigs = kisigs
+                      , tcg_rn_roles  = roles
+                      , tcg_rn_instds = inst_ds }
 
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
@@ -2306,7 +2304,7 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
 
 -- Class declarations: added to the TyClGroup
 add gp@(HsGroup {hs_tyclds = ts}) l (TyClD _ d) ds
-  = addl (gp { hs_tyclds = add_tycld (L l d) ts }) ds
+  = addl (gp { hs_tyclds = TcgPsDecl (L l d) : ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD _ (FixSig _ f)) ds
@@ -2314,7 +2312,7 @@ add gp@(HsGroup {hs_fixds = ts}) l (SigD _ (FixSig _ f)) ds
 
 -- Standalone kind signatures: added to the TyClGroup
 add gp@(HsGroup {hs_tyclds = ts}) l (KindSigD _ s) ds
-  = addl (gp {hs_tyclds = add_kisig (L l s) ts}) ds
+  = addl (gp {hs_tyclds = TcgPsKiSig (L l s) : ts}) ds
 
 add gp@(HsGroup {hs_valds = ts}) l (SigD _ d) ds
   = addl (gp {hs_valds = add_sig (L l d) ts}) ds
@@ -2325,13 +2323,13 @@ add gp@(HsGroup {hs_valds  = ts}) l (ValD _ d) ds
 
 -- Role annotations: added to the TyClGroup
 add gp@(HsGroup {hs_tyclds = ts}) l (RoleAnnotD _ d) ds
-  = addl (gp { hs_tyclds = add_role_annot (L l d) ts }) ds
+  = addl (gp { hs_tyclds = TcgPsRole (L l d) : ts }) ds
 
 -- NB instance declarations go into TyClGroups. We throw them into the first
 -- group, just as we do for the TyClD case. The renamer will go on to group
 -- and order them later.
 add gp@(HsGroup {hs_tyclds = ts})  l (InstD _ d) ds
-  = addl (gp { hs_tyclds = add_instd (L l d) ts }) ds
+  = addl (gp { hs_tyclds = TcgPsInst (L l d) : ts }) ds
 
 -- The rest are routine
 add gp@(HsGroup {hs_derivds = ts})  l (DerivD _ d) ds
@@ -2351,58 +2349,6 @@ add gp l (DocD _ d) ds
 add (HsGroup {}) _ (SpliceD _ (XSpliceDecl nec)) _ = noExtCon nec
 add (HsGroup {}) _ (XHsDecl nec)                 _ = noExtCon nec
 add (XHsGroup nec) _ _                           _ = noExtCon nec
-
-add_tycld :: LTyClDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-          -> [TyClGroup (GhcPass p)]
-add_tycld d []       = [TyClGroup { group_ext    = noExtField
-                                  , group_tyclds = [d]
-                                  , group_kisigs = []
-                                  , group_roles  = []
-                                  , group_instds = []
-                                  }
-                       ]
-add_tycld d (ds@(TyClGroup { group_tyclds = tyclds }):dss)
-  = ds { group_tyclds = d : tyclds } : dss
-add_tycld _ (XTyClGroup nec: _) = noExtCon nec
-
-add_instd :: LInstDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-          -> [TyClGroup (GhcPass p)]
-add_instd d []       = [TyClGroup { group_ext    = noExtField
-                                  , group_tyclds = []
-                                  , group_kisigs = []
-                                  , group_roles  = []
-                                  , group_instds = [d]
-                                  }
-                       ]
-add_instd d (ds@(TyClGroup { group_instds = instds }):dss)
-  = ds { group_instds = d : instds } : dss
-add_instd _ (XTyClGroup nec: _) = noExtCon nec
-
-add_role_annot :: LRoleAnnotDecl (GhcPass p) -> [TyClGroup (GhcPass p)]
-               -> [TyClGroup (GhcPass p)]
-add_role_annot d [] = [TyClGroup { group_ext    = noExtField
-                                 , group_tyclds = []
-                                 , group_kisigs = []
-                                 , group_roles  = [d]
-                                 , group_instds = []
-                                 }
-                      ]
-add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
-  = tycls { group_roles = d : roles } : rest
-add_role_annot _ (XTyClGroup nec: _) = noExtCon nec
-
-add_kisig :: LStandaloneKindSig (GhcPass p)
-         -> [TyClGroup (GhcPass p)] -> [TyClGroup (GhcPass p)]
-add_kisig d [] = [TyClGroup { group_ext    = noExtField
-                            , group_tyclds = []
-                            , group_kisigs = [d]
-                            , group_roles  = []
-                            , group_instds = []
-                            }
-                 ]
-add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
-  = tycls { group_kisigs = d : kisigs } : rest
-add_kisig _ (XTyClGroup nec : _) = noExtCon nec
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs

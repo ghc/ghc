@@ -1261,17 +1261,16 @@ instance ( a ~ GhcPass p
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where
-  toHie TyClGroup{ group_tyclds = classes
-                 , group_roles  = roles
-                 , group_kisigs = sigs
-                 , group_instds = instances } =
+  toHie TcgRn{ tcg_rn_tyclds = classes
+             , tcg_rn_roles  = roles
+             , tcg_rn_kisigs = sigs
+             , tcg_rn_instds = instances } =
     concatM
     [ toHie classes
     , toHie sigs
     , toHie roles
     , toHie instances
     ]
-  toHie (XTyClGroup _) = pure []
 
 instance ToHie (LTyClDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of

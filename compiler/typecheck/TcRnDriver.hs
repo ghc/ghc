@@ -1452,7 +1452,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (concatMap tyClGroupTyClDecls tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1692,7 +1692,7 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                                               -- instances
 
 tcTyClsInstDecls tycl_decls deriv_decls binds
- = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
+ = tcAddDataFamConPlaceholders (tycl_decls >>= tyClGroupInstDecls) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
    do { (tcg_env, inst_info, deriv_info)
           <- tcTyAndClassDecls tycl_decls ;
