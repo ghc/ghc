@@ -28,6 +28,7 @@ module GHC.Hs.Extension where
 import GhcPrelude
 
 import Data.Data hiding ( Fixity )
+import Data.Semigroup
 import Name
 import RdrName
 import Var
@@ -142,6 +143,12 @@ data NoExtField = NoExtField
 
 instance Outputable NoExtField where
   ppr _ = text "NoExtField"
+
+instance Semigroup NoExtField where
+  _ <> _ = NoExtField
+
+instance Monoid NoExtField where
+  mempty = NoExtField
 
 -- | Used when constructing a term with an unused extension point.
 noExtField :: NoExtField

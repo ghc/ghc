@@ -625,7 +625,8 @@ tcRnHsBootDecls hsc_src decls
    = do { (first_group, group_tail) <- findSplice decls
 
                 -- Rename the declarations
-        ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
+        ; (tcg_env, HsGroup { hs_ext = kinded_decls
+                            , hs_tyclds = tycl_decls
                             , hs_derivds = deriv_decls
                             , hs_fords  = for_decls
                             , hs_defds  = def_decls
@@ -653,7 +654,7 @@ tcRnHsBootDecls hsc_src decls
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds)
-             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
+             <- tcTyClsInstDecls kinded_decls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
         -- Emit Typeable bindings
@@ -1396,7 +1397,8 @@ rnTopSrcDecls group
    }
 
 tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
+tcTopSrcDecls (HsGroup { hs_ext = kinded_decls,
+                         hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -1412,7 +1414,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
-            <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
+            <- tcTyClsInstDecls kinded_decls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
 
@@ -1681,7 +1683,8 @@ tcMissingParentClassWarn warnFlag isName shouldName
 
 
 ---------------------------
-tcTyClsInstDecls :: [TyClGroup GhcRn]
+tcTyClsInstDecls :: KindedDecls
+                 -> [TyClGroup GhcRn]
                  -> [LDerivDecl GhcRn]
                  -> [(RecFlag, LHsBinds GhcRn)]
                  -> TcM (TcGblEnv,            -- The full inst env
@@ -1691,11 +1694,11 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                           HsValBinds GhcRn)   -- Supporting bindings for derived
                                               -- instances
 
-tcTyClsInstDecls tycl_decls deriv_decls binds
+tcTyClsInstDecls kinded_decls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= tyClGroupInstDecls) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
    do { (tcg_env, inst_info, deriv_info)
-          <- tcTyAndClassDecls tycl_decls ;
+          <- tcTyAndClassDecls kinded_decls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
           -- process the deriving clauses, including data family deriving

@@ -251,8 +251,8 @@ tcHsSigType ctxt sig_ty
     skol_info = SigTypeSkol ctxt
 
 -- Does validity checking and zonking.
-tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
-tcStandaloneKindSig (L _ kisig) = case kisig of
+tcStandaloneKindSig :: StandaloneKindSig GhcRn -> TcM (Name, Kind)
+tcStandaloneKindSig kisig = case kisig of
   StandaloneKindSig _ (L _ name) ksig ->
     let ctxt = StandaloneKindSigCtxt name in
     addSigCtxt ctxt (hsSigType ksig) $

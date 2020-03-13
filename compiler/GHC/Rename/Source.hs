@@ -52,6 +52,7 @@ import PrelNames        ( applicativeClassName, pureAName, thenAName
 import Name
 import NameSet
 import NameEnv
+import TyCon            ( TyConFlavour(..) )
 import Avail
 import Outputable
 import Bag
@@ -59,7 +60,8 @@ import BasicTypes       ( pprRuleName, TypeOrKind(..) )
 import FastString
 import SrcLoc
 import GHC.Driver.Session
-import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import Util             ( debugIsOn, filterOut, lengthExceeds,
+                          partitionWith, (<&&>) )
 import GHC.Driver.Types         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -160,7 +162,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
+   (rn_tycl_decls, kinded_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
@@ -202,7 +204,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
-   let {rn_group = HsGroup { hs_ext     = noExtField,
+   let {rn_group = HsGroup { hs_ext     = kinded_decls,
                              hs_valds   = rn_val_decls,
                              hs_splcds  = rn_splice_decls,
                              hs_tyclds  = rn_tycl_decls,
@@ -1287,7 +1289,7 @@ constructors] in TcEnv
 
 
 rnTyClDecls :: [TyClGroup GhcPs]
-            -> RnM ([TyClGroup GhcRn], FreeVars)
+            -> RnM ([TyClGroup GhcRn], KindedDecls, FreeVars)
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
@@ -1297,11 +1299,19 @@ rnTyClDecls tycl_ds
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (concatMap tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (concatMap tyClGroupRoleDecls tycl_ds)
 
+       ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+                   -- See Note [CUSKs and PolyKinds] in TcTyClsDecls
+       ; let (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
+             decl_sig_list =
+               mapMaybe (mkDeclSigRn cusks_enabled kisig_env . fst) $
+               tycls_w_fvs
+             decl_sig_env = mkNameEnv decl_sig_list
+             kinded_decls = KindedDecls (mkNameSet (map fst decl_sig_list))
+
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
        ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
-             (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
 
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
              (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
@@ -1314,7 +1324,7 @@ rnTyClDecls tycl_ds
                                     , tcg_rn_instds = init_inst_ds }]
 
              (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
+                = mapAccumL (mk_group role_annot_env decl_sig_env) rest_inst_ds tycl_sccs
 
              all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
@@ -1326,25 +1336,87 @@ rnTyClDecls tycl_ds
                                        $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
-       ; return (all_groups, all_fvs) }
+       ; return (all_groups, kinded_decls, all_fvs) }
   where
     mk_group :: RoleAnnotEnv
-             -> KindSigEnv
+             -> NameEnv DeclSigRn
              -> InstDeclFreeVarsMap
              -> SCC (LTyClDecl GhcRn)
              -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env kisig_env inst_map scc
+    mk_group role_env decl_sig_env inst_map scc
       = (inst_map', group)
       where
         tycl_ds              = flattenSCC scc
         bndrs                = map (tcdName . unLoc) tycl_ds
         roles                = getRoleAnnots bndrs role_env
-        kisigs               = getKindSigs   bndrs kisig_env
+        decl_sigs            = getDeclSigs   bndrs decl_sig_env
         (inst_ds, inst_map') = getInsts      bndrs inst_map
         group = TcgRn { tcg_rn_tyclds = tycl_ds
-                      , tcg_rn_kisigs = kisigs
+                      , tcg_rn_kisigs = decl_sigs
                       , tcg_rn_roles  = roles
                       , tcg_rn_instds = inst_ds }
+
+mkDeclSigRn
+  :: Bool   -- ^ CUSKs enabled
+  -> KindSigEnv
+  -> LTyClDecl GhcRn
+  -> Maybe (Name, DeclSigRn)
+mkDeclSigRn cusks_enabled kisig_env tcd
+    -- Stanadlone kind signature
+    | Just ki <- lookupNameEnv kisig_env name
+    = Just (name, DeclSigRnSAKS decl_header ki)
+    -- Complete user-supplied kind
+    | cusks_enabled && has_cusk
+    = Just (name, DeclSigRnCUSK decl_header)
+    -- No signature: needs inference
+    | otherwise
+    = Nothing
+  where
+    has_cusk = hsDeclHasCusk (unLoc tcd)
+    name = tcdName (unLoc tcd)
+    decl_header = mapLoc mkDeclHeaderRn tcd
+
+mkDeclHeaderRn :: TyClDecl GhcRn -> DeclHeaderRn
+mkDeclHeaderRn tcd = case tcd of
+  -- Class
+  ClassDecl { tcdLName = name, tcdTyVars = ktvs }
+    -> DeclHeaderRn
+      { decl_header_flav = ClassFlavour,
+        decl_header_name = name,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = Nothing }
+  -- Data/Newtype
+  DataDecl { tcdLName = name
+           , tcdTyVars = ktvs
+           , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                      , dd_ND = new_or_data } }
+    -> DeclHeaderRn
+      { decl_header_flav = newOrDataToFlavour new_or_data,
+        decl_header_name = name,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = m_sig }
+  -- Type/data family
+  FamDecl { tcdFam =
+    FamilyDecl { fdLName     = name
+               , fdTyVars    = ktvs
+               , fdResultSig = L _ resultSig
+               , fdInfo      = info } }
+    -> DeclHeaderRn
+      { decl_header_flav = getFamFlav Nothing info,
+        decl_header_name = name,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = famResultKindSignature resultSig }
+  -- Type synonym
+  SynDecl { tcdLName = name, tcdTyVars = ktvs, tcdRhs = rhs }
+    -> DeclHeaderRn
+      { decl_header_flav = TypeSynonymFlavour,
+        decl_header_name = name,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = hsTyKindSig rhs }
+  -- Impossible cases
+  DataDecl _ _ _ _ (XHsDataDefn nec) -> noExtCon nec
+  FamDecl {tcdFam = XFamilyDecl nec} -> noExtCon nec
+  XTyClDecl nec -> noExtCon nec
 
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
@@ -1364,8 +1436,8 @@ mkKindSig_fv_env kisigs_w_fvs = (kisig_env, kisig_fv_env)
     compound_env :: NameEnv (LStandaloneKindSig GhcRn, FreeVars)
       = mkNameEnvWith (standaloneKindSigName . unLoc . fst) kisigs_w_fvs
 
-getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
-getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
+getDeclSigs :: [Name] -> NameEnv DeclSigRn -> [DeclSigRn]
+getDeclSigs bndrs decl_sig_env = mapMaybe (lookupNameEnv decl_sig_env) bndrs
 
 rnStandaloneKindSignatures
   :: NameSet  -- names of types and classes in the current TyClGroup
