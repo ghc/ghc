@@ -53,9 +53,9 @@ typecheckPlugin [name, "typecheck"] _ tc
 typecheckPlugin _ _ tc = return tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
-metaPlugin' [name, "meta"] (L l (HsPar x (L _ (XExpr (HsWrap w (HsApp noExt (L _ (HsVar _ (L _ id))) e))))))
+metaPlugin' [name, "meta"] (L l (HsPar x (L _ (XExpr (WrapExpr (HsWrap w (HsApp noExt (L _ (HsVar _ (L _ id))) e)))))))
   | occNameString (getOccName id) == name
-  = return (L l (XExpr (HsWrap w (unLoc e))))
+  = return (L l (XExpr (WrapExpr (HsWrap w (unLoc e)))))
 -- The test should always match this first case. If the desugaring changes
 -- again in the future then the panic is more useful than the previous
 -- inscrutable failure.
