@@ -540,14 +540,15 @@
             (NoExtField)
             ({ <no location info> }
              (XExpr
-              (HsWrap
-               (WpTyApp
-                (TyConApp
-                 ({abstract:TyCon})
-                 []))
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))))
+              (WrapExpr
+               (HsWrap
+                (WpTyApp
+                 (TyConApp
+                  ({abstract:TyCon})
+                  []))
+                (HsConLikeOut
+                 (NoExtField)
+                 ({abstract:ConLike}))))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -564,14 +565,15 @@
                 (NoExtField)
                 ({ <no location info> }
                  (XExpr
-                  (HsWrap
-                   (WpTyApp
-                    (TyConApp
-                     ({abstract:TyCon})
-                     []))
-                   (HsConLikeOut
-                    (NoExtField)
-                    ({abstract:ConLike})))))
+                  (WrapExpr
+                   (HsWrap
+                    (WpTyApp
+                     (TyConApp
+                      ({abstract:TyCon})
+                      []))
+                    (HsConLikeOut
+                     (NoExtField)
+                     ({abstract:ConLike}))))))
                 ({ <no location info> }
                  (HsVar
                   (NoExtField)
@@ -588,14 +590,15 @@
                     (NoExtField)
                     ({ <no location info> }
                      (XExpr
-                      (HsWrap
-                       (WpTyApp
-                        (TyConApp
-                         ({abstract:TyCon})
-                         []))
-                       (HsConLikeOut
-                        (NoExtField)
-                        ({abstract:ConLike})))))
+                      (WrapExpr
+                       (HsWrap
+                        (WpTyApp
+                         (TyConApp
+                          ({abstract:TyCon})
+                          []))
+                        (HsConLikeOut
+                         (NoExtField)
+                         ({abstract:ConLike}))))))
                     ({ <no location info> }
                      (HsVar
                       (NoExtField)
@@ -603,14 +606,15 @@
                        {Var: $krep})))))
                   ({ <no location info> }
                    (XExpr
-                    (HsWrap
-                     (WpTyApp
-                      (TyConApp
-                       ({abstract:TyCon})
-                       []))
-                     (HsConLikeOut
-                      (NoExtField)
-                      ({abstract:ConLike})))))))))))))))))))))
+                    (WrapExpr
+                     (HsWrap
+                      (WpTyApp
+                       (TyConApp
+                        ({abstract:TyCon})
+                        []))
+                      (HsConLikeOut
+                       (NoExtField)
+                       ({abstract:ConLike}))))))))))))))))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -632,14 +636,15 @@
            {Var: DumpTypecheckedAst.$tcPeano})))))
       ({ <no location info> }
        (XExpr
-        (HsWrap
-         (WpTyApp
-          (TyConApp
-           ({abstract:TyCon})
-           []))
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))))))))
+        (WrapExpr
+         (HsWrap
+          (WpTyApp
+           (TyConApp
+            ({abstract:TyCon})
+            []))
+          (HsConLikeOut
+           (NoExtField)
+           ({abstract:ConLike}))))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)

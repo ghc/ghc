@@ -4,4 +4,4 @@
 "RealSrcSpan SrcSpanPoint \"filename\" 1 3 Nothing"
 "RealSrcSpan SrcSpanOneLine \"filename\" 1 3 5 Nothing"
 "RealSrcSpan SrcSpanMultiLine \"filename\" 1 5 10 1 Nothing"
-"UnhelpfulSpan \"bad span\""
+"UnhelpfulSpan (UnhelpfulOther \"bad span\")"

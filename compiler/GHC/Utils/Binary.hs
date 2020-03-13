@@ -1448,6 +1448,23 @@ instance Binary BufSpan where
     end <- get bh
     return (BufSpan start end)
 
+instance Binary UnhelpfulSpanReason where
+  put_ bh r = case r of
+    UnhelpfulNoLocationInfo -> putByte bh 0
+    UnhelpfulWiredIn        -> putByte bh 1
+    UnhelpfulInteractive    -> putByte bh 2
+    UnhelpfulGenerated      -> putByte bh 3
+    UnhelpfulOther fs       -> putByte bh 4 >> put_ bh fs
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return UnhelpfulNoLocationInfo
+      1 -> return UnhelpfulWiredIn
+      2 -> return UnhelpfulInteractive
+      3 -> return UnhelpfulGenerated
+      _ -> UnhelpfulOther <$> get bh
+
 instance Binary SrcSpan where
   put_ bh (RealSrcSpan ss sb) = do
           putByte bh 0

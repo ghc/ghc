@@ -2224,7 +2224,7 @@ parseSpanArg s = do
 -- @<filename>:(<line>,<col>)-(<line-end>,<col-end>)@
 -- while simply unpacking 'UnhelpfulSpan's
 showSrcSpan :: SrcSpan -> String
-showSrcSpan (UnhelpfulSpan s)  = unpackFS s
+showSrcSpan (UnhelpfulSpan s)  = unpackFS (unhelpfulSpanFS s)
 showSrcSpan (RealSrcSpan spn _) = showRealSrcSpan spn
 
 -- | Variant of 'showSrcSpan' for 'RealSrcSpan's

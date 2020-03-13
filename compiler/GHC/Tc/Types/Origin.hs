@@ -501,7 +501,6 @@ exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf _ (SyntaxExprRn syn) _ _ _) = exprCtOrigin syn
 exprCtOrigin (HsIf {})           = Shouldn'tHappenOrigin "if expression"
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
@@ -520,6 +519,7 @@ exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
+exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin

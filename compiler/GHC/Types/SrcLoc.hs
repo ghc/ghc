@@ -39,10 +39,11 @@ module GHC.Types.SrcLoc (
         -- * SrcSpan
         RealSrcSpan,            -- Abstract
         SrcSpan(..),
+        UnhelpfulSpanReason(..),
 
         -- ** Constructing SrcSpan
         mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
-        noSrcSpan,
+        noSrcSpan, generatedSrcSpan, isGeneratedSrcSpan,
         wiredInSrcSpan,         -- Something wired into the compiler
         interactiveSrcSpan,
         srcLocSpan, realSrcLocSpan,
@@ -53,7 +54,8 @@ module GHC.Types.SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        pprUserRealSpan,
+        pprUserRealSpan, pprUnhelpfulSpanReason,
+        unhelpfulSpanFS,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -302,11 +304,18 @@ data BufSpan =
 -- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
-  | UnhelpfulSpan !FastString   -- Just a general indication
-                                -- also used to indicate an empty span
+  | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
+
+data UnhelpfulSpanReason
+  = UnhelpfulNoLocationInfo
+  | UnhelpfulWiredIn
+  | UnhelpfulInteractive
+  | UnhelpfulGenerated
+  | UnhelpfulOther !FastString
+  deriving (Eq, Show)
 
 {- Note [Why Maybe BufPos]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -344,18 +353,23 @@ instance NFData SrcSpan where
   rnf x = x `seq` ()
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
-noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
-noSrcSpan          = UnhelpfulSpan (fsLit "<no location info>")
-wiredInSrcSpan     = UnhelpfulSpan (fsLit "<wired into compiler>")
-interactiveSrcSpan = UnhelpfulSpan (fsLit "<interactive>")
+noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
+noSrcSpan          = UnhelpfulSpan UnhelpfulNoLocationInfo
+wiredInSrcSpan     = UnhelpfulSpan UnhelpfulWiredIn
+interactiveSrcSpan = UnhelpfulSpan UnhelpfulInteractive
+generatedSrcSpan   = UnhelpfulSpan UnhelpfulGenerated
+
+isGeneratedSrcSpan :: SrcSpan -> Bool
+isGeneratedSrcSpan (UnhelpfulSpan UnhelpfulGenerated) = True
+isGeneratedSrcSpan _                                  = False
 
 -- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan
-mkGeneralSrcSpan = UnhelpfulSpan
+mkGeneralSrcSpan = UnhelpfulSpan . UnhelpfulOther
 
 -- | Create a 'SrcSpan' corresponding to a single point
 srcLocSpan :: SrcLoc -> SrcSpan
-srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
+srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 srcLocSpan (RealSrcLoc l mb) = RealSrcSpan (realSrcLocSpan l) (fmap (\b -> BufSpan b b) mb)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
@@ -383,8 +397,8 @@ isPointRealSpan (RealSrcSpan' _ line1 col1 line2 col2)
 
 -- | Create a 'SrcSpan' between two points in a file
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
-mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
+mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan (UnhelpfulOther str)
+mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 mkSrcSpan (RealSrcLoc loc1 mbpos1) (RealSrcLoc loc2 mbpos2)
     = RealSrcSpan (mkRealSrcSpan loc1 loc2) (liftA2 BufSpan mbpos1 mbpos2)
 
@@ -396,7 +410,8 @@ combineSrcSpans l (UnhelpfulSpan _) = l
 combineSrcSpans (RealSrcSpan span1 mbspan1) (RealSrcSpan span2 mbspan2)
   | srcSpanFile span1 == srcSpanFile span2
       = RealSrcSpan (combineRealSrcSpans span1 span2) (liftA2 combineBufSpans mbspan1 mbspan2)
-  | otherwise = UnhelpfulSpan (fsLit "<combineSrcSpans: files differ>")
+  | otherwise = UnhelpfulSpan $
+      UnhelpfulOther (fsLit "<combineSrcSpans: files differ>")
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
@@ -488,12 +503,12 @@ srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
-srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
+srcSpanStart (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
 srcSpanStart (RealSrcSpan s b) = RealSrcLoc (realSrcSpanStart s) (fmap bufSpanStart b)
 
 -- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanEnd :: SrcSpan -> SrcLoc
-srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str
+srcSpanEnd (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
 srcSpanEnd (RealSrcSpan s b) = RealSrcLoc (realSrcSpanEnd s) (fmap bufSpanEnd b)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
@@ -559,6 +574,9 @@ instance Outputable RealSrcSpan where
 instance Outputable SrcSpan where
     ppr span = pprUserSpan True span
 
+instance Outputable UnhelpfulSpanReason where
+    ppr = pprUnhelpfulSpanReason
+
 -- I don't know why there is this style-based difference
 --      = getPprStyle $ \ sty ->
 --        if userStyle sty || debugStyle sty then
@@ -568,8 +586,19 @@ instance Outputable SrcSpan where
 --           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
 --           RealSrcSpan s -> ppr s
 
+unhelpfulSpanFS :: UnhelpfulSpanReason -> FastString
+unhelpfulSpanFS r = case r of
+  UnhelpfulOther s        -> s
+  UnhelpfulNoLocationInfo -> fsLit "<no location info>"
+  UnhelpfulWiredIn        -> fsLit "<wired into compiler>"
+  UnhelpfulInteractive    -> fsLit "<interactive>"
+  UnhelpfulGenerated      -> fsLit "<generated>"
+
+pprUnhelpfulSpanReason :: UnhelpfulSpanReason -> SDoc
+pprUnhelpfulSpanReason r = ftext (unhelpfulSpanFS r)
+
 pprUserSpan :: Bool -> SrcSpan -> SDoc
-pprUserSpan _         (UnhelpfulSpan s) = ftext s
+pprUserSpan _         (UnhelpfulSpan r) = pprUnhelpfulSpanReason r
 pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc

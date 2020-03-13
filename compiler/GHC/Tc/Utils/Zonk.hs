@@ -825,12 +825,11 @@ zonkExpr env (HsCase x expr ms)
        new_ms <- zonkMatchGroup env zonkLExpr ms
        return (HsCase x new_expr new_ms)
 
-zonkExpr env (HsIf x fun e1 e2 e3)
-  = do (env1, new_fun) <- zonkSyntaxExpr env fun
-       new_e1 <- zonkLExpr env1 e1
-       new_e2 <- zonkLExpr env1 e2
-       new_e3 <- zonkLExpr env1 e3
-       return (HsIf x new_fun new_e1 new_e2 new_e3)
+zonkExpr env (HsIf x e1 e2 e3)
+  = do new_e1 <- zonkLExpr env e1
+       new_e2 <- zonkLExpr env e2
+       new_e3 <- zonkLExpr env e3
+       return (HsIf x new_e1 new_e2 new_e3)
 
 zonkExpr env (HsMultiIf ty alts)
   = do { alts' <- mapM (wrapLocM zonk_alt) alts
@@ -907,10 +906,13 @@ zonkExpr env (HsProc x pat body)
 zonkExpr env (HsStatic fvs expr)
   = HsStatic fvs <$> zonkLExpr env expr
 
-zonkExpr env (XExpr (HsWrap co_fn expr))
+zonkExpr env (XExpr (WrapExpr (HsWrap co_fn expr)))
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
        new_expr <- zonkExpr env1 expr
-       return (XExpr (HsWrap new_co_fn new_expr))
+       return (XExpr (WrapExpr (HsWrap new_co_fn new_expr)))
+
+zonkExpr env (XExpr (ExpansionExpr (HsExpanded a b)))
+  = XExpr . ExpansionExpr . HsExpanded a <$> zonkExpr env b
 
 zonkExpr _ e@(HsUnboundVar {})
   = return e

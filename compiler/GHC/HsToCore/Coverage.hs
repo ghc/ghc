@@ -552,8 +552,8 @@ addTickHsExpr (HsCase x e mgs) =
                 (addTickLHsExpr e) -- not an EvalInner; e might not necessarily
                                    -- be evaluated.
                 (addTickMatchGroup False mgs)
-addTickHsExpr (HsIf x cnd e1 e2 e3) =
-        liftM3 (HsIf x cnd)
+addTickHsExpr (HsIf x e1 e2 e3) =
+        liftM3 (HsIf x)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
@@ -629,10 +629,12 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (XExpr (HsWrap w e)) =
-        liftM XExpr $
-        liftM (HsWrap w)
+addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
+        liftM (XExpr . WrapExpr . HsWrap w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
+addTickHsExpr (XExpr (ExpansionExpr (HsExpanded a b))) =
+        liftM (XExpr . ExpansionExpr . HsExpanded a) $
+              (addTickHsExpr b)
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)

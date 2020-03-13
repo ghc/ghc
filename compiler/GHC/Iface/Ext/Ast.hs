@@ -758,14 +758,14 @@ instance HiePass p => HasType (LHsExpr (GhcPass p)) where
           -- performance before marking more things as 'True'.
           skipDesugaring :: HsExpr GhcTc -> Bool
           skipDesugaring e = case e of
-            HsVar{}          -> False
-            HsUnboundVar{}   -> False
-            HsConLikeOut{}   -> False
-            HsRecFld{}       -> False
-            HsOverLabel{}    -> False
-            HsIPVar{}        -> False
-            XExpr (HsWrap{}) -> False
-            _                -> True
+            HsVar{}             -> False
+            HsUnboundVar{}      -> False
+            HsConLikeOut{}      -> False
+            HsRecFld{}          -> False
+            HsOverLabel{}       -> False
+            HsIPVar{}           -> False
+            XExpr (WrapExpr {}) -> False
+            _                   -> True
 
 data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
@@ -1099,7 +1099,7 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
         [ toHie expr
         , toHie matches
         ]
-      HsIf _ _ a b c ->
+      HsIf _ a b c ->
         [ toHie a
         , toHie b
         , toHie c
@@ -1166,9 +1166,13 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
         ]
       XExpr x
         | GhcTc <- ghcPass @p
-        , HsWrap w a <- x
+        , WrapExpr (HsWrap w a) <- x
         -> [ toHie $ L mspan a
            , toHie (L mspan w)
+           ]
+        | GhcTc <- ghcPass @p
+        , ExpansionExpr (HsExpanded _ b) <- x
+        -> [ toHie (L mspan b)
            ]
         | otherwise -> []
 
