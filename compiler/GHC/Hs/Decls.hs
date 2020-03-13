@@ -3,6 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -30,6 +31,7 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  DeclHeaderRn(..), DeclSigRn(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -43,7 +45,7 @@ module GHC.Hs.Decls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..),
+  InstDecl(..), LInstDecl, FamilyInfo(..), getFamFlav,
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -89,10 +91,13 @@ module GHC.Hs.Decls (
   resultVariableName, familyDeclLName, familyDeclName,
 
   -- * Grouping
+  KindedDecls(..), isKindedDecl,
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
   hsGroupTopLevelFixitySigs,
 
     ) where
+
+#include "HsVersions.h"
 
 -- friends:
 import GhcPrelude
@@ -122,6 +127,7 @@ import Bag
 import Maybes
 import Data.Data        hiding (TyCon,Fixity, Infix)
 import Data.Void
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -252,15 +258,28 @@ data HsGroup p
     }
   | XHsGroup (XXHsGroup p)
 
-type instance XCHsGroup (GhcPass _) = NoExtField
+type instance XCHsGroup GhcPs = NoExtField
+type instance XCHsGroup GhcRn = KindedDecls
+type instance XCHsGroup GhcTc = KindedDecls
 type instance XXHsGroup (GhcPass _) = NoExtCon
 
+-- | Names of declarations that either have a CUSK or a SAKS.
+newtype KindedDecls = KindedDecls NameSet
 
-emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup (GhcPass p)
+instance Semigroup KindedDecls where
+  KindedDecls a <> KindedDecls b = KindedDecls (unionNameSet a b)
+
+instance Monoid KindedDecls where
+  mempty = KindedDecls emptyNameSet
+
+isKindedDecl :: KindedDecls -> TyClDecl GhcRn -> Bool
+isKindedDecl (KindedDecls nameSet) d = elemNameSet (tcdName d) nameSet
+
+emptyGroup, emptyRdrGroup, emptyRnGroup :: Monoid (XCHsGroup (GhcPass p)) => HsGroup (GhcPass p)
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-emptyGroup = HsGroup { hs_ext = noExtField,
+emptyGroup = HsGroup { hs_ext = mempty,
                        hs_tyclds = [],
                        hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
@@ -282,10 +301,12 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
                 ]
 hsGroupTopLevelFixitySigs (XHsGroup nec) = noExtCon nec
 
-appendGroups :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
+appendGroups :: Semigroup (XCHsGroup (GhcPass p))
+             => HsGroup (GhcPass p) -> HsGroup (GhcPass p)
              -> HsGroup (GhcPass p)
 appendGroups
     HsGroup {
+        hs_ext    = ext1,
         hs_valds  = val_groups1,
         hs_splcds = spliceds1,
         hs_tyclds = tyclds1,
@@ -298,6 +319,7 @@ appendGroups
         hs_ruleds = rulds1,
         hs_docs   = docs1 }
     HsGroup {
+        hs_ext    = ext2,
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
         hs_tyclds = tyclds2,
@@ -311,7 +333,7 @@ appendGroups
         hs_docs   = docs2 }
   =
     HsGroup {
-        hs_ext    = noExtField,
+        hs_ext    = ext1 Data.Semigroup.<> ext2,
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
         hs_splcds = spliceds1 ++ spliceds2,
         hs_tyclds = tyclds1 ++ tyclds2,
@@ -972,6 +994,28 @@ See Note [Dependency analysis of type, class, and instance decls]
 in GHC.Rename.Source for more info.
 -}
 
+-- | Renamed declaration header (left-hand side of a declaration):
+--
+-- 1. data T a b = MkT (a -> b)
+--    ^^^^^^^^^^
+--
+-- 2. class C a where
+--    ^^^^^^^^^
+--
+-- 3. type family F a b :: r where
+--    ^^^^^^^^^^^^^^^^^^^^^^
+--
+-- Supplies arity and flavor information not covered by a standalone kind
+-- signature.
+--
+data DeclHeaderRn
+  = DeclHeaderRn
+      { decl_header_flav :: TyConFlavour,
+        decl_header_name :: Located (IdP GhcRn),
+        decl_header_bndrs :: LHsQTyVars GhcRn,
+        decl_header_res_sig :: Maybe (LHsType GhcRn)
+      }
+
 -- | Type or Class Group
 data family TyClGroup pass
 
@@ -981,11 +1025,23 @@ data instance TyClGroup GhcPs
   | TcgPsKiSig (LStandaloneKindSig GhcPs)
   | TcgPsInst (LInstDecl GhcPs)
 
+-- | Declaration signature (CUSK or SAKS).
+data DeclSigRn
+  = DeclSigRnCUSK
+      (Located DeclHeaderRn)      -- Complete user-specified kind (CUSK)
+  | DeclSigRnSAKS
+      (Located DeclHeaderRn)      -- Not necessarily a CUSK
+      (LStandaloneKindSig GhcRn)  -- Standalone kind signature (SAKS)
+
+instance Outputable DeclSigRn where
+  ppr (DeclSigRnCUSK hdr) = text "CUSK:" <+> ppr (decl_header_name (unLoc hdr))
+  ppr (DeclSigRnSAKS _ sig) = ppr sig
+
 -- See Note [TyClGroups and dependency analysis]
 data instance TyClGroup GhcRn =
   TcgRn { tcg_rn_tyclds :: [LTyClDecl GhcRn]
         , tcg_rn_roles  :: [LRoleAnnotDecl GhcRn]
-        , tcg_rn_kisigs :: [LStandaloneKindSig GhcRn]
+        , tcg_rn_kisigs :: [DeclSigRn]
         , tcg_rn_instds :: [LInstDecl GhcRn] }
 
 newtype instance TyClGroup GhcTc = TcgTc Void
@@ -1018,7 +1074,7 @@ tyClGroupKindSigs :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LStandalone
 tyClGroupKindSigs tcg =
   case ghcPass @p of
     GhcPs -> [a | TcgPsKiSig a <- [tcg] ]
-    GhcRn -> tcg_rn_kisigs tcg
+    GhcRn -> [a | DeclSigRnSAKS _ a <- tcg_rn_kisigs tcg ]
     GhcTc -> tcg_tc_absurd tcg
 
 {- *********************************************************************
@@ -1175,6 +1231,27 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
+getFamFlav
+  :: Maybe TyCon    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour
+getFamFlav mb_parent_tycon info =
+  case info of
+    DataFamily         -> DataFamilyFlavour mb_parent_tycon
+    OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
+    ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon ) -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
+
+{- Note [Closed type family mb_parent_tycon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no way to write a closed type family inside a class declaration:
+
+  class C a where
+    type family F a where  -- error: parse error on input ‘where’
+
+In fact, it is not clear what the meaning of such a declaration would be.
+Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
+-}
 
 ------------- Functions over FamilyDecls -----------
 
