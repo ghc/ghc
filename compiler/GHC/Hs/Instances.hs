@@ -431,4 +431,7 @@ deriving instance Eq (IE GhcPs)
 deriving instance Eq (IE GhcRn)
 deriving instance Eq (IE GhcTc)
 
+
 -- ---------------------------------------------------------------------
+
+deriving instance Data XXExprGhcTc

@@ -113,7 +113,7 @@ tcCheckExpr, tcCheckExprNC
 -- to do so himself.
 
 tcCheckExpr expr res_ty
-  = addExprCtxt expr $
+  = addExprErrCtxt (unLoc expr) $
     tcCheckExprNC expr res_ty
 
 tcCheckExprNC (L loc expr) res_ty
@@ -129,15 +129,15 @@ tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 -- It goes against the principle of eager instantiation,
 -- so we expect very very few calls to this function
 -- Most clients will want tcInferRho
-tcInferSigma le@(L loc expr)
-  = addExprCtxt le $ setSrcSpan loc $
+tcInferSigma (L loc expr)
+  = addExprErrCtxt expr $ setSrcSpan loc $
     do { (fun, args, ty) <- tcInferApp expr
        ; return (L loc (applyHsArgs fun args), ty) }
 
 ---------------
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
-tcInferRho le = addExprCtxt le (tcInferRhoNC le)
+tcInferRho le = addExprErrCtxt (unLoc le) (tcInferRhoNC le)
 
 tcInferRhoNC (L loc expr)
   = setSrcSpan loc $
@@ -162,7 +162,7 @@ tcLExpr, tcLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcLExpr expr res_ty
-  = addExprCtxt expr (tcLExprNC expr res_ty)
+  = addExprErrCtxt (unLoc expr) (tcLExprNC expr res_ty)
 
 tcLExprNC (L loc expr) res_ty
   = setSrcSpan loc $
@@ -330,7 +330,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
-       ; (arg1', arg1_ty) <- addErrCtxt (funAppCtxt op arg1 1) $
+       ; (arg1', arg1_ty) <- addAppErrCtxt (unLoc op) (unLoc arg1) 1 $
                              tcInferRhoNC arg1
 
        ; let doc   = text "The first argument of ($) takes"
@@ -537,7 +537,7 @@ tcExpr (HsCase x scrut matches) res_ty
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = tcBody }
 
-tcExpr (HsIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
+tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred' <- tcLExpr pred (mkCheckExpType boolTy)
        ; res_ty <- tauifyExpType res_ty
            -- Just like Note [Case branches must never infer a non-tau type]
@@ -545,17 +545,7 @@ tcExpr (HsIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
 
        ; b1' <- tcLExpr b1 res_ty
        ; b2' <- tcLExpr b2 res_ty
-       ; return (HsIf x NoSyntaxExprTc pred' b1' b2') }
-
-tcExpr (HsIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty
-  = do { ((pred', b1', b2'), fun')
-           <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] ->
-              do { pred' <- tcCheckExpr pred pred_ty
-                 ; b1'   <- tcCheckExpr b1   b1_ty
-                 ; b2'   <- tcCheckExpr b2   b2_ty
-                 ; return (pred', b1', b2') }
-       ; return (HsIf x fun' pred' b1' b2') }
+       ; return (HsIf x pred' b1' b2') }
 
 tcExpr (HsMultiIf _ alts) res_ty
   = do { res_ty <- if isSingleton alts
@@ -991,6 +981,19 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty
 {-
 ************************************************************************
 *                                                                      *
+                Rebindable syntax
+*                                                                      *
+************************************************************************
+-}
+
+-- See Note [Rebindable syntax and HsExpansion].
+tcExpr (XExpr (HsExpanded a b)) t
+  = fmap (XExpr . ExpansionExpr . HsExpanded a) $
+    tcExpr b t
+
+{-
+************************************************************************
+*                                                                      *
                 Catch-all
 *                                                                      *
 ************************************************************************
@@ -1221,8 +1224,15 @@ tcApp expr res_ty
          then tcTagToEnum expr fun args app_res_ty res_ty
          else -- The wildly common case
     do { let expr' = applyHsArgs fun args
-       ; addFunResCtxt True fun app_res_ty res_ty $
+       ; maybeAddFunResCtxt fun app_res_ty res_ty $
          tcWrapResult expr expr' app_res_ty res_ty } }
+
+  where
+    maybeAddFunResCtxt fun actual res
+      | Just l <- getFunLoc (snd $ collectHsArgs expr), l == noSrcSpan
+      = id
+      | otherwise
+      = addFunResCtxt True fun actual res
 
 ---------------------------
 tcInferApp :: HsExpr GhcRn
@@ -1292,7 +1302,7 @@ tcInferAppHead e
       ExprWithTySig _ e hs_ty -> add_ctxt $ tcExprWithSig e hs_ty
       _                       -> add_ctxt $ tcInfer (tcExpr e)
   where
-    add_ctxt thing = addErrCtxt (exprCtxt e) thing
+    add_ctxt thing = addExprErrCtxt e thing
 
 ----------------
 -- | Type-check the arguments to a function, possibly including visible type
@@ -1470,7 +1480,7 @@ tcArg :: HsExpr GhcRn                   -- The function (for error messages)
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTc)           -- Resulting argument
 tcArg fun arg ty arg_no
-  = addErrCtxt (funAppCtxt fun arg arg_no) $
+  = addAppErrCtxt fun (unLoc arg) arg_no $
     do { traceTc "tcArg {" $
            vcat [ text "arg #" <> ppr arg_no <+> dcolon <+> ppr ty
                 , text "arg:" <+> ppr arg ]
@@ -2557,8 +2567,27 @@ fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
   = text "In the" <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
 
-addExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
-addExprCtxt e thing_inside = addErrCtxt (exprCtxt (unLoc e)) thing_inside
+-- See Note [Rebindable syntax and HsExpansion].
+addAppErrCtxt
+  :: HsExpr GhcRn
+  -> HsExpr GhcRn
+  -> Int
+  -> TcM a
+  -> TcM a
+addAppErrCtxt fun arg arg_no =
+  addExprErrCtxt' arg (exprCtxt arg) (funAppCtxt fun arg arg_no)
+
+-- See Note [Rebindable syntax and HsExpansion].
+addExprErrCtxt :: HsExpr GhcRn -> TcM a -> TcM a
+addExprErrCtxt e = addExprErrCtxt' e (exprCtxt e) (exprCtxt e)
+
+addExprErrCtxt' :: HsExpr GhcRn -> SDoc -> SDoc -> TcM a -> TcM a
+addExprErrCtxt' e expandedExprDoc otherDoc
+  = case e of
+      -- this is an expanded expression, we use the dedicated doc in the context
+      XExpr (HsExpanded{}) -> addErrCtxt expandedExprDoc
+      -- this is not an expanded expression, we just use the "standard" doc
+      _                    -> addErrCtxt otherDoc
 
 exprCtxt :: HsExpr GhcRn -> SDoc
 exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))

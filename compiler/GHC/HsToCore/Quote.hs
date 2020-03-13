@@ -1417,11 +1417,11 @@ repE (HsCase _ e (MG { mg_alts = (L _ ms) }))
                                ; ms2 <- mapM repMatchTup ms
                                ; core_ms2 <- coreListM matchTyConName ms2
                                ; repCaseE arg core_ms2 }
-repE (HsIf _ _ x y z)       = do
-                              a <- repLE x
-                              b <- repLE y
-                              c <- repLE z
-                              repCond a b c
+repE (HsIf _ x y z)       = do
+                            a <- repLE x
+                            b <- repLE y
+                            c <- repLE z
+                            repCond a b c
 repE (HsMultiIf _ alts)
   = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList alts')
@@ -1508,7 +1508,7 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
-
+repE (XExpr (HsExpanded _ b))        = repE b
 repE e@(HsPragE _ HsPragCore {} _)   = notHandled "Core annotations" (ppr e)
 repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
 repE e@(HsPragE _ HsPragTick {} _)   = notHandled "Tick Pragma" (ppr e)

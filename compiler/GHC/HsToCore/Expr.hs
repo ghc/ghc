@@ -273,12 +273,12 @@ dsExpr (HsLit _ lit)
 dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
-
-dsExpr hswrap@(XExpr (HsWrap co_fn e))
+dsExpr (XExpr (ExpansionExpr (HsExpanded _ b))) = dsExpr b
+dsExpr hswrap@(XExpr (WrapExpr (HsWrap co_fn e)))
   = do { e' <- case e of
                  HsVar _ (L _ var) -> return $ varToCoreExpr var
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
-                 XExpr (HsWrap _ _) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
+                 XExpr (WrapExpr (HsWrap _ _)) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
                  _ -> dsExpr e
                -- See Note [Detecting forced eta expansion]
@@ -430,13 +430,11 @@ dsExpr (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
 dsExpr (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
 dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
-dsExpr (HsIf _ fun guard_expr then_expr else_expr)
+dsExpr (HsIf _ guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
-       ; case fun of  -- See Note [Rebindable if] in Hs.Expr
-           (SyntaxExprTc {}) -> dsSyntaxExpr fun [pred, b1, b2]
-           NoSyntaxExprTc    -> return $ mkIfThenElse pred b1 b2 }
+       ; return $ mkIfThenElse pred b1 b2 }
 
 dsExpr (HsMultiIf res_ty alts)
   | null alts
