@@ -55,7 +55,7 @@ compilePackage rs = do
         &%> \ [dyn_o, _dyn_hi] -> do
           p <- platformSupportsSharedLibs
           if p
-            then need [dyn_o -<.> "o", dyn_o -<.> "hi"]
+            then compileHsObjectAndHi rs (dyn_o -<.> "o")
             else compileHsObjectAndHi rs dyn_o
 
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
