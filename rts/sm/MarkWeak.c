@@ -213,6 +213,11 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
         switch (t->what_next) {
         case ThreadKilled:
         case ThreadComplete:
+            // Thread was unreachable so far and it won't be resurrected. Remove
+            // it from old_threads so that if it gets evacuated to a gen
+            // collected with mark-compact later in WeakDone phase we don't
+            // thread the global_link field during compacting. See #17785.
+            t->global_link = END_TSO_QUEUE;
             continue;
         default:
             tmp = t;
@@ -222,6 +227,8 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
             flag = true;
         }
     }
+
+    gen->old_threads = END_TSO_QUEUE;
     return flag;
 }
 
