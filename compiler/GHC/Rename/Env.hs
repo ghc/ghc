@@ -31,7 +31,7 @@ module GHC.Rename.Env (
 
         -- Rebindable Syntax
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse,
+        lookupIfThenElse, lookupReboundIf,
 
         -- Constructing usage information
         addUsedGRE, addUsedGREs, addUsedDataCons,
@@ -1686,6 +1686,37 @@ lookupSyntaxNames std_names
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
              ; return (map (HsVar noExtField . noLoc) usr_names, mkFVs usr_names) } }
+
+-- looking up rebindable names
+
+-- Lookup a locally-rebound name for Rebindable Syntax.
+--
+-- - When RS is off, 'lookupRebound' just returns 'Nothing', whatever
+--   name it is given.
+--
+-- - When RS is on, we always try to return a 'Just', and GHC errors out
+--   if no suitable name is found in the environment.
+--
+-- 'Nothing' really is "reserved" and means that rebindable syntax is off.
+lookupRebound :: String -> RnM (Maybe Name)
+lookupRebound nameStr = do
+  rebind <- xoptM LangExt.RebindableSyntax
+  if rebind
+    -- If repetitive lookups ever become a problem perormance-wise,
+    -- we could lookup all the names we will ever care about just once
+    -- at the beginning and stick them in the environment, possibly
+    -- populating that "cache" lazily too.
+    then Just <$> lookupOccRn (mkVarUnqual (fsLit nameStr))
+    else pure Nothing
+
+-- | Lookup an @ifThenElse@ binding (see 'lookupRebound').
+lookupReboundIf :: RnM (Maybe Name)
+lookupReboundIf = lookupRebound reboundIfSymbol
+
+-- rebindable names
+
+reboundIfSymbol :: String
+reboundIfSymbol = "ifThenElse"
 
 -- Error messages
 
