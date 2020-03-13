@@ -377,9 +377,6 @@ data HsExpr p
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
                                --  rebindable syntax
-                (SyntaxExpr p) -- cond function
-                                 -- NoSyntaxExpr => use the built-in 'if'
-                                 -- See Note [Rebindable if]
                 (LHsExpr p)    --  predicate
                 (LHsExpr p)    --  then part
                 (LHsExpr p)    --  else part
@@ -617,9 +614,7 @@ type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          (GhcPass _) = NoExtField
 
-type instance XIf            GhcPs = Bool      -- True <=> might use rebindable syntax
-type instance XIf            GhcRn = NoExtField
-type instance XIf            GhcTc = NoExtField
+type instance XIf            (GhcPass _) = NoExtField
 
 type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
@@ -667,8 +662,77 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
-type instance XXExpr         GhcRn       = NoExtCon
+type instance XXExpr         GhcRn       = HsExpansion (LHsExpr GhcPs)
+                                                       (LHsExpr GhcRn)
 type instance XXExpr         GhcTc       = HsWrap HsExpr
+
+{-
+Note [Rebindable syntax and HsExpansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We now implement rebindable syntax (RS) support by performing a new desugaring
+in the renamer. We transform GhcPs expressions affected by RS into the
+appropriate desugared form, but **annotated with the original expression**.
+
+For example, we turn (modulo source spans, etc)
+
+    HsIf cond t f
+      :: HsExpr GhcPs
+
+into
+
+    XExpr
+      (HsExpanded
+        (HsIf cond t f)
+        (((Var ifThenElse `App` cond'') `App` t'') `App` f'')
+      ) :: HsExpr GhcRn
+
+where cond' is the result of renaming cond, and cond'' is
+
+    XExpr (HsExpanded cond cond')
+
+Likewise for t'' and f''. We essentially wrap the "root" of the affected
+source expression and all its sub-expressions with HsExpanded. The motivation
+for this is that during typechecking, we will be able to enter those nodes
+and process the desugared form while reporting the original expression in
+error messages (context lines in particular, 'In the expression: ...' etc).
+
+We maintain one very important invariant in 'mkExpanded' which we use in TcExpr:
+
+  The second field of an 'HsExpansion (LHsExpr GhcPs) (LHsExpr GhcRn)' does not
+  have actual an location attached but instead uses 'noSrcSpan'.
+
+When we then build an 'LHsExpr GhcRn' out of such a value, we set the span
+of the whole expression to be the **orginal** one's.
+
+By ensuring, in the renamer, that only expressions that appear in the
+original rebound expression are wrapped in 'HsExpansion', we can
+guarantee in TcExpr.{addApp,addExpr}ErrCtx that no context is pushed for
+any expression with no source span attached, and that we otherwise report
+a suitable context depending on whether we're processing an expansion or
+a "normal" expression.
+
+-}
+data HsExpansion a b
+  = HsExpanded a b
+  deriving (Typeable, Data)
+
+-- | Build a "wrapped" 'HsExpansion' out of an extension constructor,
+--   and the two components of the expansion: original and desugared
+--   expressions.
+mkExpanded
+  :: (HsExpansion (Located a) (Located b) -> b)  -- XExpr, XCmd
+  -> Located a -- original AST
+  -> Located b -- "desugared" AST
+  -> Located b
+mkExpanded xwrap a b = L (getLoc a) $
+  xwrap (HsExpanded a $ noloc b)
+
+  where noloc (L _ x) = L noSrcSpan x
+
+-- | Just print the original expression.
+instance Outputable a => Outputable (HsExpansion a b) where
+  ppr (HsExpanded a _)= ppr a
 
 -- ---------------------------------------------------------------------
 
@@ -1014,7 +1078,7 @@ ppr_expr (HsCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsIf _ _ e1 e2 e3)
+ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
          nest 4 (ppr e2),
          text "else",

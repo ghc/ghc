@@ -31,7 +31,7 @@ module GHC.Rename.Env (
 
         -- Rebindable Syntax
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse,
+        lookupIfThenElse, lookupITE,
 
         -- Constructing usage information
         addUsedGRE, addUsedGREs, addUsedDataCons,
@@ -1653,6 +1653,13 @@ lookupIfThenElse maybe_use_rs
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
                  ; return ( mkRnSyntaxExpr ite
                           , unitFV ite ) } }
+
+lookupITE :: RnM (Maybe Name)
+lookupITE = do
+  rebind <- xoptM LangExt.RebindableSyntax
+  if rebind
+    then Just <$> lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
+    else pure Nothing
 
 lookupSyntaxName :: Name                      -- ^ The standard name
                  -> RnM (Name, FreeVars)      -- ^ Possibly a non-standard name

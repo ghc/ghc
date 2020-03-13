@@ -90,7 +90,45 @@ rnExprs ls = rnExprs' ls emptyUniqSet
 -- Variables. We look up the variable and return the resulting name.
 
 rnLExpr :: LHsExpr GhcPs -> RnM (LHsExpr GhcRn, FreeVars)
-rnLExpr = wrapLocFstM rnExpr
+-- rebindable elements unfortunately have to processed at the 'rnLExpr'
+-- level (and not 'rnExpr') because we need to reuse the 'HsIf' node's
+-- location for some subnodes of the expression that we rename the if to,
+-- when RS is on.
+rnLExpr e@(L l (HsIf _ p b1 b2))
+  = do { (p', fvP) <- rnLExpr p
+       ; (b1', fvB1) <- rnLExpr b1
+       ; (b2', fvB2) <- rnLExpr b2
+       ; mifteName <- lookupITE
+       ; case mifteName of
+           -- RS is off, we keep an 'HsIf' node around
+           Nothing -> return $
+             (L l $ HsIf noExtField  p' b1' b2', plusFVs [fvP, fvB1, fvB2])
+
+           -- RS is on and we found an 'ifThenElse' function in the environment
+           -- we therefore turn 'if cond then t else f' into
+           -- 'ifThenElse cond t f'... but with a twist or two:
+           --   - we wrap the entire expression into an 'HsExpansion', keeping
+           --     track of the original 'if' expression in the first field and
+           --     the desugared expression in the second field.
+           --   - we also wrap each component of the 'if' (predicate, true and
+           --     false branches) similarly, to have pre- and post-renaming
+           --     expressions available.
+           --
+           -- The desugared expressions all have **no** location attached, which
+           -- is critical in the error message reporting logic of TcExpr, see
+           -- e.g 'TcExpr.addExprErrCtxt'.
+           --
+           -- See Note [Rebindable syntax and HsExpansion].
+           Just ifteName ->
+             let ifteFun = L l $ HsVar noExtField (noLoc ifteName) -- ifThenElse
+                 p''     = mkExpanded XExpr p  p'                  -- predicate
+                 b1''    = mkExpanded XExpr b1 b1'                 -- if true
+                 b2''    = mkExpanded XExpr b2 b2'                 -- if false
+                 ifteApp = mkHsApps ifteFun [p'', b1'', b2'']
+                 ifteEx  = mkExpanded XExpr e ifteApp              -- entire if
+             in pure (ifteEx, plusFVs [unitFV ifteName, fvP, fvB1, fvB2])
+       }
+rnLExpr a = wrapLocFstM rnExpr a
 
 rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
@@ -321,13 +359,6 @@ rnExpr (ExprWithTySig _ expr pty)
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
-
-rnExpr (HsIf might_use_rebindable_syntax _ p b1 b2)
-  = do { (p', fvP) <- rnLExpr p
-       ; (b1', fvB1) <- rnLExpr b1
-       ; (b2', fvB2) <- rnLExpr b2
-       ; (mb_ite, fvITE) <- lookupIfThenElse might_use_rebindable_syntax
-       ; return (HsIf noExtField mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnExpr (HsMultiIf x alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts

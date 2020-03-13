@@ -1058,7 +1058,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp (ExplicitTuple _ es1 _) (ExplicitTuple _ es2 _) =
         eq_list tup_arg es1 es2
     exp (ExplicitSum _ _ _ e) (ExplicitSum _ _ _ e') = lexp e e'
-    exp (HsIf _ _ e e1 e2) (HsIf _ _ e' e1' e2') =
+    exp (HsIf _ e e1 e2) (HsIf _ e' e1' e2') =
         lexp e e' && lexp e1 e1' && lexp e2 e2'
 
     -- Enhancement: could implement equality for more expressions
