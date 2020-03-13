@@ -1267,7 +1267,7 @@ instance ToHie (TyClGroup GhcRn) where
              , tcg_rn_instds = instances } =
     concatM
     [ toHie classes
-    , toHie sigs
+    , toHie [a | DeclSigRnSAKS _ a <- sigs ]
     , toHie roles
     , toHie instances
     ]

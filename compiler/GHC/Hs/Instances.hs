@@ -104,6 +104,8 @@ deriving instance Data (HsDecl GhcPs)
 deriving instance Data (HsDecl GhcRn)
 deriving instance Data (HsDecl GhcTc)
 
+deriving instance Data KindedDecls
+
 -- deriving instance (DataIdLR p p) => Data (HsGroup p)
 deriving instance Data (HsGroup GhcPs)
 deriving instance Data (HsGroup GhcRn)
@@ -118,6 +120,9 @@ deriving instance Data (SpliceDecl GhcTc)
 deriving instance Data (TyClDecl GhcPs)
 deriving instance Data (TyClDecl GhcRn)
 deriving instance Data (TyClDecl GhcTc)
+
+deriving instance Data DeclHeaderRn
+deriving instance Data DeclSigRn
 
 -- deriving instance (DataIdLR p p) => Data (TyClGroup p)
 deriving instance Data (TyClGroup GhcPs)
