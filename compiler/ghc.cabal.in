@@ -401,6 +401,7 @@ Library
         GHC.Builtin.Names
         GHC.Core.Opt.ConstantFold
         GHC.Builtin.PrimOps
+        GHC.Builtin.RebindableNames
         GHC.Builtin.Types.Prim
         GHC.Builtin.Types
         GHC.Types.CostCentre

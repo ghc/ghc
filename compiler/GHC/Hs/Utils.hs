@@ -32,7 +32,7 @@ just attach noSrcSpan to everything.
 
 module GHC.Hs.Utils(
   -- * Terms
-  mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
+  mkHsPar, mkHsApp, mkHsApps, mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
@@ -192,6 +192,10 @@ mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExtField e1 e2)
 
+mkHsApps
+  :: LHsExpr (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
+mkHsApps = foldl' mkHsApp
+
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
 mkHsAppType e t = addCLoc e t_body (HsAppType noExtField e paren_wct)
   where
@@ -292,8 +296,7 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsIf c a b = HsIf True {- this might use rebindable syntax -} noSyntaxExpr c a b
-  -- see Note [Rebindable if] in Hs.Expr
+mkHsIf c a b = HsIf noExtField c a b
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> HsCmd GhcPs
@@ -506,9 +509,8 @@ nlHsPar e              = noLoc (HsPar noExtField e)
 
 -- nlHsIf should generate if-expressions which are NOT subject to
 -- RebindableSyntax, so the first field of HsIf is False. (#12080)
--- See Note [Rebindable if] in Hs.Expr
 nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-nlHsIf cond true false = noLoc (HsIf False noSyntaxExpr cond true false)
+nlHsIf cond true false = noLoc (HsIf noExtField cond true false)
 
 nlHsCase expr matches
   = noLoc (HsCase noExtField expr (mkMatchGroup Generated matches))
@@ -801,9 +803,9 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 -- See Note [Detecting forced eta expansion] in "GHC.HsToCore.Expr"
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
-mkHsWrap co_fn (XExpr (HsWrap co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn (HsPar x (L l e))         = HsPar x (L l (mkHsWrap co_fn e))
-mkHsWrap co_fn e                         = XExpr (HsWrap co_fn e)
+mkHsWrap co_fn (XExpr (WrapExpr (HsWrap co_fn' e))) = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn (HsPar x (L l e))                = HsPar x (L l (mkHsWrap co_fn e))
+mkHsWrap co_fn e                                = XExpr (WrapExpr $ HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr GhcTc -> HsExpr GhcTc

@@ -379,9 +379,6 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
                                --  rebindable syntax
-                (SyntaxExpr p) -- cond function
-                                 -- NoSyntaxExpr => use the built-in 'if'
-                                 -- See Note [Rebindable if]
                 (LHsExpr p)    --  predicate
                 (LHsExpr p)    --  then part
                 (LHsExpr p)    --  else part
@@ -554,8 +551,10 @@ data HsExpr p
   -- Expressions annotated with pragmas, written as {-# ... #-}
   | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
 
-  | XExpr       !(XXExpr p) -- Note [Trees that Grow] extension constructor
-
+  | XExpr       !(XXExpr p)
+  -- Note [Trees that Grow] extension constructor for the
+  -- general idea, and Note [Rebindable syntax and HsExpansion]
+  -- for an example of how we use it.
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
@@ -621,9 +620,7 @@ type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          (GhcPass _) = NoExtField
 
-type instance XIf            GhcPs = Bool      -- True <=> might use rebindable syntax
-type instance XIf            GhcRn = NoExtField
-type instance XIf            GhcTc = NoExtField
+type instance XIf            (GhcPass _) = NoExtField
 
 type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
@@ -671,8 +668,133 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
-type instance XXExpr         GhcRn       = NoExtCon
-type instance XXExpr         GhcTc       = HsWrap HsExpr
+
+-- See Note [Rebindable syntax and HsExpansion] below
+type instance XXExpr         GhcRn       = HsExpansion (LHsExpr GhcPs)
+                                                       (HsExpr GhcRn)
+type instance XXExpr         GhcTc       = XXExprGhcTc
+
+data XXExprGhcTc = WrapExpr (HsWrap HsExpr)
+                 | ExpansionExpr (HsExpansion (LHsExpr GhcPs) (HsExpr GhcTc))
+
+
+{-
+Note [Rebindable syntax and HsExpansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We implement rebindable syntax (RS) support by performing a desugaring
+in the renamer. We transform GhcPs expressions affected by RS into the
+appropriate desugared form, but **annotated with the original expression**.
+
+Let us consider a piece of code like:
+
+    {-# LANGUAGE RebindableSyntax #-}
+    ifThenElse :: Char -> () -> () -> ()
+    ifThenElse _ _ _ = ()
+    x = if 'a' then () else True
+
+The parsed AST for the RHS of x would look something like (slightly simplified):
+
+    L locif (HsIf (L loca 'a') (L loctrue ()) (L locfalse True))
+
+Upon seeing such an AST with RS on, we could transform it into a
+mere function call, as per the RS rules, equivalent to the
+following function application:
+
+    ifThenElse 'a' () True
+
+which doesn't typecheck. But GHC would report an error about
+not being able to match the third argument's type (Bool) with the
+expected type: (), in the expression _as desugared_, i.e in
+the aforementionned function application. But the user never
+wrote a function application! This would be pretty bad.
+
+To remedy this, instead of transforming the original HsIf
+node into mere applications of 'ifThenElse', we keep the
+original 'if' expression around too, using the TTG
+XExpr extension point to allow GHC to construct an
+'HsExpansion' value that will keep track of the original
+expression in its first field, and the desugared one in the
+second field. The resulting renamed AST would look like:
+
+    L locif (XExpr
+      (HsExpanded
+        (L locif (HsIf (L loca 'a')
+                       (L loctrue ())
+                       (L locfalse True)
+                 )
+        )
+        (((L ... (Var ifThenElse) `App` L loca 'a')
+                                  `App` L loctrue ())
+                                  `App` L locfalse True
+        )
+      )
+    )
+
+When comes the time to typecheck the program, we end up calling
+tcMonoExpr on the AST above. If this expression gives rise to
+a type error, then it will appear in a context line and GHC
+will pretty-print it using the 'Outputable (HsExpansion a b)'
+instance defined below, which *only prints the original
+expression*. This is the gist of the idea, but is not quite
+enough to recover the error messages that we had with the
+SyntaxExpr-based, typechecking/desugaring-to-core time
+implementation of rebindable syntax. The key idea is to decorate
+some elements of the desugared expression so as to be able to
+give them a special treatment when typechecking the desugared
+expression, to print a different context line or skip one
+altogether:
+
+- Since the HsExpanded nodes store an 'HsExpr GhcRn' for the
+  desugared expression (with no location attached), and expression
+  contexts are only pushed by functions that take a located
+  expression, we cannot push the toplevel desugared expression,
+  by construction, since we call tcExpr on it.
+
+- Once we enter the desugared expression, we are typechecking
+  applications of 'ifThenElse', using tcApp/tcArgs/tcArg. In
+  order to avoid "in the Nth argument of ifThenElse", we decorate
+  all the subexpressions of the original 'if' in HsExpanded, so
+  that when they are processed by tcArg, we push a normal expression
+  context ("In the expression [...]") instead of the aforementioned
+  one.
+
+- We also decorate the HsVar of ifThenElse with a "fake" source span
+  (noSrcSpan) and give a special treatment to such functions calls
+  when typechecking the return type of the application, in order to
+  omit the "too few/many arguments" context line altogether, in
+  tcApp.
+
+-}
+
+data HsExpansion a b
+  = HsExpanded a b
+  deriving Data
+
+-- | Build a "wrapped" 'HsExpansion' out of an extension constructor,
+--   and the two components of the expansion: original and desugared
+--   expressions.
+--
+--   The 'SrcSpan' of the result is set to be the span of
+--   the source expression, that we stick as-is in the first field.
+--   We however modify the desugared expression to have 'noSrcSpan'
+--   as its location. This serves as a hint to the typechecker that
+--   this expression is the want we want to perform the typechecking
+--   on, but without reporting it in error messages.
+--
+--   See Note [Rebindable Syntax and HsExpansion] above for more details.
+mkExpanded
+  :: (HsExpansion (Located a) b -> b) -- ^ XExpr, XCmd, ...
+  -> Located a                        -- ^ source expression ('GhcPs')
+  -> b                                -- ^ "desugared" expression
+                                      --   ('GhcRn')
+  -> Located b                        -- ^ suitably wrapped
+                                      --   'HsExpansion'
+mkExpanded xwrap a b = L (getLoc a) $ xwrap (HsExpanded a b)
+
+-- | Just print the original expression (the @a@).
+instance Outputable a => Outputable (HsExpansion a b) where
+  ppr (HsExpanded a _)= ppr a
 
 -- ---------------------------------------------------------------------
 
@@ -1017,7 +1139,7 @@ ppr_expr (HsCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsIf _ _ e1 e2 e3)
+ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
          nest 4 (ppr e2),
          text "else",
@@ -1089,21 +1211,25 @@ ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> ppr x
-  GhcRn -> ppr x
 #endif
+  GhcRn -> ppr x
   GhcTc -> case x of
-    HsWrap co_fn e -> pprHsWrapper co_fn (\parens -> if parens then pprExpr e
-                                                      else pprExpr e)
+    WrapExpr (HsWrap co_fn e) -> pprHsWrapper co_fn
+      (\parens -> if parens then pprExpr e else pprExpr e)
+    ExpansionExpr e -> ppr e -- e is an HsExpansion, we print the original
+                             -- expression (LHsExpr GhcPs), not the
+                             -- desugared one (LHsExpr GhcT).
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
-ppr_infix_expr (XExpr x)
-  | GhcTc <- ghcPass @p
-  , HsWrap _ e <- x
-  = ppr_infix_expr e
+ppr_infix_expr (XExpr x)            = case (ghcPass @p, x) of
+  (GhcTc, WrapExpr (HsWrap _ e))          -> ppr_infix_expr e
+  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr (unLoc a)
+  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr (unLoc a)
+  (GhcPs, _)                              -> Nothing
 ppr_infix_expr _ = Nothing
 
 ppr_apps :: (OutputableBndrId p)
@@ -1204,9 +1330,11 @@ hsExprNeedsParens p = go
     go (HsRecFld{})                   = False
     go (XExpr x)
       | GhcTc <- ghcPass @p
-      , HsWrap _ e <- x
-      = go e
-
+      = case x of
+          WrapExpr      (HsWrap _ e)     -> go e
+          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p (unLoc a)
+      | GhcRn <- ghcPass @p
+      = case x of HsExpanded a _ -> hsExprNeedsParens p (unLoc a)
       | otherwise
       = True
 
@@ -1238,8 +1366,11 @@ isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
-  | GhcTc <- ghcPass @p
-  , HsWrap _ e <- x              = isAtomicHsExpr e
+  | GhcTc <- ghcPass @p          = case x of
+      WrapExpr      (HsWrap _ e)     -> isAtomicHsExpr e
+      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr (unLoc a)
+  | GhcRn <- ghcPass @p          = case x of
+      HsExpanded a _         -> isAtomicHsExpr (unLoc a)
 isAtomicHsExpr _                 = False
 
 instance Outputable (HsPragE (GhcPass p)) where

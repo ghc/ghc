@@ -91,9 +91,9 @@ rnExprs ls = rnExprs' ls emptyUniqSet
 -- Variables. We look up the variable and return the resulting name.
 
 rnLExpr :: LHsExpr GhcPs -> RnM (LHsExpr GhcRn, FreeVars)
-rnLExpr = wrapLocFstM rnExpr
+rnLExpr (L l e) = (\(e', fvs) -> (L l e', fvs)) <$> setSrcSpan l (rnExpr l e)
 
-rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnExpr :: SrcSpan -> HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
 finishHsVar :: Located Name -> RnM (HsExpr GhcRn, FreeVars)
 -- Separated from rnExpr because it's also used
@@ -116,7 +116,7 @@ rnUnboundVar v
              do { n <- reportUnboundName v
                 ; return (HsVar noExtField (noLoc n), emptyFVs) } }
 
-rnExpr (HsVar _ (L l v))
+rnExpr loc (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
        ; dflags <- getDynFlags
@@ -127,7 +127,7 @@ rnExpr (HsVar _ (L l v))
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
               , xopt LangExt.OverloadedLists dflags
-              -> rnExpr (ExplicitList noExtField Nothing [])
+              -> rnExpr loc (ExplicitList noExtField Nothing [])
 
               | otherwise
               -> finishHsVar (L l name) ;
@@ -138,51 +138,51 @@ rnExpr (HsVar _ (L l v))
                      , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
-rnExpr (HsIPVar x v)
+rnExpr _ (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
 
-rnExpr (HsUnboundVar x v)
+rnExpr _ (HsUnboundVar x v)
   = return (HsUnboundVar x v, emptyFVs)
 
-rnExpr (HsOverLabel x _ v)
+rnExpr _ (HsOverLabel x _ v)
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fromLabel <- lookupOccRn (mkVarUnqual (fsLit "fromLabel"))
                  ; return (HsOverLabel x (Just fromLabel) v, unitFV fromLabel) }
          else return (HsOverLabel x Nothing v, emptyFVs) }
 
-rnExpr (HsLit x lit@(HsString src s))
+rnExpr l (HsLit x lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit x (mkHsIsString src s))
+            rnExpr l (HsOverLit x (mkHsIsString src s))
          else do {
             ; rnLit lit
             ; return (HsLit x (convertLit lit), emptyFVs) } }
 
-rnExpr (HsLit x lit)
+rnExpr _ (HsLit x lit)
   = do { rnLit lit
        ; return (HsLit x(convertLit lit), emptyFVs) }
 
-rnExpr (HsOverLit x lit)
+rnExpr _ (HsOverLit x lit)
   = do { ((lit', mb_neg), fvs) <- rnOverLit lit -- See Note [Negative zero]
        ; case mb_neg of
               Nothing -> return (HsOverLit x lit', fvs)
               Just neg -> return (HsApp x (noLoc neg) (noLoc (HsOverLit x lit'))
                                  , fvs ) }
 
-rnExpr (HsApp x fun arg)
+rnExpr _ (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (HsAppType x fun arg)
+rnExpr _ (HsAppType x fun arg)
   = do { type_app <- xoptM LangExt.TypeApplications
        ; unless type_app $ addErr $ typeAppErr "type" $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
        ; return (HsAppType x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (OpApp _ e1 op e2)
+rnExpr _ (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
         ; (e2', fv_e2) <- rnLExpr e2
         ; (op', fv_op) <- rnLExpr op
@@ -201,7 +201,7 @@ rnExpr (OpApp _ e1 op e2)
         ; final_e <- mkOpAppRn e1' op' fixity e2'
         ; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }
 
-rnExpr (NegApp _ e _)
+rnExpr _ (NegApp _ e _)
   = do { (e', fv_e)         <- rnLExpr e
        ; (neg_name, fv_neg) <- lookupSyntax negateName
        ; final_e            <- mkNegAppRn e' neg_name
@@ -209,32 +209,32 @@ rnExpr (NegApp _ e _)
 
 ------------------------------------------
 -- Template Haskell extensions
-rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
+rnExpr _ e@(HsBracket _ br_body) = rnBracket e br_body
 
-rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
+rnExpr _ (HsSpliceE _ splice) = rnSpliceExpr splice
 
 ---------------------------------------------
 --      Sections
 -- See Note [Parsing sections] in GHC.Parser
-rnExpr (HsPar x (L loc (section@(SectionL {}))))
+rnExpr _ (HsPar x (L loc (section@(SectionL {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar x (L loc section'), fvs) }
 
-rnExpr (HsPar x (L loc (section@(SectionR {}))))
+rnExpr _ (HsPar x (L loc (section@(SectionR {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar x (L loc section'), fvs) }
 
-rnExpr (HsPar x e)
+rnExpr _ (HsPar x e)
   = do  { (e', fvs_e) <- rnLExpr e
         ; return (HsPar x e', fvs_e) }
 
-rnExpr expr@(SectionL {})
+rnExpr _ expr@(SectionL {})
   = do  { addErr (sectionErr expr); rnSection expr }
-rnExpr expr@(SectionR {})
+rnExpr _ expr@(SectionR {})
   = do  { addErr (sectionErr expr); rnSection expr }
 
 ---------------------------------------------
-rnExpr (HsPragE x prag expr)
+rnExpr _ (HsPragE x prag expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
        ; return (HsPragE x (rn_prag prag) expr', fvs_expr) }
   where
@@ -243,32 +243,32 @@ rnExpr (HsPragE x prag expr)
     rn_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
     rn_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
 
-rnExpr (HsLam x matches)
+rnExpr _ (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
        ; return (HsLam x matches', fvMatch) }
 
-rnExpr (HsLamCase x matches)
+rnExpr _ (HsLamCase x matches)
   = do { (matches', fvs_ms) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsLamCase x matches', fvs_ms) }
 
-rnExpr (HsCase x expr matches)
+rnExpr _ (HsCase x expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase x new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnExpr (HsLet x (L l binds) expr)
+rnExpr _ (HsLet x (L l binds) expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
       { (expr',fvExpr) <- rnLExpr expr
       ; return (HsLet x (L l binds') expr', fvExpr) }
 
-rnExpr (HsDo x do_or_lc (L l stmts))
+rnExpr _ (HsDo x do_or_lc (L l stmts))
   = do  { ((stmts', _), fvs) <-
            rnStmtsWithPostProcessing do_or_lc rnLExpr
              postProcessStmtsForApplicativeDo stmts
              (\ _ -> return ((), emptyFVs))
         ; return ( HsDo x do_or_lc (L l stmts'), fvs ) }
 
-rnExpr (ExplicitList x _  exps)
+rnExpr _ (ExplicitList x _  exps)
   = do  { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; (exps', fvs) <- rnExprs exps
         ; if opt_OverloadedLists
@@ -279,7 +279,7 @@ rnExpr (ExplicitList x _  exps)
            else
             return  (ExplicitList x Nothing exps', fvs) }
 
-rnExpr (ExplicitTuple x tup_args boxity)
+rnExpr _ (ExplicitTuple x tup_args boxity)
   = do { checkTupleSection tup_args
        ; checkTupSize (length tup_args)
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
@@ -290,11 +290,11 @@ rnExpr (ExplicitTuple x tup_args boxity)
     rnTupArg (L l (Missing _)) = return (L l (Missing noExtField)
                                         , emptyFVs)
 
-rnExpr (ExplicitSum x alt arity expr)
+rnExpr _ (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
        ; return (ExplicitSum x alt arity expr', fvs) }
 
-rnExpr (RecordCon { rcon_con_name = con_id
+rnExpr _ (RecordCon { rcon_con_name = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
@@ -308,32 +308,39 @@ rnExpr (RecordCon { rcon_con_name = con_id
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
-rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
+rnExpr _ (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = do  { (expr', fvExpr) <- rnLExpr expr
         ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
         ; return (RecordUpd { rupd_ext = noExtField, rupd_expr = expr'
                             , rupd_flds = rbinds' }
                  , fvExpr `plusFV` fvRbinds) }
 
-rnExpr (ExprWithTySig _ expr pty)
+rnExpr _ (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType BindUnlessForall ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
-
-rnExpr (HsIf might_use_rebindable_syntax _ p b1 b2)
+rnExpr l e@(HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
-       ; (mb_ite, fvITE) <- lookupIfThenElse might_use_rebindable_syntax
-       ; return (HsIf noExtField mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
-
-rnExpr (HsMultiIf x alts)
+       ; mifteName <- lookupReboundIf
+       ; let subFVs = plusFVs [fvP, fvB1, fvB2]
+       ; return $ case mifteName of
+           -- RS is off, we keep an 'HsIf' node around
+           Nothing ->
+             (HsIf noExtField  p' b1' b2', subFVs)
+           -- See Note [Rebindable syntax and HsExpansion].
+           Just ifteName ->
+             let ifteExpr = rebindIf l e ifteName p p' b1 b1' b2 b2'
+             in (ifteExpr, plusFVs [unitFV (unLoc ifteName), subFVs])
+       }
+rnExpr _ (HsMultiIf x alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
        -- ; return (HsMultiIf ty alts', fvs) }
        ; return (HsMultiIf x alts', fvs) }
 
-rnExpr (ArithSeq x _ seq)
+rnExpr _ (ArithSeq x _ seq)
   = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
        ; (new_seq, fvs) <- rnArithSeq seq
        ; if opt_OverloadedLists
@@ -356,7 +363,7 @@ We also collect the free variables of the term which come from
 this module. See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
 -}
 
-rnExpr e@(HsStatic _ expr) = do
+rnExpr _ e@(HsStatic _ expr) = do
     -- Normally, you wouldn't be able to construct a static expression without
     -- first enabling -XStaticPointers in the first place, since that extension
     -- is what makes the parser treat `static` as a keyword. But this is not a
@@ -387,13 +394,13 @@ rnExpr e@(HsStatic _ expr) = do
 ************************************************************************
 -}
 
-rnExpr (HsProc x pat body)
+rnExpr _ (HsProc x pat body)
   = newArrowScope $
     rnPat ProcExpr pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
 
-rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
+rnExpr _ other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
 ----------------------
@@ -2190,3 +2197,32 @@ getMonadFailOp
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
       | otherwise = lookupSyntax failMName
+
+-- Rebindable if
+--
+-- See Note [Rebindable syntax and HsExpansion]
+rebindIf
+  :: SrcSpan      -- source span of the if expression
+  -> HsExpr GhcPs -- original if expression
+  -> Located Name -- 'Name' for the 'ifThenElse' function we will rebind to
+  -> LHsExpr GhcPs -> LHsExpr GhcRn -- original and renamed condition
+  -> LHsExpr GhcPs -> LHsExpr GhcRn -- original and renamed true branch
+  -> LHsExpr GhcPs -> LHsExpr GhcRn -- original and renamed false branch
+  -> HsExpr GhcRn -- rebound if expression
+rebindIf l e ifteName p p' b1 b1' b2 b2' =
+  let ifteFun = L noSrcSpan (HsVar noExtField ifteName)
+                -- ifThenElse var
+      p''     = mkExpanded XExpr p  (unLoc p')
+                -- (source_predicate, desugared_predicate)
+      b1''    = mkExpanded XExpr b1 (unLoc b1')
+                -- (source_true_branch, desugared_true_branch)
+      b2''    = mkExpanded XExpr b2 (unLoc b2')
+                -- (source_false_branch, desugared_false_branch)
+      ifteApp = mkHsApps ifteFun [p'', b1'', b2'']
+                -- desugared_if_expr =
+                --   ifThenElse desugared_predicate
+                --              desugared_true_branch
+                --              desugared_false_branch
+      ifteEx  = mkExpanded XExpr (L l e) (unLoc ifteApp)
+                -- (source_if_expr, desugared_if_expr)
+  in unLoc ifteEx
