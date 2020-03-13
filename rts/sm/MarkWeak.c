@@ -221,6 +221,12 @@ static bool resurrectUnreachableThreads (generation *gen)
         switch (t->what_next) {
         case ThreadKilled:
         case ThreadComplete:
+            // The thread was unreachable so far, but it might still end up
+            // being reachable later, e.g. after collectDeadWeakPtrs(). We don't
+            // want the global_link field to be dangling in that case, so reset
+            // it to END_TSO_QUEUE. The copying GC doesn't currently care, but
+            // the compacting GC does, see #17785.
+            t->global_link = END_TSO_QUEUE;
             continue;
         default:
             tmp = t;
@@ -230,6 +236,8 @@ static bool resurrectUnreachableThreads (generation *gen)
             flag = true;
         }
     }
+
+    gen->old_threads = END_TSO_QUEUE;
     return flag;
 }
 
