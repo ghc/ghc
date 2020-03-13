@@ -2748,7 +2748,7 @@ tcHsQTyVarBndr _ _ (XTyVarBndr nec) = noExtCon nec
 --------------------------------------
 
 bindTyClTyVars :: Name
-               -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
+               -> (TcTyCon -> [TyConBinder] -> Kind -> TcM a) -> TcM a
 -- ^ Used for the type variables of a type or class decl
 -- in the "kind checking" and "type checking" pass,
 -- but not in the initial-kind run.
@@ -2759,7 +2759,7 @@ bindTyClTyVars tycon_name thing_inside
              binders    = tyConBinders tycon
        ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
        ; tcExtendNameTyVarEnv scoped_prs $
-         thing_inside binders res_kind }
+         thing_inside tycon binders res_kind }
 
 
 {- *********************************************************************
