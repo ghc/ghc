@@ -135,14 +135,11 @@ dsHsBind :: DynFlags
          -- bindings and their desugared right hand sides.
 
 dsHsBind dflags (VarBind { var_id = var
-                         , var_rhs = expr
-                         , var_inline = inline_regardless })
+                         , var_rhs = expr })
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
-                   | otherwise         = var
-        ; let core_bind@(id,_) = makeCorePair dflags var' False 0 core_expr
+        ; let core_bind@(id,_) = makeCorePair dflags var False 0 core_expr
               force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []

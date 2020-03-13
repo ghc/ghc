@@ -276,9 +276,7 @@ data HsBindLR idL idR
   | VarBind {
         var_ext    :: XVarBind idL idR,
         var_id     :: IdP idL,
-        var_rhs    :: LHsExpr idR,   -- ^ Located only for consistency
-        var_inline :: Bool           -- ^ True <=> inline this binding regardless
-                                     -- (used for implication constraints only)
+        var_rhs    :: LHsExpr idR    -- ^ Located only for consistency
     }
 
   -- | Abstraction Bindings
