@@ -79,7 +79,7 @@ module TcRnMonad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
-  addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
+  addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
   addErrTc, addErrsTc,
@@ -1024,7 +1024,7 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
 addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
 
--- Helper function for the above
+-- Helper function for the two functions below
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
                            env { tcl_ctxt = upd ctxt })
