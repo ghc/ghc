@@ -66,8 +66,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -132,8 +131,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -198,8 +196,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: GHC.Types.krep$*})))))
-    (False)))
+         {Var: GHC.Types.krep$*})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -264,8 +261,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -330,8 +326,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -352,8 +347,7 @@
           (SourceText
            "2")
           (False)
-          (2)))))))
-    (False)))
+          (2)))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -374,8 +368,7 @@
           (SourceText
            "1")
           (False)
-          (1)))))))
-    (False)))
+          (1)))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -396,8 +389,7 @@
           (SourceText
            "0")
           (False)
-          (0)))))))
-    (False)))
+          (0)))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -421,8 +413,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -446,8 +437,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: GHC.Types.krep$*})))))
-    (False)))
+         {Var: GHC.Types.krep$*})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -471,8 +461,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -496,8 +485,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -521,8 +509,7 @@
        (HsVar
         (NoExtField)
         ({ <no location info> }
-         {Var: $krep})))))
-    (False)))
+         {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -623,8 +610,7 @@
                        []))
                      (HsConLikeOut
                       (NoExtField)
-                      ({abstract:ConLike})))))))))))))))))))
-    (False)))
+                      ({abstract:ConLike})))))))))))))))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -653,8 +639,7 @@
            []))
          (HsConLikeOut
           (NoExtField)
-          ({abstract:ConLike})))))))
-    (False)))
+          ({abstract:ConLike})))))))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
@@ -700,8 +685,7 @@
             (NoExtField)
             (HsStringPrim
              (NoSourceText)
-             "DumpTypecheckedAst")))))))))
-    (False)))
+             "DumpTypecheckedAst")))))))))))
  ,({ DumpTypecheckedAst.hs:18:1-23 }
    (AbsBinds
     (NoExtField)
@@ -766,4 +750,5 @@
          (FromSource))
         []))]}
     (False)))]}
+
 
