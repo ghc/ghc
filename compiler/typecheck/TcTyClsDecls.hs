@@ -157,10 +157,10 @@ tcTyClGroup :: TyClGroup GhcRn
             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
-tcTyClGroup (TyClGroup { group_tyclds = tyclds
-                       , group_roles  = roles
-                       , group_kisigs = kisigs
-                       , group_instds = instds })
+tcTyClGroup (TcgRn { tcg_rn_tyclds = tyclds
+                   , tcg_rn_roles  = roles
+                   , tcg_rn_kisigs = kisigs
+                   , tcg_rn_instds = instds })
   = do { let role_annots = mkRoleAnnotEnv roles
 
            -- Step 1: Typecheck the standalone kind signatures and type/class declarations
@@ -201,9 +201,6 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; return (gbl_env', inst_info, deriv_info) }
-
-
-tcTyClGroup (XTyClGroup nec) = noExtCon nec
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind

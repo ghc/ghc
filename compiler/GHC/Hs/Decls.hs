@@ -10,6 +10,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module GHC.Hs.Extension
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
@@ -88,7 +89,7 @@ module GHC.Hs.Decls (
   resultVariableName, familyDeclLName, familyDeclName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
   hsGroupTopLevelFixitySigs,
 
     ) where
@@ -120,6 +121,7 @@ import GHC.Core.Type
 import Bag
 import Maybes
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Void
 
 {-
 ************************************************************************
@@ -258,9 +260,6 @@ emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup (GhcPass p)
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-hsGroupInstDecls :: HsGroup id -> [LInstDecl id]
-hsGroupInstDecls = (=<<) group_instds . hs_tyclds
-
 emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_tyclds = [],
                        hs_derivds = [],
@@ -273,12 +272,12 @@ emptyGroup = HsGroup { hs_ext = noExtField,
 -- | The fixity signatures for each top-level declaration and class method
 -- in an 'HsGroup'.
 -- See Note [Top-level fixity signatures in an HsGroup]
-hsGroupTopLevelFixitySigs :: HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
+hsGroupTopLevelFixitySigs :: IsPass p => HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
 hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
     fixds ++ cls_fixds
   where
     cls_fixds = [ L loc sig
-                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
+                | L _ ClassDecl{tcdSigs = sigs} <- concatMap tyClGroupTyClDecls tyclds
                 , L loc (FixSig _ sig) <- sigs
                 ]
 hsGroupTopLevelFixitySigs (XHsGroup nec) = noExtCon nec
@@ -360,10 +359,10 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
-             ppr_ds (tyClGroupRoleDecls tycl_decls),
-             ppr_ds (tyClGroupKindSigs  tycl_decls),
-             ppr_ds (tyClGroupTyClDecls tycl_decls),
-             ppr_ds (tyClGroupInstDecls tycl_decls),
+             ppr_ds (concatMap tyClGroupRoleDecls tycl_decls),
+             ppr_ds (concatMap tyClGroupKindSigs  tycl_decls),
+             ppr_ds (concatMap tyClGroupTyClDecls tycl_decls),
+             ppr_ds (concatMap tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,
              ppr_ds foreign_decls]
         where
@@ -795,20 +794,28 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
 
     ppr (XTyClDecl x) = ppr x
 
-instance OutputableBndrId p
-       => Outputable (TyClGroup (GhcPass p)) where
-  ppr (TyClGroup { group_tyclds = tyclds
-                 , group_roles = roles
-                 , group_kisigs = kisigs
-                 , group_instds = instds
-                 }
-      )
-    = hang (text "TyClGroup") 2 $
-      ppr kisigs $$
-      ppr tyclds $$
-      ppr roles $$
-      ppr instds
-  ppr (XTyClGroup x) = ppr x
+instance IsPass p => Outputable (TyClGroup (GhcPass p)) where
+  ppr =
+    case ghcPass @p of
+      GhcPs -> pprPs
+      GhcRn -> pprRn
+      GhcTc -> tcg_tc_absurd
+    where
+      pprPs (TcgPsDecl d) = ppr d
+      pprPs (TcgPsRole role) = ppr role
+      pprPs (TcgPsKiSig kisig) = ppr kisig
+      pprPs (TcgPsInst instd) = ppr instd
+
+      pprRn (TcgRn { tcg_rn_tyclds = tyclds
+                   , tcg_rn_roles = roles
+                   , tcg_rn_kisigs = kisigs
+                   , tcg_rn_instds = instds
+                   })
+        = hang (text "TyClGroup") 2 $
+          ppr kisigs $$
+          ppr tyclds $$
+          ppr roles $$
+          ppr instds
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => Located (IdP (GhcPass p))
@@ -966,30 +973,53 @@ in GHC.Rename.Source for more info.
 -}
 
 -- | Type or Class Group
-data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
-  = TyClGroup { group_ext    :: XCTyClGroup pass
-              , group_tyclds :: [LTyClDecl pass]
-              , group_roles  :: [LRoleAnnotDecl pass]
-              , group_kisigs :: [LStandaloneKindSig pass]
-              , group_instds :: [LInstDecl pass] }
-  | XTyClGroup (XXTyClGroup pass)
+data family TyClGroup pass
 
-type instance XCTyClGroup (GhcPass _) = NoExtField
-type instance XXTyClGroup (GhcPass _) = NoExtCon
+data instance TyClGroup GhcPs
+  = TcgPsDecl (LTyClDecl GhcPs)
+  | TcgPsRole (LRoleAnnotDecl GhcPs)
+  | TcgPsKiSig (LStandaloneKindSig GhcPs)
+  | TcgPsInst (LInstDecl GhcPs)
 
+-- See Note [TyClGroups and dependency analysis]
+data instance TyClGroup GhcRn =
+  TcgRn { tcg_rn_tyclds :: [LTyClDecl GhcRn]
+        , tcg_rn_roles  :: [LRoleAnnotDecl GhcRn]
+        , tcg_rn_kisigs :: [LStandaloneKindSig GhcRn]
+        , tcg_rn_instds :: [LInstDecl GhcRn] }
 
-tyClGroupTyClDecls :: [TyClGroup pass] -> [LTyClDecl pass]
-tyClGroupTyClDecls = concatMap group_tyclds
+newtype instance TyClGroup GhcTc = TcgTc Void
 
-tyClGroupInstDecls :: [TyClGroup pass] -> [LInstDecl pass]
-tyClGroupInstDecls = concatMap group_instds
+tcg_tc_absurd :: TyClGroup GhcTc -> a
+tcg_tc_absurd (TcgTc a) = absurd a
 
-tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
-tyClGroupRoleDecls = concatMap group_roles
+tyClGroupTyClDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LTyClDecl (GhcPass p)]
+tyClGroupTyClDecls tcg =
+  case ghcPass @p of
+    GhcPs -> [a | TcgPsDecl a <- [tcg] ]
+    GhcRn -> tcg_rn_tyclds tcg
+    GhcTc -> tcg_tc_absurd tcg
 
-tyClGroupKindSigs :: [TyClGroup pass] -> [LStandaloneKindSig pass]
-tyClGroupKindSigs = concatMap group_kisigs
+tyClGroupInstDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LInstDecl (GhcPass p)]
+tyClGroupInstDecls tcg =
+  case ghcPass @p of
+    GhcPs -> [a | TcgPsInst a <- [tcg] ]
+    GhcRn -> tcg_rn_instds tcg
+    GhcTc -> tcg_tc_absurd tcg
 
+tyClGroupRoleDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LRoleAnnotDecl (GhcPass p)]
+tyClGroupRoleDecls tcg =
+  case ghcPass @p of
+    GhcPs -> [a | TcgPsRole a <- [tcg] ]
+    GhcRn -> tcg_rn_roles tcg
+    GhcTc -> tcg_tc_absurd tcg
+
+tyClGroupKindSigs :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LStandaloneKindSig (GhcPass p)]
+tyClGroupKindSigs tcg =
+  case ghcPass @p of
+    GhcPs -> [a | TcgPsKiSig a <- [tcg] ]
+    GhcRn -> tcg_rn_kisigs tcg
+    GhcTc -> tcg_tc_absurd tcg
 
 {- *********************************************************************
 *                                                                      *

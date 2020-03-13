@@ -283,12 +283,12 @@ topDecls = filterClasses . filterDecls . collectDocs . sortLocated . ungroup
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
-  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
+  mkDecls (concatMap tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
   mkDecls hs_derivds             (DerivD noExtField) group_ ++
   mkDecls hs_defds               (DefD noExtField)   group_ ++
   mkDecls hs_fords               (ForD noExtField)   group_ ++
   mkDecls hs_docs                (DocD noExtField)   group_ ++
-  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
+  mkDecls (concatMap tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
   mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
   mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where

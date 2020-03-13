@@ -376,11 +376,6 @@ type family XClassDecl     x
 type family XXTyClDecl     x
 
 -- -------------------------------------
--- TyClGroup type families
-type family XCTyClGroup      x
-type family XXTyClGroup      x
-
--- -------------------------------------
 -- FamilyResultSig type families
 type family XNoSig            x
 type family XCKindSig         x -- Clashes with XKindSig above
