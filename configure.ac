@@ -117,9 +117,12 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
-dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
+dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
+dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
+AC_ARG_VAR(LD_STAGE0, [Linker command (bootstrap)])
+AC_ARG_VAR(AR_STAGE0, [Archive command (bootstrap)])
 
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
@@ -135,13 +138,17 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  dnl infer CC_STAGE0 from `ghc --info` unless explicitly set by user
+  dnl infer {CC,LD,AR}_STAGE0 from `ghc --info` unless explicitly set by user
   if test -z "$CC_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   fi
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
-  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  if test -z "$LD_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
+  fi
+  if test -z "$AR_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  fi
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
 fi
