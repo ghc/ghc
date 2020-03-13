@@ -130,7 +130,7 @@ tcMonoExpr, tcMonoExprNC
     -> TcM (LHsExpr GhcTcId)
 
 tcMonoExpr expr res_ty
-  = addErrCtxt (exprCtxt expr) $
+  = addExprErrCtxt expr $
     tcMonoExprNC expr res_ty
 
 tcMonoExprNC (L loc expr) res_ty
@@ -142,7 +142,7 @@ tcMonoExprNC (L loc expr) res_ty
 tcInferSigma, tcInferSigmaNC :: LHsExpr GhcRn -> TcM ( LHsExpr GhcTcId
                                                     , TcSigmaType )
 -- Infer a *sigma*-type.
-tcInferSigma expr = addErrCtxt (exprCtxt expr) (tcInferSigmaNC expr)
+tcInferSigma expr = addExprErrCtxt expr (tcInferSigmaNC expr)
 
 tcInferSigmaNC (L loc expr)
   = setSrcSpan loc $
@@ -151,7 +151,7 @@ tcInferSigmaNC (L loc expr)
 
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcRhoType)
 -- Infer a *rho*-type. The return type is always (shallowly) instantiated.
-tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
+tcInferRho expr = addExprErrCtxt expr (tcInferRhoNC expr)
 
 tcInferRhoNC expr
   = do { (expr', sigma) <- tcInferSigmaNC expr
@@ -534,7 +534,7 @@ tcExpr (HsCase x scrut matches) res_ty
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = tcBody }
 
-tcExpr (HsIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
+tcExpr (HsIf x pred b1 b2) res_ty    -- Ordinary 'if'
   = do { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
        ; res_ty <- tauifyExpType res_ty
            -- Just like Note [Case branches must never infer a non-tau type]
@@ -542,17 +542,7 @@ tcExpr (HsIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
 
        ; b1' <- tcMonoExpr b1 res_ty
        ; b2' <- tcMonoExpr b2 res_ty
-       ; return (HsIf x NoSyntaxExprTc pred' b1' b2') }
-
-tcExpr (HsIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty
-  = do { ((pred', b1', b2'), fun')
-           <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] ->
-              do { pred' <- tcPolyExpr pred pred_ty
-                 ; b1'   <- tcPolyExpr b1   b1_ty
-                 ; b2'   <- tcPolyExpr b2   b2_ty
-                 ; return (pred', b1', b2') }
-       ; return (HsIf x fun' pred' b1' b2') }
+       ; return (HsIf x pred' b1' b2') }
 
 tcExpr (HsMultiIf _ alts) res_ty
   = do { res_ty <- if isSingleton alts
@@ -985,6 +975,23 @@ tcExpr e@(HsBracket _ brack)         res_ty
 tcExpr e@(HsRnBracketOut _ brack ps) res_ty
   = tcUntypedBracket e brack ps res_ty
 
+
+{-
+************************************************************************
+*                                                                      *
+                Rebindable syntax
+*                                                                      *
+************************************************************************
+-}
+
+-- When RS is on, the renamer turns nodes affected by rebindable
+-- syntax into XExpr (HsExpanded <original expr> <desugared expr> ...)
+-- nodes, which we typecheck by processing the desugared expr. But we
+-- arrange for error contexts to only mention original expressions
+-- (see 'addExprErrCtxt').
+tcExpr (XExpr (HsExpanded _ b)) t = tcExpr (unLoc b) t
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1383,8 +1390,11 @@ tcArg :: LHsExpr GhcRn                   -- The function (for error messages)
       -> TcRhoType                       -- expected arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)           -- Resulting argument
-tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcPolyExprNC arg ty
+tcArg fun arg ty arg_no = do
+  case arg of
+    L _ (XExpr _) -> tcPolyExpr arg ty
+    _             -> addErrCtxt (funAppCtxt fun arg arg_no) $
+      tcPolyExprNC arg ty
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]
@@ -2483,9 +2493,25 @@ Boring and alphabetical:
 -}
 
 addExprErrCtxt :: LHsExpr GhcRn -> TcM a -> TcM a
-addExprErrCtxt expr = addErrCtxt (exprCtxt expr)
+-- For expressions involved in rebindable syntax, for which we track the source
+-- expression and the "desugared" one, we add the source expression to the error
+-- context, since the user might not recognize the desugared form. And we add it
+-- as a special kind of context, at that. One which will prevent further
+-- contexts to be pushed when they arise from typechecking the desugared
+-- expression, but will make sure that further contexts arising from entering
+-- further XExpr nodes (inserted e.g around the condition/true/false branches of
+-- the if, not just the ifThenElse node) will be added when appropriate. This
+-- allows us to "zoom" into the original source exprs and the renamed ones to
+-- report the formers in error context lines while doing the actual work on the
+-- latters.
+addExprErrCtxt (L _ (XExpr (HsExpanded a _))) = addExpansionCtxt (exprCtxt a)
+addExprErrCtxt expr                           = addErrCtxt (exprCtxt expr)
 
-exprCtxt :: LHsExpr GhcRn -> SDoc
+exprCtxt
+  :: ( IsPass p, OutputableBndr (IdGhcP p)
+     , OutputableBndr (IdGhcP (NoGhcTcPass p))
+     )
+  => LHsExpr (GhcPass p) -> SDoc
 exprCtxt expr
   = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))
 

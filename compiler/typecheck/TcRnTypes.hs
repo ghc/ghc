@@ -35,7 +35,7 @@ module TcRnTypes(
         FrontendResult(..),
 
         -- Renamer types
-        ErrCtxt, RecFieldEnv, pushErrCtxt, pushErrCtxtSameOrigin,
+        ErrCtxt(..), RecFieldEnv, pushErrCtxt, pushErrCtxtSameOrigin,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         WhereFrom(..), mkModDeps, modDepsElts,
 
@@ -793,13 +793,22 @@ setLclEnvLoc env loc = env { tcl_loc = loc }
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc
 
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+data ErrCtxt
+  = ErrCtxt (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction
 
         -- Bool:  True <=> this is a landmark context; do not
         --                 discard it when trimming for display
+  | ExpansionCtxt MsgDoc
+        -- context line inserted when typechecking an
+        -- expression that uses the XExpr (HsExpanded ...)
+        -- form, so as to use the typechecking rule of
+        -- the rewritten expression while reporting about
+        -- the original expression, and only allowing
+        -- the context to be enriched with ExpansionCtxt
+        -- values once we've pushed one at the top.
 
 -- These are here to avoid module loops: one might expect them
 -- in Constraint, but they refer to ErrCtxt which refers to TcM.

@@ -957,7 +957,7 @@ instance ( a ~ GhcPass p
         [ toHie expr
         , toHie matches
         ]
-      HsIf _ _ a b c ->
+      HsIf _ a b c ->
         [ toHie a
         , toHie b
         , toHie c

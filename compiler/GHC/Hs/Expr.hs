@@ -377,9 +377,6 @@ data HsExpr p
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
                                --  rebindable syntax
-                (SyntaxExpr p) -- cond function
-                                 -- NoSyntaxExpr => use the built-in 'if'
-                                 -- See Note [Rebindable if]
                 (LHsExpr p)    --  predicate
                 (LHsExpr p)    --  then part
                 (LHsExpr p)    --  else part
@@ -617,9 +614,7 @@ type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          (GhcPass _) = NoExtField
 
-type instance XIf            GhcPs = Bool      -- True <=> might use rebindable syntax
-type instance XIf            GhcRn = NoExtField
-type instance XIf            GhcTc = NoExtField
+type instance XIf            (GhcPass _) = NoExtField
 
 type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
@@ -667,8 +662,23 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
-type instance XXExpr         GhcRn       = NoExtCon
+type instance XXExpr         GhcRn       = HsExpansion (LHsExpr GhcPs) (LHsExpr GhcRn)
 type instance XXExpr         GhcTc       = HsWrap HsExpr
+
+-- | An @'HsExpansion' a b@ represents a source AST of type @a@
+--   paired with the desugaring that it gave rise to.
+--
+--   The renamer uses this data type to rewrite @if@ expressions to applications
+--   of a user-supplied @ifThenElse@ while keeping the original expression
+--   around. This lets us typecheck those expressions using function application
+--   rules while reporting useful error messages that mention the original code.
+data HsExpansion a b
+  = HsExpanded a b
+  deriving (Typeable, Data)
+
+-- | Just print the original expression.
+instance Outputable a => Outputable (HsExpansion a b) where
+  ppr (HsExpanded a _)= ppr a
 
 -- ---------------------------------------------------------------------
 
@@ -1014,7 +1024,7 @@ ppr_expr (HsCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsIf _ _ e1 e2 e3)
+ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
          nest 4 (ppr e2),
          text "else",

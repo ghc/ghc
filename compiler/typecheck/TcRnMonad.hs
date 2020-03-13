@@ -78,8 +78,8 @@ module TcRnMonad(
   ifErrsM, failIfErrsM,
 
   -- * Context management for the type checker
-  getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
-  addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
+  getErrCtxt, setErrCtxt, addErrCtxt, addExpansionCtxt, addErrCtxtM, addLandmarkErrCtxt,
+  addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
   addErrTc, addErrsTc,
@@ -1008,9 +1008,16 @@ setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 addErrCtxt :: MsgDoc -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
+-- | Add a marker message to the error context,
+--   which will prevent further error contexts
+--   to be inserted on top during the given
+--   computation.
+addExpansionCtxt :: MsgDoc -> TcM a -> TcM a
+addExpansionCtxt msg = tryPushErrCtxt (ExpansionCtxt msg)
+
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
+addErrCtxtM ctxt = tryPushErrCtxt (ErrCtxt (False, ctxt))
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1022,15 +1029,30 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
+addLandmarkErrCtxtM ctxt = tryPushErrCtxt (ErrCtxt (True, ctxt))
 
--- Helper function for the above
+-- Helper function for the two functions below
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
                            env { tcl_ctxt = upd ctxt })
 
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
+
+
+-- If we have an ExpansionCtxt at the top, ony allow the TcM
+-- computation to push other 'ExpansionCtxt's on top, so as
+-- to filter the context lines we want when reporting about
+-- sub-expressions affected by rebindable syntax, which use
+-- XExpr (HsExpanded ...) nodes.
+tryPushErrCtxt :: ErrCtxt -> TcM a -> TcM a
+tryPushErrCtxt c = updCtxt $ \ctxts ->
+  case ctxts of
+    ExpansionCtxt _ : _ ->
+      case c of
+        ExpansionCtxt _ -> c : ctxts
+        _               -> ctxts
+    _ -> c : ctxts
 
 getCtLocM :: CtOrigin -> Maybe TypeOrKind -> TcM CtLoc
 getCtLocM origin t_or_k
@@ -1420,7 +1442,7 @@ mkErrInfo env ctxts
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
    go _ _ _   [] = return empty
-   go dbg n env ((is_landmark, ctxt) : ctxts)
+   go dbg n env (ErrCtxt (is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- ctxt env
           ; let n' = if is_landmark then n else n+1
@@ -1428,6 +1450,8 @@ mkErrInfo env ctxts
           ; return (msg $$ rest) }
      | otherwise
      = go dbg n env ctxts
+   go dbg n env (ExpansionCtxt msg : ctxts)
+     = (msg $$) <$> go dbg (n+1) env ctxts
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3

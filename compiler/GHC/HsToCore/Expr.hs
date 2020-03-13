@@ -434,13 +434,11 @@ dsExpr (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
 dsExpr (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
 dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
-dsExpr (HsIf _ fun guard_expr then_expr else_expr)
+dsExpr (HsIf _ guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
-       ; case fun of  -- See Note [Rebindable if] in Hs.Expr
-           (SyntaxExprTc {}) -> dsSyntaxExpr fun [pred, b1, b2]
-           NoSyntaxExprTc    -> return $ mkIfThenElse pred b1 b2 }
+       ; return $ mkIfThenElse pred b1 b2 }
 
 dsExpr (HsMultiIf res_ty alts)
   | null alts

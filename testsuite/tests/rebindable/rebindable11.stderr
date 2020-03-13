@@ -1,0 +1,29 @@
+
+rebindable11.hs:9:19: error:
+    • Couldn't match expected type ‘Bool’
+                  with actual type ‘GHC.Types.Char’
+    • In the expression: 'a'
+      In the expression: if 'a' then () else ()
+      In an equation for ‘foo’: foo = if 'a' then () else ()
+
+rebindable11.hs:10:10: error:
+    • Couldn't match expected type ‘Bool’
+                  with actual type ‘GHC.Types.Char’
+    • In the expression: 'a'
+      In the first argument of ‘(*)’, namely ‘(if 'a' then () else ())’
+      In the first argument of ‘(+)’, namely
+        ‘(if 'a' then () else ()) * 2’
+
+rebindable11.hs:11:9: error:
+    • Couldn't match expected type ‘Bool’
+                  with actual type ‘GHC.Types.Char’
+    • In the expression: 'a'
+      In the expression: if 'a' then () else ()
+      In an equation for ‘a3’: a3 = if 'a' then () else ()
+
+rebindable11.hs:12:13: error:
+    • Couldn't match expected type ‘Bool’
+                  with actual type ‘GHC.Types.Char’
+    • In the expression: 'a'
+      In the first argument of ‘(==)’, namely ‘(if 'a' then () else ())’
+      In the expression: (if 'a' then () else ()) == 10

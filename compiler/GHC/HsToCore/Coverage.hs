@@ -558,8 +558,8 @@ addTickHsExpr (HsCase x e mgs) =
                 (addTickLHsExpr e) -- not an EvalInner; e might not necessarily
                                    -- be evaluated.
                 (addTickMatchGroup False mgs)
-addTickHsExpr (HsIf x cnd e1 e2 e3) =
-        liftM3 (HsIf x cnd)
+addTickHsExpr (HsIf x e1 e2 e3) =
+        liftM3 (HsIf x)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
