@@ -516,6 +516,10 @@ test('T16255', normal, compile_fail, [''])
 test('T16204c', normal, compile_fail, [''])
 test('T16394', normal, compile_fail, [''])
 test('T16414', normal, compile_fail, [''])
+test('T16453E1', extra_files(['T16453T.hs', 'T16453S.hs']), multimod_compile_fail,
+    ['T16453E1.hs', '-v0'])
+test('T16453E2', extra_files(['T16453T.hs', 'T16453S.hs']),
+    multimod_compile_fail, ['T16453E2.hs', '-v0'])
 test('T16456', normal, compile_fail, ['-fprint-explicit-foralls'])
 test('T16627', normal, compile_fail, [''])
 test('T502', normal, compile_fail, [''])

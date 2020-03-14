@@ -17,6 +17,7 @@ module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
                 tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
                 tcCheckId,
                 addExprErrCtxt,
+                addAmbiguousNameErr,
                 getFixedTyVars ) where
 
 #include "HsVersions.h"
@@ -2193,10 +2194,16 @@ disambiguateSelector lr@(L _ rdr) parent_type
 -- occurrence" error, then give up.
 ambiguousSelector :: Located RdrName -> TcM a
 ambiguousSelector (L _ rdr)
+  = do { addAmbiguousNameErr rdr
+       ; failM }
+
+-- | This name really is ambiguous, so add a suitable "ambiguous
+-- occurrence" error, then continue
+addAmbiguousNameErr :: RdrName -> TcM ()
+addAmbiguousNameErr rdr
   = do { env <- getGlobalRdrEnv
        ; let gres = lookupGRE_RdrName rdr env
-       ; setErrCtxt [] $ addNameClashErrRn rdr gres
-       ; failM }
+       ; setErrCtxt [] $ addNameClashErrRn rdr gres}
 
 -- Disambiguate the fields in a record update.
 -- See Note [Disambiguating record fields]

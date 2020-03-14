@@ -1,0 +1,9 @@
+T16453E2.hs:1:1:
+    Ambiguous occurrence ‘main’
+    It could refer to
+       either ‘T16453T.main’,
+              imported from ‘T16453T’ at T16453E2.hs:2:1-14
+              (and originally defined at T16453T.hs:2:1-4)
+           or ‘T16453S.main’,
+              imported from ‘T16453S’ at T16453E2.hs:3:1-14
+              (and originally defined at T16453S.hs:2:1-4)
