@@ -604,18 +604,8 @@ checkSTACK (StgStack *stack)
 void
 checkTSO(StgTSO *tso)
 {
-    StgTSO *next;
-    const StgInfoTable *info;
-
-    if (tso->what_next == ThreadKilled) {
-      /* The garbage collector doesn't bother following any pointers
-       * from dead threads, so don't check sanity here.
-       */
-      return;
-    }
-
-    next = tso->_link;
-    info = (const StgInfoTable*) tso->_link->header.info;
+    StgTSO *next = tso->_link;
+    const StgInfoTable *info = (const StgInfoTable*) tso->_link->header.info;
     load_load_barrier();
 
     ASSERT(next == END_TSO_QUEUE ||
@@ -636,9 +626,9 @@ checkTSO(StgTSO *tso)
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->blocked_exceptions));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->stackobj));
-
-    // XXX are we checking the stack twice?
-    checkSTACK(tso->stackobj);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->global_link) &&
+            (tso->global_link == END_TSO_QUEUE ||
+             get_itbl((StgClosure*)tso->global_link)->type == TSO));
 }
 
 /*
@@ -648,16 +638,14 @@ checkTSO(StgTSO *tso)
 void
 checkGlobalTSOList (bool checkTSOs)
 {
-  StgTSO *tso;
-  uint32_t g;
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (tso=generations[g].threads; tso != END_TSO_QUEUE;
+  for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (StgTSO *tso = generations[g].threads; tso != END_TSO_QUEUE;
            tso = tso->global_link) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
           ASSERT(get_itbl((StgClosure *)tso)->type == TSO);
-          if (checkTSOs)
+          if (checkTSOs) {
               checkTSO(tso);
+          }
 
           // If this TSO is dirty and in an old generation, it better
           // be on the mutable list.
@@ -666,22 +654,20 @@ checkGlobalTSOList (bool checkTSOs)
               tso->flags &= ~TSO_MARKED;
           }
 
-          {
-              StgStack *stack;
-              StgUnderflowFrame *frame;
-
-              stack = tso->stackobj;
-              while (1) {
-                  if (stack->dirty & STACK_DIRTY) {
-                      ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & STACK_SANE));
-                      stack->dirty &= ~STACK_SANE;
-                  }
-                  frame = (StgUnderflowFrame*) (stack->stack + stack->stack_size
-                                                - sizeofW(StgUnderflowFrame));
-                  if (frame->info != &stg_stack_underflow_frame_info
-                      || frame->next_chunk == (StgStack*)END_TSO_QUEUE) break;
-                  stack = frame->next_chunk;
+          StgStack *stack = tso->stackobj;
+          while (1) {
+              if (stack->dirty & STACK_DIRTY) {
+                  ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & STACK_SANE));
+                  stack->dirty &= ~STACK_SANE;
               }
+              StgUnderflowFrame *frame =
+                  (StgUnderflowFrame*) (stack->stack + stack->stack_size
+                          - sizeofW(StgUnderflowFrame));
+              if (frame->info != &stg_stack_underflow_frame_info
+                      || frame->next_chunk == (StgStack*)END_TSO_QUEUE) {
+                  break;
+              }
+              stack = frame->next_chunk;
           }
       }
   }
