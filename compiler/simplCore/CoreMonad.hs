@@ -29,7 +29,7 @@ module CoreMonad (
 
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
-    getDynFlags, getOrigNameCache, getPackageFamInstEnv,
+    getDynFlags, getPackageFamInstEnv,
     getVisibleOrphanMods, getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
@@ -66,7 +66,6 @@ import FastString
 import ErrUtils( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
 import UniqSupply
 import MonadUtils
-import NameCache
 import NameEnv
 import SrcLoc
 import Data.Bifunctor ( bimap )
@@ -74,7 +73,6 @@ import ErrUtils (dumpAction)
 import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic
-import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
@@ -708,13 +706,6 @@ instance HasDynFlags CoreM where
 
 instance HasModule CoreM where
     getModule = read cr_module
-
--- | The original name cache is the current mapping from 'Module' and
--- 'OccName' to a compiler-wide unique 'Name'
-getOrigNameCache :: CoreM OrigNameCache
-getOrigNameCache = do
-    nameCacheRef <- fmap hsc_NC getHscEnv
-    liftIO $ fmap nsNames $ readIORef nameCacheRef
 
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
 getPackageFamInstEnv = do

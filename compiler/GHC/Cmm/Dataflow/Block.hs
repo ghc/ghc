@@ -66,13 +66,7 @@ data MaybeO ex t where
   JustO    :: t -> MaybeO O t
   NothingO ::      MaybeO C t
 
--- | Maybe type indexed by closed/open
-data MaybeC ex t where
-  JustC    :: t -> MaybeC C t
-  NothingC ::      MaybeC O t
-
 deriving instance Functor (MaybeO ex)
-deriving instance Functor (MaybeC ex)
 
 -- -----------------------------------------------------------------------------
 -- The Block type

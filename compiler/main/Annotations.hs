@@ -9,7 +9,6 @@ module Annotations (
         -- * Main Annotation data types
         Annotation(..), AnnPayload,
         AnnTarget(..), CoreAnnTarget,
-        getAnnTargetName_maybe,
 
         -- * AnnEnv for collecting and querying Annotations
         AnnEnv,
@@ -56,11 +55,6 @@ data AnnTarget name
 
 -- | The kind of annotation target found in the middle end of the compiler
 type CoreAnnTarget = AnnTarget Name
-
--- | Get the 'name' of an annotation target if it exists.
-getAnnTargetName_maybe :: AnnTarget name -> Maybe name
-getAnnTargetName_maybe (NamedTarget nm) = Just nm
-getAnnTargetName_maybe _                = Nothing
 
 instance Outputable name => Outputable (AnnTarget name) where
     ppr (NamedTarget nm) = text "Named target" <+> ppr nm

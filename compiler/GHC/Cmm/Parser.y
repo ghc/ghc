@@ -873,17 +873,6 @@ section s           = OtherSection s
 mkString :: String -> CmmStatic
 mkString s = CmmString (BS8.pack s)
 
--- |
--- Given an info table, decide what the entry convention for the proc
--- is.  That is, for an INFO_TABLE_RET we want the return convention,
--- otherwise it is a NativeNodeCall.
---
-infoConv :: Maybe CmmInfoTable -> Convention
-infoConv Nothing = NativeNodeCall
-infoConv (Just info)
-  | isStackRep (cit_rep info) = NativeReturn
-  | otherwise                 = NativeNodeCall
-
 -- mkMachOp infers the type of the MachOp from the type of its first
 -- argument.  We assume that this is correct: for MachOps that don't have
 -- symmetrical args (e.g. shift ops), the first arg determines the type of
