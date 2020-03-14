@@ -455,6 +455,14 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
+  local test_target
+  case "$TEST_SPEED" in
+    slow)   test_target="slowtest" ;;
+    fast)   test_target="fasttest" ;;
+    normal) test_target="test" ;;
+    *)      fail "Unknown TEST_SPEED" ;;
+  esac
+
   if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
@@ -462,7 +470,8 @@ function test_make() {
 
   run "$MAKE" test_bindist TEST_PREP=YES
   (unset $(compgen -v | grep CI_*);
-    run "$MAKE" V=0 VERBOSE=1 test \
+    run "$MAKE" V=0 VERBOSE=1 \
+      "$test_target" \
       THREADS="$cores" \
       JUNIT_FILE=../../junit.xml \
       EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}")
@@ -519,6 +528,7 @@ function test_hadrian() {
 
   run_hadrian \
     test \
+    --test-speed="$TEST_SPEED" \
     --summary-junit=./junit.xml \
     --test-have-intree-files \
     --test-compiler="$TOP/_build/install/bin/ghc$exe" \
@@ -660,6 +670,13 @@ fi
 if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
   RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
 fi
+
+case "$TEST_SPEED" in
+  slow|fast|normal) ;;
+  "") info "TEST_SPEED unset; defaulting to 'normal'."
+      TEST_SPEED="normal" ;;
+  *) fail "Unknown TEST_SPEED value" ;;
+esac
 
 set_toolchain_paths
 

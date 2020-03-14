@@ -24,6 +24,8 @@ variables:
   # Makes ci.sh isolate CABAL_DIR
   HERMETIC: "YES"
 
+  TEST_SPEED: "normal"
+
   # Reduce XZ compression level for regular jobs (it is bumped to 9 for releases
   # and nightly jobs). In my experiments I've got the following bindist size in
   # the given time for each compression level (with the quick flavour):
@@ -441,7 +443,7 @@ lint-libs:
 
 .validate:
   variables:
-    TEST_TYPE: test
+    TEST_SPEED: normal
     MAKE_ARGS: "-Werror"
   script: |
     # Build hyperlinked sources for documentation when building releases
@@ -771,7 +773,7 @@ nightly-armv7-linux-deb10:
   <<: *nightly
   extends: .build-armv7-linux-deb10
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 #################################
 # i386-linux-deb9
@@ -799,7 +801,7 @@ nightly-i386-linux-deb9:
   <<: *nightly
   extends: .build-i386-linux-deb9
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 #################################
 # x86_64-linux-deb9
@@ -832,7 +834,7 @@ nightly-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
@@ -844,7 +846,7 @@ validate-x86_64-linux-deb9-debug:
     ValidateSpeed: SLOW
     # Override validate flavour default; see #16890.
     BUILD_SPHINX_PDF: "YES"
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
     TEST_ENV: "x86_64-linux-deb9-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
     HADDOCK_HYPERLINKED_SOURCES: "yes"
@@ -870,7 +872,7 @@ nightly-x86_64-linux-deb9-integer-simple:
   variables:
     BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 .build-x86_64-linux-deb9-tsan:
   extends: .validate-linux-hadrian
@@ -925,7 +927,7 @@ nightly-x86_64-linux-deb10:
   <<: *nightly
   extends: .build-x86_64-linux-deb10
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 release-x86_64-linux-deb10:
   <<: *release
@@ -984,7 +986,7 @@ nightly-x86_64-linux-ubuntu2004:
   <<: *nightly
   extends: .build-x86_64-linux-ubuntu2004
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 release-x86_64-linux-ubuntu2004:
   <<: *release
