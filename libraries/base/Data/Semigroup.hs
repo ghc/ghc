@@ -125,6 +125,21 @@ cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
 -- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
+--
+-- >>> import Data.Semigroup
+-- >>> let hello = diff "Hello, "
+-- >>> appEndo hello "World!"
+-- "Hello, World!"
+-- >>> appEndo (hello <> mempty) "World!"
+-- "Hello, World!"
+-- >>> appEndo (mempty <> hello) "World!"
+-- "Hello, World!"
+-- >>> let world = diff "World"
+-- >>> let excl = diff "!"
+-- >>> print $ appEndo (hello <> (world <> excl)) mempty
+-- "Hello, World!"
+-- >>> print $ appEndo ((hello <> world) <> excl) mempty
+-- "Hello, World!"
 diff :: Semigroup m => m -> Endo m
 diff = Endo . (<>)
 
