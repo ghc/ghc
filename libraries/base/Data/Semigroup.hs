@@ -126,6 +126,7 @@ cycle1 xs = xs' where xs' = xs <> xs'
 
 -- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
 --
+-- === __Example:__
 -- >>> let hello = diff "Hello, "
 -- >>> appEndo hello "World!"
 -- "Hello, World!"
