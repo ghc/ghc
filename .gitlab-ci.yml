@@ -16,6 +16,8 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "recursive"
 
+  TEST_SPEED: "normal"
+
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
@@ -355,7 +357,7 @@ lint-base:
 
 .validate:
   variables:
-    TEST_TYPE: test
+    TEST_SPEED: normal
     MAKE_ARGS: "-Werror"
   script:
     - .gitlab/ci.sh setup
@@ -573,7 +575,7 @@ nightly-aarch64-linux-deb10:
   <<: *nightly
   extends: .build-aarch64-linux-deb10
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 #################################
 # armv7-linux-deb10
@@ -608,7 +610,7 @@ nightly-armv7-linux-deb10:
   <<: *nightly
   extends: .build-armv7-linux-deb10
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 #################################
 # i386-linux-deb9
@@ -634,7 +636,7 @@ nightly-i386-linux-deb9:
   <<: *nightly
   extends: .build-i386-linux-deb9
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 #################################
 # x86_64-linux-deb9
@@ -667,19 +669,21 @@ nightly-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
+    # V=0 otherwise we overflow the log size limit
+    MAKE_ARGS: "V=0"
     BUILD_FLAVOUR: validate
     # Ensure that stage2 also has DEBUG enabled
     ValidateSpeed: SLOW
     # Override validate flavour default; see #16890.
     BUILD_SPHINX_PDF: "YES"
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
     TEST_ENV: "x86_64-linux-deb9-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
   artifacts:
@@ -702,7 +706,7 @@ nightly-x86_64-linux-deb9-integer-simple:
   variables:
     BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 .build-x86_64-linux-deb9-tsan:
   extends: .validate-linux-hadrian
@@ -755,7 +759,7 @@ nightly-x86_64-linux-deb10:
   <<: *nightly
   extends: .build-x86_64-linux-deb10
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 release-x86_64-linux-deb10:
   <<: *release
@@ -810,7 +814,7 @@ nightly-x86_64-linux-ubuntu2004:
   <<: *nightly
   extends: .build-x86_64-linux-ubuntu2004
   variables:
-    TEST_TYPE: slowtest
+    TEST_SPEED: slow
 
 release-x86_64-linux-ubuntu2004:
   <<: *release
