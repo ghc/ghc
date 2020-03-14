@@ -267,7 +267,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                ; tcg_env <- if isHsBootOrSig hsc_src
                             then tcRnHsBootDecls hsc_src local_decls
                             else {-# SCC "tcRnSrcDecls" #-}
-                                 tcRnSrcDecls explicit_mod_hdr local_decls
+                                 tcRnSrcDecls explicit_mod_hdr local_decls export_ies
                ; setGblEnv tcg_env
                  $ do { -- Process the export list
                         traceRn "rn4a: before exports" empty
@@ -399,8 +399,9 @@ tcRnImports hsc_env import_decls
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> [LHsDecl GhcPs]               -- Declarations
+             -> Maybe (Located [LIE GhcPs])
              -> TcM TcGblEnv
-tcRnSrcDecls explicit_mod_hdr decls
+tcRnSrcDecls explicit_mod_hdr decls export_ies
  = do { -- Do all the declarations
       ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
 
@@ -409,7 +410,7 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- NB: always set envs *before* captureTopConstraints
       ; (tcg_env, lie_main) <- setEnvs (tcg_env, tcl_env) $
                                captureTopConstraints $
-                               checkMain explicit_mod_hdr
+                               checkMain explicit_mod_hdr export_ies
 
       ; setEnvs (tcg_env, tcl_env) $ do {
 
@@ -1718,29 +1719,47 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
 -}
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all
+          -> Maybe (Located [LIE GhcPs])  -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined.
-checkMain explicit_mod_hdr
+checkMain explicit_mod_hdr export_ies
  = do   { dflags  <- getDynFlags
         ; tcg_env <- getGblEnv
-        ; check_main dflags tcg_env explicit_mod_hdr }
+        ; check_main dflags tcg_env explicit_mod_hdr export_ies }
 
-check_main :: DynFlags -> TcGblEnv -> Bool -> TcM TcGblEnv
-check_main dflags tcg_env explicit_mod_hdr
+check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
+           -> TcM TcGblEnv
+check_main dflags tcg_env explicit_mod_hdr export_ies
  | mod /= main_mod
  = traceTc "checkMain not" (ppr main_mod <+> ppr mod) >>
    return tcg_env
 
  | otherwise
- = do   { mb_main <- lookupGlobalOccRn_maybe main_fn
+ = do   { mains_all <- lookupInfoOccRn main_fn
                 -- Check that 'main' is in scope
                 -- It might be imported from another module!
-        ; case mb_main of {
-             Nothing -> do { traceTc "checkMain fail" (ppr main_mod <+> ppr main_fn)
+        ; let mains = filterInsMains (selExportMains export_ies) mains_all
+                -- use only main function mentioned in the export list
+        ; case mains of {
+             [] -> do { traceTc "checkMain fail" (ppr main_mod <+> ppr main_fn)
                            ; complain_no_main
                            ; return tcg_env } ;
-             Just main_name -> do
+             [main_name] -> use main_name ;
+             _ -> do {
+                 _ <- lookupGlobalOccRn_maybe main_fn -- issue error msg
+                 ; return tcg_env
+                 } ;
+    }}
+  where
+    mod         = tcg_mod tcg_env
+    main_mod    = mainModIs dflags
+    main_fn     = getMainFun dflags
+    occ_main_fn = occName main_fn
+    interactive = ghcLink dflags == LinkInMemory
 
+    -- There is a single 'main' function.
+    use :: Name -> TcM TcGblEnv
+    use main_name = do
         { traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
         ; let loc       = srcLocSpan (getSrcLoc main_name)
         ; ioTyCon <- tcLookupTyCon ioTyConName
@@ -1778,13 +1797,7 @@ check_main dflags tcg_env explicit_mod_hdr
                                         `plusDU` usesOnly (unitFV main_name)
                         -- Record the use of 'main', so that we don't
                         -- complain about it being defined but not used
-                 })
-    }}}
-  where
-    mod         = tcg_mod tcg_env
-    main_mod    = mainModIs dflags
-    main_fn     = getMainFun dflags
-    interactive = ghcLink dflags == LinkInMemory
+        })}
 
     complain_no_main = unless (interactive && not explicit_mod_hdr)
                               (addErrTc noMainMsg)                  -- #12906
@@ -1796,6 +1809,29 @@ check_main dflags tcg_env explicit_mod_hdr
     noMainMsg = text "The" <+> pp_main_fn
                 <+> text "is not defined in module" <+> quotes (ppr main_mod)
     pp_main_fn = ppMainFn main_fn
+
+    -- Select the main functions from the export list.
+    -- Only the module name is needed, the function name is fix.
+    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName] -- #16453
+    selExportMains Nothing = [moduleName main_mod]
+        -- no main specified, but there is a header!!!!
+    selExportMains (Just exps) = fmap fst $
+        filter (\(_,n) -> n == occ_main_fn ) texp
+      where
+        ies = fmap unLoc $ unLoc exps
+        texp = catMaybes $ fmap transExportIE ies
+
+    -- Filter all main functions in scope that match the export specs
+    filterInsMains :: [ModuleName] -> [Name] -> [Name]               -- #16453
+    filterInsMains export_mains inscope_mains =
+      [mod | mod <- inscope_mains,
+            (moduleName . nameModule) mod `elem` export_mains]
+
+    -- Transform an export_ie to a (ModuleName OccName) pair.
+    transExportIE :: IE GhcPs -> Maybe (ModuleName, OccName)          -- #16453
+    transExportIE (IEVar _  var) = isQual_maybe $ ieWrappedName $ unLoc var
+    transExportIE (IEModuleContents _ mod) = Just (unLoc mod, occ_main_fn)
+    transExportIE _ = Nothing
 
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
 -- Either returns the default name or the one configured on the command line with -main-is
@@ -2573,7 +2609,7 @@ tcRnDeclsi :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
-    tcRnSrcDecls False local_decls
+    tcRnSrcDecls False local_decls Nothing
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id
