@@ -350,7 +350,8 @@ function build_make() {
   fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
-  echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
+  echo 'GhcLibHcOpts += -haddock' >> mk/build.mk
+  echo 'WERROR += -Werror' >> mk/build.mk
   run "$MAKE" -j"$cores" $MAKE_ARGS
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
@@ -377,6 +378,9 @@ function build_hadrian() {
   if [ -z "$FLAVOUR" ]; then
     fail "FLAVOUR not set"
   fi
+
+  mkdir -p _build
+  echo "stage1.*.ghc.hs.opts += -Werror" > _build/hadrian.settings
 
   run_hadrian binary-dist
 
