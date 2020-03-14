@@ -55,7 +55,7 @@ module Constraint (
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
-        wrapType, wrapTypeWithImplication,
+        wrapType,
 
         CtFlavour(..), ShadowInfo(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
@@ -86,7 +86,6 @@ import Coercion
 import Class
 import TyCon
 import Var
-import Id
 
 import TcType
 import TcEvidence
@@ -1291,17 +1290,6 @@ pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 
 
-
--- | Wraps the given type with the constraints (via ic_given) in the given
--- implication, according to the variables mentioned (via ic_skols)
--- in the implication, but taking care to only wrap those variables
--- that are mentioned in the type or the implication.
-wrapTypeWithImplication :: Type -> Implication -> Type
-wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
-    where givens = map idType $ ic_given impl
-          skols = ic_skols impl
-          freeVars = fvVarSet $ tyCoFVsOfTypes (ty:givens)
-          mentioned_skols = filter (`elemVarSet` freeVars) skols
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
 wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty

@@ -27,7 +27,7 @@ module GHC.Core.Utils (
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
-        exprIsBig, exprIsConLike,
+        exprIsConLike,
         isCheapApp, isExpandableApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
@@ -2058,8 +2058,6 @@ c.f. add_evals in Simplify.simplAlt
 -- | A cheap equality test which bales out fast!
 --      If it returns @True@ the arguments are definitely equal,
 --      otherwise, they may or may not be equal.
---
--- See also 'exprIsBig'
 cheapEqExpr :: Expr b -> Expr b -> Bool
 cheapEqExpr = cheapEqExpr' (const False)
 
@@ -2085,17 +2083,6 @@ cheapEqExpr' ignoreTick = go_s
         {-# INLINE go #-}
 {-# INLINE cheapEqExpr' #-}
 
-exprIsBig :: Expr b -> Bool
--- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
-exprIsBig (Lit _)      = False
-exprIsBig (Var _)      = False
-exprIsBig (Type _)     = False
-exprIsBig (Coercion _) = False
-exprIsBig (Lam _ e)    = exprIsBig e
-exprIsBig (App f a)    = exprIsBig f || exprIsBig a
-exprIsBig (Cast e _)   = exprIsBig e    -- Hopefully coercions are not too big!
-exprIsBig (Tick _ e)   = exprIsBig e
-exprIsBig _            = True
 
 eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
 -- Compares for equality, modulo alpha

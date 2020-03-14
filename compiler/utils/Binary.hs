@@ -31,10 +31,8 @@ module Binary
 --   closeBin,
 
    seekBin,
-   seekBy,
    tellBin,
    castBin,
-   isEOFBin,
    withBinBuffer,
 
    writeBinMem,
@@ -183,21 +181,6 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
-
-seekBy :: BinHandle -> Int -> IO ()
-seekBy h@(BinMem _ ix_r sz_r _) !off = do
-  sz <- readFastMutInt sz_r
-  ix <- readFastMutInt ix_r
-  let ix' = ix + off
-  if (ix' >= sz)
-        then do expandBin h ix'; writeFastMutInt ix_r ix'
-        else writeFastMutInt ix_r ix'
-
-isEOFBin :: BinHandle -> IO Bool
-isEOFBin (BinMem _ ix_r sz_r _) = do
-  ix <- readFastMutInt ix_r
-  sz <- readFastMutInt sz_r
-  return (ix >= sz)
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
