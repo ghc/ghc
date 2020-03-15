@@ -34,7 +34,6 @@ module GHC.Hs.Decls (
   tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
-  isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
@@ -682,16 +681,6 @@ isTypeFamilyDecl (FamDecl _ (FamilyDecl { fdInfo = info })) = case info of
   ClosedTypeFamily {} -> True
   _                   -> False
 isTypeFamilyDecl _ = False
-
--- | open type family info
-isOpenTypeFamilyInfo :: FamilyInfo pass -> Bool
-isOpenTypeFamilyInfo OpenTypeFamily = True
-isOpenTypeFamilyInfo _              = False
-
--- | closed type family info
-isClosedTypeFamilyInfo :: FamilyInfo pass -> Bool
-isClosedTypeFamilyInfo (ClosedTypeFamily {}) = True
-isClosedTypeFamilyInfo _                     = False
 
 -- | data family declaration
 isDataFamilyDecl :: TyClDecl pass -> Bool

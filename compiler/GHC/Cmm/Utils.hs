@@ -13,7 +13,7 @@
 
 module GHC.Cmm.Utils(
         -- CmmType
-        primRepCmmType, slotCmmType, slotForeignHint,
+        primRepCmmType,
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
@@ -45,9 +45,6 @@ module GHC.Cmm.Utils(
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
-        -- Statics
-        blankWord,
-
         -- Tagging
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
         cmmConstrTag1,
@@ -73,7 +70,7 @@ module GHC.Cmm.Utils(
 import GhcPrelude
 
 import TyCon    ( PrimRep(..), PrimElemRep(..) )
-import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
+import GHC.Types.RepType  ( UnaryType, typePrimRep1 )
 
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm
@@ -117,13 +114,6 @@ primRepCmmType _      FloatRep         = f32
 primRepCmmType _      DoubleRep        = f64
 primRepCmmType _      (VecRep len rep) = vec len (primElemRepCmmType rep)
 
-slotCmmType :: DynFlags -> SlotTy -> CmmType
-slotCmmType dflags PtrSlot    = gcWord dflags
-slotCmmType dflags WordSlot   = bWord dflags
-slotCmmType _      Word64Slot = b64
-slotCmmType _      FloatSlot  = f32
-slotCmmType _      DoubleSlot = f64
-
 primElemRepCmmType :: PrimElemRep -> CmmType
 primElemRepCmmType Int8ElemRep   = b8
 primElemRepCmmType Int16ElemRep  = b16
@@ -157,13 +147,6 @@ primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep     = NoHint
 primRepForeignHint DoubleRep    = NoHint
 primRepForeignHint (VecRep {})  = NoHint
-
-slotForeignHint :: SlotTy -> ForeignHint
-slotForeignHint PtrSlot       = AddrHint
-slotForeignHint WordSlot      = NoHint
-slotForeignHint Word64Slot    = NoHint
-slotForeignHint FloatSlot     = NoHint
-slotForeignHint DoubleSlot    = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep1
@@ -370,9 +353,6 @@ cmmQuotWord dflags e1 e2 = CmmMachOp (mo_wordUQuot dflags) [e1, e2]
 cmmNegate :: DynFlags -> CmmExpr -> CmmExpr
 cmmNegate _      (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
 cmmNegate dflags e                       = CmmMachOp (MO_S_Neg (cmmExprWidth dflags e)) [e]
-
-blankWord :: DynFlags -> CmmStatic
-blankWord dflags = CmmUninitialised (wORD_SIZE dflags)
 
 cmmToWord :: DynFlags -> CmmExpr -> CmmExpr
 cmmToWord dflags e

@@ -77,7 +77,7 @@ module OccName (
         isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
         parenSymOcc, startsWithUnderscore,
 
-        isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
+        isTcClsNameSpace, isDataConNameSpace, isVarNameSpace,
 
         -- * The 'OccEnv' type
         OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
@@ -175,19 +175,10 @@ isTcClsNameSpace :: NameSpace -> Bool
 isTcClsNameSpace TcClsName = True
 isTcClsNameSpace _         = False
 
-isTvNameSpace :: NameSpace -> Bool
-isTvNameSpace TvName = True
-isTvNameSpace _      = False
-
 isVarNameSpace :: NameSpace -> Bool     -- Variables or type variables, but not constructors
 isVarNameSpace TvName  = True
 isVarNameSpace VarName = True
 isVarNameSpace _       = False
-
-isValNameSpace :: NameSpace -> Bool
-isValNameSpace DataName = True
-isValNameSpace VarName  = True
-isValNameSpace _        = False
 
 pprNameSpace :: NameSpace -> SDoc
 pprNameSpace DataName  = text "data constructor"

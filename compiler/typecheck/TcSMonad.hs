@@ -16,7 +16,7 @@ module TcSMonad (
 
     -- The TcS monad
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
-    failTcS, warnTcS, addErrTcS,
+    failTcS, addErrTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
@@ -27,7 +27,7 @@ module TcSMonad (
     QCInst(..),
 
     -- Tracing etc
-    panicTcS, traceTcS,
+    traceTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
 
@@ -60,7 +60,7 @@ module TcSMonad (
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
     getInertInsols,
-    getTcSInerts, setTcSInerts,
+    getTcSInerts,
     matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
@@ -100,7 +100,7 @@ module TcSMonad (
     instDFunType,                              -- Instantiation
 
     -- MetaTyVars
-    newFlexiTcSTy, instFlexi, instFlexiX,
+    instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
     tcInstSkolTyVarsX,
 
@@ -2695,13 +2695,10 @@ wrapWarnTcS :: TcM a -> TcS a
 -- There's no static check; it's up to the user
 wrapWarnTcS = wrapTcS
 
-failTcS, panicTcS  :: SDoc -> TcS a
-warnTcS   :: WarningFlag -> SDoc -> TcS ()
+failTcS :: SDoc -> TcS a
 addErrTcS :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS flag = wrapTcS . TcM.addWarn (Reason flag)
 addErrTcS    = wrapTcS . TcM.addErr
-panicTcS doc = pprPanic "TcCanonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
@@ -2970,9 +2967,6 @@ getTcSWorkListRef = TcS (return . tcs_worklist)
 
 getTcSInerts :: TcS InertSet
 getTcSInerts = getTcSInertsRef >>= readTcRef
-
-setTcSInerts :: InertSet -> TcS ()
-setTcSInerts ics = do { r <- getTcSInertsRef; writeTcRef r ics }
 
 getWorkListImplics :: TcS (Bag Implication)
 getWorkListImplics
@@ -3317,9 +3311,6 @@ pprKicked n = parens (int n <+> text "kicked out")
 instDFunType :: DFunId -> [DFunInstType] -> TcS ([TcType], TcThetaType)
 instDFunType dfun_id inst_tys
   = wrapTcS $ TcM.instDFunType dfun_id inst_tys
-
-newFlexiTcSTy :: Kind -> TcS TcType
-newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
 
 cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
 cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)

@@ -24,7 +24,7 @@ module TcEnv(
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
-        lookupGlobal, ioLookupDataCon,
+        lookupGlobal,
         addTypecheckedBinds,
 
         -- Local environment
@@ -39,7 +39,6 @@ module TcEnv(
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
         tcLookupTcTyCon,
         tcLookupLcl_maybe,
-        getInLocalScope,
         wrongThingErr, pprBinders,
 
         tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
@@ -169,22 +168,6 @@ importDecl_maybe hsc_env name
         ; return (Succeeded thing) }
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
-
-ioLookupDataCon :: HscEnv -> Name -> IO DataCon
-ioLookupDataCon hsc_env name = do
-  mb_thing <- ioLookupDataCon_maybe hsc_env name
-  case mb_thing of
-    Succeeded thing -> return thing
-    Failed msg      -> pprPanic "lookupDataConIO" msg
-
-ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc DataCon)
-ioLookupDataCon_maybe hsc_env name = do
-    thing <- lookupGlobal hsc_env name
-    return $ case thing of
-        AConLike (RealDataCon con) -> Succeeded con
-        _                          -> Failed $
-          pprTcTyThingCategory (AGlobal thing) <+> quotes (ppr name) <+>
-                text "used as a data constructor"
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
@@ -465,10 +448,6 @@ tcLookupTcTyCon name = do
     case thing of
         ATcTyCon tc -> return tc
         _           -> pprPanic "tcLookupTcTyCon" (ppr name)
-
-getInLocalScope :: TcM (Name -> Bool)
-getInLocalScope = do { lcl_env <- getLclTypeEnv
-                     ; return (`elemNameEnv` lcl_env) }
 
 tcExtendKindEnvList :: [(Name, TcTyThing)] -> TcM r -> TcM r
 -- Used only during kind checking, for TcThings that are

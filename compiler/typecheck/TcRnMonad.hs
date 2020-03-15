@@ -29,7 +29,7 @@ module TcRnMonad(
   withDoDynamicToo,
   getEpsVar,
   getEps,
-  updateEps, updateEps_,
+  updateEps_,
   getHpt, getEpsAndHpt,
 
   -- * Arrow scopes
@@ -82,8 +82,8 @@ module TcRnMonad(
   addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
-  addErrTc, addErrsTc,
-  addErrTcM, mkErrTcM, mkErrTc,
+  addErrTc,
+  addErrTcM,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
@@ -520,18 +520,6 @@ getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
 
 getEps :: TcRnIf gbl lcl ExternalPackageState
 getEps = do { env <- getTopEnv; readMutVar (hsc_EPS env) }
-
--- | Update the external package state.  Returns the second result of the
--- modifier function.
---
--- This is an atomic operation and forces evaluation of the modified EPS in
--- order to avoid space leaks.
-updateEps :: (ExternalPackageState -> (ExternalPackageState, a))
-          -> TcRnIf gbl lcl a
-updateEps upd_fn = do
-  traceIf (text "updating EPS")
-  eps_var <- getEpsVar
-  atomicUpdMutVar' eps_var upd_fn
 
 -- | Update the external package state.
 --
@@ -1282,26 +1270,11 @@ addErrTc :: MsgDoc -> TcM ()
 addErrTc err_msg = do { env0 <- tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }
 
-addErrsTc :: [MsgDoc] -> TcM ()
-addErrsTc err_msgs = mapM_ addErrTc err_msgs
-
 addErrTcM :: (TidyEnv, MsgDoc) -> TcM ()
 addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
          loc  <- getSrcSpanM ;
          add_err_tcm tidy_env err_msg loc ctxt }
-
--- Return the error message, instead of reporting it straight away
-mkErrTcM :: (TidyEnv, MsgDoc) -> TcM ErrMsg
-mkErrTcM (tidy_env, err_msg)
-  = do { ctxt <- getErrCtxt ;
-         loc  <- getSrcSpanM ;
-         err_info <- mkErrInfo tidy_env ctxt ;
-         mkLongErrAt loc err_msg err_info }
-
-mkErrTc :: MsgDoc -> TcM ErrMsg
-mkErrTc msg = do { env0 <- tcInitTidyEnv
-                 ; mkErrTcM (env0, msg) }
 
 -- The failWith functions add an error message and cause failure
 

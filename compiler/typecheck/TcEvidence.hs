@@ -9,7 +9,7 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper,
   pprHsWrapper,
 
   -- * Evidence bindings
@@ -35,16 +35,16 @@ module TcEvidence (
   Role(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
-  mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSubCo,
+  mkTcUnbranchedAxInstCo, mkTcForAllCo,
+  mkTcSymCo, mkTcTransCo, mkTcLRCo, mkTcSubCo, maybeTcSubCo,
   tcDowngradeRole,
-  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflLeftCo, mkTcPhantomCo,
+  mkTcGReflRightCo, mkTcGReflLeftCo,
   mkTcCoherenceLeftCo,
   mkTcCoherenceRightCo,
   mkTcKindCo,
-  tcCoercionKind, coVarsOfTcCo,
+  tcCoercionKind,
   mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo, isTcGReflMCo, tcCoToMCo,
+  isTcReflCo, isTcReflexiveCo,
   tcCoercionRole,
   unwrapIP, wrapIP,
 
@@ -112,32 +112,24 @@ mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
 mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
-mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
-                       -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
                        -> [TcCoercion] -> TcCoercionR
 mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
-mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: TcCoercionN -> TcCoercionR
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
-mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
 mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
 mkTcGReflLeftCo        :: Role -> TcType -> TcCoercionN -> TcCoercion
 mkTcCoherenceLeftCo    :: Role -> TcType -> TcCoercionN
                        -> TcCoercion -> TcCoercion
 mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
                        -> TcCoercion -> TcCoercion
-mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
 mkTcKindCo             :: TcCoercion -> TcCoercionN
 mkTcCoVarCo            :: CoVar -> TcCoercion
 
 tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
-coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
-isTcGReflMCo           :: TcMCoercion -> Bool
 
 -- | This version does a slow check, calculating the related types and seeing
 -- if they are equal.
@@ -151,32 +143,22 @@ mkTcRepReflCo          = mkRepReflCo
 mkTcTyConAppCo         = mkTyConAppCo
 mkTcAppCo              = mkAppCo
 mkTcFunCo              = mkFunCo
-mkTcAxInstCo           = mkAxInstCo
 mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
 mkTcForAllCo           = mkForAllCo
-mkTcForAllCos          = mkForAllCos
-mkTcNthCo              = mkNthCo
 mkTcLRCo               = mkLRCo
 mkTcSubCo              = mkSubCo
 tcDowngradeRole        = downgradeRole
-mkTcAxiomRuleCo        = mkAxiomRuleCo
 mkTcGReflRightCo       = mkGReflRightCo
 mkTcGReflLeftCo        = mkGReflLeftCo
 mkTcCoherenceLeftCo    = mkCoherenceLeftCo
 mkTcCoherenceRightCo   = mkCoherenceRightCo
-mkTcPhantomCo          = mkPhantomCo
 mkTcKindCo             = mkKindCo
 mkTcCoVarCo            = mkCoVarCo
 
 tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
-coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
-isTcGReflMCo           = isGReflMCo
 isTcReflexiveCo        = isReflexiveCo
-
-tcCoToMCo :: TcCoercion -> TcMCoercion
-tcCoToMCo = coToMCo
 
 -- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
 -- Note that the input coercion should always be nominal.
@@ -355,20 +337,6 @@ idHsWrapper = WpHole
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
-
--- | Is the wrapper erasable, i.e., will not affect runtime semantics?
-isErasableHsWrapper :: HsWrapper -> Bool
-isErasableHsWrapper = go
-  where
-    go WpHole                  = True
-    go (WpCompose wrap1 wrap2) = go wrap1 && go wrap2
-    go WpFun{}                 = False
-    go WpCast{}                = True
-    go WpEvLam{}               = False -- case in point
-    go WpEvApp{}               = False
-    go WpTyLam{}               = True
-    go WpTyApp{}               = True
-    go WpLet{}                 = False
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,

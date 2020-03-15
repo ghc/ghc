@@ -22,7 +22,7 @@ module Predicate (
   getClassPredTys, getClassPredTys_maybe,
 
   -- Implicit parameters
-  isIPPred, isIPPred_maybe, isIPTyCon, isIPClass, hasIPPred,
+  isIPPred, isIPTyCon, isIPClass, hasIPPred,
 
   -- Evidence variables
   DictId, isEvVar, isDictId
@@ -38,11 +38,9 @@ import Coercion
 
 import PrelNames
 
-import FastString
 import Outputable
 import Util
 
-import Control.Monad ( guard )
 
 -- | A predicate in the solver. The solver tries to prove Wanted predicates
 -- from Given ones.
@@ -197,13 +195,6 @@ isIPClass cls = cls `hasKey` ipClassKey
 
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)
-
-isIPPred_maybe :: Type -> Maybe (FastString, Type)
-isIPPred_maybe ty =
-  do (tc,[t1,t2]) <- splitTyConApp_maybe ty
-     guard (isIPTyCon tc)
-     x <- isStrLitTy t1
-     return (x,t2)
 
 hasIPPred :: PredType -> Bool
 hasIPPred pred

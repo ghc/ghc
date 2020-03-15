@@ -23,7 +23,7 @@ module GHCi.UI.Monad (
         runStmt, runDecls, runDecls', resume, recordBreak, revertCAFs,
         ActionStats(..), runAndPrintStats, runWithStats, printStats,
 
-        printForUserNeverQualify, printForUserModInfo,
+        printForUserModInfo,
         printForUser, printForUserPartWay, prettyLocations,
 
         compileGHCiExpr,
@@ -380,11 +380,6 @@ unsetOption :: GhciMonad m => GHCiOption -> m ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
-
-printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
-printForUserNeverQualify doc = do
-  dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout neverQualify doc
 
 printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
 printForUserModInfo info doc = do

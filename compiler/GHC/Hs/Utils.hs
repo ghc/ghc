@@ -59,7 +59,7 @@ module GHC.Hs.Utils(
 
   -- * Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
-  nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
+  nlConPatName, nlNullaryConPat, nlWildConPat, nlWildPat,
   nlWildPatName, nlTuplePat, mkParPat, nlParPat,
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
@@ -432,11 +432,6 @@ nlConVarPat con vars = nlConPat con (map nlVarPat vars)
 
 nlConVarPatName :: Name -> [Name] -> LPat GhcRn
 nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
-
-nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
-nlInfixConPat con l r = noLoc (ConPatIn (noLoc con)
-                              (InfixCon (parenthesizePat opPrec l)
-                                        (parenthesizePat opPrec r)))
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats =

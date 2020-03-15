@@ -18,7 +18,7 @@ types that
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module BasicTypes(
-        Version, bumpVersion, initialVersion,
+        Version,
 
         LeftOrRight(..),
         pickLR,
@@ -353,12 +353,6 @@ instance Outputable FunctionOrData where
 -}
 
 type Version = Int
-
-bumpVersion :: Version -> Version
-bumpVersion v = v+1
-
-initialVersion :: Version
-initialVersion = 1
 
 {-
 ************************************************************************

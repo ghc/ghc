@@ -20,7 +20,7 @@ module GHC.Cmm.Node (
      ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
-     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
+     wrapRecExpM, mapSuccessors, mapCollectSuccessors,
 
      -- * Tick scopes
      CmmTickScope(..), isTickSubScope, combineTickScopes,
@@ -485,10 +485,6 @@ mapExpDeep f = mapExp $ wrapRecExp f
 ------------------------------------------------------------------------
 -- mapping Expr in GHC.Cmm.Node, but not performing allocation if no changes
 
-mapForeignTargetM :: (CmmExpr -> Maybe CmmExpr) -> ForeignTarget -> Maybe ForeignTarget
-mapForeignTargetM f (ForeignTarget e c) = (\x -> ForeignTarget x c) `fmap` f e
-mapForeignTargetM _ (PrimTarget _)      = Nothing
-
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
 -- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
 --                   then  gives f a chance to rewrite the resulting expression
@@ -496,33 +492,10 @@ wrapRecExpM f n@(CmmMachOp op es)  = maybe (f n) (f . CmmMachOp op)    (mapListM
 wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecExpM f addr)
 wrapRecExpM f e                    = f e
 
-mapExpM :: (CmmExpr -> Maybe CmmExpr) -> CmmNode e x -> Maybe (CmmNode e x)
-mapExpM _ (CmmEntry{})              = Nothing
-mapExpM _ (CmmComment _)            = Nothing
-mapExpM _ (CmmTick _)               = Nothing
-mapExpM f (CmmUnwind regs)          = CmmUnwind `fmap` mapM (\(r,e) -> mapM f e >>= \e' -> pure (r,e')) regs
-mapExpM f (CmmAssign r e)           = CmmAssign r `fmap` f e
-mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap` mapListM f [addr, e]
-mapExpM _ (CmmBranch _)             = Nothing
-mapExpM f (CmmCondBranch e ti fi l) = (\x -> CmmCondBranch x ti fi l) `fmap` f e
-mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
-mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
-mapExpM f (CmmUnsafeForeignCall tgt fs as)
-    = case mapForeignTargetM f tgt of
-        Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
-        Nothing   -> (\xs -> CmmUnsafeForeignCall tgt fs xs) `fmap` mapListM f as
-mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
-    = case mapForeignTargetM f tgt of
-        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl)
-        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ ret_args updfr intrbl) `fmap` mapListM f as
-
 -- share as much as possible
 mapListM :: (a -> Maybe a) -> [a] -> Maybe [a]
 mapListM f xs = let (b, r) = mapListT f xs
                 in if b then Just r else Nothing
-
-mapListJ :: (a -> Maybe a) -> [a] -> [a]
-mapListJ f xs = snd (mapListT f xs)
 
 mapListT :: (a -> Maybe a) -> [a] -> (Bool, [a])
 mapListT f xs = foldr g (False, []) (zip3 (tails xs) xs (map f xs))
@@ -530,9 +503,6 @@ mapListT f xs = foldr g (False, []) (zip3 (tails xs) xs (map f xs))
           g (_,   _, Just y)  (True, ys)  = (True,  y:ys)
           g (ys', _, Nothing) (False, _)  = (False, ys')
           g (_,   _, Just y)  (False, ys) = (True,  y:ys)
-
-mapExpDeepM :: (CmmExpr -> Maybe CmmExpr) -> CmmNode e x -> Maybe (CmmNode e x)
-mapExpDeepM f = mapExpM $ wrapRecExpM f
 
 -----------------------------------
 -- folding Expr in GHC.Cmm.Node

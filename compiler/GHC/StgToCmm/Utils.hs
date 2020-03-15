@@ -39,7 +39,6 @@ module GHC.StgToCmm.Utils (
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
         mkWordCLit, mkByteStringCLit,
         newStringCLit, newByteStringCLit,
-        blankWord,
 
         -- * Update remembered set operations
         whenUpdRemSetEnabled,

@@ -79,7 +79,6 @@ module GHC (
         modInfoExportsWithSelectors,
         modInfoInstances,
         modInfoIsExportedName,
-        modInfoLookupName,
         modInfoIface,
         modInfoRdrEnv,
         modInfoSafe,
@@ -1253,17 +1252,6 @@ mkPrintUnqualifiedForModule :: GhcMonad m =>
                             -> m (Maybe PrintUnqualified) -- XXX: returns a Maybe X
 mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
   return (fmap (mkPrintUnqualified (hsc_dflags hsc_env)) (minf_rdr_env minf))
-
-modInfoLookupName :: GhcMonad m =>
-                     ModuleInfo -> Name
-                  -> m (Maybe TyThing) -- XXX: returns a Maybe X
-modInfoLookupName minf name = withSession $ \hsc_env -> do
-   case lookupTypeEnv (minf_type_env minf) name of
-     Just tyThing -> return (Just tyThing)
-     Nothing      -> do
-       eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
