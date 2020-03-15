@@ -1330,7 +1330,7 @@ rnTyClDecls tycl_ds
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
                        foldr (plusFV . snd) emptyFVs kisigs_w_fvs
 
-             all_groups = first_group ++ groups
+             all_groups = concatMap split_group (first_group ++ groups)
 
        ; MASSERT2( null final_inst_ds,  ppr instds_w_fvs $$ ppr inst_ds_map
                                        $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
@@ -1355,6 +1355,11 @@ rnTyClDecls tycl_ds
                       , tcg_rn_kisigs = decl_sigs
                       , tcg_rn_roles  = roles
                       , tcg_rn_instds = inst_ds }
+
+    split_group :: TyClGroup GhcRn -> [TyClGroup GhcRn]
+    split_group (TcgRn tyclds [] kisigs []) =
+      [TcgRn [] [] kisigs [], TcgRn tyclds [] [] []]
+    split_group g = [g]
 
 mkDeclSigRn
   :: Bool   -- ^ CUSKs enabled
