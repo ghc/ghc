@@ -69,6 +69,7 @@ import GHC.Platform.Reg
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
+import GHC.CmmToAsm.Config
 import GHC.Cmm.DebugBlock
 
 import GHC.Cmm.BlockId
@@ -191,14 +192,15 @@ x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, RawCmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
 x86_64NcgImpl dflags
  = NcgImpl {
-        cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr dflags
+        ncgConfig                 = config
+       ,cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr config
        ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
        ,canShortcut               = X86.Instr.canShortcut
        ,shortcutStatics           = X86.Instr.shortcutStatics
        ,shortcutJump              = X86.Instr.shortcutJump
-       ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl
-       ,maxSpillSlots             = X86.Instr.maxSpillSlots dflags
+       ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl config
+       ,maxSpillSlots             = X86.Instr.maxSpillSlots config
        ,allocatableRegs           = X86.Regs.allocatableRegs platform
        ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
@@ -206,19 +208,22 @@ x86_64NcgImpl dflags
        ,extractUnwindPoints       = X86.CodeGen.extractUnwindPoints
        ,invertCondBranches        = X86.CodeGen.invertCondBranches
    }
-    where platform = targetPlatform dflags
+    where
+      config   = initConfig dflags
+      platform = ncgPlatform config
 
 ppcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
 ppcNcgImpl dflags
  = NcgImpl {
-        cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr dflags
+        ncgConfig                 = config
+       ,cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr config
        ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
        ,canShortcut               = PPC.RegInfo.canShortcut
        ,shortcutStatics           = PPC.RegInfo.shortcutStatics
        ,shortcutJump              = PPC.RegInfo.shortcutJump
-       ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl
-       ,maxSpillSlots             = PPC.Instr.maxSpillSlots dflags
+       ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl config
+       ,maxSpillSlots             = PPC.Instr.maxSpillSlots config
        ,allocatableRegs           = PPC.Regs.allocatableRegs platform
        ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
@@ -226,19 +231,22 @@ ppcNcgImpl dflags
        ,extractUnwindPoints       = const []
        ,invertCondBranches        = \_ _ -> id
    }
-    where platform = targetPlatform dflags
+    where
+      config   = initConfig dflags
+      platform = ncgPlatform config
 
 sparcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
 sparcNcgImpl dflags
  = NcgImpl {
-        cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
+        ncgConfig                 = config
+       ,cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
        ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr dflags
        ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
        ,canShortcut               = SPARC.ShortcutJump.canShortcut
        ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
        ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
-       ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl
-       ,maxSpillSlots             = SPARC.Instr.maxSpillSlots dflags
+       ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl config
+       ,maxSpillSlots             = SPARC.Instr.maxSpillSlots config
        ,allocatableRegs           = SPARC.Regs.allocatableRegs
        ,ncgAllocMoreStack         = noAllocMoreStack
        ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
@@ -246,6 +254,8 @@ sparcNcgImpl dflags
        ,extractUnwindPoints       = const []
        ,invertCondBranches        = \_ _ -> id
    }
+    where
+      config   = initConfig dflags
 
 --
 -- Allocating more stack space for spilling is currently only
@@ -538,7 +548,8 @@ cmmNativeGen
 
 cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
-        let platform = targetPlatform dflags
+        let config   = ncgConfig ncgImpl
+        let platform = ncgPlatform config
 
         let proc_name = case cmm of
                 (CmmProc _ entry_label _ _) -> ppr entry_label
@@ -577,7 +588,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- tag instructions with register liveness information
         -- also drops dead code. We don't keep the cfg in sync on
         -- some backends, so don't use it there.
-        let livenessCfg = if (backendMaintainsCfg dflags)
+        let livenessCfg = if backendMaintainsCfg platform
                                 then Just nativeCfgWeights
                                 else Nothing
         let (withLiveness, usLive) =
@@ -607,7 +618,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                         = {-# SCC "RegAlloc-color" #-}
                           initUs usLive
                           $ Color.regAlloc
-                                dflags
+                                config
                                 alloc_regs
                                 (mkUniqSet [0 .. maxSpillSlots ncgImpl])
                                 (maxSpillSlots ncgImpl)
@@ -655,7 +666,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc dflags proc
+                               Linear.regAlloc config proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do
@@ -691,11 +702,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
             cfgRegAllocUpdates = (concatMap Linear.ra_fixupList raStats)
 
         let cfgWithFixupBlks =
-                (\cfg -> addNodesBetween cfg cfgRegAllocUpdates) <$> livenessCfg
+                (\cfg -> addNodesBetween dflags cfg cfgRegAllocUpdates) <$> livenessCfg
 
         -- Insert stack update blocks
         let postRegCFG =
-                pure (foldl' (\m (from,to) -> addImmediateSuccessor from to m ))
+                pure (foldl' (\m (from,to) -> addImmediateSuccessor dflags from to m ))
                      <*> cfgWithFixupBlks
                      <*> pure stack_updt_blks
 
@@ -725,7 +736,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks
             getBlks _ = []
 
-        when ( backendMaintainsCfg dflags &&
+        when ( backendMaintainsCfg platform &&
                 (gopt Opt_DoAsmLinting dflags || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
                 let labels = setFromList $ fmap blockId blocks :: LabelSet
@@ -854,7 +865,7 @@ makeImportsDoc dflags imports
                 -- security. GHC generated code does not need an executable
                 -- stack so add the note in:
             (if platformHasGnuNonexecStack platform
-             then text ".section .note.GNU-stack,\"\"," <> sectionType "progbits"
+             then text ".section .note.GNU-stack,\"\"," <> sectionType platform "progbits"
              else Outputable.empty)
             $$
                 -- And just because every other compiler does, let's stick in
@@ -865,9 +876,8 @@ makeImportsDoc dflags imports
              else Outputable.empty)
 
  where
-        platform = targetPlatform dflags
-        arch = platformArch platform
-        os   = platformOS   platform
+        config   = initConfig dflags
+        platform = ncgPlatform config
 
         -- Generate "symbol stubs" for all external symbols that might
         -- come from a dynamic library.
@@ -877,10 +887,10 @@ makeImportsDoc dflags imports
         -- (Hack) sometimes two Labels pretty-print the same, but have
         -- different uniques; so we compare their text versions...
         dyld_stubs imps
-                | needImportedSymbols dflags arch os
+                | needImportedSymbols config
                 = vcat $
-                        (pprGotDeclaration dflags arch os :) $
-                        map ( pprImportedSymbol dflags platform . fst . head) $
+                        (pprGotDeclaration config :) $
+                        map ( pprImportedSymbol dflags config . fst . head) $
                         groupBy (\(_,a) (_,b) -> a == b) $
                         sortBy (\(_,a) (_,b) -> compare a b) $
                         map doPpr $

@@ -27,6 +27,7 @@ import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
+import GHC.Platform
 
 import Outputable
 import UniqFM
@@ -45,7 +46,11 @@ data RegAllocStats statics instr
         , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
           -- | Information to help choose which regs to spill.
-        , raSpillCosts  :: SpillCostInfo }
+        , raSpillCosts  :: SpillCostInfo
+
+          -- | Target platform
+        , raPlatform    :: !Platform
+        }
 
 
         -- Information about an intermediate graph.
@@ -98,23 +103,27 @@ data RegAllocStats statics instr
         , raFinal         :: [NatCmmDecl statics instr]
 
           -- | Spill\/reload\/reg-reg moves present in this code.
-        , raSRMs          :: (Int, Int, Int) }
+        , raSRMs          :: (Int, Int, Int)
+
+          -- | Target platform
+        , raPlatform    :: !Platform
+        }
 
 
 instance (Outputable statics, Outputable instr)
        => Outputable (RegAllocStats statics instr) where
 
- ppr (s@RegAllocStatsStart{}) = sdocWithPlatform $ \platform ->
-           text "#  Start"
+ ppr (s@RegAllocStatsStart{})
+    =      text "#  Start"
         $$ text "#  Native code with liveness information."
         $$ ppr (raLiveCmm s)
         $$ text ""
         $$ text "#  Initial register conflict graph."
         $$ Color.dotGraph
-                (targetRegDotColor platform)
-                (trivColorable platform
-                        (targetVirtualRegSqueeze platform)
-                        (targetRealRegSqueeze platform))
+                (targetRegDotColor (raPlatform s))
+                (trivColorable (raPlatform s)
+                        (targetVirtualRegSqueeze (raPlatform s))
+                        (targetRealRegSqueeze (raPlatform s)))
                 (raGraph s)
 
 
@@ -140,8 +149,7 @@ instance (Outputable statics, Outputable instr)
 
 
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
-    = sdocWithPlatform $ \platform ->
-           text "#  Colored"
+    =      text "#  Colored"
 
         $$ text "#  Code with liveness information."
         $$ ppr (raCode s)
@@ -149,10 +157,10 @@ instance (Outputable statics, Outputable instr)
 
         $$ text "#  Register conflict graph (colored)."
         $$ Color.dotGraph
-                (targetRegDotColor platform)
-                (trivColorable platform
-                        (targetVirtualRegSqueeze platform)
-                        (targetRealRegSqueeze platform))
+                (targetRegDotColor (raPlatform s))
+                (trivColorable (raPlatform s)
+                        (targetVirtualRegSqueeze (raPlatform s))
+                        (targetRealRegSqueeze (raPlatform s)))
                 (raGraphColored s)
         $$ text ""
 

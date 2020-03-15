@@ -19,8 +19,8 @@ import Cpr( seqCprSig )
 import BasicTypes( seqOccInfo )
 import VarSet( seqDVarSet )
 import Var( varType, tyVarKind )
-import Type( seqType, isTyVar )
-import Coercion( seqCo )
+import GHC.Core.Type( seqType, isTyVar )
+import GHC.Core.Coercion( seqCo )
 import Id( Id, idInfo )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the

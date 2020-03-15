@@ -84,14 +84,14 @@ import TysWiredIn
 import Id
 import Var
 import RdrName
-import InstEnv
-import DataCon ( DataCon )
-import PatSyn  ( PatSyn )
-import ConLike
-import TyCon
-import Type
-import CoAxiom
-import Class
+import GHC.Core.InstEnv
+import GHC.Core.DataCon ( DataCon )
+import GHC.Core.PatSyn  ( PatSyn )
+import GHC.Core.ConLike
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Class
 import Name
 import NameSet
 import NameEnv

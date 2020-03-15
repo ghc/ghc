@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module GHC.CmmToAsm.BlockLayout
-    ( sequenceTop )
+    ( sequenceTop, backendMaintainsCfg)
 where
 
 #include "HsVersions.h"
@@ -25,7 +25,8 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
-import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, backendMaintainsCfg)
+import GHC.Platform
+import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import UniqFM
 import Util
 import Unique
@@ -785,7 +786,7 @@ sequenceTop
 sequenceTop _     _       _           top@(CmmData _ _) = top
 sequenceTop dflags ncgImpl edgeWeights
             (CmmProc info lbl live (ListGraph blocks))
-  | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg dflags
+  | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg (targetPlatform dflags)
   --Use chain based algorithm
   , Just cfg <- edgeWeights
   = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
@@ -799,7 +800,7 @@ sequenceTop dflags ncgImpl edgeWeights
                                 sequenceBlocks cfg info blocks)
   where
     dontUseCfg = gopt Opt_WeightlessBlocklayout dflags ||
-                 (not $ backendMaintainsCfg dflags)
+                 (not $ backendMaintainsCfg (targetPlatform dflags))
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of
@@ -893,3 +894,10 @@ lookupDeleteUFM :: Uniquable key => UniqFM elt -> key
 lookupDeleteUFM m k = do -- Maybe monad
     v <- lookupUFM m k
     return (v, delFromUFM m k)
+
+backendMaintainsCfg :: Platform -> Bool
+backendMaintainsCfg platform = case platformArch platform of
+    -- ArchX86 -- Should work but not tested so disabled currently.
+    ArchX86_64 -> True
+    _otherwise -> False
+

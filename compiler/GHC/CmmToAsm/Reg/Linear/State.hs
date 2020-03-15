@@ -30,6 +30,8 @@ module GHC.CmmToAsm.Reg.Linear.State (
         getDeltaR,
 
         getUniqueR,
+        getConfig,
+        getPlatform,
 
         recordSpill,
         recordFixupBlock
@@ -43,10 +45,11 @@ import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 import GHC.Cmm.BlockId
 
-import GHC.Driver.Session
+import GHC.Platform
 import Unique
 import UniqSupply
 
@@ -79,12 +82,16 @@ instance Applicative (RegM freeRegs) where
 instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { RA_Result s a -> unReg (k a) s }
 
-instance HasDynFlags (RegM a) where
-    getDynFlags = RegM $ \s -> RA_Result s (ra_DynFlags s)
+-- | Get native code generator configuration
+getConfig :: RegM a NCGConfig
+getConfig = RegM $ \s -> RA_Result s (ra_config s)
 
+-- | Get target platform from native code generator configuration
+getPlatform :: RegM a Platform
+getPlatform = ncgPlatform <$> getConfig
 
 -- | Run a computation in the RegM register allocator monad.
-runR    :: DynFlags
+runR    :: NCGConfig
         -> BlockAssignment freeRegs
         -> freeRegs
         -> RegMap Loc
@@ -93,7 +100,7 @@ runR    :: DynFlags
         -> RegM freeRegs a
         -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
 
-runR dflags block_assig freeregs assig stack us thing =
+runR config block_assig freeregs assig stack us thing =
   case unReg thing
         (RA_State
                 { ra_blockassig = block_assig
@@ -103,7 +110,7 @@ runR dflags block_assig freeregs assig stack us thing =
                 , ra_stack      = stack
                 , ra_us         = us
                 , ra_spills     = []
-                , ra_DynFlags   = dflags
+                , ra_config     = config
                 , ra_fixups     = [] })
    of
         RA_Result state returned_thing
@@ -121,10 +128,9 @@ makeRAStats state
 spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack0} ->
-  let dflags = ra_DynFlags s
-      (stack1,slot) = getStackSlotFor stack0 temp
-      instr  = mkSpillInstr dflags reg delta slot
+spillR reg temp = RegM $ \s ->
+  let (stack1,slot) = getStackSlotFor (ra_stack s) temp
+      instr  = mkSpillInstr (ra_config s) reg (ra_delta s) slot
   in
   RA_Result s{ra_stack=stack1} (instr,slot)
 
@@ -132,9 +138,8 @@ spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack0} ->
 loadR :: Instruction instr
       => Reg -> Int -> RegM freeRegs instr
 
-loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
-  let dflags = ra_DynFlags s
-  in RA_Result s (mkLoadInstr dflags reg delta slot)
+loadR reg slot = RegM $ \s ->
+  RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->

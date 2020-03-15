@@ -9,7 +9,7 @@
 -- as used in System FC. See 'GHC.Core.Expr' for
 -- more on System FC and how coercions fit into it.
 --
-module Coercion (
+module GHC.Core.Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionR,
         UnivCoProvenance, CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
@@ -121,14 +121,14 @@ import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
 import GhcPrelude
 
 import GHC.Iface.Type
-import TyCoRep
-import TyCoFVs
-import TyCoPpr
-import TyCoSubst
-import TyCoTidy
-import Type
-import TyCon
-import CoAxiom
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.Tidy
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.Coercion.Axiom
 import Var
 import VarEnv
 import VarSet
@@ -155,7 +155,7 @@ import Data.Char( isDigit )
      -- The coercion arguments always *precisely* saturate
      -- arity of (that branch of) the CoAxiom.  If there are
      -- any left over, we use AppCo.  See
-     -- See [Coercion axioms applied to coercions] in TyCoRep
+     -- See [Coercion axioms applied to coercions] in GHC.Core.TyCo.Rep
 
 \subsection{Coercion variables}
 %*                                                                      *
@@ -185,7 +185,7 @@ Defined here to avoid module loops. CoAxiom is loaded very early on.
 etaExpandCoAxBranch :: CoAxBranch -> ([TyVar], [Type], Type)
 -- Return the (tvs,lhs,rhs) after eta-expanding,
 -- to the way in which the axiom was originally written
--- See Note [Eta reduction for data families] in CoAxiom
+-- See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
 etaExpandCoAxBranch (CoAxBranch { cab_tvs = tvs
                                 , cab_eta_tvs = eta_tvs
                                 , cab_lhs = lhs
@@ -241,7 +241,7 @@ ppr_co_ax_branch ppr_rhs fam_tc branch
 
     -- Eta-expand LHS and RHS types, because sometimes data family
     -- instances are eta-reduced.
-    -- See Note [Eta reduction for data families] in FamInstEnv.
+    -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv.
     (ee_tvs, ee_lhs, ee_rhs) = etaExpandCoAxBranch branch
 
     pp_lhs = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc)
@@ -330,7 +330,7 @@ Suppose we have this:
     (f |> co) t1 .. tn
 Then we want to push the coercion into the arguments, so as to make
 progress. For example of why you might want to do so, see Note
-[Respecting definitional equality] in TyCoRep.
+[Respecting definitional equality] in GHC.Core.TyCo.Rep.
 
 This is done by decomposePiCos.  Specifically, if
     decomposePiCos co [t1,..,tn] = ([co1,...,cok], cor)
@@ -732,7 +732,7 @@ mkAppCo (TyConAppCo r tc args) arg
 mkAppCo co arg = AppCo co  arg
 -- Note, mkAppCo is careful to maintain invariants regarding
 -- where Refl constructors appear; see the comments in the definition
--- of Coercion and the Note [Refl invariant] in TyCoRep.
+-- of Coercion and the Note [Refl invariant] in GHC.Core.TyCo.Rep.
 
 -- | Applies multiple 'Coercion's to another 'Coercion', from left to right.
 -- See also 'mkAppCo'.
@@ -743,8 +743,8 @@ mkAppCos co1 cos = foldl' mkAppCo co1 cos
 
 {- Note [Unused coercion variable in ForAllCo]
 
-See Note [Unused coercion variable in ForAllTy] in TyCoRep for the motivation for
-checking coercion variable in types.
+See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep for the
+motivation for checking coercion variable in types.
 To lift the design choice to (ForAllCo cv kind_co body_co), we have two options:
 
 (1) In mkForAllCo, we check whether cv is a coercion variable
@@ -1367,7 +1367,7 @@ promoteCoercion co = case co of
     ForAllCo _ _ _
       -> ASSERT( False )
          mkNomReflCo liftedTypeKind
-      -- See Note [Weird typing rule for ForAllTy] in Type
+      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
 
     FunCo _ _ _
       -> ASSERT( False )
@@ -1416,7 +1416,7 @@ promoteCoercion co = case co of
       | otherwise
       -> ASSERT( False)
          mkNomReflCo liftedTypeKind
-           -- See Note [Weird typing rule for ForAllTy] in Type
+           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
 
     KindCo _
       -> ASSERT( False )
@@ -1486,7 +1486,7 @@ castCoercionKindI g h1 h2
   = mkCoherenceRightCo r t2 h2 (mkCoherenceLeftCo r t1 h1 g)
   where (Pair t1 t2, r) = coercionKindRole g
 
--- See note [Newtype coercions] in TyCon
+-- See note [Newtype coercions] in GHC.Core.TyCon
 
 mkPiCos :: Role -> [Var] -> Coercion -> Coercion
 mkPiCos r vs co = foldr (mkPiCo r) co vs
@@ -1743,8 +1743,8 @@ This follows the lifting context extension definition in the
 
 data LiftingContext = LC TCvSubst LiftCoEnv
   -- in optCoercion, we need to lift when optimizing InstCo.
-  -- See Note [Optimising InstCo] in OptCoercion
-  -- We thus propagate the substitution from OptCoercion here.
+  -- See Note [Optimising InstCo] in GHC.Core.Coercion.Opt
+  -- We thus propagate the substitution from GHC.Core.Coercion.Opt here.
 
 instance Outputable LiftingContext where
   ppr (LC _ env) = hang (text "LiftingContext:") 2 (ppr env)
@@ -1912,7 +1912,7 @@ Note [liftCoSubstTyVar]
 This function can fail if a coercion in the environment is of too low a role.
 
 liftCoSubstTyVar is called from two places: in liftCoSubst (naturally), and
-also in matchAxiom in OptCoercion. From liftCoSubst, the so-called lifting
+also in matchAxiom in GHC.Core.Coercion.Opt. From liftCoSubst, the so-called lifting
 lemma guarantees that the roles work out. If we fail in this
 case, we really should panic -- something is deeply wrong. But, in matchAxiom,
 failing is fine. matchAxiom is trying to find a set of coercions
@@ -2423,7 +2423,8 @@ mkReprPrimEqPred ty1  ty2
 -- | Assuming that two types are the same, ignoring coercions, find
 -- a nominal coercion between the types. This is useful when optimizing
 -- transitivity over coercion applications, where splitting two
--- AppCos might yield different kinds. See Note [EtaAppCo] in OptCoercion.
+-- AppCos might yield different kinds. See Note [EtaAppCo] in
+-- GHC.Core.Coercion.Opt.
 buildCoercion :: Type -> Type -> CoercionN
 buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
   where
@@ -2792,7 +2793,7 @@ is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
 -}
 
 
--- This is shared between the flattener and the normaliser in FamInstEnv.
+-- This is shared between the flattener and the normaliser in GHC.Core.FamInstEnv.
 -- See Note [simplifyArgsWorker]
 {-# INLINE simplifyArgsWorker #-}
 simplifyArgsWorker :: [TyCoBinder] -> Kind

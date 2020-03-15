@@ -14,22 +14,22 @@ module TcCanonical(
 import GhcPrelude
 
 import Constraint
-import Predicate
+import GHC.Core.Predicate
 import TcOrigin
 import TcUnify( swapOverTyVars, metaTyVarUpdateOK )
 import TcType
-import Type
+import GHC.Core.Type
 import TcFlatten
 import TcSMonad
 import TcEvidence
 import TcEvTerm
-import Class
-import TyCon
-import TyCoRep   -- cleverly decomposes types, good for completeness checking
-import Coercion
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
+import GHC.Core.Coercion
 import GHC.Core
 import Id( idType, mkTemplateLocals )
-import FamInstEnv ( FamInstEnvs )
+import GHC.Core.FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
@@ -694,7 +694,7 @@ case.  Instead we have a special case in TcInteract.doTopReactOther,
 which looks for primitive equalities specially in the quantified
 constraints.
 
-See also Note [Evidence for quantified constraints] in Predicate.
+See also Note [Evidence for quantified constraints] in GHC.Core.Predicate.
 
 
 ************************************************************************
@@ -1652,7 +1652,7 @@ Conclusion:
 It all comes from the fact that newtypes aren't necessarily injective
 w.r.t. representational equality.
 
-Furthermore, as explained in Note [NthCo and newtypes] in TyCoRep, we can't use
+Furthermore, as explained in Note [NthCo and newtypes] in GHC.Core.TyCo.Rep, we can't use
 NthCo on representational coercions over newtypes. NthCo comes into play
 only when decomposing givens.
 

@@ -68,7 +68,7 @@ import CostCentre  ( CostCentreStack )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
-import DataCon
+import GHC.Core.DataCon
 import GHC.Driver.Session
 import ForeignCall ( ForeignCall )
 import Id
@@ -80,9 +80,9 @@ import GHC.Driver.Packages ( isDynLinkName )
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
-import TyCon       ( PrimRep(..), TyCon )
-import Type        ( Type )
-import GHC.Types.RepType     ( typePrimRep1 )
+import GHC.Core.TyCon    ( PrimRep(..), TyCon )
+import GHC.Core.Type     ( Type )
+import GHC.Types.RepType ( typePrimRep1 )
 import Util
 
 import Data.List.NonEmpty ( NonEmpty, toList )
