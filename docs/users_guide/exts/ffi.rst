@@ -38,7 +38,7 @@ Guaranteed call safety
 
 The Haskell 2010 Report specifies that ``safe`` FFI calls must allow foreign
 calls to safely call into Haskell code. In practice, this means that called
-functions also have to assume heap-allocated haskell values may move around
+functions also have to assume heap-allocated Haskell values may move around
 arbitrarily in order to allow for GC.
 
 This greatly constrains library authors since it implies that it is not safe to
