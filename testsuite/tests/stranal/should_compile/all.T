@@ -33,7 +33,7 @@ test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 # T9208 fails (and should do so) if you have assertion checking on in the compiler
 # Hence the above expect_broken.  See comments in the ticket
 
-test('T10694', [ grep_errmsg(r'(Str|Cpr)=') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
+test('T10694', [ grep_errmsg(r'(Str|Cpr)=') ],   compile, ['-dppr-cols=200 -ddump-simpl -dsuppress-uniques'])
 test('T11770', [ check_errmsg('OneShot') ], compile, ['-ddump-simpl'])
 
 test('T13031', normal, makefile_test, [])
@@ -51,3 +51,4 @@ test('T17852',  [ grep_errmsg(r'\\$wf ::') ], compile, ['-ddump-worker-wrapper -
 
 test('T16029', normal, makefile_test, [])
 test('T10069',  [ grep_errmsg(r'(wc1).*Int#$') ], compile, ['-dppr-cols=200 -ddump-simpl'])
+test('T13380b',  [ grep_errmsg('bigDeadAction') ], compile, ['-dppr-cols=200 -ddump-simpl'])
