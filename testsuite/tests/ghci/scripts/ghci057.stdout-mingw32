@@ -12,7 +12,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
-  -Wmissing-monadfail-instances
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
@@ -35,7 +34,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
-  -Wmissing-monadfail-instances
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
@@ -57,7 +55,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
-  -Wmissing-monadfail-instances
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
@@ -81,7 +78,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
-  -Wmissing-monadfail-instances
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
