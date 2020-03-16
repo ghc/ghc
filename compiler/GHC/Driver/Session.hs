@@ -230,7 +230,7 @@ module GHC.Driver.Session (
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
 
         -- * SDoc
-        initSDocContext,
+        initSDocContext, initDefaultSDocContext,
 
         -- * Make use of the Cmm CFG
         CfgWeights(..)
@@ -1588,7 +1588,8 @@ defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
 defaultLogActionHPutStrDoc dflags h d sty
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
-  = printSDoc Pretty.PageMode dflags h sty d
+  = printSDoc ctx Pretty.PageMode h d
+    where ctx = initSDocContext dflags sty
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -5184,7 +5185,7 @@ emptyFilesToClean :: FilesToClean
 emptyFilesToClean = FilesToClean Set.empty Set.empty
 
 
-
+-- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags style = SDC
   { sdocStyle                       = style
@@ -5220,3 +5221,7 @@ initSDocContext dflags style = SDC
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocDynFlags                    = dflags
   }
+
+-- | Initialize the pretty-printing options using the default user style
+initDefaultSDocContext :: DynFlags -> SDocContext
+initDefaultSDocContext dflags = initSDocContext dflags (defaultUserStyle dflags)
