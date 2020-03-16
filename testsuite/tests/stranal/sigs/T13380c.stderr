@@ -1,0 +1,18 @@
+
+==================== Strictness signatures ====================
+Lib.$trModule:
+Lib.f: <S,1*U(U)><S,1*U(U)><L,U>
+
+
+
+==================== Cpr signatures ====================
+Lib.$trModule: m1
+Lib.f:
+
+
+
+==================== Strictness signatures ====================
+Lib.$trModule: 
+Lib.f: <S,1*U(U)><S,1*U(U)><L,U>
+
+
