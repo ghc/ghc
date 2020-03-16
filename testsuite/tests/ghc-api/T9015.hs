@@ -2,8 +2,9 @@ module Main where
 
 import GHC
 import GHC.Driver.Session
-import System.Environment
 import GHC.Driver.Monad
+import GHC.Parser.Lexer (mkParserFlags)
+import System.Environment
 
 testStrings = [
     "import Data.Maybe"
@@ -52,7 +53,8 @@ main = do
   where
     testWithParser parser = do
       dflags <- getSessionDynFlags
-      liftIO . putStrLn . unlines $ map (testExpr (parser dflags)) testStrings
+      let pflags = mkParserFlags dflags
+      liftIO . putStrLn . unlines $ map (testExpr (parser pflags)) testStrings
 
     testExpr parser expr = do
       expr ++ ": " ++ show (parser expr)
