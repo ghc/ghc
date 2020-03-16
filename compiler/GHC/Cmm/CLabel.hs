@@ -8,6 +8,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Cmm.CLabel (
         CLabel, -- abstract type
@@ -1168,93 +1169,85 @@ instance Outputable CLabel where
   ppr c = sdocWithDynFlags $ \dynFlags -> pprCLabel dynFlags c
 
 pprCLabel :: DynFlags -> CLabel -> SDoc
+pprCLabel dflags = \case
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
-pprCLabel _ (LocalBlockLabel u)
-  =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+   (AsmTempLabel u)
+      | not (platformUnregisterised platform)
+      -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
-pprCLabel dynFlags (AsmTempLabel u)
- | not (platformUnregisterised $ targetPlatform dynFlags)
-  =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+   (AsmTempDerivedLabel l suf)
+      | useNCG
+      -> ptext (asmTempLabelPrefix platform)
+         <> case l of AsmTempLabel u    -> pprUniqueAlways u
+                      LocalBlockLabel u -> pprUniqueAlways u
+                      _other            -> pprCLabel dflags l
+         <> ftext suf
 
-pprCLabel dynFlags (AsmTempDerivedLabel l suf)
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-   = ptext (asmTempLabelPrefix $ targetPlatform dynFlags)
-     <> case l of AsmTempLabel u    -> pprUniqueAlways u
-                  LocalBlockLabel u -> pprUniqueAlways u
-                  _other            -> pprCLabel dynFlags l
-     <> ftext suf
+   (DynamicLinkerLabel info lbl)
+      | useNCG
+      -> pprDynamicLinkerAsmLabel platform info lbl
 
-pprCLabel dynFlags (DynamicLinkerLabel info lbl)
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-   = pprDynamicLinkerAsmLabel (targetPlatform dynFlags) info lbl
+   PicBaseLabel
+      | useNCG
+      -> text "1b"
 
-pprCLabel dynFlags PicBaseLabel
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-   = text "1b"
+   (DeadStripPreventer lbl)
+      | useNCG
+      ->
+      {-
+         `lbl` can be temp one but we need to ensure that dsp label will stay
+         in the final binary so we prepend non-temp prefix ("dsp_") and
+         optional `_` (underscore) because this is how you mark non-temp symbols
+         on some platforms (Darwin)
+      -}
+      maybe_underscore $ text "dsp_" <> pprCLabel dflags lbl <> text "_dsp"
 
-pprCLabel dynFlags (DeadStripPreventer lbl)
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-   =
-   {-
-      `lbl` can be temp one but we need to ensure that dsp label will stay
-      in the final binary so we prepend non-temp prefix ("dsp_") and
-      optional `_` (underscore) because this is how you mark non-temp symbols
-      on some platforms (Darwin)
-   -}
-   maybe_underscore dynFlags $ text "dsp_"
-   <> pprCLabel dynFlags lbl <> text "_dsp"
+   (StringLitLabel u)
+      | useNCG
+      -> pprUniqueAlways u <> ptext (sLit "_str")
 
-pprCLabel dynFlags (StringLitLabel u)
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-  = pprUniqueAlways u <> ptext (sLit "_str")
+   lbl -> getPprStyle $ \sty ->
+            if useNCG && asmStyle sty
+            then maybe_underscore $ pprAsmCLbl lbl
+            else pprCLbl dflags lbl
 
-pprCLabel dynFlags lbl
-   = getPprStyle $ \ sty ->
-     if platformMisc_ghcWithNativeCodeGen (platformMisc dynFlags) && asmStyle sty
-     then maybe_underscore dynFlags $ pprAsmCLbl (targetPlatform dynFlags) lbl
-     else pprCLbl lbl
+  where
+    platform = targetPlatform dflags
+    useNCG   = platformMisc_ghcWithNativeCodeGen (platformMisc dflags)
 
-maybe_underscore :: DynFlags -> SDoc -> SDoc
-maybe_underscore dynFlags doc =
-  if platformMisc_leadingUnderscore $ platformMisc dynFlags
-  then pp_cSEP <> doc
-  else doc
+    maybe_underscore :: SDoc -> SDoc
+    maybe_underscore doc =
+      if platformMisc_leadingUnderscore $ platformMisc dflags
+      then pp_cSEP <> doc
+      else doc
 
-pprAsmCLbl :: Platform -> CLabel -> SDoc
-pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
- | platformOS platform == OSMinGW32
-    -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
-    -- (The C compiler does this itself).
-    = ftext fs <> char '@' <> int sz
-pprAsmCLbl _ lbl
-   = pprCLbl lbl
+    pprAsmCLbl (ForeignLabel fs (Just sz) _ _)
+     | platformOS platform == OSMinGW32
+        -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
+        -- (The C compiler does this itself).
+        = ftext fs <> char '@' <> int sz
+    pprAsmCLbl lbl = pprCLbl dflags lbl
 
-pprCLbl :: CLabel -> SDoc
-pprCLbl (StringLitLabel u)
-  = pprUniqueAlways u <> text "_str"
+pprCLbl :: DynFlags -> CLabel -> SDoc
+pprCLbl dflags = \case
+   (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
+   (SRTLabel u)         -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore
+                           <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
+                           -- Some bitmaps for tuple constructors have a numeric tag (e.g. '7')
+                           -- until that gets resolved we'll just force them to start
+                           -- with a letter so the label will be legal assembly code.
 
-pprCLbl (SRTLabel u)
-  = tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+   (CmmLabel _ str CmmCode)     -> ftext str
+   (CmmLabel _ str CmmData)     -> ftext str
+   (CmmLabel _ str CmmPrimCall) -> ftext str
 
-pprCLbl (LargeBitmapLabel u)  =
-  tempLabelPrefixOrUnderscore
-  <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
--- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
--- until that gets resolved we'll just force them to start
--- with a letter so the label will be legal assembly code.
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
 
+   (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
-pprCLbl (CmmLabel _ str CmmCode)        = ftext str
-pprCLbl (CmmLabel _ str CmmData)        = ftext str
-pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
-
-pprCLbl (LocalBlockLabel u)             =
-    tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
-
-pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> text "_fast"
-
-pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
-  = sdocWithDynFlags $ \dflags ->
+   (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
     ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd
@@ -1262,8 +1255,7 @@ pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
                  else (sLit "_noupd_info"))
         ]
 
-pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = sdocWithDynFlags $ \dflags ->
+   (RtsLabel (RtsSelectorEntry upd_reqd offset)) ->
     ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
                 ptext (if upd_reqd
@@ -1271,8 +1263,7 @@ pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
                         else (sLit "_noupd_entry"))
         ]
 
-pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
-  = sdocWithDynFlags $ \dflags ->
+   (RtsLabel (RtsApInfoTable upd_reqd arity)) ->
     ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
     hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
@@ -1280,8 +1271,7 @@ pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
                         else (sLit "_noupd_info"))
         ]
 
-pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
-  = sdocWithDynFlags $ \dflags ->
+   (RtsLabel (RtsApEntry upd_reqd arity)) ->
     ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
     hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
@@ -1289,44 +1279,29 @@ pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
                         else (sLit "_noupd_entry"))
         ]
 
-pprCLbl (CmmLabel _ fs CmmInfo)
-  = ftext fs <> text "_info"
+   (CmmLabel _ fs CmmInfo)    -> ftext fs <> text "_info"
+   (CmmLabel _ fs CmmEntry)   -> ftext fs <> text "_entry"
+   (CmmLabel _ fs CmmRetInfo) -> ftext fs <> text "_info"
+   (CmmLabel _ fs CmmRet)     -> ftext fs <> text "_ret"
+   (CmmLabel _ fs CmmClosure) -> ftext fs <> text "_closure"
 
-pprCLbl (CmmLabel _ fs CmmEntry)
-  = ftext fs <> text "_entry"
+   (RtsLabel (RtsPrimOp primop)) -> text "stg_" <> ppr primop
+   (RtsLabel (RtsSlowFastTickyCtr pat)) ->
+      text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
-pprCLbl (CmmLabel _ fs CmmRetInfo)
-  = ftext fs <> text "_info"
+   (ForeignLabel str _ _ _) -> ftext str
 
-pprCLbl (CmmLabel _ fs CmmRet)
-  = ftext fs <> text "_ret"
+   (IdLabel name _cafs flavor) -> internalNamePrefix name <> ppr name <> ppIdFlavor flavor
 
-pprCLbl (CmmLabel _ fs CmmClosure)
-  = ftext fs <> text "_closure"
+   (CC_Label cc)       -> ppr cc
+   (CCS_Label ccs)     -> ppr ccs
+   (HpcTicksLabel mod) -> text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
 
-pprCLbl (RtsLabel (RtsPrimOp primop))
-  = text "stg_" <> ppr primop
-
-pprCLbl (RtsLabel (RtsSlowFastTickyCtr pat))
-  = text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
-
-pprCLbl (ForeignLabel str _ _ _)
-  = ftext str
-
-pprCLbl (IdLabel name _cafs flavor) =
-  internalNamePrefix name <> ppr name <> ppIdFlavor flavor
-
-pprCLbl (CC_Label cc)           = ppr cc
-pprCLbl (CCS_Label ccs)         = ppr ccs
-
-pprCLbl (HpcTicksLabel mod)
-  = text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
-
-pprCLbl (AsmTempLabel {})       = panic "pprCLbl AsmTempLabel"
-pprCLbl (AsmTempDerivedLabel {})= panic "pprCLbl AsmTempDerivedLabel"
-pprCLbl (DynamicLinkerLabel {}) = panic "pprCLbl DynamicLinkerLabel"
-pprCLbl (PicBaseLabel {})       = panic "pprCLbl PicBaseLabel"
-pprCLbl (DeadStripPreventer {}) = panic "pprCLbl DeadStripPreventer"
+   (AsmTempLabel {})        -> panic "pprCLbl AsmTempLabel"
+   (AsmTempDerivedLabel {}) -> panic "pprCLbl AsmTempDerivedLabel"
+   (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
+   (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
+   (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text
