@@ -759,7 +759,7 @@ arityType _ (Var v)
   , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
-  = if isBotDiv res then ABot arity
+  = if isDeadEndDiv res then ABot arity
                     else ATop (take arity one_shots)
   | otherwise
   = ATop (take (idArity v) one_shots)
@@ -787,7 +787,7 @@ arityType env (App fun arg )
         -- The difference is observable using 'seq'
         --
 arityType env (Case scrut _ _ alts)
-  | exprIsBottom scrut || null alts
+  | exprIsDeadEnd scrut || null alts
   = ABot 0     -- Do not eta expand
                -- See Note [Dealing with bottom (1)]
   | otherwise

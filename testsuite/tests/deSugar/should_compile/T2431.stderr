@@ -7,6 +7,7 @@ Result size of Tidy Core
 T2431.$WRefl [InlPrag=INLINE[0]] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
@@ -110,3 +111,6 @@ T2431.$tc'Refl
       $tc'Refl2
       1#
       $krep3
+
+
+
