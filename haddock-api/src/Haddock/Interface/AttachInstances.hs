@@ -27,21 +27,21 @@ import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Class
+import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Core (isOrphan)
 import ErrUtils
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import GHC
-import InstEnv
+import GHC.Core.InstEnv
 import Module ( ModuleSet, moduleSetElts )
 import MonadUtils (liftIO)
 import Name
 import NameEnv
 import Outputable (text, sep, (<+>))
 import SrcLoc
-import TyCon
-import TyCoRep
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
 import TysPrim( funTyConName )
 import Var hiding (varName)
 

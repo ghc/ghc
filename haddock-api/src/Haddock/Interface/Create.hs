@@ -43,7 +43,7 @@ import Avail hiding (avail)
 import qualified Avail
 import qualified Module
 import qualified SrcLoc
-import ConLike (ConLike(..))
+import GHC.Core.ConLike (ConLike(..))
 import GHC
 import GHC.Driver.Types
 import Name
