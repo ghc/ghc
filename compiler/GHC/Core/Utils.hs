@@ -1386,7 +1386,6 @@ type CheapAppFun = Id -> Arity -> Bool
   -- but with minor variations:
   --    isWorkFreeApp
   --    isCheapApp
-  --    isExpandableApp
 
 isWorkFreeApp :: CheapAppFun
 isWorkFreeApp fn n_val_args

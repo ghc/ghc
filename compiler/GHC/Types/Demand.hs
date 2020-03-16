@@ -29,7 +29,7 @@ module GHC.Types.Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
+        Divergence(..), lubDivergence, isBotDiv, topDiv, botDiv, exnDiv, conDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
@@ -41,7 +41,6 @@ module GHC.Types.Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
         splitDmdTy, splitFVs,
-        deferAfterIO,
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
@@ -179,6 +178,77 @@ is not strict in its argument: Just try this in GHCi
 
 Any analysis that assumes otherwise will be broken in some way or another
 (beyond `-fno-pendantic-bottoms`).
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
+=======
+
+But then #13380 and #17676 suggest (in Mar 20) that we need to re-introduce a
+subtly different variant of `ThrowsExn` (which we call `ExnOrDiv` now) that is
+only used by `raiseIO#` in order to preserve precise exceptions by strictness
+analysis, while not impacting the ability to eliminate dead code.
+See Note [Precise exceptions and strictness analysis].
+
+Note [Precise exceptions and strictness analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have to take care to preserve precise exception semantics (#17676).
+There are two scenarios that need careful hacks.
+
+Scenario 1: Precise exceptions in case scrutinees
+-------------------------------------------------
+Consider
+
+     case foo x s of { (# s', r #) -> y }
+
+Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
+(ultimately via the 'raiseIO#' PrimOp), then we must not force 'y' (which may
+fail to terminate or throw an imprecise exception) until we have performed
+@foo x s@.
+
+Hackish solution: spot the exceptional situation and add a virtual branch,
+as if we had
+     case foo x s of
+        (# s, r #) -> y
+        other      -> return ()
+So the 'y' isn't necessarily going to be evaluated.
+
+The function that spots this situation is
+'CoreUtils.exprMayThrowPreciseException', and
+'Demand.deferAfterPreciseException' will lub with the strictness analysis
+results of the virtual branch.
+
+A more complete example (#148, #1592) where this shows up is:
+     do { let len = <expensive> ;
+        ; when (...) (exitWith ExitSuccess)
+        ; print len }
+Here, we want to defer, because @when (...) (exitWith ExitSuccess)@ might throw
+a precise exception.
+
+However, consider
+  f x s = case getMaskingState# s of
+            (# s, r #) ->
+          case x of I# x2 -> ...
+
+Here it is terribly sad to make 'f' lazy in 'x'.  After all,
+getMaskingState# is not going throw a precise exception! And
+'exprMayThrowPreciseException' recognises that.
+This situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
+(on an MVar not an Int), and made a material difference.
+
+Scenario 2: Precise exceptions in case alternatives
+---------------------------------------------------
+The motivating example for #13380 is the following:
+    f x y | x>0       = raiseIO blah
+          | y>0       = return 1
+          | otherwise = return 2
+If 'f' was inferred to be strict in 'y', WW would turn a precise into an
+imprecise exception in the call site @f 1 (error "boom")@.
+
+The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
+'Demand.defaultDmd' is lazy. But then the simplifier fails to eliminate a lot of
+dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need to
+give it 'exnDiv', which was conceived entirely for this reason. The default
+demand of 'exnDiv' is lazy, but otherwise (in terms of 'Demand.isBotDiv') it
+behaves exactly as 'botDiv', so that dead code elimination works as expected.
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 -}
 
 -- | Vanilla strictness domain
@@ -906,21 +976,65 @@ Divergence:     Dunno
 In a fixpoint iteration, start from Diverges
 -}
 
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 data Divergence
   = Diverges    -- Definitely diverges
   | Dunno       -- Might diverge or converge
+=======
+-- | Divergence lattice. Models a subset lattice of the following exhaustive
+-- set of divergence results:
+--
+-- [n] nontermination (e.g. loops)
+-- [i] throws imprecise exception
+-- [p] throws precise exception
+-- [c] converges (reduces to WHNF)
+--
+-- The different lattice elements correspond to different subsets, indicated by
+-- juxtaposition of indicators (e.g. __nc__ definitely doesn't throw an
+-- exception, and may or may not reduce to WHNF).
+--
+-- @
+--             Dunno (nipc)
+--             /          \
+-- ConOrDiv (nic)       ExnOrDiv (nip)
+--             \          /
+--            Diverges (ni)
+-- @
+--
+-- See Note [Precise exceptions and strictness analysis] for why __p__ is so
+-- special compared to __i__.
+data Divergence
+  = Diverges -- ^ Definitely throws an imprecise exception or diverges.
+  | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
+             --   exception or diverges. Never converges, hence 'isBotDiv'!
+             --   See scenario 2 in Note [Precise exceptions and strictness analysis].
+  | ConOrDiv -- ^ Definitely converges, throws an imprecise exception or
+             --   diverges. Never throws a precise exception! Important for
+             --   its interaction with 'bothDivergence' and hence analysis of
+             --   case expressions and function applications.
+             --   See scenario 1 in Note [Precise exceptions and strictness analysis]
+             --   and Note [Asymmetry of 'both' for DmdType and Divergence].
+  | Dunno    -- ^ Might diverge, throw any kind of exception or converge.
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 lubDivergence Dunno    Dunno    = Dunno
+=======
+lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
+lubDivergence ConOrDiv ConOrDiv = ConOrDiv
+lubDivergence _        _        = Dunno
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 bothDivergence _ Diverges = Diverges
 bothDivergence r Dunno    = r
 -- This needs to commute with defaultDmd, i.e.
@@ -930,6 +1044,18 @@ bothDivergence r Dunno    = r
 instance Outputable Divergence where
   ppr Diverges      = char 'b'
   ppr Dunno         = empty
+=======
+bothDivergence Diverges _ = Diverges
+bothDivergence ExnOrDiv _ = ExnOrDiv
+bothDivergence ConOrDiv r = lubDivergence Diverges r -- strip convergence!
+bothDivergence Dunno    r = lubDivergence ExnOrDiv r -- strip convergence!
+
+instance Outputable Divergence where
+  ppr Diverges = char 'b' -- for (b)ottom
+  ppr ExnOrDiv = char 'x' -- for e(x)ception
+  ppr ConOrDiv = char 'c' -- for (c)onverges
+  ppr Dunno    = empty
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
 {- Note [Precise vs imprecise exceptions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -982,26 +1108,42 @@ Simplifier.Utils.mkArgInfo.
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
 
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
 topDiv, botDiv :: Divergence
 topDiv = Dunno
+=======
+topDiv, exnDiv, conDiv, botDiv :: Divergence
+topDiv = Dunno
+exnDiv = ExnOrDiv
+conDiv = ConOrDiv
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 botDiv = Diverges
 
-isTopDiv :: Divergence -> Bool
-isTopDiv Dunno = True
-isTopDiv _     = False
-
--- | True if the result diverges or throws an exception
+-- | True if the result indicates that evaluation will not return.
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 isBotDiv _        = False
+=======
+isBotDiv ExnOrDiv = True
+isBotDiv ConOrDiv = False
+isBotDiv Dunno    = False
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
 defaultDmd :: Divergence -> Demand
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
 defaultDmd Dunno = absDmd
 defaultDmd _     = botDmd  -- Diverges
+=======
+defaultDmd Dunno    = absDmd
+defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultDmd ConOrDiv = absDmd
+defaultDmd Diverges = botDmd -- Diverges
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
 resTypeArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1093,10 +1235,18 @@ compute (dt_rhs `bothType` dt_scrut).
 We
  1. combine the information on the free variables,
  2. take the demand on arguments from the first argument
- 3. combine the termination results, but
- 4. take CPR info from the first argument.
+ 3. combine the termination results, as in bothDivergence.
 
-3 and 4 are implemented in bothDivergence.
+What should be the semantics of 'bothDivergence'? Note that we can only "fall
+through" from the left to the right argument when the left argument might
+converge. Similarly, the whole expression can only converge when /both/
+arguments can converge. Thus:
+- When the left argument 'isBotDiv': We return that result, because there is no
+  possibility to fall through to the second argument.
+- Otherwise, we return the 'lubDivergence', with a twist: If the right argument
+  also 'isBotDiv', we surely won't converge.
+
+
 -}
 
 -- Equality needed for fixpoints in GHC.Core.Op.DmdAnal
@@ -1173,8 +1323,8 @@ nopDmdType = DmdType emptyDmdEnv [] topDiv
 botDmdType = DmdType emptyDmdEnv [] botDiv
 
 isTopDmdType :: DmdType -> Bool
-isTopDmdType (DmdType env [] res)
-  | isTopDiv res && isEmptyVarEnv env = True
+isTopDmdType (DmdType env [] Dunno)
+  | isEmptyVarEnv env = True
 isTopDmdType _                        = False
 
 mkDmdType :: DmdEnv -> [Demand] -> Divergence -> DmdType
@@ -1212,22 +1362,6 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 -- free vars, so no need to add more!
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
-
--- When e is evaluated after executing an IO action, and d is e's demand, then
--- what of this demand should we consider, given that the IO action can cleanly
--- exit?
--- * We have to kill all strictness demands (i.e. lub with a lazy demand)
--- * We can keep usage information (i.e. lub with an absent demand)
--- * We have to kill definite divergence
--- * We can keep CPR information.
--- See Note [IO hack in the demand analyser] in GHC.Core.Op.DmdAnal
-deferAfterIO :: DmdType -> DmdType
-deferAfterIO d@(DmdType _ _ res) =
-    case d `lubDmdType` nopDmdType of
-        DmdType fv ds _ -> DmdType fv ds (defer_res res)
-  where
-  defer_res r@(Dunno {}) = r
-  defer_res _            = topDiv  -- Diverges
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
@@ -1410,7 +1544,7 @@ its demand is taken to be a result demand of the type.
     For the usage component, we use Absent.
 So we use either absDmd or botDmd.
 
-Also note the equations for lubDivergence (resp. bothDivergence) noted there.
+Also note the equation for lubDivergence noted there.
 
 Note [Always analyse in virgin pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2013,9 +2147,20 @@ instance Binary DmdType where
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
   put_ bh Diverges = putByte bh 1
+=======
+  put_ bh ExnOrDiv = putByte bh 1
+  put_ bh ConOrDiv = putByte bh 2
+  put_ bh Diverges = putByte bh 3
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
+<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
+=======
+                  1 -> return ExnOrDiv
+                  2 -> return ConOrDiv
+>>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
                   _ -> return Diverges }

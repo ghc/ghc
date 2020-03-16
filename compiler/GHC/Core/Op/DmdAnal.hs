@@ -222,14 +222,12 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
         scrut_dmd          = mkProdDmd id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty             = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
         bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
@@ -341,51 +339,8 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
 
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
-
-     case foo x s of { (# s', r #) -> y }
-
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
-
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
