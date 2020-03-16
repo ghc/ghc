@@ -132,6 +132,7 @@ import GHC.Platform
 import GHC.Types.Unique.Set
 import Util
 import GHC.Core.Ppr ( {- instances -} )
+import GHC.CmmToAsm.Config
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -1027,23 +1028,21 @@ isLocalCLabel this_mod lbl =
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-labelDynamic :: DynFlags -> Module -> CLabel -> Bool
-labelDynamic dflags this_mod lbl =
+labelDynamic :: NCGConfig -> Module -> CLabel -> Bool
+labelDynamic config this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
      externalDynamicRefs && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _ ->
-     isDynLinkName dflags this_mod n
+     externalDynamicRefs && isDynLinkName platform this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 ->
-       externalDynamicRefs && (this_pkg /= pkg)
-    | otherwise ->
-       gopt Opt_ExternalDynamicRefs dflags
+    | os == OSMinGW32 -> externalDynamicRefs && (this_pkg /= pkg)
+    | otherwise       -> externalDynamicRefs
 
    LocalBlockLabel _    -> False
 
@@ -1080,8 +1079,9 @@ labelDynamic dflags this_mod lbl =
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
   where
-    externalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-    os = platformOS (targetPlatform dflags)
+    externalDynamicRefs = ncgExternalDynamicRefs config
+    platform = ncgPlatform config
+    os = platformOS platform
     this_pkg = moduleUnitId this_mod
 
 

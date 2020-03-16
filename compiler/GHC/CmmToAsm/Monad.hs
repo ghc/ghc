@@ -148,18 +148,46 @@ mkNatM_State us delta dflags this_mod
 -- | Initialize the native code generator configuration from the DynFlags
 initConfig :: DynFlags -> NCGConfig
 initConfig dflags = NCGConfig
-   { ncgPlatform            = targetPlatform dflags
-   , ncgProcAlignment       = cmmProcAlignment dflags
-   , ncgDebugLevel          = debugLevel dflags
-   , ncgExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-   , ncgPIC                 = positionIndependent dflags
-   , ncgSplitSections       = gopt Opt_SplitSections dflags
-   , ncgSpillPreallocSize   = rESERVED_C_STACK_BYTES dflags
-   , ncgRegsIterative       = gopt Opt_RegsIterative dflags
-   , ncgAsmLinting          = gopt Opt_DoAsmLinting dflags
-   , ncgDumpRegAllocStages  = dopt Opt_D_dump_asm_regalloc_stages dflags
-   , ncgDumpAsmStats        = dopt Opt_D_dump_asm_stats dflags
-   , ncgDumpAsmConflicts    = dopt Opt_D_dump_asm_conflicts dflags
+   { ncgPlatform              = targetPlatform dflags
+   , ncgUnitId                = thisPackage dflags
+   , ncgProcAlignment         = cmmProcAlignment dflags
+   , ncgDebugLevel            = debugLevel dflags
+   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
+   , ncgPIC                   = positionIndependent dflags
+   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
+   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
+   , ncgSplitSections         = gopt Opt_SplitSections dflags
+   , ncgSpillPreallocSize     = rESERVED_C_STACK_BYTES dflags
+   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
+
+     -- With -O1 and greater, the cmmSink pass does constant-folding, so
+     -- we don't need to do it again in the native code generator.
+   , ncgDoConstantFolding     = optLevel dflags < 1
+
+   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
+   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
+   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
+   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
+                                 ArchX86_64 -> bmiVersion dflags
+                                 ArchX86    -> bmiVersion dflags
+                                 _          -> Nothing
+
+     -- We Assume  SSE1 and SSE2 operations are available on both
+     -- x86 and x86_64. Historically we didn't default to SSE2 and
+     -- SSE1 on x86, which results in defacto nondeterminism for how
+     -- rounding behaves in the associated x87 floating point instructions
+     -- because variations in the spill/fpu stack placement of arguments for
+     -- operations would change the precision and final result of what
+     -- would otherwise be the same expressions with respect to single or
+     -- double precision IEEE floating point computations.
+   , ncgSseVersion =
+      let v | sseVersion dflags < Just SSE2 = Just SSE2
+            | otherwise                     = sseVersion dflags
+      in case platformArch (targetPlatform dflags) of
+            ArchX86_64 -> v
+            ArchX86    -> v
+            _          -> Nothing
    }
 
 

@@ -104,26 +104,13 @@ is32BitPlatform = do
 
 sse2Enabled :: NatM Bool
 sse2Enabled = do
-  platform <- getPlatform
-  case platformArch platform of
-  -- We Assume  SSE1 and SSE2 operations are available on both
-  -- x86 and x86_64. Historically we didn't default to SSE2 and
-  -- SSE1 on x86, which results in defacto nondeterminism for how
-  -- rounding behaves in the associated x87 floating point instructions
-  -- because variations in the spill/fpu stack placement of arguments for
-  -- operations would change the precision and final result of what
-  -- would otherwise be the same expressions with respect to single or
-  -- double precision IEEE floating point computations.
-    ArchX86_64 -> return True
-    ArchX86    -> return True
-    _          -> panic "trying to generate x86/x86_64 on the wrong platform"
-
+  config <- getConfig
+  return (ncgSseVersion config >= Just SSE2)
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
-  dflags <- getDynFlags
-  return (isSse4_2Enabled dflags)
-
+  config <- getConfig
+  return (ncgSseVersion config >= Just SSE42)
 
 cmmTopCodeGen
         :: RawCmmDecl
@@ -1474,11 +1461,11 @@ memConstant :: Alignment -> CmmLit -> NatM Amode
 memConstant align lit = do
   lbl <- getNewLabelNat
   let rosection = Section ReadOnlyData lbl
-  dflags <- getDynFlags
+  config <- getConfig
   platform <- getPlatform
   (addr, addr_code) <- if target32Bit platform
                        then do dynRef <- cmmMakeDynamicReference
-                                             dflags
+                                             config
                                              DataReference
                                              lbl
                                Amode addr addr_code <- getAmode dynRef
@@ -2122,10 +2109,10 @@ genCCall is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
 
   | otherwise = do
     code_src <- getAnyReg src
-    platform <- ncgPlatform <$> getConfig
+    config <- getConfig
+    let platform = ncgPlatform config
     let dst_r = getRegisterReg platform (CmmLocal dst)
-    dflags <- getDynFlags
-    if isBmi2Enabled dflags
+    if ncgBmiVersion config >= Just BMI2
     then do
         src_r <- getNewRegNat (intFormat width)
         let instrs = appOL (code_src src_r) $ case width of
@@ -2158,13 +2145,13 @@ genCCall is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
     bw = widthInBits width
 
 genCCall bits mop dst args bid = do
-  dflags <- getDynFlags
-  instr <- genCCall' dflags bits mop dst args bid
+  config <- getConfig
+  instr <- genCCall' config bits mop dst args bid
   return (instr, Nothing)
 
 -- genCCall' handles cases not introducing new code blocks.
 genCCall'
-    :: DynFlags
+    :: NCGConfig
     -> Bool                     -- 32 bit platform?
     -> ForeignTarget            -- function to call
     -> [CmmFormal]        -- where to put the result
@@ -2174,9 +2161,9 @@ genCCall'
 
 -- Unroll memcpy calls if the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
+genCCall' config _ (PrimTarget (MO_Memcpy align)) _
          [dst, src, CmmLit (CmmInt n _)] _
-    | fromInteger insns <= maxInlineMemcpyInsns dflags = do
+    | fromInteger insns <= ncgInlineThresholdMemcpy config = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
         code_src <- getAnyReg src
@@ -2185,7 +2172,7 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
             go dst_r src_r tmp_r (fromInteger n)
   where
-    platform = targetPlatform dflags
+    platform = ncgPlatform config
     -- The number of instructions we will generate (approx). We need 2
     -- instructions per move.
     insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
@@ -2224,12 +2211,12 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall' dflags _ (PrimTarget (MO_Memset align)) _
+genCCall' config _ (PrimTarget (MO_Memset align)) _
          [dst,
           CmmLit (CmmInt c _),
           CmmLit (CmmInt n _)]
          _
-    | fromInteger insns <= maxInlineMemsetInsns dflags = do
+    | fromInteger insns <= ncgInlineThresholdMemset config = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
         if format == II64 && n >= 8 then do
@@ -2242,7 +2229,7 @@ genCCall' dflags _ (PrimTarget (MO_Memset align)) _
           return $ code_dst dst_r `appOL`
                    go4 dst_r (fromInteger n)
   where
-    platform = targetPlatform dflags
+    platform = ncgPlatform config
     maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment
@@ -2348,10 +2335,10 @@ genCCall' _ is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] _ = do
   where
     format = intFormat width
 
-genCCall' dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
+genCCall' config is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] bid = do
     sse4_2 <- sse4_2Enabled
-    platform <- ncgPlatform <$> getConfig
+    let platform = ncgPlatform config
     if sse4_2
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat format
@@ -2369,20 +2356,20 @@ genCCall' dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
                          unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
                      else nilOL)
         else do
-            targetExpr <- cmmMakeDynamicReference dflags
+            targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
                                                            CmmMayReturn)
-            genCCall' dflags is32Bit target dest_regs args bid
+            genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
 
-genCCall' dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
+genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
          args@[src, mask] bid = do
-    platform <- ncgPlatform <$> getConfig
-    if isBmi2Enabled dflags
+    let platform = ncgPlatform config
+    if ncgBmiVersion config >= Just BMI2
         then do code_src  <- getAnyReg src
                 code_mask <- getAnyReg mask
                 src_r     <- getNewRegNat format
@@ -2402,20 +2389,20 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
                          unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
                      else nilOL)
         else do
-            targetExpr <- cmmMakeDynamicReference dflags
+            targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
                                                            CmmMayReturn)
-            genCCall' dflags is32Bit target dest_regs args bid
+            genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
 
-genCCall' dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
+genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
          args@[src, mask] bid = do
-    platform <- ncgPlatform <$> getConfig
-    if isBmi2Enabled dflags
+    let platform = ncgPlatform config
+    if ncgBmiVersion config >= Just BMI2
         then do code_src  <- getAnyReg src
                 code_mask <- getAnyReg mask
                 src_r     <- getNewRegNat format
@@ -2435,30 +2422,31 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
                          unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
                      else nilOL)
         else do
-            targetExpr <- cmmMakeDynamicReference dflags
+            targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
                                                            CmmMayReturn)
-            genCCall' dflags is32Bit target dest_regs args bid
+            genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
 
-genCCall' dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
+genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
   | is32Bit && width == W64 = do
     -- Fallback to `hs_clz64` on i386
-    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+    targetExpr <- cmmMakeDynamicReference config CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
                                            CmmMayReturn)
-    genCCall' dflags is32Bit target dest_regs args bid
+    genCCall' config is32Bit target dest_regs args bid
 
   | otherwise = do
     code_src <- getAnyReg src
-    platform <- ncgPlatform <$> getConfig
+    config <- getConfig
+    let platform = ncgPlatform config
     let dst_r = getRegisterReg platform (CmmLocal dst)
-    if isBmi2Enabled dflags
+    if ncgBmiVersion config >= Just BMI2
         then do
             src_r <- getNewRegNat (intFormat width)
             return $ appOL (code_src src_r) $ case width of
@@ -2489,13 +2477,13 @@ genCCall' dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     bw = widthInBits width
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
-genCCall' dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
-    targetExpr <- cmmMakeDynamicReference dflags
+genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
+    targetExpr <- cmmMakeDynamicReference config
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
                                            CmmMayReturn)
-    genCCall' dflags is32Bit target dest_regs args bid
+    genCCall' config is32Bit target dest_regs args bid
   where
     lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
 
@@ -3142,8 +3130,8 @@ outOfLineCmmOp :: BlockId -> CallishMachOp -> Maybe CmmFormal -> [CmmActual]
                -> NatM InstrBlock
 outOfLineCmmOp bid mop res args
   = do
-      dflags <- getDynFlags
-      targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+      config <- getConfig
+      targetExpr <- cmmMakeDynamicReference config CallReference lbl
       let target = ForeignTarget targetExpr
                            (ForeignConvention CCallConv [] [] CmmMayReturn)
 
@@ -3252,7 +3240,6 @@ genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
 
 genSwitch expr targets = do
   config <- getConfig
-  dflags <- getDynFlags
   let platform = ncgPlatform config
   if ncgPIC config
   then do
@@ -3272,7 +3259,7 @@ genSwitch expr targets = do
               -- if L0 is not preceded by a non-anonymous label in its section.
               OSDarwin | not is32bit -> Section Text lbl
               _ -> Section ReadOnlyData lbl
-        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+        dynRef <- cmmMakeDynamicReference config DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))

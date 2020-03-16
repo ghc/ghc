@@ -53,7 +53,6 @@ import GHC.CmmToAsm.CPrim
 
 -- The rest:
 import GHC.Types.Basic
-import GHC.Driver.Session
 import FastString
 import OrdList
 import Outputable
@@ -455,7 +454,7 @@ genCCall target dest_regs args
         let transfer_code
                 = toOL (move_final vregs allArgRegs extraStackArgsHere)
 
-        dflags <- getDynFlags
+        platform <- getPlatform
         return
          $      argcode                 `appOL`
                 move_sp_down            `appOL`
@@ -463,7 +462,7 @@ genCCall target dest_regs args
                 callinsns               `appOL`
                 unitOL NOP              `appOL`
                 move_sp_up              `appOL`
-                assign_code (targetPlatform dflags) dest_regs
+                assign_code platform dest_regs
 
 
 -- | Generate code to calculate an argument, and move it into one
@@ -594,8 +593,8 @@ outOfLineMachOp mop
  = do   let functionName
                 = outOfLineMachOp_table mop
 
-        dflags  <- getDynFlags
-        mopExpr <- cmmMakeDynamicReference dflags CallReference
+        config  <- getConfig
+        mopExpr <- cmmMakeDynamicReference config CallReference
                 $  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 
         let mopLabelOrExpr
