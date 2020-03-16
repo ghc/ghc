@@ -1245,7 +1245,7 @@ mkPrimOpId prim_op
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr
-      | isBotDiv (snd (splitStrictSig strict_sig)) = botCpr
+      | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
       | otherwise                                  = topCpr
 
     info = noCafIdInfo
@@ -1371,8 +1371,9 @@ noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineI
 proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
-       (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
-                    `setNeverLevPoly`  ty )
+       (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding -- Note [evaldUnfoldings]
+                    `setNeverLevPoly`   ty
+                    `setStrictnessInfo` nopSig)
   where
     -- proxy# :: forall {k} (a:k). Proxy# k a
     --
@@ -1393,6 +1394,7 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
                        `setNeverLevPoly`   addrPrimTy
+                       `setStrictnessInfo` nopSig
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
@@ -1698,14 +1700,16 @@ inlined.
 
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
-                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
-                                  `setOneShotInfo` stateHackOneShot
-                                  `setNeverLevPoly` realWorldStatePrimTy)
+                     (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding    -- Note [evaldUnfoldings]
+                                  `setOneShotInfo`    stateHackOneShot
+                                  `setNeverLevPoly`   realWorldStatePrimTy
+                                  `setStrictnessInfo` nopSig)
 
 voidPrimId :: Id     -- Global constant :: Void#
 voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
-                (noCafIdInfo `setUnfoldingInfo` evaldUnfolding     -- Note [evaldUnfoldings]
-                             `setNeverLevPoly`  voidPrimTy)
+                (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding     -- Note [evaldUnfoldings]
+                             `setNeverLevPoly`   voidPrimTy
+                             `setStrictnessInfo` nopSig)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
