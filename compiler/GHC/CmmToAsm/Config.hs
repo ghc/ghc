@@ -9,21 +9,25 @@ where
 import GhcPrelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
+import Module
 
 -- | Native code generator configuration
 data NCGConfig = NCGConfig
-   { ncgPlatform            :: !Platform    -- ^ Target platform
-   , ncgProcAlignment       :: !(Maybe Int) -- ^ Mandatory proc alignment
-   , ncgDebugLevel          :: !Int         -- ^ Debug level
-   , ncgExternalDynamicRefs :: !Bool        -- ^ Generate code to link against dynamic libraries
-   , ncgPIC                 :: !Bool        -- ^ Enable Position-Independent Code
-   , ncgSplitSections       :: !Bool        -- ^ Split sections
-   , ncgSpillPreallocSize   :: !Int         -- ^ Size in bytes of the pre-allocated spill space on the C stack
-   , ncgRegsIterative       :: !Bool
-   , ncgAsmLinting          :: !Bool        -- ^ Perform ASM linting pass
-   , ncgDumpRegAllocStages  :: !Bool
-   , ncgDumpAsmStats        :: !Bool
-   , ncgDumpAsmConflicts    :: !Bool
+   { ncgPlatform              :: !Platform    -- ^ Target platform
+   , ncgUnitId                :: UnitId       -- ^ Target unit ID
+   , ncgProcAlignment         :: !(Maybe Int) -- ^ Mandatory proc alignment
+   , ncgDebugLevel            :: !Int         -- ^ Debug level
+   , ncgExternalDynamicRefs   :: !Bool        -- ^ Generate code to link against dynamic libraries
+   , ncgPIC                   :: !Bool        -- ^ Enable Position-Independent Code
+   , ncgInlineThresholdMemcpy :: !Word        -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
+   , ncgInlineThresholdMemset :: !Word        -- ^ Ditto for `memset`
+   , ncgSplitSections         :: !Bool        -- ^ Split sections
+   , ncgSpillPreallocSize     :: !Int         -- ^ Size in bytes of the pre-allocated spill space on the C stack
+   , ncgRegsIterative         :: !Bool
+   , ncgAsmLinting            :: !Bool        -- ^ Perform ASM linting pass
+   , ncgDumpRegAllocStages    :: !Bool
+   , ncgDumpAsmStats          :: !Bool
+   , ncgDumpAsmConflicts      :: !Bool
    }
 
 -- | Return Word size
