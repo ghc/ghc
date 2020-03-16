@@ -178,7 +178,7 @@ module GHC (
         isRecordSelector,
         isPrimOpId, isFCallId, isClassOpId_maybe,
         isDataConWorkId, idDataCon,
-        isBottomingId, isDictonaryId,
+        isDeadEndId, isDictonaryId,
         recordSelectorTyCon,
 
         -- ** Type constructors
