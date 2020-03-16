@@ -158,8 +158,8 @@ libCaseBind env (Rec pairs)
                                    Let (Rec dup_pairs) (Var unitDataConId)
 
     ok_pair (id,_)
-        =  idArity id > 0          -- Note [Only functions!]
-        && not (isBottomingId id)  -- Note [Not bottoming ids]
+        =  idArity id > 0       -- Note [Only functions!]
+        && not (isDeadEndId id) -- Note [Not bottoming ids]
 
 {- Note [Not bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
