@@ -75,14 +75,14 @@ llvmCodeGen dflags h cmm_stream
 
        -- run code generation
        a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
-         llvmCodeGen' (liftStream cmm_stream)
+         llvmCodeGen' dflags (liftStream cmm_stream)
 
        bFlush bufh
 
        return a
 
-llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup a -> LlvmM a
-llvmCodeGen' cmm_stream
+llvmCodeGen' :: DynFlags -> Stream.Stream LlvmM RawCmmGroup a -> LlvmM a
+llvmCodeGen' dflags cmm_stream
   = do  -- Preamble
         renderLlvm header
         ghcInternalFunctions
@@ -100,19 +100,19 @@ llvmCodeGen' cmm_stream
         return a
   where
     header :: SDoc
-    header = sdocWithDynFlags $ \dflags ->
+    header =
       let target = platformMisc_llvmTarget $ platformMisc dflags
-      in     text ("target datalayout = \"" ++ getDataLayout dflags target ++ "\"")
+      in     text ("target datalayout = \"" ++ getDataLayout (llvmConfig dflags) target ++ "\"")
          $+$ text ("target triple = \"" ++ target ++ "\"")
 
-    getDataLayout :: DynFlags -> String -> String
-    getDataLayout dflags target =
-      case lookup target (llvmTargets $ llvmConfig dflags) of
+    getDataLayout :: LlvmConfig -> String -> String
+    getDataLayout config target =
+      case lookup target (llvmTargets config) of
         Just (LlvmTarget {lDataLayout=dl}) -> dl
         Nothing -> pprPanic "Failed to lookup LLVM data layout" $
                    text "Target:" <+> text target $$
                    hang (text "Available targets:") 4
-                        (vcat $ map (text . fst) $ llvmTargets $ llvmConfig dflags)
+                        (vcat $ map (text . fst) $ llvmTargets config)
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do
