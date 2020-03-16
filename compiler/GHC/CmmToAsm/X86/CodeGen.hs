@@ -2158,13 +2158,13 @@ genCCall is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
     bw = widthInBits width
 
 genCCall bits mop dst args bid = do
-  dflags <- getDynFlags
-  instr <- genCCall' dflags bits mop dst args bid
+  config <- getConfig
+  instr <- genCCall' config bits mop dst args bid
   return (instr, Nothing)
 
 -- genCCall' handles cases not introducing new code blocks.
 genCCall'
-    :: DynFlags
+    :: NCGConfig
     -> Bool                     -- 32 bit platform?
     -> ForeignTarget            -- function to call
     -> [CmmFormal]        -- where to put the result
@@ -2174,9 +2174,9 @@ genCCall'
 
 -- Unroll memcpy calls if the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
+genCCall' config _ (PrimTarget (MO_Memcpy align)) _
          [dst, src, CmmLit (CmmInt n _)] _
-    | fromInteger insns <= maxInlineMemcpyInsns dflags = do
+    | fromInteger insns <= ncgInlineThresholdMemcpy config = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
         code_src <- getAnyReg src
@@ -2185,7 +2185,7 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
             go dst_r src_r tmp_r (fromInteger n)
   where
-    platform = targetPlatform dflags
+    platform = ncgPlatform config
     -- The number of instructions we will generate (approx). We need 2
     -- instructions per move.
     insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
@@ -2224,12 +2224,12 @@ genCCall' dflags _ (PrimTarget (MO_Memcpy align)) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall' dflags _ (PrimTarget (MO_Memset align)) _
+genCCall' config _ (PrimTarget (MO_Memset align)) _
          [dst,
           CmmLit (CmmInt c _),
           CmmLit (CmmInt n _)]
          _
-    | fromInteger insns <= maxInlineMemsetInsns dflags = do
+    | fromInteger insns <= ncgInlineThresholdMemset config = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat format
         if format == II64 && n >= 8 then do
@@ -2242,7 +2242,7 @@ genCCall' dflags _ (PrimTarget (MO_Memset align)) _
           return $ code_dst dst_r `appOL`
                    go4 dst_r (fromInteger n)
   where
-    platform = targetPlatform dflags
+    platform = targetPlatform config
     maxAlignment = wordAlignment platform -- only machine word wide MOVs are supported
     effectiveAlignment = min (alignmentOf align) maxAlignment
     format = intFormat . widthFromBytes $ alignmentBytes effectiveAlignment

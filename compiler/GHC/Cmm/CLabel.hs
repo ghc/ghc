@@ -1030,15 +1030,13 @@ labelDynamic dflags this_mod lbl =
      externalDynamicRefs && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _ ->
-     isDynLinkName dflags this_mod n
+     externalDynamicRefs && isDynLinkName platform this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 ->
-       externalDynamicRefs && (this_pkg /= pkg)
-    | otherwise ->
-       gopt Opt_ExternalDynamicRefs dflags
+    | os == OSMinGW32 -> externalDynamicRefs && (this_pkg /= pkg)
+    | otherwise       -> externalDynamicRefs
 
    LocalBlockLabel _    -> False
 
@@ -1076,7 +1074,8 @@ labelDynamic dflags this_mod lbl =
    _                 -> False
   where
     externalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-    os = platformOS (targetPlatform dflags)
+    platform = targetPlatform dflags
+    os = platformOS platform
     this_pkg = moduleUnitId this_mod
 
 
