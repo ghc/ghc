@@ -518,9 +518,9 @@ printForC dflags handle doc =
 
 -- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
 -- outputs to a 'BufHandle'.
-bufLeftRenderSDoc :: DynFlags -> BufHandle -> PprStyle -> SDoc -> IO ()
-bufLeftRenderSDoc dflags bufHandle sty doc =
-  Pretty.bufLeftRender bufHandle (runSDoc doc (initSDocContext dflags sty))
+bufLeftRenderSDoc :: SDocContext -> BufHandle -> SDoc -> IO ()
+bufLeftRenderSDoc ctx bufHandle doc =
+  Pretty.bufLeftRender bufHandle (runSDoc doc ctx)
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
