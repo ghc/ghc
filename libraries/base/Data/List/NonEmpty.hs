@@ -170,6 +170,8 @@ init :: NonEmpty a -> [a]
 init ~(a :| as) = List.init (a : as)
 
 -- | Construct a 'NonEmpty' list from a single element.
+--
+-- @since 4.15
 singleton :: a -> NonEmpty a
 singleton a = a :| []
 
