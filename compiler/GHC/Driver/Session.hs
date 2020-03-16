@@ -5054,13 +5054,6 @@ setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
 
-data SseVersion = SSE1
-                | SSE2
-                | SSE3
-                | SSE4
-                | SSE42
-                deriving (Eq, Ord)
-
 isSseEnabled :: DynFlags -> Bool
 isSseEnabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> True
@@ -5105,10 +5098,6 @@ isAvx512pfEnabled dflags = avx512pf dflags
 
 -- -----------------------------------------------------------------------------
 -- BMI2
-
-data BmiVersion = BMI1
-                | BMI2
-                deriving (Eq, Ord)
 
 isBmiEnabled :: DynFlags -> Bool
 isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
