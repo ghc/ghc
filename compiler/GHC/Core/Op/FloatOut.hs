@@ -20,7 +20,7 @@ import GHC.Core.Op.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
 import ErrUtils          ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Types.Id      ( Id, idArity, idType, isBottomingId,
+import GHC.Types.Id      ( Id, idArity, idType, isDeadEndId,
                            isJoinId, isJoinId_maybe )
 import GHC.Core.Op.SetLevels
 import GHC.Types.Unique.Supply ( UniqSupply )
@@ -221,7 +221,7 @@ floatBind (NonRec (TB var _) rhs)
 
         -- A tiresome hack:
         -- see Note [Bottoming floats: eta expansion] in GHC.Core.Op.SetLevels
-    let rhs'' | isBottomingId var = etaExpand (idArity var) rhs'
+    let rhs'' | isDeadEndId var   = etaExpand (idArity var) rhs'
               | otherwise         = rhs'
 
     in (fs, rhs_floats, [NonRec var rhs'']) }

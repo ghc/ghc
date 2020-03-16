@@ -2,7 +2,9 @@
 -- But it won't if the strictness analyser thinks that 'len' is use
 -- strictly, which was the case in GHC 6.0
 
--- See the io_hack_reqd in GHC.Core.Op.DmdAnal
+-- See Note [Precise exceptions and strictness analysis] in GHC.Types.Demand
+-- This is similar to T17676, but with an extra putStrLn.
+-- See also #148, #1592.
 
 module Main where
 

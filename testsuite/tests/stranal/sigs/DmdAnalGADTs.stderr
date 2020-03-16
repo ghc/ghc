@@ -1,15 +1,15 @@
 
 ==================== Strictness signatures ====================
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
+DmdAnalGADTs.$tc'A: c
+DmdAnalGADTs.$tc'B: c
+DmdAnalGADTs.$tcD: c
+DmdAnalGADTs.$trModule: c
 DmdAnalGADTs.diverges: b
-DmdAnalGADTs.f: <S,1*U>
-DmdAnalGADTs.f': <S,1*U>
-DmdAnalGADTs.g: <S,1*U>
-DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U>
+DmdAnalGADTs.f: <S,1*U>c
+DmdAnalGADTs.f': <S,1*U>c
+DmdAnalGADTs.g: <S,1*U>c
+DmdAnalGADTs.hasCPR: c
+DmdAnalGADTs.hasStrSig: <S,1*U>c
 
 
 
@@ -28,15 +28,15 @@ DmdAnalGADTs.hasStrSig:
 
 
 ==================== Strictness signatures ====================
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
+DmdAnalGADTs.$tc'A: c
+DmdAnalGADTs.$tc'B: c
+DmdAnalGADTs.$tcD: c
+DmdAnalGADTs.$trModule: c
 DmdAnalGADTs.diverges: b
-DmdAnalGADTs.f: <S,1*U>
-DmdAnalGADTs.f': <S,1*U>
-DmdAnalGADTs.g: <S,1*U>
-DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U>
+DmdAnalGADTs.f: <S,1*U>c
+DmdAnalGADTs.f': <S,1*U>c
+DmdAnalGADTs.g: <S,1*U>c
+DmdAnalGADTs.hasCPR: c
+DmdAnalGADTs.hasStrSig: <S,1*U>c
 
 

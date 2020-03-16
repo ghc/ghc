@@ -39,7 +39,7 @@ import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
-import GHC.Types.Demand( etaExpandStrictSig )
+import GHC.Types.Demand( etaConvertStrictSig )
 import GHC.Core.Coercion.Opt ( optCoercion )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -764,7 +764,7 @@ joinPointBinding_maybe bndr rhs
   , let str_sig   = idStrictness bndr
         str_arity = count isId bndrs  -- Strictness demands are for Ids only
         join_bndr = bndr `asJoinId`        join_arity
-                         `setIdStrictness` etaExpandStrictSig str_arity str_sig
+                         `setIdStrictness` etaConvertStrictSig str_arity str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise

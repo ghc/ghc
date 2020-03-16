@@ -70,7 +70,7 @@ module GHC.Types.Id (
         isDataConWrapId, isDataConWrapId_maybe,
         isDataConId_maybe,
         idDataCon,
-        isConLikeId, isBottomingId, idIsFrom,
+        isConLikeId, isDeadEndId, idIsFrom,
         hasNoBinding,
 
         -- ** Join variables
@@ -637,10 +637,11 @@ setIdCallArity id arity = modifyIdInfo (`setCallArityInfo` arity) id
 idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 
--- | Returns true if an application to n args would diverge
-isBottomingId :: Var -> Bool
-isBottomingId v
-  | isId v    = isBottomingSig (idStrictness v)
+-- | Returns true if an application to n args diverges or throws an exception
+-- (a "dead end", see 'Demand.isDeadEndSig'/'Demand.isDeadEndDiv').
+isDeadEndId :: Var -> Bool
+isDeadEndId v
+  | isId v    = isDeadEndSig (idStrictness v)
   | otherwise = False
 
 -- | Accesses the 'Id''s 'strictnessInfo'.
@@ -657,7 +658,7 @@ setIdCprInfo :: Id -> CprSig -> Id
 setIdCprInfo id sig = modifyIdInfo (\info -> setCprInfo info sig) id
 
 zapIdStrictness :: Id -> Id
-zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
+zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` emptySig topDiv) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (i.e an
@@ -958,7 +959,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     new_occ_info    = zapOccTailCallInfo old_occ_info
 
     old_strictness  = strictnessInfo old_info
-    new_strictness  = increaseStrictSigArity arity_increase old_strictness
+    new_strictness  = prependArgsStrictSig arity_increase old_strictness
     old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity

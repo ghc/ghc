@@ -1,8 +1,8 @@
 
 ==================== Strictness signatures ====================
-BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: <S(S),1*U(U)>
-BottomFromInnerLambda.f: <S(S),1*U(U)>
+BottomFromInnerLambda.$trModule: c
+BottomFromInnerLambda.expensive: <S(S),1*U(U)>c
+BottomFromInnerLambda.f: <S(S),1*U(U)>c
 
 
 
@@ -14,8 +14,8 @@ BottomFromInnerLambda.f:
 
 
 ==================== Strictness signatures ====================
-BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: <S(S),1*U(1*U)>
-BottomFromInnerLambda.f: <S(S),1*U(1*U)>
+BottomFromInnerLambda.$trModule: c
+BottomFromInnerLambda.expensive: <S(S),1*U(1*U)>c
+BottomFromInnerLambda.f: <S(S),1*U(1*U)>c
 
 

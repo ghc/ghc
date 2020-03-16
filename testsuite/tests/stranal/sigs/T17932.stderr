@@ -1,11 +1,11 @@
 
 ==================== Strictness signatures ====================
-T17932.$tc'Options:
-T17932.$tc'X:
-T17932.$tcOptions:
-T17932.$tcX:
-T17932.$trModule:
-T17932.flags: <S(SS),1*U(1*U,1*U)>
+T17932.$tc'Options: c
+T17932.$tc'X: c
+T17932.$tcOptions: c
+T17932.$tcX: c
+T17932.$trModule: c
+T17932.flags: <S(SS),1*U(1*U,1*U)>c
 
 
 
@@ -20,11 +20,11 @@ T17932.flags:
 
 
 ==================== Strictness signatures ====================
-T17932.$tc'Options:
-T17932.$tc'X:
-T17932.$tcOptions:
-T17932.$tcX:
-T17932.$trModule:
-T17932.flags: <S(SS),1*U(1*U,1*U)>
+T17932.$tc'Options: c
+T17932.$tc'X: c
+T17932.$tcOptions: c
+T17932.$tcX: c
+T17932.$trModule: c
+T17932.flags: <S(SS),1*U(1*U,1*U)>c
 
 
