@@ -72,7 +72,7 @@ defaults
    can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
-   strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topDiv }
+   strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) conDiv }
    fixity           = Nothing
    llvm_only        = False
    vector           = []
@@ -2584,7 +2584,7 @@ primop  CatchOp "catch#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
-                                                 , topDmd] topDiv }
+                                                 , topDmd] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2595,11 +2595,14 @@ primop  RaiseOp "raise#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   has_side_effects = True
-     -- raise# certainly throws a Haskell exception and hence has_side_effects
-     -- It doesn't actually make much difference because the fact that it
-     -- returns bottom independently ensures that we are careful not to discard
-     -- it.  But still, it's better to say the Right Thing.
+   can_fail = True
+     -- In contrast to 'raiseIO#', which throws a *precise* exception,
+     -- exceptions thrown by 'raise#' are considered *imprecise*.
+     -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
+     -- Hence 'raise#' is marked as "can_fail" (which 'raiseIO#' is not), but
+     -- not as "has_side_effects" (which 'raiseIO#' is).
+     -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
+     -- For the same reasons, it has 'botDiv', not 'exnDiv'.
 
 -- Note [Arithmetic exception primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2648,8 +2651,8 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
    -- See Note [Precise exceptions and strictness analysis] in Demand.hs
-   -- for why we give it topDiv
-   -- strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] topDiv }
+   -- for why this is the *only* primop that has 'exnDiv'
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2657,7 +2660,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2666,7 +2669,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] conDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2674,7 +2677,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2695,7 +2698,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2724,7 +2727,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
-                                                 , topDmd ] topDiv }
+                                                 , topDmd ] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2736,7 +2739,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
-                                                 , topDmd ] topDiv }
+                                                 , topDmd ] conDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -3261,7 +3264,7 @@ section "Tag to enum stuff"
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#  -- Zero-indexed; the first constructor has tag zero
    with
-   strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topDiv }
+   strictness = { \ _arity -> mkClosedStrictSig [evalDmd] conDiv }
    -- See Note [dataToTag# magic] in GHC.Core.Op.ConstantFold
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
@@ -3777,7 +3780,7 @@ primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
 
 primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] conDiv }
         has_side_effects =  True
 ----
 
@@ -3795,7 +3798,7 @@ primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
 
 primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
    a ->  State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] conDiv }
         has_side_effects =  True
 ----
 
@@ -3813,7 +3816,7 @@ primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
 
 primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] conDiv }
         has_side_effects =  True
 ----
 
@@ -3831,7 +3834,7 @@ primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
 
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
+   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] conDiv }
         has_side_effects =  True
 
 ------------------------------------------------------------------------

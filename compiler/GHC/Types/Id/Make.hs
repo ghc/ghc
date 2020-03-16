@@ -442,7 +442,7 @@ mkDictSelId name clas
         -- It's worth giving one, so that absence info etc is generated
         -- even if the selector isn't inlined
 
-    strict_sig = mkClosedStrictSig [arg_dmd] topDiv
+    strict_sig = mkClosedStrictSig [arg_dmd] conDiv
     arg_dmd | new_tycon = evalDmd
             | otherwise = mkManyUsedDmd $
                           mkProdDmd [ if name == sel_name then evalDmd else absDmd
@@ -518,7 +518,7 @@ mkDataConWorkId wkr_name data_con
                      -- setNeverLevPoly
 
     wkr_arity = dataConRepArity data_con
-    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) topDiv
+    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) conDiv
         --      Note [Data-con worker strictness]
         -- Notice that we do *not* say the worker Id is strict
         -- even if the data constructor is declared strict
@@ -663,7 +663,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                              -- so it not make sure that the CAF info is sane
                          `setLevityInfoWithType` wrap_ty
 
-             wrap_sig = mkClosedStrictSig wrap_arg_dmds topDiv
+             wrap_sig = mkClosedStrictSig wrap_arg_dmds conDiv
 
              wrap_arg_dmds =
                replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
@@ -1227,7 +1227,7 @@ mkPrimOpId prim_op
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr
-      | isBotDiv (snd (splitStrictSig strict_sig)) = botCpr
+      | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
       | otherwise                                  = topCpr
 
     info = noCafIdInfo
@@ -1272,7 +1272,7 @@ mkFCallId dflags uniq fcall ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedStrictSig (replicate arity topDmd) topDiv
+    strict_sig = mkClosedStrictSig (replicate arity topDmd) conDiv
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See #11076.
@@ -1353,8 +1353,9 @@ noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineI
 proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
-       (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
-                    `setNeverLevPoly`  ty )
+       (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding -- Note [evaldUnfoldings]
+                    `setNeverLevPoly`   ty
+                    `setStrictnessInfo` emptySig conDiv)
   where
     -- proxy# :: forall {k} (a:k). Proxy# k a
     --
@@ -1375,6 +1376,7 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
                        `setNeverLevPoly`   addrPrimTy
+                       `setStrictnessInfo` emptySig conDiv
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
@@ -1680,14 +1682,16 @@ inlined.
 
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
-                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
-                                  `setOneShotInfo` stateHackOneShot
-                                  `setNeverLevPoly` realWorldStatePrimTy)
+                     (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding    -- Note [evaldUnfoldings]
+                                  `setOneShotInfo`    stateHackOneShot
+                                  `setNeverLevPoly`   realWorldStatePrimTy
+                                  `setStrictnessInfo` emptySig conDiv)
 
 voidPrimId :: Id     -- Global constant :: Void#
 voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
-                (noCafIdInfo `setUnfoldingInfo` evaldUnfolding     -- Note [evaldUnfoldings]
-                             `setNeverLevPoly`  voidPrimTy)
+                (noCafIdInfo `setUnfoldingInfo`  evaldUnfolding     -- Note [evaldUnfoldings]
+                             `setNeverLevPoly`   voidPrimTy
+                             `setStrictnessInfo` emptySig conDiv)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy

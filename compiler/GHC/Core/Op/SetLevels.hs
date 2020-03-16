@@ -87,7 +87,7 @@ import GHC.Types.Unique.Set   ( nonDetFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, prependArgsStrictSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
@@ -293,7 +293,7 @@ lvlTopBind env (Rec pairs)
 lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr -> LvlM LevelledExpr
 lvl_top env is_rec bndr rhs
   = lvlRhs env is_rec
-           (isBottomingId bndr)
+           (isDeadEndId bndr)
            Nothing  -- Not a join point
            (freeVars rhs)
 
@@ -983,7 +983,7 @@ annotateBotStr id n_extra mb_str
   = case mb_str of
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
-                              `setIdStrictness` (increaseStrictSigArity n_extra sig)
+                              `setIdStrictness` (prependArgsStrictSig n_extra sig)
                               `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
