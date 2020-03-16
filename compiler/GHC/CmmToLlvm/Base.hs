@@ -447,8 +447,8 @@ renderLlvm sdoc = do
     -- Write to output
     dflags <- getDynFlags
     out <- getEnv envOutput
-    liftIO $ Outp.bufLeftRenderSDoc dflags out
-               (Outp.mkCodeStyle Outp.CStyle) sdoc
+    let ctx = initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle)
+    liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
 
     -- Dump, if requested
     dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" FormatLLVM sdoc
