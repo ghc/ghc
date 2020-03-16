@@ -39,7 +39,7 @@ import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( tidyTopType )
-import GHC.Types.Demand  ( appIsBottom, isTopSig, isBottomingSig )
+import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
@@ -726,7 +726,7 @@ addExternal omit_prags expose_all id
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
+    bottoming_fn   = isDeadEndSig (strictnessInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1229,7 +1229,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False
-                                  Just (arity, _) -> not (appIsBottom id_sig arity)
+                                  Just (arity, _) -> not (appIsDeadEnd id_sig arity)
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
