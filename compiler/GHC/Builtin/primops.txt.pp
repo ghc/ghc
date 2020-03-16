@@ -2567,14 +2567,17 @@ section "Exceptions"
 ------------------------------------------------------------------------
 
 -- Note [Strictness for mask/unmask/catch]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Consider this example, which comes from GHC.IO.Handle.Internals:
 --    wantReadableHandle3 f ma b st
 --      = case ... of
 --          DEFAULT -> case ma of MVar a -> ...
---          0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
+--          0#      -> maskAsyncExceptions# (\st -> case ma of MVar a -> ...)
 -- The outer case just decides whether to mask exceptions, but we don't want
--- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
+-- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd
+-- in mask and unmask. But catch really is lazy in its first argument, see
+-- #11555. So for IO actions 'ma' we often use a wrapper around it that is
+-- head-strict in 'ma': GHC.IO.catchException.
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
@@ -2593,13 +2596,16 @@ primop  RaiseOp "raise#" GenPrimOp
    b -> o
       -- NB: the type variable "o" is "a", but with OpenKind
    with
+   -- In contrast to 'raiseIO#', which throws a *precise* exception,
+   -- exceptions thrown by 'raise#' are considered *imprecise*.
+   -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
+   -- Hence, it has 'botDiv', not 'exnDiv'.
+   -- For the same reasons, 'raise#' is marked as "can_fail" (which 'raiseIO#'
+   -- is not), but not as "has_side_effects" (which 'raiseIO#' is).
+   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   has_side_effects = True
-     -- raise# certainly throws a Haskell exception and hence has_side_effects
-     -- It doesn't actually make much difference because the fact that it
-     -- returns bottom independently ensures that we are careful not to discard
-     -- it.  But still, it's better to say the Right Thing.
+   can_fail = True
 
 -- Note [Arithmetic exception primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2648,8 +2654,8 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
    -- See Note [Precise exceptions and strictness analysis] in Demand.hs
-   -- for why we give it topDiv
-   -- strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] topDiv }
+   -- for why this is the *only* primop that has 'exnDiv'
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnDiv }
    out_of_line = True
    has_side_effects = True
 
