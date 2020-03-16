@@ -33,7 +33,7 @@ import GHC.CmmToAsm.CPrim
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat
    , getBlockIdNat, getPicBaseNat, getNewRegPairNat
-   , getPicBaseMaybeNat, getPlatform, initConfig
+   , getPicBaseMaybeNat, getPlatform, getConfig
    )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -57,7 +57,6 @@ import GHC.Cmm.Dataflow.Graph
 -- The rest:
 import OrdList
 import Outputable
-import GHC.Driver.Session
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Bits
@@ -149,7 +148,7 @@ stmtsToInstrs stmts
 
 stmtToInstrs :: CmmNode e x -> NatM InstrBlock
 stmtToInstrs stmt = do
-  dflags <- getDynFlags
+  config <- getConfig
   platform <- getPlatform
   case stmt of
     CmmComment s   -> return (unitOL (COMMENT s))
@@ -180,7 +179,7 @@ stmtToInstrs stmt = do
       b1 <- genCondJump true arg prediction
       b2 <- genBranch false
       return (b1 `appOL` b2)
-    CmmSwitch arg ids -> genSwitch dflags arg ids
+    CmmSwitch arg ids -> genSwitch config arg ids
     CmmCall { cml_target = arg
             , cml_args_regs = gregs } -> genJump arg (jumpRegs platform gregs)
     _ ->
@@ -404,10 +403,10 @@ iselExpr64 expr
 
 
 getRegister :: CmmExpr -> NatM Register
-getRegister e = do dflags <- getDynFlags
-                   getRegister' dflags (targetPlatform dflags) e
+getRegister e = do config <- getConfig
+                   getRegister' config (ncgPlatform config) e
 
-getRegister' :: DynFlags -> Platform -> CmmExpr -> NatM Register
+getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 
 getRegister' _ platform (CmmReg (CmmGlobal PicBaseReg))
   | OSAIX <- platformOS platform = do
@@ -424,8 +423,8 @@ getRegister' _ platform (CmmReg reg)
   = return (Fixed (cmmTypeFormat (cmmRegType platform reg))
                   (getRegisterReg platform reg) nilOL)
 
-getRegister' dflags platform tree@(CmmRegOff _ _)
-  = getRegister' dflags platform (mangleIndexTree platform tree)
+getRegister' config platform tree@(CmmRegOff _ _)
+  = getRegister' config platform (mangleIndexTree platform tree)
 
     -- for 32-bit architectures, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
@@ -509,7 +508,7 @@ getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode DS mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
 
-getRegister' dflags platform (CmmMachOp mop [x]) -- unary MachOps
+getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT
 
@@ -539,7 +538,7 @@ getRegister' dflags platform (CmmMachOp mop [x]) -- unary MachOps
         triv_ucode_float width instr = trivialUCode (floatFormat  width) instr x
 
         conversionNop new_format expr
-            = do e_code <- getRegister' dflags platform expr
+            = do e_code <- getRegister' config platform expr
                  return (swizzleRegisterRep e_code new_format)
 
         clearLeft from to
@@ -662,9 +661,9 @@ getRegister' _ _ (CmmLit (CmmInt i rep))
     in
         return (Any (intFormat rep) code)
 
-getRegister' dflags _ (CmmLit (CmmFloat f frep)) = do
+getRegister' config _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+    dynRef <- cmmMakeDynamicReference config DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
     let format = floatFormat frep
         code dst =
@@ -673,7 +672,7 @@ getRegister' dflags _ (CmmLit (CmmFloat f frep)) = do
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 
-getRegister' dflags platform (CmmLit lit)
+getRegister' config platform (CmmLit lit)
   | target32Bit platform
   = let rep = cmmLitType platform lit
         imm = litToImm lit
@@ -684,7 +683,7 @@ getRegister' dflags platform (CmmLit lit)
     in return (Any (cmmTypeFormat rep) code)
   | otherwise
   = do lbl <- getNewLabelNat
-       dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+       dynRef <- cmmMakeDynamicReference config DataReference lbl
        Amode addr addr_code <- getAmode D dynRef
        let rep = cmmLitType platform lit
            format = cmmTypeFormat rep
@@ -1031,8 +1030,8 @@ assignMem_IntCode pk addr src = do
 -- dst is a reg, but src could be anything
 assignReg_IntCode _ reg src
     = do
-        dflags <- getDynFlags
-        let dst = getRegisterReg (targetPlatform dflags) reg
+        platform <- getPlatform
+        let dst = getRegisterReg platform reg
         r <- getRegister src
         return $ case r of
             Any _ code         -> code dst
@@ -1053,8 +1052,8 @@ genJump (CmmLit (CmmLabel lbl)) regs
 
 genJump tree gregs
   = do
-        dflags <- getDynFlags
-        genJump' tree (platformToGCP (targetPlatform dflags)) gregs
+        platform <- getPlatform
+        genJump' tree (platformToGCP platform) gregs
 
 genJump' :: CmmExpr -> GenCCallPlatform -> [Reg] -> NatM InstrBlock
 
@@ -1132,9 +1131,8 @@ genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
 genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
-          fmt      = intFormat width
+ = do platform <- getPlatform
+      let fmt      = intFormat width
           reg_dst  = getRegisterReg platform (CmmLocal dst)
       (instr, n_code) <- case amop of
             AMO_Add  -> getSomeRegOrImm ADD True reg_dst
@@ -1184,9 +1182,8 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                           return  (op dst dst (RIReg n_reg), n_code)
 
 genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
-          fmt      = intFormat width
+ = do platform <- getPlatform
+      let fmt      = intFormat width
           reg_dst  = getRegisterReg platform (CmmLocal dst)
           form     = if widthInBits width == 64 then DS else D
       Amode addr_reg addr_code <- getAmode form addr
@@ -1216,9 +1213,8 @@ genCCall (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
     return $ unitOL(HWSYNC) `appOL` code
 
 genCCall (PrimTarget (MO_Clz width)) [dst] [src]
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
-          reg_dst = getRegisterReg platform (CmmLocal dst)
+ = do platform <- getPlatform
+      let reg_dst = getRegisterReg platform (CmmLocal dst)
       if target32Bit platform && width == W64
         then do
           ChildCode64 code vr_lo <- iselExpr64 src
@@ -1268,9 +1264,8 @@ genCCall (PrimTarget (MO_Clz width)) [dst] [src]
           return $ s_code `appOL` pre `appOL` cntlz `appOL` post
 
 genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
-          reg_dst = getRegisterReg platform (CmmLocal dst)
+ = do platform <- getPlatform
+      let reg_dst = getRegisterReg platform (CmmLocal dst)
       if target32Bit platform && width == W64
         then do
           let format = II32
@@ -1334,8 +1329,7 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
                           ]
 
 genCCall target dest_regs argsAndHints
- = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
+ = do platform <- getPlatform
       case target of
         PrimTarget (MO_S_QuotRem  width) -> divOp1 platform True  width
                                                    dest_regs argsAndHints
@@ -1354,7 +1348,8 @@ genCCall target dest_regs argsAndHints
                                                    dest_regs argsAndHints
         PrimTarget MO_F64_Fabs -> fabs platform dest_regs argsAndHints
         PrimTarget MO_F32_Fabs -> fabs platform dest_regs argsAndHints
-        _ -> genCCall' dflags (platformToGCP platform)
+        _ -> do config <- getConfig
+                genCCall' config (platformToGCP platform)
                        target dest_regs argsAndHints
         where divOp1 platform signed width [res_q, res_r] [arg_x, arg_y]
                 = do let reg_q = getRegisterReg platform (CmmLocal res_q)
@@ -1586,7 +1581,7 @@ platformToGCP platform
 
 
 genCCall'
-    :: DynFlags
+    :: NCGConfig
     -> GenCCallPlatform
     -> ForeignTarget            -- function to call
     -> [CmmFormal]        -- where to put the result
@@ -1639,7 +1634,7 @@ genCCall'
 -}
 
 
-genCCall' dflags gcp target dest_regs args
+genCCall' config gcp target dest_regs args
   = do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
                                                    (zip3 args argReps argHints)
@@ -1705,7 +1700,6 @@ genCCall' dflags gcp target dest_regs args
                        `snocOL` BCTRL usedRegs
                        `appOL`  codeAfter)
     where
-        config   = initConfig dflags
         platform = ncgPlatform config
 
         uses_pic_base_implicitly = do
@@ -1777,7 +1771,7 @@ genCCall' dflags gcp target dest_regs args
         passArguments [] _ _ stackOffset accumCode accumUsed = return (stackOffset, accumCode, accumUsed)
         passArguments ((arg,arg_ty,_):args) gprs fprs stackOffset
                accumCode accumUsed | isWord64 arg_ty
-                                     && target32Bit (targetPlatform dflags) =
+                                     && target32Bit (ncgPlatform config) =
             do
                 ChildCode64 code vr_lo <- iselExpr64 arg
                 let vr_hi = getHiVRegFromLo vr_lo
@@ -1945,8 +1939,7 @@ genCCall' dflags gcp target dest_regs args
 
         outOfLineMachOp mop =
             do
-                dflags <- getDynFlags
-                mopExpr <- cmmMakeDynamicReference dflags CallReference $
+                mopExpr <- cmmMakeDynamicReference config CallReference $
                               mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
@@ -2041,8 +2034,8 @@ genCCall' dflags gcp target dest_regs args
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
-genSwitch dflags expr targets
+genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
+genSwitch config expr targets
   | OSAIX <- platformOS platform
   = do
         (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
@@ -2050,7 +2043,7 @@ genSwitch dflags expr targets
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+        dynRef <- cmmMakeDynamicReference config DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
                             SL fmt tmp reg (RIImm (ImmInt sha)),
@@ -2067,7 +2060,7 @@ genSwitch dflags expr targets
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+        dynRef <- cmmMakeDynamicReference config DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
                             SL fmt tmp reg (RIImm (ImmInt sha)),
@@ -2095,7 +2088,6 @@ genSwitch dflags expr targets
   where
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config
-    config        = initConfig dflags
 
 generateJumpTableForInstr :: NCGConfig -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
@@ -2334,9 +2326,9 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
     lbl <- getNewLabelNat
     itmp <- getNewRegNat II32
     ftmp <- getNewRegNat FF64
-    dflags <- getDynFlags
+    config <- getConfig
     platform <- getPlatform
-    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
+    dynRef <- cmmMakeDynamicReference config DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
