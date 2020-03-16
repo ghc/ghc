@@ -127,15 +127,15 @@ modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
 modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f
 
-emptyPLS :: DynFlags -> PersistentLinkerState
-emptyPLS _ = PersistentLinkerState {
-                        closure_env = emptyNameEnv,
-                        itbl_env    = emptyNameEnv,
-                        pkgs_loaded = init_pkgs,
-                        bcos_loaded = [],
-                        objs_loaded = [],
-                        temp_sos = [] }
-
+emptyPLS :: PersistentLinkerState
+emptyPLS = PersistentLinkerState
+   { closure_env = emptyNameEnv
+   , itbl_env    = emptyNameEnv
+   , pkgs_loaded = init_pkgs
+   , bcos_loaded = []
+   , objs_loaded = []
+   , temp_sos = []
+   }
   -- Packages that don't need loading, because the compiler
   -- shares them with the interpreted program.
   --
@@ -280,7 +280,7 @@ reallyInitDynLinker :: HscEnv -> IO PersistentLinkerState
 reallyInitDynLinker hsc_env = do
   -- Initialise the linker state
   let dflags = hsc_dflags hsc_env
-      pls0 = emptyPLS dflags
+      pls0 = emptyPLS
 
   -- (a) initialise the C dynamic linker
   initObjLinker hsc_env
