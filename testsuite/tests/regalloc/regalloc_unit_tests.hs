@@ -26,6 +26,8 @@ import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
+import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Monad as NCGConfig
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
@@ -97,13 +99,13 @@ assertIO = assertOr $ \msg -> void (throwIO . RegAllocTestException $ msg)
 compileCmmForRegAllocStats ::
     DynFlags ->
     FilePath ->
-    (DynFlags ->
+    (NCGConfig ->
         NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
     UniqSupply ->
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
-    let ncgImpl = ncgImplF dflags
+    let ncgImpl = ncgImplF (NCGConfig.initConfig dflags)
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
