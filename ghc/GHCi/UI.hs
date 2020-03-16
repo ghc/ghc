@@ -1168,7 +1168,7 @@ enqueueCommands cmds = do
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: GhciMonad m => String -> SingleStep -> m (Maybe GHC.ExecResult)
 runStmt input step = do
-  dflags <- GHC.getInteractiveDynFlags
+  pflags <- Lexer.mkParserFlags <$> GHC.getInteractiveDynFlags
   -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
   -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
   -- declarations and statements are not affected.
@@ -1177,7 +1177,7 @@ runStmt input step = do
   let source = progname st
   let line = line_number st
 
-  if | GHC.isStmt dflags input -> do
+  if | GHC.isStmt pflags input -> do
          hsc_env <- GHC.getSession
          mb_stmt <- liftIO (runInteractiveHsc hsc_env (hscParseStmtWithLocation source line input))
          case mb_stmt of
@@ -1187,13 +1187,13 @@ runStmt input step = do
            Just stmt ->
              run_stmt stmt
 
-     | GHC.isImport dflags input -> run_import
+     | GHC.isImport pflags input -> run_import
 
      -- Every import declaration should be handled by `run_import`. As GHCi
      -- in general only accepts one command at a time, we simply throw an
      -- exception when the input contains multiple commands of which at least
      -- one is an import command (see #10663).
-     | GHC.hasImport dflags input -> throwGhcException
+     | GHC.hasImport pflags input -> throwGhcException
        (CmdLineError "error: expecting a single import declaration")
 
      -- Otherwise assume a declaration (or a list of declarations)
