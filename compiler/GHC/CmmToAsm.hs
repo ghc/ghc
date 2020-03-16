@@ -162,35 +162,36 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let platform = targetPlatform dflags
+ = let config   = initConfig dflags
+       platform = ncgPlatform config
        nCG' :: ( Outputable statics, Outputable instr
                , Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
        nCG' ncgImpl = nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
-      ArchX86       -> nCG' (x86NcgImpl    dflags)
-      ArchX86_64    -> nCG' (x86_64NcgImpl dflags)
-      ArchPPC       -> nCG' (ppcNcgImpl    dflags)
+      ArchX86       -> nCG' (x86NcgImpl    config)
+      ArchX86_64    -> nCG' (x86_64NcgImpl config)
+      ArchPPC       -> nCG' (ppcNcgImpl    config)
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
-      ArchSPARC     -> nCG' (sparcNcgImpl  dflags)
+      ArchSPARC     -> nCG' (sparcNcgImpl  config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
       ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
-      ArchPPC_64 _  -> nCG' (ppcNcgImpl    dflags)
+      ArchPPC_64 _  -> nCG' (ppcNcgImpl    config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
 
-x86NcgImpl :: DynFlags -> NcgImpl (Alignment, RawCmmStatics)
+x86NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
-x86NcgImpl dflags
- = (x86_64NcgImpl dflags)
+x86NcgImpl config
+ = (x86_64NcgImpl config)
 
-x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, RawCmmStatics)
+x86_64NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
-x86_64NcgImpl dflags
+x86_64NcgImpl config
  = NcgImpl {
         ncgConfig                 = config
        ,cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -209,11 +210,10 @@ x86_64NcgImpl dflags
        ,invertCondBranches        = X86.CodeGen.invertCondBranches
    }
     where
-      config   = initConfig dflags
       platform = ncgPlatform config
 
-ppcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
-ppcNcgImpl dflags
+ppcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
+ppcNcgImpl config
  = NcgImpl {
         ncgConfig                 = config
        ,cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
@@ -232,11 +232,10 @@ ppcNcgImpl dflags
        ,invertCondBranches        = \_ _ -> id
    }
     where
-      config   = initConfig dflags
       platform = ncgPlatform config
 
-sparcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
-sparcNcgImpl dflags
+sparcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
+sparcNcgImpl config
  = NcgImpl {
         ncgConfig                 = config
        ,cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
@@ -255,7 +254,6 @@ sparcNcgImpl dflags
        ,invertCondBranches        = \_ _ -> id
    }
     where
-      config   = initConfig dflags
       platform = ncgPlatform config
 
 --
@@ -565,7 +563,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
                 {-# SCC "cmmToCmm" #-}
-                cmmToCmm dflags this_mod fixed_cmm
+                cmmToCmm config this_mod fixed_cmm
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_opt_cmm "Optimised Cmm" FormatCMM
@@ -1067,10 +1065,10 @@ Ideas for other things we could do (put these in Hoopl please!):
     temp assignments, and certain assigns to mem...)
 -}
 
-cmmToCmm :: DynFlags -> Module -> RawCmmDecl -> (RawCmmDecl, [CLabel])
+cmmToCmm :: NCGConfig -> Module -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ _ top@(CmmData _ _) = (top, [])
-cmmToCmm dflags this_mod (CmmProc info lbl live graph)
-    = runCmmOpt dflags this_mod $
+cmmToCmm config this_mod (CmmProc info lbl live graph)
+    = runCmmOpt config this_mod $
       do blocks' <- mapM cmmBlockConFold (toBlockList graph)
          return $ CmmProc info lbl live (ofBlockList (g_entry graph) blocks')
 
@@ -1087,7 +1085,7 @@ pattern OptMResult x y = (# x, y #)
 data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
 #endif
 
-newtype CmmOptM a = CmmOptM (DynFlags -> Module -> [CLabel] -> OptMResult a)
+newtype CmmOptM a = CmmOptM (NCGConfig -> Module -> [CLabel] -> OptMResult a)
     deriving (Functor)
 
 instance Applicative CmmOptM where
@@ -1096,11 +1094,11 @@ instance Applicative CmmOptM where
 
 instance Monad CmmOptM where
   (CmmOptM f) >>= g =
-    CmmOptM $ \dflags this_mod imports0 ->
-                case f dflags this_mod imports0 of
+    CmmOptM $ \config this_mod imports0 ->
+                case f config this_mod imports0 of
                   OptMResult x imports1 ->
                     case g x of
-                      CmmOptM g' -> g' dflags this_mod imports1
+                      CmmOptM g' -> g' config this_mod imports1
 
 instance CmmMakeDynamicReferenceM CmmOptM where
     addImport = addImportCmmOpt
@@ -1109,12 +1107,12 @@ instance CmmMakeDynamicReferenceM CmmOptM where
 addImportCmmOpt :: CLabel -> CmmOptM ()
 addImportCmmOpt lbl = CmmOptM $ \_ _ imports -> OptMResult () (lbl:imports)
 
-instance HasDynFlags CmmOptM where
-    getDynFlags = CmmOptM $ \dflags _ imports -> OptMResult dflags imports
+getCmmOptConfig :: CmmOptM NCGConfig
+getCmmOptConfig = CmmOptM $ \config _ imports -> OptMResult config imports
 
-runCmmOpt :: DynFlags -> Module -> CmmOptM a -> (a, [CLabel])
-runCmmOpt dflags this_mod (CmmOptM f) =
-  case f dflags this_mod [] of
+runCmmOpt :: NCGConfig -> Module -> CmmOptM a -> (a, [CLabel])
+runCmmOpt config this_mod (CmmOptM f) =
+  case f config this_mod [] of
     OptMResult result imports -> (result, imports)
 
 cmmBlockConFold :: CmmBlock -> CmmOptM CmmBlock
@@ -1178,29 +1176,26 @@ cmmStmtConFold stmt
 
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprConFold referenceKind expr = do
-    dflags <- getDynFlags
+    config <- getCmmOptConfig
 
-    -- With -O1 and greater, the cmmSink pass does constant-folding, so
-    -- we don't need to do it again here.
-    let expr' = if optLevel dflags >= 1
+    let expr' = if not (ncgDoConstantFolding config)
                     then expr
-                    else cmmExprCon dflags expr
+                    else cmmExprCon config expr
 
     cmmExprNative referenceKind expr'
 
-cmmExprCon :: DynFlags -> CmmExpr -> CmmExpr
-cmmExprCon dflags (CmmLoad addr rep) = CmmLoad (cmmExprCon dflags addr) rep
-cmmExprCon dflags (CmmMachOp mop args)
-    = cmmMachOpFold platform mop (map (cmmExprCon dflags) args)
-    where platform = targetPlatform dflags
+cmmExprCon :: NCGConfig -> CmmExpr -> CmmExpr
+cmmExprCon config (CmmLoad addr rep) = CmmLoad (cmmExprCon config addr) rep
+cmmExprCon config (CmmMachOp mop args)
+    = cmmMachOpFold (ncgPlatform config) mop (map (cmmExprCon config) args)
 cmmExprCon _ other = other
 
 -- handles both PIC and non-PIC cases... a very strange mixture
 -- of things to do.
 cmmExprNative :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprNative referenceKind expr = do
-     dflags <- getDynFlags
-     let platform = targetPlatform dflags
+     config <- getCmmOptConfig
+     let platform = ncgPlatform config
          arch = platformArch platform
      case expr of
         CmmLoad addr rep
@@ -1219,10 +1214,10 @@ cmmExprNative referenceKind expr = do
 
         CmmLit (CmmLabel lbl)
            -> do
-                cmmMakeDynamicReference dflags referenceKind lbl
+                cmmMakeDynamicReference config referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
            -> do
-                 dynRef <- cmmMakeDynamicReference dflags referenceKind lbl
+                 dynRef <- cmmMakeDynamicReference config referenceKind lbl
                  -- need to optimize here, since it's late
                  return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
                      dynRef,
@@ -1233,15 +1228,15 @@ cmmExprNative referenceKind expr = do
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | arch == ArchPPC && not (positionIndependent dflags)
+          | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | arch == ArchPPC && not (positionIndependent dflags)
+          | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
-          | arch == ArchPPC && not (positionIndependent dflags)
+          | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_fun")))
 

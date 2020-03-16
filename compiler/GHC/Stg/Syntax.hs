@@ -126,15 +126,17 @@ data StgArg
 -- If so, we can't allocate it statically
 isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags this_mod con args
- | platformOS (targetPlatform dflags) == OSMinGW32
-    = isDynLinkName dflags this_mod (dataConName con) || any is_dll_arg args
+ | not (gopt Opt_ExternalDynamicRefs dflags) = False
+ | platformOS platform == OSMinGW32
+    = isDynLinkName platform this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
+    platform = targetPlatform dflags
     -- NB: typePrimRep1 is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
-                             && isDynLinkName dflags this_mod (idName v)
+                             && isDynLinkName platform this_mod (idName v)
     is_dll_arg _             = False
 
 -- True of machine addresses; these are the things that don't work across DLLs.
