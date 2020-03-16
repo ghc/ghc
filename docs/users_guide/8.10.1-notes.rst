@@ -66,6 +66,11 @@ Language
   <standalone-kind-signatures>` enables polymorphic recursion. This feature is
   a replacement for :extension:`CUSKs`.
 
+  **Note:** The finer points around this feature are subject to change. In particular,
+  it is likely that the treatment around :ref:`specified and inferred <inferred-vs-specified>`
+  variables may change, to become more like the way term-level type signatures are
+  handled.
+
 - GHC now parses visible, dependent quantifiers (as proposed in
   `GHC proposal 35
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0081-forall-arrow.rst>`__),
