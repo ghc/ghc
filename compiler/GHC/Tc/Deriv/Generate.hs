@@ -1342,8 +1342,9 @@ gen_data dflags data_type_name constr_names loc rep_tc
                      L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
 
     sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
+    ctx    = initDefaultSDocContext dflags
     rhs    = nlHsVar mkDataType_RDR
-             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr rep_tc)))
+             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr rep_tc)))
              `nlHsApp` nlList (map nlHsVar constr_names)
 
     genDataDataCon :: DataCon -> RdrName -> DerivStuff

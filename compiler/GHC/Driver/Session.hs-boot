@@ -8,7 +8,6 @@ data DynFlags
 
 targetPlatform           :: DynFlags -> Platform
 pprUserLength            :: DynFlags -> Int
-pprCols                  :: DynFlags -> Int
 unsafeGlobalDynFlags     :: DynFlags
 hasPprDebug              :: DynFlags -> Bool
 hasNoDebugOutput         :: DynFlags -> Bool
