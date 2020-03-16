@@ -48,7 +48,10 @@ fingerprintFingerprints fs = unsafeDupablePerformIO $
     fingerprintData (castPtr p) (len * sizeOf (head fs))
 
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
-fingerprintData buf len = do
+-- DmdAnal thinks that c_MD5Init might throw a precise exception, so this
+-- function isn't strict in buf and len by itself, hence the bangs.
+-- See Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
+fingerprintData !buf !len = do
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
     c_MD5Init pctxt
     c_MD5Update pctxt buf (fromIntegral len)
