@@ -2,37 +2,38 @@
 
 -- | A description of the platform we're compiling for.
 --
-module GHC.Platform (
-        PlatformMini(..),
-        PlatformWordSize(..),
-        Platform(..), platformArch, platformOS,
-        Arch(..),
-        OS(..),
-        ArmISA(..),
-        ArmISAExt(..),
-        ArmABI(..),
-        PPC_64ABI(..),
-        ByteOrder(..),
-
-        target32Bit,
-        isARM,
-        osElfTarget,
-        osMachOTarget,
-        osSubsectionsViaSymbols,
-        platformUsesFrameworks,
-        platformWordSizeInBytes,
-        platformWordSizeInBits,
-        platformMinInt,
-        platformMaxInt,
-        platformMaxWord,
-        platformInIntRange,
-        platformInWordRange,
-
-        PlatformMisc(..),
-        IntegerLibrary(..),
-
-        stringEncodeArch,
-        stringEncodeOS,
+module GHC.Platform
+   ( PlatformMini(..)
+   , PlatformWordSize(..)
+   , Platform(..)
+   , platformArch
+   , platformOS
+   , Arch(..)
+   , OS(..)
+   , ArmISA(..)
+   , ArmISAExt(..)
+   , ArmABI(..)
+   , PPC_64ABI(..)
+   , ByteOrder(..)
+   , target32Bit
+   , isARM
+   , osElfTarget
+   , osMachOTarget
+   , osSubsectionsViaSymbols
+   , platformUsesFrameworks
+   , platformWordSizeInBytes
+   , platformWordSizeInBits
+   , platformMinInt
+   , platformMaxInt
+   , platformMaxWord
+   , platformInIntRange
+   , platformInWordRange
+   , PlatformMisc(..)
+   , IntegerLibrary(..)
+   , stringEncodeArch
+   , stringEncodeOS
+   , SseVersion (..)
+   , BmiVersion (..)
 )
 
 where
@@ -338,3 +339,24 @@ platformInIntRange platform x = x >= platformMinInt platform && x <= platformMax
 -- | Test if the given Integer is representable with a platform Word
 platformInWordRange :: Platform -> Integer -> Bool
 platformInWordRange platform x = x >= 0 && x <= platformMaxWord platform
+
+
+--------------------------------------------------
+-- Instruction sets
+--------------------------------------------------
+
+-- | x86 SSE instructions
+data SseVersion
+   = SSE1
+   | SSE2
+   | SSE3
+   | SSE4
+   | SSE42
+   deriving (Eq, Ord)
+
+-- | x86 BMI (bit manipulation) instructions
+data BmiVersion
+   = BMI1
+   | BMI2
+   deriving (Eq, Ord)
+
