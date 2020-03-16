@@ -148,18 +148,21 @@ mkNatM_State us delta dflags this_mod
 -- | Initialize the native code generator configuration from the DynFlags
 initConfig :: DynFlags -> NCGConfig
 initConfig dflags = NCGConfig
-   { ncgPlatform            = targetPlatform dflags
-   , ncgProcAlignment       = cmmProcAlignment dflags
-   , ncgDebugLevel          = debugLevel dflags
-   , ncgExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-   , ncgPIC                 = positionIndependent dflags
-   , ncgSplitSections       = gopt Opt_SplitSections dflags
-   , ncgSpillPreallocSize   = rESERVED_C_STACK_BYTES dflags
-   , ncgRegsIterative       = gopt Opt_RegsIterative dflags
-   , ncgAsmLinting          = gopt Opt_DoAsmLinting dflags
-   , ncgDumpRegAllocStages  = dopt Opt_D_dump_asm_regalloc_stages dflags
-   , ncgDumpAsmStats        = dopt Opt_D_dump_asm_stats dflags
-   , ncgDumpAsmConflicts    = dopt Opt_D_dump_asm_conflicts dflags
+   { ncgPlatform              = targetPlatform dflags
+   , ncgUnitId                = thisPackage dflags
+   , ncgProcAlignment         = cmmProcAlignment dflags
+   , ncgDebugLevel            = debugLevel dflags
+   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
+   , ncgPIC                   = positionIndependent dflags
+   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
+   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
+   , ncgSplitSections         = gopt Opt_SplitSections dflags
+   , ncgSpillPreallocSize     = rESERVED_C_STACK_BYTES dflags
+   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
+   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
+   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
+   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
    }
 
 

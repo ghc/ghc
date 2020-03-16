@@ -2123,9 +2123,8 @@ displayInstalledUnitId dflags uid =
     fmap sourcePackageIdString (lookupInstalledPackage dflags uid)
 
 -- | Will the 'Name' come from a dynamically linked package?
-isDynLinkName :: DynFlags -> Module -> Name -> Bool
-isDynLinkName dflags this_mod name
-  | not (gopt Opt_ExternalDynamicRefs dflags) = False
+isDynLinkName :: Platform -> Module -> Name -> Bool
+isDynLinkName platform this_mod name
   | Just mod <- nameModule_maybe name
     -- Issue #8696 - when GHC is dynamically linked, it will attempt
     -- to load the dynamic dependencies of object files at compile
@@ -2139,7 +2138,7 @@ isDynLinkName dflags this_mod name
     -- In the mean time, always force dynamic indirections to be
     -- generated: when the module name isn't the module being
     -- compiled, references are dynamic.
-    = case platformOS $ targetPlatform dflags of
+    = case platformOS platform of
         -- On Windows the hack for #8696 makes it unlinkable.
         -- As the entire setup of the code from Cmm down to the RTS expects
         -- the use of trampolines for the imported functions only when
