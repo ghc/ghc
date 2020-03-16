@@ -1420,7 +1420,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
-            prof_init = profilingInitCode this_mod cost_centre_info
+            prof_init = profilingInitCode dflags this_mod cost_centre_info
             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
         ------------------  Code generation ------------------
