@@ -484,37 +484,37 @@ whenPprDebug d = ifPprDebug d empty
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
 --   terminal doesn't get screwed up by the ANSI color codes if an exception
 --   is thrown during pretty-printing.
-printSDoc :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
-printSDoc mode dflags handle sty doc =
+printSDoc :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
+printSDoc ctx mode handle doc =
   Pretty.printDoc_ mode cols handle (runSDoc doc ctx)
     `finally`
       Pretty.printDoc_ mode cols handle
         (runSDoc (coloured Col.colReset empty) ctx)
   where
-    cols = pprCols dflags
-    ctx = initSDocContext dflags sty
+    cols = sdocLineLength ctx
 
 -- | Like 'printSDoc' but appends an extra newline.
-printSDocLn :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
-printSDocLn mode dflags handle sty doc =
-  printSDoc mode dflags handle sty (doc $$ text "")
+printSDocLn :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
+printSDocLn ctx mode handle doc =
+  printSDoc ctx mode handle (doc $$ text "")
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
-  = printSDocLn PageMode dflags handle
-               (mkUserStyle dflags unqual AllTheWay) doc
+  = printSDocLn ctx PageMode handle doc
+    where ctx = initSDocContext dflags (mkUserStyle dflags unqual AllTheWay)
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
-  = printSDocLn PageMode dflags handle
-                (mkUserStyle dflags unqual (PartWay d)) doc
+  = printSDocLn ctx PageMode handle doc
+    where ctx = initSDocContext dflags (mkUserStyle dflags unqual (PartWay d))
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
 -- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
-  printSDocLn LeftMode dflags handle (PprCode CStyle) doc
+  printSDocLn ctx LeftMode handle doc
+  where ctx = initSDocContext dflags (PprCode CStyle)
 
 -- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
 -- outputs to a 'BufHandle'.
