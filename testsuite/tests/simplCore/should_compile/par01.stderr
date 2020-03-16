@@ -6,7 +6,7 @@ Result size of CorePrep
 Rec {
 -- RHS size: {terms: 7, types: 3, coercions: 0, joins: 0/0}
 Par01.depth [Occ=LoopBreaker] :: GHC.Types.Int -> GHC.Types.Int
-[GblId, Arity=1, Str=<L,U>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<L,U>c, Unf=OtherCon []]
 Par01.depth
   = \ (d :: GHC.Types.Int) ->
       case GHC.Prim.par# @GHC.Types.Int d of { __DEFAULT ->
@@ -16,27 +16,27 @@ end Rec }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule4 :: GHC.Prim.Addr#
-[GblId, Unf=OtherCon []]
+[GblId, Str=c, Unf=OtherCon []]
 Par01.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule3 :: GHC.Types.TrName
-[GblId, Cpr=m1, Unf=OtherCon []]
+[GblId, Str=c, Cpr=m1, Unf=OtherCon []]
 Par01.$trModule3 = GHC.Types.TrNameS Par01.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule2 :: GHC.Prim.Addr#
-[GblId, Unf=OtherCon []]
+[GblId, Str=c, Unf=OtherCon []]
 Par01.$trModule2 = "Par01"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule1 :: GHC.Types.TrName
-[GblId, Cpr=m1, Unf=OtherCon []]
+[GblId, Str=c, Cpr=m1, Unf=OtherCon []]
 Par01.$trModule1 = GHC.Types.TrNameS Par01.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule :: GHC.Types.Module
-[GblId, Cpr=m1, Unf=OtherCon []]
+[GblId, Str=c, Cpr=m1, Unf=OtherCon []]
 Par01.$trModule
   = GHC.Types.Module Par01.$trModule3 Par01.$trModule1
 

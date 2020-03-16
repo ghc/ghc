@@ -1,18 +1,18 @@
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule: c
-HyperStrUse.f: <S(SL),1*U(1*U(U),A)><S,1*U>c
+Lib.$trModule: c
+Lib.f: <S,1*U(U)><S,1*U(U)><L,U>c
 
 
 
 ==================== Cpr signatures ====================
-HyperStrUse.$trModule: m1
-HyperStrUse.f: m1
+Lib.$trModule: m1
+Lib.f:
 
 
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule: c
-HyperStrUse.f: <S(SL),1*U(1*U(U),A)><S,1*U>c
+Lib.$trModule: c
+Lib.f: <S,1*U(U)><S,1*U(U)><L,U>c
 
 
