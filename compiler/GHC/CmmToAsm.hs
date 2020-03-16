@@ -516,8 +516,8 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
 emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
 emitNativeCode dflags h sdoc = do
 
-        {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc dflags h
-                                      (mkCodeStyle AsmStyle) sdoc
+        let ctx = initSDocContext dflags (mkCodeStyle AsmStyle)
+        {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc ctx h sdoc
 
         -- dump native code
         dumpIfSet_dyn dflags
