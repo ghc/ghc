@@ -1,10 +1,10 @@
 
 ==================== Strictness signatures ====================
-Test.$tc'MkT:
-Test.$tcT:
-Test.$trModule:
-Test.t: <S,1*U(U)><S,1*U(U)>
-Test.t2: <S,1*U(U)><S,1*U(U)>
+Test.$tc'MkT: c
+Test.$tcT: c
+Test.$trModule: c
+Test.t: <S,1*U(U)><S,1*U(U)>c
+Test.t2: <S,1*U(U)><S,1*U(U)>c
 
 
 
@@ -18,10 +18,10 @@ Test.t2: m1
 
 
 ==================== Strictness signatures ====================
-Test.$tc'MkT:
-Test.$tcT:
-Test.$trModule:
-Test.t: <S,1*U(U)><S,1*U(U)>
-Test.t2: <S,1*U(U)><S,1*U(U)>
+Test.$tc'MkT: c
+Test.$tcT: c
+Test.$trModule: c
+Test.t: <S,1*U(U)><S,1*U(U)>c
+Test.t2: <S,1*U(U)><S,1*U(U)>c
 
 
