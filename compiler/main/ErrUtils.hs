@@ -729,12 +729,13 @@ withTiming' dflags what force_result prtimings action
           then do whenPrintTimings $
                     logInfo dflags (defaultUserStyle dflags) $
                       text "***" <+> what <> colon
-                  eventBegins dflags what
+                  let ctx = initDefaultSDocContext dflags
+                  eventBegins ctx what
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
                   !r <- action
                   () <- pure $ force_result r
-                  eventEnds dflags what
+                  eventEnds ctx what
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
@@ -753,7 +754,7 @@ withTiming' dflags what force_result prtimings action
 
                   whenPrintTimings $
                       dumpIfSet_dyn dflags Opt_D_dump_timings "" FormatText
-                          $ text $ showSDocOneLine dflags
+                          $ text $ showSDocOneLine ctx
                           $ hsep [ what <> colon
                                  , text "alloc=" <> ppr alloc
                                  , text "time=" <> doublePrec 3 time
@@ -762,15 +763,15 @@ withTiming' dflags what force_result prtimings action
            else action
 
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
-          eventBegins dflags w = do
-            whenPrintTimings $ traceMarkerIO (eventBeginsDoc dflags w)
-            liftIO $ traceEventIO (eventBeginsDoc dflags w)
-          eventEnds dflags w = do
-            whenPrintTimings $ traceMarkerIO (eventEndsDoc dflags w)
-            liftIO $ traceEventIO (eventEndsDoc dflags w)
+          eventBegins ctx w = do
+            whenPrintTimings $ traceMarkerIO (eventBeginsDoc ctx w)
+            liftIO $ traceEventIO (eventBeginsDoc ctx w)
+          eventEnds ctx w = do
+            whenPrintTimings $ traceMarkerIO (eventEndsDoc ctx w)
+            liftIO $ traceEventIO (eventEndsDoc ctx w)
 
-          eventBeginsDoc dflags w = showSDocOneLine dflags $ text "GHC:started:" <+> w
-          eventEndsDoc dflags w = showSDocOneLine dflags $ text "GHC:finished:" <+> w
+          eventBeginsDoc ctx w = showSDocOneLine ctx $ text "GHC:started:" <+> w
+          eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $
