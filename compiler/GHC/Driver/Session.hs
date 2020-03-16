@@ -230,7 +230,7 @@ module GHC.Driver.Session (
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
 
         -- * SDoc
-        initSDocContext,
+        initSDocContext, initDefaultSDocContext,
 
         -- * Make use of the Cmm CFG
         CfgWeights(..)
@@ -5190,7 +5190,7 @@ emptyFilesToClean :: FilesToClean
 emptyFilesToClean = FilesToClean Set.empty Set.empty
 
 
-
+-- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags style = SDC
   { sdocStyle                       = style
@@ -5226,3 +5226,7 @@ initSDocContext dflags style = SDC
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocDynFlags                    = dflags
   }
+
+-- | Initialize the pretty-printing options using the default user style
+initDefaultSDocContext :: DynFlags -> SDocContext
+initDefaultSDocContext dflags = initSDocContext dflags (defaultUserStyle dflags)
