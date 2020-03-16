@@ -1599,8 +1599,8 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                               , ri_lam_body = body, ri_arg_occs = arg_occs })
                spec_info@(SI { si_specs = specs, si_n_specs = spec_count
                              , si_mb_unspec = mb_unspec })
-  | isBottomingId fn      -- Note [Do not specialise diverging functions]
-                          -- and do not generate specialisation seeds from its RHS
+  | isDeadEndId fn  -- Note [Do not specialise diverging functions]
+                    -- and do not generate specialisation seeds from its RHS
   = -- pprTrace "specialise bot" (ppr fn) $
     return (nullUsage, spec_info)
 
@@ -1761,10 +1761,10 @@ calcSpecStrictness :: Id                     -- The original function
                    -> StrictSig              -- Strictness of specialised thing
 -- See Note [Transfer strictness]
 calcSpecStrictness fn qvars pats
-  = mkClosedStrictSig spec_dmds topDiv
+  = mkClosedStrictSig spec_dmds div
   where
     spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
-    StrictSig (DmdType _ dmds _) = idStrictness fn
+    StrictSig (DmdType _ dmds div) = idStrictness fn
 
     dmd_env = go emptyVarEnv dmds pats
 
@@ -1824,10 +1824,10 @@ Note [Transfer strictness]
 We must transfer strictness information from the original function to
 the specialised one.  Suppose, for example
 
-  f has strictness     SS
+  f has strictness     SSx
         and a RULE     f (a:as) b = f_spec a as b
 
-Now we want f_spec to have strictness  LLS, otherwise we'll use call-by-need
+Now we want f_spec to have strictness  LLSx, otherwise we'll use call-by-need
 when calling f_spec instead of call-by-value.  And that can result in
 unbounded worsening in space (cf the classic foldl vs foldl')
 
