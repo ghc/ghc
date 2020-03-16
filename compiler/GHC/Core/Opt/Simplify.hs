@@ -3058,7 +3058,7 @@ altsWouldDup (alt:alts)
   | is_bot_alt alt = altsWouldDup alts
   | otherwise      = not (all is_bot_alt alts)
   where
-    is_bot_alt (_,_,rhs) = exprIsBottom rhs
+    is_bot_alt (_,_,rhs) = exprIsDeadEnd rhs
 
 -------------------------
 mkDupableCont :: SimplEnv -> SimplCont
@@ -3515,7 +3515,7 @@ mkLetUnfolding dflags top_lvl src id new_rhs
             --             we don't.)  The simple thing is always to have one.
   where
     is_top_lvl   = isTopLevel top_lvl
-    is_bottoming = isBottomingId id
+    is_bottoming = isDeadEndId id
 
 -------------------
 simplStableUnfolding :: SimplEnv -> TopLevelFlag
