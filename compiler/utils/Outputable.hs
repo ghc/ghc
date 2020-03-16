@@ -96,7 +96,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
-                           , pprUserLength, pprCols
+                           , pprUserLength
                            , unsafeGlobalDynFlags, initSDocContext
                            )
 import {-# SOURCE #-}   GHC.Types.Module( UnitId, Module, ModuleName, moduleName )
@@ -484,43 +484,43 @@ whenPprDebug d = ifPprDebug d empty
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
 --   terminal doesn't get screwed up by the ANSI color codes if an exception
 --   is thrown during pretty-printing.
-printSDoc :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
-printSDoc mode dflags handle sty doc =
+printSDoc :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
+printSDoc ctx mode handle doc =
   Pretty.printDoc_ mode cols handle (runSDoc doc ctx)
     `finally`
       Pretty.printDoc_ mode cols handle
         (runSDoc (coloured Col.colReset empty) ctx)
   where
-    cols = pprCols dflags
-    ctx = initSDocContext dflags sty
+    cols = sdocLineLength ctx
 
 -- | Like 'printSDoc' but appends an extra newline.
-printSDocLn :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
-printSDocLn mode dflags handle sty doc =
-  printSDoc mode dflags handle sty (doc $$ text "")
+printSDocLn :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
+printSDocLn ctx mode handle doc =
+  printSDoc ctx mode handle (doc $$ text "")
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
-  = printSDocLn PageMode dflags handle
-               (mkUserStyle dflags unqual AllTheWay) doc
+  = printSDocLn ctx PageMode handle doc
+    where ctx = initSDocContext dflags (mkUserStyle dflags unqual AllTheWay)
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
-  = printSDocLn PageMode dflags handle
-                (mkUserStyle dflags unqual (PartWay d)) doc
+  = printSDocLn ctx PageMode handle doc
+    where ctx = initSDocContext dflags (mkUserStyle dflags unqual (PartWay d))
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
 -- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
-  printSDocLn LeftMode dflags handle (PprCode CStyle) doc
+  printSDocLn ctx LeftMode handle doc
+  where ctx = initSDocContext dflags (PprCode CStyle)
 
 -- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
 -- outputs to a 'BufHandle'.
-bufLeftRenderSDoc :: DynFlags -> BufHandle -> PprStyle -> SDoc -> IO ()
-bufLeftRenderSDoc dflags bufHandle sty doc =
-  Pretty.bufLeftRender bufHandle (runSDoc doc (initSDocContext dflags sty))
+bufLeftRenderSDoc :: SDocContext -> BufHandle -> SDoc -> IO ()
+bufLeftRenderSDoc ctx bufHandle doc =
+  Pretty.bufLeftRender bufHandle (runSDoc doc ctx)
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -566,12 +566,12 @@ renderWithStyle ctx sdoc
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
-showSDocOneLine :: DynFlags -> SDoc -> String
-showSDocOneLine dflags d
+showSDocOneLine :: SDocContext -> SDoc -> String
+showSDocOneLine ctx d
  = let s = Pretty.style{ Pretty.mode = OneLineMode,
-                         Pretty.lineLength = pprCols dflags } in
+                         Pretty.lineLength = sdocLineLength ctx } in
    Pretty.renderStyle s $
-      runSDoc d (initSDocContext dflags (defaultUserStyle dflags))
+      runSDoc d ctx
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
