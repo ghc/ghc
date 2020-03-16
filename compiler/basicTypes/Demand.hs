@@ -1092,9 +1092,7 @@ data DmdType = DmdType
 {-
 Note [Nature of result demand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A Divergence contains information about termination (currently distinguishing
-definite divergence and no information; it is possible to include definite
-convergence here), and CPR information about the result.
+A Divergence contains information about termination.
 
 The semantics of this depends on whether we are looking at a DmdType, i.e. the
 demand put on by an expression _under a specific incoming demand_ on its
@@ -1105,9 +1103,7 @@ For a
    generated with, while for
  * a StrictSig it holds after applying enough arguments.
 
-The CPR information, though, is valid after the number of arguments mentioned
-in the type is given. Therefore, when forgetting the demand on arguments, as in
-dmdAnalRhs, this needs to be considered (via removeDmdTyArgs).
+See also Note [Understanding DmdType and StrictSig].
 
 Consider
   b2 x y = x `seq` y `seq` error (show x)
@@ -1224,7 +1220,7 @@ emptyDmdEnv = emptyVarEnv
 -- Note that it is ''not'' the top of the lattice (which would be "may use everything"),
 -- so it is (no longer) called topDmd
 nopDmdType, botDmdType :: DmdType
-nopDmdType = DmdType emptyDmdEnv [] topDiv
+nopDmdType = DmdType emptyDmdEnv [] conDiv
 botDmdType = DmdType emptyDmdEnv [] botDiv
 
 isTopDmdType :: DmdType -> Bool
@@ -1240,8 +1236,7 @@ dmdTypeDepth (DmdType _ ds _) = length ds
 
 -- | This makes sure we can use the demand type with n arguments.
 -- It extends the argument list with the correct resTypeArgDmd.
--- It also adjusts the Divergence: Divergence survives additional arguments,
--- CPR information does not (and definite converge also would not).
+-- It also adjusts the Divergence: Divergence survives additional arguments.
 ensureArgs :: Arity -> DmdType -> DmdType
 ensureArgs n d | n == depth = d
                | otherwise  = DmdType fv ds' r'
@@ -1250,8 +1245,11 @@ ensureArgs n d | n == depth = d
 
         ds' = take n (ds ++ repeat (resTypeArgDmd r))
         r' = case r of    -- See [Nature of result demand]
-              Dunno -> topDiv
-              _     -> r
+              ConOrDiv
+                | n > length ds
+                -> Dunno -- supplying more arguments might throw
+                         -- a precise exception in a lambda body
+              _ -> r
 
 
 seqDmdType :: DmdType -> ()
@@ -1307,8 +1305,10 @@ postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
     = (postProcessDmdEnv du fv, postProcessDivergence ss res_ty)
 
 postProcessDivergence :: Str () -> Divergence -> Divergence
-postProcessDivergence Lazy _   = topDiv
-postProcessDivergence _    res = res
+-- In a Lazy scenario, we might not force the Divergence, in which case we
+-- converge. That corresponds to @lubDivergence ConOrDiv@.
+postProcessDivergence Lazy d = lubDivergence conDiv d
+postProcessDivergence _    d = d
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
@@ -1737,7 +1737,7 @@ dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
    | (cd',defer_use) <- peelCallDmd cd
    , Just jds <- splitProdDmd_maybe dict_dmd
    = postProcessUnsat defer_use $
-     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topDiv
+     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] conDiv
    | otherwise
    = nopDmdType              -- See Note [Demand transformer for a dictionary selector]
   where
