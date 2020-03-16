@@ -64,7 +64,7 @@ import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Arity        ( typeArity )
-import GHC.Types.Demand ( splitStrictSig, isBotDiv )
+import GHC.Types.Demand ( splitStrictSig, isDeadEndDiv )
 
 import GHC.Driver.Types
 import GHC.Driver.Session
@@ -651,7 +651,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            ppr binder)
 
        ; case splitStrictSig (idStrictness binder) of
-           (demands, result_info) | isBotDiv result_info ->
+           (demands, result_info) | isDeadEndDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
                (text "idArity" <+> ppr (idArity binder) <+>
                text "exceeds arity imposed by the strictness signature" <+>
@@ -986,7 +986,7 @@ used to check two things:
 * exprIsHNF is false: it would *seem* to be terribly wrong if
   the scrutinee was already in head normal form.
 
-* exprIsBottom is true: we should be able to see why GHC believes the
+* exprIsDeadEnd is true: we should be able to see why GHC believes the
   scrutinee is diverging for sure.
 
 It was already known that the second test was not entirely reliable.
@@ -1182,7 +1182,7 @@ lintCaseExpr scrut var alt_ty alts =
               , isAlgTyCon tycon
               , not (isAbstractTyCon tycon)
               , null (tyConDataCons tycon)
-              , not (exprIsBottom scrut)
+              , not (exprIsDeadEnd scrut)
               -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
                         -- This can legitimately happen for type families
                       $ return ()

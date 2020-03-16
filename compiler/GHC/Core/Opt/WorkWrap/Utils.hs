@@ -1228,7 +1228,10 @@ mk_absent_let dflags fam_envs arg
 
     abs_rhs      = mkAbsentErrorApp arg_ty msg
     msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
-                          (ppr arg <+> ppr (idType arg))
+                            (ppr arg <+> ppr (idType arg) <+> file_msg)
+    file_msg     = case outputFile dflags of
+                     Nothing -> empty
+                     Just f  -> text "in output file " <+> quotes (text f)
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for
               -- determinism, because with different uniques the strings
