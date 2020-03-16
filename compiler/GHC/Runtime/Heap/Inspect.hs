@@ -865,7 +865,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
           -- This is a bit involved since we allow packing multiple fields
           -- within a single word. See also
           -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding
-          platform <- targetPlatform <$> getDynFlags
+          platform <- getPlatform
           let word_size = platformWordSizeInBytes platform
               endian = platformByteOrder platform
               size_b = primRepSizeB platform rep
