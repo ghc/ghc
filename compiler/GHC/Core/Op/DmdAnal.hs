@@ -829,7 +829,7 @@ a product type.
 -}
 
 unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topDiv
+unitDmdType dmd_env = DmdType dmd_env [] conDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
