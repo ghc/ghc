@@ -16,10 +16,10 @@ module GHC.Core.Op.DmdAnal ( dmdAnalProgram ) where
 import GhcPrelude
 
 import GHC.Driver.Session
-import GHC.Core.Op.WorkWrap.Lib ( findTypeShape )
 import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
+import GHC.Core.Op.WorkWrap.Lib
 import Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
@@ -30,11 +30,10 @@ import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Coercion ( Coercion, coVarsOfCo )
+import GHC.Core.Coercion ( Coercion, coVarsOfCo, instNewTyCon_maybe )
 import GHC.Core.FamInstEnv
 import Util
 import Maybes           ( isJust )
-import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
@@ -150,8 +149,8 @@ dmdAnal, dmdAnal' :: AnalEnv
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
-dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+dmdAnal' _ _ (Lit lit)     = (emptyDmdType conDiv, Lit lit)
+dmdAnal' _ _ (Type ty)     = (emptyDmdType conDiv, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
@@ -222,8 +221,13 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
+        fam_envs                 = ae_fam_envs env
+        -- See Note [Precise exceptions and strictness analysis] in Demand
+        alt_ty3
+          | mayThrowPreciseException fam_envs (idType case_bndr) scrut_ty
+          = deferAfterPreciseException alt_ty2
+          | otherwise
+          = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -314,19 +318,6 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
-  | otherwise
-  = False
-
 dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | null bndrs    -- Literals, DEFAULT, and nullary constructors
@@ -340,52 +331,73 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
+-- | Returns True if an expression of the given Type and DmdType might throw a
+-- precise exception. In particular, that implies that the Type
+-- 'forcesRealWorld', because otherwise it can't call 'raiseIO#'.
+-- Except for black magic like 'unsafePerformIO' and friends, in which all
+-- precise exception guarantees are off the table.
+-- See Note [Precise exceptions and strictness analysis] in Demand.hs
+mayThrowPreciseException :: FamInstEnvs -> Type -> DmdType -> Bool
+mayThrowPreciseException fam_envs ty dmd_ty
+  = mayThrowPreciseDmdType dmd_ty && forcesRealWorld fam_envs ty
 
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
+-- | Whether a 'seqDmd' on an expression of the given type may force
+-- @State# RealWorld@, incurring a side-effect (ignoring unsafe shenigans like
+-- 'unsafePerformIO'). Looks through coercions and recurses into
+-- unlifted/strict fields.
+forcesRealWorld :: FamInstEnvs -> Type -> Bool
+forcesRealWorld fam_envs = go initRecTc
+  where
+    go :: RecTcChecker -> Type -> Bool
+    go rec_tc ty
+      -- Found it!
+      | ty `eqType`  realWorldStatePrimTy
+      = True
+      -- search depth-first
+      | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
+          <- deepSplitProductType_maybe fam_envs ty
+      -- don't check the same TyCon twice
+      , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
+      = any (strict_field_forces rec_tc') field_tys
+      | otherwise
+      = False
 
-     case foo x s of { (# s', r #) -> y }
+    strict_field_forces rec_tc (field_ty, str_mark) =
+      (isMarkedStrict str_mark || isLiftedType_maybe field_ty == Just False)
+        && go rec_tc field_ty
 
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
+-- | Tries to reset the precise exception flag from the 'StrictSig's
+-- 'Divergence' if really it not 'mayThrowPreciseException'. Resetting the flag
+-- means that the (very conservative) precise exception "taint" won't spread
+-- from pure expressions for which the analysis failed to prove absence of
+-- precise excpetions.
+tryClearPreciseException :: FamInstEnvs -> Type -> StrictSig -> StrictSig
+tryClearPreciseException fam_envs ty sig@(StrictSig dmd_ty@(DmdType fvs args div))
+  | not (mayThrowPreciseDmdType dmd_ty) -- Why bother clearing if there is nothing to clear?
+  = sig
+  | otherwise
+  = go initRecTc (length args) ty
+  where
+    -- This looks through foralls, arrows and newtypes like Core.Arity.typeArity
+    -- The RecTcChecker tracks newtype unwrappings
+    go :: RecTcChecker -> Int -> Type -> StrictSig
+    go rec_nts n ty
+      | Just (_, ty') <- splitForAllTy_maybe ty -- foralls
+      = go rec_nts n     ty'
+      | Just (_, ty') <- splitFunTy_maybe ty    -- arrows
+      = go rec_nts (n-1) ty'
+      | Just (tc,tys) <- splitTyConApp_maybe ty
+      , Just (ty', _) <- instNewTyCon_maybe tc tys
+      , Just rec_nts' <- checkRecTc rec_nts tc  -- newtypes
+      = go rec_nts' n ty'
+    go _ 0 ty
+      | mayThrowPreciseException fam_envs ty dmd_ty
+      = sig
+    go _ _ _
+      = StrictSig (DmdType fvs args (removeExn div))
 
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
@@ -545,7 +557,8 @@ dmdFix top_lvl env let_dmd orig_pairs
 
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+    zapIdStrictness pairs
+      = [(setIdStrictnessResetExc env id (emptySig topDiv), rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
@@ -600,10 +613,9 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
       = mkRhsDmd env rhs_arity rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    -- TODO: Won't the following line unnecessarily trim down arity for join
-    --       points returning a lambda in a C(S) context?
     sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
-    id'            = setIdStrictness id sig
+    id'            = -- pprTraceWith "dmdAnalRhsLetDown" (\sig'-> ppr id <+> ppr sig <+> ppr sig') $
+                     setIdStrictnessResetExc env id sig
         -- See Note [NOINLINE and strictness]
 
 
@@ -888,7 +900,7 @@ deleted the special case.
 -}
 
 unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topDiv
+unitDmdType dmd_env = DmdType dmd_env [] conDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
@@ -1188,6 +1200,10 @@ findBndrDmd env arg_of_dfun dmd_ty id
       = dmd
 
     fam_envs = ae_fam_envs env
+
+setIdStrictnessResetExc :: AnalEnv -> Id -> StrictSig -> Id
+setIdStrictnessResetExc env id sig
+  = setIdStrictness id (tryClearPreciseException (ae_fam_envs env) (idType id) sig)
 
 {- Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
