@@ -96,7 +96,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
-                           , pprUserLength, pprCols
+                           , pprUserLength
                            , unsafeGlobalDynFlags, initSDocContext
                            )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
@@ -566,12 +566,12 @@ renderWithStyle ctx sdoc
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
-showSDocOneLine :: DynFlags -> SDoc -> String
-showSDocOneLine dflags d
+showSDocOneLine :: SDocContext -> SDoc -> String
+showSDocOneLine ctx d
  = let s = Pretty.style{ Pretty.mode = OneLineMode,
-                         Pretty.lineLength = pprCols dflags } in
+                         Pretty.lineLength = sdocLineLength ctx } in
    Pretty.renderStyle s $
-      runSDoc d (initSDocContext dflags (defaultUserStyle dflags))
+      runSDoc d ctx
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
