@@ -16,7 +16,7 @@ module GHC.Core.Opt.DmdAnal ( dmdAnalProgram ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Core.Opt.WorkWrap.Utils ( findTypeShape )
+import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
@@ -34,7 +34,7 @@ import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import GHC.Utils.Misc
 import GHC.Data.Maybe         ( isJust )
-import GHC.Builtin.Types
+import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Utils.Error        ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
@@ -151,7 +151,7 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
 dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
@@ -222,8 +222,13 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
+        fam_envs                 = ae_fam_envs env
+        alt_ty3
+          -- See Note [Precise exceptions and strictness analysis] in Demand
+          | exprMayThrowPreciseException fam_envs scrut
+          = deferAfterPreciseException alt_ty2
+          | otherwise
+          = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -251,12 +256,20 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
-        res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
+        fam_envs             = ae_fam_envs env
+        alt_ty2
+          -- See Note [Precise exceptions and strictness analysis] in Demand
+          | exprMayThrowPreciseException fam_envs scrut
+          = deferAfterPreciseException alt_ty
+          | otherwise
+          = alt_ty
+        res_ty               = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
+
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_tys" <+> ppr alt_tys
---                                   , text "alt_ty" <+> ppr alt_ty
+--                                   , text "alt_ty2" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
@@ -314,16 +327,36 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
+-- | A very syntactic analysis of whether an expression might throw a precise
+-- exception when evaluated. Only true for an IO action that is not a 'PrimOp'
+-- application other than 'raiseIO#'.
+--
+-- See Note [Precise exceptions and strictness analysis] in DmdAnal.
+exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
+exprMayThrowPreciseException envs e
+  | not (forcesRealWorld envs (exprType e))
+  = False -- No precise exception without IO. We give no guarantees wrt. to
+          -- unsafePerformIO!
+  | (Var f, _) <- collectArgs e       -- The only IO PrimOp that throws a
+  , Just op    <- isPrimOpId_maybe f  -- precise exception is RaiseIOOp
+  = op == RaiseIOOp
+  | otherwise                      -- A conservative default for all the other
+                                   -- cases
+  = True
+
+-- | Recognises types that are
+--    * @State# RealWorld@
+--    * Unboxed tuples with a @State# RealWorld@ field
+-- modulo coercions. This will detect 'IO' actions and user-written variants
+-- thereof by their type.
+forcesRealWorld :: FamInstEnvs -> Type -> Bool
+forcesRealWorld fam_envs ty
+  | ty `eqType` realWorldStatePrimTy
+  = True
+  | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
+      <- deepSplitProductType_maybe fam_envs ty
+  , isUnboxedTupleCon dc
+  = any (\(ty,_) -> ty `eqType` realWorldStatePrimTy) field_tys
   | otherwise
   = False
 
@@ -340,52 +373,8 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
-
-     case foo x s of { (# s', r #) -> y }
-
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
-
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
@@ -453,27 +442,33 @@ dmdTransform :: AnalEnv         -- The strictness environment
         -- this function plus demand on its free variables
 
 dmdTransform env var dmd
-  | isDataConWorkId var                          -- Data constructor
+  -- Data constructors
+  | isDataConWorkId var
   = dmdTransformDataConSig (idArity var) dmd
-
+  -- Dictionary component selectors
   | gopt Opt_DmdTxDictSel (ae_dflags env),
-    Just _ <- isClassOpId_maybe var -- Dictionary component selector
+    Just _ <- isClassOpId_maybe var
   = dmdTransformDictSelSig (idStrictness var) dmd
-
-  | isGlobalId var                               -- Imported function
+  -- Imported functions
+  | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
-
-  | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
+  -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
+  -- In that case, we have a strictness signature to unleash in our AnalEnv.
+  | Just (sig, top_lvl) <- lookupSigEnv env var
   , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+  = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
-    then fn_ty   -- Don't record top level things
+    then fn_ty   -- Don't record demand on top-level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
-
-  | otherwise                                    -- Local non-letrec-bound thing
-  = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
+  -- Everything else:
+  --   * Local let binders for which we use LetUp (cf. 'useLetUp')
+  --   * Lambda binders
+  --   * Case and constructor field binders
+  | otherwise
+  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
+    unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
 
 {-
 ************************************************************************
@@ -600,10 +595,9 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
       = mkRhsDmd env rhs_arity rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    -- TODO: Won't the following line unnecessarily trim down arity for join
-    --       points returning a lambda in a C(S) context?
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
-    id'            = setIdStrictness id sig
+    sig            = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
+    id'            = -- pprTrace "dmdAnalRhsLetDown" (ppr id <+> ppr sig) $
+                     setIdStrictness id sig
         -- See Note [NOINLINE and strictness]
 
 
