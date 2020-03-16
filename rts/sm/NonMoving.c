@@ -976,6 +976,28 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         }
     }
 
+    // Walk the list of filled segments that we collected during preparation,
+    // updated their snapshot pointers and move them to the sweep list.
+    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+        struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx]->saved_filled;
+        uint32_t n_filled = 0;
+        if (filled) {
+            struct NonmovingSegment *seg = filled;
+            while (true) {
+                // Set snapshot
+                nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+                n_filled++;
+                if (seg->link)
+                    seg = seg->link;
+                else
+                    break;
+            }
+            // add filled segments to sweep_list
+            seg->link = nonmovingHeap.sweep_list;
+            nonmovingHeap.sweep_list = filled;
+        }
+    }
+
     // Do concurrent marking; most of the heap will get marked here.
     nonmovingMarkThreadsWeaks(mark_queue);
 
