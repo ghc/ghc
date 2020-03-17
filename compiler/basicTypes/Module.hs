@@ -526,10 +526,10 @@ instance Uniquable ComponentId where
 
 instance Outputable ComponentId where
   ppr cid@(ComponentId fs) =
-    getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
     sdocWithDynFlags $ \dflags ->
       case componentIdString dflags cid of
-        Just str | not (debugStyle sty) -> text str
+        Just str | not debug -> text str
         _ -> ftext fs
 
 {-
@@ -697,10 +697,10 @@ instance Uniquable InstalledUnitId where
 
 instance Outputable InstalledUnitId where
     ppr uid@(InstalledUnitId fs) =
-        getPprStyle $ \sty ->
+        getPprDebug $ \debug ->
         sdocWithDynFlags $ \dflags ->
           case displayInstalledUnitId dflags uid of
-            Just str | not (debugStyle sty) -> text str
+            Just str | not debug -> text str
             _ -> ftext fs
 
 installedUnitIdKey :: InstalledUnitId -> Unique
