@@ -30,19 +30,19 @@ import Maybes
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
-import TyCoFVs
-import TyCoRep
-import TyCoPpr
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
-import Type
-import Unify      ( tcMatchTyX_BM, BindFlag(..) )
-import Coercion
-import CoAxiom
-import Class
-import TyCon
-import Predicate
+import GHC.Core.Type
+import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
+import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Predicate
 import TcOrigin
 
 -- others:
@@ -52,8 +52,8 @@ import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
-import FamInstEnv  ( isDominatedBy, injectiveBranches,
-                     InjectivityCheckResult(..) )
+import GHC.Core.FamInstEnv
+   ( isDominatedBy, injectiveBranches, InjectivityCheckResult(..) )
 import FamInst
 import Name
 import VarEnv
@@ -891,7 +891,7 @@ checkEscapingKind env tvbs theta tau =
   case occCheckExpand (binderVars tvbs) phi_kind of
     -- Ensure that none of the tvs occur in the kind of the forall
     -- /after/ expanding type synonyms.
-    -- See Note [Phantom type variables in kinds] in Type
+    -- See Note [Phantom type variables in kinds] in GHC.Core.Type
     Nothing -> failWithTcM $ forAllEscapeErr env tvbs theta tau tau_kind
     Just _  -> pure ()
   where
@@ -943,7 +943,7 @@ checkConstraintsOK ve theta ty
   | allConstraintsAllowed (ve_ctxt ve) = return ()
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
-    -- See Note [Constraints in kinds] in TyCoRep, and #16263
+    -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and #16263
     checkTcM (all isEqPred theta) $
     constraintTyErr (ve_tidy_env ve) ty
 
@@ -2031,7 +2031,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
      -- Injectivity check: check whether a new (CoAxBranch) can extend
      -- already checked equations without violating injectivity
      -- annotation supplied by the user.
-     -- See Note [Verifying injectivity annotation] in FamInstEnv
+     -- See Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv
     check_injectivity prev_branches cur_branch
       | Injective inj <- injectivity
       = do { dflags <- getDynFlags
@@ -2046,7 +2046,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     gather_conflicts inj prev_branches cur_branch (acc, n) branch
                -- n is 0-based index of branch in prev_branches
       = case injectiveBranches inj cur_branch branch of
-           -- Case 1B2 in Note [Verifying injectivity annotation] in FamInstEnv
+           -- Case 1B2 in Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv
           InjectivityUnified ax1 ax2
             | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
                 -> (acc, n + 1)
@@ -2669,7 +2669,7 @@ To solve this problem in a robust way, we do the following:
 
 Note that we only perform this check for type families, and not for data
 families. This is because it is perfectly acceptable to oversaturate data
-family instance equations: see Note [Arity of data families] in FamInstEnv.
+family instance equations: see Note [Arity of data families] in GHC.Core.FamInstEnv.
 
 ************************************************************************
 *                                                                      *

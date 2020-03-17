@@ -2,15 +2,15 @@
 
 module T11195 where
 
-import TyCoRep
-import Coercion
-import Type hiding( substTyVarBndr, substTy, extendTCvSubst )
+import GHC.Core.TyCo.Rep
+import GHC.Core.Coercion
+import GHC.Core.Type hiding( substTyVarBndr, substTy, extendTCvSubst )
+import GHC.Core.InstEnv
+import GHC.Core.Coercion.Axiom
 import TcType       ( exactTyCoVarsOfType )
-import CoAxiom
 import VarSet
 import VarEnv
 import Pair
-import InstEnv
 
 type NormalCo    = Coercion
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity

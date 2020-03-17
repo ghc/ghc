@@ -20,7 +20,7 @@ import GhcPrelude
 
 import GHC.Hs
 import TcPat
-import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
+import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -29,7 +29,7 @@ import TcHsSyn
 import TysPrim
 import Name
 import SrcLoc
-import PatSyn
+import GHC.Core.PatSyn
 import NameSet
 import Panic
 import Outputable
@@ -42,7 +42,7 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
-import Predicate
+import GHC.Core.Predicate
 import TysWiredIn
 import TcType
 import TcEvidence
@@ -51,7 +51,7 @@ import BuildTyCl
 import VarSet
 import MkId
 import TcTyDecls
-import ConLike
+import GHC.Core.ConLike
 import FieldLabel
 import Bag
 import Util
@@ -303,7 +303,7 @@ have type
   $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
 
 and that is bad because (a ~# Maybe b) is not a predicate type
-(see Note [Types for coercions, predicates, and evidence] in TyCoRep
+(see Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
@@ -400,7 +400,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                   -- satisfy the substitution invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
-                  -- See also Note [The substitution invariant] in TyCoSubst.
+                  -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }
@@ -686,7 +686,7 @@ tcPatSynMatcher :: Located Name
                 -> ([LHsExpr GhcTcId], [TcType])
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
--- See Note [Matchers and builders for pattern synonyms] in PatSyn
+-- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
 tcPatSynMatcher (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
@@ -812,7 +812,7 @@ mkPatSynBuilderId dir (L _ name)
 
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
--- See Note [Matchers and builders for pattern synonyms] in PatSyn
+-- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
 tcPatSynBuilderBind (PSB { psb_id = L loc name
                          , psb_def = lpat
                          , psb_dir = dir

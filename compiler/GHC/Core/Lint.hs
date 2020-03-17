@@ -32,7 +32,7 @@ import GHC.Core.Stats ( coreBindsStats )
 import CoreMonad
 import Bag
 import Literal
-import DataCon
+import GHC.Core.DataCon
 import TysWiredIn
 import TysPrim
 import TcType ( isFloatingTy )
@@ -45,16 +45,16 @@ import Id
 import IdInfo
 import GHC.Core.Ppr
 import ErrUtils
-import Coercion
+import GHC.Core.Coercion
 import SrcLoc
-import Type
+import GHC.Core.Type as Type
 import GHC.Types.RepType
-import TyCoRep       -- checks validity of types/coercions
-import TyCoSubst
-import TyCoFVs
-import TyCoPpr ( pprTyVar )
-import TyCon
-import CoAxiom
+import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
+import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCon as TyCon
+import GHC.Core.Coercion.Axiom
 import BasicTypes
 import ErrUtils as Err
 import ListSetOps
@@ -62,9 +62,9 @@ import PrelNames
 import Outputable
 import FastString
 import Util
-import InstEnv     ( instanceDFunId )
-import OptCoercion ( checkAxInstCo )
-import GHC.Core.Arity ( typeArity )
+import GHC.Core.InstEnv      ( instanceDFunId )
+import GHC.Core.Coercion.Opt ( checkAxInstCo )
+import GHC.Core.Arity        ( typeArity )
 import Demand ( splitStrictSig, isBotDiv )
 
 import GHC.Driver.Types
@@ -1087,7 +1087,7 @@ lintTyApp fun_ty arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
         -- uniques that are already in scope.
-        -- See Note [The substitution invariant] in TyCoSubst
+        -- See Note [The substitution invariant] in GHC.Core.TyCo.Subst
         ; return (substTyWithInScope in_scope [tv] [arg_ty] body_ty) }
 
   | otherwise
@@ -1466,7 +1466,7 @@ lintType t@(ForAllTy (Bndr cv _vis) ty)
        ; checkValueKind k (text "the body of forall:" <+> ppr t)
        ; return liftedTypeKind
            -- We don't check variable escape here. Namely, k could refer to cv'
-           -- See Note [NthCo and newtypes] in TyCoRep
+           -- See Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
     }}
 
 lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
@@ -1585,7 +1585,7 @@ lint_app :: SDoc -> LintedKind -> [(LintedType,LintedKind)] -> LintM Kind
 lint_app doc kfn kas
     = do { in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
-         -- Note [The substitution invariant] in TyCoSubst
+         -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
          ; foldlM (go_app in_scope) kfn kas }
   where
     fail_msg extra = vcat [ hang (text "Kind application error in") 2 doc
@@ -1807,7 +1807,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `tv2` has the same unique as `tv1`.
-                     -- See Note [The substitution invariant] in TyCoSubst.
+                     -- See Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                      unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
              tyr = mkInvForAllTy tv2 $
                    substTy subst t2
@@ -1825,7 +1825,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; checkValueKind k3 (text "the body of a ForAllCo over covar:" <+> ppr co)
        ; checkValueKind k4 (text "the body of a ForAllCo over covar:" <+> ppr co)
-           -- See Note [Weird typing rule for ForAllTy] in Type
+           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
        ; in_scope <- getInScope
        ; let tyl   = mkTyCoInvForAllTy cv1 t1
              r2    = coVarRole cv1
@@ -1838,13 +1838,13 @@ lintCoercion (ForAllCo cv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `cv2` has the same unique as `cv1`.
-                     -- See Note [The substitution invariant] in TyCoSubst.
+                     -- See Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                      unitVarEnv cv1 (eta1 `mkTransCo` (mkCoVarCo cv2)
                                           `mkTransCo` (mkSymCo eta2))
              tyr = mkTyCoInvForAllTy cv2 $
                    substTy subst t2
        ; return (liftedTypeKind, liftedTypeKind, tyl, tyr, r) } }
-                   -- See Note [Weird typing rule for ForAllTy] in Type
+                   -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
 
 lintCoercion co@(FunCo r co1 co2)
   = do { (k1,k'1,s1,t1,r1) <- lintCoercion co1
@@ -1964,7 +1964,7 @@ lintCoercion the_co@(NthCo r0 n co)
          { (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
              , isInjectiveTyCon tc_s r
-                 -- see Note [NthCo and newtypes] in TyCoRep
+                 -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
              -> do { lintRole the_co tr r0
@@ -2018,7 +2018,7 @@ lintCoercion (InstCo co arg)
              , CoercionTy s2' <- s2
              -> do { return $
                        (liftedTypeKind, liftedTypeKind
-                          -- See Note [Weird typing rule for ForAllTy] in Type
+                          -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
                        , substTy (mkCvSubst in_scope $ unitVarEnv cv1 s1') t1
                        , substTy (mkCvSubst in_scope $ unitVarEnv cv2 s2') t2
                        , r) }

@@ -4,7 +4,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module Unify (
+module GHC.Core.Unify (
         tcMatchTy, tcMatchTyKi,
         tcMatchTys, tcMatchTyKis,
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
@@ -32,12 +32,12 @@ import Var
 import VarEnv
 import VarSet
 import Name( Name )
-import Type hiding ( getTvSubstEnv )
-import Coercion hiding ( getCvSubstEnv )
-import TyCon
-import TyCoRep
-import TyCoFVs ( tyCoVarsOfCoList, tyCoFVsOfTypes )
-import TyCoSubst ( mkTvSubst )
+import GHC.Core.Type     hiding ( getTvSubstEnv )
+import GHC.Core.Coercion hiding ( getCvSubstEnv )
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
+import GHC.Core.TyCo.Subst ( mkTvSubst )
 import FV( FV, fvVarSet, fvVarList )
 import Util
 import Pair
@@ -228,7 +228,7 @@ matchBindFun tvs tv = if tv `elemVarSet` tvs then BindMe else Skolem
 *                                                                      *
 ********************************************************************* -}
 
--- See Note [Rough match] field in InstEnv
+-- See Note [Rough match] field in GHC.Core.InstEnv
 
 roughMatchTcs :: [Type] -> [Maybe Name]
 roughMatchTcs tys = map rough tys
@@ -682,7 +682,7 @@ Note [Specification of unification]
 The pure unifier, unify_ty, defined in this module, tries to work out
 a substitution to make two types say True to eqType. NB: eqType is
 itself not purely syntactic; it accounts for CastTys;
-see Note [Non-trivial definitional equality] in TyCoRep
+see Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
 
 Unlike the "impure unifiers" in the typechecker (the eager unifier in
 TcUnify, and the constraint solver itself in TcCanonical), the pure
@@ -691,7 +691,7 @@ unifier It does /not/ work up to ~.
 The algorithm implemented here is rather delicate, and we depend on it
 to uphold certain properties. This is a summary of these required
 properties. Any reference to "flattening" refers to the flattening
-algorithm in FamInstEnv (See Note [Flattening] in FamInstEnv), not
+algorithm in GHC.Core.FamInstEnv (See Note [Flattening] in GHC.Core.FamInstEnv), not
 the flattening algorithm in the solver.
 
 Notation:
@@ -1507,7 +1507,7 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
 --        subst2 <- ty_co_match menv subst1 s2 eta2 kco3 kco4
 --      Question: How do we get kcoi?
 --   2. Given:
---        lkco :: <*>    -- See Note [Weird typing rule for ForAllTy] in Type
+--        lkco :: <*>    -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
 --        rkco :: <*>
 --      Wanted:
 --        ty_co_match menv' subst2 ty1 co2 lkco' rkco'

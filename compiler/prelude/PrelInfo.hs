@@ -51,13 +51,13 @@ import GhcPrelude
 import KnownUniques
 import Unique           ( isValidKnownKeyUnique )
 
-import ConLike          ( ConLike(..) )
+import GHC.Core.ConLike ( ConLike(..) )
 import THNames          ( templateHaskellNames )
 import PrelNames
 import PrelRules
 import Avail
 import PrimOp
-import DataCon
+import GHC.Core.DataCon
 import Id
 import Name
 import NameEnv
@@ -66,8 +66,8 @@ import Outputable
 import TysPrim
 import TysWiredIn
 import GHC.Driver.Types
-import Class
-import TyCon
+import GHC.Core.Class
+import GHC.Core.TyCon
 import UniqFM
 import Util
 import TcTypeNats ( typeNatTyCons )

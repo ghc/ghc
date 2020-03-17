@@ -193,19 +193,19 @@ module TcType (
 -- friends:
 import GhcPrelude
 
-import TyCoRep
-import TyCoSubst ( mkTvSubst, substTyWithCoVars )
-import TyCoFVs
-import TyCoPpr
-import Class
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr
+import GHC.Core.Class
 import Var
 import ForeignCall
 import VarSet
-import Coercion
-import Type
-import Predicate
+import GHC.Core.Coercion
+import GHC.Core.Type as Type
+import GHC.Core.Predicate
 import GHC.Types.RepType
-import TyCon
+import GHC.Core.TyCon
 
 -- others:
 import GHC.Driver.Session
@@ -508,7 +508,7 @@ data TcTyVarDetails
                   --     how this level number is used
        Bool       -- True <=> this skolem type variable can be overlapped
                   --          when looking up instances
-                  -- See Note [Binding when looking up instances] in InstEnv
+                  -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
@@ -518,7 +518,7 @@ data TcTyVarDetails
            , mtv_tclvl :: TcLevel }  -- See Note [TcLevel and untouchable type variables]
 
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
--- See Note [Binding when looking up instances] in InstEnv
+-- See Note [Binding when looking up instances] in GHC.Core.InstEnv
 vanillaSkolemTv = SkolemTv topTcLevel False  -- Might be instantiated
 superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely distinct type
                   -- The choice of level number here is a bit dodgy, but
@@ -921,7 +921,7 @@ exactTyCoVarsOfType is used by the type checker to figure out exactly
 which type variables are mentioned in a type.  It only matters
 occasionally -- see the calls to exactTyCoVarsOfType.
 
-We place this function here in TcType, note in TyCoFVs,
+We place this function here in TcType, not in GHC.Core.TyCo.FVs,
 because we want to "see" tcView (efficiency issue only).
 -}
 
@@ -1494,7 +1494,7 @@ tcEqKind = tcEqType
 
 tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
 -- tcEqType is a proper implements the same Note [Non-trivial definitional
--- equality] (in TyCoRep) as `eqType`, but Type.eqType believes (* ==
+-- equality] (in GHC.Core.TyCo.Rep) as `eqType`, but Type.eqType believes (* ==
 -- Constraint), and that is NOT what we want in the type checker!
 tcEqType ty1 ty2
   =  tc_eq_type False False ki1 ki2
@@ -1556,7 +1556,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     go env ty (FunTy _ arg res) = eqFunTy env arg res ty
     go env (FunTy _ arg res) ty = eqFunTy env arg res ty
 
-      -- See Note [Equality on AppTys] in Type
+      -- See Note [Equality on AppTys] in GHC.Core.Type
     go env (AppTy s1 t1)        ty2
       | Just (s2, t2) <- tcRepSplitAppTy_maybe ty2
       = go env s1 s2 && go env t1 t2
@@ -1923,7 +1923,7 @@ Note [Lift equality constraints when quantifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't quantify over a constraint (t1 ~# t2) because that isn't a
 predicate type; see Note [Types for coercions, predicates, and evidence]
-in TyCoRep.
+in GHC.Core.TyCo.Rep.
 
 So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
 to Coercible.

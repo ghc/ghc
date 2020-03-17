@@ -49,7 +49,7 @@ import Name hiding( isVarOcc, isTcOcc, varName, tcName )
 import THNames
 import NameEnv
 import TcType
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Core
 import GHC.Core.Make
@@ -68,9 +68,9 @@ import MonadUtils
 import TcEvidence
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import Class
+import GHC.Core.Class
 import GHC.Driver.Types ( MonadThings )
-import DataCon
+import GHC.Core.DataCon
 import Var
 import GHC.HsToCore.Binds
 

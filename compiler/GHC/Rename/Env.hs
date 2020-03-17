@@ -60,9 +60,9 @@ import NameSet
 import NameEnv
 import Avail
 import Module
-import ConLike
-import DataCon
-import TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCon
 import ErrUtils         ( MsgDoc )
 import PrelNames        ( rOOT_MAIN )
 import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )

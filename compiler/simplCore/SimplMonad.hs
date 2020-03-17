@@ -26,9 +26,9 @@ import Var              ( Var, isId, mkLocalVar )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import Type             ( Type, mkLamTypes )
-import FamInstEnv       ( FamInstEnv )
-import GHC.Core         ( RuleEnv(..) )
+import GHC.Core.Type       ( Type, mkLamTypes )
+import GHC.Core.FamInstEnv ( FamInstEnv )
+import GHC.Core            ( RuleEnv(..) )
 import UniqSupply
 import GHC.Driver.Session
 import CoreMonad

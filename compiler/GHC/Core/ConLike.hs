@@ -7,7 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module ConLike (
+module GHC.Core.ConLike (
           ConLike(..)
         , conLikeArity
         , conLikeFieldLabels
@@ -28,16 +28,16 @@ module ConLike (
 
 import GhcPrelude
 
-import DataCon
-import PatSyn
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import Outputable
 import Unique
 import Util
 import Name
 import BasicTypes
-import TyCoRep (Type, ThetaType)
+import GHC.Core.TyCo.Rep (Type, ThetaType)
 import Var
-import Type (mkTyConApp)
+import GHC.Core.Type(mkTyConApp)
 
 import qualified Data.Data as Data
 
@@ -167,7 +167,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 conLikeFullSig :: ConLike
                -> ([TyVar], [TyCoVar], [EqSpec]
                    -- Why tyvars for universal but tycovars for existential?
-                   -- See Note [Existential coercion variables] in DataCon
+                   -- See Note [Existential coercion variables] in GHC.Core.DataCon
                   , ThetaType, ThetaType, [Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con

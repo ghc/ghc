@@ -24,7 +24,7 @@ import GHC.Driver.Session
 import TcRnMonad
 import FamInst
 import TcOrigin
-import Predicate
+import GHC.Core.Predicate
 import TcDerivInfer
 import TcDerivUtils
 import TcValidity( allDistinctTyVars )
@@ -32,12 +32,12 @@ import TcClassDcl( instDeclCtxt3, tcATDefault )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import TcValidity( checkValidInstHead )
-import InstEnv
+import GHC.Core.InstEnv
 import Inst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import TcHsType
-import TyCoRep
-import TyCoPpr    ( pprTyVars )
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr ( pprTyVars )
 
 import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
 import GHC.Rename.Binds
@@ -45,16 +45,16 @@ import GHC.Rename.Env
 import GHC.Rename.Source ( addTcgDUs )
 import Avail
 
-import Unify( tcUnifyTy )
-import Class
-import Type
+import GHC.Core.Unify( tcUnifyTy )
+import GHC.Core.Class
+import GHC.Core.Type
 import ErrUtils
-import DataCon
+import GHC.Core.DataCon
 import Maybes
 import RdrName
 import Name
 import NameSet
-import TyCon
+import GHC.Core.TyCon
 import TcType
 import Var
 import VarEnv
@@ -886,7 +886,7 @@ from DataFamInstTyCon:
       TyCon   -- The family TyCon
       [Type]  -- Argument types (mentions the tyConTyVars of this TyCon)
               -- No shorter in length than the tyConTyVars of the family TyCon
-              -- How could it be longer? See [Arity of data families] in FamInstEnv
+              -- How could it be longer? See [Arity of data families] in GHC.Core.FamInstEnv
 
 Notice that the arg tys might not be the same as the family tycon arity
 (= length tyConTyVars).
@@ -1312,7 +1312,7 @@ write it out
       return x = MkT [x]
       ... etc ...
 
-See Note [Eta reduction for data families] in FamInstEnv
+See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
 
 %************************************************************************
 %*                                                                      *

@@ -74,7 +74,7 @@ import GhcPrelude
 import GHC.Hs
 import TcRnMonad
 import TcOrigin
-import Predicate
+import GHC.Core.Predicate
 import Constraint
 import TcEvidence
 import TcEnv
@@ -84,20 +84,20 @@ import TcUnify
 import GHC.IfaceToCore
 import TcSimplify
 import TcHsSyn
-import TyCoRep
-import TyCoPpr
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import Type
+import GHC.Core.Type
 import TysPrim
 import RdrName( lookupLocalRdrOcc )
 import Var
 import VarSet
-import TyCon
-import ConLike
-import DataCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Class
 import Name
 -- import NameSet
 import VarEnv
@@ -969,7 +969,7 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
     UnboxedTuple ->
       let tycon    = tupleTyCon Unboxed arity
           tau_reps = map kindRep tau_kinds
-          -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
+          -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
           arg_tys  = tau_reps ++ tau_tys
           res_kind = unboxedTupleKind tau_reps in
       check_expected_kind (mkTyConApp tycon arg_tys) res_kind
@@ -1541,7 +1541,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
-    -- See Note [Constraints in kinds] in TyCoRep
+    -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
     dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
     dc_theta_illegal_constraint = find (not . isEqPred)
 
@@ -2467,7 +2467,7 @@ kcLHsQTyVarBndrs:
   * The use of tcImplicitQTKBndrs
   * The tcLookupLocal_maybe code in kc_hs_tv
 
-See Note [Associated type tyvar names] in Class and
+See Note [Associated type tyvar names] in GHC.Core.Class and
     Note [TyVar binders for associated decls] in GHC.Hs.Decls
 
 We must do the same for family instance decls, where the in-scope

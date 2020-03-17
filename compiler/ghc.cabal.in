@@ -171,7 +171,6 @@ Library
         specialise
         stranal
         typecheck
-        types
         utils
 
     -- we use an explicit Prelude
@@ -193,9 +192,9 @@ Library
         Avail
         AsmUtils
         BasicTypes
-        ConLike
-        DataCon
-        PatSyn
+        GHC.Core.ConLike
+        GHC.Core.DataCon
+        GHC.Core.PatSyn
         Demand
         Cpr
         GHC.Cmm.DebugBlock
@@ -207,7 +206,7 @@ Library
         GHC.Driver.Ways
         Id
         IdInfo
-        Predicate
+        GHC.Core.Predicate
         Lexeme
         Literal
         GHC.Llvm
@@ -407,7 +406,7 @@ Library
         Ctype
         HaddockUtils
         Lexer
-        OptCoercion
+        GHC.Core.Coercion.Opt
         Parser
         RdrHsSyn
         ApiAnnotation
@@ -523,22 +522,22 @@ Library
         TcSMonad
         TcTypeNats
         TcSplice
-        Class
-        Coercion
+        GHC.Core.Class
+        GHC.Core.Coercion
         GHC.HsToCore.Quote
         THNames
-        FamInstEnv
+        GHC.Core.FamInstEnv
         FunDeps
-        InstEnv
-        TyCon
-        CoAxiom
-        Type
-        TyCoRep
-        TyCoFVs
-        TyCoSubst
-        TyCoPpr
-        TyCoTidy
-        Unify
+        GHC.Core.InstEnv
+        GHC.Core.TyCon
+        GHC.Core.Coercion.Axiom
+        GHC.Core.Type
+        GHC.Core.TyCo.Rep
+        GHC.Core.TyCo.FVs
+        GHC.Core.TyCo.Subst
+        GHC.Core.TyCo.Ppr
+        GHC.Core.TyCo.Tidy
+        GHC.Core.Unify
         Bag
         Binary
         BooleanFormula
