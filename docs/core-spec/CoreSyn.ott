@@ -143,6 +143,7 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
   | < t > R mg              ::   :: GRefl         {{ com \ctor{GRefl}: Generalized Reflexivity }}
     {{ tex {\langle [[t]] \rangle}^{[[mg]]}_{[[R]]} }}
   | T RA </ gi // i />      ::   :: TyConAppCo    {{ com \ctor{TyConAppCo}: Type constructor application }}
+  | g1 -> RA g2             ::   :: FunCo         {{ com \ctor{FunCo}: Functions }}
   | g1 g2                   ::   :: AppCo         {{ com \ctor{AppCo}: Application }}
   | forall z : h . g        ::   :: ForAllCo      {{ com \ctor{ForAllCo}: Polymorphism }}
     {{ tex [[forall]] [[z]]{:}[[h]].[[g]] }}
@@ -162,6 +163,7 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
   | sub g                   ::   :: SubCo         {{ com \ctor{SubCo}: Sub-role --- convert nominal to representational }}
   | ( g )                   :: M :: Parens        {{ com Parentheses }}
   | t $ liftingsubst        :: M :: Lifted        {{ com Type lifted to coercion }}
+  | downgradeRole R g       :: M :: downgradeRole {{ com \textsf{downgradeRole} }}
 
 prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/TyCoRep.hs}{UnivCoProvenance} }}
   | UnsafeCoerceProv   ::   :: UnsafeCoerceProv  {{ com From \texttt{unsafeCoerce\#} }}
@@ -396,8 +398,10 @@ terminals :: 'terminals_' ::=
   | -->          ::   :: steps            {{ tex \longrightarrow }}
   | coercionKind ::   :: coercionKind     {{ tex \textsf{coercionKind} }}
   | coercionRole ::   :: coercionRole     {{ tex \textsf{coercionRole} }}
+  | downgradeRole ::  :: downgradeRole    {{ tex \textsf{downgradeRole} }}
   | take         ::   :: take             {{ tex \textsf{take}\! }}
   | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
+  | almostDevoid ::   :: almostDevoid     {{ tex \textsf{almostDevoid} }}
   | Just         ::   :: Just             {{ tex \textsf{Just} }}
   | \\           ::   :: newline          {{ tex \\ }}
   | classifiesTypeWithValues :: :: ctwv   {{ tex \textsf{classifiesTypeWithValues} }}
@@ -483,6 +487,7 @@ formula :: 'formula_' ::=
   | z elt vars                         ::   :: in_vars
   | split _ I s = types                ::   :: split_type
     {{ tex \mathop{\textsf{split} }_{[[I]]} [[s]] = [[types]] }}
+  | almostDevoid x g                   ::   :: almostDevoid
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
