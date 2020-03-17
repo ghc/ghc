@@ -506,10 +506,10 @@ instance Uniquable UnitId where
 
 instance Outputable UnitId where
     ppr uid@(UnitId fs) =
-        getPprStyle $ \sty ->
+        getPprDebug $ \debug ->
         sdocWithDynFlags $ \dflags ->
           case displayUnitId (pkgState dflags) uid of
-            Just str | not (debugStyle sty) -> text str
+            Just str | not debug -> text str
             _ -> ftext fs
 
 -- | A 'DefUnitId' is an 'UnitId' with the invariant that
@@ -562,8 +562,8 @@ instance Uniquable unit => Uniquable (Indefinite unit) where
 instance Outputable unit => Outputable (Indefinite unit) where
   ppr (Indefinite uid Nothing)        = ppr uid
   ppr (Indefinite uid (Just pprinfo)) =
-    getPprStyle $ \sty ->
-      if debugStyle sty
+    getPprDebug $ \debug ->
+      if debug
          then ppr uid
          else ppr pprinfo
 
