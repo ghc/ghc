@@ -437,7 +437,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
             Err.dumpIfSet_dyn dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
               Err.FormatText
-              (pprRulesForUser dflags tidy_rules)
+              (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds

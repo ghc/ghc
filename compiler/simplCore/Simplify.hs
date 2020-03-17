@@ -1802,7 +1802,7 @@ completeCall env var cont
 
     log_inlining doc
       = liftIO $ dumpAction dflags
-           (mkUserStyle dflags alwaysQualify AllTheWay)
+           (mkUserStyle alwaysQualify AllTheWay)
            (dumpOptionsFromFlag Opt_D_dump_inlinings)
            "" FormatText doc
 
@@ -2090,7 +2090,7 @@ tryRules env rules fn args call_cont
 
     log_rule dflags flag hdr details
       = liftIO $ do
-         let sty = mkDumpStyle dflags alwaysQualify
+         let sty = mkDumpStyle alwaysQualify
          dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
            sep [text hdr, nest 4 details]
 
