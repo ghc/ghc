@@ -781,7 +781,7 @@ msg sev reason doc
              err_sty  = mkErrStyle dflags unqual
              user_sty = mkUserStyle unqual AllTheWay
              dump_sty = mkDumpStyle unqual
-       ; liftIO $ putLogMsg dflags reason sev loc sty doc }
+       ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
