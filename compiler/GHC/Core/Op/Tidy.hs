@@ -191,7 +191,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         -- Similarly for the demand info - on a let binder, this tells
         -- CorePrep to turn the let into a case.
         -- But: Remove the usage demand here
-        --      (See Note [Zapping DmdEnv after Demand Analyzer] in WorkWrap)
+        --      (See Note [Zapping DmdEnv after Demand Analyzer] in GHC.Core.Op.WorkWrap)
         --
         -- Similarly arity info for eta expansion in CorePrep
         -- Don't attempt to recompute arity here; this is just tidying!

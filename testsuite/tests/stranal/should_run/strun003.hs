@@ -2,7 +2,7 @@
 -- But it won't if the strictness analyser thinks that 'len' is use
 -- strictly, which was the case in GHC 6.0
 
--- See the io_hack_reqd in DmdAnal.lhs
+-- See the io_hack_reqd in GHC.Core.Op.DmdAnal
 
 module Main where
 

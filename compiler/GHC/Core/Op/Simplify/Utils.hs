@@ -1,12 +1,12 @@
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
-\section[SimplUtils]{The simplifier utilities}
+The simplifier utilities
 -}
 
 {-# LANGUAGE CPP #-}
 
-module SimplUtils (
+module GHC.Core.Op.Simplify.Utils (
         -- Rebuilding
         mkLam, mkCase, prepareAlts, tryEtaExpandRhs,
 
@@ -40,8 +40,8 @@ module SimplUtils (
 
 import GhcPrelude
 
-import SimplEnv
-import CoreMonad        ( SimplMode(..), Tick(..) )
+import GHC.Core.Op.Simplify.Env
+import GHC.Core.Op.Monad        ( SimplMode(..), Tick(..) )
 import GHC.Driver.Session
 import GHC.Core
 import qualified GHC.Core.Subst
@@ -56,7 +56,7 @@ import Id
 import IdInfo
 import Var
 import Demand
-import SimplMonad
+import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
@@ -66,7 +66,7 @@ import Util
 import OrdList          ( isNilOL )
 import MonadUtils
 import Outputable
-import PrelRules
+import GHC.Core.Op.ConstantFold
 import FastString       ( fsLit )
 
 import Control.Monad    ( when )
@@ -498,7 +498,8 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- interesting context.  This avoids substituting
                         -- top-level bindings for (say) strings into
                         -- calls to error.  But now we are more careful about
-                        -- inlining lone variables, so its ok (see SimplUtils.analyseCont)
+                        -- inlining lone variables, so it's ok
+                        -- (see GHC.Core.Op.Simplify.Utils.analyseCont)
                    if isBotDiv result_info then
                         map isStrictDmd demands         -- Finite => result is bottom
                    else
@@ -773,7 +774,7 @@ interestingArg env e = go env 0 e
 ************************************************************************
 
 The SimplMode controls several switches; see its definition in
-CoreMonad
+GHC.Core.Op.Monad
         sm_rules      :: Bool     -- Whether RULES are enabled
         sm_inline     :: Bool     -- Whether inlining is enabled
         sm_case_case  :: Bool     -- Whether case-of-case is enabled
@@ -844,7 +845,7 @@ we do not want to eta-expand to
   --    = (/\a \(d:Ord a) (x:a) (eta:State#). bla eta) |> co
 
 because not specialisation of the overloading doesn't work properly
-(see Note [Specialisation shape] in Specialise), #9509.
+(see Note [Specialisation shape] in GHC.Core.Op.Specialise), #9509.
 
 So we disable eta-expansion in stable unfoldings.
 
@@ -1525,7 +1526,7 @@ tryEtaExpandRhs mode bndr rhs
        ; WARN( new_arity < old_id_arity,
                (text "Arity decrease:" <+> (ppr bndr <+> ppr old_id_arity
                 <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
-                        -- Note [Arity decrease] in Simplify
+                        -- Note [Arity decrease] in GHC.Core.Op.Simplify
          return (new_arity, is_bot, new_rhs) }
   where
     try_expand
@@ -1575,9 +1576,11 @@ arguments!
 
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similarly to CPR (see Note [Don't w/w join points for CPR] in WorkWrap), a join point
-stands well to gain from its outer binding's eta-expansion, and eta-expanding a
-join point is fraught with issues like how to deal with a cast:
+
+Similarly to CPR (see Note [Don't w/w join points for CPR] in
+GHC.Core.Op.WorkWrap), a join point stands well to gain from its outer binding's
+eta-expansion, and eta-expanding a join point is fraught with issues like how to
+deal with a cast:
 
     let join $j1 :: IO ()
              $j1 = ...
@@ -1666,8 +1669,9 @@ So I have elaborated simplLazyBind to understand right-hand sides that look
 like
         /\ a1..an. body
 
-and treat them specially. The real work is done in SimplUtils.abstractFloats,
-but there is quite a bit of plumbing in simplLazyBind as well.
+and treat them specially. The real work is done in
+GHC.Core.Op.Simplify.Utils.abstractFloats, but there is quite a bit of plumbing
+in simplLazyBind as well.
 
 The same transformation is good when there are lets in the body:
 
@@ -2042,7 +2046,7 @@ There are some wrinkles
   But NB: we use b'; we do not duplicate 'e'.
 
 * In dataToTag we might need to make up some fake binders;
-  see Note [caseRules for dataToTag] in PrelRules
+  see Note [caseRules for dataToTag] in GHC.Core.Op.ConstantFold
 -}
 
 mkCase, mkCase1, mkCase2, mkCase3
@@ -2154,7 +2158,7 @@ mkCase2 dflags scrut bndr alts_ty alts
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives
                   -- See Note [Unreachable caseRules alternatives]
-                  -- in PrelRules
+                  -- in GHC.Core.Op.ConstantFold
 
        ; mkCase3 dflags scrut' bndr' alts_ty $
          add_default (re_sort alts')
@@ -2198,7 +2202,7 @@ mkCase2 dflags scrut bndr alts_ty alts
     mk_new_bndrs new_bndr (DataAlt dc)
       | not (isNullaryRepDataCon dc)
       = -- For non-nullary data cons we must invent some fake binders
-        -- See Note [caseRules for dataToTag] in PrelRules
+        -- See Note [caseRules for dataToTag] in GHC.Core.Op.ConstantFold
         do { us <- getUniquesM
            ; let (ex_tvs, arg_ids) = dataConRepInstPat us dc
                                         (tyConAppArgs (idType new_bndr))
@@ -2236,7 +2240,7 @@ This may generate sligthtly better code (although it should not, since
 all cases are exhaustive) and/or optimise better.  I'm not certain that
 it's necessary, but currently we do make this change.  We do it here,
 NOT in the TagToEnum rules (see "Beware" in Note [caseRules for tagToEnum]
-in PrelRules)
+in GHC.Core.Op.ConstantFold)
 -}
 
 --------------------------------------------------
@@ -2245,7 +2249,8 @@ in PrelRules)
 mkCase3 _dflags scrut bndr alts_ty alts
   = return (Case scrut bndr alts_ty alts)
 
--- See Note [Exitification] and Note [Do not inline exit join points] in Exitify.hs
+-- See Note [Exitification] and Note [Do not inline exit join points] in
+-- GHC.Core.Op.Exitify
 -- This lives here (and not in Id) because occurrence info is only valid on
 -- InIds, so it's crucial that isExitJoinId is only called on freshly
 -- occ-analysed code. It's not a generic function you can call anywhere.

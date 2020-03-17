@@ -31,7 +31,7 @@ import GHC.Core.FVs
 import {-# SOURCE #-} GHC.Core.Unfold( mkUnfolding )
 import GHC.Core.Make ( FloatBind(..) )
 import GHC.Core.Ppr  ( pprCoreBindings, pprRules )
-import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
+import GHC.Core.Op.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
 import IdInfo   ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
@@ -469,7 +469,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
     post_inline_unconditionally
        | isExportedId in_bndr  = False -- Note [Exported Ids and trivial RHSs]
        | stable_unf            = False -- Note [Stable unfoldings and postInlineUnconditionally]
-       | not active            = False --     in SimplUtils
+       | not active            = False --     in GHC.Core.Op.Simplify.Utils
        | is_loop_breaker       = False -- If it's a loop-breaker of any kind, don't inline
                                        -- because it might be referred to "earlier"
        | exprIsTrivial out_rhs = True
@@ -489,7 +489,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
 {- Note [Exported Ids and trivial RHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We obviously do not want to unconditionally inline an Id that is exported.
-In SimplUtils, Note [Top level and postInlineUnconditionally], we
+In GHC.Core.Op.Simplify.Utils, Note [Top level and postInlineUnconditionally], we
 explain why we don't inline /any/ top-level things unconditionally, even
 trivial ones.  But we do here!  Why?  In the simple optimiser
 
@@ -1247,7 +1247,7 @@ pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
--- C.f. simplCast in Simplify.hs
+-- C.f. simplCast in GHC.Core.Op.Simplify
 -- 'co' is always Representational
 -- If the returned coercion is Nothing, then it would have been reflexive
 pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty

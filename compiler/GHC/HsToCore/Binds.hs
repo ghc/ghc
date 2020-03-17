@@ -37,8 +37,8 @@ import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
-import GHC.Core.SimpleOpt ( simpleOptExpr )
-import OccurAnal          ( occurAnalyseExpr )
+import GHC.Core.SimpleOpt    ( simpleOptExpr )
+import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Arity     ( etaExpand )

@@ -1,11 +1,11 @@
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
-\section[SimplMonad]{The simplifier Monad}
+\section[GHC.Core.Op.Simplify.Monad]{The simplifier Monad}
 -}
 
 {-# LANGUAGE DeriveFunctor #-}
-module SimplMonad (
+module GHC.Core.Op.Simplify.Monad (
         -- The monad
         SimplM,
         initSmpl, traceSmpl,
@@ -31,7 +31,7 @@ import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core            ( RuleEnv(..) )
 import UniqSupply
 import GHC.Driver.Session
-import CoreMonad
+import GHC.Core.Op.Monad
 import Outputable
 import FastString
 import MonadUtils

@@ -337,7 +337,7 @@ We do *not* desugar simply to
    error "empty case"
 or some such, because 'x' might be bound to (error "hello"), in which
 case we want to see that "hello" exception, not (error "empty case").
-See also Note [Case elimination: lifted case] in Simplify.
+See also Note [Case elimination: lifted case] in GHC.Core.Op.Simplify.
 
 
 ************************************************************************

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, GADTs, RankNTypes,
              PolyKinds, KindSignatures #-}
-{-# OPTIONS_GHC -O2 #-} -- We are provoking a bug in SpecConstr
+{-# OPTIONS_GHC -O2 #-} -- We are provoking a bug in GHC.Core.Op.SpecConstr
 
 module T14270a where
 
@@ -25,4 +25,4 @@ g kv x = case kv of
 -- The point here is that the call to f looks like
 --    f @(a |> co) (T2 @(a |> co))
 -- where 'co' is bound by the pattern match on K1
--- See Note [SpecConstr and casts] in SpecConstr
+-- See Note [SpecConstr and casts] in GHC.Core.Op.SpecConstr

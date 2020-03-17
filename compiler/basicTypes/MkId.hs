@@ -35,7 +35,7 @@ module MkId (
         coerceName,
 
         -- Re-export error Ids
-        module PrelRules
+        module GHC.Core.Op.ConstantFold
     ) where
 
 #include "HsVersions.h"
@@ -45,7 +45,7 @@ import GhcPrelude
 import GHC.Core.Rules
 import TysPrim
 import TysWiredIn
-import PrelRules
+import GHC.Core.Op.ConstantFold
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
@@ -1500,7 +1500,7 @@ enough support that you can do this using a rewrite rule:
 
 You write that rule.  When GHC sees a case expression that discards
 its result, it mentally transforms it to a call to 'seq' and looks for
-a RULE.  (This is done in Simplify.trySeqRules.)  As usual, the
+a RULE.  (This is done in GHC.Core.Op.Simplify.trySeqRules.)  As usual, the
 correctness of the rule is up to you.
 
 VERY IMPORTANT: to make this work, we give the RULE an arity of 1, not 2.
@@ -1512,10 +1512,10 @@ with rule arity 2, then two bad things would happen:
     for saturated application of 'seq' would turn the LHS into
     a case expression!
 
-  - The code in Simplify.rebuildCase would need to actually supply
+  - The code in GHC.Core.Op.Simplify.rebuildCase would need to actually supply
     the value argument, which turns out to be awkward.
 
-See also: Note [User-defined RULES for seq] in Simplify.
+See also: Note [User-defined RULES for seq] in GHC.Core.Op.Simplify.
 
 
 Note [lazyId magic]
@@ -1647,7 +1647,7 @@ cannot be instantiated with a forall.  The field of `WrapC` contains
 a `Proxy` parameter which is used to link the type of the constraint,
 `C a`, with the type of the `Wrap` value being made.
 
-Next, we add a built-in Prelude rule (see prelude/PrelRules.hs),
+Next, we add a built-in Prelude rule (see GHC.Core.Op.ConstantFold),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 

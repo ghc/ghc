@@ -354,7 +354,7 @@ an unlifted literal, like all the others.
 
 Also, we do not permit case analysis with literal patterns on floating-point
 types. See #9238 and Note [Rules for floating-point comparisons] in
-PrelRules for the rationale for this restriction.
+GHC.Core.Op.ConstantFold for the rationale for this restriction.
 
 -------------------------- GHC.Core INVARIANTS ---------------------------
 
@@ -508,7 +508,7 @@ checked by Core Lint.
 
 5. Floating-point values must not be scrutinised against literals.
    See #9238 and Note [Rules for floating-point comparisons]
-   in PrelRules for rationale.  Checked in lintCaseExpr;
+   in GHC.Core.Op.ConstantFold for rationale.  Checked in lintCaseExpr;
    see the call to isFloatingTy.
 
 6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
@@ -784,7 +784,7 @@ is crucial for understanding how case-of-case interacts with join points:
     _  -> False
 
 The simplifier will pull the case into the join point (see Note [Join points
-and case-of-case] in Simplify):
+and case-of-case] in GHC.Core.Op.Simplify):
 
   join
     j :: Int -> Bool -> Bool -- changed!
@@ -1810,9 +1810,9 @@ the occurrence info is wrong
 -}
 
 -- The Ord is needed for the FiniteMap used in the lookForConstructor
--- in SimplEnv.  If you declared that lookForConstructor *ignores*
--- constructor-applications with LitArg args, then you could get
--- rid of this Ord.
+-- in GHC.Core.Op.Simplify.Env.  If you declared that lookForConstructor
+-- *ignores* constructor-applications with LitArg args, then you could get rid
+-- of this Ord.
 
 instance Outputable AltCon where
   ppr (DataAlt dc) = ppr dc

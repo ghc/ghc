@@ -22,7 +22,7 @@ import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Op.Tidy
-import CoreMonad
+import GHC.Core.Op.Monad
 import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
@@ -896,7 +896,7 @@ Now that RULE *might* be useful to an importing module, but that is
 purely speculative, and meanwhile the code is taking up space and
 codegen time.  I found that binary sizes jumped by 6-10% when I
 started to specialise INLINE functions (again, Note [Inline
-specialisations] in Specialise).
+specialisations] in GHC.Core.Op.Specialise).
 
 So it seems better to drop the binding for f_spec, and the rule
 itself, if the auto-generated rule is the *only* reason that it is
@@ -904,8 +904,8 @@ being kept alive.
 
 (The RULE still might have been useful in the past; that is, it was
 the right thing to have generated it in the first place.  See Note
-[Inline specialisations] in Specialise.  But now it has served its
-purpose, and can be discarded.)
+[Inline specialisations] in GHC.Core.Op.Specialise. But now it has
+served its purpose, and can be discarded.)
 
 So findExternalRules does this:
   * Remove all bindings that are kept alive *only* by isAutoRule rules
@@ -1253,7 +1253,8 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.hs
+    -- split (see Note [Worker-wrapper for bottoming functions] in
+    -- GHC.Core.Op.WorkWrap)
 
 
     --------- Arity ------------

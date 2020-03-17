@@ -163,7 +163,7 @@ Note [Instances and loop breakers]
   loop-breaker because df_i isn't), op1_i will ironically never be
   inlined.  But this is OK: the recursion breaking happens by way of
   a RULE (the magic ClassOp rule above), and RULES work inside InlineRule
-  unfoldings. See Note [RULEs enabled in InitialPhase] in SimplUtils
+  unfoldings. See Note [RULEs enabled in InitialPhase] in GHC.Core.Op.Simplify.Utils
 
 Note [ClassOp/DFun selection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -488,7 +488,7 @@ isDataConId_maybe id = case Var.idDetails id of
                          _                 -> Nothing
 
 isJoinId :: Var -> Bool
--- It is convenient in SetLevels.lvlMFE to apply isJoinId
+-- It is convenient in GHC.Core.Op.SetLevels.lvlMFE to apply isJoinId
 -- to the free vars of an expression, so it's convenient
 -- if it returns False for type variables
 isJoinId id
@@ -894,7 +894,7 @@ Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 This transfer is used in three places:
         FloatOut (long-distance let-floating)
-        SimplUtils.abstractFloats (short-distance let-floating)
+        GHC.Core.Op.Simplify.Utils.abstractFloats (short-distance let-floating)
         StgLiftLams (selectively lambda-lift local functions to top-level)
 
 Consider the short-distance let-floating:

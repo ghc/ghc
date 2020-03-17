@@ -2,7 +2,7 @@
 -- Copyright (c) 2014 Joachim Breitner
 --
 
-module CallArity
+module GHC.Core.Op.CallArity
     ( callArityAnalProgram
     , callArityRHS -- for testing
     ) where

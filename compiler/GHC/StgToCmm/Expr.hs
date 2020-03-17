@@ -64,7 +64,7 @@ cgExpr  :: CgStgExpr -> FCode ReturnKind
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
 -- seq# a s ==> a
--- See Note [seq# magic] in PrelRules
+-- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
@@ -404,7 +404,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
 
 {- Note [Handle seq#]
 ~~~~~~~~~~~~~~~~~~~~~
-See Note [seq# magic] in PrelRules.
+See Note [seq# magic] in GHC.Core.Op.ConstantFold.
 The special case for seq# in cgCase does this:
 
   case seq# a s of v
@@ -419,7 +419,7 @@ is the same as the return convention for just 'a')
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- Note [Handle seq#]
-    -- And see Note [seq# magic] in PrelRules
+    -- And see Note [seq# magic] in GHC.Core.Op.ConstantFold
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 

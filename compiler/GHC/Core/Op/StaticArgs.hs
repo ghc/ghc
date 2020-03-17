@@ -49,7 +49,7 @@ essential to make this work well!
 -}
 
 {-# LANGUAGE CPP #-}
-module SAT ( doStaticArgs ) where
+module GHC.Core.Op.StaticArgs ( doStaticArgs ) where
 
 import GhcPrelude
 

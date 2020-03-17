@@ -117,7 +117,7 @@ import TcRnMonad
 import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
 import PrelInfo
-import SimplCore
+import GHC.Core.Op.Simplify.Driver
 import GHC.HsToCore
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
 import GHC.Iface.Make

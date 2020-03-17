@@ -9,7 +9,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-module Specialise ( specProgram, specUnfolding ) where
+module GHC.Core.Op.Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
 
@@ -21,7 +21,7 @@ import GHC.Core.Type  hiding( substTy, extendTvSubstList )
 import GHC.Core.Predicate
 import Module( Module, HasModule(..) )
 import GHC.Core.Coercion( Coercion )
-import CoreMonad
+import GHC.Core.Op.Monad
 import qualified GHC.Core.Subst
 import GHC.Core.Unfold
 import Var              ( isLocalVar )
@@ -1436,7 +1436,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
              let body = mkLams unspec_bndrs rhs_body'
                  body_ty = substTy rhs_env2 $ exprType body
                  (lam_extra_args, app_args)     -- See Note [Specialisations Must Be Lifted]
-                   | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
+                   | isUnliftedType body_ty     -- C.f. GHC.Core.Op.WorkWrap.Lib.mkWorkerArgs
                    , not (isJoinId fn)
                    = ([voidArgId], voidPrimId : unspec_bndrs)
                    | otherwise = ([], unspec_bndrs)
@@ -1507,7 +1507,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
-                --      See Note [Arity decrease] in Simplify
+                --      See Note [Arity decrease] in GHC.Core.Op.Simplify
                 -- Copy InlinePragma information from the parent Id.
                 -- So if f has INLINE[1] so does spec_f
                 spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - n_dicts)
@@ -1634,7 +1634,7 @@ Consider
 
 In f's stable unfolding we have done some modest simplification which
 has pushed the cast to the outside.  (I wonder if this is the Right
-Thing, but it's what happens now; see SimplUtils Note [Casts and
+Thing, but it's what happens now; see GHC.Core.Op.Simplify.Utils Note [Casts and
 lambdas].)  Now that stable unfolding must be specialised, so we want
 to push the cast back inside. It would be terrible if the cast
 defeated specialisation!  Hence the use of collectBindersPushingCo.

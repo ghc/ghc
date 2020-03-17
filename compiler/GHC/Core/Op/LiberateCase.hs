@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-module LiberateCase ( liberateCase ) where
+module GHC.Core.Op.LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 

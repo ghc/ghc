@@ -62,7 +62,7 @@ import VarSet
 import Name
 import NameEnv
 import NameSet
-import OccurAnal        ( occurAnalyseExpr )
+import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
 import Demand
 import Module
 import UniqFM

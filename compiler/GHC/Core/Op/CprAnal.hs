@@ -7,13 +7,13 @@
 -- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
 -- CPR analysis should happen after strictness analysis.
 -- See Note [Phase ordering].
-module CprAnal ( cprAnalProgram ) where
+module GHC.Core.Op.CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import WwLib            ( deepSplitProductType_maybe )
+import GHC.Core.Op.WorkWrap.Lib ( deepSplitProductType_maybe )
 import GHC.Driver.Session
 import Demand
 import Cpr
@@ -107,7 +107,7 @@ cprAnalProgram dflags fam_envs binds = do
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
-  -- See Note [Stamp out space leaks in demand analysis] in DmdAnal
+  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Op.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
 -- Analyse a (group of) top-level binding(s)
@@ -251,7 +251,7 @@ cprFix top_lvl env orig_pairs
   = loop 1 initial_pairs
   where
     bot_sig = mkCprSig 0 botCpr
-    -- See Note [Initialising strictness] in DmdAnal.hs
+    -- See Note [Initialising strictness] in GHC.Core.Op.DmdAnal
     initial_pairs | ae_virgin env = [(setIdCprInfo id bot_sig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 

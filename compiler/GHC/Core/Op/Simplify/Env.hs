@@ -1,19 +1,19 @@
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
-\section[SimplMonad]{The simplifier Monad}
+\section[GHC.Core.Op.Simplify.Monad]{The simplifier Monad}
 -}
 
 {-# LANGUAGE CPP #-}
 
-module SimplEnv (
+module GHC.Core.Op.Simplify.Env (
         -- * The simplifier mode
         setMode, getMode, updMode, seDynFlags,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
-        SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
+        extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
@@ -47,8 +47,8 @@ module SimplEnv (
 
 import GhcPrelude
 
-import SimplMonad
-import CoreMonad                ( SimplMode(..) )
+import GHC.Core.Op.Simplify.Monad
+import GHC.Core.Op.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
 import Var
@@ -60,7 +60,7 @@ import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
 import TysWiredIn
 import qualified GHC.Core.Type as Type
-import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr )
+import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import BasicTypes
@@ -669,7 +669,7 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         -- Even though it isn't in the substitution, it may be in
         -- the in-scope set with better IdInfo.
         --
-        -- See also Note [In-scope set as a substitution] in Simplify.
+        -- See also Note [In-scope set as a substitution] in GHC.Core.Op.Simplify.
 
 refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v

@@ -4,7 +4,7 @@ import GHC.Core.Utils
 import Id
 import GHC.Core.Type
 import GHC.Core.Make
-import CallArity (callArityRHS)
+import GHC.Core.Op.CallArity (callArityRHS)
 import MkId
 import SysTools
 import GHC.Driver.Session
