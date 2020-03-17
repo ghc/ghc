@@ -48,7 +48,7 @@ import TysPrim
 import UniqFM
 import Util
 import VarEnv
-import DataCon
+import GHC.Core.DataCon
 import BasicTypes
 
 -------------------------------------

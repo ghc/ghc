@@ -14,7 +14,7 @@ module GHC.StgToCmm.Types
 import GhcPrelude
 
 import BasicTypes
-import DataCon
+import GHC.Core.DataCon
 import NameEnv
 import Outputable
 
