@@ -1044,10 +1044,13 @@ mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
 
 dsHsVar :: Id -> DsM CoreExpr
 dsHsVar var
-               -- See Wrinkle in Note [Detecting forced eta expansion]
-  = ASSERT2(null (badUseOfLevPolyPrimop var ty), ppr var $$ ppr ty)
-    return (varToCoreExpr var)   -- See Note [Desugaring vars]
+  | let bad_tys = badUseOfLevPolyPrimop var ty
+  , not (null bad_tys)
+  = do { levPolyPrimopErr (ppr var) ty bad_tys
+       ; return unitExpr }  -- return something eminently safe
 
+  | otherwise
+  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
   where
     ty = idType var
 
@@ -1134,6 +1137,8 @@ This invariant is checked in dsExpr.
 With that representation invariant, we simply look inside every HsWrap
 to see if its body is an HsVar whose Id hasNoBinding. Then, we look
 at the wrapped type. If it has any levity polymorphic arguments, reject.
+Because we might have an HsVar without a wrapper, we check in dsHsVar
+as well. typecheck/should_fail/T17021 triggers this case.
 
 Interestingly, this approach does not look to see whether the Id in
 question will be eta expanded. The logic is this:
@@ -1144,20 +1149,6 @@ question will be eta expanded. The logic is this:
     argument. If its wrapped type contains levity polymorphic arguments, reject.
 So, either way, we're good to reject.
 
-Wrinkle
-~~~~~~~
-Currently, all levity-polymorphic Ids are wrapped in HsWrap.
-
-However, this is not set in stone, in the future we might make
-instantiation more lazy.  (See "Visible type application", ESOP '16.)
-If we spot a levity-polymorphic hasNoBinding Id without a wrapper,
-then that is surely a problem. In this case, we raise an assertion failure.
-This failure can be changed to a call to `levPolyPrimopErr` in the future,
-if we decide to change instantiation.
-
-We can just check HsVar and HsConLikeOut for RealDataCon, since
-we don't have levity-polymorphic pattern synonyms. (This might change
-in the future.)
 -}
 
 -- | Takes an expression and its instantiated type. If the expression is an
