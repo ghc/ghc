@@ -206,6 +206,9 @@ data Type
   | ForAllTy
         {-# UNPACK #-} !TyCoVarBinder
         Type            -- ^ A Π type.
+             -- INVARIANT: If the binder is a coercion variable, it must
+             -- be mentioned in the Type. See
+             -- Note [Unused coercion variable in ForAllTy]
 
   | FunTy      -- ^ t1 -> t2   Very common, so an important special case
                 -- See Note [Function types]
@@ -218,9 +221,10 @@ data Type
   | CastTy
         Type
         KindCoercion  -- ^ A kind cast. The coercion is always nominal.
-                      -- INVARIANT: The cast is never refl.
+                      -- INVARIANT: The cast is never reflexive
                       -- INVARIANT: The Type is not a CastTy (use TransCo instead)
-                      -- See Note [Respecting definitional equality] (EQ2) and (EQ3)
+                      -- INVARIANT: The Type is not a ForAllTy over a type variable
+                      -- See Note [Respecting definitional equality] (EQ2), (EQ3), (EQ4)
 
   | CoercionTy
         Coercion    -- ^ Injection of a Coercion into a type
@@ -567,10 +571,19 @@ be pulled to the right. But we don't need to pull it: (T |> axFun) Int is not
 `eqType` to any proper TyConApp -- thus, leaving it where it is doesn't violate
 our (EQ) property.
 
-Lastly, in order to detect reflexive casts reliably, we must make sure not
+In order to detect reflexive casts reliably, we must make sure not
 to have nested casts: we update (t |> co1 |> co2) to (t |> (co1 `TransCo` co2)).
 
-In sum, in order to uphold (EQ), we need the following three invariants:
+One other troublesome case is ForAllTy. See Note [Weird typing rule for ForAllTy].
+The kind of the body is the same as the kind of the ForAllTy. Accordingly,
+
+  ForAllTy tv (ty |> co)     and     (ForAllTy tv ty) |> co
+
+are `eqType`. But only the first can be split by splitForAllTy. So we forbid
+the second form, instead pushing the coercion inside to get the first form.
+This is done in mkCastTy.
+
+In sum, in order to uphold (EQ), we need the following invariants:
 
   (EQ1) No decomposable CastTy to the left of an AppTy, where a decomposable
         cast is one that relates either a FunTy to a FunTy or a
@@ -578,7 +591,7 @@ In sum, in order to uphold (EQ), we need the following three invariants:
   (EQ2) No reflexive casts in CastTy.
   (EQ3) No nested CastTys.
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
-        See Note [Weird typing rule for ForAllTy] in GHC.Core.Type.
+        See Note [Weird typing rule for ForAllTy]
 
 These invariants are all documented above, in the declaration for Type.
 
@@ -606,6 +619,45 @@ body. If so, it returns a FunTy instead of a ForAllTy.
 There are cases we want to skip the check. For example, the check is
 unnecessary when it is known from the context that the input variable
 is a type variable.  In those cases, we use mkForAllTy.
+
+Note [Weird typing rule for ForAllTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is the (truncated) typing rule for the dependent ForAllTy:
+
+  inner : TYPE r
+  tyvar is not free in r
+  ----------------------------------------
+  ForAllTy (Bndr tyvar vis) inner : TYPE r
+
+Note that the kind of `inner` is the kind of the overall ForAllTy. This is
+necessary because every ForAllTy over a type variable is erased at runtime.
+Thus the runtime representation of a ForAllTy (as encoded, via TYPE rep, in
+the kind) must be the same as the representation of the body. We must check
+for skolem-escape, though. The skolem-escape would prevent a definition like
+
+  undefined :: forall (r :: RuntimeRep) (a :: TYPE r). a
+
+because the type's kind (TYPE r) mentions the out-of-scope r. Luckily, the real
+type of undefined is
+
+  undefined :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
+
+and that HasCallStack constraint neatly sidesteps the potential skolem-escape
+problem.
+
+If the bound variable is a coercion variable:
+
+  inner : TYPE r
+  covar is free in inner
+  ------------------------------------
+  ForAllTy (Bndr covar vis) inner : Type
+
+Here, the kind of the ForAllTy is just Type, because coercion abstractions
+are *not* erased. The "covar is free in inner" premise is solely to maintain
+the representation invariant documented in
+Note [Unused coercion variable in ForAllTy]. Though there is surface similarity
+between this free-var check and the one in the tyvar rule, these two restrictions
+are truly unrelated.
 
 -}
 
@@ -1003,6 +1055,7 @@ data Coercion
                -- The TyCon is never a synonym;
                -- we expand synonyms eagerly
                -- But it can be a type function
+               -- TyCon is never a saturated (->); use FunCo instead
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e

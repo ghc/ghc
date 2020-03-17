@@ -1382,6 +1382,7 @@ mkCastTy (CastTy ty co1) co2
 
 mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
   -- (EQ4) from the Note
+  -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
   | isTyVar tv
   , let fvs = tyCoVarsOfCo co
   = -- have to make sure that pushing the co in doesn't capture the bound var!
