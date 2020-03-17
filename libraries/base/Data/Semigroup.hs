@@ -286,6 +286,13 @@ instance Num a => Num (Max a) where
 
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
 -- placed inside 'Min' and 'Max' to compute an arg min or arg max.
+--
+-- === __Example:__
+-- >>> import qualified Data.List.NonEmpty as NE
+-- >>> let f x = x * x
+-- >>>     as = map (\i -> Min (Arg (f i) i)) [-10 .. 10]
+-- >>> case getMin $ sconcat (NE.fromList as) of Arg y x -> x
+-- 0
 data Arg a b = Arg a b deriving
   ( Show     -- ^ @since 4.9.0.0
   , Read     -- ^ @since 4.9.0.0
