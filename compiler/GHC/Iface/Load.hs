@@ -1117,7 +1117,7 @@ showIface hsc_env filename = do
                                    neverQualifyModules
                                    neverQualifyPackages
    putLogMsg dflags NoReason SevDump noSrcSpan
-      (mkDumpStyle print_unqual) (pprModIface iface)
+      $ withPprStyle (mkDumpStyle print_unqual) (pprModIface iface)
 
 -- Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.

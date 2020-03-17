@@ -177,7 +177,7 @@ showTerm term = do
                       -- XXX: this tries to disable logging of errors
                       -- does this still do what it is intended to do
                       -- with the changed error handling and logging?
-           let noop_log _ _ _ _ _ _ = return ()
+           let noop_log _ _ _ _ _ = return ()
                expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"

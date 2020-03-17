@@ -372,7 +372,7 @@ displayLintResults :: DynFlags -> CoreToDo
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
   = do { putLogMsg dflags NoReason Err.SevDump noSrcSpan
-           defaultDumpStyle
+           $ withPprStyle defaultDumpStyle
            (vcat [ lint_banner "errors" (ppr pass), Err.pprMessageBag errs
                  , text "*** Offending Program ***"
                  , pprCoreBindings binds
@@ -385,7 +385,7 @@ displayLintResults dflags pass warns errs binds
   -- If the Core linter encounters an error, output to stderr instead of
   -- stdout (#13342)
   = putLogMsg dflags NoReason Err.SevInfo noSrcSpan
-        defaultDumpStyle
+      $ withPprStyle defaultDumpStyle
         (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
   | otherwise = return ()
@@ -416,7 +416,8 @@ lintInteractiveExpr what hsc_env expr
 
     display_lint_err err
       = do { putLogMsg dflags NoReason Err.SevDump
-               noSrcSpan defaultDumpStyle
+               noSrcSpan
+               $ withPprStyle defaultDumpStyle
                (vcat [ lint_banner "errors" (text what)
                      , err
                      , text "*** Offending Program ***"

@@ -86,8 +86,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                                                    NoReason
                                                    SevDump
                                                    noSrcSpan
-                                                   defaultDumpStyle
-                                                   err
+                                                   $ withPprStyle defaultDumpStyle err
                                        ; ghcExit dflags 1
                                        }
                         Nothing  -> return ()

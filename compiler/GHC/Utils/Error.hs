@@ -379,7 +379,7 @@ printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle dflags unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s style (formatErrDoc ctx doc)
+                in putLogMsg dflags reason sev s $ withPprStyle style (formatErrDoc ctx doc)
               | ErrMsg { errMsgSpan      = s,
                          errMsgDoc       = doc,
                          errMsgSeverity  = sev,
@@ -441,8 +441,8 @@ dumpIfSet dflags flag hdr doc
                             NoReason
                             SevDump
                             noSrcSpan
-                            defaultDumpStyle
-                            (mkDumpDoc hdr doc)
+                            (withPprStyle defaultDumpStyle
+                              (mkDumpDoc hdr doc))
 
 -- | a wrapper around 'dumpAction'.
 -- First check whether the dump flag is set
@@ -523,14 +523,14 @@ dumpSDocWithStyle sty dflags dumpOpt hdr doc =
                                 $$ blankLine
                                 $$ doc
                         return $ mkDumpDoc hdr d
-        defaultLogActionHPrintDoc dflags handle doc' sty
+        defaultLogActionHPrintDoc dflags handle (withPprStyle sty doc')
 
     -- write the dump to stdout
     writeDump Nothing = do
         let (doc', severity)
               | null hdr  = (doc, SevOutput)
               | otherwise = (mkDumpDoc hdr doc, SevDump)
-        putLogMsg dflags NoReason severity noSrcSpan sty doc'
+        putLogMsg dflags NoReason severity noSrcSpan (withPprStyle sty doc')
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -610,15 +610,15 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
-   = putLogMsg dflags NoReason SevError noSrcSpan (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
 
 warningMsg :: DynFlags -> MsgDoc -> IO ()
 warningMsg dflags msg
-   = putLogMsg dflags NoReason SevWarning noSrcSpan (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg =
-    putLogMsg dflags NoReason SevFatal noSrcSpan (defaultErrStyle dflags) msg
+    putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
@@ -627,12 +627,12 @@ compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg = do
     traceEventIO $ "GHC progress: " ++ msg
     ifVerbose dflags 1 $
-        logOutput dflags defaultUserStyle (text msg)
+        logOutput dflags $ withPprStyle defaultUserStyle (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
   = ifVerbose dflags 2 $
-    logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
+    logInfo dflags $ withPprStyle defaultUserStyle (text "***" <+> text what <> colon)
 
 data PrintTimings = PrintTimings | DontPrintTimings
   deriving (Eq, Show)
@@ -727,7 +727,7 @@ withTiming' :: MonadIO m
 withTiming' dflags what force_result prtimings action
   = do if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do whenPrintTimings $
-                    logInfo dflags defaultUserStyle $
+                    logInfo dflags $ withPprStyle defaultUserStyle $
                       text "***" <+> what <> colon
                   let ctx = initDefaultSDocContext dflags
                   eventBegins ctx what
@@ -743,7 +743,7 @@ withTiming' dflags what force_result prtimings action
                       time = realToFrac (end - start) * 1e-9
 
                   when (verbosity dflags >= 2 && prtimings == PrintTimings)
-                      $ liftIO $ logInfo dflags defaultUserStyle
+                      $ liftIO $ logInfo dflags $ withPprStyle defaultUserStyle
                           (text "!!!" <+> what <> colon <+> text "finished in"
                            <+> doublePrec 2 time
                            <+> text "milliseconds"
@@ -774,27 +774,29 @@ withTiming' dflags what force_result prtimings action
           eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
-debugTraceMsg dflags val msg = ifVerbose dflags val $
-                               logInfo dflags defaultDumpStyle msg
+debugTraceMsg dflags val msg =
+   ifVerbose dflags val $
+      logInfo dflags (withPprStyle defaultDumpStyle msg)
+
 putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = logInfo dflags defaultUserStyle msg
+putMsg dflags msg = logInfo dflags (withPprStyle defaultUserStyle msg)
 
 printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printInfoForUser dflags print_unqual msg
-  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
+  = logInfo dflags (withUserStyle print_unqual AllTheWay msg)
 
 printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printOutputForUser dflags print_unqual msg
-  = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
+  = logOutput dflags (withUserStyle print_unqual AllTheWay msg)
 
-logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
-logInfo dflags sty msg
-  = putLogMsg dflags NoReason SevInfo noSrcSpan sty msg
+logInfo :: DynFlags -> MsgDoc -> IO ()
+logInfo dflags msg
+  = putLogMsg dflags NoReason SevInfo noSrcSpan msg
 
-logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
--- ^ Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
-logOutput dflags sty msg
-  = putLogMsg dflags NoReason SevOutput noSrcSpan sty msg
+-- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
+logOutput :: DynFlags -> MsgDoc -> IO ()
+logOutput dflags msg
+  = putLogMsg dflags NoReason SevOutput noSrcSpan msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
