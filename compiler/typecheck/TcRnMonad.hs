@@ -712,8 +712,8 @@ dumpTcRn useUserStyle dumpOpt title fmt doc = do
   printer <- getPrintUnqualified dflags
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
-              then mkUserStyle dflags printer AllTheWay
-              else mkDumpStyle dflags printer
+              then mkUserStyle printer AllTheWay
+              else mkDumpStyle printer
   liftIO $ dumpAction dflags sty dumpOpt title fmt real_doc
 
 -- | Add current location if -dppr-debug
