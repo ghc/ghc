@@ -183,13 +183,14 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
            -- Note [Linting type synonym applications].
            case lintTypes dflags tcvs' (rhs':lhs') of
              Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error" (vcat [ fail_msg
-                                                               , ppr fam_tc
-                                                               , ppr subst
-                                                               , ppr tvs'
-                                                               , ppr cvs'
-                                                               , ppr lhs'
-                                                               , ppr rhs' ])
+             Just fail_msg -> pprPanic "Core Lint error in newFamInst" $
+                              vcat [ fail_msg
+                                   , ppr fam_tc
+                                   , ppr subst
+                                   , ppr tvs'
+                                   , ppr cvs'
+                                   , ppr lhs'
+                                   , ppr rhs' ]
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs

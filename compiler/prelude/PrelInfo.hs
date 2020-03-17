@@ -54,7 +54,7 @@ import Unique           ( isValidKnownKeyUnique )
 import GHC.Core.ConLike ( ConLike(..) )
 import THNames          ( templateHaskellNames )
 import PrelNames
-import PrelRules
+import GHC.Core.Op.ConstantFold
 import Avail
 import PrimOp
 import GHC.Core.DataCon

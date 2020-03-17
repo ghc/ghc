@@ -681,7 +681,7 @@ mkCallDmd (JD {sd = d, ud = u})
 mkCallDmds :: Arity -> CleanDemand -> CleanDemand
 mkCallDmds arity cd = iterate mkCallDmd cd !! arity
 
--- See Note [Demand on the worker] in WorkWrap
+-- See Note [Demand on the worker] in GHC.Core.Op.WorkWrap
 mkWorkerDemand :: Int -> Demand
 mkWorkerDemand n = JD { sd = Lazy, ud = Use One (go n) }
   where go 0 = Used
@@ -859,7 +859,7 @@ Bottom line: we really don't want to have a binder whose demand is more
 deeply-nested than its type.  There are various ways to tackle this.
 When processing (x |> g1), we could "trim" the incoming demand U(U,U)
 to match x's type.  But I'm currently doing so just at the moment when
-we pin a demand on a binder, in DmdAnal.findBndrDmd.
+we pin a demand on a binder, in GHC.Core.Op.DmdAnal.findBndrDmd.
 
 
 Note [Threshold demands]
@@ -1053,7 +1053,7 @@ We
 3 and 4 are implemented in bothDivergence.
 -}
 
--- Equality needed for fixpoints in DmdAnal
+-- Equality needed for fixpoints in GHC.Core.Op.DmdAnal
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 div1)
        (DmdType fv2 ds2 div2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
@@ -1174,7 +1174,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- * We can keep usage information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
--- See Note [IO hack in the demand analyser] in DmdAnal
+-- See Note [IO hack in the demand analyser] in GHC.Core.Op.DmdAnal
 deferAfterIO :: DmdType -> DmdType
 deferAfterIO d@(DmdType _ _ res) =
     case d `lubDmdType` nopDmdType of
@@ -1530,7 +1530,7 @@ Here comes the subtle part: The threshold is encoded in the wrapped demand
 type's depth! So in mkStrictSigForArity we make sure to trim the list of
 argument demands to the given threshold arity. Call sites will make sure that
 this corresponds to the arity of the call demand that elicited the wrapped
-demand type. See also Note [What are demand signatures?] in DmdAnal.
+demand type. See also Note [What are demand signatures?] in GHC.Core.Op.DmdAnal.
 
 Besides trimming argument demands, mkStrictSigForArity will also trim CPR
 information if necessary.
@@ -1703,7 +1703,7 @@ argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
 -- saturatedByOneShots n C1(C1(...)) = True,
 --   <=>
 -- there are at least n nested C1(..) calls
--- See Note [Demand on the worker] in WorkWrap
+-- See Note [Demand on the worker] in GHC.Core.Op.WorkWrap
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots n (JD { ud = usg })
   = case usg of

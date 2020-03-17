@@ -355,8 +355,8 @@ types are apart. This has practical consequences for the ability for closed
 type family applications to reduce. See test case
 indexed-types/should_compile/Overlap14.
 
-Note [Unifying with skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unification with skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we discover that two types unify if and only if a skolem variable is
 substituted, we can't properly unify the types. But, that skolem variable
 may later be instantiated with a unifyable type. So, we return maybeApart
