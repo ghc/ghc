@@ -242,9 +242,9 @@ If 'f' was inferred to be strict in 'y', WW would turn a precise into an
 imprecise exception in the call site @f 1 (error "boom")@.
 
 The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
-'Demand.defaultDmd' is lazy. But then the simplifier fails to eliminate a lot of
-dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need to
-give it 'exnDiv', which was conceived entirely for this reason. The default
+'Demand.defaultFvDmd' is lazy. But then the simplifier fails to eliminate a lot
+of dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need
+to give it 'exnDiv', which was conceived entirely for this reason. The default
 demand of 'exnDiv' is lazy, but otherwise (in terms of 'Demand.isBotDiv') it
 behaves exactly as 'botDiv', so that dead code elimination works as expected.
 -}
@@ -1010,8 +1010,8 @@ lubDivergence r        Diverges = r
 lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 lubDivergence ConOrDiv ConOrDiv = ConOrDiv
 lubDivergence _        _        = Dunno
--- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
+-- This needs to commute with defaultFvDmd, i.e.
+-- defaultFvDmd (r1 `lubDivergence` r2) = defaultFvDmd r1 `lubDmd` defaultFvDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
@@ -1045,26 +1045,30 @@ isBotDiv ConOrDiv = False
 isBotDiv Dunno    = False
 
 -- See Notes [Default demand on free variables]
--- and [defaultDmd vs. resTypeArgDmd]
+-- and [defaultFvDmd vs. defaultArgDmd]
 -- and Scenario 2 in [Precise exceptions and strictness analysis]
-defaultDmd :: Divergence -> Demand
-defaultDmd Dunno    = absDmd
-defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
-defaultDmd ConOrDiv = absDmd
-defaultDmd Diverges = botDmd -- Diverges
+defaultFvDmd :: Divergence -> Demand
+defaultFvDmd Dunno    = absDmd
+defaultFvDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultFvDmd ConOrDiv = absDmd
+defaultFvDmd Diverges = botDmd -- Diverges
 
-resTypeArgDmd :: Divergence -> Demand
+defaultArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
 --      BotRes === (Bot -> BotRes) === ...
 --      TopRes === (Top -> TopRes) === ...
 -- This function makes that concrete
--- Also see Note [defaultDmd vs. resTypeArgDmd]
-resTypeArgDmd Dunno = topDmd
-resTypeArgDmd _     = botDmd   -- Diverges
+-- Also see Note [defaultFvDmd vs. defaultArgDmd]
+defaultArgDmd Dunno    = topDmd
+defaultArgDmd ConOrDiv = topDmd
+-- NB: not botDmd! We don't want to mask the precise exception by forcing the
+-- argument. But it is still absent.
+defaultArgDmd ExnOrDiv = absDmd
+defaultArgDmd Diverges = botDmd
 
 {-
-Note [defaultDmd and resTypeArgDmd]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [defaultFvDmd and defaultArgDmd]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These functions are similar: They express the demand on something not
 explicitly mentioned in the environment resp. the argument list. Yet they are
@@ -1170,7 +1174,7 @@ lubDmdType d1 d2
     (DmdType fv1 ds1 r1) = ensureArgs n d1
     (DmdType fv2 ds2 r2) = ensureArgs n d2
 
-    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd r2)
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
 
@@ -1197,7 +1201,7 @@ bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'both' for DmdType and Divergence]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
-  = DmdType (plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd t2))
+  = DmdType (plusVarEnv_CD bothDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
             ds1
             (r1 `bothDivergence` t2)
 
@@ -1235,22 +1239,37 @@ dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
 -- | This makes sure we can use the demand type with n arguments.
--- It extends the argument list with the correct resTypeArgDmd.
+-- It extends the argument list with the correct defaultArgDmd.
 -- It also adjusts the Divergence: Divergence survives additional arguments.
 ensureArgs :: Arity -> DmdType -> DmdType
 ensureArgs n d | n == depth = d
-               | otherwise  = DmdType fv ds' r'
+               | n >  depth = DmdType inc_fv inc_ds inc_div
+               | otherwise  = DmdType dec_fv dec_ds dec_div
   where depth = dmdTypeDepth d
-        DmdType fv ds r = d
+        DmdType fv ds div = d
 
-        ds' = take n (ds ++ repeat (resTypeArgDmd r))
-        r' = case r of    -- See [Nature of result demand]
-              ConOrDiv
-                | n > length ds
-                -> Dunno -- supplying more arguments might throw
-                         -- a precise exception in a lambda body
-              _ -> r
+        -- Arity increase:
+        --  * Demands on FVs are still valid
+        --  * Demands on args also valid, plus we can extend with defaultArgDmd
+        --    as appropriate for the given Divergence
+        --  * Divergence must account for possibly throwing a precise exception
+        --    when entering the additional lambda.
+        inc_fv  = fv
+        inc_ds  = take n (ds ++ repeat (defaultArgDmd div))
+        inc_div = case div of -- See [Nature of result demand]
+          ConOrDiv -> Dunno
+          _        -> div
 
+        -- Arity decrease:
+        --  * Demands on FVs must be zapped, because they were computed for a
+        --    stronger incoming demand.
+        --  * Demands on args must also be zapped.
+        --  * Divergence may now also converge. Dunno would be a conservative
+        --    way to say so, but also very crude because we won't throw a
+        --    precise exception if we didn't before anyway.
+        dec_fv = emptyVarEnv
+        dec_ds = []
+        dec_div = lubDivergence ConOrDiv div -- we possibly converge now
 
 seqDmdType :: DmdType -> ()
 seqDmdType (DmdType env ds res) =
@@ -1264,7 +1283,7 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 -- We already have a suitable demand on all
 -- free vars, so no need to add more!
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
+splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
@@ -1429,14 +1448,14 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
   where
   fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables]
-  dmd  = lookupVarEnv fv id `orElse` defaultDmd res
+  dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
 
 findIdDemand :: DmdType -> Var -> Demand
 findIdDemand (DmdType fv _ res) id
-  = lookupVarEnv fv id `orElse` defaultDmd res
+  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 {-
 Note [Default demand on free variables]
@@ -1665,13 +1684,7 @@ etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
 -- ^ We are expanding (\x y. e) to (\x y z. e z).
 -- In contrast to 'increaseStrictSigArity', this /appends/ extra arg demands if
 -- necessary, potentially destroying the signature's CPR property.
-etaExpandStrictSig arity (StrictSig dmd_ty)
-  | arity < dmdTypeDepth dmd_ty
-  -- an arity decrease must zap the whole signature, because it was possibly
-  -- computed for a higher incoming call demand.
-  = nopSig
-  | otherwise
-  = StrictSig $ ensureArgs arity dmd_ty
+etaExpandStrictSig arity (StrictSig dmd_ty) = StrictSig $ ensureArgs arity dmd_ty
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
