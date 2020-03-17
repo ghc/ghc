@@ -51,7 +51,6 @@ import GHC.Core.Make      (mkListExpr, mkCharExpr)
 import UniqSupply
 import FastString
 import SrcLoc
-import ListSetOps (unionLists)
 import Maybes
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -613,9 +612,6 @@ Maintaining these invariants in 'addVarCt' (the core of the term oracle) and
   - (Refine) If we had @x /~ K zs@, unify each y with each z in turn.
 * Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'addNotConCt')
   - (Refut) If we have @x ~ K ys@, refute.
-  - (Redundant) If we have @x ~ K2@ and @eqPmAltCon K K2 == Disjoint@
-    (ex. Just and Nothing), the info is redundant and can be
-    discarded.
   - (COMPLETE) If K=Nothing and we had @x /~ Just@, then we get
     @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
@@ -655,7 +651,7 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM addTmCt delta new_
 -- * Looking up VarInfo
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) [] [] NoPM
+emptyVarInfo x = VI (idType x) [] emptyPmAltConSet NoPM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
@@ -754,7 +750,7 @@ TyCon, so tc_rep = tc_fam afterwards.
 canDiverge :: Delta -> Id -> Bool
 canDiverge delta@MkDelta{ delta_tm_st = ts } x
   | VI _ pos neg _ <- lookupVarInfo ts x
-  = null neg && all pos_can_diverge pos
+  = isEmptyPmAltConSet neg && all pos_can_diverge pos
   where
     pos_can_diverge (PmAltConLike (RealDataCon dc), _, [y])
       -- See Note [Divergence of Newtype matches]
@@ -793,8 +789,8 @@ lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
 lookupRefuts MkDelta{ delta_tm_st = ts@(TmSt (SDIE env) _) } k =
   case lookupUDFM env k of
     Nothing -> []
-    Just (Indirect y) -> vi_neg (lookupVarInfo ts y)
-    Just (Entry vi)   -> vi_neg vi
+    Just (Indirect y) -> pmAltConSetElems (vi_neg (lookupVarInfo ts y))
+    Just (Entry vi)   -> pmAltConSetElems (vi_neg vi)
 
 isDataConSolution :: (PmAltCon, [TyVar], [Id]) -> Bool
 isDataConSolution (PmAltConLike (RealDataCon _), _, _) = True
@@ -937,7 +933,7 @@ addNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
         | any (implies nalt) pos = neg
         -- See Note [Completeness checking with required Thetas]
         | hasRequiredTheta nalt  = neg
-        | otherwise              = unionLists neg [nalt]
+        | otherwise              = extendPmAltConSet neg nalt
   let vi_ext = vi{ vi_neg = neg' }
   -- 3. Make sure there's at least one other possible constructor
   vi' <- case nalt of
@@ -1129,7 +1125,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
         let add_refut delta nalt = addNotConCt delta y nalt
-        delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
+        delta_neg <- foldlM add_refut delta_pos (pmAltConSetElems (vi_neg vi_x))
         -- vi_cache will be updated in addNotConCt, so we are good to
         -- go!
         pure delta_neg
@@ -1144,7 +1140,7 @@ addConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
 addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
   VI ty pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
-  guard (all ((/= Equal) . eqPmAltCon alt) neg)
+  guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
   -- additional refinement of the possible values x could take) indicate a
   -- contradiction
@@ -1160,11 +1156,8 @@ addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
       let tm_cts = zipWithEqual "addConCt" PmVarCt args other_args
       MaybeT $ addPmCts delta (listToBag ty_cts `unionBags` listToBag tm_cts)
     Nothing -> do
-      -- Filter out redundant negative facts (those that compare Just False to
-      -- the new solution)
-      let neg' = filter ((== PossiblyOverlap) . eqPmAltCon alt) neg
       let pos' = (alt, tvs, args):pos
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache)) reps}
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg cache)) reps}
 
 equateTys :: [Type] -> [Type] -> [PmCt]
 equateTys ts us =
@@ -1553,7 +1546,7 @@ provideEvidence = go
         []
           -- When there are literals involved, just print negative info
           -- instead of listing missed constructors
-          | notNull [ l | PmAltLit l <- neg ]
+          | notNull [ l | PmAltLit l <- pmAltConSetElems neg ]
           -> go xs n delta
         [] -> try_instantiate x xs n delta
 
