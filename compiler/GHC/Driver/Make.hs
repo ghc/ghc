@@ -907,7 +907,7 @@ checkStability hpt sccs all_home_mods =
 -- | Each module is given a unique 'LogQueue' to redirect compilation messages
 -- to. A 'Nothing' value contains the result of compilation, and denotes the
 -- end of the message queue.
-data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, PprStyle, MsgDoc)])
+data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, MsgDoc)])
                          !(MVar ())
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
@@ -1126,7 +1126,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
             return (success_flag,ok_results)
 
   where
-    writeLogQueue :: LogQueue -> Maybe (WarnReason,Severity,SrcSpan,PprStyle,MsgDoc) -> IO ()
+    writeLogQueue :: LogQueue -> Maybe (WarnReason,Severity,SrcSpan,MsgDoc) -> IO ()
     writeLogQueue (LogQueue ref sem) msg = do
         atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
         _ <- tryPutMVar sem ()
@@ -1135,8 +1135,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     -- The log_action callback that is used to synchronize messages from a
     -- worker thread.
     parLogAction :: LogQueue -> LogAction
-    parLogAction log_queue _dflags !reason !severity !srcSpan !style !msg = do
-        writeLogQueue log_queue (Just (reason,severity,srcSpan,style,msg))
+    parLogAction log_queue _dflags !reason !severity !srcSpan !msg = do
+        writeLogQueue log_queue (Just (reason,severity,srcSpan,msg))
 
     -- Print each message from the log_queue using the log_action from the
     -- session's DynFlags.
@@ -1149,8 +1149,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
 
             print_loop [] = read_msgs
             print_loop (x:xs) = case x of
-                Just (reason,severity,srcSpan,style,msg) -> do
-                    putLogMsg dflags reason severity srcSpan style msg
+                Just (reason,severity,srcSpan,msg) -> do
+                    putLogMsg dflags reason severity srcSpan msg
                     print_loop xs
                 -- Exit the loop once we encounter the end marker.
                 Nothing -> return ()
@@ -2653,8 +2653,8 @@ withDeferredDiagnostics f = do
     errors <- liftIO $ newIORef []
     fatals <- liftIO $ newIORef []
 
-    let deferDiagnostics _dflags !reason !severity !srcSpan !style !msg = do
-          let action = putLogMsg dflags reason severity srcSpan style msg
+    let deferDiagnostics _dflags !reason !severity !srcSpan !msg = do
+          let action = putLogMsg dflags reason severity srcSpan msg
           case severity of
             SevWarning -> atomicModifyIORef' warnings $ \i -> (action: i, ())
             SevError -> atomicModifyIORef' errors $ \i -> (action: i, ())

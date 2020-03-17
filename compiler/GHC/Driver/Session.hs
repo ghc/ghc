@@ -1508,7 +1508,6 @@ type LogAction = DynFlags
               -> WarnReason
               -> Severity
               -> SrcSpan
-              -> PprStyle
               -> MsgDoc
               -> IO ()
 
@@ -1519,10 +1518,10 @@ defaultFatalMessager = hPutStrLn stderr
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
-jsonLogAction dflags reason severity srcSpan _style msg
+jsonLogAction dflags reason severity srcSpan msg
   = do
-    defaultLogActionHPutStrDoc dflags stdout (doc $$ text "")
-                               (mkCodeStyle CStyle)
+    defaultLogActionHPutStrDoc dflags stdout
+      (withPprStyle (mkCodeStyle CStyle) (doc $$ text ""))
     where
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
@@ -1533,13 +1532,13 @@ jsonLogAction dflags reason severity srcSpan _style msg
 
 
 defaultLogAction :: LogAction
-defaultLogAction dflags reason severity srcSpan style msg
+defaultLogAction dflags reason severity srcSpan msg
     = case severity of
-      SevOutput      -> printOut msg style
-      SevDump        -> printOut (msg $$ blankLine) style
-      SevInteractive -> putStrSDoc msg style
-      SevInfo        -> printErrs msg style
-      SevFatal       -> printErrs msg style
+      SevOutput      -> printOut msg
+      SevDump        -> printOut (msg $$ blankLine)
+      SevInteractive -> putStrSDoc msg
+      SevInfo        -> printErrs msg
+      SevFatal       -> printErrs msg
       SevWarning     -> printWarns
       SevError       -> printWarns
     where
@@ -1555,8 +1554,9 @@ defaultLogAction dflags reason severity srcSpan style msg
             if gopt Opt_DiagnosticsShowCaret dflags
             then getCaretDiagnostic severity srcSpan
             else pure empty
-        printErrs (message $+$ caretDiagnostic)
-            (setStyleColoured True style)
+        printErrs $ getPprStyle $ \style ->
+          withPprStyle (setStyleColoured True style)
+            (message $+$ caretDiagnostic)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of
@@ -1584,16 +1584,16 @@ defaultLogAction dflags reason severity srcSpan style msg
           | otherwise = ""
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
-defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPrintDoc dflags h d sty
- = defaultLogActionHPutStrDoc dflags h (d $$ text "") sty
+defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> IO ()
+defaultLogActionHPrintDoc dflags h d
+ = defaultLogActionHPutStrDoc dflags h (d $$ text "")
 
-defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPutStrDoc dflags h d sty
+defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> IO ()
+defaultLogActionHPutStrDoc dflags h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
   = printSDoc ctx Pretty.PageMode h d
-    where ctx = initSDocContext dflags sty
+    where ctx = initSDocContext dflags defaultDumpStyle
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -2171,8 +2171,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   return (dflags5, leftover, warns' ++ warns)
 
 -- | Write an error or warning to the 'LogOutput'.
-putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> PprStyle
-          -> MsgDoc -> IO ()
+putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> MsgDoc -> IO ()
 putLogMsg dflags = log_action dflags dflags
 
 updateWays :: DynFlags -> DynFlags
