@@ -1825,7 +1825,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; checkValueKind k3 (text "the body of a ForAllCo over covar:" <+> ppr co)
        ; checkValueKind k4 (text "the body of a ForAllCo over covar:" <+> ppr co)
-           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
        ; in_scope <- getInScope
        ; let tyl   = mkTyCoInvForAllTy cv1 t1
              r2    = coVarRole cv1
@@ -1844,7 +1844,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
              tyr = mkTyCoInvForAllTy cv2 $
                    substTy subst t2
        ; return (liftedTypeKind, liftedTypeKind, tyl, tyr, r) } }
-                   -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+                   -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 
 lintCoercion co@(FunCo r co1 co2)
   = do { (k1,k'1,s1,t1,r1) <- lintCoercion co1
@@ -2018,7 +2018,7 @@ lintCoercion (InstCo co arg)
              , CoercionTy s2' <- s2
              -> do { return $
                        (liftedTypeKind, liftedTypeKind
-                          -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+                          -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
                        , substTy (mkCvSubst in_scope $ unitVarEnv cv1 s1') t1
                        , substTy (mkCvSubst in_scope $ unitVarEnv cv2 s2') t2
                        , r) }

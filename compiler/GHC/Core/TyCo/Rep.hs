@@ -578,7 +578,7 @@ In sum, in order to uphold (EQ), we need the following three invariants:
   (EQ2) No reflexive casts in CastTy.
   (EQ3) No nested CastTys.
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
-        See Note [Weird typing rule for ForAllTy] in GHC.Core.Type.
+        See Note [Weird typing rule for ForAllTy]
 
 These invariants are all documented above, in the declaration for Type.
 
@@ -606,6 +606,23 @@ body. If so, it returns a FunTy instead of a ForAllTy.
 There are cases we want to skip the check. For example, the check is
 unnecessary when it is known from the context that the input variable
 is a type variable.  In those cases, we use mkForAllTy.
+
+Note [Weird typing rule for ForAllTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is the (truncated) typing rule for the dependent ForAllTy:
+
+inner : kind
+------------------------------------
+ForAllTy (Bndr tyvar vis) inner : kind
+
+inner : TYPE r
+------------------------------------
+ForAllTy (Bndr covar vis) inner : TYPE
+
+Note that when inside the binder is a tyvar, neither the inner type nor for
+ForAllTy itself have to have kind *! But, it means that we should push any kind
+casts through the ForAllTy. The only trouble is avoiding capture.
+See GHC.Core.Type.mkCastTy.
 
 -}
 
@@ -1003,6 +1020,7 @@ data Coercion
                -- The TyCon is never a synonym;
                -- we expand synonyms eagerly
                -- But it can be a type function
+               -- TyCon is never a saturated (->); use FunCo instead
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
