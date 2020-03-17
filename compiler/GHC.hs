@@ -611,7 +611,7 @@ setSessionDynFlags dflags = do
              | otherwise                      = ""
            msg = text "Starting " <> text prog
          tr <- if verbosity dflags >= 3
-                then return (logInfo dflags (defaultDumpStyle dflags) msg)
+                then return (logInfo dflags defaultDumpStyle msg)
                 else return (pure ())
          let
           conf = IServConfig

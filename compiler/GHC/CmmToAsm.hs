@@ -390,7 +390,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
                 $ makeImportsDoc dflags (concat (ngs_imports ngs))
         return us'
   where
-    dump_stats = dumpAction dflags (mkDumpStyle dflags alwaysQualify)
+    dump_stats = dumpAction dflags (mkDumpStyle alwaysQualify)
                    (dumpOptionsFromFlag Opt_D_dump_asm_stats) "NCG stats"
                    FormatText
 
