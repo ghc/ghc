@@ -17,6 +17,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -187,8 +188,8 @@ instance Outputable SyntaxExprTc where
                     , syn_arg_wraps = arg_wraps
                     , syn_res_wrap  = res_wrap })
     = sdocOption sdocPrintExplicitCoercions $ \print_co ->
-      getPprStyle $ \s ->
-      if debugStyle s || print_co
+      getPprDebug $ \debug ->
+      if debug || print_co
       then ppr expr <> braces (pprWithCommas ppr arg_wraps)
                     <> braces (ppr res_wrap)
       else ppr expr
@@ -1141,9 +1142,9 @@ can see the structure of the parse tree.
 pprDebugParendExpr :: (OutputableBndrId p)
                    => PprPrec -> LHsExpr (GhcPass p) -> SDoc
 pprDebugParendExpr p expr
-  = getPprStyle (\sty ->
-    if debugStyle sty then pprParendLExpr p expr
-                      else pprLExpr      expr)
+  = getPprDebug $ \case
+      True  -> pprParendLExpr p expr
+      False -> pprLExpr         expr
 
 pprParendLExpr :: (OutputableBndrId p)
                => PprPrec -> LHsExpr (GhcPass p) -> SDoc
