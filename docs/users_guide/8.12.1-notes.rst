@@ -24,6 +24,23 @@ Language
   would have accepted ``x``, but its type would have involved the mysterious ``Any``
   internal type family. Now, GHC rejects, explaining the situation.
 
+* GHC now more faithfully implements the instance-lookup scheme described with
+  :extension:`QuantifiedConstraints`. Previous bugs meant that programs like this
+  were accepted::
+
+    data T (c :: Type -> Constraint)
+    instance (forall h. c h => Functor h) => Functor (T c)
+    instance (forall h. c h => Applicative h) => Applicative (T c)
+
+  Note that in the instance declaration for ``Applicative (T c)``, we cannot prove
+  ``Functor (T c)``, because the quantified constraint shadows the global instance.
+  There is an easy workaround, though: just include ``Functor (T c)`` as an assumption. ::
+
+    instance (forall h. c h => Applicative h, Functor (T c)) => Applicative (T c)
+
+  There is a chance we will tweak the lookup scheme in the future, to make this
+  workaround unnecessary.
+  
 Compiler
 ~~~~~~~~
 
