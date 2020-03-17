@@ -260,14 +260,14 @@ functions (lambdas) except by name, so in this case it seems like
 a good idea to treat 'M.k' as a roughTopName of the call.
 -}
 
-pprRulesForUser :: DynFlags -> [CoreRule] -> SDoc
+pprRulesForUser :: [CoreRule] -> SDoc
 -- (a) tidy the rules
 -- (b) sort them into order based on the rule name
 -- (c) suppress uniques (unless -dppr-debug is on)
 -- This combination makes the output stable so we can use in testing
 -- It's here rather than in GHC.Core.Ppr because it calls tidyRules
-pprRulesForUser dflags rules
-  = withPprStyle (defaultUserStyle dflags) $
+pprRulesForUser rules
+  = withPprStyle defaultUserStyle $
     pprRules $
     sortBy (comparing ruleName) $
     tidyRules emptyTidyEnv rules
