@@ -52,7 +52,6 @@ import GhcPrelude
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
 import GHC.StgToCmm.Types
-import DataCon
 import Id
 import IdInfo
 import GHC.Core

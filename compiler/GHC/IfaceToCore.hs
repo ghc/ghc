@@ -81,7 +81,6 @@ import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
-import Type
 
 import Control.Monad
 import qualified Data.Map as Map
