@@ -531,24 +531,25 @@ instance OutputableBndr Name where
 
 pprName :: Name -> SDoc
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
-  = getPprStyle $ \ sty ->
+  = getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
     case sort of
-      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
-      External mod            -> pprExternal sty uniq mod occ False UserSyntax
-      System                  -> pprSystem sty uniq occ
-      Internal                -> pprInternal sty uniq occ
+      WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
+      External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
+      System                  -> pprSystem   debug sty uniq occ
+      Internal                -> pprInternal debug sty uniq occ
 
 -- | Print the string of Name unqualifiedly directly.
 pprNameUnqualified :: Name -> SDoc
 pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
-pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
-pprExternal sty uniq mod occ is_wired is_builtin
+pprExternal :: Bool -> PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
+pprExternal debug sty uniq mod occ is_wired is_builtin
   | codeStyle sty = ppr mod <> char '_' <> ppr_z_occ_name occ
         -- In code style, always qualify
         -- ToDo: maybe we could print all wired-in things unqualified
         --       in code style, to reduce symbol table bloat?
-  | debugStyle sty = pp_mod <> ppr_occ_name occ
+  | debug         = pp_mod <> ppr_occ_name occ
                      <> braces (hsep [if is_wired then text "(w)" else empty,
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
@@ -563,10 +564,10 @@ pprExternal sty uniq mod occ is_wired is_builtin
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (ppr mod <> dot)
 
-pprInternal :: PprStyle -> Unique -> OccName -> SDoc
-pprInternal sty uniq occ
+pprInternal :: Bool -> PprStyle -> Unique -> OccName -> SDoc
+pprInternal debug sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
-  | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
+  | debug          = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
                                                        pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
                         -- For debug dumps, we're not necessarily dumping
@@ -574,10 +575,10 @@ pprInternal sty uniq occ
   | otherwise      = ppr_occ_name occ   -- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
-pprSystem :: PprStyle -> Unique -> OccName -> SDoc
-pprSystem sty uniq occ
+pprSystem :: Bool -> PprStyle -> Unique -> OccName -> SDoc
+pprSystem debug sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
-  | debugStyle sty = ppr_occ_name occ <> ppr_underscore_unique uniq
+  | debug          = ppr_occ_name occ <> ppr_underscore_unique uniq
                      <> braces (pprNameSpaceBrief (occNameSpace occ))
   | otherwise      = ppr_occ_name occ <> ppr_underscore_unique uniq
                                 -- If the tidy phase hasn't run, the OccName
