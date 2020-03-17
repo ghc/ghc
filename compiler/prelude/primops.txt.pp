@@ -3252,7 +3252,7 @@ primop SparkOp "spark#" GenPrimOp
 
 primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
-   -- See Note [seq# magic] in PrelRules
+   -- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
@@ -3277,7 +3277,7 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#  -- Zero-indexed; the first constructor has tag zero
    with
    strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topDiv }
-   -- See Note [dataToTag# magic] in PrelRules
+   -- See Note [dataToTag# magic] in GHC.Core.Op.ConstantFold
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a

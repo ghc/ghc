@@ -1,7 +1,6 @@
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
-\section[CoreMonad]{The core pipeline monad}
 -}
 
 {-# LANGUAGE CPP #-}
@@ -9,7 +8,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module CoreMonad (
+module GHC.Core.Op.Monad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..), runWhen, runMaybe,
     SimplMode(..),
@@ -154,7 +153,7 @@ pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n
                                             , ppr md ]
 pprPassDetails _ = Outputable.empty
 
-data SimplMode             -- See comments in SimplMonad
+data SimplMode             -- See comments in GHC.Core.Op.Simplify.Monad
   = SimplMode
         { sm_names      :: [String] -- Name(s) of the phase
         , sm_phase      :: CompilerPhase
@@ -195,7 +194,7 @@ data FloatOutSwitches = FloatOutSwitches {
                              -- ^ True <=> float out over-saturated applications
                              --            based on arity information.
                              -- See Note [Floating over-saturated applications]
-                             -- in SetLevels
+                             -- in GHC.Core.Op.SetLevels
   floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
   }
 instance Outputable FloatOutSwitches where

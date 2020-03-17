@@ -273,7 +273,7 @@ test('T9339',
       only_ways(['normal'])],
      compile_and_run,
      ['-O2 -fspec-constr-keen'])
-     # For the -fspec-constr-keen see Note [Making SpecConstr keener] in SpecConstr
+     # For the -fspec-constr-keen see Note [Making SpecConstr keener] in GHC.Core.Op.SpecConstr
 
 
 test('T8472',
