@@ -92,7 +92,9 @@ readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
 readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
-    let printer :: SDoc -> IO ()
+    let platform = targetPlatform dflags
+
+        printer :: SDoc -> IO ()
         printer = case traceBinIFaceReading of
                       TraceBinIFaceReading -> \sd ->
                           putLogMsg dflags
@@ -122,9 +124,9 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- (This magic number does not change when we change
     --  GHC interface file format)
     magic <- get bh
-    wantedGot "Magic" (binaryInterfaceMagic dflags) magic ppr
+    wantedGot "Magic" (binaryInterfaceMagic platform) magic ppr
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
-        (binaryInterfaceMagic dflags) magic
+        (binaryInterfaceMagic platform) magic
 
     -- Note [dummy iface field]
     -- read a dummy 32/64 bit value.  This field used to hold the
@@ -133,7 +135,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- should be).  Also, the serialisation of value of type "Bin
     -- a" used to depend on the word size of the machine, now they
     -- are always 32 bits.
-    case platformWordSize (targetPlatform dflags) of
+    case platformWordSize platform of
       PW4 -> do _ <- Binary.get bh :: IO Word32; return ()
       PW8 -> do _ <- Binary.get bh :: IO Word64; return ()
 
@@ -194,12 +196,13 @@ getWithUserData ncu bh = do
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeBinIface dflags hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
-    put_ bh (binaryInterfaceMagic dflags)
+    let platform = targetPlatform dflags
+    put_ bh (binaryInterfaceMagic platform)
 
    -- dummy 32/64-bit field before the version/way for
    -- compatibility with older interface file formats.
    -- See Note [dummy iface field] above.
-    case platformWordSize (targetPlatform dflags) of
+    case platformWordSize platform of
       PW4 -> Binary.put_ bh (0 :: Word32)
       PW8 -> Binary.put_ bh (0 :: Word64)
 
@@ -288,10 +291,10 @@ putWithUserData log_action bh payload = do
 initBinMemSize :: Int
 initBinMemSize = 1024 * 1024
 
-binaryInterfaceMagic :: DynFlags -> Word32
-binaryInterfaceMagic dflags
- | target32Bit (targetPlatform dflags) = 0x1face
- | otherwise                           = 0x1face64
+binaryInterfaceMagic :: Platform -> Word32
+binaryInterfaceMagic platform
+ | target32Bit platform = 0x1face
+ | otherwise            = 0x1face64
 
 
 -- -----------------------------------------------------------------------------
