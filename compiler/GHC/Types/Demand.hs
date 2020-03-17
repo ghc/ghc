@@ -178,8 +178,6 @@ is not strict in its argument: Just try this in GHCi
 
 Any analysis that assumes otherwise will be broken in some way or another
 (beyond `-fno-pendantic-bottoms`).
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-=======
 
 But then #13380 and #17676 suggest (in Mar 20) that we need to re-introduce a
 subtly different variant of `ThrowsExn` (which we call `ExnOrDiv` now) that is
@@ -243,12 +241,11 @@ If 'f' was inferred to be strict in 'y', WW would turn a precise into an
 imprecise exception in the call site @f 1 (error "boom")@.
 
 The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
-'Demand.defaultDmd' is lazy. But then the simplifier fails to eliminate a lot of
-dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need to
-give it 'exnDiv', which was conceived entirely for this reason. The default
+'Demand.defaultFvDmd' is lazy. But then the simplifier fails to eliminate a lot
+of dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need
+to give it 'exnDiv', which was conceived entirely for this reason. The default
 demand of 'exnDiv' is lazy, but otherwise (in terms of 'Demand.isBotDiv') it
 behaves exactly as 'botDiv', so that dead code elimination works as expected.
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 -}
 
 -- | Vanilla strictness domain
@@ -976,11 +973,6 @@ Divergence:     Dunno
 In a fixpoint iteration, start from Diverges
 -}
 
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-data Divergence
-  = Diverges    -- Definitely diverges
-  | Dunno       -- Might diverge or converge
-=======
 -- | Divergence lattice. Models a subset lattice of the following exhaustive
 -- set of divergence results:
 --
@@ -1015,36 +1007,20 @@ data Divergence
              --   See scenario 1 in Note [Precise exceptions and strictness analysis]
              --   and Note [Asymmetry of 'both' for DmdType and Divergence].
   | Dunno    -- ^ Might diverge, throw any kind of exception or converge.
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-lubDivergence Dunno    Dunno    = Dunno
-=======
 lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 lubDivergence ConOrDiv ConOrDiv = ConOrDiv
 lubDivergence _        _        = Dunno
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
--- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
+-- This needs to commute with defaultFvDmd, i.e.
+-- defaultFvDmd (r1 `lubDivergence` r2) = defaultFvDmd r1 `lubDmd` defaultFvDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-bothDivergence _ Diverges = Diverges
-bothDivergence r Dunno    = r
--- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
--- (See Note [Default demand on free variables] for why)
-
-instance Outputable Divergence where
-  ppr Diverges      = char 'b'
-  ppr Dunno         = empty
-=======
 bothDivergence Diverges _ = Diverges
 bothDivergence ExnOrDiv _ = ExnOrDiv
 bothDivergence ConOrDiv r = lubDivergence Diverges r -- strip convergence!
@@ -1055,7 +1031,6 @@ instance Outputable Divergence where
   ppr ExnOrDiv = char 'x' -- for e(x)ception
   ppr ConOrDiv = char 'c' -- for (c)onverges
   ppr Dunno    = empty
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
 {- Note [Precise vs imprecise exceptions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1108,55 +1083,44 @@ Simplifier.Utils.mkArgInfo.
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
 
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
--- [cprRes] lets us switch off CPR analysis
--- by making sure that everything uses TopRes
-topDiv, botDiv :: Divergence
-topDiv = Dunno
-=======
 topDiv, exnDiv, conDiv, botDiv :: Divergence
 topDiv = Dunno
 exnDiv = ExnOrDiv
 conDiv = ConOrDiv
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 botDiv = Diverges
 
 -- | True if the result indicates that evaluation will not return.
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-isBotDiv _        = False
-=======
 isBotDiv ExnOrDiv = True
 isBotDiv ConOrDiv = False
 isBotDiv Dunno    = False
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
 -- See Notes [Default demand on free variables]
--- and [defaultDmd vs. resTypeArgDmd]
-defaultDmd :: Divergence -> Demand
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-defaultDmd Dunno = absDmd
-defaultDmd _     = botDmd  -- Diverges
-=======
-defaultDmd Dunno    = absDmd
-defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
-defaultDmd ConOrDiv = absDmd
-defaultDmd Diverges = botDmd -- Diverges
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
+-- and [defaultFvDmd vs. defaultArgDmd]
+-- and Scenario 2 in [Precise exceptions and strictness analysis]
+defaultFvDmd :: Divergence -> Demand
+defaultFvDmd Dunno    = absDmd
+defaultFvDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultFvDmd ConOrDiv = absDmd
+defaultFvDmd Diverges = botDmd -- Diverges
 
-resTypeArgDmd :: Divergence -> Demand
+defaultArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
 --      BotRes === (Bot -> BotRes) === ...
 --      TopRes === (Top -> TopRes) === ...
 -- This function makes that concrete
--- Also see Note [defaultDmd vs. resTypeArgDmd]
-resTypeArgDmd Dunno = topDmd
-resTypeArgDmd _     = botDmd   -- Diverges
+-- Also see Note [defaultFvDmd vs. defaultArgDmd]
+defaultArgDmd Dunno    = topDmd
+defaultArgDmd ConOrDiv = topDmd
+-- NB: not botDmd! We don't want to mask the precise exception by forcing the
+-- argument. But it is still absent.
+defaultArgDmd ExnOrDiv = absDmd
+defaultArgDmd Diverges = botDmd
 
 {-
-Note [defaultDmd and resTypeArgDmd]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [defaultFvDmd and defaultArgDmd]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These functions are similar: They express the demand on something not
 explicitly mentioned in the environment resp. the argument list. Yet they are
@@ -1262,7 +1226,7 @@ lubDmdType d1 d2
     (DmdType fv1 ds1 r1) = ensureArgs n d1
     (DmdType fv2 ds2 r2) = ensureArgs n d2
 
-    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd r2)
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
 
@@ -1292,7 +1256,7 @@ bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'both' for DmdType and Divergence]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
-  = DmdType (plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd t2))
+  = DmdType (plusVarEnv_CD bothDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
             ds1
             (r1 `bothDivergence` t2)
 
@@ -1330,22 +1294,37 @@ dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
 -- | This makes sure we can use the demand type with n arguments.
--- It extends the argument list with the correct resTypeArgDmd.
+-- It extends the argument list with the correct defaultArgDmd.
 -- It also adjusts the Divergence: Divergence survives additional arguments.
 ensureArgs :: Arity -> DmdType -> DmdType
 ensureArgs n d | n == depth = d
-               | otherwise  = DmdType fv ds' r'
+               | n >  depth = DmdType inc_fv inc_ds inc_div
+               | otherwise  = DmdType dec_fv dec_ds dec_div
   where depth = dmdTypeDepth d
-        DmdType fv ds r = d
+        DmdType fv ds div = d
 
-        ds' = take n (ds ++ repeat (resTypeArgDmd r))
-        r' = case r of    -- See [Nature of result demand]
-              ConOrDiv
-                | n > length ds
-                -> Dunno -- supplying more arguments might throw
-                         -- a precise exception in a lambda body
-              _ -> r
+        -- Arity increase:
+        --  * Demands on FVs are still valid
+        --  * Demands on args also valid, plus we can extend with defaultArgDmd
+        --    as appropriate for the given Divergence
+        --  * Divergence must account for possibly throwing a precise exception
+        --    when entering the additional lambda.
+        inc_fv  = fv
+        inc_ds  = take n (ds ++ repeat (defaultArgDmd div))
+        inc_div = case div of -- See [Nature of result demand]
+          ConOrDiv -> Dunno
+          _        -> div
 
+        -- Arity decrease:
+        --  * Demands on FVs must be zapped, because they were computed for a
+        --    stronger incoming demand.
+        --  * Demands on args must also be zapped.
+        --  * Divergence may now also converge. Dunno would be a conservative
+        --    way to say so, but also very crude because we won't throw a
+        --    precise exception if we didn't before anyway.
+        dec_fv = emptyVarEnv
+        dec_ds = []
+        dec_div = lubDivergence ConOrDiv div -- we possibly converge now
 
 seqDmdType :: DmdType -> ()
 seqDmdType (DmdType env ds res) =
@@ -1359,7 +1338,7 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 -- We already have a suitable demand on all
 -- free vars, so no need to add more!
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
+splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
@@ -1524,14 +1503,14 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
   where
   fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables]
-  dmd  = lookupVarEnv fv id `orElse` defaultDmd res
+  dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
 
 findIdDemand :: DmdType -> Var -> Demand
 findIdDemand (DmdType fv _ res) id
-  = lookupVarEnv fv id `orElse` defaultDmd res
+  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 {-
 Note [Default demand on free variables]
@@ -1760,13 +1739,7 @@ etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
 -- ^ We are expanding (\x y. e) to (\x y z. e z).
 -- In contrast to 'increaseStrictSigArity', this /appends/ extra arg demands if
 -- necessary, potentially destroying the signature's CPR property.
-etaExpandStrictSig arity (StrictSig dmd_ty)
-  | arity < dmdTypeDepth dmd_ty
-  -- an arity decrease must zap the whole signature, because it was possibly
-  -- computed for a higher incoming call demand.
-  = nopSig
-  | otherwise
-  = StrictSig $ ensureArgs arity dmd_ty
+etaExpandStrictSig arity (StrictSig dmd_ty) = StrictSig $ ensureArgs arity dmd_ty
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
@@ -2147,20 +2120,13 @@ instance Binary DmdType where
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-  put_ bh Diverges = putByte bh 1
-=======
   put_ bh ExnOrDiv = putByte bh 1
   put_ bh ConOrDiv = putByte bh 2
   put_ bh Diverges = putByte bh 3
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
-<<<<<<< HEAD:compiler/GHC/Types/Demand.hs
-=======
                   1 -> return ExnOrDiv
                   2 -> return ConOrDiv
->>>>>>> Add ConOrDiv to Divergence and see where it gets us:compiler/basicTypes/Demand.hs
                   _ -> return Diverges }
