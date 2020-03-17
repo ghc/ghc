@@ -54,8 +54,8 @@ import NameSet
 import NameEnv
 import GHC.Core.Rules
 import BasicTypes
-import CoreMonad        ( CoreToDo(..) )
-import GHC.Core.Lint    ( endPassIO )
+import GHC.Core.Op.Monad ( CoreToDo(..) )
+import GHC.Core.Lint     ( endPassIO )
 import VarSet
 import FastString
 import ErrUtils

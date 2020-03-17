@@ -2,7 +2,7 @@
 module Main where
 
 import GHC.ByteCode.Linker
-import CoreMonad
+import GHC.Core.Op.Monad
 import Data.Array
 import GHC.Core.DataCon
 import GHC

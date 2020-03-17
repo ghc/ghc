@@ -19,7 +19,7 @@ module GHC.CoreToStg.Prep (
 
 import GhcPrelude
 
-import OccurAnal
+import GHC.Core.Op.OccurAnal
 
 import GHC.Driver.Types
 import PrelNames
@@ -27,7 +27,7 @@ import MkId             ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
-import CoreMonad        ( CoreToDo(..) )
+import GHC.Core.Op.Monad        ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
@@ -523,7 +523,7 @@ it seems good for CorePrep to be robust.
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
             -> UniqSM (JoinId, CpeRhs)
 -- Used for all join bindings
--- No eta-expansion: see Note [Do not eta-expand join points] in SimplUtils
+-- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Op.Simplify.Utils
 cpeJoinPair env bndr rhs
   = ASSERT(isJoinId bndr)
     do { let Just join_arity = isJoinId_maybe bndr

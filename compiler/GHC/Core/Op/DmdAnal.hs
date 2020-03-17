@@ -9,14 +9,14 @@
 
 {-# LANGUAGE CPP #-}
 
-module DmdAnal ( dmdAnalProgram ) where
+module GHC.Core.Op.DmdAnal ( dmdAnalProgram ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import GHC.Driver.Session
-import WwLib            ( findTypeShape )
+import GHC.Core.Op.WorkWrap.Lib ( findTypeShape )
 import Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
@@ -759,7 +759,7 @@ information, but
   * Performing the worker/wrapper split based on this information would be
     implicitly eta-expanding `f`, playing fast and loose with divergence and
     even being unsound in the presence of newtypes, so we refrain from doing so.
-    Also see Note [Don't eta expand in w/w] in WorkWrap.
+    Also see Note [Don't eta expand in w/w] in GHC.Core.Op.WorkWrap.
 
 Since we only compute one signature, we do so for arity 1. Computing multiple
 signatures for different arities (i.e., polyvariance) would be entirely
@@ -1246,8 +1246,9 @@ The once-used information is (currently) only used by the code
 generator, though.  So:
 
  * We zap the used-once info in the worker-wrapper;
-   see Note [Zapping Used Once info in WorkWrap] in WorkWrap. If it's
-   not reliable, it's better not to have it at all.
+   see Note [Zapping Used Once info in WorkWrap] in
+   GHC.Core.Op.WorkWrap.
+   If it's not reliable, it's better not to have it at all.
 
  * Just before TidyCore, we add a pass of the demand analyser,
       but WITHOUT subsequent worker/wrapper and simplifier,

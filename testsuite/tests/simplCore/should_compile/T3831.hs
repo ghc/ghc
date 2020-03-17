@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances  #-}
 
 -- This test has a deep nest of join points, which led to 
--- an exponential blow-up in SpecConstr
+-- an exponential blow-up in GHC.Core.Op.SpecConstr
 
 module T3831(setAttributes)  where
 

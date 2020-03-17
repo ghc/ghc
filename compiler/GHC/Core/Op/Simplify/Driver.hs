@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module SimplCore ( core2core, simplifyExpr ) where
+module GHC.Core.Op.Simplify.Driver ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
@@ -15,40 +15,40 @@ import GhcPrelude
 import GHC.Driver.Session
 import GHC.Core
 import GHC.Driver.Types
-import CSE              ( cseProgram )
+import GHC.Core.Op.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
-import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
+import GHC.Core.Op.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
-import Simplify         ( simplTopBinds, simplExpr, simplRules )
-import SimplUtils       ( simplEnvForGHCi, activeRule, activeUnfolding )
-import SimplEnv
-import SimplMonad
-import CoreMonad
+import GHC.Core.Op.Simplify       ( simplTopBinds, simplExpr, simplRules )
+import GHC.Core.Op.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
+import GHC.Core.Op.Simplify.Env
+import GHC.Core.Op.Simplify.Monad
+import GHC.Core.Op.Monad
 import qualified ErrUtils as Err
-import FloatIn          ( floatInwards )
-import FloatOut         ( floatOutwards )
+import GHC.Core.Op.FloatIn  ( floatInwards )
+import GHC.Core.Op.FloatOut ( floatOutwards )
 import GHC.Core.FamInstEnv
 import Id
 import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
-import LiberateCase     ( liberateCase )
-import SAT              ( doStaticArgs )
-import Specialise       ( specProgram)
-import SpecConstr       ( specConstrProgram)
-import DmdAnal          ( dmdAnalProgram )
-import CprAnal          ( cprAnalProgram )
-import CallArity        ( callArityAnalProgram )
-import Exitify          ( exitifyProgram )
-import WorkWrap         ( wwTopBinds )
+import GHC.Core.Op.LiberateCase ( liberateCase )
+import GHC.Core.Op.StaticArgs   ( doStaticArgs )
+import GHC.Core.Op.Specialise   ( specProgram)
+import GHC.Core.Op.SpecConstr   ( specConstrProgram)
+import GHC.Core.Op.DmdAnal      ( dmdAnalProgram )
+import GHC.Core.Op.CprAnal      ( cprAnalProgram )
+import GHC.Core.Op.CallArity    ( callArityAnalProgram )
+import GHC.Core.Op.Exitify      ( exitifyProgram )
+import GHC.Core.Op.WorkWrap     ( wwTopBinds )
 import SrcLoc
 import Util
 import Module
@@ -311,7 +311,7 @@ getCoreToDo dflags
             simpl_phase 0 ["post-liberate-case"] max_iter
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possibility of shadowing
-                        -- Reason: see Note [Shadowing] in SpecConstr.hs
+                        -- Reason: see Note [Shadowing] in GHC.Core.Op.SpecConstr
 
         runWhen spec_constr CoreDoSpecConstr,
 
@@ -337,7 +337,7 @@ getCoreToDo dflags
 
         -- Final run of the demand_analyser, ensures that one-shot thunks are
         -- really really one-shot thunks. Only needed if the demand analyser
-        -- has run at all. See Note [Final Demand Analyser run] in DmdAnal
+        -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Op.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
@@ -605,7 +605,7 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 
 -- It's important that simplExprGently does eta reduction; see
 -- Note [Simplifying the left-hand side of a RULE] above.  The
--- simplifier does indeed do eta reduction (it's in Simplify.completeLam)
+-- simplifier does indeed do eta reduction (it's in GHC.Core.Op.Simplify.completeLam)
 -- but only if -O is on.
 
 simplExprGently env expr = do
@@ -727,7 +727,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                   ; return (getTopFloatBinds floats, rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
-                -- See Note [Which transformations are innocuous] in CoreMonad
+                -- See Note [Which transformations are innocuous] in GHC.Core.Op.Monad
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks

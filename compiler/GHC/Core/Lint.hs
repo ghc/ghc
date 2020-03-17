@@ -29,7 +29,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
-import CoreMonad
+import GHC.Core.Op.Monad
 import Bag
 import Literal
 import GHC.Core.DataCon
@@ -167,7 +167,7 @@ In the desugarer, it's very very convenient to be able to say (in effect)
         let x::a = True in <body>
 That is, use a type let.   See Note [Type let] in CoreSyn.
 One place it is used is in mkWwArgs; see Note [Join points and beta-redexes]
-in WwLib.  (Maybe there are other "clients" of this feature; I'm not sure).
+in GHC.Core.Op.WorkWrap.Lib.  (Maybe there are other "clients" of this feature; I'm not sure).
 
 * Hence when linting <body> we need to remember that a=Int, else we
   might reject a correct program.  So we carry a type substitution (in
@@ -639,7 +639,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
        -- We used to check that the dmdTypeDepth of a demand signature never
        -- exceeds idArity, but that is an unnecessary complication, see
-       -- Note [idArity varies independently of dmdTypeDepth] in DmdAnal
+       -- Note [idArity varies independently of dmdTypeDepth] in GHC.Core.Op.DmdAnal
 
        -- Check that the binder's arity is within the bounds imposed by
        -- the type and the strictness signature. See Note [exprArity invariant]
@@ -1146,7 +1146,7 @@ lintCaseExpr scrut var alt_ty alts =
      -- Check that the scrutinee is not a floating-point type
      -- if there are any literal alternatives
      -- See GHC.Core Note [Case expression invariants] item (5)
-     -- See Note [Rules for floating-point comparisons] in PrelRules
+     -- See Note [Rules for floating-point comparisons] in GHC.Core.Op.ConstantFold
      ; let isLitPat (LitAlt _, _ , _) = True
            isLitPat _                 = False
      ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
@@ -2838,7 +2838,7 @@ lintAnnots pname pass guts = do
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-    when (not (null diffs)) $ CoreMonad.putMsg $ vcat
+    when (not (null diffs)) $ GHC.Core.Op.Monad.putMsg $ vcat
       [ lint_banner "warning" pname
       , text "Core changes with annotations:"
       , withPprStyle (defaultDumpStyle dflags) $ nest 2 $ vcat diffs

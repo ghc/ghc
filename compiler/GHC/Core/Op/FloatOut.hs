@@ -8,21 +8,21 @@
 
 {-# LANGUAGE CPP #-}
 
-module FloatOut ( floatOutwards ) where
+module GHC.Core.Op.FloatOut ( floatOutwards ) where
 
 import GhcPrelude
 
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Core.Arity   ( etaExpand )
-import CoreMonad        ( FloatOutSwitches(..) )
+import GHC.Core.Arity    ( etaExpand )
+import GHC.Core.Op.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Id               ( Id, idArity, idType, isBottomingId,
                           isJoinId, isJoinId_maybe )
-import SetLevels
+import GHC.Core.Op.SetLevels
 import UniqSupply       ( UniqSupply )
 import Bag
 import Util
@@ -113,7 +113,7 @@ Note [Join points]
 Every occurrence of a join point must be a tail call (see Note [Invariants on
 join points] in GHC.Core), so we must be careful with how far we float them. The
 mechanism for doing so is the *join ceiling*, detailed in Note [Join ceiling]
-in SetLevels. For us, the significance is that a binder might be marked to be
+in GHC.Core.Op.SetLevels. For us, the significance is that a binder might be marked to be
 dropped at the nearest boundary between tail calls and non-tail calls. For
 example:
 
@@ -220,7 +220,7 @@ floatBind (NonRec (TB var _) rhs)
   = case (floatRhs var rhs) of { (fs, rhs_floats, rhs') ->
 
         -- A tiresome hack:
-        -- see Note [Bottoming floats: eta expansion] in SetLevels
+        -- see Note [Bottoming floats: eta expansion] in GHC.Core.Op.SetLevels
     let rhs'' | isBottomingId var = etaExpand (idArity var) rhs'
               | otherwise         = rhs'
 
@@ -337,7 +337,7 @@ makes f and x' look mutually recursive when they're not.
 The test was shootout/k-nucleotide, as compiled using commit 47d5dd68 on the
 wip/join-points branch.
 
-TODO: This can probably be solved somehow in SetLevels. The difference between
+TODO: This can probably be solved somehow in GHC.Core.Op.SetLevels. The difference between
 "this *is at* level <2,0>" and "this *depends on* level <2,0>" is very
 important.)
 
@@ -408,7 +408,7 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
         bndrs                = [b | TB b _ <- bndrs_w_lvls]
         bndr_lvl             = asJoinCeilLvl (floatSpecLevel lam_spec)
         -- All the binders have the same level
-        -- See SetLevels.lvlLamBndrs
+        -- See GHC.Core.Op.SetLevels.lvlLamBndrs
         -- Use asJoinCeilLvl to make this the join ceiling
     in
     case (floatBody bndr_lvl body) of { (fs, floats, body') ->
@@ -597,7 +597,7 @@ lifted to top level.
 
 The trouble is that
   (a) we partition these floating bindings *at every binding site*
-  (b) SetLevels introduces a new bindings site for every float
+  (b) GHC.Core.Op.SetLevels introduces a new bindings site for every float
 So we had better not look at each binding at each binding site!
 
 That is why MajorEnv is represented as a finite map.
