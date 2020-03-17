@@ -556,8 +556,8 @@ resetLastErrorLocations = do
 
 ghciLogAction :: LogAction -> IORef [(FastString, Int)] ->  LogAction
 ghciLogAction old_log_action lastErrLocations
-              dflags flag severity srcSpan style msg = do
-    old_log_action dflags flag severity srcSpan style msg
+              dflags flag severity srcSpan msg = do
+    old_log_action dflags flag severity srcSpan msg
     case severity of
         SevError -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
