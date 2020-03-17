@@ -375,8 +375,8 @@ pprCoreBinder LetBind binder
 
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder bind_site bndr
-  = getPprStyle $ \ sty ->
-    pprTypedLamBinder bind_site (debugStyle sty) bndr
+  = getPprDebug $ \debug ->
+    pprTypedLamBinder bind_site debug bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
