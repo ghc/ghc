@@ -45,3 +45,23 @@ if [ ! -e $toolchain/bin/alex ]; then
     cp $APPDATA/cabal/bin/alex $toolchain/bin
 fi
 
+if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+cat > mk/build.mk <<EOF
+include mk/flavours/${BUILD_FLAVOUR}.mk
+
+V=1
+HADDOCK_DOCS=YES
+LATEX_DOCS=YES
+HSCOLOUR_SRCS=YES
+BUILD_SPHINX_HTML=YES
+BUILD_SPHINX_PDF=NO
+BeConservative=YES
+INTEGER_LIBRARY=$INTEGER_LIBRARY
+GhcLibHcOpts+=-haddock
+EOF
+
+echo "================================================="
+echo "Build.mk:"
+echo ""
+cat mk/build.mk
+echo "================================================="
