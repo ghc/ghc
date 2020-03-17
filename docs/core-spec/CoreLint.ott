@@ -232,8 +232,8 @@ G |-co g1 : s1 k1~R k'1 t1
 G |-co g2 : s2 k2~R k'2 t2
 G |-arrow k1 -> k2 : k
 G |-arrow k'1 -> k'2 : k'
-------------------------- :: TyConAppCoFunTy
-G |-co (->)_R g1 g2 : (s1 -> s2) k~R k' (t1 -> t2)
+------------------------- :: FunCo
+G |-co g1 ->_R g2 : (s1 -> s2) k~R k' (t1 -> t2)
 
 T /= (->)
 </ Ri // i /> = take(length </ gi // i />, tyConRolesX R T)
@@ -258,9 +258,19 @@ G |-app (t2 : k2') : k2 ~> k4
 G |-co g1 g2 : (s1 t1) k3~Ph k4 (s2 t2)
 
 G |-co h : k1 *~Nom * k2
-G, z_k1 |-co g : t1 k3~R k4 t2
------------------------------------------------------------------- :: ForAllCo
-G |-co forall z:h. g : (forall z_k1. t1) k3~R k4 (forall z_k2. (t2[z |-> z_k2 |> sym h]))
+G, alpha_k1 |-co g : t1 k3~R k4 t2
+------------------------------------------------------------------ :: ForAllCo_Tv
+G |-co forall alpha:h. g : (forall alpha_k1. t1) k3~R k4 (forall alpha_k2. (t2[alpha |-> alpha_k2 |> sym h]))
+
+G |-co h : k1 *~Nom * k2
+G, x_k1 |-co g : t1 {TYPE s1}~R {TYPE s2} t2
+R2 = coercionRole x_k1
+h' = downgradeRole R2 h
+h1 = nth R2 2 h'
+h2 = nth R2 3 h'
+almostDevoid x g
+------------------------------------------- :: ForAllCo_Cv
+G |-co forall x:h.g : (forall x_k1. t1) *~R * (forall x_k2. (t2[ x |-> h1 ; x_k2 ; sym h2 ]))
 
 z_phi elt G
 phi = t1 k1~#k2 t2
@@ -495,10 +505,17 @@ G |-app </ (ti : ki) // i /> : tyConKind T ~> k
 G |-ty T </ ti // i /> : k
 
 G |-ki k1 ok
-G, z_k1 |-ty t : TYPE s
-not (z elt fv(s))
------------------------- :: ForAllTy
-G |-ty forall z_k1. t : TYPE s
+G, alpha_k1 |-ty t : TYPE s
+not (alpha elt fv(s))
+------------------------ :: ForAllTy_Tv
+G |-ty forall alpha_k1. t : TYPE s
+
+phi = s1 k1~#k2 s2
+G |-ki phi ok
+G, x_phi |-ty t : TYPE s
+x elt fv(t)
+--------------------- :: ForAllTy_Cv
+G |-ty forall x_phi.t : *
 
 G |-tylit lit : k
 -------------- :: LitTy

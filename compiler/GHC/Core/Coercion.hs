@@ -1367,7 +1367,7 @@ promoteCoercion co = case co of
     ForAllCo _ _ _
       -> ASSERT( False )
          mkNomReflCo liftedTypeKind
-      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 
     FunCo _ _ _
       -> ASSERT( False )
@@ -1416,7 +1416,7 @@ promoteCoercion co = case co of
       | otherwise
       -> ASSERT( False)
          mkNomReflCo liftedTypeKind
-           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+           -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 
     KindCo _
       -> ASSERT( False )
