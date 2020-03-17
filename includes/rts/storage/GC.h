@@ -170,10 +170,13 @@ extern generation * oldest_gen;
                                 Allocates memory from the nursery in
                                 the current Capability.
 
-   StgPtr allocatePinned(Capability *cap, W_ n)
+   StgPtr allocatePinned(Capability *cap, W_ n, W_ alignment, W_ align_off)
                                 Allocates a chunk of contiguous store
                                 n words long, which is at a fixed
-                                address (won't be moved by GC).
+                                address (won't be moved by GC). The
+                                word at the byte offset 'align_off'
+                                will be aligned to 'alignment', which
+                                must be a power of two.
                                 Returns a pointer to the first word.
                                 Always succeeds.
 
@@ -191,7 +194,7 @@ extern generation * oldest_gen;
 
 StgPtr  allocate          ( Capability *cap, W_ n );
 StgPtr  allocateMightFail ( Capability *cap, W_ n );
-StgPtr  allocatePinned    ( Capability *cap, W_ n );
+StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
 
 /* memory allocator for executable memory */
 typedef void* AdjustorWritable;
