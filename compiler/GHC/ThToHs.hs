@@ -11,6 +11,7 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -134,15 +135,15 @@ wrapMsg :: (Show a, TH.Ppr a) => String -> a -> CvtM b -> CvtM b
 -- E.g  wrapMsg "declaration" dec thing
 wrapMsg what item (CvtM m)
   = CvtM $ \origin loc -> case m origin loc of
-      Left err -> Left (err $$ getPprStyle msg)
+      Left err -> Left (err $$ msg)
       Right v  -> Right v
   where
         -- Show the item in pretty syntax normally,
         -- but with all its constructors if you say -dppr-debug
-    msg sty = hang (text "When splicing a TH" <+> text what <> colon)
-                 2 (if debugStyle sty
-                    then text (show item)
-                    else text (pprint item))
+    msg = hang (text "When splicing a TH" <+> text what <> colon)
+                 2 (getPprDebug $ \case
+                     True  -> text (show item)
+                     False -> text (pprint item))
 
 wrapL :: CvtM a -> CvtM (Located a)
 wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of

@@ -273,11 +273,8 @@ pprOccName (OccName sp occ)
   = getPprStyle $ \ sty ->
     if codeStyle sty
     then ztext (zEncodeFS occ)
-    else pp_occ <> pp_debug sty
+    else pp_occ <> whenPprDebug (braces (pprNameSpaceBrief sp))
   where
-    pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
-                 | otherwise      = empty
-
     pp_occ = sdocOption sdocSuppressUniques $ \case
                True  -> text (strip_th_unique (unpackFS occ))
                False -> ftext occ

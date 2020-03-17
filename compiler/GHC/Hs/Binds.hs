@@ -630,11 +630,10 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
   ppr (XValBindsLR (NValBinds sccs sigs))
-    = getPprStyle $ \ sty ->
-      if debugStyle sty then    -- Print with sccs showing
-        vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
-     else
-        pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
+    = getPprDebug $ \case
+        -- Print with sccs showing
+        True  -> vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
+        False -> pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
      pp_rec Recursive    = text "rec"
@@ -784,9 +783,11 @@ pprTicks :: SDoc -> SDoc -> SDoc
 -- Also print ticks in dumpStyle, so that -ddump-hpc actually does
 -- something useful.
 pprTicks pp_no_debug pp_when_debug
-  = getPprStyle (\ sty -> if debugStyle sty || dumpStyle sty
-                             then pp_when_debug
-                             else pp_no_debug)
+  = getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
+      if debug || dumpStyle sty
+         then pp_when_debug
+         else pp_no_debug
 
 {-
 ************************************************************************

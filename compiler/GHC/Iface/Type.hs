@@ -692,7 +692,8 @@ if_print_coercions :: SDoc  -- ^ if printing coercions
 if_print_coercions yes no
   = sdocOption sdocPrintExplicitCoercions $ \print_co ->
     getPprStyle $ \style ->
-    if print_co || dumpStyle style || debugStyle style
+    getPprDebug $ \debug ->
+    if print_co || dumpStyle style || debug
     then yes
     else no
 
@@ -1286,12 +1287,12 @@ pprIfaceTypeApp prec tc args = pprTyTcApp prec tc args
 pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
-    getPprStyle $ \style ->
-    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds) style
+    getPprDebug $ \debug ->
+    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds) debug
 
 pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
-            -> PrintExplicitKinds -> PprStyle -> SDoc
-pprTyTcApp' ctxt_prec tc tys printExplicitKinds style
+            -> PrintExplicitKinds -> Bool -> SDoc
+pprTyTcApp' ctxt_prec tc tys printExplicitKinds debug
   | ifaceTyConName tc `hasKey` ipClassKey
   , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
            Required (IA_Arg ty Required IA_Nil) <- tys
@@ -1299,7 +1300,7 @@ pprTyTcApp' ctxt_prec tc tys printExplicitKinds style
     $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
 
   | IfaceTupleTyCon arity sort <- ifaceTyConSort info
-  , not (debugStyle style)
+  , not debug
   , arity == ifaceVisAppArgsLength tys
   = pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
 
@@ -1382,8 +1383,9 @@ ppr_equality ctxt_prec tc args
         sdocOption sdocPrintExplicitKinds $ \print_kinds ->
         sdocOption sdocPrintEqualityRelations $ \print_eqs ->
         getPprStyle      $ \style  ->
+        getPprDebug      $ \debug  ->
         print_equality' args print_kinds
-          (print_eqs || dumpStyle style || debugStyle style)
+          (print_eqs || dumpStyle style || debug)
 
     print_equality' (ki1, ki2, ty1, ty2) print_kinds print_eqs
       | -- If -fprint-equality-relations is on, just print the original TyCon

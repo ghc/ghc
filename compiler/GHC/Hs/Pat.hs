@@ -514,14 +514,13 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
+-- | Print with type info if -dppr-debug is on
 pprPatBndr :: OutputableBndr name => name -> SDoc
-pprPatBndr var                  -- Print with type info if -dppr-debug is on
-  = getPprStyle $ \ sty ->
-    if debugStyle sty then
-        parens (pprBndr LambdaBind var)         -- Could pass the site to pprPat
-                                                -- but is it worth it?
-    else
-        pprPrefixOcc var
+pprPatBndr var
+  = getPprDebug $ \case
+      True -> parens (pprBndr LambdaBind var) -- Could pass the site to pprPat
+                                              -- but is it worth it?
+      False -> pprPrefixOcc var
 
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
