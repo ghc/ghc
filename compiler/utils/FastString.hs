@@ -470,8 +470,11 @@ mkFastStringForeignPtr ptr !fp len
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
 mkFastStringByteString :: ByteString -> FastString
-mkFastStringByteString bs =
-    inlinePerformIO $
+mkFastStringByteString bs
+  | BS.null bs
+  = nilFS
+  | otherwise
+  = inlinePerformIO $
       BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
         let ptr' = castPtr ptr
         mkFastStringWith (mkNewFastStringByteString bs ptr' len) ptr' len
