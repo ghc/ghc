@@ -1507,7 +1507,7 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
 --        subst2 <- ty_co_match menv subst1 s2 eta2 kco3 kco4
 --      Question: How do we get kcoi?
 --   2. Given:
---        lkco :: <*>    -- See Note [Weird typing rule for ForAllTy] in GHC.Core.Type
+--        lkco :: <*>    -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 --        rkco :: <*>
 --      Wanted:
 --        ty_co_match menv' subst2 ty1 co2 lkco' rkco'

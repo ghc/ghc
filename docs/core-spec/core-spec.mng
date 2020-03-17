@@ -106,10 +106,10 @@ There are a few key invariants about expressions:
 \item The right-hand sides of all top-level and recursive $[[let]]$s
 must be of lifted type, with one exception: the right-hand side of a top-level
 $[[let]]$ may be of type \texttt{Addr\#} if it's a primitive string literal.
-See \verb|#top_level_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
+See \verb|#top_level_invariant#| in \ghcfile{GHC.Core}.
 \item The right-hand side of a non-recursive $[[let]]$ and the argument
 of an application may be of unlifted type, but only if the expression
-is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
+is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{GHC.Core}.
 \item We allow a non-recursive $[[let]]$ for bind a type variable.
 \item The $[[_]]$ case for a $[[case]]$ must come first.
 \item The list of case alternatives must be exhaustive.
@@ -119,7 +119,7 @@ In other words, the payload inside of a \texttt{Type} constructor must not turn 
 to be built with \texttt{CoercionTy}.
 \item Join points (introduced by $[[join]]$ expressions) follow the invariants
 laid out in \verb|Note [Invariants on join points]| in
-\ghcfile{coreSyn/CoreSyn.hs}:
+\ghcfile{GHC.Core}:
 \begin{enumerate}
     \item All occurrences must be tail calls. This is enforced in our typing
     rules using the label environment $[[D]]$.
@@ -170,9 +170,9 @@ A program is just a list of bindings:
 \gram{\ottt}
 
 \ctor{FunTy} is the special case for non-dependent function type. The
-\ctor{TyBinder} in \ghcfile{types/TyCoRep.hs} distinguishes whether a binder is
+\ctor{TyBinder} in \ghcfile{GHC.Core.TyCo.Rep} distinguishes whether a binder is
 anonymous (\ctor{FunTy}) or named (\ctor{ForAllTy}). See
-\verb|Note [TyBinders]| in \ghcfile{types/TyCoRep.hs}.
+\verb|Note [TyBinders]| in \ghcfile{GHC.Core.TyCo.Rep}.
 
 There are some invariants on types:
 \begin{itemize}
@@ -191,7 +191,7 @@ a term-level literal, but we are ignoring this distinction here.
 \item If $[[forall n. t]]$ is a polymorphic type over a coercion variable (i.e.
   $[[n]]$ is a coercion variable), then $[[n]]$ must appear in $[[t]]$;
   otherwise it should be represented as a \texttt{FunTy}. See \texttt{Note
-    [Unused coercion variable in ForAllTy]} in \ghcfile{types/TyCoRep.hs}.
+    [Unused coercion variable in ForAllTy]} in \ghcfile{GHC.Core.TyCo.Rep}.
 \end{itemize}
 
 Note that the use of the $[[T </ ti // i />]]$ form and the $[[t1 -> t2]]$ form
@@ -216,14 +216,15 @@ Invariants on coercions:
 reflexive, use $[[T_R </ gi // i />]]$, never $[[<T> g1 g2]] \ldots$.
 \item The $[[T]]$ in $[[T_R </gi//i/>]]$ is never a type synonym, though it could
 be a type function.
-\item Every non-reflexive coercion coerces between two distinct types.
 \item The name in a coercion must be a term-level name (\ctor{Id}).
 \item The contents of $[[<t>]]$ must not be a coercion. In other words,
 the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
 \item If $[[forall z: h .g]]$ is a polymorphic coercion over a coercion variable
   (i.e. $[[z]]$ is a coercion variable), then $[[z]]$ can only appear in
-  \texttt{Refl} and \texttt{GRefl} in $[[g]]$. See \texttt{Note[Unused coercion
-    variable in ForAllCo] in \ghcfile{types/Coercion.hs}}.
+  \texttt{Refl} and \texttt{GRefl} in $[[g]]$. See \texttt{Note [Unused coercion
+    variable in ForAllCo] in \ghcfile{GHC.Core.Coercion}}.
+\item Prefer $[[g1 ->_R g2]]$ over $[[(->)_R g1 g2]]$; that is, we use \ctor{FunCo},
+never \ctor{TyConAppCo}, for coercions over saturated uses of $[[->]]$.
 \end{itemize}
 
 The \texttt{UnivCo} constructor takes several arguments: the two types coerced
@@ -327,7 +328,7 @@ synonym for $[[TYPE 'Unlifted]]$.
 
 \section{Contexts}
 
-The functions in \ghcfile{coreSyn/CoreLint.hs} use the \texttt{LintM} monad.
+The functions in \ghcfile{GHC.Core.Lint} use the \texttt{LintM} monad.
 This monad contains a context with a set of bound variables $[[G]]$ and a set
 of bound labels $[[D]]$. The formalism treats $[[G]]$ and $[[D]]$ as ordered
 lists, but GHC uses sets as its
@@ -451,6 +452,10 @@ and \ottdrulename{Co\_CoVarCoRepr}.
 See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$, and
 see Section~\ref{sec:axiom_rules} for more information about $[[coaxrProves]]$.
 
+The $[[downgradeRole R g]]$ function returns a new coercion that relates the same
+types as $[[g]]$ but with role $[[R]]$. It assumes that the role of $[[g]]$ is a
+sub-role ($\leq$) of $[[R]]$.
+
 \subsection{Name consistency}
 \label{sec:name_consistency}
 
@@ -463,7 +468,7 @@ There are three very similar checks for names, two performed as part of
 
 The point of the extra checks on $[[t']]$ is that a join point's type cannot be
 polymorphic in its return type; see \texttt{Note [The polymorphism rule of join
-points]} in \ghcfile{coreSyn/CoreSyn.hs}.
+points]} in \ghcfile{GHC.Core}.
 
 \ottdefnlintBinder{}
 
