@@ -237,7 +237,7 @@ showLinkerState :: DynLinker -> DynFlags -> IO ()
 showLinkerState dl dflags
   = do pls <- readPLS dl
        putLogMsg dflags NoReason SevDump noSrcSpan
-          defaultDumpStyle
+          $ withPprStyle defaultDumpStyle
                  (vcat [text "----- Linker state -----",
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
@@ -420,7 +420,7 @@ classifyLdInput dflags f
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
         putLogMsg dflags NoReason SevInfo noSrcSpan
-            defaultUserStyle
+            $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
     where platform = targetPlatform dflags
@@ -1414,7 +1414,7 @@ load_dyn hsc_env crash_early dll = do
           when (wopt Opt_WarnMissedExtraSharedLib dflags)
             $ putLogMsg dflags
                 (Reason Opt_WarnMissedExtraSharedLib) SevWarning
-                  noSrcSpan defaultUserStyle (note err)
+                  noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
     note err = vcat $ map text
       [ err
@@ -1715,8 +1715,7 @@ maybePutStr dflags s
               NoReason
               SevInteractive
               noSrcSpan
-              defaultUserStyle
-              (text s)
+              $ withPprStyle defaultUserStyle (text s)
 
 maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")

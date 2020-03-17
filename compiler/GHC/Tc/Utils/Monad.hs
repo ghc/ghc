@@ -1902,7 +1902,7 @@ failIfM msg
         ; let full_msg = (if_loc env <> colon) $$ nest 2 msg
         ; dflags <- getDynFlags
         ; liftIO (putLogMsg dflags NoReason SevFatal
-                   noSrcSpan (defaultErrStyle dflags) full_msg)
+                   noSrcSpan $ withPprStyle (defaultErrStyle dflags) full_msg)
         ; failM }
 
 --------------------
@@ -1938,8 +1938,7 @@ forkM_maybe doc thing_inside
                                              NoReason
                                              SevFatal
                                              noSrcSpan
-                                             (defaultErrStyle dflags)
-                                             msg
+                                             $ withPprStyle (defaultErrStyle dflags) msg
 
                     ; traceIf (text "} ending fork (badly)" <+> doc)
                     ; return Nothing }
