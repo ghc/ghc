@@ -6,7 +6,7 @@
 -- It produces a nested unfold that should look something
 -- like the code below.  Note the 'lvl1_shW'.  It is BAD
 -- if this is a lambda instead; you get a lot more allocation
--- See Note [Escaping a value lambda] in SetLevels
+-- See Note [Escaping a value lambda] in GHC.Core.Op.SetLevels
 
 
 {-

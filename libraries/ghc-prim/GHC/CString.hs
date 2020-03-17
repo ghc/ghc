@@ -46,7 +46,7 @@ is a waste.
 Moreover, inlining early may interfere with a variety of rules that are supposed
 to match unpackCString#,
 
- * BuiltInRules in PrelRules.hs; e.g.
+ * BuiltInRules in GHC.Core.Op.ConstantFold; e.g.
        eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)
           = s1 == s2
 
@@ -60,8 +60,8 @@ to match unpackCString#,
 
 Moreover, we want to make it CONLIKE, so that:
 
-* the rules in PrelRules will fire when the string is let-bound.
-  E.g. the eqString rule in PrelRules
+* the rules in GHC.Core.Op.ConstantFold will fire when the string is let-bound.
+  E.g. the eqString rule in GHC.Core.Op.ConstantFold
    eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
 * exprIsConApp_maybe will see the string when we have
@@ -115,7 +115,7 @@ unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 
 -- Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#
 
--- It also has a BuiltInRule in PrelRules.hs:
+-- It also has a BuiltInRule in GHC.Core.Op.ConstantFold:
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
 --        =  unpackFoldrCString# "foobaz" c n
 

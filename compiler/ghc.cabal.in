@@ -167,9 +167,6 @@ Library
         parser
         prelude
         profiling
-        simplCore
-        specialise
-        stranal
         typecheck
         utils
 
@@ -414,7 +411,7 @@ Library
         KnownUniques
         PrelInfo
         PrelNames
-        PrelRules
+        GHC.Core.Op.ConstantFold
         PrimOp
         ToolSettings
         TysPrim
@@ -434,19 +431,19 @@ Library
         GHC.Rename.Fixity
         GHC.Rename.Utils
         GHC.Rename.Unbound
-        CoreMonad
-        CSE
-        FloatIn
-        FloatOut
-        LiberateCase
-        OccurAnal
-        SAT
-        SetLevels
-        SimplCore
-        SimplEnv
-        SimplMonad
-        SimplUtils
-        Simplify
+        GHC.Core.Op.Monad
+        GHC.Core.Op.CSE
+        GHC.Core.Op.FloatIn
+        GHC.Core.Op.FloatOut
+        GHC.Core.Op.LiberateCase
+        GHC.Core.Op.OccurAnal
+        GHC.Core.Op.StaticArgs
+        GHC.Core.Op.SetLevels
+        GHC.Core.Op.Simplify.Driver
+        GHC.Core.Op.Simplify.Env
+        GHC.Core.Op.Simplify.Monad
+        GHC.Core.Op.Simplify.Utils
+        GHC.Core.Op.Simplify
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.CSE
@@ -463,14 +460,14 @@ Library
         GHC.CoreToStg.Prep
         GHC.Types.RepType
         GHC.Core.Rules
-        SpecConstr
-        Specialise
-        CallArity
-        DmdAnal
-        CprAnal
-        Exitify
-        WorkWrap
-        WwLib
+        GHC.Core.Op.SpecConstr
+        GHC.Core.Op.Specialise
+        GHC.Core.Op.CallArity
+        GHC.Core.Op.DmdAnal
+        GHC.Core.Op.CprAnal
+        GHC.Core.Op.Exitify
+        GHC.Core.Op.WorkWrap
+        GHC.Core.Op.WorkWrap.Lib
         FamInst
         ClsInst
         Inst

@@ -6,11 +6,11 @@
 -- with saying "import GHC.Plugins".
 --
 -- Particularly interesting modules for plugin writers include
--- "GHC.Core" and "CoreMonad".
+-- "GHC.Core" and "GHC.Core.Op.Monad".
 module GHC.Plugins(
         module GHC.Driver.Plugins,
         module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module CoreMonad, module GHC.Core, module Literal, module GHC.Core.DataCon,
+        module GHC.Core.Op.Monad, module GHC.Core, module Literal, module GHC.Core.DataCon,
         module GHC.Core.Utils, module GHC.Core.Make, module GHC.Core.FVs,
         module GHC.Core.Subst, module GHC.Core.Rules, module Annotations,
         module GHC.Driver.Session, module GHC.Driver.Packages,
@@ -37,7 +37,7 @@ import Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExported {- all 
 import IdInfo
 
 -- Core
-import CoreMonad
+import GHC.Core.Op.Monad
 import GHC.Core
 import Literal
 import GHC.Core.DataCon
@@ -95,8 +95,8 @@ import TcEnv            ( lookupGlobal )
 
 import qualified Language.Haskell.TH as TH
 
-{- This instance is defined outside CoreMonad.hs so that
-   CoreMonad does not depend on TcEnv -}
+{- This instance is defined outside GHC.Core.Op.Monad.hs so that
+   GHC.Core.Op.Monad does not depend on TcEnv -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
                           ; liftIO $ lookupGlobal hsc_env name }

@@ -16,7 +16,7 @@ then discover that they aren't needed in the chosen branch.
 {-# OPTIONS_GHC -fprof-auto #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module FloatIn ( floatInwards ) where
+module GHC.Core.Op.FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
 
@@ -27,7 +27,7 @@ import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Driver.Types     ( ModGuts(..) )
 import GHC.Core.Utils
 import GHC.Core.FVs
-import CoreMonad        ( CoreM )
+import GHC.Core.Op.Monad        ( CoreM )
 import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import Var
 import GHC.Core.Type
@@ -91,7 +91,7 @@ The fix is
 to let bind the algebraic case scrutinees (done, I think) and
 the case alternatives (except the ones with an
 unboxed type)(not done, I think). This is best done in the
-SetLevels.hs module, which tags things with their level numbers.
+GHC.Core.Op.SetLevels.hs module, which tags things with their level numbers.
 \item
 do the full laziness pass (floating lets outwards).
 \item
