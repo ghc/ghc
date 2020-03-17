@@ -282,11 +282,11 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
       case msg of
         BuildMsg msg -> do
           putLogMsg dflags NoReason SevInfo noSrcSpan
-              (defaultUserStyle dflags) msg
+              defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
           putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
-              (defaultUserStyle dflags) msg
+              defaultUserStyle msg
           log_loop chan t
         EOF ->
           log_loop chan  (t-1)

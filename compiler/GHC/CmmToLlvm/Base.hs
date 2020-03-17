@@ -519,7 +519,7 @@ strDisplayName_llvm lbl = do
     dflags <- getDynFlags
     let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
-        style = Outp.mkUserStyle dflags Outp.reallyAlwaysQualify depth
+        style = Outp.mkUserStyle Outp.reallyAlwaysQualify depth
         str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
     return (fsLit (dropInfoSuffix str))
 
@@ -536,7 +536,7 @@ strProcedureName_llvm lbl = do
     dflags <- getDynFlags
     let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
-        style = Outp.mkUserStyle dflags Outp.neverQualify depth
+        style = Outp.mkUserStyle Outp.neverQualify depth
         str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
     return (fsLit str)
 
