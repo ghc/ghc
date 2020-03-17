@@ -101,8 +101,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
                                     NoReason
                                     SevOutput
                                     noSrcSpan
-                                    defaultDumpStyle
-                                    sd
+                                    $ withPprStyle defaultDumpStyle sd
                       QuietBinIFaceReading -> \_ -> return ()
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
