@@ -24,6 +24,10 @@ module GHC.HsToCore.PmCheck.Types (
         -- * Caching partially matched COMPLETE sets
         ConLikeSet, PossibleMatches(..),
 
+        -- * PmAltConSet
+        PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
+        extendPmAltConSet, pmAltConSetElems,
+
         -- * A 'DIdEnv' where entries may be shared
         Shared(..), SharedDIdEnv(..), emptySDIE, lookupSDIE, sameRepresentativeSDIE,
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
@@ -49,6 +53,7 @@ import Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import Outputable
+import ListSetOps (unionLists)
 import Maybes
 import GHC.Core.Type
 import GHC.Core.TyCon
@@ -151,6 +156,33 @@ eqConLike _                 _                 = PossiblyOverlap
 -- Really similar to 'GHC.Core.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
+
+data PmAltConSet = PACS !ConLikeSet ![PmLit]
+
+emptyPmAltConSet :: PmAltConSet
+emptyPmAltConSet = PACS emptyUniqDSet []
+
+isEmptyPmAltConSet :: PmAltConSet -> Bool
+isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
+
+-- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
+-- the given 'PmAltCon' according to 'eqPmAltCon'.
+elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
+elemPmAltConSet (PmAltConLike cl) (PACS cls _   ) = elementOfUniqDSet cl cls
+elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = elem lit lits
+
+extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
+extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
+  = PACS (addOneToUniqDSet cls cl) lits
+extendPmAltConSet (PACS cls lits) (PmAltLit lit)
+  = PACS cls (unionLists lits [lit])
+
+pmAltConSetElems :: PmAltConSet -> [PmAltCon]
+pmAltConSetElems (PACS cls lits)
+  = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
+
+instance Outputable PmAltConSet where
+  ppr = ppr . pmAltConSetElems
 
 -- | We can't in general decide whether two 'PmAltCon's match the same set of
 -- values. In addition to the reasons in 'eqPmLit' and 'eqConLike', a
@@ -475,7 +507,7 @@ data VarInfo
   -- However, no more than one RealDataCon in the list, otherwise contradiction
   -- because of generativity.
 
-  , vi_neg :: ![PmAltCon]
+  , vi_neg :: !PmAltConSet
   -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
   -- Example, assuming
   --
@@ -489,6 +521,9 @@ data VarInfo
   -- between 'vi_pos' and 'vi_neg'.
 
   -- See Note [Why record both positive and negative info?]
+  -- It's worth having an actual set rather than a simple association list,
+  -- because files like Cabal's `LicenseId` define relatively huge enums
+  -- that lead to quadratic or worse behavior.
 
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
