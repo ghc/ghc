@@ -1242,7 +1242,7 @@ pprCLbl dflags = \case
 
    (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
-   (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) -> 
+   (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
     ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd

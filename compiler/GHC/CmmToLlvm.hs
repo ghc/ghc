@@ -100,7 +100,7 @@ llvmCodeGen' dflags cmm_stream
         return a
   where
     header :: SDoc
-    header = 
+    header =
       let target = platformMisc_llvmTarget $ platformMisc dflags
       in     text ("target datalayout = \"" ++ getDataLayout (llvmConfig dflags) target ++ "\"")
          $+$ text ("target triple = \"" ++ target ++ "\"")
