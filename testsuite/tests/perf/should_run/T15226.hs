@@ -6,7 +6,7 @@ import Prelude hiding (repeat)
 
 -- We want to be sure that the compiler *doesn't* know that
 -- all the elements of the list are in WHNF, because if it
--- does, PrelRules may erase the seq#'s altogether.
+-- does, GHC.Core.Op.ConstantFold may erase the seq#'s altogether.
 repeat :: a -> [a]
 repeat a = res
   where res = a : res

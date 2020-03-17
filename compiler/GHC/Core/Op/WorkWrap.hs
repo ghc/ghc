@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-module WorkWrap ( wwTopBinds ) where
+module GHC.Core.Op.WorkWrap ( wwTopBinds ) where
 
 import GhcPrelude
 
@@ -23,7 +23,7 @@ import BasicTypes
 import GHC.Driver.Session
 import Demand
 import Cpr
-import WwLib
+import GHC.Core.Op.WorkWrap.Lib
 import Util
 import Outputable
 import GHC.Core.FamInstEnv
@@ -282,7 +282,7 @@ Follows on from Note [Worker-wrapper for INLINABLE functions]
 It is *vital* that if the worker gets an INLINABLE pragma (from the
 original function), then the worker has the same phase activation as
 the wrapper (or later).  That is necessary to allow the wrapper to
-inline into the worker's unfolding: see SimplUtils
+inline into the worker's unfolding: see GHC.Core.Op.Simplify.Utils
 Note [Simplifying inside stable unfoldings].
 
 If the original is NOINLINE, it's important that the work inherit the
@@ -477,14 +477,14 @@ tryWW dflags fam_envs is_rec fn_id rhs
 
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
-    -- See Note [Arity trimming for CPR signatures] in CprAnal
+    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Op.CprAnal
     cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
-        -- See Note [Zapping Used Once info in WorkWrap]
+        -- See Note [Zapping Used Once info WorkWrap]
 
     is_fun     = notNull wrap_dmds || isJoinId fn_id
     -- See Note [Don't eta expand in w/w]
@@ -511,7 +511,7 @@ Why here?
 
 We also need to do it in TidyCore.tidyLetBndr to clean up after the
 final, worker/wrapper-less run of the demand analyser (see
-Note [Final Demand Analyser run] in DmdAnal).
+Note [Final Demand Analyser run] in GHC.Core.Op.DmdAnal).
 
 Note [Zapping Used Once info in WorkWrap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -712,7 +712,7 @@ Consider this rather common form of binding:
         $j = \x:Void# -> ...no use of x...
 
 Since x is not used it'll be marked as absent.  But there is no point
-in w/w-ing because we'll simply add (\y:Void#), see WwLib.mkWorerArgs.
+in w/w-ing because we'll simply add (\y:Void#), see GHC.Core.Op.WorkWrap.Lib.mkWorerArgs.
 
 If x has a more interesting type (eg Int, or Int#), there *is* a point
 in w/w so that we don't pass the argument at all.
