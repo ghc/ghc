@@ -45,9 +45,6 @@ module GHC.Cmm.Utils(
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
-        -- Statics
-        blankWord,
-
         -- Tagging
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
         cmmConstrTag1,
@@ -370,9 +367,6 @@ cmmQuotWord dflags e1 e2 = CmmMachOp (mo_wordUQuot dflags) [e1, e2]
 cmmNegate :: DynFlags -> CmmExpr -> CmmExpr
 cmmNegate _      (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
 cmmNegate dflags e                       = CmmMachOp (MO_S_Neg (cmmExprWidth dflags e)) [e]
-
-blankWord :: DynFlags -> CmmStatic
-blankWord dflags = CmmUninitialised (wORD_SIZE dflags)
 
 cmmToWord :: DynFlags -> CmmExpr -> CmmExpr
 cmmToWord dflags e

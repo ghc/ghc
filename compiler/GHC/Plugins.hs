@@ -64,7 +64,7 @@ import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Driver.Types
-import BasicTypes hiding ( Version {- conflicts with Packages.Version -} )
+import BasicTypes
 
 -- Collections and maps
 import VarSet
