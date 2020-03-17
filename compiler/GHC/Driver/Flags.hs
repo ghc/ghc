@@ -519,8 +519,7 @@ instance ToJson WarnReason where
 
 
 data Language = Haskell98 | Haskell2010
-   deriving (Eq, Enum, Show)
+   deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where
     ppr = text . show
-
