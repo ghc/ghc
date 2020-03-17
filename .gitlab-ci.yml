@@ -335,7 +335,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.6.5
+    GHC_VERSION: 8.8.3
     CABAL_INSTALL_VERSION: 2.4.1.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
@@ -373,7 +373,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.6.3
+    GHC_VERSION: 8.8.3
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
@@ -811,7 +811,7 @@ validate-x86_64-linux-fedora27:
   extends: .build-windows
   stage: full-build
   variables:
-    GHC_VERSION: "8.6.5"
+    GHC_VERSION: "8.8.3"
     FLAVOUR: "validate"
   # due to #16574 this currently fails
   allow_failure: true
@@ -861,7 +861,7 @@ nightly-i386-windows-hadrian:
   allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
-    GHC_VERSION: "8.6.5"
+    GHC_VERSION: "8.8.3"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
   script:
     - |
