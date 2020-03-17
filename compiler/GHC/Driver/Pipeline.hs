@@ -1913,7 +1913,7 @@ linkDynLibCheck dflags o_files dep_packages
  = do
     when (haveRtsOptsFlags dflags) $ do
       putLogMsg dflags NoReason SevInfo noSrcSpan
-          (defaultUserStyle dflags)
+          defaultUserStyle
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
 
