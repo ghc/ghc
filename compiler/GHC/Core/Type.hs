@@ -2447,7 +2447,7 @@ normally it would make no sense to have
    forall r. (ty :: K r)
 because the kind of the forall would escape the binding
 of 'r'.  But in this case it's fine because (K r) exapands
-to Type, so we expliclity /permit/ the type
+to Type, so we explicitly /permit/ the type
    forall r. T r
 
 To accommodate such a type, in typeKind (forall a.ty) we use
@@ -2455,8 +2455,13 @@ occCheckExpand to expand any type synonyms in the kind of 'ty'
 to eliminate 'a'.  See kinding rule (FORALL) in
 Note [Kinding rules for types]
 
-And in TcValidity.checkEscapingKind, we use also use
-occCheckExpand, for the same reason.
+See also
+ * TcUnify.occCheckExpand
+ * GHC.Core.Utils.coreAltsType
+ * TcValidity.checkEscapingKind
+all of which grapple with with the same problem.
+
+See #14939.
 -}
 
 -----------------------------
