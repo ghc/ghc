@@ -5217,4 +5217,4 @@ initSDocContext dflags style = SDC
 
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
-initDefaultSDocContext dflags = initSDocContext dflags (defaultUserStyle dflags)
+initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle

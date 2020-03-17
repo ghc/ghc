@@ -368,6 +368,6 @@ dumpWith dflags flag txt fmt sdoc = do
     -- If `-ddump-cmm-verbose -ddump-to-file` is specified,
     -- dump each Cmm pipeline stage output to a separate file.  #16930
     when (dopt Opt_D_dump_cmm_verbose dflags)
-      $ dumpAction dflags (mkDumpStyle dflags alwaysQualify)
+      $ dumpAction dflags (mkDumpStyle alwaysQualify)
                    (dumpOptionsFromFlag flag) txt fmt sdoc
   dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc txt fmt sdoc

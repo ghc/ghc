@@ -75,7 +75,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
         return ()
       Just msg -> do
         putLogMsg dflags NoReason Err.SevDump noSrcSpan
-          (defaultDumpStyle dflags)
+          defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
                   msg,

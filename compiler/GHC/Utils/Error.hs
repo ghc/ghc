@@ -441,7 +441,7 @@ dumpIfSet dflags flag hdr doc
                             NoReason
                             SevDump
                             noSrcSpan
-                            (defaultDumpStyle dflags)
+                            defaultDumpStyle
                             (mkDumpDoc hdr doc)
 
 -- | a wrapper around 'dumpAction'.
@@ -459,7 +459,7 @@ dumpIfSet_dyn_printer :: PrintUnqualified -> DynFlags -> DumpFlag -> String
                          -> DumpFormat -> SDoc -> IO ()
 dumpIfSet_dyn_printer printer dflags flag hdr fmt doc
   = when (dopt flag dflags) $ do
-      let sty = mkDumpStyle dflags printer
+      let sty = mkDumpStyle printer
       dumpAction dflags sty (dumpOptionsFromFlag flag) hdr fmt doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
@@ -627,12 +627,12 @@ compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg = do
     traceEventIO $ "GHC progress: " ++ msg
     ifVerbose dflags 1 $
-        logOutput dflags (defaultUserStyle dflags) (text msg)
+        logOutput dflags defaultUserStyle (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
   = ifVerbose dflags 2 $
-    logInfo dflags (defaultUserStyle dflags) (text "***" <+> text what <> colon)
+    logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
 
 data PrintTimings = PrintTimings | DontPrintTimings
   deriving (Eq, Show)
@@ -727,7 +727,7 @@ withTiming' :: MonadIO m
 withTiming' dflags what force_result prtimings action
   = do if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do whenPrintTimings $
-                    logInfo dflags (defaultUserStyle dflags) $
+                    logInfo dflags defaultUserStyle $
                       text "***" <+> what <> colon
                   let ctx = initDefaultSDocContext dflags
                   eventBegins ctx what
@@ -743,7 +743,7 @@ withTiming' dflags what force_result prtimings action
                       time = realToFrac (end - start) * 1e-9
 
                   when (verbosity dflags >= 2 && prtimings == PrintTimings)
-                      $ liftIO $ logInfo dflags (defaultUserStyle dflags)
+                      $ liftIO $ logInfo dflags defaultUserStyle
                           (text "!!!" <+> what <> colon <+> text "finished in"
                            <+> doublePrec 2 time
                            <+> text "milliseconds"
@@ -775,17 +775,17 @@ withTiming' dflags what force_result prtimings action
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $
-                               logInfo dflags (defaultDumpStyle dflags) msg
+                               logInfo dflags defaultDumpStyle msg
 putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = logInfo dflags (defaultUserStyle dflags) msg
+putMsg dflags msg = logInfo dflags defaultUserStyle msg
 
 printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printInfoForUser dflags print_unqual msg
-  = logInfo dflags (mkUserStyle dflags print_unqual AllTheWay) msg
+  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
 
 printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printOutputForUser dflags print_unqual msg
-  = logOutput dflags (mkUserStyle dflags print_unqual AllTheWay) msg
+  = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
 
 logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logInfo dflags sty msg

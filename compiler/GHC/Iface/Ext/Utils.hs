@@ -44,8 +44,7 @@ generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
         this = fmap (pure . (nodeSpan ast,)) $ nodeIdentifiers $ nodeInfo ast
 
 renderHieType :: DynFlags -> HieTypeFix -> String
-renderHieType df ht = renderWithStyle (initSDocContext df sty) (ppr $ hieTypeToIface ht)
-  where sty = defaultUserStyle df
+renderHieType dflags ht = renderWithStyle (initSDocContext dflags defaultUserStyle) (ppr $ hieTypeToIface ht)
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
 resolveVisibility kind ty_args

@@ -495,7 +495,7 @@ ruleCheckPass current_phase pat guts =
     ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
                         ++ (mg_rules guts)
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
-                   (defaultDumpStyle dflags)
+                   defaultDumpStyle
                    (ruleCheckProgram current_phase pat
                       rule_fn (mg_binds guts))
     ; return guts }
