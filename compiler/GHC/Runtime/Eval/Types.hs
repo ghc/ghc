@@ -16,12 +16,12 @@ import GhcPrelude
 
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
-import Id
-import Name
-import Module
-import RdrName
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Module
+import GHC.Types.Name.Reader
 import GHC.Core.Type
-import SrcLoc
+import GHC.Types.SrcLoc
 import Exception
 
 import Data.Word

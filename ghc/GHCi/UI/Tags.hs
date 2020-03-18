@@ -20,8 +20,8 @@ import Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
-import Name (nameOccName)
-import OccName (pprOccName)
+import GHC.Types.Name (nameOccName)
+import GHC.Types.Name.Occurrence (pprOccName)
 import GHC.Core.ConLike
 import MonadUtils
 

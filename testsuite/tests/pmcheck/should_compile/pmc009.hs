@@ -1,6 +1,6 @@
 module HsUtils where
 import GHC.Hs.Binds
-import SrcLoc
+import GHC.Types.SrcLoc
 
 addPatSynSelector:: LHsBind p -> [a]
 addPatSynSelector bind

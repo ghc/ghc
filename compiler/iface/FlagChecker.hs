@@ -13,8 +13,8 @@ import GhcPrelude
 import Binary
 import GHC.Driver.Session
 import GHC.Driver.Types
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import Fingerprint
 import BinFingerprint
 -- import Outputable

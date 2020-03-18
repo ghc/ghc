@@ -25,8 +25,8 @@ import GraphBase
 import GHC.Cmm.Dataflow.Collections (mapLookup)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import Digraph          (flattenSCCs)
 import Outputable
 import GHC.Platform

@@ -13,15 +13,15 @@ module TcAnnotations ( tcAnnotations, annCtxt ) where
 import GhcPrelude
 
 import {-# SOURCE #-} TcSplice ( runAnnotation )
-import Module
+import GHC.Types.Module
 import GHC.Driver.Session
 import Control.Monad ( when )
 
 import GHC.Hs
-import Name
-import Annotations
+import GHC.Types.Name
+import GHC.Types.Annotations
 import TcRnMonad
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import GHC.Driver.Types
 
