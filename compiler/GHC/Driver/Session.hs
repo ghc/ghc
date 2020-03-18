@@ -135,7 +135,6 @@ module GHC.Driver.Session (
         sGhcWithSMP,
         sGhcRTSWays,
         sTablesNextToCode,
-        sLeadingUnderscore,
         sLibFFI,
         sGhcThreaded,
         sGhcDebugged,

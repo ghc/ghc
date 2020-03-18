@@ -55,16 +55,17 @@ data PlatformMini
     deriving (Read, Show, Eq)
 
 -- | Contains enough information for the native code generator to emit
---      code for this platform.
+-- code for this platform.
 data Platform = Platform
-   { platformMini                     :: PlatformMini
-   , platformWordSize                 :: PlatformWordSize
-   , platformByteOrder                :: ByteOrder
-   , platformUnregisterised           :: Bool
-   , platformHasGnuNonexecStack       :: Bool
-   , platformHasIdentDirective        :: Bool
-   , platformHasSubsectionsViaSymbols :: Bool
-   , platformIsCrossCompiling         :: Bool
+   { platformMini                     :: !PlatformMini
+   , platformWordSize                 :: !PlatformWordSize -- ^ Word size
+   , platformByteOrder                :: !ByteOrder        -- ^ Byte order (endianness)
+   , platformUnregisterised           :: !Bool
+   , platformHasGnuNonexecStack       :: !Bool
+   , platformHasIdentDirective        :: !Bool
+   , platformHasSubsectionsViaSymbols :: !Bool
+   , platformIsCrossCompiling         :: !Bool
+   , platformLeadingUnderscore        :: !Bool             -- ^ Symbols need underscore prefix
    }
    deriving (Read, Show, Eq)
 
@@ -301,7 +302,6 @@ data PlatformMisc = PlatformMisc
   --   before the entry code, or with an indirection to the entry code. See
   --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
   , platformMisc_tablesNextToCode     :: Bool
-  , platformMisc_leadingUnderscore    :: Bool
   , platformMisc_libFFI               :: Bool
   , platformMisc_ghcThreaded          :: Bool
   , platformMisc_ghcDebugged          :: Bool
