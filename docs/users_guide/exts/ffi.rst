@@ -37,31 +37,51 @@ Guaranteed call safety
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The Haskell 2010 Report specifies that ``safe`` FFI calls must allow foreign
-calls to safely call into Haskell code. In practice, this means that the
-garbage collector must be able to run while these calls are in progress,
-moving heap-allocated Haskell values around arbitrarily.
+calls to safely call into Haskell code. In practice, this means that called
+functions also have to assume heap-allocated Haskell values may move around
+arbitrarily in order to allow for GC.
 
 This greatly constrains library authors since it implies that it is not safe to
 pass any heap object reference to a ``safe`` foreign function call.  For
-instance, it is often desirable to pass an :ref:`unpinned <pinned-byte-arrays>`
+instance, it is often desirable to pass :ref:`unpinned <pinned-byte-arrays>`
 ``ByteArray#``\s directly to native code to avoid making an otherwise-unnecessary
-copy. However, this can only be done safely if the array is guaranteed not to be
-moved by the garbage collector in the middle of the call.
+copy. However, this can not be done safely for ``safe`` calls since the array might
+be moved by the garbage collector in the middle of the call.
 
-The Chapter does *not* require implementations to refrain from doing the
-same for ``unsafe`` calls, so strictly Haskell 2010-conforming programs
+The Chapter *does* allow for implementations to move objects around during
+``unsafe`` calls as well. So strictly Haskell 2010-conforming programs
 cannot pass heap-allocated references to ``unsafe`` FFI calls either.
+
+GHC, since version 8.4, **guarantees** that garbage collection will never occur
+during an ``unsafe`` call, even in the bytecode interpreter, and further guarantees
+that ``unsafe`` calls will be performed in the calling thread. Making it safe to
+pass heap-allocated objects to unsafe functions.
 
 In previous releases, GHC would take advantage of the freedom afforded by the
 Chapter by performing ``safe`` foreign calls in place of ``unsafe`` calls in
 the bytecode interpreter. This meant that some packages which worked when
-compiled would fail under GHCi (e.g. :ghc-ticket:`13730`).
+compiled would fail under GHCi (e.g. :ghc-ticket:`13730`). But this is no
+longer the case in recent releases.
 
-However, since version 8.4 this is no longer the case: GHC **guarantees** that
-garbage collection will never occur during an ``unsafe`` call, even in the
-bytecode interpreter, and further guarantees that ``unsafe`` calls will be
-performed in the calling thread.
+Interactions between ``safe`` calls and bound threads
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+A ``safe`` call calling into haskell is run on a bound thread by
+the RTS. This means any nesting of ``safe`` calls will be executed on
+the same operating system thread. *Sequential* ``safe`` calls however
+do not enjoy this luxury and may be run on arbitrary OS threads.
+
+This behaviour is considered an implementation detail and code relying on
+thread local state should instead use one of the interfaces provided
+in :base-ref:`Control.Concurrent.` to make this explicit.
+
+For information on what bound threads are,
+see the documentation for the :base-ref:`Control.Concurrent.`.
+
+For more details on the implementation see the Paper:
+"Extending the Haskell Foreign Function Interface with Concurrency".
+Last known to be accessible `here
+<https://www.microsoft.com/en-us/research/wp-content/uploads/2004/09/conc-ffi.pdf>`_.
 
 .. _ffi-ghcexts:
 
@@ -100,7 +120,7 @@ restrictions:
   of heap objects record writes for the purpose of garbage collection.
   An array of heap objects is passed to a foreign C function, the
   runtime does not record any writes. Consequently, it is not safe to
-  write to an array of heap objects in a foreign function. 
+  write to an array of heap objects in a foreign function.
   Since the runtime has no facilities for tracking mutation of a
   ``MutableByteArray#``, these can be safely mutated in any foreign
   function.
@@ -169,7 +189,7 @@ In other situations, the C function may need knowledge of the RTS
 closure types. The following example sums the first element of
 each ``ByteArray#`` (interpreting the bytes as an array of ``CInt``)
 element of an ``ArrayArray##`` [3]_::
-    
+
     // C source, must include the RTS to make the struct StgArrBytes
     // available along with its fields: ptrs and payload.
     #include "Rts.h"
