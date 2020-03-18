@@ -45,31 +45,31 @@ import GHC.Driver.Finder
 import GHC.Driver.Monad
 import HeaderInfo
 import GHC.Driver.Types
-import Module
+import GHC.Types.Module
 import GHC.IfaceToCore  ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 import GHC.Driver.Main
 
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
-import BasicTypes
+import GHC.Types.Basic
 import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
 import FastString
 import Maybes           ( expectJust )
-import Name
+import GHC.Types.Name
 import MonadUtils       ( allM )
 import Outputable
 import Panic
-import SrcLoc
+import GHC.Types.SrcLoc
 import StringBuffer
-import UniqFM
-import UniqDSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
 import TcBackpack
 import GHC.Driver.Packages
-import UniqSet
+import GHC.Types.Unique.Set
 import Util
 import qualified GHC.LanguageExtensions as LangExt
-import NameEnv
+import GHC.Types.Name.Env
 import FileCleanup
 
 import Data.Either ( rights, partitionEithers )

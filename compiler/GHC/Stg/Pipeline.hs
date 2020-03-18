@@ -23,11 +23,11 @@ import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
-import Module           ( Module )
+import GHC.Types.Module ( Module )
 
 import GHC.Driver.Session
 import ErrUtils
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Outputable
 import Control.Monad
 import Control.Monad.IO.Class

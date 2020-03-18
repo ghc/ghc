@@ -53,13 +53,13 @@ import GHC.Core.Type hiding
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
 import PrelNames
-import VarSet
-import VarEnv
-import Id
-import Name     ( Name )
-import Var
-import IdInfo
-import UniqSupply
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Id
+import GHC.Types.Name     ( Name )
+import GHC.Types.Var
+import GHC.Types.Id.Info
+import GHC.Types.Unique.Supply
 import Maybes
 import Util
 import Outputable

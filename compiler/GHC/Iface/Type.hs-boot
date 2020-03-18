@@ -4,7 +4,7 @@ module GHC.Iface.Type
    )
 where
 
-import Var (VarBndr, ArgFlag)
+import GHC.Types.Var (VarBndr, ArgFlag)
 
 data IfaceAppArgs
 

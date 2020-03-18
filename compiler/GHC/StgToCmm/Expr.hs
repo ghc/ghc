@@ -39,13 +39,13 @@ import GHC.Cmm.Info
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Driver.Session ( mAX_PTR_TAG )
-import ForeignCall
-import Id
+import GHC.Types.ForeignCall
+import GHC.Types.Id
 import PrimOp
 import GHC.Core.TyCon
-import GHC.Core.Type      ( isUnliftedType )
-import GHC.Types.RepType  ( isVoidTy, countConRepArgs )
-import CostCentre         ( CostCentreStack, currentCCS )
+import GHC.Core.Type        ( isUnliftedType )
+import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
+import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import Maybes
 import Util
 import FastString

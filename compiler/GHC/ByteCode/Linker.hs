@@ -28,10 +28,10 @@ import SizedSeq
 import GHC.Runtime.Interpreter
 import GHC.ByteCode.Types
 import GHC.Driver.Types
-import Name
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import PrimOp
-import Module
+import GHC.Types.Module
 import FastString
 import Panic
 import Outputable

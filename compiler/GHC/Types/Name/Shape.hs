@@ -1,14 +1,15 @@
 {-# LANGUAGE CPP #-}
 
-module GHC.Types.Name.Shape(
-    NameShape(..),
-    emptyNameShape,
-    mkNameShape,
-    extendNameShape,
-    nameShapeExports,
-    substNameShape,
-    maybeSubstNameShape,
-    ) where
+module GHC.Types.Name.Shape
+   ( NameShape(..)
+   , emptyNameShape
+   , mkNameShape
+   , extendNameShape
+   , nameShapeExports
+   , substNameShape
+   , maybeSubstNameShape
+   )
+where
 
 #include "HsVersions.h"
 
@@ -16,13 +17,13 @@ import GhcPrelude
 
 import Outputable
 import GHC.Driver.Types
-import Module
-import UniqFM
-import Avail
-import FieldLabel
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Avail
+import GHC.Types.FieldLabel
 
-import Name
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import TcRnMonad
 import Util
 import GHC.Iface.Env

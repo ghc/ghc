@@ -28,21 +28,21 @@ import GhcPrelude
 
 import GHC.Hs as Hs
 import PrelNames
-import RdrName
-import qualified Name
-import Module
+import GHC.Types.Name.RdrName
+import qualified GHC.Types.Name as Name
+import GHC.Types.Module
 import RdrHsSyn
-import OccName
-import SrcLoc
+import GHC.Types.Name.OccName as OccName
+import GHC.Types.SrcLoc
 import GHC.Core.Type
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import TysWiredIn
-import BasicTypes as Hs
-import ForeignCall
-import Unique
+import GHC.Types.Basic as Hs
+import GHC.Types.ForeignCall
+import GHC.Types.Unique
 import ErrUtils
 import Bag
-import Lexeme
+import GHC.Types.Lexeme
 import Util
 import FastString
 import Outputable

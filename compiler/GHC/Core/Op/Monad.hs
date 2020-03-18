@@ -52,21 +52,21 @@ import GhcPrelude hiding ( read )
 
 import GHC.Core
 import GHC.Driver.Types
-import Module
+import GHC.Types.Module
 import GHC.Driver.Session
-import BasicTypes       ( CompilerPhase(..) )
-import Annotations
+import GHC.Types.Basic  ( CompilerPhase(..) )
+import GHC.Types.Annotations
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
-import Var
+import GHC.Types.Var
 import Outputable
 import FastString
 import ErrUtils( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
-import UniqSupply
+import GHC.Types.Unique.Supply
 import MonadUtils
-import NameEnv
-import SrcLoc
+import GHC.Types.Name.Env
+import GHC.Types.SrcLoc
 import Data.Bifunctor ( bimap )
 import ErrUtils (dumpAction)
 import Data.List (intersperse, groupBy, sortBy)
