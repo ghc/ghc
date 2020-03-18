@@ -2228,12 +2228,10 @@ mkCallUDs env f args
 
 mkCallUDs' env f args
   | not (want_calls_for f)  -- Imported from elsewhere
-  || null theta             -- Not overloaded
+  || null dicts             -- Not overloaded
   = emptyUDs
 
-  |  not (all type_determines_value theta)
-  || not (computeArity ci_key <= idArity f)
-  || not (length dicts == length theta)
+  |  not (computeArity ci_key <= idArity f)
   || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
   -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
@@ -2245,8 +2243,7 @@ mkCallUDs' env f args
   where
     _trace_doc = vcat [ppr f, ppr args, ppr (map (interestingDict env) dicts)]
     pis                = fst $ splitPiTys $ idType f
-    theta              = getTheta pis
-    constrained_tyvars = tyCoVarsOfTypes theta
+    constrained_tyvars = tyCoVarsOfTypes $ getTheta pis
 
     ci_key :: [SpecArg]
     ci_key = fmap (\(t, a) ->
@@ -2258,7 +2255,9 @@ mkCallUDs' env f args
               _ -> pprPanic "ci_key" $ ppr a
           |  otherwise
           -> UnspecType
-        Anon InvisArg _ -> SpecDict a
+        Anon InvisArg pred
+          | type_determines_value pred -> SpecDict a
+          | otherwise -> UnspecArg
         Anon VisArg _ -> UnspecArg
                 ) $ zip pis args
 
