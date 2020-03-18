@@ -728,6 +728,7 @@ Options affecting code generation
     Request that GHC emits verbose symbol tables which include local symbols
     for module-internal functions. These can be useful for tools like
     :ref:`perf <https://perf.wiki.kernel.org/>` but increase object file sizes.
+    This is implied by :ghc-flag:`-g2` and above.
 
     :ghc-flag:`-fno-expose-internal-symbols` suppresses all non-global symbol
     table entries, resulting in smaller object file sizes at the expense of
