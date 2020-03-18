@@ -220,11 +220,11 @@ utf8EncodeString (Ptr a#) str = go a# str
           go (a# `plusAddr#` off#) cs
 
 utf8EncodeShortByteString :: String -> IO ShortByteString
-utf8EncodeShortByteString str = stToIO $ ST $ \s ->
   let !(I# len#) = utf8EncodedLength str in
   case newByteArray# len# s of { (# s, mba# #) ->
   let ST f_go = go mba# 0# str in
   case f_go s of { (# s, () #) ->
+utf8EncodeShortByteString str = IO $ \s ->
   case unsafeFreezeByteArray# mba# s of { (# s, ba# #) ->
   (# s, SBS ba# #) }}}
   where
