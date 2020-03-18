@@ -9,11 +9,11 @@ module THNames where
 import GhcPrelude ()
 
 import PrelNames( mk_known_key_name )
-import Module( Module, mkModuleNameFS, mkModule, thUnitId )
-import Name( Name )
-import OccName( tcName, clsName, dataName, varName )
-import RdrName( RdrName, nameRdrName )
-import Unique
+import GHC.Types.Module( Module, mkModuleNameFS, mkModule, thUnitId )
+import GHC.Types.Name( Name )
+import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
+import GHC.Types.Name.Reader( RdrName, nameRdrName )
+import GHC.Types.Unique
 import FastString
 
 -- To add a name, do three things
@@ -170,13 +170,13 @@ mkTHModule :: FastString -> Module
 mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
-libFun = mk_known_key_name OccName.varName  thLib
-libTc  = mk_known_key_name OccName.tcName   thLib
-thFun  = mk_known_key_name OccName.varName  thSyn
-thTc   = mk_known_key_name OccName.tcName   thSyn
-thCls  = mk_known_key_name OccName.clsName  thSyn
-thCon  = mk_known_key_name OccName.dataName thSyn
-qqFun  = mk_known_key_name OccName.varName  qqLib
+libFun = mk_known_key_name varName  thLib
+libTc  = mk_known_key_name tcName   thLib
+thFun  = mk_known_key_name varName  thSyn
+thTc   = mk_known_key_name tcName   thSyn
+thCls  = mk_known_key_name clsName  thSyn
+thCon  = mk_known_key_name dataName thSyn
+qqFun  = mk_known_key_name varName  qqLib
 
 -------------------- TH.Syntax -----------------------
 liftClassName :: Name

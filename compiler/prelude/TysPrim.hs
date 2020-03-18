@@ -110,11 +110,11 @@ import {-# SOURCE #-} TysWiredIn
   , doubleElemRepDataConTy
   , mkPromotedListTy )
 
-import Var              ( TyVar, mkTyVar )
-import Name
+import GHC.Types.Var    ( TyVar, mkTyVar )
+import GHC.Types.Name
 import GHC.Core.TyCon
-import SrcLoc
-import Unique
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import PrelNames
 import FastString
 import Outputable

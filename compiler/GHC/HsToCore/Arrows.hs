@@ -45,18 +45,18 @@ import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.HsToCore.Binds (dsHsWrapper)
 
-import Id
+import GHC.Types.Id
 import GHC.Core.ConLike
 import TysWiredIn
-import BasicTypes
+import GHC.Types.Basic
 import PrelNames
 import Outputable
-import VarSet
-import SrcLoc
+import GHC.Types.Var.Set
+import GHC.Types.SrcLoc
 import ListSetOps( assocMaybe )
 import Data.List
 import Util
-import UniqDSet
+import GHC.Types.Unique.DSet
 
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr

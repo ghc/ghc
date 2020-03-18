@@ -15,7 +15,7 @@ import GHC.Platform.Reg
 
 import GraphBase
 
-import UniqSet
+import GHC.Types.Unique.Set
 import GHC.Platform
 import Panic
 

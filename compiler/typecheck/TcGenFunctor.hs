@@ -29,8 +29,8 @@ import FastString
 import GHC.Hs
 import Outputable
 import PrelNames
-import RdrName
-import SrcLoc
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
 import State
 import TcGenDeriv
 import TcType
@@ -38,9 +38,9 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import Util
-import Var
-import VarSet
-import MkId (coerceId)
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Id.Make (coerceId)
 import TysWiredIn (true_RDR, false_RDR)
 
 import Data.Maybe (catMaybes, isJust)

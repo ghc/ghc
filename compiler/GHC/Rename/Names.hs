@@ -44,23 +44,23 @@ import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
 import TcRnMonad
 import PrelNames
-import Module
-import Name
-import NameEnv
-import NameSet
-import Avail
-import FieldLabel
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.FieldLabel
 import GHC.Driver.Types
-import RdrName
+import GHC.Types.Name.Reader
 import RdrHsSyn        ( setRdrNameSpace )
 import Outputable
 import Maybes
-import SrcLoc
-import BasicTypes      ( TopLevelFlag(..), StringLiteral(..) )
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
 import Util
 import FastString
 import FastStringEnv
-import Id
+import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.PatSyn
 import qualified GHC.LanguageExtensions as LangExt
@@ -1065,7 +1065,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
            -- Look up the children in the sub-names of the parent
            let subnames = case ns of   -- The tc is first in ns,
                             [] -> []   -- if it is there at all
-                                       -- See the AvailTC Invariant in Avail.hs
+                                       -- See the AvailTC Invariant in
+                                       -- GHC.Types.Avail
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
            case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
@@ -1350,7 +1351,7 @@ This code finds which import declarations are unused.  The
 specification and implementation notes are here:
   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/unused-imports
 
-See also Note [Choosing the best import declaration] in RdrName
+See also Note [Choosing the best import declaration] in GHC.Types.Name.Reader
 -}
 
 type ImportDeclUsage

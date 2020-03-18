@@ -53,20 +53,20 @@ module GHC.Core.Op.StaticArgs ( doStaticArgs ) where
 
 import GhcPrelude
 
-import Var
+import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Type
 import GHC.Core.Coercion
-import Id
-import Name
-import VarEnv
-import UniqSupply
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Var.Env
+import GHC.Types.Unique.Supply
 import Util
-import UniqFM
-import VarSet
-import Unique
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Var.Set
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
 import Outputable
 
 import Data.List (mapAccumL)

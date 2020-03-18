@@ -36,18 +36,18 @@ where
 import GhcPrelude
 
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import TcEnv
 import TcRnMonad
-import Name
-import NameSet
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
 import GHC.Core.DataCon
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
 import Util
-import BasicTypes       ( TopLevelFlag(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..) )
 import ListSetOps       ( removeDups )
 import GHC.Driver.Session
 import FastString

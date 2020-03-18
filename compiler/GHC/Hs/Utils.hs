@@ -110,20 +110,20 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 
 import TcEvidence
-import RdrName
-import Var
+import GHC.Types.Name.Reader
+import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
 import TcType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
-import Id
-import Name
-import NameSet hiding ( unitFV )
-import NameEnv
-import BasicTypes
-import SrcLoc
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Name.Set hiding ( unitFV )
+import GHC.Types.Name.Env
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
 import FastString
 import Util
 import Bag

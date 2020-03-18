@@ -1,5 +1,5 @@
 module TcExpr where
-import Name
+import GHC.Types.Name
 import GHC.Hs    ( HsExpr, LHsExpr, SyntaxExprRn, SyntaxExprTc )
 import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
 import TcRnTypes( TcM )

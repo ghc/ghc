@@ -159,24 +159,24 @@ import GHC.Runtime.Eval.Types ( Resume )
 import GHC.Runtime.Interpreter.Types (Interp)
 import GHC.ForeignSrcLang
 
-import UniqFM
+import GHC.Types.Unique.FM
 import GHC.Hs
-import RdrName
-import Avail
-import Module
+import GHC.Types.Name.Reader
+import GHC.Types.Avail
+import GHC.Types.Module
 import GHC.Core.InstEnv ( InstEnv, ClsInst, identicalClsInstHead )
 import GHC.Core.FamInstEnv
 import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
-import Name
-import NameEnv
-import VarSet
-import Var
-import Id
-import IdInfo           ( IdDetails(..), RecSelParent(..))
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Var.Set
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Info ( IdDetails(..), RecSelParent(..))
 import GHC.Core.Type
 
 import ApiAnnotation    ( ApiAnns )
-import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
+import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
@@ -193,13 +193,13 @@ import GHC.Driver.Phases
    ( Phase, HscSource(..), hscSourceString
    , isHsBootOrSig, isHsigFile )
 import qualified GHC.Driver.Phases as Phase
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Iface.Syntax
 import Maybes
 import Outputable
-import SrcLoc
-import Unique
-import UniqDFM
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
+import GHC.Types.Unique.DFM
 import FastString
 import StringBuffer     ( StringBuffer )
 import Fingerprint
@@ -207,10 +207,10 @@ import MonadUtils
 import Bag
 import Binary
 import ErrUtils
-import NameCache
+import GHC.Types.Name.Cache
 import GHC.Platform
 import Util
-import UniqDSet
+import GHC.Types.Unique.DSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1611,7 +1611,7 @@ The Ids bound by previous Stmts in GHCi are currently
      global.
 
  (b) Having an External Name is important because of Note
-     [GlobalRdrEnv shadowing] in RdrName
+     [GlobalRdrEnv shadowing] in GHC.Types.Names.RdrName
 
  (c) Their types are tidied. This is important, because :info may ask
      to look at them, and :info expects the things it looks up to have
