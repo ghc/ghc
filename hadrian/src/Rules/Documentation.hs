@@ -111,11 +111,6 @@ documentationRules = do
 
         need $ map (root -/-) targets
 
-        when (SphinxPDFs `Set.member` doctargets)
-          $ checkUserGuideFlags $ pdfRoot -/- "users_guide" -/- "ghc-flags.txt"
-        when (SphinxHTML `Set.member` doctargets)
-          $ checkUserGuideFlags $ root -/- htmlRoot -/- "users_guide" -/- "ghc-flags.txt"
-
     where archiveTarget "libraries"   = Haddocks
           archiveTarget _             = SphinxHTML
 
@@ -128,17 +123,6 @@ checkSphinxWarnings out = do
     log <- liftIO $ readFile (out -/- ".log")
     when ("reference target not found" `isInfixOf` log)
       $ fail "Undefined reference targets found in Sphinx log."
-
--- | Check that all GHC flags are documented in the users guide.
-checkUserGuideFlags :: FilePath -> Action ()
-checkUserGuideFlags documentedFlagList = do
-    scriptPath <- (</> "docs/users_guide/compare-flags.py") <$> topDirectory
-    ghcPath <- (</>) <$> topDirectory <*> programPath (vanillaContext Stage1 ghc)
-    runBuilder Python
-      [ scriptPath
-      , "--doc-flags", documentedFlagList
-      , "--ghc", ghcPath
-      ] [documentedFlagList] []
 
 
 ------------------------------------- HTML -------------------------------------
