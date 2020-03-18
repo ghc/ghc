@@ -117,15 +117,11 @@ import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
 import qualified Data.ByteString.Short.Internal as SBS
 import Foreign.C
-import GHC.Exts
 import System.IO
 import Data.Data
 import Data.IORef
 import Data.Char
 import Data.Semigroup as Semi
-
-import GHC.IO
-import GHC.ST
 
 import Foreign
 
@@ -136,6 +132,8 @@ import GHC.Conc.Sync    (sharedCAF)
 #if __GLASGOW_HASKELL__ < 811
 import GHC.Base (unpackCString#,unpackNBytes#)
 #endif
+import GHC.Exts
+import GHC.IO
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
@@ -458,8 +456,8 @@ mkFastStringBytes !ptr !len =
         mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
 newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
-newSBSFromPtr (Ptr src#) (I# len#) =
-  stToIO $ ST $ \s ->
+newSBSFromPtr (Ptr src#) (I# len#) = do
+  IO $ \s ->
     case newByteArray# len# s of { (# s, dst# #) ->
     case copyAddrToByteArray# src# dst# 0# len# s of { s ->
     case unsafeFreezeByteArray# dst# s of { (# s, ba# #) ->
