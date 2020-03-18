@@ -37,12 +37,12 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Driver.Session
 import GHC.Platform
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
-import Module   ( rtsUnitId )
+import GHC.Types.Module ( rtsUnitId )
 import GHC.Core.Type    ( Type, tyConAppTyCon )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel

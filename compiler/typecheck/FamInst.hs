@@ -23,24 +23,24 @@ import GHC.Core.Lint
 import TcEvidence
 import GHC.Iface.Load
 import TcRnMonad
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.TyCon
 import TcType
 import GHC.Core.Coercion.Axiom
 import GHC.Driver.Session
-import Module
+import GHC.Types.Module
 import Outputable
 import Util
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Core.DataCon ( dataConName )
 import Maybes
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
 import TcMType
-import Name
+import GHC.Types.Name
 import Panic
-import VarSet
+import GHC.Types.Var.Set
 import FV
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad

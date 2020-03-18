@@ -19,7 +19,7 @@ import GHC.Cmm.Expr
 import GHC.Platform
 import FastString
 import Outputable ( panic )
-import Unique
+import GHC.Types.Unique
 
 -- | Get the LlvmVar function variable storing the real register
 lmGlobalRegVar :: Platform -> GlobalReg -> LlvmVar

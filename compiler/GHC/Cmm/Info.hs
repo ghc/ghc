@@ -49,7 +49,7 @@ import Maybes
 import GHC.Driver.Session
 import ErrUtils (withTimingSilent)
 import Panic
-import UniqSupply
+import GHC.Types.Unique.Supply
 import MonadUtils
 import Util
 import Outputable

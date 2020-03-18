@@ -38,31 +38,26 @@ import qualified Language.Haskell.TH as TH
 
 import GHC.Hs
 import PrelNames
--- To avoid clashes with GHC.HsToCore.Quote.varName we must make a local alias
--- for OccName.varName. We do this by removing varName from the import of OccName
--- above, making a qualified instance of OccName and using OccNameAlias.varName
--- where varName ws previously used in this file.
-import qualified OccName( isDataOcc, isVarOcc, isTcOcc )
 
-import Module
-import Id
-import Name hiding( isVarOcc, isTcOcc, varName, tcName )
+import GHC.Types.Module
+import GHC.Types.Id
+import GHC.Types.Name hiding( varName, tcName )
 import THNames
-import NameEnv
+import GHC.Types.Name.Env
 import TcType
 import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils
-import SrcLoc
-import Unique
-import BasicTypes
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Unique
+import GHC.Types.Basic
 import Outputable
 import Bag
 import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import Util
 import Maybes
 import MonadUtils
@@ -72,7 +67,7 @@ import Control.Monad.Trans.Class
 import GHC.Core.Class
 import GHC.Driver.Types ( MonadThings )
 import GHC.Core.DataCon
-import Var
+import GHC.Types.Var
 import GHC.HsToCore.Binds
 
 import GHC.TypeLits
@@ -2105,10 +2100,10 @@ globalVar name
       name_mod = moduleNameString (moduleName mod)
       name_pkg = unitIdString (moduleUnitId mod)
       name_occ = nameOccName name
-      mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
-              | OccName.isVarOcc  name_occ = mkNameG_vName
-              | OccName.isTcOcc   name_occ = mkNameG_tcName
-              | otherwise                  = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name)
+      mk_varg | isDataOcc name_occ = mkNameG_dName
+              | isVarOcc  name_occ = mkNameG_vName
+              | isTcOcc   name_occ = mkNameG_tcName
+              | otherwise          = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name)
 
 lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
            -> MetaM Type  -- The type

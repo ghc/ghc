@@ -34,23 +34,23 @@ import GHC.HsToCore.Utils
 
 import GHC.Hs
 
-import Id
+import GHC.Types.Id
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import TcHsSyn ( shortCutLit )
 import TcType
-import Name
+import GHC.Types.Name
 import GHC.Core.Type
 import PrelNames
 import TysWiredIn
 import TysPrim
-import Literal
-import SrcLoc
+import GHC.Types.Literal
+import GHC.Types.SrcLoc
 import Data.Ratio
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import Util
 import FastString

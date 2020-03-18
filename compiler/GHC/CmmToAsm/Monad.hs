@@ -60,11 +60,11 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
 import FastString       ( FastString )
-import UniqFM
-import UniqSupply
-import Unique           ( Unique )
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique         ( Unique )
 import GHC.Driver.Session
-import Module
+import GHC.Types.Module
 
 import Control.Monad    ( ap )
 

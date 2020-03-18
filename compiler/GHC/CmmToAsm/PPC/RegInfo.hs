@@ -27,7 +27,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.CLabel
 
-import Unique
+import GHC.Types.Unique
 import Outputable (ppr, text, Outputable, (<>))
 
 data JumpDest = DestBlockId BlockId

@@ -70,8 +70,8 @@ import GHC.Cmm.CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
 import GHC.Cmm.CLabel           ( mkForeignLabel )
 
 
-import BasicTypes
-import Module
+import GHC.Types.Basic
+import GHC.Types.Module
 
 import Outputable
 

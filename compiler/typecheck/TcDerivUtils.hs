@@ -26,7 +26,7 @@ module TcDerivUtils (
 import GhcPrelude
 
 import Bag
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Driver.Session
@@ -35,12 +35,12 @@ import GHC.Driver.Types (lookupFixity, mi_fix)
 import GHC.Hs
 import Inst
 import GHC.Core.InstEnv
-import GHC.Iface.Load (loadInterfaceForName)
-import Module         (getModule)
-import Name
+import GHC.Iface.Load   (loadInterfaceForName)
+import GHC.Types.Module (getModule)
+import GHC.Types.Name
 import Outputable
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc
 import TcGenDeriv
 import TcGenFunctor
 import TcGenGenerics
@@ -52,7 +52,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprSourceTyCon)
 import GHC.Core.Type
 import Util
-import VarSet
+import GHC.Types.Var.Set
 
 import Control.Monad.Trans.Reader
 import Data.Maybe

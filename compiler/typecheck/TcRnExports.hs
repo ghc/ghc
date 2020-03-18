@@ -11,7 +11,7 @@ import GhcPrelude
 
 import GHC.Hs
 import PrelNames
-import RdrName
+import GHC.Types.Name.Reader
 import TcRnMonad
 import TcEnv
 import TcType
@@ -19,22 +19,22 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
 import ErrUtils
-import Id
-import IdInfo
-import Module
-import Name
-import NameEnv
-import NameSet
-import Avail
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
 import GHC.Core.TyCon
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Types
 import Outputable
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import Maybes
-import UniqSet
+import GHC.Types.Unique.Set
 import Util (capitalise)
 import FastString (fsLit)
 
@@ -681,7 +681,7 @@ check_occs ie occs avails
   where
     -- Each Name specified by 'ie', paired with the OccName used to
     -- refer to it in the GlobalRdrEnv
-    -- (see Note [Representing fields in AvailInfo] in Avail).
+    -- (see Note [Representing fields in AvailInfo] in GHC.Types.Avail).
     --
     -- We check for export clashes using the selector Name, but need
     -- the field label OccName for presenting error messages.
