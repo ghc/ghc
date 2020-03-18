@@ -32,7 +32,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import GHC.Core.Unify     ( tcMatchTys )
-import Module
+import GHC.Types.Module
 import FamInst
 import GHC.Core.FamInstEnv ( flattenTys )
 import Inst
@@ -43,22 +43,22 @@ import GHC.Core.DataCon
 import TcEvidence
 import TcEvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
-import Name
-import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
+import GHC.Types.Name
+import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import PrelNames ( typeableClassName )
-import Id
-import Var
-import VarSet
-import VarEnv
-import NameSet
+import GHC.Types.Id
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Name.Set
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.ConLike ( ConLike(..))
 import Util
 import FastString
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import ListSetOps       ( equivClasses )
 import Maybes

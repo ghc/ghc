@@ -38,15 +38,15 @@ module TcSplice(
 import GhcPrelude
 
 import GHC.Hs
-import Annotations
+import GHC.Types.Annotations
 import GHC.Driver.Finder
-import Name
+import GHC.Types.Name
 import TcRnMonad
 import TcType
 
 import Outputable
 import TcExpr
-import SrcLoc
+import GHC.Types.SrcLoc
 import THNames
 import TcUnify
 import TcEnv
@@ -64,7 +64,7 @@ import GHC.Driver.Main
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import GHC.ThToHs
 import GHC.Rename.Expr
@@ -75,7 +75,7 @@ import GHC.Rename.Types
 import TcHsSyn
 import TcSimplify
 import GHC.Core.Type as Type
-import NameSet
+import GHC.Types.Name.Set
 import TcMType
 import TcHsType
 import GHC.IfaceToCore
@@ -84,13 +84,13 @@ import FamInst
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
 import Inst
-import NameEnv
+import GHC.Types.Name.Env
 import PrelNames
 import TysWiredIn
-import OccName
+import GHC.Types.Name.Occurrence as OccName
 import GHC.Driver.Hooks
-import Var
-import Module
+import GHC.Types.Var
+import GHC.Types.Module
 import GHC.Iface.Load
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -99,23 +99,23 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 import TcEvidence
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Serialized
 import ErrUtils
 import Util
-import Unique
-import VarSet
+import GHC.Types.Unique
+import GHC.Types.Var.Set
 import Data.List        ( find )
 import Data.Maybe
 import FastString
-import BasicTypes hiding( SuccessFlag(..) )
+import GHC.Types.Basic as BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
 import GHC.Driver.Session
 import Panic
-import Lexeme
+import GHC.Utils.Lexeme
 import qualified EnumSet
 import GHC.Driver.Plugins
 import Bag

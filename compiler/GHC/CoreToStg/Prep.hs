@@ -24,30 +24,30 @@ import GHC.Core.Op.OccurAnal
 
 import GHC.Driver.Types
 import PrelNames
-import MkId             ( realWorldPrimId )
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
-import GHC.Core.Op.Monad        ( CoreToDo(..) )
+import GHC.Core.Op.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
-import Literal
+import GHC.Types.Literal
 import GHC.Core.Coercion
 import TcEnv
 import GHC.Core.TyCon
-import Demand
-import Var
-import VarSet
-import VarEnv
-import Id
-import IdInfo
+import GHC.Types.Demand
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import TysWiredIn
 import GHC.Core.DataCon
-import BasicTypes
-import Module
-import UniqSupply
+import GHC.Types.Basic
+import GHC.Types.Module
+import GHC.Types.Unique.Supply
 import Maybes
 import OrdList
 import ErrUtils
@@ -56,12 +56,12 @@ import GHC.Driver.Ways
 import Util
 import Outputable
 import FastString
-import Name             ( NamedThing(..), nameSrcSpan, isInternalName )
-import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
+import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
 import Control.Monad
-import CostCentre       ( CostCentre, ccFromThisModule )
+import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S
 
 {-
@@ -112,7 +112,7 @@ The goal of this pass is to prepare for code generation.
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 
-9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.hs
+9.  Replace (lazy e) by e.  See Note [lazyId magic] in GHC.Types.Id.Make
     Also replace (noinline e) by e.
 
 10. Convert (LitInteger i t) into the core representation
@@ -658,7 +658,7 @@ cvtLitInteger :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- representation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
--- See Note [Integer literals] in Literal
+-- See Note [Integer literals] in GHC.Types.Literal
 cvtLitInteger platform _ (Just sdatacon) i
   | platformInIntRange platform i -- Special case for small integers
     = mkConApp sdatacon [Lit (mkLitInt platform i)]
@@ -678,7 +678,7 @@ cvtLitInteger platform mk_integer _ i
 cvtLitNatural :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Natural to the low-level
 -- representation.
--- See Note [Natural literals] in Literal
+-- See Note [Natural literals] in GHC.Types.Literal
 cvtLitNatural platform _ (Just sdatacon) i
   | platformInWordRange platform i -- Special case for small naturals
     = mkConApp sdatacon [Lit (mkLitWord platform i)]
@@ -771,7 +771,7 @@ which happened in #11291, we do /not/ want to turn it into
    (case bot of {}) realWorldPrimId#
 because that gives a panic in CoreToStg.myCollectArgs, which expects
 only variables in function position.  But if we are sure to make
-runRW# strict (which we do in MkId), this can't happen
+runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
 -}
 
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
@@ -899,7 +899,7 @@ cpeApp top_env expr
       CpeApp arg@(Coercion {}) ->
         rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
       CpeApp arg -> do
-        let (ss1, ss_rest)  -- See Note [lazyId magic] in MkId
+        let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
@@ -918,7 +918,7 @@ cpeApp top_env expr
         rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
 
 isLazyExpr :: CoreExpr -> Bool
--- See Note [lazyId magic] in MkId
+-- See Note [lazyId magic] in GHC.Types.Id.Make
 isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
@@ -1411,7 +1411,7 @@ The solution is CorePrep to have a miniature inlining pass which deals
 with cases like this.  We can then drop the let-binding altogether.
 
 Why does the removal of 'lazy' have to occur in CorePrep?
-The gory details are in Note [lazyId magic] in MkId, but the
+The gory details are in Note [lazyId magic] in GHC.Types.Id.Make, but the
 main reason is that lazy must appear in unfoldings (optimizer
 output) and it must prevent call-by-value for catch# (which
 is implemented by CorePrep.)

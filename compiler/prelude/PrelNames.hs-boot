@@ -1,7 +1,7 @@
 module PrelNames where
 
-import Module
-import Unique
+import GHC.Types.Module
+import GHC.Types.Unique
 
 mAIN :: Module
 liftedTypeKindTyConKey :: Unique

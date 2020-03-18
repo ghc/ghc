@@ -23,10 +23,10 @@ module GHC.Stg.Lift.Analysis (
 import GhcPrelude
 import GHC.Platform
 
-import BasicTypes
-import Demand
+import GHC.Types.Basic
+import GHC.Types.Demand
 import GHC.Driver.Session
-import Id
+import GHC.Types.Id
 import GHC.Runtime.Heap.Layout ( WordOff )
 import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
@@ -34,7 +34,7 @@ import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import Outputable
 import Util
-import VarSet
+import GHC.Types.Var.Set
 
 import Data.Maybe ( mapMaybe )
 

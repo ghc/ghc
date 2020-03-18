@@ -1,7 +1,7 @@
 module GHC.Driver.Packages where
 import GhcPrelude
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} Module(ComponentId, UnitId, InstalledUnitId)
+import {-# SOURCE #-} GHC.Types.Module(ComponentId, UnitId, InstalledUnitId)
 data PackageState
 data UnitInfoMap
 data PackageDatabase

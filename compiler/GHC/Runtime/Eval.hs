@@ -69,27 +69,27 @@ import TcType
 import Constraint
 import TcOrigin
 import GHC.Core.Predicate
-import Var
-import Id
-import Name             hiding ( varName )
-import NameSet
-import Avail
-import RdrName
-import VarEnv
+import GHC.Types.Var
+import GHC.Types.Id as Id
+import GHC.Types.Name      hiding ( varName )
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.Name.Reader
+import GHC.Types.Var.Env
 import GHC.ByteCode.Types
 import GHC.Runtime.Linker as Linker
 import GHC.Driver.Session
 import GHC.LanguageExtensions
-import Unique
-import UniqSupply
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 import MonadUtils
-import Module
+import GHC.Types.Module
 import PrelNames  ( toDynName, pretendNameIsInScope )
 import TysWiredIn ( isCTupleTyConName )
 import Panic
 import Maybes
 import ErrUtils
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Runtime.Heap.Inspect
 import Outputable
 import FastString

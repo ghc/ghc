@@ -25,8 +25,8 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import FieldLabel
-import RdrName
+import GHC.Types.FieldLabel
+import GHC.Types.Name.Reader
 import GHC.Rename.Types
 import GHC.Rename.Binds
 import GHC.Rename.Env
@@ -41,30 +41,30 @@ import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
-import ForeignCall      ( CCallTarget(..) )
-import Module
-import GHC.Driver.Types         ( Warnings(..), plusWarns )
+import GHC.Types.ForeignCall ( CCallTarget(..) )
+import GHC.Types.Module
+import GHC.Driver.Types ( Warnings(..), plusWarns )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
-import Name
-import NameSet
-import NameEnv
-import Avail
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Avail
 import Outputable
 import Bag
-import BasicTypes       ( pprRuleName, TypeOrKind(..) )
+import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import FastString
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
-import GHC.Driver.Types         ( HscEnv, hsc_dflags )
+import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq )
-import UniqSet
+import GHC.Types.Unique.Set
 import OrdList
 import qualified GHC.LanguageExtensions as LangExt
 

@@ -21,7 +21,7 @@ import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Op.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
-import IdInfo
+import GHC.Types.Id.Info
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
@@ -35,11 +35,11 @@ import qualified ErrUtils as Err
 import GHC.Core.Op.FloatIn  ( floatInwards )
 import GHC.Core.Op.FloatOut ( floatOutwards )
 import GHC.Core.FamInstEnv
-import Id
+import GHC.Types.Id
 import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
-import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
-import VarSet
-import VarEnv
+import GHC.Types.Basic  ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Core.Op.LiberateCase ( liberateCase )
 import GHC.Core.Op.StaticArgs   ( doStaticArgs )
 import GHC.Core.Op.Specialise   ( specProgram)
@@ -49,14 +49,14 @@ import GHC.Core.Op.CprAnal      ( cprAnalProgram )
 import GHC.Core.Op.CallArity    ( callArityAnalProgram )
 import GHC.Core.Op.Exitify      ( exitifyProgram )
 import GHC.Core.Op.WorkWrap     ( wwTopBinds )
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
-import Module
+import GHC.Types.Module
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Runtime.Loader -- ( initializePlugins )
 
-import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
-import UniqFM
+import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
+import GHC.Types.Unique.FM
 import Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt

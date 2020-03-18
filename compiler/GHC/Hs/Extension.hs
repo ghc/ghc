@@ -28,11 +28,11 @@ module GHC.Hs.Extension where
 import GhcPrelude
 
 import Data.Data hiding ( Fixity )
-import Name
-import RdrName
-import Var
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Var
 import Outputable
-import SrcLoc (Located)
+import GHC.Types.SrcLoc (Located)
 
 import Data.Kind
 

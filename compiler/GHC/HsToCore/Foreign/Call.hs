@@ -30,21 +30,21 @@ import GHC.Core
 import GHC.HsToCore.Monad
 import GHC.Core.Utils
 import GHC.Core.Make
-import MkId
-import ForeignCall
+import GHC.Types.Id.Make
+import GHC.Types.ForeignCall
 import GHC.Core.DataCon
 import GHC.HsToCore.Utils
 
 import TcType
 import GHC.Core.Type
-import Id   ( Id )
+import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
 import PrimOp
 import TysPrim
 import GHC.Core.TyCon
 import TysWiredIn
-import BasicTypes
-import Literal
+import GHC.Types.Basic
+import GHC.Types.Literal
 import PrelNames
 import GHC.Driver.Session
 import Outputable

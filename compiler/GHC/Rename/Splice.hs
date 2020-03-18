@@ -16,10 +16,10 @@ module GHC.Rename.Splice (
 
 import GhcPrelude
 
-import Name
-import NameSet
+import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import TcRnMonad
 
 import GHC.Rename.Env
@@ -27,15 +27,15 @@ import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Source  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
-import BasicTypes       ( TopLevelFlag, isTopLevel, SourceText(..) )
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
 import Outputable
-import Module
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.SrcLoc
 import GHC.Rename.Types ( rnLHsType )
 
 import Control.Monad    ( unless, when )
 
-import {-# SOURCE #-} GHC.Rename.Expr   ( rnLExpr )
+import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
 import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )

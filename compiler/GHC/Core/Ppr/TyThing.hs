@@ -29,8 +29,8 @@ import GHC.Driver.Types( tyThingParent_maybe )
 import GHC.Iface.Make ( tyThingToIfaceDecl )
 import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
-import Name
-import VarEnv( emptyTidyEnv )
+import GHC.Types.Name
+import GHC.Types.Var.Env( emptyTidyEnv )
 import Outputable
 
 -- -----------------------------------------------------------------------------

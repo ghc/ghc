@@ -28,16 +28,16 @@ import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Driver.Types     ( ModGuts(..) )
 import GHC.Core.Utils
 import GHC.Core.FVs
-import GHC.Core.Op.Monad        ( CoreM )
-import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
-import Var
+import GHC.Core.Op.Monad    ( CoreM )
+import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
+import GHC.Types.Var
 import GHC.Core.Type
-import VarSet
+import GHC.Types.Var.Set
 import Util
 import GHC.Driver.Session
 import Outputable
 -- import Data.List        ( mapAccumL )
-import BasicTypes       ( RecFlag(..), isRec )
+import GHC.Types.Basic      ( RecFlag(..), isRec )
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not

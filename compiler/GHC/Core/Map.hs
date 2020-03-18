@@ -42,17 +42,17 @@ import GhcPrelude
 import TrieMap
 import GHC.Core
 import GHC.Core.Coercion
-import Name
+import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
-import Var
+import GHC.Types.Var
 import FastString(FastString)
 import Util
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
-import VarEnv
-import NameEnv
+import GHC.Types.Var.Env
+import GHC.Types.Name.Env
 import Outputable
 import Control.Monad( (>=>) )
 

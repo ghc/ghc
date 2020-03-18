@@ -36,15 +36,15 @@ Now `t` is no longer in a recursive function, and good things happen!
 -}
 
 import GhcPrelude
-import Var
-import Id
-import IdInfo
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.Utils
 import State
-import Unique
-import VarSet
-import VarEnv
+import GHC.Types.Unique
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Core.FVs
 import FastString
 import GHC.Core.Type

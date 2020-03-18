@@ -33,8 +33,8 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.PmCheck ( checkGuardMatches )
-import Name
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
 import GHC.Hs
@@ -50,19 +50,19 @@ import GHC.Core.Utils
 import GHC.Core.Make
 
 import GHC.Driver.Session
-import CostCentre
-import Id
-import MkId
-import Module
+import GHC.Types.CostCentre
+import GHC.Types.Id
+import GHC.Types.Id.Make
+import GHC.Types.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Ppr( pprWithTYPE )
 import TysWiredIn
 import PrelNames
-import BasicTypes
+import GHC.Types.Basic
 import Maybes
-import VarEnv
-import SrcLoc
+import GHC.Types.Var.Env
+import GHC.Types.SrcLoc
 import Util
 import Bag
 import Outputable
