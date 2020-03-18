@@ -9,7 +9,7 @@ import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
 
-import BasicTypes          ( IntegralLit(..) )
+import GHC.Types.Basic     ( IntegralLit(..) )
 import GHC.Driver.Session
 import ErrUtils            ( emptyMessages, pprLocErrMsg )
 import FastString          ( mkFastString )
@@ -17,7 +17,7 @@ import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)
                            , mkPStatePure, lexer, mkParserFlags', getErrorMessages, addFatalError )
 import Bag                 ( bagToList )
 import Outputable          ( showSDoc, panic, text, ($$) )
-import SrcLoc
+import GHC.Types.SrcLoc
 import StringBuffer        ( StringBuffer, atEnd )
 
 import Haddock.Backends.Hyperlinker.Types as T

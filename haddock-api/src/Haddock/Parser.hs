@@ -20,8 +20,8 @@ import GHC.Driver.Session ( DynFlags )
 import FastString   ( fsLit )
 import Lexer        ( mkPState, unP, ParseResult(POk) )
 import Parser       ( parseIdentifier )
-import RdrName      ( RdrName )
-import SrcLoc       ( mkRealSrcLoc, unLoc )
+import GHC.Types.Name.RdrName ( RdrName )
+import GHC.Types.SrcLoc ( mkRealSrcLoc, unLoc )
 import StringBuffer ( stringToStringBuffer )
 
 parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod RdrName

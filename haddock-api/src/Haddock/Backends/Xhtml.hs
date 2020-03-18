@@ -51,7 +51,7 @@ import Data.Ord              ( comparing )
 
 import GHC.Driver.Session (Language(..))
 import GHC hiding ( NoLink, moduleInfo,LexicalFixity(..) )
-import Name
+import GHC.Types.Name
 
 --------------------------------------------------------------------------------
 -- * Generating HTML documentation

@@ -61,10 +61,10 @@ import Documentation.Haddock.Doc (emptyMetaDoc)
 import Haddock.Types
 import Haddock.GhcUtils
 
-import BasicTypes ( PromotionFlag(..) )
+import GHC.Types.Basic ( PromotionFlag(..) )
 import Exception (ExceptionMonad)
 import GHC
-import Name
+import GHC.Types.Name
 import Outputable ( panic )
 
 import Control.Monad ( liftM )

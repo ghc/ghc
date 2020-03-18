@@ -5,10 +5,10 @@ module Haddock.Interface.Json (
   , renderJson
   ) where
 
-import BasicTypes
+import GHC.Types.Basic
 import Json
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import Outputable
 
 import Control.Arrow
