@@ -153,7 +153,7 @@ unsafeMkByteString :: String -> ByteString
 unsafeMkByteString = BSC.pack
 
 hashFastString :: FastString -> Int
-hashFastString (FastString _ sbs _) = hashStr sbs
+hashFastString fs = hashStr $ fs_sbs fs
 
 -- -----------------------------------------------------------------------------
 
@@ -184,6 +184,7 @@ of this string which is used by the compiler internally.
 -}
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
+      n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_sbs  :: {-# UNPACK #-} !ShortByteString,
       fs_zenc :: FastZString
       -- ^ Lazily computed z-encoding of this string.
@@ -231,9 +232,9 @@ instance NFData FastString where
   rnf fs = seq fs ()
 
 cmpFS :: FastString -> FastString -> Ordering
-cmpFS (FastString u1 sbs1 _) (FastString u2 sbs2 _) =
-  if u1 == u2 then EQ else
-  compare sbs1 sbs2
+cmpFS fs1 fs2 =
+  if uniq fs1 == uniq fs2 then EQ else
+  compare (fs_sbs fs1) (fs_sbs fs2)
 
 -- -----------------------------------------------------------------------------
 -- Construction
@@ -498,7 +499,8 @@ mkNewFastStringShortByteString :: ShortByteString -> Int
                                -> IORef Int -> IO FastString
 mkNewFastStringShortByteString sbs uid n_zencs = do
   let zstr = mkZFastString n_zencs sbs
-  return (FastString uid sbs zstr)
+  chars <- countUTF8Chars sbs
+  return (FastString uid chars sbs zstr)
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
@@ -523,15 +525,15 @@ hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
 
 -- | Returns the length of the 'FastString' in characters
 lengthFS :: FastString -> Int
-lengthFS (FastString _uid sbs _zstr) = inlinePerformIO $ countUTF8Chars sbs
+lengthFS fs = n_chars fs
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
-nullFS f = SBS.null (fs_sbs f)
+nullFS fs = SBS.null $ fs_sbs fs
 
 -- | Unpacks and decodes the FastString
 unpackFS :: FastString -> String
-unpackFS (FastString _ sbs _) = utf8DecodeShortByteString sbs
+unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this
@@ -539,7 +541,7 @@ unpackFS (FastString _ sbs _) = utf8DecodeShortByteString sbs
 -- memoized.
 --
 zEncodeFS :: FastString -> FastZString
-zEncodeFS (FastString _ _ ref) = ref
+zEncodeFS fs = fs_zenc fs
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringByteString
@@ -549,15 +551,15 @@ concatFS :: [FastString] -> FastString
 concatFS = mkFastStringShortByteString . mconcat . map fs_sbs
 
 headFS :: FastString -> Char
-headFS (FastString _ sbs _)
-  | SBS.null sbs = panic "headFS: Empty FastString"
+headFS fs
+  | SBS.null $ fs_sbs fs = panic "headFS: Empty FastString"
 headFS fs = head $ unpackFS fs
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
 
 uniqueOfFS :: FastString -> Int
-uniqueOfFS (FastString u _ _) = u
+uniqueOfFS fs = uniq fs
 
 nilFS :: FastString
 nilFS = mkFastString ""
