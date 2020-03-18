@@ -3915,8 +3915,7 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros,
-      Opt_ExposeAllSymbols
+      Opt_VersionMacros
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -4502,7 +4501,13 @@ setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
 setDebugLevel :: Maybe Int -> DynP ()
-setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
+setDebugLevel mb_n =
+  upd (\dfs -> exposeSyms $ dfs{ debugLevel = n })
+  where
+    n = mb_n `orElse` 2
+    exposeSyms
+      | n > 0     = setGeneralFlag' Opt_ExposeAllSymbols
+      | otherwise = id
 
 data PkgDbRef
   = GlobalPkgDb

@@ -14,6 +14,7 @@ useable by most UNIX debugging tools.
     :category: debugging
 
     :since: 7.10, numeric levels since 8.0
+    :implies: :ghc-flag:`-fexpose-all-symbols`
 
     Emit debug information in object code. Currently only DWARF debug
     information is supported on x86-64 and i386. Currently debug levels 0
