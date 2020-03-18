@@ -64,22 +64,22 @@ module GHC.Stg.Syntax (
 import GhcPrelude
 
 import GHC.Core     ( AltCon, Tickish )
-import CostCentre  ( CostCentreStack )
+import GHC.Types.CostCentre ( CostCentreStack )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import GHC.Core.DataCon
 import GHC.Driver.Session
-import ForeignCall ( ForeignCall )
-import Id
-import VarSet
-import Literal     ( Literal, literalType )
-import Module      ( Module )
+import GHC.Types.ForeignCall ( ForeignCall )
+import GHC.Types.Id
+import GHC.Types.Var.Set
+import GHC.Types.Literal     ( Literal, literalType )
+import GHC.Types.Module      ( Module )
 import Outputable
 import GHC.Driver.Packages ( isDynLinkName )
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
-import PrimOp      ( PrimOp, PrimCall )
+import PrimOp            ( PrimOp, PrimCall )
 import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Types.RepType ( typePrimRep1 )

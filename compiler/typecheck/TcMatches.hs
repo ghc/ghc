@@ -27,7 +27,7 @@ import GhcPrelude
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho
                               , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
-import BasicTypes (LexicalFixity(..))
+import GHC.Types.Basic (LexicalFixity(..))
 import GHC.Hs
 import TcRnMonad
 import TcEnv
@@ -37,15 +37,15 @@ import TcType
 import TcBinds
 import TcUnify
 import TcOrigin
-import Name
+import GHC.Types.Name
 import TysWiredIn
-import Id
+import GHC.Types.Id
 import GHC.Core.TyCon
 import TysPrim
 import TcEvidence
 import Outputable
 import Util
-import SrcLoc
+import GHC.Types.SrcLoc
 
 -- Create chunkified tuple tybes for monad comprehensions
 import GHC.Core.Make

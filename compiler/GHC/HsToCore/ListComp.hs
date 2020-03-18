@@ -28,12 +28,12 @@ import GHC.HsToCore.Utils
 
 import GHC.Driver.Session
 import GHC.Core.Utils
-import Id
+import GHC.Types.Id
 import GHC.Core.Type
 import TysWiredIn
 import GHC.HsToCore.Match
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import TcType
 import ListSetOps( getNth )

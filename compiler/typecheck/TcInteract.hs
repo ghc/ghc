@@ -11,18 +11,18 @@ module TcInteract (
 #include "HsVersions.h"
 
 import GhcPrelude
-import BasicTypes ( SwapFlag(..), isSwapped,
-                    infinity, IntWithInf, intGtLimit )
+import GHC.Types.Basic ( SwapFlag(..), isSwapped,
+                         infinity, IntWithInf, intGtLimit )
 import TcCanonical
 import TcFlatten
 import TcUnify( canSolveByUnification )
-import VarSet
+import GHC.Types.Var.Set
 import GHC.Core.Type as Type
 import GHC.Core.Coercion        ( BlockSubstFlag(..) )
 import GHC.Core.InstEnv         ( DFunInstType )
 import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
-import Var
+import GHC.Types.Var
 import TcType
 import PrelNames ( coercibleTyConKey,
                    heqTyConKey, eqTyConKey, ipClassKey )
@@ -48,13 +48,13 @@ import MonadUtils ( concatMapM, foldlM )
 
 import GHC.Core
 import Data.List( partition, deleteFirstsBy )
-import SrcLoc
-import VarEnv
+import GHC.Types.SrcLoc
+import GHC.Types.Var.Env
 
 import Control.Monad
 import Maybes( isJust )
 import Pair (Pair(..))
-import Unique( hasKey )
+import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
 import Util
 import qualified GHC.LanguageExtensions as LangExt

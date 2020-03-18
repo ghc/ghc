@@ -42,15 +42,15 @@ import TcEvidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
 
 import GHC.Driver.Session
-import Var      ( TyVar, tyVarKind )
-import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Var ( TyVar, tyVarKind )
+import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
-import BasicTypes
-import Module( getModule )
-import Name
-import NameEnv
+import GHC.Types.Basic
+import GHC.Types.Module( getModule )
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util( singleton )
 import Maybes( orElse )
 import Data.Maybe( mapMaybe )

@@ -7,9 +7,9 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCon
 
-import BasicTypes ( LeftOrRight )
+import GHC.Types.Basic ( LeftOrRight )
 import GHC.Core.Coercion.Axiom
-import Var
+import GHC.Types.Var
 import Pair
 import Util
 

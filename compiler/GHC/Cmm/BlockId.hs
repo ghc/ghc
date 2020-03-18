@@ -11,10 +11,10 @@ module GHC.Cmm.BlockId
 import GhcPrelude
 
 import GHC.Cmm.CLabel
-import IdInfo
-import Name
-import Unique
-import UniqSupply
+import GHC.Types.Id.Info
+import GHC.Types.Name
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 import GHC.Cmm.Dataflow.Label (Label, mkHooplLabel)
 

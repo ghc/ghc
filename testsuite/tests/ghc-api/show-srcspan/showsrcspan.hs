@@ -4,7 +4,7 @@ import Data.Data
 import System.IO
 import GHC
 import FastString
-import SrcLoc
+import GHC.Types.SrcLoc
 import MonadUtils
 import Outputable
 import Bag (filterBag,isEmptyBag)

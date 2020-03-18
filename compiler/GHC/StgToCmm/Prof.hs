@@ -36,10 +36,10 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
-import CostCentre
+import GHC.Types.CostCentre
 import GHC.Driver.Session
 import FastString
-import Module
+import GHC.Types.Module as Module
 import Outputable
 
 import Control.Monad

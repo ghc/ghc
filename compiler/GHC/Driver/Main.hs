@@ -88,7 +88,7 @@ import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
-import Id
+import GHC.Types.Id
 import GHC.Runtime.Interpreter ( addSptEntry )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
@@ -96,26 +96,26 @@ import GHC.Runtime.Linker
 import GHC.Core.Op.Tidy        ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
-import VarEnv                  ( emptyTidyEnv )
+import GHC.Types.Var.Env       ( emptyTidyEnv )
 import Panic
 import GHC.Core.ConLike
 
 import ApiAnnotation
-import Module
+import GHC.Types.Module
 import GHC.Driver.Packages
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump
 import GHC.Core
 import StringBuffer
 import Parser
 import Lexer
-import SrcLoc
+import GHC.Types.SrcLoc
 import TcRnDriver
 import GHC.IfaceToCore  ( typecheckIface )
 import TcRnMonad
 import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
-import NameCache        ( initNameCache )
+import GHC.Types.Name.Cache ( initNameCache )
 import PrelInfo
 import GHC.Core.Op.Simplify.Driver
 import GHC.HsToCore
@@ -129,11 +129,11 @@ import GHC.Stg.Syntax
 import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import CostCentre
-import ProfInit
+import GHC.Types.CostCentre
+import GHC.Types.CostCentre.Init
 import GHC.Core.TyCon
-import Name
-import NameSet
+import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Cmm
 import GHC.Cmm.Parser         ( parseCmmFile )
 import GHC.Cmm.Info.Build
@@ -153,11 +153,11 @@ import GHC.Driver.Session
 import ErrUtils
 
 import Outputable
-import NameEnv
+import GHC.Types.Name.Env
 import HscStats         ( ppSourceStats )
 import GHC.Driver.Types
 import FastString
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Bag
 import Exception
 import qualified Stream

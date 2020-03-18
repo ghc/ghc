@@ -25,9 +25,9 @@ import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
 import Outputable
-import Unique
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import GHC.Cmm.BlockId
 
 

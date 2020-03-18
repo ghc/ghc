@@ -20,9 +20,9 @@ import GraphBase
 import GraphOps
 import GraphPpr
 
-import Unique
-import UniqFM
-import UniqSet
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import Outputable
 
 import Data.Maybe

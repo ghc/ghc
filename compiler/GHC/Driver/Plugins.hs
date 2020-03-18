@@ -58,7 +58,7 @@ import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Driver.Monad
 import GHC.Driver.Phases
-import Module ( ModuleName, Module(moduleName))
+import GHC.Types.Module ( ModuleName, Module(moduleName))
 import Fingerprint
 import Data.List (sort)
 import Outputable (Outputable(..), text, (<+>))

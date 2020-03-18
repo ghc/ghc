@@ -120,10 +120,10 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
-import Module
-import Name
-import Id
-import BasicTypes
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Id
+import GHC.Types.Basic
 import FastString
 import Outputable
 import Util

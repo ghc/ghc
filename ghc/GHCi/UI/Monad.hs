@@ -40,13 +40,13 @@ import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
-import OccName
+import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
 import FastString
 import GHC.Driver.Types
-import SrcLoc
-import Module
-import RdrName (mkOrig)
+import GHC.Types.SrcLoc
+import GHC.Types.Module
+import GHC.Types.Name.Reader as RdrName (mkOrig)
 import PrelNames (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes

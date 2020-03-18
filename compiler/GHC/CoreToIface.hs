@@ -49,29 +49,29 @@ import GhcPrelude
 
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
 import TysWiredIn ( heqTyCon )
-import MkId ( noinlineIdName )
+import GHC.Types.Id.Make ( noinlineIdName )
 import PrelNames
-import Name
-import BasicTypes
+import GHC.Types.Name
+import GHC.Types.Basic
 import GHC.Core.Type
 import GHC.Core.PatSyn
 import Outputable
 import FastString
 import Util
-import Var
-import VarEnv
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy ( tidyCo )
-import Demand ( isTopSig )
-import Cpr ( topCprSig )
+import GHC.Types.Demand ( isTopSig )
+import GHC.Types.Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
 

@@ -20,15 +20,15 @@ import GhcPrelude
 
 import GHC.Iface.Load
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import TcRnMonad
-import Name
-import NameEnv
-import Module
-import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence,
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Module
+import GHC.Types.Basic  ( Fixity(..), FixityDirection(..), minPrecedence,
                           defaultFixity, SourceText(..) )
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import Maybes
 import Data.List

@@ -43,16 +43,16 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 import GHC.Core.Class
-import Var
+import GHC.Types.Var
 
 import GHC.Iface.Type
 
-import VarSet
-import VarEnv
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 
 import Outputable
-import BasicTypes ( PprPrec(..), topPrec, sigPrec, opPrec
-                  , funPrec, appPrec, maybeParen )
+import GHC.Types.Basic ( PprPrec(..), topPrec, sigPrec, opPrec
+                       , funPrec, appPrec, maybeParen )
 
 {-
 %************************************************************************
@@ -71,7 +71,7 @@ works just by setting the initial context precedence very high.
 Note that any function which pretty-prints a @Type@ first converts the @Type@
 to an @IfaceType@. See Note [IfaceType and pretty-printing] in GHC.Iface.Type.
 
-See Note [Precedence in types] in BasicTypes.
+See Note [Precedence in types] in GHC.Types.Basic.
 -}
 
 --------------------------------------------------------

@@ -33,7 +33,7 @@ import GhcPrelude
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.TyCon
-import Var
+import GHC.Types.Var
 import GHC.Core.Coercion
 
 import PrelNames

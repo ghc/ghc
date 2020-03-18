@@ -15,17 +15,17 @@ import GhcPrelude
 
 import GHC.Core.Op.WorkWrap.Lib ( deepSplitProductType_maybe )
 import GHC.Driver.Session
-import Demand
-import Cpr
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Core
 import GHC.Core.Seq
 import Outputable
-import VarEnv
-import BasicTypes
+import GHC.Types.Var.Env
+import GHC.Types.Basic
 import Data.List
 import GHC.Core.DataCon
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type

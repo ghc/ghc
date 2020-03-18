@@ -28,10 +28,10 @@ import TcHsSyn
 import TcSigs( TcPragEnv, lookupPragEnv, addInlinePrags )
 import TcRnMonad
 import Inst
-import Id
-import Var
-import Name
-import RdrName
+import GHC.Types.Id
+import GHC.Types.Var
+import GHC.Types.Name
+import GHC.Types.Name.Reader
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
@@ -47,10 +47,10 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import PrelNames
-import BasicTypes hiding (SuccessFlag(..))
+import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Session
-import SrcLoc
-import VarSet
+import GHC.Types.SrcLoc
+import GHC.Types.Var.Set
 import Util
 import Outputable
 import qualified GHC.LanguageExtensions as LangExt
@@ -674,7 +674,7 @@ and a case expression
 
   case x :: Map (Int, c) w of MapPair m -> ...
 
-As explained by [Wrappers for data instance tycons] in MkIds.hs, the
+As explained by [Wrappers for data instance tycons] in GHC.Types.Id.Make, the
 worker/wrapper types for MapPair are
 
   $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v

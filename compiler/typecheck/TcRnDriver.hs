@@ -71,7 +71,7 @@ import GHC.Iface.Type   ( ShowForAllFlag(..) )
 import GHC.Core.PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
-import RdrName
+import GHC.Types.Name.Reader
 import TcHsSyn
 import TcExpr
 import TcRnMonad
@@ -108,17 +108,17 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Source
 import ErrUtils
-import Id
-import IdInfo( IdDetails(..) )
-import VarEnv
-import Module
-import UniqFM
-import Name
-import NameEnv
-import NameSet
-import Avail
+import GHC.Types.Id as Id
+import GHC.Types.Id.Info( IdDetails(..) )
+import GHC.Types.Var.Env
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
 import GHC.Core.TyCon
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Driver.Types
 import ListSetOps
 import Outputable
@@ -126,9 +126,9 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class
-import BasicTypes hiding( SuccessFlag(..) )
+import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Core.Coercion.Axiom
-import Annotations
+import GHC.Types.Annotations
 import Data.List ( find, sortBy, sort )
 import Data.Ord
 import FastString

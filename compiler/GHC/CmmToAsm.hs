@@ -83,19 +83,19 @@ import GHC.Cmm.Opt           ( cmmMachOpFold )
 import GHC.Cmm.Ppr
 import GHC.Cmm.CLabel
 
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import Util
 
-import BasicTypes       ( Alignment )
+import GHC.Types.Basic       ( Alignment )
 import qualified Pretty
 import BufWrite
 import Outputable
 import FastString
-import UniqSet
+import GHC.Types.Unique.Set
 import ErrUtils
-import Module
+import GHC.Types.Module
 import Stream (Stream)
 import qualified Stream
 

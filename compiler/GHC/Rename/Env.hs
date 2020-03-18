@@ -49,26 +49,26 @@ import GhcPrelude
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
-import Name
-import NameSet
-import NameEnv
-import Avail
-import Module
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Avail
+import GHC.Types.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import ErrUtils         ( MsgDoc )
 import PrelNames        ( rOOT_MAIN )
-import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
-import SrcLoc
+import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
-import UniqSet          ( uniqSetAny )
+import GHC.Types.Unique.Set ( uniqSetAny )
 import Util
 import Maybes
 import GHC.Driver.Session

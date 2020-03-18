@@ -54,24 +54,24 @@ import TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
-import Id
-import MkId(proxyHashId)
-import Name
-import VarSet
+import GHC.Types.Id
+import GHC.Types.Id.Make(proxyHashId)
+import GHC.Types.Name
+import GHC.Types.Var.Set
 import GHC.Core.Rules
-import VarEnv
-import Var( EvVar )
+import GHC.Types.Var.Env
+import GHC.Types.Var( EvVar )
 import Outputable
-import Module
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.SrcLoc
 import Maybes
 import OrdList
 import Bag
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import FastString
 import Util
-import UniqSet( nonDetEltsUniqSet )
+import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 import MonadUtils
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad

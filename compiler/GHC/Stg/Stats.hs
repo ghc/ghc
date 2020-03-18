@@ -31,7 +31,7 @@ import GhcPrelude
 
 import GHC.Stg.Syntax
 
-import Id (Id)
+import GHC.Types.Id (Id)
 import Panic
 
 import Data.Map (Map)

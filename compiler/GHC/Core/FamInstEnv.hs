@@ -49,17 +49,17 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
-import VarSet
-import VarEnv
-import Name
-import UniqDFM
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Name
+import GHC.Types.Unique.DFM
 import Outputable
 import Maybes
 import GHC.Core.Map
-import Unique
+import GHC.Types.Unique
 import Util
-import Var
-import SrcLoc
+import GHC.Types.Var
+import GHC.Types.SrcLoc
 import FastString
 import Control.Monad
 import Data.List( mapAccumL )

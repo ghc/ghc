@@ -10,11 +10,11 @@ import Config          ( cProjectName, cProjectVersion )
 import GHC.Core        ( Tickish(..) )
 import GHC.Cmm.DebugBlock
 import GHC.Driver.Session
-import Module
+import GHC.Types.Module
 import Outputable
 import GHC.Platform
-import Unique
-import UniqSupply
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 import GHC.CmmToAsm.Dwarf.Constants
 import GHC.CmmToAsm.Dwarf.Types

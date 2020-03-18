@@ -1,25 +1,25 @@
 {-# LANGUAGE TupleSections #-}
 import GHC.Core
 import GHC.Core.Utils
-import Id
+import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.Make
 import GHC.Core.Op.CallArity (callArityRHS)
-import MkId
+import GHC.Types.Id.Make
 import SysTools
 import GHC.Driver.Session
 import ErrUtils
 import Outputable
 import TysWiredIn
-import Literal
+import GHC.Types.Literal
 import GHC
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment( getArgs )
-import VarSet
+import GHC.Types.Var.Set
 import GHC.Core.Ppr
-import Unique
-import UniqSet
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
 import GHC.Core.Lint
 import FastString
 

@@ -13,13 +13,13 @@ module GHC.Core.Stats (
 
 import GhcPrelude
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core
 import Outputable
 import GHC.Core.Coercion
-import Var
+import GHC.Types.Var
 import GHC.Core.Type(Type, typeSize)
-import Id (isJoinId)
+import GHC.Types.Id (isJoinId)
 
 data CoreStats = CS { cs_tm :: !Int    -- Terms
                     , cs_ty :: !Int    -- Types

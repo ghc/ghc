@@ -18,7 +18,7 @@ import Outputable
 import GHC.Driver.Session
 import GHC.Driver.Phases
 import GHC.Driver.Types
-import Module
+import GHC.Types.Module
 import FileCleanup (TempFileLifetime)
 
 import Control.Monad

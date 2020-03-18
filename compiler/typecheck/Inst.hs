@@ -40,7 +40,7 @@ import GhcPrelude
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
-import BasicTypes ( IntegralLit(..), SourceText(..) )
+import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
 import FastString
 import GHC.Hs
 import TcHsSyn
@@ -61,19 +61,19 @@ import GHC.Core.TyCo.Ppr ( debugPprType )
 import TcType
 import GHC.Driver.Types
 import GHC.Core.Class( Class )
-import MkId( mkDictFunId )
+import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Core( Expr(..) )  -- For the Coercion constructor
-import Id
-import Name
-import Var      ( EvVar, tyVarName, VarBndr(..) )
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
 import GHC.Core.DataCon
-import VarEnv
+import GHC.Types.Var.Env
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import Util
 import Outputable
-import BasicTypes ( TypeOrKind(..) )
+import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List ( sortBy )

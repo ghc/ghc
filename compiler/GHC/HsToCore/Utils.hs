@@ -57,9 +57,9 @@ import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
 import GHC.Core.Make
-import MkId
-import Id
-import Literal
+import GHC.Types.Id.Make
+import GHC.Types.Id
+import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -67,15 +67,15 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import TysPrim
 import TysWiredIn
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.ConLike
-import UniqSet
-import UniqSupply
-import Module
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.Supply
+import GHC.Types.Module
 import PrelNames
-import Name( isInternalName )
+import GHC.Types.Name( isInternalName )
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import GHC.Driver.Session
 import FastString

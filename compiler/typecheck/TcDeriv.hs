@@ -43,7 +43,7 @@ import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
 import GHC.Rename.Binds
 import GHC.Rename.Env
 import GHC.Rename.Source ( addTcgDUs )
-import Avail
+import GHC.Types.Avail
 
 import GHC.Core.Unify( tcUnifyTy )
 import GHC.Core.Class
@@ -51,16 +51,16 @@ import GHC.Core.Type
 import ErrUtils
 import GHC.Core.DataCon
 import Maybes
-import RdrName
-import Name
-import NameSet
+import GHC.Types.Name.Reader
+import GHC.Types.Name
+import GHC.Types.Name.Set as NameSet
 import GHC.Core.TyCon
 import TcType
-import Var
-import VarEnv
-import VarSet
+import GHC.Types.Var as Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import Outputable
 import FastString

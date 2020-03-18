@@ -25,7 +25,7 @@ import Maybes
 import Control.Monad
 import Outputable
 import GHC.Platform
-import UniqSupply
+import GHC.Types.Unique.Supply
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow

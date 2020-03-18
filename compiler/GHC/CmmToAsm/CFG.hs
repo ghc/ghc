@@ -60,7 +60,7 @@ import Util
 import Digraph
 import Maybes
 
-import Unique
+import GHC.Types.Unique
 import qualified GHC.CmmToAsm.CFG.Dominators as Dom
 import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)

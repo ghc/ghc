@@ -22,7 +22,7 @@ import GHC.Cmm.LayoutStack
 import GHC.Cmm.Sink
 import GHC.Cmm.Dataflow.Collections
 
-import UniqSupply
+import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import ErrUtils
 import GHC.Driver.Types

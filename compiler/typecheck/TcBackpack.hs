@@ -19,12 +19,12 @@ module TcBackpack (
 
 import GhcPrelude
 
-import BasicTypes (defaultFixity, TypeOrKind(..))
+import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
 import GHC.Driver.Packages
 import TcRnExports
 import GHC.Driver.Session
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import TcRnMonad
 import TcTyDecls
 import GHC.Core.InstEnv
@@ -39,13 +39,13 @@ import TcOrigin
 import GHC.Iface.Load
 import GHC.Rename.Names
 import ErrUtils
-import Id
-import Module
-import Name
-import NameEnv
-import NameSet
-import Avail
-import SrcLoc
+import GHC.Types.Id
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.SrcLoc
 import GHC.Driver.Types
 import Outputable
 import GHC.Core.Type
@@ -53,13 +53,13 @@ import FastString
 import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
 import TcEnv
-import Var
+import GHC.Types.Var
 import GHC.Iface.Syntax
 import PrelNames
 import qualified Data.Map as Map
 
 import GHC.Driver.Finder
-import UniqDSet
+import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
 import TcErrors
 import TcUnify

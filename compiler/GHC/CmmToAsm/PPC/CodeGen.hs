@@ -63,7 +63,7 @@ import Control.Monad    ( mapAndUnzipM, when )
 import Data.Bits
 import Data.Word
 
-import BasicTypes
+import GHC.Types.Basic
 import FastString
 import Util
 

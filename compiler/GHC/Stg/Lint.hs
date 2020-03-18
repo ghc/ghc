@@ -42,20 +42,20 @@ import GhcPrelude
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
-import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
-import BasicTypes       ( TopLevelFlag(..), isTopLevel )
-import CostCentre       ( isCurrentCCS )
-import Id               ( Id, idType, isJoinId, idName )
-import VarSet
+import Bag                  ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
+import GHC.Types.CostCentre ( isCurrentCCS )
+import GHC.Types.Id         ( Id, idType, isJoinId, idName )
+import GHC.Types.Var.Set
 import GHC.Core.DataCon
-import GHC.Core         ( AltCon(..) )
-import Name             ( getSrcLoc, nameIsLocalOrFrom )
-import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
+import GHC.Core             ( AltCon(..) )
+import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
+import ErrUtils             ( MsgDoc, Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import Module           ( Module )
+import GHC.Types.Module           ( Module )
 import qualified ErrUtils as Err
 import Control.Applicative ((<|>))
 import Control.Monad

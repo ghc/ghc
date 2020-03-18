@@ -9,13 +9,13 @@ import GhcPrelude
 import GHC.Core
 import GHC.Driver.Session
 import GHC.Driver.Types
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.InstEnv
-import NameEnv
-import NameSet
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
 import Util
-import Var
+import GHC.Types.Var
 import Outputable
 
 #include "HsVersions.h"

@@ -39,7 +39,7 @@ import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
-import Unique
+import GHC.Types.Unique
 import Outputable
 
 {-

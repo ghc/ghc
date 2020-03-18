@@ -3,8 +3,8 @@ module TysWiredIn where
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind)
 
-import BasicTypes (Arity, TupleSort)
-import Name (Name)
+import GHC.Types.Basic (Arity, TupleSort)
+import GHC.Types.Name (Name)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type

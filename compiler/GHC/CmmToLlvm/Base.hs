@@ -54,11 +54,11 @@ import GHC.Cmm              hiding ( succ )
 import GHC.Cmm.Utils (regsOverlap)
 import Outputable as Outp
 import GHC.Platform
-import UniqFM
-import Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 import BufWrite   ( BufHandle )
-import UniqSet
-import UniqSupply
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.Supply
 import ErrUtils
 import qualified Stream
 

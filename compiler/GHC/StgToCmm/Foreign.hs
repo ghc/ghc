@@ -36,13 +36,13 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
-import ForeignCall
+import GHC.Types.ForeignCall
 import GHC.Driver.Session
 import GHC.Platform
 import Maybes
 import Outputable
-import UniqSupply
-import BasicTypes
+import GHC.Types.Unique.Supply
+import GHC.Types.Basic
 
 import GHC.Core.TyCo.Rep
 import TysPrim

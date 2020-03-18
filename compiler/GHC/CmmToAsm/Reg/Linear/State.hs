@@ -50,8 +50,8 @@ import GHC.Platform.Reg
 import GHC.Cmm.BlockId
 
 import GHC.Platform
-import Unique
-import UniqSupply
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
 

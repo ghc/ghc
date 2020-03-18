@@ -40,12 +40,12 @@ import GHC.Cmm.MachOp
 import GHC.Cmm.Type
 import GHC.Driver.Session
 import Outputable (panic)
-import Unique
+import GHC.Types.Unique
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import BasicTypes (Alignment, mkAlignment, alignmentOf)
+import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 
 -----------------------------------------------------------------------------
 --              CmmExpr

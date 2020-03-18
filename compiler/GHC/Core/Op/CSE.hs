@@ -16,9 +16,9 @@ module GHC.Core.Op.CSE (cseProgram, cseOneExpr) where
 import GhcPrelude
 
 import GHC.Core.Subst
-import Var              ( Var )
-import VarEnv           ( mkInScopeSet )
-import Id               ( Id, idType, idHasRules
+import GHC.Types.Var    ( Var )
+import GHC.Types.Var.Env ( mkInScopeSet )
+import GHC.Types.Id     ( Id, idType, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
@@ -29,7 +29,7 @@ import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.Map
 import Util             ( filterOut, equalLength, debugIsOn )
 import Data.List        ( mapAccumL )

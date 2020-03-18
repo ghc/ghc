@@ -5,7 +5,7 @@ module HaddockUtils where
 import GhcPrelude
 
 import GHC.Hs
-import SrcLoc
+import GHC.Types.SrcLoc
 
 import Control.Monad
 

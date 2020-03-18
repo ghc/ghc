@@ -19,16 +19,16 @@ import GhcPrelude
 
 import GHC.Core
 import GHC.Core.Seq ( seqUnfolding )
-import Id
-import IdInfo
-import Demand ( zapUsageEnvSig )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Demand ( zapUsageEnvSig )
 import GHC.Core.Type     ( tidyType, tidyVarBndr )
 import GHC.Core.Coercion ( tidyCo )
-import Var
-import VarEnv
-import UniqFM
-import Name hiding (tidyNameOcc)
-import SrcLoc
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Unique.FM
+import GHC.Types.Name hiding (tidyNameOcc)
+import GHC.Types.SrcLoc
 import Maybes
 import Data.List
 
@@ -277,7 +277,7 @@ We keep the OneShotInfo because we want it to propagate into the interface.
 Not all OneShotInfo is determined by a compiler analysis; some is added by a
 call of GHC.Exts.oneShot, which is then discarded before the end of the
 optimisation pipeline, leaving only the OneShotInfo on the lambda. Hence we
-must preserve this info in inlinings. See Note [The oneShot function] in MkId.
+must preserve this info in inlinings. See Note [The oneShot function] in GHC.Types.Id.Make.
 
 This applies to lambda binders only, hence it is stored in IfaceLamBndr.
 -}

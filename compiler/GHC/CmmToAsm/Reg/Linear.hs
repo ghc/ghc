@@ -127,10 +127,10 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm hiding (RegSet)
 
 import Digraph
-import Unique
-import UniqSet
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import Outputable
 import GHC.Platform
 

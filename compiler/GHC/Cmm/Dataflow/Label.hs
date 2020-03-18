@@ -20,7 +20,7 @@ import Outputable
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
 import GHC.Cmm.Dataflow.Collections
 
-import Unique (Uniquable(..))
+import GHC.Types.Unique (Uniquable(..))
 import TrieMap
 
 

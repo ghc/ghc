@@ -29,8 +29,8 @@ import GHC.Iface.Load
 import GHC.CoreToIface
 
 import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
-import Id
-import Annotations
+import GHC.Types.Id
+import GHC.Types.Annotations
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -45,17 +45,17 @@ import TcRnMonad
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Driver.Session
-import VarEnv
-import Var
-import Name
-import Avail
-import RdrName
-import NameEnv
-import NameSet
-import Module
+import GHC.Types.Var.Env
+import GHC.Types.Var
+import GHC.Types.Name
+import GHC.Types.Avail
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Module
 import ErrUtils
 import Outputable
-import BasicTypes       hiding ( SuccessFlag(..) )
+import GHC.Types.Basic  hiding ( SuccessFlag(..) )
 import Util             hiding ( eqListBy )
 import FastString
 import Maybes
@@ -228,7 +228,7 @@ mkIface_ hsc_env
           [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
           -- The order of fixities returned from nameEnvElts is not
           -- deterministic, so we sort by OccName to canonicalize it.
-          -- See Note [Deterministic UniqFM] in UniqDFM for more details.
+          -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = src_warns
         iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts

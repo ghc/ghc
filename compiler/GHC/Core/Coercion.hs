@@ -132,21 +132,21 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
-import Var
-import VarEnv
-import VarSet
-import Name hiding ( varName )
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name hiding ( varName )
 import Util
-import BasicTypes
+import GHC.Types.Basic
 import Outputable
-import Unique
+import GHC.Types.Unique
 import Pair
-import SrcLoc
+import GHC.Types.SrcLoc
 import PrelNames
 import TysPrim
 import ListSetOps
 import Maybes
-import UniqFM
+import GHC.Types.Unique.FM
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )

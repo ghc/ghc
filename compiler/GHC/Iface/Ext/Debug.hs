@@ -9,15 +9,15 @@ module GHC.Iface.Ext.Debug where
 
 import GhcPrelude
 
-import SrcLoc
-import Module
+import GHC.Types.SrcLoc
+import GHC.Types.Module
 import FastString
 import Outputable
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Utils
-import Name
+import GHC.Types.Name
 
 import qualified Data.Map as M
 import qualified Data.Set as S

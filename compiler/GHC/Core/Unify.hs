@@ -28,10 +28,10 @@ module GHC.Core.Unify (
 
 import GhcPrelude
 
-import Var
-import VarEnv
-import VarSet
-import Name( Name )
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name( Name )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
@@ -42,8 +42,8 @@ import FV( FV, fvVarSet, fvVarList )
 import Util
 import Pair
 import Outputable
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail

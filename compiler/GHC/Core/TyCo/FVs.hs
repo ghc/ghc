@@ -50,12 +50,12 @@ import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 import Data.Monoid as DM ( Endo(..), All(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
-import Var
+import GHC.Types.Var
 import FV
 
-import UniqFM
-import VarSet
-import VarEnv
+import GHC.Types.Unique.FM
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Util
 import Panic
 

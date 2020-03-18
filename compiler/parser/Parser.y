@@ -62,12 +62,12 @@ import Maybes           ( isJust, orElse )
 import Outputable
 
 -- compiler/basicTypes
-import RdrName
-import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
-import GHC.Core.DataCon ( DataCon, dataConName )
-import SrcLoc
-import Module
-import BasicTypes
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+import GHC.Core.DataCon          ( DataCon, dataConName )
+import GHC.Types.SrcLoc
+import GHC.Types.Module
+import GHC.Types.Basic
 
 -- compiler/types
 import GHC.Core.Type    ( funTyCon )
@@ -83,7 +83,7 @@ import ApiAnnotation
 import TcEvidence       ( emptyTcEvBinds )
 
 -- compiler/prelude
-import ForeignCall
+import GHC.Types.ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
@@ -2188,8 +2188,8 @@ When the user write Zero instead of 'Zero in types, we parse it a
 HsTyVar ("Zero", TcClsName) instead of HsTyVar ("Zero", DataName). We
 deal with this in the renamer. If a HsTyVar ("Zero", TcClsName) is not
 bounded in the type level, then we look for it in the term level (we
-change its namespace to DataName, see Note [Demotion] in OccName). And
-both become a HsTyVar ("Zero", DataName) after the renamer.
+change its namespace to DataName, see Note [Demotion] in GHC.Types.Names.OccName).
+And both become a HsTyVar ("Zero", DataName) after the renamer.
 
 -}
 

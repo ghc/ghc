@@ -31,31 +31,31 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
 import StaticPtrTable
-import VarEnv
-import VarSet
-import Var
-import Id
-import MkId             ( mkDictSelRhs )
-import IdInfo
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Make ( mkDictSelRhs )
+import GHC.Types.Id.Info
 import GHC.Core.InstEnv
-import GHC.Core.Type    ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig )
-import Cpr              ( mkCprSig, botCpr )
-import BasicTypes
-import Name hiding (varName)
-import NameSet
-import NameCache
-import Avail
+import GHC.Core.Type     ( tidyTopType )
+import GHC.Types.Demand  ( appIsBottom, isTopSig, isBottomingSig )
+import GHC.Types.Cpr     ( mkCprSig, botCpr )
+import GHC.Types.Basic
+import GHC.Types.Name hiding (varName)
+import GHC.Types.Name.Set
+import GHC.Types.Name.Cache
+import GHC.Types.Avail
 import GHC.Iface.Env
 import TcEnv
 import TcRnMonad
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-import Module
+import GHC.Types.Module
 import GHC.Driver.Types
 import Maybes
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Outputable
 import Util( filterOut )
 import qualified ErrUtils as Err
@@ -581,7 +581,7 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in MkId
+  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
   | otherwise     = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]

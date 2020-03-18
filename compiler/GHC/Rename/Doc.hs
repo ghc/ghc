@@ -6,7 +6,7 @@ import GhcPrelude
 
 import TcRnTypes
 import GHC.Hs
-import SrcLoc
+import GHC.Types.SrcLoc
 
 
 rnMbLHsDoc :: Maybe LHsDocString -> RnM (Maybe LHsDocString)

@@ -7,7 +7,7 @@ package06e.hs:2:1: error:
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 package06e.hs:3:1: error:
-    Could not load module ‘UniqFM’
+    Could not load module ‘GHC.Types.Unique.FM’
     It is a member of the hidden package ‘ghc-8.7’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)

@@ -24,9 +24,9 @@ import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
 
 import GHC.Driver.Types
-import Name
-import NameSet
-import Literal
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Literal
 import GHC.Core.TyCon
 import FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
@@ -35,8 +35,8 @@ import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import Util
-import Unique
-import UniqDSet
+import GHC.Types.Unique
+import GHC.Types.Unique.DSet
 
 -- From iserv
 import SizedSeq

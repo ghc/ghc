@@ -20,7 +20,7 @@ import TcSimplify
 import TcValidity
 import TcType
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import FastString
 import qualified GHC.LanguageExtensions as LangExt

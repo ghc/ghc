@@ -38,11 +38,11 @@ import FastString
 import Outputable
 import GHC.Platform
 
-import BasicTypes       (Alignment)
+import GHC.Types.Basic (Alignment)
 import GHC.Cmm.CLabel
-import UniqSet
-import Unique
-import UniqSupply
+import GHC.Types.Unique.Set
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 import GHC.Cmm.DebugBlock (UnwindTable)
 
 import Control.Monad

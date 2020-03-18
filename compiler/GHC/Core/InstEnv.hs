@@ -36,19 +36,19 @@ import GhcPrelude
 import TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
-import Module
+import GHC.Types.Module
 import GHC.Core.Class
-import Var
-import VarSet
-import Name
-import NameSet
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Core.Unify
 import Outputable
 import ErrUtils
-import BasicTypes
-import UniqDFM
+import GHC.Types.Basic
+import GHC.Types.Unique.DFM
 import Util
-import Id
+import GHC.Types.Id
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
 

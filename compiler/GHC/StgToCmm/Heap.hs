@@ -41,10 +41,10 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils
-import CostCentre
-import IdInfo( CafInfo(..), mayHaveCafRefs )
-import Id ( Id )
-import Module
+import GHC.Types.CostCentre
+import GHC.Types.Id.Info( CafInfo(..), mayHaveCafRefs )
+import GHC.Types.Id ( Id )
+import GHC.Types.Module
 import GHC.Driver.Session
 import GHC.Platform
 import FastString( mkFastString, fsLit )

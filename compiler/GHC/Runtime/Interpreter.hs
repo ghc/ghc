@@ -62,20 +62,20 @@ import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import Fingerprint
 import GHC.Driver.Types
-import UniqFM
+import GHC.Types.Unique.FM
 import Panic
 import GHC.Driver.Session
 import Exception
-import BasicTypes
+import GHC.Types.Basic
 import FastString
 import Util
 import GHC.Runtime.Eval.Types(BreakInfo(..))
 import Outputable(brackets, ppr, showSDocUnqual)
-import SrcLoc
+import GHC.Types.SrcLoc
 import Maybes
-import Module
+import GHC.Types.Module
 import GHC.ByteCode.Types
-import Unique
+import GHC.Types.Unique
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run

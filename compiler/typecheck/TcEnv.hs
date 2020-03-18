@@ -81,9 +81,9 @@ import TcType
 import GHC.Iface.Load
 import PrelNames
 import TysWiredIn
-import Id
-import Var
-import RdrName
+import GHC.Types.Id
+import GHC.Types.Var
+import GHC.Types.Name.Reader
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon )
 import GHC.Core.PatSyn  ( PatSyn )
@@ -92,15 +92,15 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
-import Name
-import NameSet
-import NameEnv
-import VarEnv
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Var.Env
 import GHC.Driver.Types
 import GHC.Driver.Session
-import SrcLoc
-import BasicTypes hiding( SuccessFlag(..) )
-import Module
+import GHC.Types.SrcLoc
+import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.Module
 import Outputable
 import Encoding
 import FastString

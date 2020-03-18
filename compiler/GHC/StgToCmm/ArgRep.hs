@@ -20,13 +20,12 @@ module GHC.StgToCmm.ArgRep (
 import GhcPrelude
 import GHC.Platform
 
-import GHC.StgToCmm.Closure ( idPrimRep )
-
+import GHC.StgToCmm.Closure    ( idPrimRep )
 import GHC.Runtime.Heap.Layout ( WordOff )
-import Id               ( Id )
-import GHC.Core.TyCon   ( PrimRep(..), primElemRepSizeB )
-import BasicTypes       ( RepArity )
-import Constants        ( wORD64_SIZE, dOUBLE_SIZE )
+import GHC.Types.Id            ( Id )
+import GHC.Core.TyCon          ( PrimRep(..), primElemRepSizeB )
+import GHC.Types.Basic         ( RepArity )
+import Constants               ( wORD64_SIZE, dOUBLE_SIZE )
 
 import Outputable
 import FastString

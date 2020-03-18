@@ -65,9 +65,9 @@ import GHC.Platform.Reg
 import GHC.Platform
 
 -- Our intermediate code:
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Cmm.BlockId
-import Module           ( primUnitId )
+import GHC.Types.Module ( primUnitId )
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm
@@ -77,16 +77,16 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel
 import GHC.Core          ( Tickish(..) )
-import SrcLoc           ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
+import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
-import ForeignCall      ( CCallConv(..) )
+import GHC.Types.ForeignCall ( CCallConv(..) )
 import OrdList
 import Outputable
 import FastString
 import GHC.Driver.Session
 import Util
-import UniqSupply       ( getUniqueM )
+import GHC.Types.Unique.Supply ( getUniqueM )
 
 import Control.Monad
 import Data.Bits

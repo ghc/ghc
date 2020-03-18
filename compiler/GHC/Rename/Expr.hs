@@ -32,7 +32,7 @@ import GHC.Rename.Binds ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBin
 import GHC.Hs
 import TcEnv            ( isBrackStage )
 import TcRnMonad
-import Module           ( getModule )
+import GHC.Types.Module ( getModule )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
@@ -47,17 +47,17 @@ import GHC.Rename.Pat
 import GHC.Driver.Session
 import PrelNames
 
-import BasicTypes
-import Name
-import NameSet
-import RdrName
-import UniqSet
+import GHC.Types.Basic
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
+import GHC.Types.Unique.Set
 import Data.List
 import Util
 import ListSetOps       ( removeDups )
 import ErrUtils
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import FastString
 import Control.Monad
 import TysWiredIn       ( nilDataConName )

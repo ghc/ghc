@@ -71,7 +71,7 @@ import Exception
 import Outputable
 import Panic
 import qualified PprColour as Col
-import SrcLoc
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import FastString (unpackFS)
 import StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)

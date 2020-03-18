@@ -4,7 +4,7 @@ import FastString
 import GHC
 import StringBuffer
 import Lexer
-import SrcLoc
+import GHC.Types.SrcLoc
 
 main :: IO ()
 main = do

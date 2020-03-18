@@ -49,12 +49,12 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Info
 import GHC.Cmm.CLabel
 import GHC.Stg.Syntax
-import Id
+import GHC.Types.Id
 import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
-import BasicTypes        ( RepArity )
+import GHC.Types.Basic   ( RepArity )
 import GHC.Driver.Session
 import GHC.Platform
-import Module
+import GHC.Types.Module
 
 import Util
 import Data.List

@@ -14,8 +14,8 @@ where
 
 import GhcPrelude
 
-import UniqSet
-import UniqFM
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
 
 
 -- | A fn to check if a node is trivially colorable

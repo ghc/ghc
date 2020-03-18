@@ -31,16 +31,16 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
 import GHC.Cmm.Info
 import GHC.Cmm
-import Module
+import GHC.Types.Module
 import GHC.Cmm.DebugBlock
 import GHC
 import GHC.Driver.Monad
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import ErrUtils
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 
 import Stream (collect, yield)
 

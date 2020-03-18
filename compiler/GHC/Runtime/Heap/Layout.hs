@@ -46,7 +46,7 @@ module GHC.Runtime.Heap.Layout (
 
 import GhcPrelude
 
-import BasicTypes( ConTagZ )
+import GHC.Types.Basic( ConTagZ )
 import GHC.Driver.Session
 import Outputable
 import GHC.Platform

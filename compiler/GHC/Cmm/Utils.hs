@@ -83,7 +83,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import Outputable
 import GHC.Driver.Session
-import Unique
+import GHC.Types.Unique
 import GHC.Platform.Regs
 
 import Data.ByteString (ByteString)

@@ -19,17 +19,17 @@ where
 
 import GhcPrelude
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
-import Id
+import GHC.Types.Id
 import GHC.Stg.FVs ( annBindingFreeVars )
 import GHC.Stg.Lift.Analysis
 import GHC.Stg.Lift.Monad
 import GHC.Stg.Syntax
 import Outputable
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
-import VarSet
+import GHC.Types.Var.Set
 import Control.Monad ( when )
 import Data.Maybe ( isNothing )
 

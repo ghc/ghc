@@ -24,12 +24,12 @@ import TcEvidence
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.Coercion
-import Var
-import VarSet
-import VarEnv
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Outputable
 import TcSMonad as TcS
-import BasicTypes( SwapFlag(..) )
+import GHC.Types.Basic( SwapFlag(..) )
 
 import Util
 import Bag

@@ -7,7 +7,7 @@ module TcHoleErrors where
 import TcRnTypes  ( TcM )
 import Constraint ( Ct, Implication )
 import Outputable ( SDoc )
-import VarEnv     ( TidyEnv )
+import GHC.Types.Var.Env ( TidyEnv )
 
 findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Ct
                   -> TcM (TidyEnv, SDoc)

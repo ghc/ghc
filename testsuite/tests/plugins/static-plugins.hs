@@ -1,6 +1,6 @@
 module Main where
 
-import Avail
+import GHC.Types.Avail
 import Control.Monad.IO.Class
 import GHC.Driver.Session
   (getDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)

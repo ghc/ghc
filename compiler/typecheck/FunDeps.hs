@@ -21,8 +21,8 @@ module FunDeps (
 
 import GhcPrelude
 
-import Name
-import Var
+import GHC.Types.Name
+import GHC.Types.Var
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -30,14 +30,14 @@ import TcType( transSuperClasses )
 import GHC.Core.Coercion.Axiom( TypeEqn )
 import GHC.Core.Unify
 import GHC.Core.InstEnv
-import VarSet
-import VarEnv
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
 import FV
 import Outputable
 import ErrUtils( Validity(..), allValid )
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 
 import Pair             ( Pair(..) )

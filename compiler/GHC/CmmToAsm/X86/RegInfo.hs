@@ -15,9 +15,9 @@ import GHC.Platform.Reg
 
 import Outputable
 import GHC.Platform
-import Unique
+import GHC.Types.Unique
 
-import UniqFM
+import GHC.Types.Unique.FM
 import GHC.CmmToAsm.X86.Regs
 
 

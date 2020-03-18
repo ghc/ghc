@@ -39,7 +39,7 @@ import GHC.Driver.Plugins
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif
-import Module           ( ModuleName )
+import GHC.Types.Module     ( ModuleName, mkModuleName )
 
 
 -- Various other random stuff that we need
@@ -51,22 +51,21 @@ import Constants
 import GHC.Driver.Types
 import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
-import BasicTypes       ( failed )
+import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
 import SysTools.BaseDir
 import SysTools.Settings
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import Panic
-import UniqSupply
+import GHC.Types.Unique.Supply
 import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
-import GHC.Iface.Load           ( loadUserInterface )
-import Module              ( mkModuleName )
+import GHC.Iface.Load      ( loadUserInterface )
 import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )

@@ -2,8 +2,8 @@
 
 module Main where
 
-import UniqSupply
-import Unique
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
 
 -- Generate a lot of uniques
 main = do

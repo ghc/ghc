@@ -28,9 +28,9 @@ import GhcPrelude
 import Binary
 import Encoding
 import FastFunctions
-import Name
+import GHC.Types.Name
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS

@@ -27,23 +27,23 @@ import GhcPrelude
 import GHC.HsToCore.PmCheck.Types
 import GHC.HsToCore.PmCheck.Oracle
 import GHC.HsToCore.PmCheck.Ppr
-import BasicTypes (Origin, isGenerated)
+import GHC.Types.Basic (Origin, isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
 import GHC.Hs
 import TcHsSyn   ( shortCutLit )
-import Id
+import GHC.Types.Id
 import GHC.Core.ConLike
-import Name
+import GHC.Types.Name
 import FamInst
 import TysWiredIn
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import Outputable
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import Var (EvVar)
+import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
 import TcEvidence ( HsWrapper(..), isIdHsWrapper )
 import TcType (evVarPred)

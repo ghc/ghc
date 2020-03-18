@@ -33,10 +33,10 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
 import Panic
 

@@ -102,22 +102,22 @@ module GHC.Core (
 import GhcPrelude
 import GHC.Platform
 
-import CostCentre
-import VarEnv( InScopeSet )
-import Var
+import GHC.Types.CostCentre
+import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
-import Name
-import NameSet
-import NameEnv( NameEnv, emptyNameEnv )
-import Literal
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
+import GHC.Types.Literal
 import GHC.Core.DataCon
-import Module
-import BasicTypes
+import GHC.Types.Module
+import GHC.Types.Basic
 import Outputable
 import Util
-import UniqSet
-import SrcLoc     ( RealSrcSpan, containsSpan )
+import GHC.Types.Unique.Set
+import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
 import Binary
 
 import Data.Data hiding (TyCon)

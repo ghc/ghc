@@ -45,8 +45,8 @@ import FastString
 import GHC.Cmm.CLabel
 import Outputable
 import GHC.Platform
-import UniqFM (listToUFM, lookupUFM)
-import UniqSupply
+import GHC.Types.Unique.FM (listToUFM, lookupUFM)
+import GHC.Types.Unique.Supply
 
 import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)

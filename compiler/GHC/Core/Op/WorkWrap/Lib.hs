@@ -19,28 +19,28 @@ import GhcPrelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
-import Id
-import IdInfo           ( JoinArity )
+import GHC.Types.Id
+import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
-import Demand
-import Cpr
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
-import MkId             ( voidArgId, voidPrimId )
+import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import TysWiredIn       ( tupleDataCon )
 import TysPrim          ( voidPrimTy )
-import Literal          ( absentLiteralOf, rubbishLit )
-import VarEnv           ( mkInScopeSet )
-import VarSet           ( VarSet )
+import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
+import GHC.Types.Var.Env ( mkInScopeSet )
+import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Predicate ( isClassPred )
 import GHC.Types.RepType  ( isVoidTy, typePrimRep )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
-import BasicTypes       ( Boxity(..) )
+import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
-import UniqSupply
-import Unique
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
 import Maybes
 import Util
 import Outputable
@@ -957,8 +957,8 @@ deepSplitCprType_maybe _ _ _ = Nothing
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
--- The data type TypeShape is defined in Demand
--- See Note [Trimming a demand to a type] in Demand
+-- The data type TypeShape is defined in GHC.Types.Demand
+-- See Note [Trimming a demand to a type] in GHC.Types.Demand
 findTypeShape fam_envs ty
   | Just (tc, tc_args)  <- splitTyConApp_maybe ty
   , Just con <- isDataProductTyCon_maybe tc
@@ -1197,7 +1197,7 @@ mk_absent_let dflags fam_envs arg
               -- determinism, because with different uniques the strings
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
-              -- See also Note [Unique Determinism] in Unique
+              -- See also Note [Unique Determinism] in GHC.Types.Unique
     unlifted_rhs = mkTyApps (Lit rubbishLit) [arg_ty]
 
 mk_ww_local :: Unique -> (Type, StrictnessMark) -> Id

@@ -31,7 +31,7 @@ import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
 import GHC.Core.Coercion ( Role(..) )
 import Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
-import Name       ( Name, BuiltInSyntax(..) )
+import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import TysWiredIn
 import TysPrim    ( mkTemplateAnonTyConBinders )
 import PrelNames  ( gHC_TYPELITS

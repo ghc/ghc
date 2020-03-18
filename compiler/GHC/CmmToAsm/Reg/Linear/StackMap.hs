@@ -22,8 +22,8 @@ where
 
 import GhcPrelude
 
-import UniqFM
-import Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 
 
 -- | Identifier for a stack slot.

@@ -2,7 +2,7 @@
 
 module Simple.Plugin(plugin) where
 
-import UniqFM
+import GHC.Types.Unique.FM
 import GHC.Plugins
 import qualified ErrUtils
 

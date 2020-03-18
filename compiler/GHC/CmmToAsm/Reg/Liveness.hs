@@ -53,9 +53,9 @@ import Digraph
 import MonadUtils
 import Outputable
 import GHC.Platform
-import UniqSet
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import Bag
 import State
 

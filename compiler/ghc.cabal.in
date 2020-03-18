@@ -160,13 +160,10 @@ Library
 
     hs-source-dirs:
         .
-        basicTypes
-        cmm
         iface
         main
         parser
         prelude
-        profiling
         typecheck
         utils
 
@@ -186,26 +183,26 @@ Library
         GHC.Driver.Backpack.Syntax
         GHC.Types.Name.Shape
         GHC.Iface.Rename
-        Avail
+        GHC.Types.Avail
         AsmUtils
-        BasicTypes
+        GHC.Types.Basic
         GHC.Core.ConLike
         GHC.Core.DataCon
         GHC.Core.PatSyn
-        Demand
-        Cpr
+        GHC.Types.Demand
+        GHC.Types.Cpr
         GHC.Cmm.DebugBlock
         Exception
-        FieldLabel
+        GHC.Types.FieldLabel
         GHC.Driver.Monad
         GHC.Driver.Hooks
         GHC.Driver.Flags
         GHC.Driver.Ways
-        Id
-        IdInfo
+        GHC.Types.Id
+        GHC.Types.Id.Info
         GHC.Core.Predicate
-        Lexeme
-        Literal
+        GHC.Utils.Lexeme
+        GHC.Types.Literal
         GHC.Llvm
         GHC.Llvm.Syntax
         GHC.Llvm.MetaData
@@ -218,21 +215,21 @@ Library
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
         GHC.CmmToLlvm.Mangler
-        MkId
-        Module
-        Name
-        NameEnv
-        NameSet
-        OccName
-        RdrName
-        NameCache
-        SrcLoc
-        UniqSupply
-        Unique
+        GHC.Types.Id.Make
+        GHC.Types.Module
+        GHC.Types.Name
+        GHC.Types.Name.Env
+        GHC.Types.Name.Set
+        GHC.Types.Name.Occurrence
+        GHC.Types.Name.Reader
+        GHC.Types.Name.Cache
+        GHC.Types.SrcLoc
+        GHC.Types.Unique.Supply
+        GHC.Types.Unique
         UpdateCafInfos
-        Var
-        VarEnv
-        VarSet
+        GHC.Types.Var
+        GHC.Types.Var.Env
+        GHC.Types.Var.Set
         UnVarGraph
         GHC.Cmm.BlockId
         GHC.Cmm.CLabel
@@ -359,7 +356,7 @@ Library
         GHC.Iface.Recomp
         GHC.IfaceToCore
         FlagChecker
-        Annotations
+        GHC.Types.Annotations
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         Config
@@ -407,7 +404,7 @@ Library
         Parser
         RdrHsSyn
         ApiAnnotation
-        ForeignCall
+        GHC.Types.ForeignCall
         KnownUniques
         PrelInfo
         PrelNames
@@ -416,9 +413,9 @@ Library
         ToolSettings
         TysPrim
         TysWiredIn
-        CostCentre
-        CostCentreState
-        ProfInit
+        GHC.Types.CostCentre
+        GHC.Types.CostCentre.State
+        GHC.Types.CostCentre.Init
         GHC.Rename.Binds
         GHC.Rename.Env
         GHC.Rename.Expr
@@ -567,11 +564,11 @@ Library
         State
         Stream
         StringBuffer
-        UniqDFM
-        UniqDSet
-        UniqFM
-        UniqMap
-        UniqSet
+        GHC.Types.Unique.DFM
+        GHC.Types.Unique.DSet
+        GHC.Types.Unique.FM
+        GHC.Types.Unique.Map
+        GHC.Types.Unique.Set
         Util
         GHC.Cmm.Dataflow
         GHC.Cmm.Dataflow.Block

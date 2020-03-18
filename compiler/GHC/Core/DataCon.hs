@@ -63,25 +63,25 @@ module GHC.Core.DataCon (
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId( DataConBoxer )
+import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
 import GHC.Core.Type as Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
-import FieldLabel
+import GHC.Types.FieldLabel
 import GHC.Core.Class
-import Name
+import GHC.Types.Name
 import PrelNames
 import GHC.Core.Predicate
-import Var
+import GHC.Types.Var
 import Outputable
 import Util
-import BasicTypes
+import GHC.Types.Basic
 import FastString
-import Module
+import GHC.Types.Module
 import Binary
-import UniqSet
-import Unique( mkAlphaTyVarUnique )
+import GHC.Types.Unique.Set
+import GHC.Types.Unique( mkAlphaTyVarUnique )
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
@@ -204,7 +204,7 @@ Note [Data constructor workers and wrappers]
 Note [The need for a wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Why might the wrapper have anything to do?  The full story is
-in wrapper_reqd in MkId.mkDataConRep.
+in wrapper_reqd in GHC.Types.Id.Make.mkDataConRep.
 
 * Unboxing strict fields (with -funbox-strict-fields)
         data T = MkT !(Int,Int)
@@ -614,7 +614,7 @@ data DataConRep
                                  -- and *including* all evidence args
 
         , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
-                -- See also Note [Data-con worker strictness] in MkId.hs
+                -- See also Note [Data-con worker strictness] in GHC.Types.Id.Make
 
         , dcr_bangs :: [HsImplBang]  -- The actual decisions made (including failures)
                                      -- about the original arguments; 1-1 with orig_arg_tys
@@ -634,7 +634,7 @@ data DataConRep
 -- emit a warning (in checkValidDataCon) and treat it like
 -- @(HsSrcBang _ NoSrcUnpack SrcLazy)@
 data HsSrcBang =
-  HsSrcBang SourceText -- Note [Pragma source text] in BasicTypes
+  HsSrcBang SourceText -- Note [Pragma source text] in GHC.Types.Basic
             SrcUnpackedness
             SrcStrictness
   deriving Data.Data
@@ -740,7 +740,7 @@ Terminology:
 * However, if T was defined in an imported module, the importing module
   must follow the decisions made in the original module, regardless of
   the flag settings in the importing module.
-  Also see Note [Bangs on imported data constructors] in MkId
+  Also see Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
 * The dcr_bangs field of the dcRep field records the [HsImplBang]
   If T was defined in this module, Without -O the dcr_bangs might be

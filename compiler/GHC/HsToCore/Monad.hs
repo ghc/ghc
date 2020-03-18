@@ -63,28 +63,28 @@ import GHC.Hs
 import GHC.IfaceToCore
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import Bag
-import BasicTypes ( Origin )
+import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.HsToCore.PmCheck.Types
-import Id
-import Module
+import GHC.Types.Id
+import GHC.Types.Module
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Core.Type
-import UniqSupply
-import Name
-import NameEnv
+import GHC.Types.Unique.Supply
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Driver.Session
 import ErrUtils
 import FastString
-import UniqFM ( lookupWithDefaultUFM )
-import Literal ( mkLitString )
-import CostCentreState
+import GHC.Types.Unique.FM ( lookupWithDefaultUFM )
+import GHC.Types.Literal ( mkLitString )
+import GHC.Types.CostCentre.State
 
 import Data.IORef
 

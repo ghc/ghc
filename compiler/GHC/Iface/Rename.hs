@@ -19,22 +19,22 @@ module GHC.Iface.Rename (
 
 import GhcPrelude
 
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import GHC.Driver.Types
-import Module
-import UniqFM
-import Avail
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Avail
 import GHC.Iface.Syntax
-import FieldLabel
-import Var
+import GHC.Types.FieldLabel
+import GHC.Types.Var
 import ErrUtils
 
-import Name
+import GHC.Types.Name
 import TcRnMonad
 import Util
 import Fingerprint
-import BasicTypes
+import GHC.Types.Basic
 
 -- a bit vexing
 import {-# SOURCE #-} GHC.Iface.Load

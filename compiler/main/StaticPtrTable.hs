@@ -130,10 +130,10 @@ import GHC.Core.Utils (collectMakeStaticArgs)
 import GHC.Core.DataCon
 import GHC.Driver.Session
 import GHC.Driver.Types
-import Id
+import GHC.Types.Id
 import GHC.Core.Make (mkStringExprFSWith)
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import Outputable
 import GHC.Platform
 import PrelNames

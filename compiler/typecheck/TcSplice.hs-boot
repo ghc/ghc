@@ -4,11 +4,11 @@
 module TcSplice where
 
 import GhcPrelude
-import Name
+import GHC.Types.Name
 import GHC.Hs.Expr ( PendingRnSplice, DelayedSplice )
 import TcRnTypes( TcM , SpliceType )
 import TcType   ( ExpRhoType )
-import Annotations ( Annotation, CoreAnnTarget )
+import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcTcId, GhcRn, GhcPs, GhcTc )
 
 import GHC.Hs     ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,

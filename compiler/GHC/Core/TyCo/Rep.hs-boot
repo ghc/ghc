@@ -1,7 +1,7 @@
 module GHC.Core.TyCo.Rep where
 
 import Data.Data  ( Data )
-import {-# SOURCE #-} Var( Var, ArgFlag, AnonArgFlag )
+import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
 
 data Type
 data TyThing

@@ -23,9 +23,9 @@ import GHC.Platform.Reg
 import Bag
 import Outputable
 import GHC.Platform
-import UniqFM
-import UniqSet
-import UniqSupply
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.Supply
 import Util (seqList)
 import GHC.CmmToAsm.CFG
 

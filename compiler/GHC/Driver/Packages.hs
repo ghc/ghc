@@ -72,11 +72,11 @@ import GHC.PackageDb
 import UnitInfo
 import GHC.Driver.Session
 import GHC.Driver.Ways
-import Name             ( Name, nameModule_maybe )
-import UniqFM
-import UniqDFM
-import UniqSet
-import Module
+import GHC.Types.Name       ( Name, nameModule_maybe )
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique.Set
+import GHC.Types.Module
 import Util
 import Panic
 import GHC.Platform
@@ -995,7 +995,7 @@ pprTrustFlag flag = case flag of
 -- -----------------------------------------------------------------------------
 -- Wired-in packages
 --
--- See Note [Wired-in packages] in Module
+-- See Note [Wired-in packages] in GHC.Types.Module
 
 type WiredInUnitId = String
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
@@ -1015,7 +1015,7 @@ findWiredInPackages
 findWiredInPackages dflags prec_map pkgs vis_map = do
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
-  -- in Note [Wired-in packages] in Module
+  -- in Note [Wired-in packages] in GHC.Types.Module
   let
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
@@ -1119,7 +1119,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
 -- Helper functions for rewiring Module and UnitId.  These
 -- rewrite UnitIds of modules in wired-in packages to the form known to the
--- compiler, as described in Note [Wired-in packages] in Module.
+-- compiler, as described in Note [Wired-in packages] in GHC.Types.Module.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in PrelNames.

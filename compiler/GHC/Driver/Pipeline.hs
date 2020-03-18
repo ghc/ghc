@@ -49,15 +49,15 @@ import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
 import Outputable
-import Module
+import GHC.Types.Module
 import ErrUtils
 import GHC.Driver.Session
 import Panic
 import Util
 import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
-import BasicTypes       ( SuccessFlag(..) )
+import GHC.Types.Basic  ( SuccessFlag(..) )
 import Maybes           ( expectJust )
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
@@ -69,7 +69,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import GHC.Iface.Make  ( mkFullIface )
+import GHC.Iface.Make   ( mkFullIface )
 import UpdateCafInfos   ( updateModDetailsCafInfos )
 
 import Exception

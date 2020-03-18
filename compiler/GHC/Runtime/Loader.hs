@@ -26,26 +26,26 @@ import GHC.Driver.Session
 import GHC.Runtime.Linker      ( linkModule, getHValue )
 import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
-import SrcLoc           ( noSrcSpan )
-import GHC.Driver.Finder( findPluginModule, cannotFindModule )
-import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
-import GHC.Iface.Load   ( loadPluginInterface )
-import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
-                        , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
-                        , gre_name, mkRdrQual )
-import OccName          ( OccName, mkVarOcc )
+import GHC.Types.SrcLoc        ( noSrcSpan )
+import GHC.Driver.Finder       ( findPluginModule, cannotFindModule )
+import TcRnMonad               ( initTcInteractive, initIfaceTcRn )
+import GHC.Iface.Load          ( loadPluginInterface )
+import GHC.Types.Name.Reader  ( RdrName, ImportSpec(..), ImpDeclSpec(..)
+                               , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
+                               , gre_name, mkRdrQual )
+import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Rename.Names ( gresFromAvails )
 import GHC.Driver.Plugins
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Types
-import GHCi.RemoteTypes ( HValue )
+import GHCi.RemoteTypes  ( HValue )
 import GHC.Core.Type     ( Type, eqType, mkTyConTy )
 import GHC.Core.TyCo.Ppr ( pprTyThingCategory )
 import GHC.Core.TyCon    ( TyCon )
-import Name             ( Name, nameModule_maybe )
-import Id               ( idType )
-import Module           ( Module, ModuleName )
+import GHC.Types.Name    ( Name, nameModule_maybe )
+import GHC.Types.Id      ( idType )
+import GHC.Types.Module  ( Module, ModuleName )
 import Panic
 import FastString
 import ErrUtils

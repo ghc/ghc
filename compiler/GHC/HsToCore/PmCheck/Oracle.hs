@@ -34,23 +34,23 @@ import Outputable
 import ErrUtils
 import Util
 import Bag
-import UniqSet
-import UniqDSet
-import Unique
-import Id
-import VarEnv
-import UniqDFM
-import Var           (EvVar)
-import Name
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.DFM
+import GHC.Types.Var      (EvVar)
+import GHC.Types.Name
 import GHC.Core
 import GHC.Core.FVs       (exprFreeVars)
 import GHC.Core.Map
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr)
-import UniqSupply
+import GHC.Types.Unique.Supply
 import FastString
-import SrcLoc
+import GHC.Types.SrcLoc
 import Maybes
 import GHC.Core.ConLike
 import GHC.Core.DataCon

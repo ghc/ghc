@@ -9,7 +9,7 @@ import GHC.Core.InstEnv    ( ClsInst )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core         ( CoreRule )
 import GHC.Driver.Types ( CompleteMatch )
-import Annotations      ( Annotation )
+import GHC.Types.Annotations ( Annotation )
 
 tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules        :: Bool -> [IfaceRule] -> IfL [CoreRule]

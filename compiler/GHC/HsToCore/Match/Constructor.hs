@@ -23,16 +23,16 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
-import BasicTypes ( Origin(..) )
+import GHC.Types.Basic ( Origin(..) )
 import TcType
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.Core.Make ( mkCoreLets )
 import Util
-import Id
-import NameEnv
-import FieldLabel ( flSelector )
-import SrcLoc
+import GHC.Types.Id
+import GHC.Types.Name.Env
+import GHC.Types.FieldLabel ( flSelector )
+import GHC.Types.SrcLoc
 import Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)

@@ -4,7 +4,7 @@ import GhcPrelude
 import GHC.Core.Type(TyThing)
 import TcRnTypes (TcM)
 import Outputable (SDoc)
-import Name (Name)
+import GHC.Types.Name (Name)
 
 checkBootDeclM :: Bool  -- ^ True <=> an hs-boot file (could also be a sig)
                -> TyThing -> TyThing -> TcM ()

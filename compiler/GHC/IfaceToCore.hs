@@ -39,7 +39,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
 import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Driver.Types
-import Annotations
+import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
@@ -47,33 +47,33 @@ import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.Lint
 import GHC.Core.Make
-import Id
-import MkId
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Make
+import GHC.Types.Id.Info
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import PrelNames
 import TysWiredIn
-import Literal
-import Var
-import VarSet
-import Name
-import NameEnv
-import NameSet
+import GHC.Types.Literal
+import GHC.Types.Var as Var
+import GHC.Types.Var.Set
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
 import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
-import Demand
-import Module
-import UniqFM
-import UniqSupply
+import GHC.Types.Demand
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import Outputable
 import Maybes
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import Util
 import FastString
-import BasicTypes hiding ( SuccessFlag(..) )
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
@@ -963,7 +963,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                        -- decisions) to buildDataCon; it'll use
                        -- these to guide the construction of a
                        -- worker.
-                       -- See Note [Bangs on imported data constructors] in MkId
+                       -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
                        lbl_names
                        univ_tvs ex_tvs user_tv_bndrs
                        eq_spec theta
@@ -1384,13 +1384,13 @@ tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
 tcIfaceLit :: Literal -> IfL Literal
 -- Integer literals deserialise to (LitInteger i <error thunk>)
 -- so tcIfaceLit just fills in the type.
--- See Note [Integer literals] in Literal
+-- See Note [Integer literals] in GHC.Types.Literal
 tcIfaceLit (LitNumber LitNumInteger i _)
   = do t <- tcIfaceTyConByName integerTyConName
        return (mkLitInteger i (mkTyConTy t))
 -- Natural literals deserialise to (LitNatural i <error thunk>)
 -- so tcIfaceLit just fills in the type.
--- See Note [Natural literals] in Literal
+-- See Note [Natural literals] in GHC.Types.Literal
 tcIfaceLit (LitNumber LitNumNatural i _)
   = do t <- tcIfaceTyConByName naturalTyConName
        return (mkLitNatural i (mkTyConTy t))

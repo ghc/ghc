@@ -9,7 +9,7 @@ import GhcPrelude
 import GHC.Llvm.MetaData
 import GHC.Llvm.Types
 
-import Unique
+import GHC.Types.Unique
 
 -- | Block labels
 type LlvmBlockId = Unique

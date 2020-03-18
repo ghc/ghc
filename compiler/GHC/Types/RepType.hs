@@ -25,7 +25,7 @@ module GHC.Types.RepType
 
 import GhcPrelude
 
-import BasicTypes (Arity, RepArity)
+import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
 import Outputable
 import PrelNames

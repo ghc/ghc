@@ -18,15 +18,15 @@ module GHC.Hs.ImpExp where
 
 import GhcPrelude
 
-import Module           ( ModuleName )
-import GHC.Hs.Doc       ( HsDocString )
-import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
-import BasicTypes       ( SourceText(..), StringLiteral(..), pprWithSourceText )
-import FieldLabel       ( FieldLbl(..) )
+import GHC.Types.Module       ( ModuleName )
+import GHC.Hs.Doc             ( HsDocString )
+import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
+import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
 import Outputable
 import FastString
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Hs.Extension
 
 import Data.Data
@@ -80,7 +80,7 @@ data ImportDecl pass
   = ImportDecl {
       ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
-                                 -- Note [Pragma source text] in BasicTypes
+                                 -- Note [Pragma source text] in GHC.Types.Basic
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
@@ -282,7 +282,7 @@ gives rise to
     IEThingWith T [MkT] [FieldLabel "x" False x)]           (without DuplicateRecordFields)
     IEThingWith T [MkT] [FieldLabel "x" True $sel:x:MkT)]   (with    DuplicateRecordFields)
 
-See Note [Representing fields in AvailInfo] in Avail for more details.
+See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details.
 -}
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)

@@ -24,9 +24,9 @@ import Data.Data
 import MonadUtils
 import Outputable
 import Binary
-import SrcLoc
-import Unique
-import UniqSet
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
 
 ----------------------------------------------------------------------
 -- Boolean formula type and smart constructors

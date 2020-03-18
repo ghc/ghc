@@ -202,14 +202,14 @@ module GHC.Stg.Unarise (unarise) where
 
 import GhcPrelude
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.DataCon
 import FastString (FastString, mkFastString)
-import Id
-import Literal
+import GHC.Types.Id
+import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
-import MkId (voidPrimId, voidArgId)
+import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
 import GHC.Types.RepType
@@ -217,9 +217,9 @@ import GHC.Stg.Syntax
 import GHC.Core.Type
 import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
 import TysWiredIn
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
-import VarEnv
+import GHC.Types.Var.Env
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)

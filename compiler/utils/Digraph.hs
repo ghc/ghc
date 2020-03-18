@@ -58,8 +58,8 @@ import qualified Data.Set as Set
 import qualified Data.Graph as G
 import Data.Graph hiding (Graph, Edge, transposeG, reachable)
 import Data.Tree
-import Unique
-import UniqFM
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
 
 {-
 ************************************************************************

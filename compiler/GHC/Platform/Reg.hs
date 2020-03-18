@@ -29,7 +29,7 @@ where
 import GhcPrelude
 
 import Outputable
-import Unique
+import GHC.Types.Unique
 import GHC.Platform.Reg.Class
 import Data.List (intersect)
 

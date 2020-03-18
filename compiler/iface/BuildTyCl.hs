@@ -25,22 +25,22 @@ import TysWiredIn( isCTupleTyConName )
 import TysPrim ( voidPrimTy )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
-import Var
-import VarSet
-import BasicTypes
-import Name
-import NameEnv
-import MkId
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Basic
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Id.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Type
-import Id
+import GHC.Types.Id
 import TcType
 
-import SrcLoc( SrcSpan, noSrcSpan )
+import GHC.Types.SrcLoc( SrcSpan, noSrcSpan )
 import GHC.Driver.Session
 import TcRnMonad
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
 import Outputable
 
@@ -102,7 +102,7 @@ buildDataCon :: FamInstEnvs
             -> TyConRepName
             -> [HsSrcBang]
             -> Maybe [HsImplBang]
-                -- See Note [Bangs on imported data constructors] in MkId
+                -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
            -> [TyCoVar]                -- Existentials

@@ -50,23 +50,23 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Op.OccurAnal ( occurAnalyseExpr_NoBinderSwap )
 import GHC.Core.SimpleOpt
-import GHC.Core.Arity     ( manifestArity )
+import GHC.Core.Arity   ( manifestArity )
 import GHC.Core.Utils
-import Id
-import Demand          ( isBottomingSig )
+import GHC.Types.Id
+import GHC.Types.Demand ( isBottomingSig )
 import GHC.Core.DataCon
-import Literal
+import GHC.Types.Literal
 import PrimOp
-import IdInfo
-import BasicTypes       ( Arity, InlineSpec(..), inlinePragmaSpec )
+import GHC.Types.Id.Info
+import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
 import GHC.Core.Type
 import PrelNames
 import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
 import Outputable
-import ForeignCall
-import Name
+import GHC.Types.ForeignCall
+import GHC.Types.Name
 import ErrUtils
 
 import qualified Data.ByteString as BS

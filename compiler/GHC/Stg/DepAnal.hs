@@ -5,13 +5,13 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import Id
-import Name (Name, nameIsLocalOrFrom)
-import NameEnv
+import GHC.Types.Id
+import GHC.Types.Name (Name, nameIsLocalOrFrom)
+import GHC.Types.Name.Env
 import Outputable
-import UniqSet (nonDetEltsUniqSet)
-import VarSet
-import Module (Module)
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
+import GHC.Types.Var.Set
+import GHC.Types.Module (Module)
 
 import Data.Graph (SCC (..))
 

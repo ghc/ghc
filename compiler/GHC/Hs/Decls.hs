@@ -104,17 +104,17 @@ import GHC.Hs.Binds
 import GHC.Hs.Types
 import GHC.Hs.Doc
 import GHC.Core.TyCon
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.Coercion
-import ForeignCall
+import GHC.Types.ForeignCall
 import GHC.Hs.Extension
-import NameSet
+import GHC.Types.Name.Set
 
 -- others:
 import GHC.Core.Class
 import Outputable
 import Util
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Core.Type
 
 import Bag
@@ -438,7 +438,7 @@ Plan of attack:
    to ensure correct module and provenance is set
 
 These are the two places that we have to conjure up the magic derived
-names.  (The actual magic is in OccName.mkWorkerOcc, etc.)
+names.  (The actual magic is in GHC.Types.Name.Occurrence.mkWorkerOcc, etc.)
 
 Default methods
 ~~~~~~~~~~~~~~~
@@ -2241,7 +2241,7 @@ instance Outputable ForeignExport where
 -- | Located Rule Declarations
 type LRuleDecls pass = Located (RuleDecls pass)
 
-  -- Note [Pragma source text] in BasicTypes
+  -- Note [Pragma source text] in GHC.Types.Basic
 -- | Rule Declarations
 data RuleDecls pass = HsRules { rds_ext   :: XCRuleDecls pass
                               , rds_src   :: SourceText
@@ -2260,7 +2260,7 @@ data RuleDecl pass
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: Located (SourceText,RuleName)
-           -- ^ Note [Pragma source text] in BasicTypes
+           -- ^ Note [Pragma source text] in GHC.Types.Basic
        , rd_act  :: Activation
        , rd_tyvs :: Maybe [LHsTyVarBndr (NoGhcTc pass)]
            -- ^ Forall'd type vars
@@ -2387,7 +2387,7 @@ We use exported entities for things to deprecate.
 -- | Located Warning Declarations
 type LWarnDecls pass = Located (WarnDecls pass)
 
- -- Note [Pragma source text] in BasicTypes
+ -- Note [Pragma source text] in GHC.Types.Basic
 -- | Warning pragma Declarations
 data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
                                , wd_src      :: SourceText
@@ -2437,7 +2437,7 @@ type LAnnDecl pass = Located (AnnDecl pass)
 -- | Annotation Declaration
 data AnnDecl pass = HsAnnotation
                       (XHsAnnotation pass)
-                      SourceText -- Note [Pragma source text] in BasicTypes
+                      SourceText -- Note [Pragma source text] in GHC.Types.Basic
                       (AnnProvenance (IdP pass)) (Located (HsExpr pass))
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
       --           'ApiAnnotation.AnnType'

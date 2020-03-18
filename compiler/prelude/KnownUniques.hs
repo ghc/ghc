@@ -31,11 +31,11 @@ import GhcPrelude
 import TysWiredIn
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import Id
-import BasicTypes
+import GHC.Types.Id
+import GHC.Types.Basic
 import Outputable
-import Unique
-import Name
+import GHC.Types.Unique
+import GHC.Types.Name
 import Util
 
 import Data.Bits
@@ -65,7 +65,7 @@ knownUniqueName u =
 -- tag (used to identify the sum's TypeRep binding).
 --
 -- This layout is chosen to remain compatible with the usual unique allocation
--- for wired-in data constructors described in Unique.hs
+-- for wired-in data constructors described in GHC.Types.Unique
 --
 -- TyCon for sum of arity k:
 --   00000000 kkkkkkkk 11111100

@@ -54,7 +54,7 @@ import GHC.Cmm.Ppr.Decl
 import GHC.Cmm.Ppr.Expr
 import Util
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 

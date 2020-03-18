@@ -47,29 +47,29 @@ import GhcPrelude
 import GHC.Iface.Type
 import BinFingerprint
 import GHC.Core( IsOrphan, isOrphan )
-import Demand
-import Cpr
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Core.Class
-import FieldLabel
-import NameSet
+import GHC.Types.FieldLabel
+import GHC.Types.Name.Set
 import GHC.Core.Coercion.Axiom ( BranchIndex )
-import Name
-import CostCentre
-import Literal
-import ForeignCall
-import Annotations( AnnPayload, AnnTarget )
-import BasicTypes
+import GHC.Types.Name
+import GHC.Types.CostCentre
+import GHC.Types.Literal
+import GHC.Types.ForeignCall
+import GHC.Types.Annotations( AnnPayload, AnnTarget )
+import GHC.Types.Basic
 import Outputable
-import Module
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.SrcLoc
 import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import Var( VarBndr(..), binderVar )
+import GHC.Types.Var( VarBndr(..), binderVar )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
-import Lexeme (isLexSym)
+import GHC.Utils.Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
 import Util (seqList)
 
@@ -262,7 +262,7 @@ data IfaceConDecl
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
           -- or 1-1 corresp with arg tys
-          -- See Note [Bangs on imported data constructors] in MkId
+          -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
         ifConSrcStricts :: [IfaceSrcBang] } -- empty meaning no src stricts
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]

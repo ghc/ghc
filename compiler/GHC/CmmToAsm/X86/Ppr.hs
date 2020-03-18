@@ -36,12 +36,12 @@ import GHC.CmmToAsm.Ppr
 
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
+import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
 import GHC.Driver.Session
 import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import Unique           ( pprUniqueAlways )
+import GHC.Types.Unique ( pprUniqueAlways )
 import GHC.Platform
 import FastString
 import Outputable

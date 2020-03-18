@@ -10,10 +10,10 @@
 
 module GHC.Hs.Expr where
 
-import SrcLoc     ( Located )
+import GHC.Types.SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
-import BasicTypes ( SpliceExplicitFlag(..))
+import GHC.Types.Basic  ( SpliceExplicitFlag(..))
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 import Data.Kind  ( Type )
 

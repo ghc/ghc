@@ -17,16 +17,16 @@ import GhcPrelude
 
 import GHC.Driver.Session
 import GHC.Core.Op.WorkWrap.Lib ( findTypeShape )
-import Demand   -- All of it
+import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
 import Outputable
-import VarEnv
-import BasicTypes
+import GHC.Types.Var.Env
+import GHC.Types.Basic
 import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -37,7 +37,7 @@ import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import UniqSet
+import GHC.Types.Unique.Set
 
 {-
 ************************************************************************
@@ -136,7 +136,7 @@ dmdAnalStar env dmd e
   , (dmd_ty, e')    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
-    -- See Note [Analysing with absent demand] in Demand.hs
+    -- See Note [Analysing with absent demand] in GHC.Types.Demand
     (postProcessDmdType dmd_shell dmd_ty, e')
 
 -- Main Demand Analsysis machinery
@@ -389,7 +389,7 @@ Note [Demand on the scrutinee of a product case]
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in Demand.hs.
+see Note [Demand on case-alternative binders] in GHC.Types.Demand.
 This is crucial. Example:
    f x = case x of y { (a,b) -> k y a }
 If we just take scrut_demand = U(L,A), then we won't pass x to the
@@ -730,7 +730,7 @@ trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
 Because idArity of a function varies independently of its cardinality properties
 (cf. Note [idArity varies independently of dmdTypeDepth]), we implicitly encode
 the arity for when a demand signature is sound to unleash in its 'dmdTypeDepth'
-(cf. Note [Understanding DmdType and StrictSig] in Demand). It is unsound to
+(cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand). It is unsound to
 unleash a demand signature when the incoming number of arguments is less than
 that. See Note [What are demand signatures?] for more details on soundness.
 
@@ -777,7 +777,7 @@ reset or decrease arity. That's an unnecessary dependency, because
   * idArity is analysis information itself, thus volatile
   * We already *have* dmdTypeDepth, wo why not just use it to encode the
     threshold for when to unleash the signature
-    (cf. Note [Understanding DmdType and StrictSig] in Demand)
+    (cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand)
 
 Consider the following expression, for example:
 
@@ -1167,7 +1167,7 @@ findBndrsDmds env dmd_ty bndrs
       | otherwise = go dmd_ty bs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in Demand.hs
+-- See Note [Trimming a demand to a type] in GHC.Types.Demand
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where

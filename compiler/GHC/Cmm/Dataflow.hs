@@ -37,7 +37,7 @@ where
 import GhcPrelude
 
 import GHC.Cmm
-import UniqSupply
+import GHC.Types.Unique.Supply
 
 import Data.Array
 import Data.Maybe

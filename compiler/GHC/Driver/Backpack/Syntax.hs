@@ -20,9 +20,9 @@ import GhcPrelude
 
 import GHC.Driver.Phases
 import GHC.Hs
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import Module
+import GHC.Types.Module
 import UnitInfo
 
 {-

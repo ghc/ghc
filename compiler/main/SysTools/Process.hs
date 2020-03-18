@@ -18,7 +18,7 @@ import Outputable
 import Panic
 import GhcPrelude
 import Util
-import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
+import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 
 import Control.Concurrent
 import Data.Char

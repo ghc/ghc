@@ -3,7 +3,7 @@ module GHC.Rename.Splice where
 import GhcPrelude
 import GHC.Hs
 import TcRnMonad
-import NameSet
+import GHC.Types.Name.Set
 
 
 rnSpliceType :: HsSplice GhcPs   -> RnM (HsType GhcRn, FreeVars)

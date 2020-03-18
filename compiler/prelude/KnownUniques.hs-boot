@@ -1,9 +1,9 @@
 module KnownUniques where
 
 import GhcPrelude
-import Unique
-import Name
-import BasicTypes
+import GHC.Types.Unique
+import GHC.Types.Name
+import GHC.Types.Basic
 
 -- Needed by TysWiredIn
 knownUniqueName :: Unique -> Maybe Name

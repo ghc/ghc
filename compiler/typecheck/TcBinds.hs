@@ -21,7 +21,7 @@ import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import GHC.Core (Tickish (..))
-import CostCentre (mkUserCC, CCFlavour(DeclCC))
+import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import FastString
 import GHC.Hs
@@ -42,26 +42,26 @@ import TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
 import TysPrim
 import TysWiredIn( mkBoxedTupleTy )
-import Id
-import Var
-import VarSet
-import VarEnv( TidyEnv )
-import Module
-import Name
-import NameSet
-import NameEnv
-import SrcLoc
+import GHC.Types.Id
+import GHC.Types.Var as Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env( TidyEnv )
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.SrcLoc
 import Bag
 import ErrUtils
 import Digraph
 import Maybes
 import Util
-import BasicTypes
+import GHC.Types.Basic
 import Outputable
 import PrelNames( ipClassName )
 import TcValidity (checkValidType)
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.ConLike
 

@@ -3,10 +3,10 @@ module GHC.CoreToIface where
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, TyLit, Coercion )
 import {-# SOURCE #-} GHC.Iface.Type( IfaceType, IfaceTyCon, IfaceForAllBndr
                                     , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
-import Var ( TyCoVarBinder )
-import VarEnv ( TidyEnv )
+import GHC.Types.Var ( TyCoVarBinder )
+import GHC.Types.Var.Env ( TidyEnv )
 import GHC.Core.TyCon ( TyCon )
-import VarSet( VarSet )
+import GHC.Types.Var.Set( VarSet )
 
 -- For GHC.Core.TyCo.Rep
 toIfaceTypeX :: VarSet -> Type -> IfaceType

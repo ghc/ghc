@@ -17,8 +17,8 @@ import GHC.Platform.Regs
 
 import GHC.Platform
 import GHC.Driver.Session
-import Unique
-import UniqFM
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
 
 import qualified Data.IntSet as IntSet
 import Data.List (partition)

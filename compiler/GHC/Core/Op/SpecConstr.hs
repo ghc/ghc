@@ -29,7 +29,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
 import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Op.Monad
-import Literal          ( litIsLifted )
+import GHC.Types.Literal ( litIsLifted )
 import GHC.Driver.Types ( ModGuts(..) )
 import GHC.Core.Op.WorkWrap.Lib ( isWorkerSmallEnough, mkWorkerArgs )
 import GHC.Core.DataCon
@@ -37,30 +37,30 @@ import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCon   ( tyConName )
-import Id
+import GHC.Types.Id
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
-import VarEnv
-import VarSet
-import Name
-import BasicTypes
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name
+import GHC.Types.Basic
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
-import Demand
-import Cpr
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Serialized   ( deserializeWithData )
 import Util
 import Pair
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Outputable
 import FastString
-import UniqFM
+import GHC.Types.Unique.FM
 import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
 import PrelNames        ( specTyConName )
-import Module
+import GHC.Types.Module
 import GHC.Core.TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
@@ -2084,7 +2084,7 @@ callToPats env bndr_occs call@(Call _ args con_env)
                 -- lambdas with different argument orders. See
                 -- determinism/simplCore/should_compile/spec-inline-determ.hs
                 -- for an example. For explanation of determinism
-                -- considerations See Note [Unique Determinism] in Unique.
+                -- considerations See Note [Unique Determinism] in GHC.Types.Unique.
 
               in_scope_vars = getInScopeVars in_scope
               is_in_scope v = v `elemVarSet` in_scope_vars

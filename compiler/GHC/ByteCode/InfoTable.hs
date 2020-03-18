@@ -15,8 +15,8 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHC.Driver.Session
 import GHC.Driver.Types
-import Name             ( Name, getName )
-import NameEnv
+import GHC.Types.Name       ( Name, getName )
+import GHC.Types.Name.Env
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
 import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import GHC.Types.RepType

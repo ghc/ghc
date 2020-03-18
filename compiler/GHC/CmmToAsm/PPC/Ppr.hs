@@ -30,7 +30,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
-import Unique                ( pprUniqueAlways, getUnique )
+import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable

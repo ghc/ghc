@@ -234,14 +234,14 @@ import GHC.Cmm.Monad
 import GHC.Runtime.Heap.Layout
 import Lexer
 
-import CostCentre
-import ForeignCall
-import Module
+import GHC.Types.CostCentre
+import GHC.Types.ForeignCall
+import GHC.Types.Module
 import GHC.Platform
-import Literal
-import Unique
-import UniqFM
-import SrcLoc
+import GHC.Types.Literal
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import ErrUtils
 import StringBuffer
@@ -249,9 +249,9 @@ import FastString
 import Panic
 import Constants
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 import Bag              ( emptyBag, unitBag )
-import Var
+import GHC.Types.Var
 
 import Control.Monad
 import Data.Array

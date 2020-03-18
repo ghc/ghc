@@ -104,7 +104,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Class
-import Var
+import GHC.Types.Var
 import GHC.Core.Predicate
 import TcOrigin
 
@@ -112,23 +112,23 @@ import TcOrigin
 import TcRnMonad        -- TcType, amongst others
 import Constraint
 import TcEvidence
-import Id
-import Name
-import VarSet
+import GHC.Types.Id as Id
+import GHC.Types.Name
+import GHC.Types.Var.Set
 import TysWiredIn
 import TysPrim
-import VarEnv
-import NameEnv
+import GHC.Types.Var.Env
+import GHC.Types.Name.Env
 import PrelNames
 import Util
 import Outputable
 import FastString
 import Bag
 import Pair
-import UniqSet
+import GHC.Types.Unique.Set
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
-import BasicTypes ( TypeOrKind(..) )
+import GHC.Types.Basic ( TypeOrKind(..) )
 
 import Control.Monad
 import Maybes
@@ -1110,7 +1110,7 @@ Note [CandidatesQTvs determinism and order]
 
   To achieve that we use deterministic sets of variables that can be
   converted to lists in a deterministic order. For more information
-  about deterministic sets see Note [Deterministic UniqFM] in UniqDFM.
+  about deterministic sets see Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 
 * Order: as well as being deterministic, we use an
   accumulating-parameter style for candidateQTyVarsOfType so that we
@@ -1549,7 +1549,7 @@ To achieve this CandidatesQTvs is backed by deterministic sets which allows them
 to be later converted to a list in a deterministic order.
 
 For more information about deterministic sets see
-Note [Deterministic UniqFM] in UniqDFM.
+Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
 quantifyTyVars

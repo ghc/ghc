@@ -23,9 +23,9 @@ import GhcPrelude
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
-import Name hiding (varName)
-import Var
-import VarEnv
+import GHC.Types.Name hiding (varName)
+import GHC.Types.Var
+import GHC.Types.Var.Env
 import Util (seqList)
 
 import Data.List (mapAccumL)
@@ -59,7 +59,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
 
 avoidNameClashes :: [TyCoVar] -> TidyEnv -> TidyEnv
 -- Seed the occ_env with clashes among the names, see
--- Note [Tidying multiple names at once] in OccName
+-- Note [Tidying multiple names at once] in GHC.Types.Names.OccName
 avoidNameClashes tvs (occ_env, subst)
   = (avoidClashesOccEnv occ_env occs, subst)
   where

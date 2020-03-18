@@ -31,7 +31,7 @@ module GHC.Core.Rules (
 import GhcPrelude
 
 import GHC.Core         -- All of it
-import Module           ( Module, ModuleSet, elemModuleSet )
+import GHC.Types.Module   ( Module, ModuleSet, elemModuleSet )
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs     ( exprFreeVars, exprsFreeVars, bindFreeVars
@@ -47,18 +47,19 @@ import TcType           ( tcSplitTyConApp_maybe )
 import TysWiredIn       ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Op.Tidy ( tidyRules )
-import Id
-import IdInfo           ( RuleInfo( RuleInfo ) )
-import Var
-import VarEnv
-import VarSet
-import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
-import NameSet
-import NameEnv
-import UniqFM
+import GHC.Types.Id
+import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom )
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Unique.FM
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
-import BasicTypes
-import GHC.Driver.Session hiding (ruleCheck)
+import GHC.Types.Basic
+import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform )
+import GHC.Driver.Flags
 import Outputable
 import FastString
 import Maybes

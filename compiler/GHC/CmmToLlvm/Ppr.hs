@@ -20,7 +20,7 @@ import GHC.Cmm
 
 import FastString
 import Outputable
-import Unique
+import GHC.Types.Unique
 
 -- ----------------------------------------------------------------------------
 -- * Top level

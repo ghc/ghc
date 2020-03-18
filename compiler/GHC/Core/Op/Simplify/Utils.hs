@@ -51,17 +51,17 @@ import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.Unfold
-import Name
-import Id
-import IdInfo
-import Var
-import Demand
+import GHC.Types.Name
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Var
+import GHC.Types.Demand
 import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
-import VarSet
-import BasicTypes
+import GHC.Types.Var.Set
+import GHC.Types.Basic
 import Util
 import OrdList          ( isNilOL )
 import MonadUtils
@@ -1801,9 +1801,9 @@ abstractFloats dflags top_lvl main_tvs floats body
     mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
     mk_poly1 tvs_here var
       = do { uniq <- getUniqueM
-           ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
+           ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
                   poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
-                  poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
+                  poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                               mkLocalId poly_name poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,

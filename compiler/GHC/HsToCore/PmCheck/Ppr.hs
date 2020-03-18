@@ -12,10 +12,10 @@ module GHC.HsToCore.PmCheck.Ppr (
 
 import GhcPrelude
 
-import BasicTypes
-import Id
-import VarEnv
-import UniqDFM
+import GHC.Types.Basic
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.DFM
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import TysWiredIn

@@ -115,20 +115,20 @@ module GHC.Cmm.CLabel (
 
 import GhcPrelude
 
-import IdInfo
-import BasicTypes
+import GHC.Types.Id.Info
+import GHC.Types.Basic
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Driver.Packages
-import Module
-import Name
-import Unique
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Unique
 import PrimOp
-import CostCentre
+import GHC.Types.CostCentre
 import Outputable
 import FastString
 import GHC.Driver.Session
 import GHC.Platform
-import UniqSet
+import GHC.Types.Unique.Set
 import Util
 import GHC.Core.Ppr ( {- instances -} )
 

@@ -34,17 +34,17 @@ import GHC.Driver.Session
 import ErrUtils
 
 import GHC.Driver.Types
-import CostCentre
-import Id
-import IdInfo
+import GHC.Types.CostCentre
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import Module
+import GHC.Types.Module
 import Outputable
 import Stream
-import BasicTypes
-import VarSet ( isEmptyDVarSet )
+import GHC.Types.Basic
+import GHC.Types.Var.Set ( isEmptyDVarSet )
 
 import OrdList
 import GHC.Cmm.Graph

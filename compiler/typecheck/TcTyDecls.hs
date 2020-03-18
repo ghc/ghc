@@ -48,25 +48,25 @@ import GHC.Driver.Types
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import Name
-import NameEnv
-import NameSet hiding (unitFV)
-import RdrName ( mkVarUnqual )
-import Id
-import IdInfo
-import VarEnv
-import VarSet
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set hiding (unitFV)
+import GHC.Types.Name.Reader ( mkVarUnqual )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Core.Coercion ( ltRole )
-import BasicTypes
-import SrcLoc
-import Unique ( mkBuiltinUnique )
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.Unique ( mkBuiltinUnique )
 import Outputable
 import Util
 import Maybes
 import Bag
 import FastString
 import FV
-import Module
+import GHC.Types.Module
 
 import Control.Monad
 

@@ -28,12 +28,12 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
-import Var
-import Name
-import BasicTypes
-import Unique
+import GHC.Types.Var
+import GHC.Types.Name
+import GHC.Types.Basic
+import GHC.Types.Unique
 import Util
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import BooleanFormula (BooleanFormula, mkTrue)
 

@@ -26,12 +26,12 @@ import TcEvidence
 import TcType
 import GHC.Core.Type
 import GHC.Core.DataCon
-import Name
-import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
+import GHC.Types.Name
+import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
 import PrelNames ( gHC_ERR )
-import Id
-import VarSet
-import VarEnv
+import GHC.Types.Id
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Bag
 import GHC.Core.ConLike ( ConLike(..) )
 import Util

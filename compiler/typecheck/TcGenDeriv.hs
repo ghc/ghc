@@ -43,10 +43,10 @@ import GhcPrelude
 
 import TcRnMonad
 import GHC.Hs
-import RdrName
-import BasicTypes
+import GHC.Types.Name.Reader
+import GHC.Types.Basic
 import GHC.Core.DataCon
-import Name
+import GHC.Types.Name
 import Fingerprint
 import Encoding
 
@@ -56,9 +56,9 @@ import FamInst
 import GHC.Core.FamInstEnv
 import PrelNames
 import THNames
-import MkId ( coerceId )
+import GHC.Types.Id.Make ( coerceId )
 import PrimOp
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import TcEnv
 import TcType
@@ -68,12 +68,12 @@ import TysPrim
 import TysWiredIn
 import GHC.Core.Type
 import GHC.Core.Class
-import VarSet
-import VarEnv
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Util
-import Var
+import GHC.Types.Var
 import Outputable
-import Lexeme
+import GHC.Utils.Lexeme
 import FastString
 import Pair
 import Bag

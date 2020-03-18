@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Data.List
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Session

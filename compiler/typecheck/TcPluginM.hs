@@ -69,10 +69,10 @@ import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )
-import Var        ( EvVar )
+import GHC.Types.Var        ( EvVar )
 
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Class
@@ -80,10 +80,10 @@ import GHC.Driver.Types
 import Outputable
 import GHC.Core.Type
 import GHC.Core.Coercion   ( BlockSubstFlag(..) )
-import Id
+import GHC.Types.Id
 import GHC.Core.InstEnv
 import FastString
-import Unique
+import GHC.Types.Unique
 
 
 -- | Perform some IO, typically to interact with an external tool.

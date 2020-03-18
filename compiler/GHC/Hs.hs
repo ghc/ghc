@@ -45,15 +45,15 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Pat
 import GHC.Hs.Types
-import BasicTypes       ( Fixity, WarningTxt )
+import GHC.Types.Basic ( Fixity, WarningTxt )
 import GHC.Hs.Utils
 import GHC.Hs.Doc
 import GHC.Hs.Instances () -- For Data instances
 
 -- others:
 import Outputable
-import SrcLoc
-import Module           ( ModuleName )
+import GHC.Types.SrcLoc
+import GHC.Types.Module ( ModuleName )
 
 -- libraries:
 import Data.Data hiding ( Fixity )

@@ -57,7 +57,7 @@ import GHC.CmmToAsm.Format
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
-import Unique
+import GHC.Types.Unique
 
 import GHC.Platform.Regs
 import Outputable

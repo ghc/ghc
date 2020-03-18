@@ -16,7 +16,7 @@ module TcDerivInfer (inferConstraints, simplifyInstanceContexts) where
 import GhcPrelude
 
 import Bag
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
 import ErrUtils
@@ -44,8 +44,8 @@ import TcUnify (buildImplicationFor, checkConstraints)
 import TysWiredIn (typeToTypeKind)
 import GHC.Core.Unify (tcUnifyTy)
 import Util
-import Var
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Set
 
 import Control.Monad
 import Control.Monad.Trans.Class  (lift)

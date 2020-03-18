@@ -11,10 +11,10 @@ import Data.Data
 import Data.List (intercalate)
 import System.IO
 import GHC
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import MonadUtils
 import Outputable
 import GHC.Hs.Decls

@@ -27,13 +27,13 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import Outputable hiding (panic, pprPanic)
 import qualified Outputable
 import GHC.Platform
 import OrdList
-import UniqSupply
-import Unique
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
 import Util
 
 import Control.Monad.Trans.Class

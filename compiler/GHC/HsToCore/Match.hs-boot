@@ -1,10 +1,10 @@
 module GHC.HsToCore.Match where
 
 import GhcPrelude
-import Var      ( Id )
+import GHC.Types.Var ( Id )
 import TcType   ( Type )
-import GHC.HsToCore.Monad  ( DsM, EquationInfo, MatchResult )
-import GHC.Core  ( CoreExpr )
+import GHC.HsToCore.Monad ( DsM, EquationInfo, MatchResult )
+import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import GHC.Hs.Extension ( GhcRn, GhcTc )
 

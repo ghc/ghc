@@ -32,7 +32,7 @@ import Util
 import Outputable
 import Panic
 import Bag
-import SrcLoc
+import GHC.Types.SrcLoc
 import Json
 
 import Data.Function

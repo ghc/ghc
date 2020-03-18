@@ -15,8 +15,8 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
 import TysWiredIn       ( unitDataConId )
-import Id
-import VarEnv
+import GHC.Types.Id
+import GHC.Types.Var.Env
 import Util             ( notNull )
 
 {-

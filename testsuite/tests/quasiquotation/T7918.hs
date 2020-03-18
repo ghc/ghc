@@ -5,9 +5,9 @@ import GHC
 import GHC.Driver.Session
 import Outputable
 import MonadUtils
-import NameSet
-import Var
-import SrcLoc
+import GHC.Types.Name.Set
+import GHC.Types.Var
+import GHC.Types.SrcLoc as SrcLoc
 
 import Data.Data
 

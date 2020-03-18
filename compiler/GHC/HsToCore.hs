@@ -27,12 +27,12 @@ import GHC.Hs
 import TcRnTypes
 import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )
-import Id
-import IdInfo
-import Name
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCon     ( tyConDataCons )
-import Avail
+import GHC.Types.Avail
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
@@ -49,18 +49,18 @@ import GHC.Core.Coercion
 import TysWiredIn
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
-import Module
-import NameSet
-import NameEnv
+import GHC.Types.Module
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
 import GHC.Core.Rules
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core.Op.Monad ( CoreToDo(..) )
 import GHC.Core.Lint     ( endPassIO )
-import VarSet
+import GHC.Types.Var.Set
 import FastString
 import ErrUtils
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.HsToCore.Coverage
 import Util
 import MonadUtils
@@ -560,7 +560,7 @@ Note [Patching magic definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to have access to defined Ids in pure contexts. Usually, we
 simply "wire in" these entities, as we do for types in TysWiredIn and for Ids
-in MkId. See Note [Wired-in Ids] in MkId.
+in GHC.Types.Id.Make. See Note [Wired-in Ids] in GHC.Types.Id.Make.
 
 However, it is sometimes *much* easier to define entities in Haskell,
 even if we need pure access; note that wiring-in an Id requires all

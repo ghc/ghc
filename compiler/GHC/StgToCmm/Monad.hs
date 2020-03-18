@@ -70,13 +70,13 @@ import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
-import Module
-import Id
-import VarEnv
+import GHC.Types.Module
+import GHC.Types.Id
+import GHC.Types.Var.Env
 import OrdList
-import BasicTypes( ConTagZ )
-import Unique
-import UniqSupply
+import GHC.Types.Basic( ConTagZ )
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 import FastString
 import Outputable
 import Util

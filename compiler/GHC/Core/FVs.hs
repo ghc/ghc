@@ -62,14 +62,14 @@ module GHC.Core.FVs (
 import GhcPrelude
 
 import GHC.Core
-import Id
-import IdInfo
-import NameSet
-import UniqSet
-import Unique (Uniquable (..))
-import Name
-import VarSet
-import Var
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name.Set
+import GHC.Types.Unique.Set
+import GHC.Types.Unique (Uniquable (..))
+import GHC.Types.Name
+import GHC.Types.Var.Set
+import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -79,7 +79,7 @@ import GHC.Core.FamInstEnv
 import TysPrim( funTyConName )
 import Maybes( orElse )
 import Util
-import BasicTypes( Activation )
+import GHC.Types.Basic( Activation )
 import Outputable
 import FV
 

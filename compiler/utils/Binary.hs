@@ -64,14 +64,14 @@ module Binary
 
 import GhcPrelude
 
-import {-# SOURCE #-} Name (Name)
+import {-# SOURCE #-} GHC.Types.Name (Name)
 import FastString
 import PlainPanic
-import UniqFM
+import GHC.Types.Unique.FM
 import FastMutInt
 import Fingerprint
-import BasicTypes
-import SrcLoc
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
 
 import Foreign
 import Data.Array

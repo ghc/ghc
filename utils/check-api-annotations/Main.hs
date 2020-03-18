@@ -6,7 +6,7 @@ import GHC
 import GHC.Driver.Session
 import Outputable
 import ApiAnnotation
-import SrcLoc
+import GHC.Types.SrcLoc
 import System.Environment( getArgs )
 import System.Exit
 import qualified Data.Map as Map

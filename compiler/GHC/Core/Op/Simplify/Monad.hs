@@ -22,14 +22,14 @@ module GHC.Core.Op.Simplify.Monad (
 
 import GhcPrelude
 
-import Var              ( Var, isId, mkLocalVar )
-import Name             ( mkSystemVarName )
-import Id               ( Id, mkSysLocalOrCoVar )
-import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
+import GHC.Types.Var       ( Var, isId, mkLocalVar )
+import GHC.Types.Name      ( mkSystemVarName )
+import GHC.Types.Id        ( Id, mkSysLocalOrCoVar )
+import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import GHC.Core.Type       ( Type, mkLamTypes )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core            ( RuleEnv(..) )
-import UniqSupply
+import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Core.Op.Monad
 import Outputable
@@ -38,7 +38,7 @@ import MonadUtils
 import ErrUtils as Err
 import Util                ( count )
 import Panic               (throwGhcExceptionIO, GhcException (..))
-import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
+import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
 
 {-

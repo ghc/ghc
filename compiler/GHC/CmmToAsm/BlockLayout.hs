@@ -27,9 +27,9 @@ import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
 import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
-import UniqFM
+import GHC.Types.Unique.FM
 import Util
-import Unique
+import GHC.Types.Unique
 
 import Digraph
 import Outputable
