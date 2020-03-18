@@ -19,7 +19,7 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import Avail
+import GHC.Types.Avail
 import Control.Arrow
 import Control.Monad
 import Data.List
@@ -31,9 +31,9 @@ import GHC
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
-import Name
+import GHC.Types.Name
 import Outputable ( showPpr, showSDoc )
-import RdrName
+import GHC.Types.Name.RdrName
 import EnumSet
 import GHC.Rename.Env (dataTcOccs)
 

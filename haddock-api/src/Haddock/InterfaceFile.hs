@@ -38,12 +38,12 @@ import FastString
 import GHC hiding (NoLink)
 import GHC.Driver.Monad (withSession)
 import GHC.Driver.Types
-import NameCache
+import GHC.Types.Name.Cache
 import GHC.Iface.Env
-import Name
-import UniqFM
-import UniqSupply
-import Unique
+import GHC.Types.Name
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
 
 
 data InterfaceFile = InterfaceFile {

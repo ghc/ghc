@@ -21,9 +21,9 @@ import Haddock.Types
 
 import Bag (emptyBag)
 import GHC hiding (NoLink)
-import Name
+import GHC.Types.Name
 import Outputable ( panic )
-import RdrName (RdrName(Exact))
+import GHC.Types.Name.RdrName (RdrName(Exact))
 import TysWiredIn (eqTyCon_RDR)
 
 import Control.Applicative

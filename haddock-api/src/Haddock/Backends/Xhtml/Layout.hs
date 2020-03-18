@@ -51,7 +51,7 @@ import Data.Maybe (fromMaybe)
 
 import FastString            ( unpackFS )
 import GHC
-import Name (nameOccName)
+import GHC.Types.Name (nameOccName)
 
 --------------------------------------------------------------------------------
 -- * Sections of the document

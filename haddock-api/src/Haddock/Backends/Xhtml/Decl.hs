@@ -34,12 +34,12 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
-import BasicTypes (PromotionFlag(..), isPromoted)
+import GHC.Types.Basic (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..))
 import GHC.Exts
-import Name
+import GHC.Types.Name
 import BooleanFormula
-import RdrName ( rdrNameOcc )
+import GHC.Types.Name.RdrName ( rdrNameOcc )
 import Outputable ( panic )
 
 -- | Pretty print a declaration

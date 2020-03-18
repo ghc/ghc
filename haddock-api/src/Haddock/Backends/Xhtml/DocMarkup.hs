@@ -32,7 +32,7 @@ import Text.XHtml hiding ( name, p, quote )
 import Data.Maybe (fromMaybe)
 
 import GHC
-import Name
+import GHC.Types.Name
 
 
 parHtmlMarkup :: Qualification -> Bool

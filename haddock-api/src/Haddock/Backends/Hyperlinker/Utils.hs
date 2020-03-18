@@ -20,9 +20,9 @@ import Haddock.Backends.Xhtml.Utils
 import GHC
 import GHC.Iface.Ext.Types ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, HieTypeFlat )
 import GHC.Iface.Type
-import Name         ( getOccFS, getOccString )
-import Outputable   ( showSDoc )
-import Var          ( VarBndr(..) )
+import GHC.Types.Name      ( getOccFS, getOccString )
+import Outputable          ( showSDoc )
+import GHC.Types.Var       ( VarBndr(..) )
 
 import System.FilePath.Posix ((</>), (<.>))
 

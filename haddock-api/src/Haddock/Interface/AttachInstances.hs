@@ -34,16 +34,16 @@ import ErrUtils
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
-import Module ( ModuleSet, moduleSetElts )
+import GHC.Types.Module ( ModuleSet, moduleSetElts )
 import MonadUtils (liftIO)
-import Name
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import Outputable (text, sep, (<+>))
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import TysPrim( funTyConName )
-import Var hiding (varName)
+import GHC.Types.Var hiding (varName)
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module

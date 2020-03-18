@@ -71,7 +71,7 @@ import GHC.Driver.Session hiding (projectVersion, verbosity)
 import ErrUtils
 import GHC.Driver.Packages
 import Panic (handleGhcException)
-import Module
+import GHC.Types.Module
 import FastString
 import qualified GHC.Runtime.Loader
 
