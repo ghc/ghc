@@ -35,6 +35,7 @@ import GHC.Stg.Syntax
 import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
+import GHC.Cmm.Utils ( zeroExpr, cmmTagMask )
 import GHC.Cmm.Info
 import GHC.Core
 import DataCon
@@ -69,14 +70,43 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
 -- dataToTag# :: a -> Int#
--- See Note [dataToTag#] in primops.txt.pp
+-- See Note [dataToTag# magic] in PrelRules.
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   dflags <- getDynFlags
   emitComment (mkFastString "dataToTag#")
-  tmp <- newTemp (bWord dflags)
-  _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-  -- TODO: For small types look at the tag bits instead of reading info table
-  emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
+  info <- getCgIdInfo a
+  tag_reg <- assignTemp $ cmmConstrTag1 dflags (idInfoToAmode info)
+  result_reg <- newTemp (bWord dflags)
+  let tag = CmmReg $ CmmLocal tag_reg
+  -- Here we will first check the tag bits of the pointer we were given;
+  -- if this doesn't work then enter the closure and use the info table
+  -- to determine the constructor. Note that all tag bits set means that
+  -- the constructor index is too large to fit in the pointer and therefore
+  -- we must look in the info table. See Note [Tagging big families].
+
+  slow_path <- getCode $ do
+      tmp <- newTemp (bWord dflags)
+      _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+      -- TODO: For small types look at the tag bits instead of reading info table
+      emitAssign (CmmLocal result_reg)
+        $ getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))
+
+  fast_path <- getCode $ do
+      emitAssign (CmmLocal result_reg)
+        $ cmmSubWord dflags tag (CmmLit $ mkWordCLit dflags 1)
+
+  let zero = zeroExpr dflags
+      too_big_tag = cmmTagMask dflags
+      is_tagged =
+        cmmNeWord dflags
+          (cmmOrWord dflags
+            (cmmEqWord dflags tag zero)         -- not evaluated
+            (cmmEqWord dflags tag too_big_tag)) -- tag too big
+          zero
+
+  emit =<< mkCmmIfThenElse' is_tagged slow_path fast_path (Just False)
+  emitReturn [CmmReg $ CmmLocal result_reg]
+
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
