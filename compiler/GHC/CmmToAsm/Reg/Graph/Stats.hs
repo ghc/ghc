@@ -30,8 +30,8 @@ import GHC.CmmToAsm.Reg.Target
 import GHC.Platform
 
 import Outputable
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import State
 
 -- | Holds interesting statistics from the register allocator.

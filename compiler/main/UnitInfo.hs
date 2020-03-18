@@ -37,8 +37,8 @@ import Data.Version
 
 import FastString
 import Outputable
-import Module
-import Unique
+import GHC.Types.Module as Module
+import GHC.Types.Unique
 
 -- -----------------------------------------------------------------------------
 -- Our UnitInfo type is the InstalledPackageInfo from ghc-boot,

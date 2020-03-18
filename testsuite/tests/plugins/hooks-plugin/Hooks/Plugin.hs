@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module Hooks.Plugin (plugin) where
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Plugins
 import GHC.Hs.Expr
 import GHC.Hs.Extension

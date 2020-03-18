@@ -26,27 +26,27 @@ import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.TyCon
-import MkId             ( coercionTokenId )
-import Id
-import IdInfo
+import GHC.Types.Id.Make ( coercionTokenId )
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.DataCon
-import CostCentre
-import VarEnv
-import Module
-import Name             ( isExternalName, nameModule_maybe )
-import BasicTypes       ( Arity )
+import GHC.Types.CostCentre
+import GHC.Types.Var.Env
+import GHC.Types.Module
+import GHC.Types.Name   ( isExternalName, nameModule_maybe )
+import GHC.Types.Basic  ( Arity )
 import TysWiredIn       ( unboxedUnitDataCon, unitDataConId )
-import Literal
+import GHC.Types.Literal
 import Outputable
 import MonadUtils
 import FastString
 import Util
 import GHC.Driver.Session
 import GHC.Driver.Ways
-import ForeignCall
-import Demand           ( isUsedOnce )
+import GHC.Types.ForeignCall
+import GHC.Types.Demand ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
-import SrcLoc           ( mkGeneralSrcSpan )
+import GHC.Types.SrcLoc ( mkGeneralSrcSpan )
 import PrelNames        ( unsafeEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)

@@ -51,7 +51,7 @@ import GHC.Cmm.CLabel
 import GHC.CmmToAsm.CPrim
 
 -- The rest:
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import FastString
 import OrdList
