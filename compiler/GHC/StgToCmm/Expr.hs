@@ -35,6 +35,7 @@ import GHC.Stg.Syntax
 import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
+import GHC.Cmm.Utils ( zeroExpr )
 import GHC.Cmm.Info
 import GHC.Core
 import DataCon
@@ -73,10 +74,26 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   dflags <- getDynFlags
   emitComment (mkFastString "dataToTag#")
-  tmp <- newTemp (bWord dflags)
-  _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-  -- TODO: For small types look at the tag bits instead of reading info table
-  emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
+  info <- getCgIdInfo a
+  tag_reg <- assignTemp $ cmmConstrTag1 dflags (idInfoToAmode info)
+  result_reg <- newTemp (bWord dflags)
+  let tag = CmmReg $ CmmLocal tag_reg
+
+  slow_path <- getCode $ do
+      tmp <- newTemp (bWord dflags)
+      _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+      -- TODO: For small types look at the tag bits instead of reading info table
+      emitAssign (CmmLocal result_reg)
+        $ getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))
+
+  fast_path <- getCode $ do
+      emitAssign (CmmLocal result_reg) 
+        $ cmmSubWord dflags tag (CmmLit $ mkWordCLit dflags 1)
+
+  let zero = zeroExpr dflags
+  emit =<< mkCmmIfThenElse' (cmmEqWord dflags tag zero) slow_path fast_path (Just False)
+  emitReturn [CmmReg $ CmmLocal result_reg]
+
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
