@@ -158,6 +158,10 @@ utf8DecodeStringLazy fp offset (I# len#)
   = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
       let !(Ptr a#) = ptr `plusPtr` offset in
       utf8DecodeLazy# (touchForeignPtr fp) (utf8DecodeCharAddr# a#) len#
+-- Note that since utf8DecodeLazy# returns a thunk the lifetime of the
+-- ForeignPtr actually needs to be longer than the lexical lifetime
+-- withForeignPtr would provide here. That's why we use touchForeignPtr to
+-- keep the fp alive until the last character has actually been decoded.
 
 utf8DecodeShortByteString :: ShortByteString -> [Char]
 utf8DecodeShortByteString (SBS ba#)
