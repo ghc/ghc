@@ -35,7 +35,7 @@ module GHC.Driver.Finder (
 
 import GhcPrelude
 
-import Module
+import GHC.Types.Module
 import GHC.Driver.Types
 import GHC.Driver.Packages
 import FastString

@@ -57,24 +57,24 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import Id
-import Var
-import VarEnv
-import VarSet
-import Module
-import Name
-import NameSet
-import NameEnv
+import GHC.Types.Id
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
 import Outputable
 import Maybes
 import GHC.Core.Unify
 import Util
-import SrcLoc
+import GHC.Types.SrcLoc
 import ListSetOps
 import GHC.Driver.Session
-import Unique
+import GHC.Types.Unique
 import GHC.Core.ConLike( ConLike(..) )
-import BasicTypes
+import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

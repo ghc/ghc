@@ -36,15 +36,15 @@ import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import Outputable
 import FastString
-import Name
-import Unique
-import Var
+import GHC.Types.Name
+import GHC.Types.Unique
+import GHC.Types.Var
 import Util
 import Binary
 import Pair
-import BasicTypes
+import GHC.Types.Basic
 import Data.Typeable ( Typeable )
-import SrcLoc
+import GHC.Types.SrcLoc
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )

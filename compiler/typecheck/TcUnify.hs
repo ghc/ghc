@@ -55,17 +55,17 @@ import TcEvidence
 import Constraint
 import GHC.Core.Predicate
 import TcOrigin
-import Name( isSystemName )
+import GHC.Types.Name( isSystemName )
 import Inst
 import GHC.Core.TyCon
 import TysWiredIn
 import TysPrim( tYPE )
-import Var
-import VarSet
-import VarEnv
+import GHC.Types.Var as Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import ErrUtils
 import GHC.Driver.Session
-import BasicTypes
+import GHC.Types.Basic
 import Bag
 import Util
 import qualified GHC.LanguageExtensions as LangExt

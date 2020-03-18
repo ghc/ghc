@@ -24,9 +24,9 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import Digraph
 import Outputable
-import Unique
-import UniqFM
-import UniqSet
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.

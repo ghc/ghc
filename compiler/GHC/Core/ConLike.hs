@@ -31,12 +31,12 @@ import GhcPrelude
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import Outputable
-import Unique
+import GHC.Types.Unique
 import Util
-import Name
-import BasicTypes
+import GHC.Types.Name
+import GHC.Types.Basic
 import GHC.Core.TyCo.Rep (Type, ThetaType)
-import Var
+import GHC.Types.Var
 import GHC.Core.Type(mkTyConApp)
 
 import qualified Data.Data as Data
@@ -69,7 +69,7 @@ eqConLike x y = getUnique x == getUnique y
 
 -- There used to be an Ord ConLike instance here that used Unique for ordering.
 -- It was intentionally removed to prevent determinism problems.
--- See Note [Unique Determinism] in Unique.
+-- See Note [Unique Determinism] in GHC.Types.Unique.
 
 instance Uniquable ConLike where
     getUnique (RealDataCon dc) = getUnique dc

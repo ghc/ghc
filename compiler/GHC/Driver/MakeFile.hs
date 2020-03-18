@@ -24,12 +24,12 @@ import GHC.Driver.Ways
 import Util
 import GHC.Driver.Types
 import qualified SysTools
-import Module
+import GHC.Types.Module
 import Digraph          ( SCC(..) )
 import GHC.Driver.Finder
 import Outputable
 import Panic
-import SrcLoc
+import GHC.Types.SrcLoc
 import Data.List
 import FastString
 import FileCleanup

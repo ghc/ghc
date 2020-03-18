@@ -15,7 +15,7 @@ import GHC.Core.Type
 import TcRnMonad
 import TcType
 import Control.Applicative
-import Name (getOccString)
+import GHC.Types.Name (getOccString)
 import Unsafe.Coerce
 import Control.Monad
 import Data.Maybe
