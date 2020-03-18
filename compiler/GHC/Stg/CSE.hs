@@ -89,15 +89,15 @@ module GHC.Stg.CSE (stgCse) where
 import GhcPrelude
 
 import GHC.Core.DataCon
-import Id
+import GHC.Types.Id
 import GHC.Stg.Syntax
 import Outputable
-import VarEnv
+import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe)
 import GHC.Core.Map
-import NameEnv
+import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
 
 --------------

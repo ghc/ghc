@@ -28,7 +28,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
 import GHC.Core.Type ( Type )
 import Util
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
 import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )

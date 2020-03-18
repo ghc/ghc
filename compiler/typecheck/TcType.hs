@@ -198,9 +198,9 @@ import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Class
-import Var
-import ForeignCall
-import VarSet
+import GHC.Types.Var
+import GHC.Types.ForeignCall
+import GHC.Types.Var.Set
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
@@ -210,15 +210,15 @@ import GHC.Core.TyCon
 -- others:
 import GHC.Driver.Session
 import GHC.Core.FVs
-import Name -- hiding (varName)
+import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
-import NameSet
-import VarEnv
+import GHC.Types.Name.Set
+import GHC.Types.Var.Env
 import PrelNames
 import TysWiredIn( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
-import BasicTypes
+import GHC.Types.Basic
 import Util
 import Maybes
 import ListSetOps ( getNth, findDupsEq )

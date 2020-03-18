@@ -15,7 +15,7 @@ import GhcPrelude
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
 
-import UniqSupply       ( mkSplitUniqSupply )
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import GHC.Driver.Finder    ( mkStubPaths )
 import GHC.CmmToC           ( writeC )
@@ -30,8 +30,8 @@ import FileCleanup
 
 import ErrUtils
 import Outputable
-import Module
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.SrcLoc
 
 import Control.Exception
 import System.Directory

@@ -10,13 +10,13 @@ import TcRnTypes
 import GHC.Hs.Extension
 import GHC.Hs.Expr
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Hs
 import GHC.Hs.Binds
-import OccName
-import RdrName
-import Name
-import Avail
+import GHC.Types.Name.OccName
+import GHC.Types.Name.RdrName
+import GHC.Types.Name
+import GHC.Types.Avail
 import GHC.Hs.Dump
 
 plugin :: Plugin

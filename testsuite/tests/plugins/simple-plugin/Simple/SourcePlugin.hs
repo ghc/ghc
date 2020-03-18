@@ -7,7 +7,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Types
 import TcRnTypes
 import GHC.Hs.Extension
-import Avail
+import GHC.Types.Avail
 import GHC.Hs.Expr
 import Outputable
 import GHC.Hs.ImpExp

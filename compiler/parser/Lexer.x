@@ -97,7 +97,7 @@ import Bag
 import Outputable
 import StringBuffer
 import FastString
-import UniqFM
+import GHC.Types.Unique.FM
 import Util             ( readRational, readHexRational )
 
 -- compiler/main
@@ -105,11 +105,11 @@ import ErrUtils
 import GHC.Driver.Session as DynFlags
 
 -- compiler/basicTypes
-import SrcLoc
-import Module
-import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..),
-                        IntegralLit(..), FractionalLit(..),
-                        SourceText(..) )
+import GHC.Types.SrcLoc
+import GHC.Types.Module
+import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
+                         IntegralLit(..), FractionalLit(..),
+                         SourceText(..) )
 
 -- compiler/parser
 import Ctype

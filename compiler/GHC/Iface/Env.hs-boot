@@ -1,9 +1,9 @@
 module GHC.Iface.Env where
 
-import Module
-import OccName
+import GHC.Types.Module
+import GHC.Types.Name.OccName
 import TcRnMonad
-import Name
-import SrcLoc
+import GHC.Types.Name
+import GHC.Types.SrcLoc
 
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name

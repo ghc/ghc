@@ -45,8 +45,8 @@ module GHC.Stg.FVs (
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import Id
-import VarSet
+import GHC.Types.Id
+import GHC.Types.Var.Set
 import GHC.Core    ( Tickish(Breakpoint) )
 import Outputable
 import Util

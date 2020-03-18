@@ -31,22 +31,22 @@ import TysPrim
 import TysWiredIn
 
 import GHC.Cmm.Type
-import Demand
-import Id               ( Id, mkVanillaGlobalWithInfo )
-import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
-import Name
-import PrelNames        ( gHC_PRIMOPWRAPPERS )
+import GHC.Types.Demand
+import GHC.Types.Id      ( Id, mkVanillaGlobalWithInfo )
+import GHC.Types.Id.Info ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
+import GHC.Types.Name
+import PrelNames         ( gHC_PRIMOPWRAPPERS )
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
 import GHC.Types.RepType ( typePrimRep1, tyConPrimRep1 )
-import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
-                          SourceText(..) )
-import SrcLoc           ( wiredInSrcSpan )
-import ForeignCall      ( CLabelString )
-import Unique           ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+import GHC.Types.Basic   ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
+                           SourceText(..) )
+import GHC.Types.SrcLoc  ( wiredInSrcSpan )
+import GHC.Types.ForeignCall ( CLabelString )
+import GHC.Types.Unique  ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+import GHC.Types.Module  ( UnitId )
 import Outputable
 import FastString
-import Module           ( UnitId )
 
 {-
 ************************************************************************
