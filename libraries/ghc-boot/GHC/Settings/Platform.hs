@@ -37,6 +37,7 @@ getTargetPlatform settingsFile mySettings = do
   targetOS <- readSetting "target os"
   targetWordSize <- readSetting "target word size"
   targetWordBigEndian <- getBooleanSetting "target word big endian"
+  targetLeadingUnderscore <- getBooleanSetting "Leading underscore"
   targetUnregisterised <- getBooleanSetting "Unregisterised"
   targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
   targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
@@ -55,6 +56,7 @@ getTargetPlatform settingsFile mySettings = do
     , platformHasIdentDirective = targetHasIdentDirective
     , platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
     , platformIsCrossCompiling = crossCompiling
+    , platformLeadingUnderscore = targetLeadingUnderscore
     }
 
 -----------------------------------------------------------------------------

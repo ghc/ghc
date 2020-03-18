@@ -1218,7 +1218,7 @@ pprCLabel dflags = \case
 
     maybe_underscore :: SDoc -> SDoc
     maybe_underscore doc =
-      if platformMisc_leadingUnderscore $ platformMisc dflags
+      if platformLeadingUnderscore platform
       then pp_cSEP <> doc
       else doc
 
