@@ -25,8 +25,8 @@ import Data.Word
 import qualified Data.Map as M
 import Outputable
 import qualified TrieMap as TM
-import UniqFM
-import Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 import Control.Arrow (first, second)
 
 -- -----------------------------------------------------------------------------

@@ -8,14 +8,14 @@ import GhcPrelude hiding ((<*>))
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs, newTemp  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
-import ForeignCall
+import GHC.Types.ForeignCall
 import GHC.Cmm.Liveness
 import GHC.Cmm.ProcPoint
 import GHC.Runtime.Heap.Layout
@@ -24,9 +24,9 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Maybes
-import UniqFM
+import GHC.Types.Unique.FM
 import Util
 
 import GHC.Platform

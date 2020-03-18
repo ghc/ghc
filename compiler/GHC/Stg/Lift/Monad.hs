@@ -24,21 +24,21 @@ module GHC.Stg.Lift.Monad (
 
 import GhcPrelude
 
-import BasicTypes
-import CostCentre ( isCurrentCCS, dontCareCCS )
+import GHC.Types.Basic
+import GHC.Types.CostCentre ( isCurrentCCS, dontCareCCS )
 import GHC.Driver.Session
 import FastString
-import Id
-import Name
+import GHC.Types.Id
+import GHC.Types.Name
 import Outputable
 import OrdList
 import GHC.Stg.Subst
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
-import VarEnv
-import VarSet
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 
 import Control.Arrow ( second )
 import Control.Monad.Trans.Class
@@ -271,7 +271,7 @@ withLiftedBndr abs_ids bndr inner = do
   let str = "$l" ++ occNameString (getOccName bndr)
   let ty = mkLamTypes (dVarSetElems abs_ids) (idType bndr)
   let bndr'
-        -- See Note [transferPolyIdInfo] in Id.hs. We need to do this at least
+        -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
         = transferPolyIdInfo bndr (dVarSetElems abs_ids)
         . mkSysLocal (mkFastString str) uniq

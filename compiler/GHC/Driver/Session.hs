@@ -244,7 +244,7 @@ import GhcPrelude
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
-import Module
+import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
@@ -264,8 +264,8 @@ import Util
 import Maybes
 import MonadUtils
 import qualified Pretty
-import SrcLoc
-import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
+import GHC.Types.SrcLoc
+import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
 import FileSettings

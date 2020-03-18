@@ -14,7 +14,7 @@ import GhcPrelude
 
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
-import UniqFM
+import GHC.Types.Unique.FM
 import Foreign
 
 import Control.Concurrent

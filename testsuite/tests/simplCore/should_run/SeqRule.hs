@@ -2,7 +2,7 @@
 -- This test checks that the magic treatment of RULES 
 -- for 'seq' works right. 
 --
--- See Note [User-defined RULES for seq] in MkId for more details
+-- See Note [User-defined RULES for seq] in GHC.Types.Id.Make for more details
 
 module Main where
 

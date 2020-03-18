@@ -17,7 +17,7 @@ import GHC.Platform (target32Bit)
 import Prelude
 import System.Mem
 import System.Mem.Weak
-import UniqDFM
+import GHC.Types.Unique.DFM
 
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.

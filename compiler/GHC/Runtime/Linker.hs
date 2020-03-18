@@ -44,20 +44,20 @@ import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.Ways
-import Name
-import NameEnv
-import Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Module
 import ListSetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import GHC.Driver.Session
-import BasicTypes
+import GHC.Types.Basic
 import Outputable
 import Panic
 import Util
 import ErrUtils
-import SrcLoc
+import GHC.Types.SrcLoc
 import qualified Maybes
-import UniqDSet
+import GHC.Types.Unique.DSet
 import FastString
 import GHC.Platform
 import SysTools

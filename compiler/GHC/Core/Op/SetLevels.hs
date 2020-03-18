@@ -79,28 +79,28 @@ import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
 
-import Id
-import IdInfo
-import Var
-import VarSet
-import UniqSet          ( nonDetFoldUniqSet )
-import UniqDSet         ( getUniqDSet )
-import VarEnv
-import Literal          ( litIsTrivial )
-import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
-import Cpr              ( mkCprSig, botCpr )
-import Name             ( getOccName, mkSystemVarName )
-import OccName          ( occNameString )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Unique.Set   ( nonDetFoldUniqSet )
+import GHC.Types.Unique.DSet  ( getUniqDSet )
+import GHC.Types.Var.Env
+import GHC.Types.Literal      ( litIsTrivial )
+import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import GHC.Types.Cpr          ( mkCprSig, botCpr )
+import GHC.Types.Name         ( getOccName, mkSystemVarName )
+import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
-import BasicTypes       ( Arity, RecFlag(..), isRec )
+import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import TysWiredIn
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
 import Outputable
 import FastString
-import UniqDFM
+import GHC.Types.Unique.DFM
 import FV
 import Data.Maybe
 import MonadUtils       ( mapAccumLM )
@@ -1352,7 +1352,7 @@ lvlLamBndrs env lvl bndrs
     is_major bndr = isId bndr && not (isProbablyOneShotLambda bndr)
        -- The "probably" part says "don't float things out of a
        -- probable one-shot lambda"
-       -- See Note [Computing one-shot info] in Demand.hs
+       -- See Note [Computing one-shot info] in GHC.Types.Demand
 
 lvlJoinBndrs :: LevelEnv -> Level -> RecFlag -> [OutVar]
              -> (LevelEnv, [LevelledBndr])
@@ -1619,7 +1619,7 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- abstracted in deterministic order, not dependent on the values of
         -- Uniques. This is achieved by using DVarSets, deterministic free
         -- variable computation and deterministic sort.
-        -- See Note [Unique Determinism] in Unique for explanation of why
+        -- See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
         -- Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
@@ -1667,7 +1667,7 @@ newPolyBndrs dest_lvl
     add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
-    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
+    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
                              mkSysLocal (mkFastString str) uniq poly_ty
                            where

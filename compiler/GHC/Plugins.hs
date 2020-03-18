@@ -7,39 +7,67 @@
 --
 -- Particularly interesting modules for plugin writers include
 -- "GHC.Core" and "GHC.Core.Op.Monad".
-module GHC.Plugins(
-        module GHC.Driver.Plugins,
-        module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module GHC.Core.Op.Monad, module GHC.Core, module Literal, module GHC.Core.DataCon,
-        module GHC.Core.Utils, module GHC.Core.Make, module GHC.Core.FVs,
-        module GHC.Core.Subst, module GHC.Core.Rules, module Annotations,
-        module GHC.Driver.Session, module GHC.Driver.Packages,
-        module Module, module GHC.Core.Type, module GHC.Core.TyCon, module GHC.Core.Coercion,
-        module TysWiredIn, module GHC.Driver.Types, module BasicTypes,
-        module VarSet, module VarEnv, module NameSet, module NameEnv,
-        module UniqSet, module UniqFM, module FiniteMap,
-        module Util, module GHC.Serialized, module SrcLoc, module Outputable,
-        module UniqSupply, module Unique, module FastString,
-
-        -- * Getting 'Name's
-        thNameToGhcName
-    ) where
+module GHC.Plugins
+   ( module GHC.Driver.Plugins
+   , module GHC.Types.Name.Reader
+   , module GHC.Types.Name.Occurrence
+   , module GHC.Types.Name
+   , module GHC.Types.Var
+   , module GHC.Types.Id
+   , module GHC.Types.Id.Info
+   , module GHC.Core.Op.Monad
+   , module GHC.Core
+   , module GHC.Types.Literal
+   , module GHC.Core.DataCon
+   , module GHC.Core.Utils
+   , module GHC.Core.Make
+   , module GHC.Core.FVs
+   , module GHC.Core.Subst
+   , module GHC.Core.Rules
+   , module GHC.Types.Annotations
+   , module GHC.Driver.Session
+   , module GHC.Driver.Packages
+   , module GHC.Types.Module
+   , module GHC.Core.Type
+   , module GHC.Core.TyCon
+   , module GHC.Core.Coercion
+   , module TysWiredIn
+   , module GHC.Driver.Types
+   , module GHC.Types.Basic
+   , module GHC.Types.Var.Set
+   , module GHC.Types.Var.Env
+   , module GHC.Types.Name.Set
+   , module GHC.Types.Name.Env
+   , module GHC.Types.Unique
+   , module GHC.Types.Unique.Set
+   , module GHC.Types.Unique.FM
+   , module FiniteMap
+   , module Util
+   , module GHC.Serialized
+   , module GHC.Types.SrcLoc
+   , module Outputable
+   , module GHC.Types.Unique.Supply
+   , module FastString
+   , -- * Getting 'Name's
+     thNameToGhcName
+   )
+where
 
 -- Plugin stuff itself
 import GHC.Driver.Plugins
 
 -- Variable naming
-import RdrName
-import OccName  hiding  ( varName {- conflicts with Var.varName -} )
-import Name     hiding  ( varName {- reexport from OccName, conflicts with Var.varName -} )
-import Var
-import Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExported {- all three conflict with Var -} )
-import IdInfo
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence  hiding  ( varName {- conflicts with Var.varName -} )
+import GHC.Types.Name     hiding  ( varName {- reexport from OccName, conflicts with Var.varName -} )
+import GHC.Types.Var
+import GHC.Types.Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExported {- all three conflict with Var -} )
+import GHC.Types.Id.Info
 
 -- Core
 import GHC.Core.Op.Monad
 import GHC.Core
-import Literal
+import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -49,14 +77,14 @@ import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
 
 -- Core "extras"
 import GHC.Core.Rules
-import Annotations
+import GHC.Types.Annotations
 
 -- Pipeline-related stuff
 import GHC.Driver.Session
 import GHC.Driver.Packages
 
 -- Important GHC types
-import Module
+import GHC.Types.Module
 import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
@@ -64,15 +92,15 @@ import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Driver.Types
-import BasicTypes hiding ( Version {- conflicts with Packages.Version -} )
+import GHC.Types.Basic hiding ( Version {- conflicts with Packages.Version -} )
 
 -- Collections and maps
-import VarSet
-import VarEnv
-import NameSet
-import NameEnv
-import UniqSet
-import UniqFM
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
 -- Conflicts with UniqFM:
 --import LazyUniqFM
 import FiniteMap
@@ -80,10 +108,10 @@ import FiniteMap
 -- Common utilities
 import Util
 import GHC.Serialized
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import UniqSupply
-import Unique           ( Unique, Uniquable(..) )
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique ( Unique, Uniquable(..) )
 import FastString
 import Data.Maybe
 

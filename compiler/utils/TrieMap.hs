@@ -31,9 +31,9 @@ module TrieMap(
 
 import GhcPrelude
 
-import Literal
-import UniqDFM
-import Unique( Unique )
+import GHC.Types.Literal
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique( Unique )
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -198,7 +198,7 @@ solve_simple_wanteds it's merged with other WantedConstraints. We want the
 conversion to a bag to be deterministic. For that purpose we use UniqDFM
 instead of UniqFM to implement the TrieMap.
 
-See Note [Deterministic UniqFM] in UniqDFM for more details on how it's made
+See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details on how it's made
 deterministic.
 -}
 

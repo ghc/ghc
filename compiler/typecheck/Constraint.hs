@@ -85,7 +85,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Class
 import GHC.Core.TyCon
-import Var
+import GHC.Types.Var
 
 import TcType
 import TcEvidence
@@ -94,14 +94,14 @@ import TcOrigin
 import GHC.Core
 
 import GHC.Core.TyCo.Ppr
-import OccName
+import GHC.Types.Name.Occurrence
 import FV
-import VarSet
+import GHC.Types.Var.Set
 import GHC.Driver.Session
-import BasicTypes
+import GHC.Types.Basic
 
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Bag
 import Util
 

@@ -20,13 +20,13 @@ import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Core.Ppr
 import Outputable
 import FastString
-import Name
-import Unique
-import Id
+import GHC.Types.Name
+import GHC.Types.Unique
+import GHC.Types.Id
 import GHC.Core
-import Literal
+import GHC.Types.Literal
 import GHC.Core.DataCon
-import VarSet
+import GHC.Types.Var.Set
 import PrimOp
 import GHC.Runtime.Heap.Layout
 

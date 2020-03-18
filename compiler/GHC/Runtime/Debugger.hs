@@ -23,13 +23,13 @@ import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Driver.Monad
 import GHC.Driver.Types
-import Id
+import GHC.Types.Id
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Iface.Env    ( newInteractiveBinder )
-import Name
-import Var hiding ( varName )
-import VarSet
-import UniqSet
+import GHC.Types.Name
+import GHC.Types.Var hiding ( varName )
+import GHC.Types.Var.Set
+import GHC.Types.Unique.Set
 import GHC.Core.Type
 import GHC
 import Outputable
