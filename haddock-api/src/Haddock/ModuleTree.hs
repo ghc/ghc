@@ -14,8 +14,8 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
 import Haddock.Types ( MDoc )
 
-import GHC           ( Name )
-import Module        ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
+import GHC                 ( Name )
+import GHC.Types.Module    ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
 import GHC.Driver.Session  ( DynFlags )
 import GHC.Driver.Packages ( lookupUnit, sourcePackageIdString )
 

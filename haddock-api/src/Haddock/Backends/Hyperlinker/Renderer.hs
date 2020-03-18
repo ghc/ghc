@@ -13,10 +13,10 @@ import Haddock.Backends.Hyperlinker.Utils
 import qualified Data.ByteString as BS
 
 import GHC.Iface.Ext.Types
-import Module   ( ModuleName, moduleNameString )
-import Name     ( getOccString, isInternalName, Name, nameModule, nameUnique )
-import SrcLoc
-import Unique   ( getKey )
+import GHC.Types.Module ( ModuleName, moduleNameString )
+import GHC.Types.Name   ( getOccString, isInternalName, Name, nameModule, nameUnique )
+import GHC.Types.SrcLoc
+import GHC.Types.Unique ( getKey )
 import Encoding ( utf8DecodeByteString )
 
 import System.FilePath.Posix ((</>))

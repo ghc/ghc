@@ -36,12 +36,12 @@ import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
 import Documentation.Haddock.Types
-import BasicTypes (Fixity(..), PromotionFlag(..))
+import GHC.Types.Basic (Fixity(..), PromotionFlag(..))
 
 import GHC
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
-import OccName
+import GHC.Types.Name.Occurrence
 import Outputable
 
 -----------------------------------------------------------------------------

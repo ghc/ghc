@@ -39,22 +39,22 @@ import Control.Applicative
 import Control.Monad
 import Data.Traversable
 
-import Avail hiding (avail)
-import qualified Avail
-import qualified Module
-import qualified SrcLoc
+import GHC.Types.Avail hiding (avail)
+import qualified GHC.Types.Avail  as Avail
+import qualified GHC.Types.Module as Module
+import qualified GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.ConLike (ConLike(..))
 import GHC
 import GHC.Driver.Types
-import Name
-import NameSet
-import NameEnv
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
 import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
-import RdrName
+import GHC.Types.Name.Reader
 import TcRnTypes
 import FastString ( unpackFS, bytesFS )
-import BasicTypes ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
+import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified Outputable as O
 
 
@@ -869,7 +869,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         constructor_names =
           filter isDataConName (availSubordinates avail)
 
--- this heavily depends on the invariants stated in Avail
+-- this heavily depends on the invariants stated in GHC.Types.Avail
 availExportsDecl :: AvailInfo -> Bool
 availExportsDecl (AvailTC ty_name names _)
   | n : _ <- names = ty_name == n

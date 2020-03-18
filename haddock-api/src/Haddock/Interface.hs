@@ -50,16 +50,16 @@ import qualified Data.Set as Set
 import Distribution.Verbosity
 import Text.Printf
 
-import Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
+import GHC.Types.Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
 import Digraph
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
 import GHC.Driver.Types
 import FastString (unpackFS)
 import TcRnTypes (tcg_rdr_env)
-import Name (nameIsFromExternalPackage, nameOccName)
-import OccName (isTcOcc)
-import RdrName (unQualOK, gre_name, globalRdrEnvElts)
+import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
+import GHC.Types.Name.Occurrence (isTcOcc)
+import GHC.Types.Name.Reader (unQualOK, gre_name, globalRdrEnvElts)
 import ErrUtils (withTimingD)
 
 #if defined(mingw32_HOST_OS)

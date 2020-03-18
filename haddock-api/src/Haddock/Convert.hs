@@ -20,7 +20,7 @@ module Haddock.Convert (
 ) where
 
 import Bag ( emptyBag )
-import BasicTypes ( TupleSort(..), SourceText(..), LexicalFixity(..)
+import GHC.Types.Basic ( TupleSort(..), SourceText(..), LexicalFixity(..)
                   , PromotionFlag(..), DefMethSpec(..) )
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
@@ -29,11 +29,11 @@ import Data.Either (lefts, rights)
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
 import GHC.Hs
-import Name
-import NameSet ( emptyNameSet )
-import RdrName ( mkVarUnqual )
+import GHC.Types.Name
+import GHC.Types.Name.Set    ( emptyNameSet )
+import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Core.PatSyn
-import SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
+import GHC.Types.SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
 import TcType
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -43,10 +43,10 @@ import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
                   , unitTy, promotedNilDataCon, promotedConsDataCon )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
-import Unique ( getUnique )
+import GHC.Types.Unique ( getUnique )
 import Util ( chkAppend,dropList, filterByList, filterOut )
-import Var
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Set
 
 import Haddock.Types
 import Haddock.Interface.Specialize

@@ -16,7 +16,7 @@ import Data.Char
 import GHC.Driver.Session
 import Haddock.Parser
 import Haddock.Types
-import RdrName
+import GHC.Types.Name.Reader
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers

@@ -22,9 +22,9 @@ import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..) )
 import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result)
 import Data.Map as M
 import FastString     ( mkFastString )
-import Module         ( Module, moduleName )
-import NameCache      ( initNameCache )
-import UniqSupply     ( mkSplitUniqSupply )
+import GHC.Types.Module        ( Module, moduleName )
+import GHC.Types.Name.Cache    ( initNameCache )
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 
 -- | Generate hyperlinked source for given interfaces.
