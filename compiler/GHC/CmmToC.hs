@@ -30,7 +30,7 @@ import GhcPrelude
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import ForeignCall
+import GHC.Types.ForeignCall
 import GHC.Cmm hiding (pprBBlock)
 import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Cmm.Dataflow.Block
@@ -45,9 +45,9 @@ import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Platform
-import UniqSet
-import UniqFM
-import Unique
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 import Util
 
 -- The rest

@@ -37,12 +37,12 @@ import           GHC.Driver.Session (HasDynFlags(..))
 import           FastString
 import           GHC
 import           GHC.Driver.Monad
-import           Name
-import           NameSet
+import           GHC.Types.Name
+import           GHC.Types.Name.Set
 import           Outputable
-import           SrcLoc
+import           GHC.Types.SrcLoc
 import           TcHsSyn
-import           Var
+import           GHC.Types.Var
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.

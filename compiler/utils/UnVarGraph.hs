@@ -30,12 +30,12 @@ module UnVarGraph
 
 import GhcPrelude
 
-import Id
-import VarEnv
-import UniqFM
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.FM
 import Outputable
 import Bag
-import Unique
+import GHC.Types.Unique
 
 import qualified Data.IntSet as S
 

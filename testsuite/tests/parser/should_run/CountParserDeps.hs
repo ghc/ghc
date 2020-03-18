@@ -11,7 +11,7 @@ module Main(main) where
 -- need exists to produce ASTs and nothing more.
 
 import GHC.Driver.Types
-import Module
+import GHC.Types.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
@@ -21,7 +21,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import System.Exit
-import UniqSet
+import GHC.Types.Unique.Set
 
 main :: IO ()
 main = do

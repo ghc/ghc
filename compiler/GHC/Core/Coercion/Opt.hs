@@ -16,8 +16,8 @@ import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import TcType       ( exactTyCoVarsOfType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
-import VarSet
-import VarEnv
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Outputable
 import GHC.Core.FamInstEnv ( flattenTys )
 import Pair

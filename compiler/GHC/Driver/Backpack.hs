@@ -32,23 +32,23 @@ import GHC.Driver.Monad
 import GHC.Driver.Session
 import TcRnMonad
 import TcRnDriver
-import Module
+import GHC.Types.Module
 import GHC.Driver.Types
 import StringBuffer
 import FastString
 import ErrUtils
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Driver.Main
-import UniqFM
-import UniqDFM
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import Outputable
 import Maybes
 import HeaderInfo
 import GHC.Iface.Recomp
 import GHC.Driver.Make
-import UniqDSet
+import GHC.Types.Unique.DSet
 import PrelNames
-import BasicTypes hiding (SuccessFlag(..))
+import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Finder
 import Util
 

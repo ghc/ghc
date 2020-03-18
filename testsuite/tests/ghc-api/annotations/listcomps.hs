@@ -9,7 +9,7 @@ import Data.Data
 import Data.List (intercalate)
 import System.IO
 import GHC
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import MonadUtils
 import Outputable

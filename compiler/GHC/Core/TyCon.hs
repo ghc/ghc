@@ -150,24 +150,24 @@ import {-# SOURCE #-} GHC.Core.DataCon
    , isUnboxedSumCon )
 
 import Binary
-import Var
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Core.Class
-import BasicTypes
-import ForeignCall
-import Name
-import NameEnv
+import GHC.Types.Basic
+import GHC.Types.ForeignCall
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Core.Coercion.Axiom
 import PrelNames
 import Maybes
 import Outputable
 import FastStringEnv
-import FieldLabel
+import GHC.Types.FieldLabel
 import Constants
 import Util
-import Unique( tyConRepNameUnique, dataConTyRepNameUnique )
-import UniqSet
-import Module
+import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
+import GHC.Types.Unique.Set
+import GHC.Types.Module
 
 import qualified Data.Data as Data
 
@@ -213,7 +213,7 @@ We also support injective type families -- see Note [Injective type families]
 
 Note [Data type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Wrappers for data instance tycons] in MkId.hs
+See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
 
 * Data type families are declared thus
         data family T a :: *

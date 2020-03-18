@@ -16,9 +16,9 @@ import GHC.Hs.Decls
 import GHC.Hs.Extension
 import GHC.Hs.Types
 import GHC.Hs.Utils
-import Name
-import NameSet
-import SrcLoc
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.SrcLoc
 import TcRnTypes
 
 import Control.Applicative

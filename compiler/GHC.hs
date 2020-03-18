@@ -313,12 +313,12 @@ import GHC.Iface.Load   ( loadSysInterface )
 import TcRnTypes
 import GHC.Core.Predicate
 import GHC.Driver.Packages
-import NameSet
-import RdrName
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Core.Type  hiding( typeKind )
 import TcType
-import Id
+import GHC.Types.Id
 import TysPrim          ( alphaTyVars )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr   ( pprForAll )
@@ -327,9 +327,9 @@ import GHC.Core.DataCon
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts )
 import GHC.Core.InstEnv
-import Name             hiding ( varName )
-import Avail
-import SrcLoc
+import GHC.Types.Name      hiding ( varName )
+import GHC.Types.Avail
+import GHC.Types.SrcLoc
 import GHC.Core
 import GHC.Iface.Tidy
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename )
@@ -340,8 +340,8 @@ import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Ways
 import SysTools
 import SysTools.BaseDir
-import Annotations
-import Module
+import GHC.Types.Annotations
+import GHC.Types.Module
 import Panic
 import GHC.Platform
 import Bag              ( listToBag )
@@ -350,13 +350,13 @@ import MonadUtils
 import Util
 import StringBuffer
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 import FastString
 import qualified Parser
 import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
-import NameEnv
+import GHC.Types.Name.Env
 import TcRnDriver
 import Inst
 import FamInst

@@ -38,16 +38,16 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 import GHC.Driver.Session
-import Id
+import GHC.Types.Id
 import GHC.Cmm.Graph
-import Name
+import GHC.Types.Name
 import Outputable
 import GHC.Stg.Syntax
 import GHC.Core.Type
 import TysPrim
-import UniqFM
+import GHC.Types.Unique.FM
 import Util
-import VarEnv
+import GHC.Types.Var.Env
 
 -------------------------------------
 --        Manipulating CgIdInfo

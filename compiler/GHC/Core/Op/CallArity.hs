@@ -9,17 +9,17 @@ module GHC.Core.Op.CallArity
 
 import GhcPrelude
 
-import VarSet
-import VarEnv
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Driver.Session ( DynFlags )
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Core
-import Id
+import GHC.Types.Id
 import GHC.Core.Arity ( typeArity )
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import UnVarGraph
-import Demand
+import GHC.Types.Demand
 import Util
 
 import Control.Arrow ( first, second )

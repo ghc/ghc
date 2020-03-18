@@ -55,15 +55,15 @@ import GHC.Hs
 import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
                   hsc_dynLinker, hsc_interp )
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import GHC.Driver.Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
                              listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import PrelNames
-import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
-import SrcLoc
+import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
+import GHC.Types.SrcLoc as SrcLoc
 import qualified Lexer
 
 import StringBuffer
@@ -72,14 +72,14 @@ import Outputable hiding ( printForUser, printForUserPartWay )
 import GHC.Runtime.Loader ( initializePlugins )
 
 -- Other random utilities
-import BasicTypes hiding ( isTopLevel )
+import GHC.Types.Basic hiding ( isTopLevel )
 import Config
 import Digraph
 import Encoding
 import FastString
 import GHC.Runtime.Linker
 import Maybes ( orElse, expectJust )
-import NameSet
+import GHC.Types.Name.Set
 import Panic hiding ( showException )
 import Util
 import qualified GHC.LanguageExtensions as LangExt

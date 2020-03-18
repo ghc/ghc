@@ -28,24 +28,24 @@ import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
 import GHC.Core.Arity   ( joinRhsArity )
-import Id
-import IdInfo
-import Name( localiseName )
-import BasicTypes
-import Module( Module )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name( localiseName )
+import GHC.Types.Basic
+import GHC.Types.Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type
 
-import VarSet
-import VarEnv
-import Var
-import Demand           ( argOneShots, argsOneShots )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Var
+import GHC.Types.Demand ( argOneShots, argsOneShots )
 import Digraph          ( SCC(..), Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq
                         , stronglyConnCompFromEdgedVerticesUniqR )
-import Unique
-import UniqFM
-import UniqSet
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import Util
 import Outputable
 import Data.List
@@ -1870,7 +1870,7 @@ occAnalApp env (Var fun, args, ticks)
     n_args     = length args
     fun_uds    = mkOneOcc env fun (if n_val_args > 0 then IsInteresting else NotInteresting) n_args
     is_exp     = isExpandableApp fun n_val_args
-        -- See Note [CONLIKE pragma] in BasicTypes
+        -- See Note [CONLIKE pragma] in GHC.Types.Basic
         -- The definition of is_exp should match that in GHC.Core.Op.Simplify.prepareRhs
 
     one_shots  = argsOneShots (idStrictness fun) guaranteed_val_args
