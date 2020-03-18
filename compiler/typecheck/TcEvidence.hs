@@ -55,7 +55,7 @@ module TcEvidence (
 
 import GhcPrelude
 
-import Var
+import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
@@ -65,10 +65,10 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon( DataCon, dataConWrapId )
 import GHC.Core.Class( Class )
 import PrelNames
-import VarEnv
-import VarSet
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Core.Predicate
-import Name
+import GHC.Types.Name
 import Pair
 
 import GHC.Core
@@ -79,9 +79,9 @@ import Util
 import Bag
 import qualified Data.Data as Data
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Data.IORef( IORef )
-import UniqSet
+import GHC.Types.Unique.Set
 
 {-
 Note [TcCoercions]
@@ -472,7 +472,7 @@ newtype EvBindMap
             -- let $dNum = GHC.Num.$fNumInt in
             -- let $dEq = GHC.Classes.$fEqInt in ...
             --
-            -- See Note [Deterministic UniqFM] in UniqDFM for explanation why
+            -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why
             -- @UniqFM@ can lead to nondeterministic order.
 
 emptyEvBindMap :: EvBindMap

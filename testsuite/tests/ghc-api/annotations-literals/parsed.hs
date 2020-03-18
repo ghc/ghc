@@ -3,7 +3,7 @@
 -- argument.
 module Main where
 
-import BasicTypes
+import GHC.Types.Basic
 import Data.Data
 import Data.List (intercalate)
 import System.IO

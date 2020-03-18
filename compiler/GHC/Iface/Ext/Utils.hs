@@ -10,15 +10,15 @@ import GHC.Core.Map
 import GHC.Driver.Session         ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import GHC.Iface.Type
-import Name hiding (varName)
+import GHC.Types.Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import Var
-import VarEnv
+import GHC.Types.Var
+import GHC.Types.Var.Env
 
 import GHC.Iface.Ext.Types
 

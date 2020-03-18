@@ -6,8 +6,8 @@ module GHC.Stg.Subst where
 
 import GhcPrelude
 
-import Id
-import VarEnv
+import GHC.Types.Id
+import GHC.Types.Var.Env
 import Control.Monad.Trans.State.Strict
 import Outputable
 import Util

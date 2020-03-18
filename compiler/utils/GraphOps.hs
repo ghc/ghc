@@ -25,9 +25,9 @@ import GhcPrelude
 import GraphBase
 
 import Outputable
-import Unique
-import UniqSet
-import UniqFM
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
 
 import Data.List        hiding (union)
 import Data.Maybe

@@ -14,7 +14,7 @@ import GhcPrelude
 
 import Fingerprint
 import Binary
-import Name
+import GHC.Types.Name
 import PlainPanic
 import Util
 

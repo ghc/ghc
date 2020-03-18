@@ -15,7 +15,7 @@ import GhcPrelude
 import Bag
 import GHC.Hs
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 
 import Data.Char

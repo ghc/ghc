@@ -22,9 +22,10 @@ module GHC.Hs.Lit where
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
-import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
-                    negateFractionalLit,SourceText(..),pprWithSourceText,
-                    PprPrec(..), topPrec )
+import GHC.Types.Basic
+   ( IntegralLit(..), FractionalLit(..), negateIntegralLit
+   , negateFractionalLit, SourceText(..), pprWithSourceText
+   , PprPrec(..), topPrec )
 import GHC.Core.Type
 import Outputable
 import FastString
@@ -41,7 +42,7 @@ import Data.Data hiding ( Fixity )
 ************************************************************************
 -}
 
--- Note [Literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
 -- Note [Trees that grow] in GHC.Hs.Extension for the Xxxxx fields in the following
 -- | Haskell Literal
@@ -133,7 +134,7 @@ type instance XOverLit GhcTc = OverLitTc
 
 type instance XXOverLit (GhcPass _) = NoExtCon
 
--- Note [Literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
 -- | Overloaded Literal Value
 data OverLitVal

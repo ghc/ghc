@@ -16,11 +16,11 @@ import Config
 import Binary
 import FastString                 ( FastString )
 import GHC.Iface.Type
-import Module                     ( ModuleName, Module )
-import Name                       ( Name )
+import GHC.Types.Module           ( ModuleName, Module )
+import GHC.Types.Name             ( Name )
 import Outputable hiding ( (<>) )
-import SrcLoc                     ( RealSrcSpan )
-import Avail
+import GHC.Types.SrcLoc           ( RealSrcSpan )
+import GHC.Types.Avail
 
 import qualified Data.Array as A
 import qualified Data.Map as M

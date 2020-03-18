@@ -32,14 +32,14 @@ import {-# SOURCE #-} GHC.Core.Unfold( mkUnfolding )
 import GHC.Core.Make ( FloatBind(..) )
 import GHC.Core.Ppr  ( pprCoreBindings, pprRules )
 import GHC.Core.Op.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
-import Literal  ( Literal(LitString) )
-import Id
-import IdInfo   ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
-import Var      ( isNonCoVarId )
-import VarSet
-import VarEnv
+import GHC.Types.Literal  ( Literal(LitString) )
+import GHC.Types.Id
+import GHC.Types.Id.Info  ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
+import GHC.Types.Var      ( isNonCoVarId )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Core.DataCon
-import Demand( etaExpandStrictSig )
+import GHC.Types.Demand( etaExpandStrictSig )
 import GHC.Core.Coercion.Opt ( optCoercion )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -47,8 +47,8 @@ import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 import GHC.Core.TyCon ( tyConArity )
 import TysWiredIn
 import PrelNames
-import BasicTypes
-import Module       ( Module )
+import GHC.Types.Basic
+import GHC.Types.Module ( Module )
 import ErrUtils
 import GHC.Driver.Session
 import Outputable
@@ -673,7 +673,7 @@ unfolding. Also see Note [Desugaring coerce as cast] in GHC.HsToCore.
 
 However, we don't want to inline 'seq', which happens to also have a
 compulsory unfolding, so we only do this unfolding only for things
-that are always-active.  See Note [User-defined RULES for seq] in MkId.
+that are always-active.  See Note [User-defined RULES for seq] in GHC.Types.Id.Make.
 
 Note [Getting the map/coerce RULE to work]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -965,7 +965,7 @@ data ConCont = CC [CoreExpr] Coercion
 -- [exprIsConApp_maybe on data constructors with wrappers]. Data constructor wrappers
 -- are unfolded late, but we really want to trigger case-of-known-constructor as
 -- early as possible. See also Note [Activation for data constructor wrappers]
--- in MkId.
+-- in GHC.Types.Id.Make.
 --
 -- We also return the incoming InScopeSet, augmented with
 -- the binders from any [FloatBind] that we return

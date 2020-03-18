@@ -55,18 +55,18 @@ import FunDeps
 import GHC.Core.FamInstEnv
    ( isDominatedBy, injectiveBranches, InjectivityCheckResult(..) )
 import FamInst
-import Name
-import VarEnv
-import VarSet
-import Var         ( VarBndr(..), mkTyVar )
+import GHC.Types.Name
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Var     ( VarBndr(..), mkTyVar )
 import FV
 import ErrUtils
 import GHC.Driver.Session
 import Util
 import ListSetOps
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import Unique      ( mkAlphaTyVarUnique )
+import GHC.Types.Unique      ( mkAlphaTyVarUnique )
 import Bag         ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 

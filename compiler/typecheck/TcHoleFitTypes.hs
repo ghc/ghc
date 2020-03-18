@@ -11,13 +11,13 @@ import TcRnTypes
 import Constraint
 import TcType
 
-import RdrName
+import GHC.Types.Name.RdrName
 
 import GHC.Hs.Doc
-import Id
+import GHC.Types.Id
 
 import Outputable
-import Name
+import GHC.Types.Name
 
 import Data.Function ( on )
 
