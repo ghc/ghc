@@ -75,9 +75,12 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
   info <- getCgIdInfo a
-  tag_reg <- assignTemp $ cmmConstrTag1 dflags (idInfoToAmode info)
+  let amode = idInfoToAmode info
+  tag_reg <- assignTemp $ cmmConstrTag1 dflags amode
   result_reg <- newTemp (bWord dflags)
   let tag = CmmReg $ CmmLocal tag_reg
+      is_tagged = cmmNeWord platform tag (zeroExpr dflags)
+      is_too_big_tag = cmmEqWord platform tag (cmmTagMask dflags)
   -- Here we will first check the tag bits of the pointer we were given;
   -- if this doesn't work then enter the closure and use the info table
   -- to determine the constructor. Note that all tag bits set means that
@@ -87,24 +90,22 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   slow_path <- getCode $ do
       tmp <- newTemp (bWord platform)
       _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-      -- TODO: For small types look at the tag bits instead of reading info table
       emitAssign (CmmLocal result_reg)
         $ getConstrTag dflags (cmmUntag platform (CmmReg (CmmLocal tmp)))
 
   fast_path <- getCode $ do
-      emitAssign (CmmLocal result_reg)
-        $ cmmSubWord dflags tag (CmmLit $ mkWordCLit platform 1)
+      -- Return the constructor index from the pointer tag
+      return_ptr_tag <- getCode $ do
+          emitAssign (CmmLocal result_reg)
+            $ cmmSubWord platform tag (CmmLit $ mkWordCLit platform 1)
+      -- Return the constructor index recorded in the info table
+      return_info_tag <- getCode $ do
+          emitAssign (CmmLocal result_reg)
+            $ getConstrTag platform (cmmUntag dflags amode)
 
-  let zero = zeroExpr platform
-      too_big_tag = cmmTagMask platform
-      is_tagged =
-        cmmNeWord platform
-          (cmmOrWord platform
-            (cmmEqWord platform tag zero)         -- not evaluated
-            (cmmEqWord platform tag too_big_tag)) -- tag too big
-          zero
+      emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
 
-  emit =<< mkCmmIfThenElse' is_tagged slow_path fast_path (Just False)
+  emit =<< mkCmmIfThenElse' is_tagged fast_path slow_path (Just True)
   emitReturn [CmmReg $ CmmLocal result_reg]
 
 
