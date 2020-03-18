@@ -4419,7 +4419,13 @@ setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
 setDebugLevel :: Maybe Int -> DynP ()
-setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
+setDebugLevel mb_n =
+  upd (\dfs -> exposeSyms $ dfs{ debugLevel = n })
+  where
+    n = mb_n `orElse` 2
+    exposeSyms
+      | n > 2     = setGeneralFlag' Opt_ExposeInternalSymbols
+      | otherwise = id
 
 data PkgDbRef
   = GlobalPkgDb
