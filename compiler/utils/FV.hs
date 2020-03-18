@@ -28,8 +28,8 @@ module FV (
 
 import GhcPrelude
 
-import Var
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Set
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is
 -- interesting
@@ -40,7 +40,7 @@ type InterestingVarFun = Var -> Bool
 -- When computing free variables, the order in which you get them affects
 -- the results of floating and specialization. If you use UniqFM to collect
 -- them and then turn that into a list, you get them in nondeterministic
--- order as described in Note [Deterministic UniqFM] in UniqDFM.
+-- order as described in Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 
 -- A naive algorithm for free variables relies on merging sets of variables.
 -- Merging costs O(n+m) for UniqFM and for UniqDFM there's an additional log
@@ -54,7 +54,7 @@ type FV = InterestingVarFun -- Used for filtering sets as we build them
 type VarAcc = ([Var], VarSet)  -- List to preserve ordering and set to check for membership,
                                -- so that the list doesn't have duplicates
                                -- For explanation of why using `VarSet` is not deterministic see
-                               -- Note [Deterministic UniqFM] in UniqDFM.
+                               -- Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 
 -- Note [FV naming conventions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

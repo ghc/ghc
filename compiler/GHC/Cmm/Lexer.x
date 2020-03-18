@@ -21,8 +21,8 @@ import GHC.Cmm.Expr
 
 import Lexer
 import GHC.Cmm.Monad
-import SrcLoc
-import UniqFM
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.FM
 import StringBuffer
 import FastString
 import Ctype

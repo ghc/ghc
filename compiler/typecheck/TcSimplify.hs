@@ -31,10 +31,10 @@ import GhcPrelude
 import Bag
 import GHC.Core.Class ( Class, classKey, classTyCon )
 import GHC.Driver.Session
-import Id            ( idType, mkLocalId )
+import GHC.Types.Id   ( idType, mkLocalId )
 import Inst
 import ListSetOps
-import Name
+import GHC.Types.Name
 import Outputable
 import PrelInfo
 import PrelNames
@@ -53,11 +53,11 @@ import GHC.Core.Type
 import TysWiredIn     ( liftedRepTy )
 import GHC.Core.Unify ( tcMatchTyKi )
 import Util
-import Var
-import VarSet
-import UniqSet
-import BasicTypes    ( IntWithInf, intGtLimit )
-import ErrUtils      ( emptyMessages )
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Unique.Set
+import GHC.Types.Basic    ( IntWithInf, intGtLimit )
+import ErrUtils           ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

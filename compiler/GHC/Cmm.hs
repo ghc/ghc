@@ -26,8 +26,8 @@ module GHC.Cmm (
 
 import GhcPrelude
 
-import Id
-import CostCentre
+import GHC.Types.Id
+import GHC.Types.CostCentre
 import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm.Node

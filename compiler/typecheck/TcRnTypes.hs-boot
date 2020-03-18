@@ -1,7 +1,7 @@
 module TcRnTypes where
 
 import TcType
-import SrcLoc
+import GHC.Types.SrcLoc
 
 data TcLclEnv
 

@@ -99,8 +99,8 @@ import {-# SOURCE #-}   GHC.Driver.Session
                            , pprUserLength, pprCols
                            , unsafeGlobalDynFlags, initSDocContext
                            )
-import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
-import {-# SOURCE #-}   OccName( OccName )
+import {-# SOURCE #-}   GHC.Types.Module( UnitId, Module, ModuleName, moduleName )
+import {-# SOURCE #-}   GHC.Types.Name.OccName( OccName )
 
 import BufWrite (BufHandle)
 import FastString
