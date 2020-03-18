@@ -38,6 +38,7 @@ module GHC.Utils.Encoding (
 import GHC.Prelude
 
 import Foreign
+import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Data.Char
 import qualified Data.Char as Char
 import Numeric
@@ -155,8 +156,8 @@ utf8DecodeByteString (BS.PS fptr offset len)
 
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
 utf8DecodeStringLazy fp offset (I# len#)
-  = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
-      let !(Ptr a#) = ptr `plusPtr` offset in
+  = unsafeDupablePerformIO $ do
+      let !(Ptr a#) = unsafeForeignPtrToPtr fp `plusPtr` offset
       utf8DecodeLazy# (touchForeignPtr fp) (utf8DecodeCharAddr# a#) len#
 -- Note that since utf8DecodeLazy# returns a thunk the lifetime of the
 -- ForeignPtr actually needs to be longer than the lexical lifetime
