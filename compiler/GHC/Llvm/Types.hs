@@ -17,7 +17,7 @@ import Numeric
 import GHC.Driver.Session
 import FastString
 import Outputable
-import Unique
+import GHC.Types.Unique
 
 -- from NCG
 import GHC.CmmToAsm.Ppr

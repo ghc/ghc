@@ -18,7 +18,7 @@ module GHC.CmmToAsm.Reg.Graph.X86 (
 import GhcPrelude
 
 import GHC.CmmToAsm.Reg.Graph.Base  (Reg(..), RegSub(..), RegClass(..))
-import UniqSet
+import GHC.Types.Unique.Set
 
 import qualified Data.Array as A
 

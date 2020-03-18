@@ -70,16 +70,16 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 
-import Var
-import VarSet
-import VarEnv
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 
 import Pair
 import Util
-import UniqSupply
-import Unique
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import Outputable
 
 import Data.List (mapAccumL)

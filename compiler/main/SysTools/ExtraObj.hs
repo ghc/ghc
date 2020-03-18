@@ -19,8 +19,8 @@ import GHC.Driver.Session
 import GHC.Driver.Packages
 import GHC.Platform
 import Outputable
-import SrcLoc           ( noSrcSpan )
-import Module
+import GHC.Types.SrcLoc ( noSrcSpan )
+import GHC.Types.Module
 import Elf
 import Util
 import GhcPrelude

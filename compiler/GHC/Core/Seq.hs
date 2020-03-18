@@ -13,15 +13,15 @@ module GHC.Core.Seq (
 import GhcPrelude
 
 import GHC.Core
-import IdInfo
-import Demand( seqDemand, seqStrictSig )
-import Cpr( seqCprSig )
-import BasicTypes( seqOccInfo )
-import VarSet( seqDVarSet )
-import Var( varType, tyVarKind )
+import GHC.Types.Id.Info
+import GHC.Types.Demand( seqDemand, seqStrictSig )
+import GHC.Types.Cpr( seqCprSig )
+import GHC.Types.Basic( seqOccInfo )
+import GHC.Types.Var.Set( seqDVarSet )
+import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
 import GHC.Core.Coercion( seqCo )
-import Id( Id, idInfo )
+import GHC.Types.Id( Id, idInfo )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler

@@ -10,15 +10,15 @@ module GHC.Cmm.Info.Build
 
 import GhcPrelude hiding (succ)
 
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
-import Module
+import GHC.Types.Module
 import GHC.Platform
 import Digraph
 import GHC.Cmm.CLabel
@@ -28,8 +28,8 @@ import GHC.Driver.Session
 import Maybes
 import Outputable
 import GHC.Runtime.Heap.Layout
-import UniqSupply
-import CostCentre
+import GHC.Types.Unique.Supply
+import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
 
 import Control.Monad
@@ -41,7 +41,7 @@ import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 import Data.List (unzip4)
 
-import NameSet
+import GHC.Types.Name.Set
 
 {- Note [SRTs]
 
