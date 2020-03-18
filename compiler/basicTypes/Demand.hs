@@ -22,7 +22,7 @@ module Demand (
         addCaseBndrDmd,
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
-        nopDmdType, botDmdType, mkDmdType,
+        emptyDmdType, botDmdType, mkDmdType,
         addDemand, ensureArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
@@ -32,7 +32,7 @@ module Demand (
         Divergence(..), lubDivergence, isBotDiv, topDiv, botDiv, exnDiv, conDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
-        nopSig, botSig, cprProdSig,
+        emptySig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
         increaseStrictSigArity, etaExpandStrictSig,
@@ -1219,13 +1219,26 @@ instance Outputable DmdType where
 emptyDmdEnv :: VarEnv Demand
 emptyDmdEnv = emptyVarEnv
 
--- nopDmdType is the demand of doing nothing
--- (lazy, absent, no CPR information, no termination information).
--- Note that it is ''not'' the top of the lattice (which would be "may use everything"),
--- so it is (no longer) called topDmd
-nopDmdType, botDmdType :: DmdType
-nopDmdType = DmdType emptyDmdEnv [] conDiv
-botDmdType = DmdType emptyDmdEnv [] botDiv
+-- | 'emptyDmdType' is the demand type where every FV is used according to the
+-- defaultFvDemand of the given 'Divergence' and every argument is used
+-- according to the defaultArgDmd. Examples:
+--
+--   * 'botDiv': Every free var has 'botDmd' and every argument has 'botDmd'.
+--               This is 'botDmdType'.
+--   * 'exnDiv': Every free var has 'absDmd' and every argument has 'absDmd'.
+--   * 'botDiv': This is 'botDmdType'. Every free variable and argument has
+--               'botDmd'.
+--   * 'topDiv': Every free var has 'absDmd' and every argument has 'topDmd'.
+--   * 'conDiv': Like 'topDiv', but the 'Divergence' interacts in a crucial way
+--               when 'bothDmdType'd with a 'botDiv' 'DmdType'.
+--               See Note [Precise exceptions and strictness analysis] in
+--               "Demand".
+--
+emptyDmdType :: Divergence -> DmdType
+emptyDmdType div = DmdType emptyDmdEnv [] div
+
+botDmdType :: DmdType
+botDmdType = emptyDmdType botDiv
 
 isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env [] Dunno)
@@ -1239,12 +1252,12 @@ dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
 -- | This makes sure we can use the demand type with n arguments.
--- It extends the argument list with the correct defaultArgDmd.
--- It also adjusts the Divergence: Divergence survives additional arguments.
+-- It appends the argument list with the correct defaultArgDmd.
+-- It also adjusts the Divergence: 'Diverges'survives additional arguments.
 ensureArgs :: Arity -> DmdType -> DmdType
 ensureArgs n d | n == depth = d
                | n >  depth = DmdType inc_fv inc_ds inc_div
-               | otherwise  = DmdType dec_fv dec_ds dec_div
+               | otherwise  = decreaseArityDmdType d
   where depth = dmdTypeDepth d
         DmdType fv ds div = d
 
@@ -1260,16 +1273,22 @@ ensureArgs n d | n == depth = d
           ConOrDiv -> Dunno
           _        -> div
 
-        -- Arity decrease:
-        --  * Demands on FVs must be zapped, because they were computed for a
-        --    stronger incoming demand.
-        --  * Demands on args must also be zapped.
-        --  * Divergence may now also converge. Dunno would be a conservative
-        --    way to say so, but also very crude because we won't throw a
-        --    precise exception if we didn't before anyway.
-        dec_fv = emptyVarEnv
-        dec_ds = []
-        dec_div = lubDivergence ConOrDiv div -- we possibly converge now
+-- | A conservative approximation for a given 'DmdType' in case of an arity
+-- decrease:
+--
+--  * Demands on FVs must be zapped, because they were computed for a
+--    stronger incoming demand.
+--  * Demands on args must also be zapped.
+--  * Divergence may now also converge. Dunno would be a conservative
+--    way to say so, but also very crude because we won't throw a
+--    precise exception if we didn't before anyway.
+--
+-- So, basically this will return either @'emptyDmdType' topDiv@ or
+-- @'emptyDmdType' conDiv@, depending on whether the original 'DmdType'
+-- could throw a precise exception or not.
+decreaseArityDmdType :: DmdType -> DmdType
+decreaseArityDmdType (DmdType _ _ div)
+  = DmdType emptyVarEnv [] (lubDivergence ConOrDiv div)
 
 seqDmdType :: DmdType -> ()
 seqDmdType (DmdType env ds res) =
@@ -1675,7 +1694,7 @@ increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds re
   | arity_increase < 0  = WARN( True, text "increaseStrictSigArity:"
                                   <+> text "negative arity increase"
                                   <+> ppr arity_increase )
-                          nopSig
+                          StrictSig (decreaseArityDmdType dmd_ty)
   | otherwise           = StrictSig (DmdType env dmds' res)
   where
     dmds' = replicate arity_increase topDmd ++ dmds
@@ -1699,12 +1718,15 @@ strictSigDmdEnv (StrictSig (DmdType env _ _)) = env
 isBottomingSig :: StrictSig -> Bool
 isBottomingSig (StrictSig (DmdType _ _ res)) = isBotDiv res
 
-nopSig, botSig :: StrictSig
-nopSig = StrictSig nopDmdType
+-- | See 'emptyDmdType'.
+emptySig :: Divergence ->StrictSig
+emptySig div = StrictSig (emptyDmdType div)
+
+botSig :: StrictSig
 botSig = StrictSig botDmdType
 
 cprProdSig :: Arity -> StrictSig
-cprProdSig _arity = nopSig
+cprProdSig _arity = emptySig conDiv -- constructor applications never throw precise exceptions
 
 seqStrictSig :: StrictSig -> ()
 seqStrictSig (StrictSig ty) = seqDmdType ty
@@ -1730,7 +1752,7 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
                 -- Must remember whether it's a product, hence con_res, not TopRes
 
   | otherwise   -- Not saturated
-  = nopDmdType
+  = emptyDmdType conDiv
   where
     go_str 0 dmd        = splitStrProdDmd arity dmd
     go_str n (SCall s') = go_str (n-1) s'
@@ -1752,7 +1774,7 @@ dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
    = postProcessUnsat defer_use $
      DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] conDiv
    | otherwise
-   = nopDmdType              -- See Note [Demand transformer for a dictionary selector]
+   = emptyDmdType conDiv -- See Note [Demand transformer for a dictionary selector]
   where
     enhance cd old | isAbsDmd old = old
                    | otherwise    = mkOnceUsedDmd cd  -- This is the one!
@@ -1771,7 +1793,7 @@ For single-method classes, which are represented by newtypes the signature
 of 'op' won't look like U(...), so the splitProdDmd_maybe will fail.
 That's fine: if we are doing strictness analysis we are also doing inlining,
 so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
-way, returning nopDmdType.
+way, returning emptyDmdType.
 
 It is (just.. #8329) possible to be running strictness analysis *without*
 having inlined class ops from single-method classes.  Suppose you are using

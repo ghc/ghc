@@ -148,8 +148,8 @@ dmdAnal, dmdAnal' :: AnalEnv
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
-dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+dmdAnal' _ _ (Lit lit)     = (emptyDmdType conDiv, Lit lit)
+dmdAnal' _ _ (Type ty)     = (emptyDmdType conDiv, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
@@ -485,7 +485,7 @@ dmdFix top_lvl env let_dmd orig_pairs
 
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+    zapIdStrictness pairs = [(setIdStrictness id (emptySig topDiv), rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
