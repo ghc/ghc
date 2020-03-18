@@ -764,7 +764,7 @@ withTiming' dflags what force_result prtimings action
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
           eventBegins dflags w = do
             whenPrintTimings $ traceMarkerIO (eventBeginsDoc dflags w)
-            liftIO $ traceEventIO (eventEndsDoc dflags w)
+            liftIO $ traceEventIO (eventBeginsDoc dflags w)
           eventEnds dflags w = do
             whenPrintTimings $ traceMarkerIO (eventEndsDoc dflags w)
             liftIO $ traceEventIO (eventEndsDoc dflags w)
