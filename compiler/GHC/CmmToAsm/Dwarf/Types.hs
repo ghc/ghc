@@ -31,9 +31,9 @@ import Encoding
 import FastString
 import Outputable
 import GHC.Platform
-import Unique
+import GHC.Types.Unique
 import GHC.Platform.Reg
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 
 import GHC.CmmToAsm.Dwarf.Constants

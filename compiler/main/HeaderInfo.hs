@@ -28,10 +28,10 @@ import Parser           ( parseHeader )
 import Lexer
 import FastString
 import GHC.Hs
-import Module
+import GHC.Types.Module
 import PrelNames
 import StringBuffer
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import ErrUtils
 import Util
@@ -40,7 +40,7 @@ import Maybes
 import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils
 import Exception
-import BasicTypes
+import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

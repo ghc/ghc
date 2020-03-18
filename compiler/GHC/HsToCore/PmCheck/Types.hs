@@ -44,12 +44,12 @@ import GhcPrelude
 import Util
 import Bag
 import FastString
-import Var (EvVar)
-import Id
-import VarEnv
-import UniqDSet
-import UniqDFM
-import Name
+import GHC.Types.Var (EvVar)
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique.DFM
+import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import Outputable
@@ -57,7 +57,7 @@ import ListSetOps (unionLists)
 import Maybes
 import GHC.Core.Type
 import GHC.Core.TyCon
-import Literal
+import GHC.Types.Literal
 import GHC.Core
 import GHC.Core.Map
 import GHC.Core.Utils (exprType)

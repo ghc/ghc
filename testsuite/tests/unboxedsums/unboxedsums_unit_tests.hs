@@ -1,14 +1,14 @@
 module Main where
 
-import BasicTypes
+import GHC.Types.Basic
 import GHC
 import GHC.Driver.Monad
 import Outputable
 import GHC.Types.RepType
 import TysPrim
 import TysWiredIn
-import UniqSet
-import Unique
+import GHC.Types.Unique.Set
+import GHC.Types.Unique
 
 import qualified Control.Exception as E
 import Control.Monad

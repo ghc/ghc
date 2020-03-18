@@ -54,20 +54,20 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
-import Var
-import VarEnv
-import VarSet
+import GHC.Types.Var as Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import Bag
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import ErrUtils
 import FastString
-import Id
+import GHC.Types.Id
 import ListSetOps
-import Name
-import NameSet
+import GHC.Types.Name
+import GHC.Types.Name.Set
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
@@ -195,7 +195,7 @@ Instead we use a cunning trick.
 
  * ClassOp rules: We give the ClassOp 'op2' a BuiltinRule that
    extracts the right piece iff its argument satisfies
-   exprIsConApp_maybe.  This is done in MkId mkDictSelId
+   exprIsConApp_maybe.  This is done in GHC.Types.Id.Make.mkDictSelId
 
  * We make 'df' CONLIKE, so that shared uses still match; eg
       let d = df d1 d2

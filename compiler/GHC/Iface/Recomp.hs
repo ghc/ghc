@@ -19,27 +19,27 @@ import BinFingerprint
 import GHC.Iface.Load
 import FlagChecker
 
-import Annotations
+import GHC.Types.Annotations
 import GHC.Core
 import TcRnMonad
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Driver.Finder
 import GHC.Driver.Session
-import Name
-import NameSet
-import Module
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Module
 import ErrUtils
 import Digraph
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import Unique
+import GHC.Types.Unique
 import Util             hiding ( eqListBy )
 import Maybes
 import Binary
 import Fingerprint
 import Exception
-import UniqSet
+import GHC.Types.Unique.Set
 import GHC.Driver.Packages
 
 import Control.Monad

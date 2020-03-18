@@ -1,9 +1,9 @@
 module GHC.Rename.Expr where
-import Name
+import GHC.Types.Name
 import GHC.Hs
-import NameSet     ( FreeVars )
+import GHC.Types.Name.Set ( FreeVars )
 import TcRnTypes
-import SrcLoc      ( Located )
+import GHC.Types.SrcLoc   ( Located )
 import Outputable  ( Outputable )
 
 rnLExpr :: LHsExpr GhcPs

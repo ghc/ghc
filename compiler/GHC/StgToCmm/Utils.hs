@@ -64,22 +64,22 @@ import GHC.Cmm.Utils hiding (mkDataLits, mkRODataLits, mkByteStringCLit)
 import GHC.Cmm.Switch
 import GHC.StgToCmm.CgUtils
 
-import ForeignCall
-import IdInfo
+import GHC.Types.ForeignCall
+import GHC.Types.Id.Info
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
-import Module
-import Literal
+import GHC.Types.Module
+import GHC.Types.Literal
 import Digraph
 import Util
-import Unique
-import UniqSupply (MonadUnique(..))
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply (MonadUnique(..))
 import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Types.RepType
-import CostCentre
+import GHC.Types.CostCentre
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8

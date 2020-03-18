@@ -34,14 +34,14 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
 import GHC.Runtime.Heap.Layout
-import CostCentre
-import Module
+import GHC.Types.CostCentre
+import GHC.Types.Module
 import GHC.Core.DataCon
 import GHC.Driver.Session
 import FastString
-import Id
+import GHC.Types.Id
 import GHC.Types.RepType (countConRepArgs)
-import Literal
+import GHC.Types.Literal
 import PrelInfo
 import Outputable
 import GHC.Platform

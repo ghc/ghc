@@ -21,26 +21,26 @@ import GHC.ByteCode.Types
 import GHC.Stack.CCS
 import GHC.Core.Type
 import GHC.Hs
-import Module
+import GHC.Types.Module as Module
 import Outputable
 import GHC.Driver.Session
 import GHC.Core.ConLike
 import Control.Monad
-import SrcLoc
+import GHC.Types.SrcLoc
 import ErrUtils
-import NameSet hiding (FreeVars)
-import Name
+import GHC.Types.Name.Set hiding (FreeVars)
+import GHC.Types.Name
 import Bag
-import CostCentre
-import CostCentreState
+import GHC.Types.CostCentre
+import GHC.Types.CostCentre.State
 import GHC.Core
-import Id
-import VarSet
+import GHC.Types.Id
+import GHC.Types.Var.Set
 import Data.List
 import FastString
 import GHC.Driver.Types
 import GHC.Core.TyCon
-import BasicTypes
+import GHC.Types.Basic
 import MonadUtils
 import Maybes
 import GHC.Cmm.CLabel

@@ -12,7 +12,7 @@ import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 
-import UniqFM
+import GHC.Types.Unique.FM
 import Outputable
 
 import State

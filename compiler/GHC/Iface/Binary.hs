@@ -39,19 +39,19 @@ import TcRnMonad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
 import GHC.Driver.Types
-import Module
-import Name
+import GHC.Types.Module
+import GHC.Types.Name
 import GHC.Driver.Session
-import UniqFM
-import UniqSupply
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import Panic
 import Binary
-import SrcLoc
+import GHC.Types.SrcLoc
 import ErrUtils
 import FastMutInt
-import Unique
+import GHC.Types.Unique
 import Outputable
-import NameCache
+import GHC.Types.Name.Cache
 import GHC.Platform
 import FastString
 import Constants

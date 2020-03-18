@@ -21,23 +21,23 @@ import GhcPrelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
-import Literal( pprLiteral )
-import Name( pprInfixName, pprPrefixName )
-import Var
-import Id
-import IdInfo
-import Demand
-import Cpr
+import GHC.Types.Literal( pprLiteral )
+import GHC.Types.Name( pprInfixName, pprPrefixName )
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Coercion
-import BasicTypes
+import GHC.Types.Basic
 import Maybes
 import Util
 import Outputable
 import FastString
-import SrcLoc      ( pprUserRealSpan )
+import GHC.Types.SrcLoc ( pprUserRealSpan )
 
 {-
 ************************************************************************

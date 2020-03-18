@@ -80,14 +80,14 @@ import {-# SOURCE #-} GHC.Core.ConLike ( ConLike(..), conLikeName )
 
 -- friends:
 import GHC.Iface.Type
-import Var
-import VarSet
-import Name hiding ( varName )
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Name hiding ( varName )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import BasicTypes ( LeftOrRight(..), pickLR )
+import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import Outputable
 import FastString
 import Util

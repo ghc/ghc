@@ -34,10 +34,10 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Core
 import FastString      ( nilFS, mkFastString )
-import Module
+import GHC.Types.Module
 import Outputable
 import GHC.Cmm.Ppr.Expr ( pprExpr )
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util            ( seqList )
 
 import GHC.Cmm.Dataflow.Block
