@@ -33,11 +33,11 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Switch
 import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Core (Tickish)
-import qualified Unique as U
+import qualified GHC.Types.Unique as U
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
@@ -45,7 +45,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
-import Unique (nonDetCmpUnique)
+import GHC.Types.Unique (nonDetCmpUnique)
 import Util
 
 

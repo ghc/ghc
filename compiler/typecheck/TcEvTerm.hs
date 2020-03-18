@@ -10,15 +10,15 @@ import FastString
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
-import Literal ( Literal(..) )
+import GHC.Types.Literal ( Literal(..) )
 import TcEvidence
 import GHC.Driver.Types
 import GHC.Driver.Session
-import Name
-import Module
+import GHC.Types.Name
+import GHC.Types.Module
 import GHC.Core.Utils
 import PrelNames
-import SrcLoc
+import GHC.Types.SrcLoc
 
 -- Used with Opt_DeferTypeErrors
 -- See Note [Deferring coercion errors to runtime]

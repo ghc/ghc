@@ -4,7 +4,7 @@ module ErrUtils where
 
 import GhcPrelude
 import Outputable (SDoc, PprStyle )
-import SrcLoc (SrcSpan)
+import GHC.Types.SrcLoc (SrcSpan)
 import Json
 import {-# SOURCE #-} GHC.Driver.Session ( DynFlags )
 

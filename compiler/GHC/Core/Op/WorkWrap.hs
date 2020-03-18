@@ -14,15 +14,15 @@ import GHC.Core
 import GHC.Core.Unfold ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
-import Var
-import Id
-import IdInfo
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.Type
-import UniqSupply
-import BasicTypes
+import GHC.Types.Unique.Supply
+import GHC.Types.Basic
 import GHC.Driver.Session
-import Demand
-import Cpr
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Core.Op.WorkWrap.Lib
 import Util
 import Outputable

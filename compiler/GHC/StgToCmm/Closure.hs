@@ -71,19 +71,19 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 
-import CostCentre
+import GHC.Types.CostCentre
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.DataCon
-import Name
+import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import TcType
 import GHC.Core.TyCon
 import GHC.Types.RepType
-import BasicTypes
+import GHC.Types.Basic
 import Outputable
 import GHC.Driver.Session
 import Util

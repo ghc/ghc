@@ -28,17 +28,17 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
 import GHC.Core
-import Id( idType, mkTemplateLocals )
+import GHC.Types.Id( idType, mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
-import Var
-import VarEnv( mkInScopeSet )
-import VarSet( delVarSetList )
-import OccName ( OccName )
+import GHC.Types.Var
+import GHC.Types.Var.Env( mkInScopeSet )
+import GHC.Types.Var.Set( delVarSetList )
+import GHC.Types.Name.Occurrence ( OccName )
 import Outputable
 import GHC.Driver.Session( DynFlags )
-import NameSet
-import RdrName
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
 import GHC.Hs.Types( HsIPName(..) )
 
 import Pair
@@ -48,7 +48,7 @@ import MonadUtils
 import Control.Monad
 import Data.Maybe ( isJust )
 import Data.List  ( zip4 )
-import BasicTypes
+import GHC.Types.Basic
 
 import Data.Bifunctor ( bimap )
 import Data.Foldable ( traverse_ )

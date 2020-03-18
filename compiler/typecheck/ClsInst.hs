@@ -21,7 +21,7 @@ import TcMType
 import TcEvidence
 import GHC.Core.Predicate
 import GHC.Rename.Env( addUsedGRE )
-import RdrName( lookupGRE_FieldLabel )
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
 import GHC.Core.InstEnv
 import Inst( instDFunType )
 import FamInst( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
@@ -30,12 +30,12 @@ import TysWiredIn
 import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
 import PrelNames
 
-import Id
+import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
-import Name   ( Name, pprDefinedAt )
-import VarEnv ( VarEnv )
+import GHC.Types.Name   ( Name, pprDefinedAt )
+import GHC.Types.Var.Env ( VarEnv )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class

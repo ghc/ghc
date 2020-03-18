@@ -27,16 +27,16 @@ import GhcPrelude
 import TcRnMonad
 import GHC.Driver.Types
 import GHC.Core.Type
-import Var
-import Name
-import Avail
-import Module
+import GHC.Types.Var
+import GHC.Types.Name
+import GHC.Types.Avail
+import GHC.Types.Module
 import FastString
 import FastStringEnv
 import GHC.Iface.Type
-import NameCache
-import UniqSupply
-import SrcLoc
+import GHC.Types.Name.Cache
+import GHC.Types.Unique.Supply
+import GHC.Types.SrcLoc
 
 import Outputable
 import Data.List     ( partition )
@@ -48,7 +48,7 @@ import Data.List     ( partition )
 *                                                      *
 *********************************************************
 
-See Also: Note [The Name Cache] in NameCache
+See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 -}
 
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name

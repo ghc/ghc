@@ -21,20 +21,20 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHCi.RemoteTypes
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Session
 import Outputable
 import GHC.Platform
-import Name
-import MkId
-import Id
-import Var             ( updateVarType )
-import ForeignCall
+import GHC.Types.Name
+import GHC.Types.Id.Make
+import GHC.Types.Id
+import GHC.Types.Var ( updateVarType )
+import GHC.Types.ForeignCall
 import GHC.Driver.Types
 import GHC.Core.Utils
 import GHC.Core
 import GHC.Core.Ppr
-import Literal
+import GHC.Types.Literal
 import PrimOp
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -42,20 +42,20 @@ import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import Util
-import VarSet
+import GHC.Types.Var.Set
 import TysPrim
 import GHC.Core.TyCo.Ppr ( pprType )
 import ErrUtils
-import Unique
+import GHC.Types.Unique
 import FastString
 import Panic
-import GHC.StgToCmm.Closure    ( NonVoid(..), fromNonVoid, nonVoidIds )
+import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
 import OrdList
 import Maybes
-import VarEnv
+import GHC.Types.Var.Env
 import PrelNames ( unsafeEqualityProofName )
 
 import Data.List
@@ -63,8 +63,8 @@ import Foreign
 import Control.Monad
 import Data.Char
 
-import UniqSupply
-import Module
+import GHC.Types.Unique.Supply
+import GHC.Types.Module
 
 import Control.Exception
 import Data.Array

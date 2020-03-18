@@ -37,9 +37,9 @@ import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import UniqSet
-import UniqFM
-import Unique
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 import State
 import Outputable
 import GHC.Platform

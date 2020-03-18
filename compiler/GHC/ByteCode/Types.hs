@@ -16,14 +16,14 @@ module GHC.ByteCode.Types
 import GhcPrelude
 
 import FastString
-import Id
-import Name
-import NameEnv
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import Outputable
 import PrimOp
 import SizedSeq
 import GHC.Core.Type
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI

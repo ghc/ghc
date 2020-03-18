@@ -45,29 +45,29 @@ import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types
 
-import BasicTypes hiding (SuccessFlag(..))
+import GHC.Types.Basic hiding (SuccessFlag(..))
 import TcRnMonad
 
 import Constants
 import PrelNames
 import PrelInfo
 import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
-import MkId     ( seqId )
+import GHC.Types.Id.Make ( seqId )
 import TysPrim  ( funTyConName )
 import GHC.Core.Rules
 import GHC.Core.TyCon
-import Annotations
+import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import Name
-import NameEnv
-import Avail
-import Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Avail
+import GHC.Types.Module
 import Maybes
 import ErrUtils
 import GHC.Driver.Finder
-import UniqFM
-import SrcLoc
+import GHC.Types.Unique.FM
+import GHC.Types.SrcLoc
 import Outputable
 import GHC.Iface.Binary
 import Panic
@@ -75,9 +75,9 @@ import Util
 import FastString
 import Fingerprint
 import GHC.Driver.Hooks
-import FieldLabel
+import GHC.Types.FieldLabel
 import GHC.Iface.Rename
-import UniqDSet
+import GHC.Types.Unique.DSet
 import GHC.Driver.Plugins
 
 import Control.Monad

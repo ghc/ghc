@@ -6,7 +6,7 @@ import GHC.Driver.Monad
 import Outputable
 import System.Environment
 import GHC.Driver.Session
-import Module
+import GHC.Types.Module
 
 main =
   do [libdir] <- getArgs
