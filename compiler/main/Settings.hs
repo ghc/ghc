@@ -51,7 +51,6 @@ module Settings
   , sGhcWithSMP
   , sGhcRTSWays
   , sTablesNextToCode
-  , sLeadingUnderscore
   , sLibFFI
   , sGhcThreaded
   , sGhcDebugged
@@ -191,8 +190,6 @@ sGhcRTSWays :: Settings -> String
 sGhcRTSWays = platformMisc_ghcRTSWays . sPlatformMisc
 sTablesNextToCode :: Settings -> Bool
 sTablesNextToCode = platformMisc_tablesNextToCode . sPlatformMisc
-sLeadingUnderscore :: Settings -> Bool
-sLeadingUnderscore = platformMisc_leadingUnderscore . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
 sGhcThreaded :: Settings -> Bool
