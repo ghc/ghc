@@ -51,8 +51,8 @@ import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import TcEnv
-import TcRnMonad
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
 import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
 import GHC.Types.Name

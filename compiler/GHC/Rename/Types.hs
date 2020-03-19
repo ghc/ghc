@@ -45,7 +45,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
                          , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import PrelNames
 import TysPrim          ( funTyConName )
@@ -70,7 +70,7 @@ import Control.Monad      ( unless, when )
 #include "HsVersions.h"
 
 {-
-These type renamers are in a separate module, rather than in (say) GHC.Rename.Source,
+These type renamers are in a separate module, rather than in (say) GHC.Rename.Module,
 to break several loop.
 
 *********************************************************
@@ -1012,7 +1012,7 @@ argument, build a map and look them up.
 
 rnConDeclFields :: HsDocContext -> [FieldLabel] -> [LConDeclField GhcPs]
                 -> RnM ([LConDeclField GhcRn], FreeVars)
--- Also called from GHC.Rename.Source
+-- Also called from GHC.Rename.Module
 -- No wildcards can appear in record fields
 rnConDeclFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields

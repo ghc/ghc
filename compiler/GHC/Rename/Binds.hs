@@ -34,7 +34,7 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr, rnStmts )
 
 import GHC.Hs
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Rename.Types
 import GHC.Rename.Pat
 import GHC.Rename.Names
@@ -472,7 +472,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               fvs'    = filterNameSet (nameIsLocalOrFrom mod) all_fvs
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
-                -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+                -- MonoLocalBinds test in GHC.Tc.Binds.decideGeneralisationPlan
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss'
                            , pat_ext = fvs' }
@@ -511,7 +511,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
         ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) rhs_fvs
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
-                -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+                -- MonoLocalBinds test in GHC.Tc.Binds.decideGeneralisationPlan
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind { fun_matches = matches'
@@ -720,7 +720,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
               fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
-                -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+                -- MonoLocalBinds test in GHC.Tc.Binds.decideGeneralisationPlan
 
               bind' = bind{ psb_args = details'
                           , psb_def = pat'
@@ -797,7 +797,7 @@ In this case, 'P' needs to be typechecked in two passes:
 
 2. Typecheck the builder definition, which needs the typechecked
    definition of 'f' to be in scope; done by calls oo tcPatSynBuilderBind
-   in TcBinds.tcValBinds.
+   in GHC.Tc.Binds.tcValBinds.
 
 This behaviour is implemented in 'tcValBinds', but it crucially
 depends on 'P' not being put in a recursive group with 'f' (which

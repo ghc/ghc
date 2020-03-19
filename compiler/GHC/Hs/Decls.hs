@@ -201,7 +201,7 @@ An `HsGroup p` stores every top-level fixity declarations in one of two places:
 The story for fixity signatures for class methods is made slightly complicated
 by the fact that they can appear both inside and outside of the class itself,
 and both forms of fixity signatures are considered top-level. This matters
-in `GHC.Rename.Source.rnSrcDecls`, which must create a fixity environment out
+in `GHC.Rename.Module.rnSrcDecls`, which must create a fixity environment out
 of all top-level fixity signatures before doing anything else. Therefore,
 `rnSrcDecls` must be aware of both (1) and (2) above. The
 `hsGroupTopLevelFixitySigs` function is responsible for collecting this
@@ -492,7 +492,7 @@ Each instance declaration gives rise to one dictionary function binding.
 
 The type checker makes up new source-code instance declarations
 (e.g. from 'deriving' or generic default methods --- see
-TcInstDcls.tcInstDecls1).  So we can't generate the names for
+GHC.Tc.TyCl.Instance.tcInstDecls1).  So we can't generate the names for
 dictionary functions in advance (we don't know how many we need).
 
 On the other hand for interface-file instance declarations, the decl
@@ -962,7 +962,7 @@ Invariants
    ones.
 
 See Note [Dependency analysis of type, class, and instance decls]
-in GHC.Rename.Source for more info.
+in GHC.Rename.Module for more info.
 -}
 
 -- | Type or Class Group
@@ -1284,7 +1284,7 @@ type LHsDerivingClause pass = Located (HsDerivingClause pass)
 --       'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
 --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 data HsDerivingClause pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = HsDerivingClause
     { deriv_clause_ext :: XCHsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
@@ -1478,7 +1478,7 @@ There's a wrinkle in ConDeclGADT
             con_args   = PrefixCon []
             con_res_ty = a :*: (b -> (a :*: (b -> (a :+: b))))
 
-       - In the renamer (GHC.Rename.Source.rnConDecl), we unravel it after
+       - In the renamer (GHC.Rename.Module.rnConDecl), we unravel it after
          operator fixities are sorted. So we generate. So we end
          up with
             con_args   = PrefixCon [ a :*: b, a :*: b ]
@@ -1963,7 +1963,7 @@ data DerivDecl pass = DerivDecl
           --
           -- Which signifies that the context should be inferred.
 
-          -- See Note [Inferring the instance context] in TcDerivInfer.
+          -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
@@ -2004,7 +2004,7 @@ type LDerivStrategy pass = Located (DerivStrategy pass)
 
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
                      --   custom instance for the data type. This only works
                      --   for certain types that GHC knows about (e.g., 'Eq',

@@ -7,7 +7,7 @@ import GHC.Hs.Expr
 import GHC.Hs.Extension
 import GHC.Hs.Lit
 import GHC.Driver.Hooks
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 
 plugin :: Plugin
 plugin = defaultPlugin { dynflagsPlugin = hooksP }

@@ -389,7 +389,7 @@ G |-co g0 : t1 {subst1(k)}~R subst2(k) t2
 G |-axk [ namesroles, n_R |-> gs, g0 ] ~> (subst1 [n |-> t1], subst2 [n |-> t2])
 
 defn validRoles T ::  :: checkValidRoles :: 'Cvr_'
-  {{ com Type constructor role validity, \coderef{typecheck/TcTyClsDecls.hs}{checkValidRoles} }}
+  {{ com Type constructor role validity, \coderef{GHC/Tc/TyCl.hs}{checkValidRoles} }}
 by
 
 </ Ki // i /> = tyConDataCons T
@@ -399,7 +399,7 @@ by
 validRoles T
 
 defn validDcRoles </ Raa // aa /> K :: :: check_dc_roles :: 'Cdr_'
-  {{ com Data constructor role validity, \coderef{typecheck/TcTyClsDecls.hs}{check\_dc\_roles} }}
+  {{ com Data constructor role validity, \coderef{GHC/Tc/TyCl.hs}{check\_dc\_roles} }}
 by
 
 forall </ naa // aa />. forall </ mbb // bb />. </ tcc // cc /> $ -> T </ naa // aa /> = dataConRepType K
@@ -408,7 +408,7 @@ forall </ naa // aa />. forall </ mbb // bb />. </ tcc // cc /> $ -> T </ naa //
 validDcRoles </ Raa // aa /> K
 
 defn O |- t : R  ::   :: check_ty_roles :: 'Ctr_'
-  {{ com Type role validity, \coderef{typecheck/TcTyClsDecls.hs}{check\_ty\_roles} }}
+  {{ com Type role validity, \coderef{GHC/Tc/TyCl.hs}{check\_ty\_roles} }}
   {{ tex [[O]] \labeledjudge{ctr} [[t]] : [[R]] }}
 by
 

@@ -231,7 +231,7 @@ Note carefully:
   determine whether or not to emit hole constraints on each wildcard
   (we don't if it's a visible type/kind argument or a type family pattern).
   See related notes Note [Wildcards in visible kind application]
-  and Note [Wildcards in visible type application] in TcHsType.hs
+  and Note [Wildcards in visible type application] in GHC.Tc.HsType
 
 * After type checking is done, we report what types the wildcards
   got unified with.
@@ -1013,7 +1013,7 @@ terms, such as this example:
 
 If we do not pattern-match on ForallInvis in hsScopedTvs, then `a` would
 erroneously be brought into scope over the body of `x` when renaming it.
-Although the typechecker would later reject this (see `TcValidity.vdqAllowed`),
+Although the typechecker would later reject this (see `GHC.Tc.Validity.vdqAllowed`),
 it is still possible for this to wreak havoc in the renamer before it gets to
 that point (see #17687 for an example of this).
 Bottom line: nip problems in the bud by matching on ForallInvis from the start.
@@ -1345,7 +1345,7 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- occurrences).
 --
 -- See Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat and
--- Note [Disambiguating record fields] in TcExpr.
+-- Note [Disambiguating record fields] in GHC.Tc.Expr.
 -- See Note [Located RdrNames] in GHC.Hs.Expr
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)

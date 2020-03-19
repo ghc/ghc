@@ -28,7 +28,7 @@ import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
 import GHC.Types.SrcLoc        ( noSrcSpan )
 import GHC.Driver.Finder       ( findPluginModule, cannotFindModule )
-import TcRnMonad               ( initTcInteractive, initIfaceTcRn )
+import GHC.Tc.Utils.Monad            ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface )
 import GHC.Types.Name.Reader  ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName

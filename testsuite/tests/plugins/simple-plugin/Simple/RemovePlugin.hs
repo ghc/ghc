@@ -6,7 +6,7 @@ import Data.List (intercalate)
 import GHC.Driver.Plugins
 import Bag
 import GHC.Driver.Types
-import TcRnTypes
+import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Hs.Expr
 import Outputable

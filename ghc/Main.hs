@@ -67,7 +67,7 @@ import MonadUtils       ( liftIO )
 -- Imports for --abi-hash
 import GHC.Iface.Load      ( loadUserInterface )
 import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
-import TcRnMonad           ( initIfaceCheck )
+import GHC.Tc.Utils.Monad        ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )
 import BinFingerprint      ( fingerprintBinMem )
 

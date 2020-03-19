@@ -207,7 +207,7 @@ pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
 
 pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
 -- Used when printing injectivity errors (FamInst.reportInjectivityErrors)
--- and inaccessible branches (TcValidity.inaccessibleCoAxBranch)
+-- and inaccessible branches (GHC.Tc.Validity.inaccessibleCoAxBranch)
 -- This happens in error messages: don't print the RHS of a data
 --   family axiom, which is meaningless to a user
 pprCoAxBranchUser tc br
@@ -2524,7 +2524,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 %*                                                                      *
 %************************************************************************
 
-The function below morally belongs in TcFlatten, but it is used also in
+The function below morally belongs in GHC.Tc.Solver.Flatten, but it is used also in
 FamInstEnv, and so lives here.
 
 Note [simplifyArgsWorker]
@@ -2838,7 +2838,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         kind_co = liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
-      = -- By Note [Flattening] in TcFlatten invariant (F2),
+      = -- By Note [Flattening] in GHC.Tc.Solver.Flatten invariant (F2),
          -- tcTypeKind(xi) = tcTypeKind(ty). But, it's possible that xi will be
          -- used as an argument to a function whose kind is different, if
          -- earlier arguments have been flattened to new types. We thus
@@ -2898,7 +2898,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
            -- This debug information is commented out because leaving it in
            -- causes a ~2% increase in allocations in T9872d.
            -- That's independent of the analogous case in flatten_args_fast
-           -- in TcFlatten:
+           -- in GHC.Tc.Solver.Flatten:
            -- each of these causes a 2% increase on its own, so commenting them
            -- both out gives a 4% decrease in T9872d.
            {-
