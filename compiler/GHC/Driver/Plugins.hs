@@ -50,9 +50,9 @@ module GHC.Driver.Plugins (
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Core.Op.Monad ( CoreToDo, CoreM )
-import qualified TcRnTypes
-import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
-import TcHoleFitTypes ( HoleFitPluginR )
+import qualified GHC.Tc.Types
+import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
+import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
 import GHC.Hs
 import GHC.Driver.Session
 import GHC.Driver.Types
@@ -188,7 +188,7 @@ instance Monoid PluginRecompile where
   mempty = NoForceRecompile
 
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
-type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
+type TcPlugin = [CommandLineOption] -> Maybe GHC.Tc.Types.TcPlugin
 type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
