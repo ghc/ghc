@@ -182,7 +182,7 @@ hackMarkup fmt' currPkg h' =
       UntouchedDoc d -> (markup fmt $ _doc d, [_meta d])
       CollapsingHeader (Header lvl titl) par n nm ->
         let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
-            col' = collapseControl id_ "caption"
+            col' = collapseControl id_ "subheading"
             summary = thesummary ! [ theclass "hide-when-js-enabled" ] << "Expand"
             instTable contents = collapseDetails id_ DetailsClosed (summary +++ contents)
             lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
