@@ -3513,7 +3513,7 @@ mkLetUnfolding dflags top_lvl src id new_rhs
             --             we don't.)  The simple thing is always to have one.
   where
     is_top_lvl   = isTopLevel top_lvl
-    is_bottoming = isBottomingId id
+    is_bottoming = isDeadEndId id
 
 -------------------
 simplStableUnfolding :: SimplEnv -> TopLevelFlag

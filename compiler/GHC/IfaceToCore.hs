@@ -1508,7 +1508,7 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
             Nothing -> NoUnfolding
             Just expr -> mkUnfolding dflags unf_src
                            True {- Top level -}
-                           (isBottomingSig strict_sig)
+                           (isDeadEndSig strict_sig)
                            expr
         }
   where

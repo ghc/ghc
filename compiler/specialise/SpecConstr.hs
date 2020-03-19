@@ -1599,8 +1599,8 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                               , ri_lam_body = body, ri_arg_occs = arg_occs })
                spec_info@(SI { si_specs = specs, si_n_specs = spec_count
                              , si_mb_unspec = mb_unspec })
-  | isBottomingId fn      -- Note [Do not specialise diverging functions]
-                          -- and do not generate specialisation seeds from its RHS
+  | isDeadEndId fn  -- Note [Do not specialise diverging functions]
+                    -- and do not generate specialisation seeds from its RHS
   = -- pprTrace "specialise bot" (ppr fn) $
     return (nullUsage, spec_info)
 

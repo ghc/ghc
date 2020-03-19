@@ -65,7 +65,7 @@ import Util
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Arity        ( typeArity )
-import Demand ( splitStrictSig, isBotDiv )
+import Demand ( splitStrictSig, isDeadEndDiv )
 
 import GHC.Driver.Types
 import GHC.Driver.Session
@@ -651,7 +651,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
            ppr binder)
 
        ; case splitStrictSig (idStrictness binder) of
-           (demands, result_info) | isBotDiv result_info ->
+           (demands, result_info) | isDeadEndDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
                (text "idArity" <+> ppr (idArity binder) <+>
                text "exceeds arity imposed by the strictness signature" <+>

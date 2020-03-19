@@ -1111,7 +1111,7 @@ exprIsBottom e
   | otherwise
   = go 0 e
   where
-    go n (Var v) = isBottomingId v &&  n >= idArity v
+    go n (Var v) = isDeadEndId v &&  n >= idArity v
     go n (App e a) | isTypeArg a = go n e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e
@@ -1434,7 +1434,7 @@ isWorkFreeApp fn n_val_args
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
   | isWorkFreeApp fn n_val_args = True
-  | isBottomingId fn            = True  -- See Note [isCheapApp: bottoming functions]
+  | isDeadEndId fn              = True  -- See Note [isCheapApp: bottoming functions]
   | otherwise
   = case idDetails fn of
       DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
@@ -1456,7 +1456,7 @@ isExpandableApp fn n_val_args
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId {}      -> False
-      _ | isBottomingId fn               -> False
+      _ | isDeadEndId fn                 -> False
           -- See Note [isExpandableApp: bottoming functions]
         | isConLike (idRuleMatchInfo fn) -> True
         | all_args_are_preds             -> True
@@ -2202,7 +2202,7 @@ diffExpr top env (Tick n1 e1)   (Tick n2 e2)
  -- generated names, which are allowed to differ.
 diffExpr _   _   (App (App (Var absent) _) _)
                  (App (App (Var absent2) _) _)
-  | isBottomingId absent && isBottomingId absent2 = []
+  | isDeadEndId absent && isDeadEndId absent2 = []
 diffExpr top env (App f1 a1)    (App f2 a2)
   = diffExpr top env f1 f2 ++ diffExpr top env a1 a2
 diffExpr top env (Lam b1 e1)  (Lam b2 e2)

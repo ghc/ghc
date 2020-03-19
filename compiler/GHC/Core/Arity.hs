@@ -759,7 +759,7 @@ arityType _ (Var v)
   , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
-  = if isBotDiv res then ABot arity
+  = if isDeadEndDiv res then ABot arity
                     else ATop (take arity one_shots)
   | otherwise
   = ATop (take (idArity v) one_shots)

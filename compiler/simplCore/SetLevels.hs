@@ -293,7 +293,7 @@ lvlTopBind env (Rec pairs)
 lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr -> LvlM LevelledExpr
 lvl_top env is_rec bndr rhs
   = lvlRhs env is_rec
-           (isBottomingId bndr)
+           (isDeadEndId bndr)
            Nothing  -- Not a join point
            (freeVars rhs)
 

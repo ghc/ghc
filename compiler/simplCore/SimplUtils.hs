@@ -499,7 +499,7 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- top-level bindings for (say) strings into
                         -- calls to error.  But now we are more careful about
                         -- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-                   if isBotDiv result_info then
+                   if isDeadEndDiv result_info then
                         map isStrictDmd demands         -- Finite => result is bottom
                    else
                         map isStrictDmd demands ++ vanilla_stricts
@@ -1141,7 +1141,7 @@ preInlineUnconditionally
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
-  | isTopLevel top_lvl && isBottomingId bndr = Nothing -- Note [Top-level bottoming Ids]
+  | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify

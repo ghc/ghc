@@ -28,8 +28,8 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isBotDiv, topDiv, botDiv, exnDiv, conDiv,
-        appIsBottom, isBottomingSig, pprIfaceStrictSig,
+        Divergence(..), lubDivergence, isDeadEndDiv, topDiv, botDiv, exnDiv, conDiv,
+        appIsBottom, isDeadEndSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         emptySig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
@@ -240,7 +240,7 @@ The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
 of dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need
 to give it 'exnDiv', which was conceived entirely for this reason. The default
 FV demand of 'exnDiv' is lazy, its default arg dmd is absent, but otherwise (in
-terms of 'Demand.isBotDiv') it behaves exactly as 'botDiv', so that dead code
+terms of 'Demand.isDeadEndDiv') it behaves exactly as 'botDiv', so that dead code
 elimination works as expected.
 -}
 
@@ -988,7 +988,7 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 data Divergence
   = Diverges -- ^ Definitely throws an imprecise exception or diverges.
   | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
-             --   exception or diverges. Never converges, hence 'isBotDiv'!
+             --   exception or diverges. Never converges, hence 'isDeadEndDiv'!
              --   See scenario 2 in Note [Precise exceptions and strictness analysis].
   | ConOrDiv -- ^ Definitely converges, throws an imprecise exception or
              --   diverges. Never throws a precise exception! Important for
@@ -1040,11 +1040,11 @@ conDiv = ConOrDiv
 botDiv = Diverges
 
 -- | True if the result indicates that evaluation will not return.
-isBotDiv :: Divergence -> Bool
-isBotDiv Diverges = True
-isBotDiv ExnOrDiv = True
-isBotDiv ConOrDiv = False
-isBotDiv Dunno    = False
+isDeadEndDiv :: Divergence -> Bool
+isDeadEndDiv Diverges = True
+isDeadEndDiv ExnOrDiv = True
+isDeadEndDiv ConOrDiv = False
+isDeadEndDiv Dunno    = False
 
 -- See Notes [Default demand on free variables]
 -- and [defaultFvDmd vs. defaultArgDmd]
@@ -1739,8 +1739,8 @@ strictSigDmdEnv :: StrictSig -> DmdEnv
 strictSigDmdEnv (StrictSig (DmdType env _ _)) = env
 
 -- | True if the signature diverges or throws an exception
-isBottomingSig :: StrictSig -> Bool
-isBottomingSig (StrictSig (DmdType _ _ res)) = isBotDiv res
+isDeadEndSig :: StrictSig -> Bool
+isDeadEndSig (StrictSig (DmdType _ _ res)) = isDeadEndDiv res
 
 -- | See 'emptyDmdType'.
 emptySig :: Divergence ->StrictSig
@@ -1886,7 +1886,7 @@ binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
 -- See Note [Unsaturated applications]
 appIsBottom :: StrictSig -> Int -> Bool
 appIsBottom (StrictSig (DmdType _ ds res)) n
-            | isBotDiv res                   = not $ lengthExceeds ds n
+            | isDeadEndDiv res                   = not $ lengthExceeds ds n
 appIsBottom _                              _ = False
 
 {-
