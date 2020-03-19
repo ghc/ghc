@@ -186,10 +186,25 @@ only used by `raiseIO#` in order to preserve precise exceptions by strictness
 analysis, while not impacting the ability to eliminate dead code.
 See Note [Precise exceptions and strictness analysis].
 
+Note [What are precise exceptions?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An exception is considered to be /precise/ when it is thrown by the 'raiseIO#'
+primop. It follows that all other primops (such as 'raise#' or
+division-by-zero) throw /imprecise/ exceptions. Note that the actual type of
+the exception thrown doesn't have any impact!
+
+GHC undertakes some effort not to apply an optimisation that would mask a
+/precise/ exception with some other source of divergence, such as genuine
+non-termination or an imprecise exception, so that the user can reliably
+intercept the precise exception with a catch handler before and after
+optimisations.
+
+See the paper "A Semantics for Imprecise Exceptions" for more details.
+
 Note [Precise exceptions and strictness analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have to take care to preserve precise exception semantics (#17676).
-There are two scenarios that need careful hacks.
+We have to take care to preserve precise exception semantics in strictness
+analysis (#17676). There are two scenarios that need careful hacks.
 
 Scenario 1: Precise exceptions in case scrutinees
 -------------------------------------------------
@@ -211,9 +226,9 @@ So the 'y' isn't necessarily going to be evaluated.
 
 To detect this scenario, why we track precise exceptions in the Divergence
 lattice. Specifically, if 'foo' throws an exception, the Divergence in its
-strictness signature will indicate so (ExnOrDiv or Dunno), in which case
+strictness signature will indicate so ('exnDiv' or 'topDiv'), in which case
 'Demand.deferAfterPreciseException' will lub with the strictness analysis
-results of the virtual branch.
+results of the virtual branch when @dmdAnal'@ysing the @Case@.
 
 A more complete example (#148, #1592) where this shows up is:
      do { let len = <expensive> ;
@@ -232,15 +247,29 @@ The motivating example for #13380 is the following:
     f x y | x>0       = raiseIO blah
           | y>0       = return 1
           | otherwise = return 2
-If 'f' was inferred to be strict in 'y', WW would turn a precise into an
-imprecise exception in the call site @f 1 (error "boom")@.
+'f' should not be strict in 'y'. If 'f' was inferred to be strict in 'y', WW
+would turn a precise into an imprecise exception in the call site
+@f 1 (error "boom")@. If the user wrote a catch block for the precise exception
+around that call site, it would no longer match.
 
-The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
-'Demand.defaultFvDmd' is lazy. But then the simplifier fails to eliminate a lot
-of dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need
-to give it 'exnDiv', which was conceived entirely for this reason. The default
-FV demand of 'exnDiv' is lazy, its default arg dmd is absent, but otherwise (in
-terms of 'Demand.isDeadEndDiv') it behaves exactly as 'botDiv', so that dead code
+Contrast this with
+    g x y | x>0       = error "You won't see this"
+          | otherwise = return 2
+'error' throws an imprecise exception, which the compiler is free to mask
+with a different exception or non-termination as it sees fit.
+
+You might think that the solution is to give 'raiseIO#' 'topDiv' instead of
+'botDiv' (which we do for 'error' and other kinds of bottom), so that its
+'Demand.defaultFvDmd' is lazy (cf. Note [Default demand on free variables and arguments]).
+Then the first branch would no longer be strict in 'y'.
+
+But then the simplifier would fail to eliminate a lot of dead code (which
+happens in 'Simplifier.rebuildCall', feeding on the 'arg_stricts' constructed
+in 'SimplUtils.mkArgInfo', which in turn consults 'isDeadEndDiv') when
+'raiseIO#' occurs in a case scrutinee. Hence we need to give it 'exnDiv', which
+was conceived entirely for this reason. The default FV demand of 'exnDiv' is
+lazy (and its default arg dmd is absent), but otherwise (in terms of
+'Demand.isDeadEndDiv') it behaves exactly as 'botDiv', so that dead code
 elimination works as expected.
 -}
 
@@ -1007,7 +1036,7 @@ lubDivergence ConOrDiv ConOrDiv = ConOrDiv
 lubDivergence _        _        = Dunno
 -- This needs to commute with defaultFvDmd, i.e.
 -- defaultFvDmd (r1 `lubDivergence` r2) = defaultFvDmd r1 `lubDmd` defaultFvDmd r2
--- (See Note [Default demand on free variables] for why)
+-- (See Note [Default demand on free variables and arguments] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
@@ -1046,7 +1075,7 @@ isDeadEndDiv ExnOrDiv = True
 isDeadEndDiv ConOrDiv = False
 isDeadEndDiv Dunno    = False
 
--- See Notes [Default demand on free variables]
+-- See Notes [Default demand on free variables and arguments]
 -- and [defaultFvDmd vs. defaultArgDmd]
 -- and Scenario 2 in [Precise exceptions and strictness analysis]
 defaultFvDmd :: Divergence -> Demand
@@ -1087,7 +1116,7 @@ different:
 ************************************************************************
 -}
 
-type DmdEnv = VarEnv Demand   -- See Note [Default demand on free variables]
+type DmdEnv = VarEnv Demand   -- See Note [Default demand on free variables and arguments]
 
 data DmdType = DmdType
                   DmdEnv        -- Demand on explicitly-mentioned
@@ -1484,7 +1513,7 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
   where
   fv' = fv `delVarEnv` id
-  -- See Note [Default demand on free variables]
+  -- See Note [Default demand on free variables and arguments]
   dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
@@ -1495,17 +1524,24 @@ findIdDemand (DmdType fv _ res) id
   = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 {-
-Note [Default demand on free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the variable is not mentioned in the environment of a demand type,
-its demand is taken to be a result demand of the type.
-    For the strictness component,
-     if the result demand is a Diverges, then we use HyperStr
-                                         else we use Lazy
-    For the usage component, we use Absent.
-So we use either absDmd or botDmd.
+Note [Default demand on free variables and arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Free variables not mentioned in the environment of a 'DmdType'
+are demanded according to the demand type's Divergence:
+  * In a Diverges (botDiv) context, that demand is botDmd
+    (HyperStr and Absent).
+  * In all other contexts, the demand is absDmd (Lazy and Absent).
+This is recorded in 'defaultFvDmd'.
 
-Also note the equation for lubDivergence noted there.
+Similarly, we can eta-expand demand types to get demands on excess arguments
+not accounted for in the type, by consulting 'defaultArgDmd':
+  * In a Diverges (botDiv) context, that demand is again botDmd.
+  * In a ExnOrDiv (exnDiv) context, that demand is absDmd: We surely diverge
+    before evaluating the excess argument, but don't want to eagerly evaluate
+    it (cf. Note [Precise exceptions and strictness analysis]).
+  * In all other contexts (conDiv, topDiv), the demand is topDmd, because
+    it's perfectly possible to enter the additional lambda and evaluate it
+    in unforeseen ways.
 
 Note [Always analyse in virgin pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
