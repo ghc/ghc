@@ -2,7 +2,7 @@ module GHC.Rename.Splice where
 
 import GhcPrelude
 import GHC.Hs
-import TcRnMonad
+import GHC.Tc.Monad
 import GHC.Types.Name.Set
 
 
