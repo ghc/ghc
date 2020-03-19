@@ -934,4 +934,4 @@ Other
     This does not add checks to out-of-line primops, and it cannot. For
     example, this flag affects operations like ``indexWord8Array#`` but not
     ``copyArray#``. To add bounds-checking to out-of-line primops,
-    use :rts-flag:`-D`. 
+    use :rts-flag:`-D ⟨x⟩`.
