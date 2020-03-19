@@ -301,7 +301,8 @@ to the user interrupt.
 
 The problem is that it is not possible in general to interrupt a foreign
 call safely. However, GHC does provide a way to interrupt blocking
-system calls which works for most system calls on both Unix and Windows.
+*system* calls which works for most system calls on both Unix and Windows.
+
 When the ``InterruptibleFFI`` extension is enabled, a foreign call can
 be annotated with ``interruptible`` instead of ``safe`` or ``unsafe``: ::
 
@@ -325,12 +326,38 @@ Windows systems
     ``CancelSynchronousIo``, which will cause a blocking I/O operation
     to return with the error ``ERROR_OPERATION_ABORTED``.
 
-If the system call is successfully interrupted, it will return to
-Haskell whereupon the exception can be raised. Be especially careful
-when using ``interruptible`` that the caller of the foreign function is
-prepared to deal with the consequences of the call being interrupted; on
-Unix it is good practice to check for ``EINTR`` always, but on Windows
-it is not typically necessary to handle ``ERROR_OPERATION_ABORTED``.
+Once the system call is successfully interrupted, the surrounding
+code must return control out of the ``foreign import``, back into Haskell code,
+so that the ``throwTo`` Haskell exception can be raised there.
+
+If the foreign code simply retries the system call directly without returning
+back to Haskell, then the intended effect of `interruptible` disappears
+and functions like :base-ref:`System.Timeout.timeout` will not work.
+
+Finally, after the ``interruptible`` foreign call returns into Haskell, the
+Haskell code should allow exceptions to be raised
+(``Control.Exception``'s ``allowInterrupt``, or ``interruptible yield``
+for non-``-threaded``, see https://gitlab.haskell.org/ghc/ghc/issues/8684),
+and implement the ``EINTR``-retrying in Haskell
+(e.g. using e.g. :base-ref:`Foreign.C.Error.throwErrnoIfMinus1Retry`).
+
+Be especially careful when using ``interruptible`` to check that that
+the called foreign function is prepared to deal with the consequences
+of the call being interrupted.
+On Unix it is considered good practice to always check for ``EINTR`` after
+system calls, so you can expect it not to crash (but in that case
+``interruptible`` will not work as intended unless the code then returns
+all the way up to Haskell as described above).
+But on Windows it is not typically common practice to handle
+``ERROR_OPERATION_ABORTED``.
+
+The approach works *only* for foreign code that does I/O (system calls),
+not for CPU-intensive computations that do not do any system calls.
+This is because the only way by which the foreign code can observe
+interruption is by system calls returning interruption error codes.
+To be able to interrupt long-running foreign code doing no system calls,
+the code must likely be changed to explicitly check for intended
+early termination.
 
 .. _ffi-capi:
 
