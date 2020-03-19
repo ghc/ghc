@@ -30,13 +30,13 @@ import VarEnv
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.SimpleOpt ( collectBindersPushingCo )
-import GHC.Core.Utils     ( exprIsTrivial, mkCast, exprType )
+import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe, mkCast, exprType )
 import GHC.Core.FVs
 import GHC.Core.Arity     ( etaExpandToJoinPointRule )
 import UniqSupply
 import Name
 import MkId             ( voidArgId, voidPrimId )
-import Maybes           ( mapMaybe, isJust )
+import Maybes           ( mapMaybe, maybeToList, isJust )
 import MonadUtils       ( foldlM )
 import BasicTypes
 import GHC.Driver.Types
@@ -776,19 +776,18 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
-  = do { inst_dict_id <- newDictBndr env bndr
-       ; let (rhs_env2, dx_binds, spec_dict_args')
-                = bindAuxiliaryDicts env [bndr] [d] [inst_dict_id]
-       ; (env', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader rhs_env2 bndrs args
-       ; pure ( env'
+  = do { rule_bndr <- newDictBndr env bndr
+       ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr d
+       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+             <- specHeader env' bndrs args
+       ; pure ( env''
               , unused_bndrs
               -- See Note [Evidence foralls]
-              , exprFreeIdsList (varToCoreExpr inst_dict_id) ++ rule_bs
-              , varToCoreExpr inst_dict_id : rule_es
+              , exprFreeIdsList (varToCoreExpr rule_bndr) ++ rule_bs
+              , varToCoreExpr rule_bndr : rule_es
               , bs'
-              , dx_binds ++ dx
-              , spec_dict_args' ++ spec_args
+              , maybeToList dx_bind ++ dx
+              , spec_dict : spec_args
               )
        }
 
@@ -1049,6 +1048,12 @@ data SpecEnv
              -- and hence may be worth specialising against
              -- See Note [Interesting dictionary arguments]
      }
+
+instance Outputable SpecEnv where
+  ppr (SE { se_subst = subst, se_interesting = interesting })
+    = text "SE" <+> braces (sep $ punctuate comma
+        [ text "subst =" <+> ppr subst
+        , text "interesting =" <+> ppr interesting ])
 
 specVar :: SpecEnv -> Id -> CoreExpr
 specVar env v = GHC.Core.Subst.lookupIdSubst (text "specVar") (se_subst env) v
@@ -1678,41 +1683,32 @@ module M will be used in other modules only if M.hi has been read for
 some other reason, which is actually pretty likely.
 -}
 
-bindAuxiliaryDicts
-        :: SpecEnv
-        -> [DictId] -> [CoreExpr]   -- Original dict bndrs, and the witnessing expressions
-        -> [DictId]                 -- A cloned dict-id for each dict arg
-        -> (SpecEnv,                -- Substitute for all orig_dicts
-            [DictBind],             -- Auxiliary dict bindings
-            [CoreExpr])             -- Witnessing expressions (all trivial)
--- Bind any dictionary arguments to fresh names, to preserve sharing
-bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
-                   orig_dict_ids call_ds inst_dict_ids
-  = (env', dx_binds, spec_dict_args)
+-- | Binds a dictionary argument to a fresh name, to preserve sharing
+bindAuxiliaryDict
+  :: SpecEnv
+  -> DictId -> CoreExpr      -- Original dict bndr, and the witnessing expression
+  -> SpecM (SpecEnv,         -- Substitute for orig_dict
+            Maybe DictBind,  -- Auxiliary dict binding, if any
+            CoreExpr)        -- Witnessing expression (always trivial)
+bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
+                   orig_dict_id spec_dict
+
+  -- If the dictionary argument is trivial, don’t bother creating a
+  -- new dict binding.
+  | Just spec_id <- getIdFromTrivialExpr_maybe spec_dict
+  = pure (extendEnv spec_id spec_dict, Nothing, spec_dict)
+        -- See Note [Keep the old dictionaries interesting]
+
+  | otherwise
+  = do spec_id <- newDictBndr env orig_dict_id
+       let dict_bind = mkDB (NonRec spec_id spec_dict)
+       pure (extendEnv spec_id (Var spec_id), Just dict_bind, Var spec_id)
+           -- See Note [Make the new dictionaries interesting]
   where
-    (dx_binds, spec_dict_args) = go call_ds inst_dict_ids
-    env' = env { se_subst = subst `GHC.Core.Subst.extendSubstList`
-                                     (orig_dict_ids `zip` spec_dict_args)
-                                  `GHC.Core.Subst.extendInScopeList` dx_ids
-               , se_interesting = interesting `unionVarSet` interesting_dicts }
-
-    dx_ids = [dx_id | (NonRec dx_id _, _) <- dx_binds]
-    interesting_dicts = mkVarSet [ dx_id | (NonRec dx_id dx, _) <- dx_binds
-                                 , interestingDict env dx ]
-                  -- See Note [Make the new dictionaries interesting]
-
-    go :: [CoreExpr] -> [CoreBndr] -> ([DictBind], [CoreExpr])
-    go [] _  = ([], [])
-    go (dx:dxs) (dx_id:dx_ids)
-      | exprIsTrivial dx = (dx_binds,                          dx        : args)
-      | otherwise        = (mkDB (NonRec dx_id dx) : dx_binds, Var dx_id : args)
-      where
-        (dx_binds, args) = go dxs dx_ids
-             -- In the first case extend the substitution but not bindings;
-             -- in the latter extend the bindings but not the substitution.
-             -- For the former, note that we bind the *original* dict in the substitution,
-             -- overriding any d->dx_id binding put there by substBndrs
-    go _ _ = pprPanic "bindAuxiliaryDicts" (ppr orig_dict_ids $$ ppr call_ds $$ ppr inst_dict_ids)
+    extendEnv spec_id spec_dict =
+      env { se_subst = GHC.Core.Subst.extendSubst subst orig_dict_id spec_dict
+                         `GHC.Core.Subst.extendInScope` spec_id
+          , se_interesting = interesting `extendVarSet` spec_id }
 
 {-
 Note [Make the new dictionaries interesting]
@@ -1725,6 +1721,45 @@ If we specialise f for a call (f (dfun dNumInt)), we'll get
 a consequent call (g d') with an auxiliary definition
     d' = df dNumInt
 We want that consequent call to look interesting
+
+Note [Keep the old dictionaries interesting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In bindAuxiliaryDicts, we don’t bother creating a new dict binding if
+the dict expression is trivial. For example, if we have
+
+    f = \ @m1 (d1 :: Monad m1) -> ...
+
+and we specialize it at the pattern
+
+    [SpecType IO, SpecArg $dMonadIO]
+
+it would be silly to create a new binding for $dMonadIO; it’s already
+a binding! So we just extend the substitution directly:
+
+    m1 :-> IO
+    d1 :-> $dMonadIO
+
+But this creates a new subtlety: the dict expression might be a dict
+binding we floated out while specializing another function. For
+example, we might have
+
+    d2 = $p1Monad $dMonadIO -- floated out by bindAuxiliaryDicts
+    $sg = h @IO d2
+    h = \ @m2 (d2 :: Applicative m2) -> ...
+
+and end up specializing h at the following pattern:
+
+    [SpecType IO, SpecArg d2]
+
+When we created the d2 binding in the first place, we locally marked
+it as interesting while specializing g as described above by
+Note [Make the new dictionaries interesting]. But when we go to
+specialize h, it isn’t in the SpecEnv anymore, so we’ve lost the
+knowledge that we should specialize on it.
+
+To fix this, we have to explicitly add d2 *back* to the interesting
+set. That way, it will still be considered interesting while
+specializing the body of h. See !2913.
 
 
 Note [From non-recursive to recursive]
@@ -2227,26 +2262,20 @@ mkCallUDs env f args
     res = mkCallUDs' env f args
 
 mkCallUDs' env f args
-  | not (want_calls_for f)  -- Imported from elsewhere
-  || null theta             -- Not overloaded
-  = emptyUDs
-
-  |  not (all type_determines_value theta)
+  |  not (want_calls_for f)      -- Imported from elsewhere
+  || null (getSpecDicts ci_key)  -- Not overloaded, or no specialisation wanted
   || not (computeArity ci_key <= idArity f)
-  || not (length dicts == length theta)
-  || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
   -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
-    emptyUDs    -- Not overloaded, or no specialisation wanted
+    emptyUDs
 
   | otherwise
   = -- pprTrace "mkCallUDs: keeping" _trace_doc
     singleCall f ci_key
   where
-    _trace_doc = vcat [ppr f, ppr args, ppr (map (interestingDict env) dicts)]
+    _trace_doc = vcat [ppr f, ppr args, ppr ci_key]
     pis                = fst $ splitPiTys $ idType f
-    theta              = getTheta pis
-    constrained_tyvars = tyCoVarsOfTypes theta
+    constrained_tyvars = tyCoVarsOfTypes $ getTheta pis
 
     ci_key :: [SpecArg]
     ci_key = fmap (\(t, a) ->
@@ -2258,11 +2287,13 @@ mkCallUDs' env f args
               _ -> pprPanic "ci_key" $ ppr a
           |  otherwise
           -> UnspecType
-        Anon InvisArg _ -> SpecDict a
+        Anon InvisArg pred
+          | type_determines_value pred
+          , interestingDict env a -- Note [Interesting dictionary arguments]
+          -> SpecDict a
+          | otherwise -> UnspecArg
         Anon VisArg _ -> UnspecArg
                 ) $ zip pis args
-
-    dicts = getSpecDicts ci_key
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
          -- For imported things, we gather call instances if
@@ -2282,12 +2313,18 @@ mkCallUDs' env f args
 {-
 Note [Type determines value]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only specialise if all overloading is on non-IP *class* params,
-because these are the ones whose *type* determines their *value*.  In
-parrticular, with implicit params, the type args *don't* say what the
-value of the implicit param is!  See #7101
+Only specialise on non-IP *class* params, because these are the ones
+whose *type* determines their *value*.  In particular, with implicit
+params, the type args *don't* say what the value of the implicit param
+is!  See #7101.
 
-However, consider
+So we treat implicit params just like ordinary arguments for the
+purposes of specialisation.  Note that we still want to specialise
+functions with implicit params if they have *other* dicts which are
+class params; see #17930.
+
+One apparent additional complexity involves type families. For
+example, consider
          type family D (v::*->*) :: Constraint
          type instance D [] = ()
          f :: D v => v Char -> Int
@@ -2298,8 +2335,7 @@ and it's good to specialise f at this dictionary.
 So the question is: can an implicit parameter "hide inside" a
 type-family constraint like (D a).  Well, no.  We don't allow
         type instance D Maybe = ?x:Int
-Hence the IrredPred case in type_determines_value.
-See #7785.
+Hence the IrredPred case in type_determines_value.  See #7785.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
