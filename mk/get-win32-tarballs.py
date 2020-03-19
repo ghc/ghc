@@ -8,7 +8,6 @@ import argparse
 
 TARBALL_VERSION = '0.1'
 BASE_URL = "https://downloads.haskell.org/ghc/mingw/{}".format(TARBALL_VERSION)
-BASE_URL = "http://home.smart-cactus.org/~ben/ghc/mingw/{}".format(TARBALL_VERSION)
 DEST = Path('ghc-tarballs/mingw-w64')
 ARCHS = ['i686', 'x86_64', 'sources']
 
