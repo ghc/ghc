@@ -507,11 +507,8 @@ pprAlignForSection platform seg =
            _                 -> int 8
 
 pprDataItem :: NCGConfig -> CmmLit -> SDoc
-pprDataItem config lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags config lit
-
-pprDataItem' :: DynFlags -> NCGConfig -> CmmLit -> SDoc
-pprDataItem' dflags config lit
-  = vcat (ppr_item (cmmTypeFormat $ cmmLitType dflags lit) lit)
+pprDataItem config lit
+  = vcat (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
         platform = ncgPlatform config
         imm = litToImm lit

@@ -1,0 +1,7 @@
+
+ExplicitSpecificity1.hs:9:15: error:
+    • Cannot apply expression of type ‘a0 -> a0’
+      to a visible type argument ‘Int’
+    • In the expression: foo @Int 42
+      In an equation for ‘x’: x = foo @Int 42
+      In the expression: let x = foo @Int 42 in ()
