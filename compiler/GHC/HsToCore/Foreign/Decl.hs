@@ -18,7 +18,7 @@ module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
 #include "HsVersions.h"
 import GhcPrelude
 
-import TcRnMonad        -- temp
+import GHC.Tc.Monad        -- temp
 
 import GHC.Core
 
@@ -36,8 +36,8 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.TyCon
 import GHC.Core.Coercion
-import TcEnv
-import TcType
+import GHC.Tc.Env
+import GHC.Tc.Utils.Type
 
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils

@@ -1172,7 +1172,7 @@ runStmt input step = do
   -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
   -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
   -- declarations and statements are not affected.
-  -- See Note [Deferred type errors in GHCi] in typecheck/TcRnDriver.hs
+  -- See Note [Deferred type errors in GHCi] in GHC.Tc.Module
   st <- getGHCiState
   let source = progname st
   let line = line_number st
@@ -2104,7 +2104,7 @@ exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
 -----------------------------------------------------------------------------
--- | @:type@ command. See also Note [TcRnExprMode] in TcRnDriver.
+-- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
 
 typeOfExpr :: GHC.GhcMonad m => String -> m ()
 typeOfExpr str = handleSourceError GHC.printException $ do

@@ -940,7 +940,7 @@ One might think that we wish to treat 'family' and 'role' as regular old
 varids whenever -XTypeFamilies and -XRoleAnnotations are off, respectively.
 But, there is no need to do so. These pseudo-keywords are not stolen syntax:
 they are only used after the keyword 'type' at the top-level, where varids are
-not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
+not allowed. Furthermore, checks further downstream (GHC.Tc.TyCl) ensure that
 type families and role annotations are never declared without their extensions
 on. In fact, by unconditionally lexing these pseudo-keywords as special, we
 can get better error messages.

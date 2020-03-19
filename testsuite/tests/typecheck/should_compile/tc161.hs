@@ -7,7 +7,7 @@
 --    In the application `GHC.Err.noMethodBindingError "Foo.hs:7|Foo.foo"#'
 --
 -- Fix is to give wild-card args to the default methods
--- See TcClassDcl.mkDefMethRhs
+-- See GHC.Tc.TyCl.Class.mkDefMethRhs
 
 module ShouldCompile where
 

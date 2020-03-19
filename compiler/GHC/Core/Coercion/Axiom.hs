@@ -240,7 +240,7 @@ data CoAxBranch
     , cab_cvs      :: [CoVar]       -- Bound coercion variables
                                     -- Always empty, for now.
                                     -- See Note [Constraints in patterns]
-                                    -- in TcTyClsDecls
+                                    -- in GHC.Tc.TyCl
     , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
     , cab_rhs      :: Type          -- Right-hand side of the equality
@@ -427,7 +427,7 @@ TyCon rep_tc:
   - This eta reduction happens for data instances as well
     as newtype instances. Here we want to eta-reduce the data family axiom.
 
-  - This eta-reduction is done in TcInstDcls.tcDataFamInstDecl.
+  - This eta-reduction is done in GHC.Tc.TyCl.Instance.tcDataFamInstDecl.
 
 But for a /type/ family
   - cab_lhs has the exact arity of the family tycon
