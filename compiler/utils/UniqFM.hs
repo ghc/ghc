@@ -20,6 +20,7 @@ and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
 of arguments of combining function.
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -100,7 +101,7 @@ unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
 
 -- when you've got the Unique already
 unitDirectlyUFM :: Unique -> elt -> UniqFM elt
-unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
+unitDirectlyUFM !u v = UFM (M.singleton (getKey u) v)
 
 listToUFM :: Uniquable key => [(key,elt)] -> UniqFM elt
 listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
@@ -166,7 +167,7 @@ adjustUFM :: Uniquable key => (elt -> elt) -> UniqFM elt -> key -> UniqFM elt
 adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
 
 adjustUFM_Directly :: (elt -> elt) -> UniqFM elt -> Unique -> UniqFM elt
-adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
+adjustUFM_Directly f (UFM m) !u = UFM (M.adjust f (getKey u) m)
 
 delFromUFM :: Uniquable key => UniqFM elt -> key    -> UniqFM elt
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)

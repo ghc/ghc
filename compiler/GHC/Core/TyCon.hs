@@ -697,7 +697,7 @@ instance Binary TyConBndrVis where
 data TyCon
   = -- | The function type constructor, @(->)@
     FunTyCon {
-        tyConUnique :: Unique,   -- ^ A Unique of this TyCon. Invariant:
+        tyConUnique :: !Unique,  -- ^ A Unique of this TyCon. Invariant:
                                  -- identical to Unique of Name stored in
                                  -- tyConName field.
 
@@ -726,7 +726,7 @@ data TyCon
   -- Data/newtype/type /families/ are handled by 'FamilyTyCon'.
   -- See 'AlgTyConRhs' for more information.
   | AlgTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
+        tyConUnique  :: !Unique, -- ^ A Unique of this TyCon. Invariant:
                                  -- identical to Unique of Name stored in
                                  -- tyConName field.
 
@@ -783,7 +783,7 @@ data TyCon
 
   -- | Represents type synonyms
   | SynonymTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
+        tyConUnique  :: !Unique, -- ^ A Unique of this TyCon. Invariant:
                                  -- identical to Unique of Name stored in
                                  -- tyConName field.
 
@@ -816,7 +816,7 @@ data TyCon
   -- | Represents families (both type and data)
   -- Argument roles are all Nominal
   | FamilyTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
+        tyConUnique  :: !Unique, -- ^ A Unique of this TyCon. Invariant:
                                  -- identical to Unique of Name stored in
                                  -- tyConName field.
 
@@ -853,9 +853,9 @@ data TyCon
   -- the usual suspects (such as @Int#@) as well as foreign-imported
   -- types and kinds (@*@, @#@, and @?@)
   | PrimTyCon {
-        tyConUnique   :: Unique, -- ^ A Unique of this TyCon. Invariant:
-                                 -- identical to Unique of Name stored in
-                                 -- tyConName field.
+        tyConUnique   :: !Unique, -- ^ A Unique of this TyCon. Invariant:
+                                  -- identical to Unique of Name stored in
+                                  -- tyConName field.
 
         tyConName     :: Name,   -- ^ Name of the constructor
 
@@ -880,7 +880,7 @@ data TyCon
 
   -- | Represents promoted data constructor.
   | PromotedDataCon {          -- See Note [Promoted data constructors]
-        tyConUnique  :: Unique,     -- ^ Same Unique as the data constructor
+        tyConUnique  :: !Unique,    -- ^ Same Unique as the data constructor
         tyConName    :: Name,       -- ^ Same Name as the data constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
@@ -898,7 +898,7 @@ data TyCon
   -- | These exist only during type-checking. See Note [How TcTyCons work]
   -- in TcTyClsDecls
   | TcTyCon {
-        tyConUnique :: Unique,
+        tyConUnique :: !Unique,
         tyConName   :: Name,
 
         -- See Note [The binders/kind/arity fields of a TyCon]
