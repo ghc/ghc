@@ -87,7 +87,7 @@ import UniqSet          ( nonDetFoldUniqSet )
 import UniqDSet         ( getUniqDSet )
 import VarEnv
 import Literal          ( litIsTrivial )
-import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, prependArgsStrictSig )
 import Cpr              ( mkCprSig, botCpr )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
@@ -983,7 +983,7 @@ annotateBotStr id n_extra mb_str
   = case mb_str of
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
-                              `setIdStrictness` (increaseStrictSigArity n_extra sig)
+                              `setIdStrictness` (prependArgsStrictSig n_extra sig)
                               `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
