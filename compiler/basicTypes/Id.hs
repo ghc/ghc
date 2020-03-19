@@ -958,7 +958,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     new_occ_info    = zapOccTailCallInfo old_occ_info
 
     old_strictness  = strictnessInfo old_info
-    new_strictness  = increaseStrictSigArity arity_increase old_strictness
+    new_strictness  = prependArgsStrictSig arity_increase old_strictness
     old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity
