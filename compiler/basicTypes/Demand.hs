@@ -1319,7 +1319,7 @@ deferAfterPreciseException d = lubDmdType d (emptyDmdType conDiv)
 
 mayThrowPreciseException :: DmdType -> Bool
 mayThrowPreciseException (DmdType _ _ Dunno)    = True
-mayThrowPreciseException (DmdType _ _ ConOrDiv) = True
+mayThrowPreciseException (DmdType _ _ ExnOrDiv) = True
 mayThrowPreciseException (DmdType _ _ _)        = False
 
 strictenDmd :: Demand -> CleanDemand
