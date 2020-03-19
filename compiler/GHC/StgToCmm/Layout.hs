@@ -53,6 +53,7 @@ import Id
 import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
 import GHC.Driver.Session
+import GHC.Platform
 import Module
 
 import Util
@@ -78,12 +79,13 @@ import Control.Monad
 emitReturn :: [CmmExpr] -> FCode ReturnKind
 emitReturn results
   = do { dflags    <- getDynFlags
+       ; platform  <- getPlatform
        ; sequel    <- getSequel
        ; updfr_off <- getUpdFrameOff
        ; case sequel of
            Return ->
              do { adjustHpBackwards
-                ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
+                ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord platform)
                 ; emit (mkReturn dflags (entryCode dflags e) results updfr_off)
                 }
            AssignTo regs adjust ->
@@ -189,6 +191,7 @@ slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args
   = do  dflags <- getDynFlags
+        platform <- getPlatform
         argsreps <- getArgRepsAmodes stg_args
         let (rts_fun, arity) = slowCallPattern (map fst argsreps)
 
@@ -227,8 +230,8 @@ slowCall fun stg_args
              is_tagged_lbl <- newBlockId
              end_lbl <- newBlockId
 
-             let correct_arity = cmmEqWord dflags (funInfoArity dflags fun_iptr)
-                                                  (mkIntExpr dflags n_args)
+             let correct_arity = cmmEqWord platform (funInfoArity dflags fun_iptr)
+                                                    (mkIntExpr platform n_args)
 
              tscope <- getTickScope
              emit (mkCbranch (cmmIsTagged dflags funv)
@@ -389,9 +392,9 @@ hpRel hp off = off - hp
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
 -- See Note [Virtual and real heap pointers] in GHC.StgToCmm.Monad
 getHpRelOffset virtual_offset
-  = do dflags <- getDynFlags
+  = do platform <- getPlatform
        hp_usg <- getHpUsage
-       return (cmmRegOffW dflags hpReg (hpRel (realHp hp_usg) virtual_offset))
+       return (cmmRegOffW platform hpReg (hpRel (realHp hp_usg) virtual_offset))
 
 data FieldOffOrPadding a
     = FieldOff (NonVoid a) -- Something that needs an offset.
@@ -426,15 +429,16 @@ mkVirtHeapOffsetsWithPadding
 mkVirtHeapOffsetsWithPadding dflags header things =
     ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
     ( tot_wds
-    , bytesToWordsRoundUp dflags bytes_of_ptrs
+    , bytesToWordsRoundUp platform bytes_of_ptrs
     , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
     )
   where
+    platform = targetPlatform dflags
     hdr_words = case header of
       NoHeader -> 0
       StdHeader -> fixedHdrSizeW dflags
       ThunkHeader -> thunkHdrSize dflags
-    hdr_bytes = wordsToBytes dflags hdr_words
+    hdr_bytes = wordsToBytes platform hdr_words
 
     (ptrs, non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
 
@@ -443,7 +447,7 @@ mkVirtHeapOffsetsWithPadding dflags header things =
     (tot_bytes, non_ptrs_w_offsets) =
        mapAccumL computeOffset bytes_of_ptrs non_ptrs
 
-    tot_wds = bytesToWordsRoundUp dflags tot_bytes
+    tot_wds = bytesToWordsRoundUp platform tot_bytes
 
     final_pad_size = tot_wds * word_size - tot_bytes
     final_pad
@@ -451,7 +455,7 @@ mkVirtHeapOffsetsWithPadding dflags header things =
                                          (hdr_bytes + tot_bytes))]
         | otherwise          = []
 
-    word_size = wORD_SIZE dflags
+    word_size = platformWordSizeInBytes platform
 
     computeOffset bytes_so_far nv_thing =
         (new_bytes_so_far, with_padding field_off)
@@ -598,10 +602,11 @@ emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> FCode ()
 emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
  = do   { dflags <- getDynFlags
+        ; platform <- getPlatform
         -- Bind the binder itself, but only if it's not a top-level
         -- binding. We need non-top let-bindings to refer to the
         -- top-level binding, which this binding would incorrectly shadow.
-        ; node <- if top_lvl then return $ idToReg dflags (NonVoid bndr)
+        ; node <- if top_lvl then return $ idToReg platform (NonVoid bndr)
                   else bindToReg (NonVoid bndr) lf_info
         ; let node_points = nodeMustPointToIt dflags lf_info
         ; arg_regs <- bindArgsToRegs args

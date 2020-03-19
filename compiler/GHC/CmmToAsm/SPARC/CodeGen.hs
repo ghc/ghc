@@ -36,7 +36,8 @@ import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Stack
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Monad   ( NatM, getNewRegNat, getNewLabelNat )
+import GHC.CmmToAsm.Monad   ( NatM, getNewRegNat, getNewLabelNat, getPlatform, getConfig )
+import GHC.CmmToAsm.Config
 
 -- Our intermediate code:
 import GHC.Cmm.BlockId
@@ -123,7 +124,8 @@ stmtsToInstrs stmts
 
 stmtToInstrs :: CmmNode e x -> NatM InstrBlock
 stmtToInstrs stmt = do
-  dflags <- getDynFlags
+  platform <- getPlatform
+  config <- getConfig
   case stmt of
     CmmComment s   -> return (unitOL (COMMENT s))
     CmmTick {}     -> return nilOL
@@ -133,14 +135,14 @@ stmtToInstrs stmt = do
       | isFloatType ty  -> assignReg_FltCode format reg src
       | isWord64 ty     -> assignReg_I64Code        reg src
       | otherwise       -> assignReg_IntCode format reg src
-        where ty = cmmRegType dflags reg
+        where ty = cmmRegType platform reg
               format = cmmTypeFormat ty
 
     CmmStore addr src
       | isFloatType ty  -> assignMem_FltCode format addr src
       | isWord64 ty     -> assignMem_I64Code      addr src
       | otherwise       -> assignMem_IntCode format addr src
-        where ty = cmmExprType dflags src
+        where ty = cmmExprType platform src
               format = cmmTypeFormat ty
 
     CmmUnsafeForeignCall target result_regs args
@@ -151,8 +153,7 @@ stmtToInstrs stmt = do
       b1 <- genCondJump true arg
       b2 <- genBranch false
       return (b1 `appOL` b2)
-    CmmSwitch arg ids   -> do dflags <- getDynFlags
-                              genSwitch dflags arg ids
+    CmmSwitch arg ids   -> genSwitch config arg ids
     CmmCall { cml_target = arg } -> genJump arg
 
     _
@@ -180,8 +181,8 @@ temporary, then do the other computation, and then use the temporary:
 
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
-jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
+jumpTableEntry :: Platform -> Maybe BlockId -> CmmStatic
+jumpTableEntry platform Nothing = CmmStaticLit (CmmInt 0 (wordWidth platform))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = blockLbl blockid
 
@@ -208,9 +209,9 @@ assignMem_IntCode pk addr src = do
 
 assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_IntCode _ reg src = do
-    dflags <- getDynFlags
+    platform <- getPlatform
     r <- getRegister src
-    let dst = getRegisterReg (targetPlatform dflags) reg
+    let dst = getRegisterReg platform reg
     return $ case r of
         Any _ code         -> code dst
         Fixed _ freg fcode -> fcode `snocOL` OR False g0 (RIReg freg) dst
@@ -220,12 +221,12 @@ assignReg_IntCode _ reg src = do
 -- Floating point assignment to memory
 assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_FltCode pk addr src = do
-    dflags <- getDynFlags
+    platform <- getPlatform
     Amode dst__2 code1 <- getAmode addr
     (src__2, code2) <- getSomeReg src
     tmp1 <- getNewRegNat pk
     let
-        pk__2   = cmmExprType dflags src
+        pk__2   = cmmExprType platform src
         code__2 = code1 `appOL` code2 `appOL`
             if   formatToWidth pk == typeWidth pk__2
             then unitOL (ST pk src__2 dst__2)
@@ -236,8 +237,7 @@ assignMem_FltCode pk addr src = do
 -- Floating point assignment to a register/temporary
 assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_FltCode pk dstCmmReg srcCmmExpr = do
-    dflags <- getDynFlags
-    let platform = targetPlatform dflags
+    platform <- getPlatform
     srcRegister <- getRegister srcCmmExpr
     let dstReg  = getRegisterReg platform dstCmmReg
 
@@ -309,13 +309,13 @@ genCondJump bid bool = do
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
-genSwitch dflags expr targets
-        | positionIndependent dflags
+genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
+genSwitch config expr targets
+        | ncgPIC config
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise
-        = do    (e_reg, e_code) <- getSomeReg (cmmOffset dflags expr offset)
+        = do    (e_reg, e_code) <- getSomeReg (cmmOffset (ncgPlatform config) expr offset)
 
                 base_reg        <- getNewRegNat II32
                 offset_reg      <- getNewRegNat II32
@@ -338,10 +338,10 @@ genSwitch dflags expr targets
                         , NOP ]
   where (offset, ids) = switchTargetsToTable targets
 
-generateJumpTableForInstr :: DynFlags -> Instr
+generateJumpTableForInstr :: Platform -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
-generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
-  let jumpTable = map (jumpTableEntry dflags) ids
+generateJumpTableForInstr platform (JMP_TBL _ ids label) =
+  let jumpTable = map (jumpTableEntry platform) ids
   in Just (CmmData (Section ReadOnlyData label) (RawCmmStatics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
@@ -469,21 +469,21 @@ genCCall target dest_regs args
 -- | Generate code to calculate an argument, and move it into one
 --      or two integer vregs.
 arg_to_int_vregs :: CmmExpr -> NatM (OrdList Instr, [Reg])
-arg_to_int_vregs arg = do dflags <- getDynFlags
-                          arg_to_int_vregs' dflags arg
+arg_to_int_vregs arg = do platform <- getPlatform
+                          arg_to_int_vregs' platform arg
 
-arg_to_int_vregs' :: DynFlags -> CmmExpr -> NatM (OrdList Instr, [Reg])
-arg_to_int_vregs' dflags arg
+arg_to_int_vregs' :: Platform -> CmmExpr -> NatM (OrdList Instr, [Reg])
+arg_to_int_vregs' platform arg
 
         -- If the expr produces a 64 bit int, then we can just use iselExpr64
-        | isWord64 (cmmExprType dflags arg)
+        | isWord64 (cmmExprType platform arg)
         = do    (ChildCode64 code r_lo) <- iselExpr64 arg
                 let r_hi                = getHiVRegFromLo r_lo
                 return (code, [r_hi, r_lo])
 
         | otherwise
         = do    (src, code)     <- getSomeReg arg
-                let pk          = cmmExprType dflags arg
+                let pk          = cmmExprType platform arg
 
                 case cmmTypeFormat pk of
 
