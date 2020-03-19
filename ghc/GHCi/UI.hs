@@ -3047,7 +3047,10 @@ showCmd str = do
             , action "imports"    $ showImports
             , action "modules"    $ showModules
             , action "bindings"   $ showBindings
-            , action "linker"     $ getDynFlags >>= liftIO . (showLinkerState (hsc_dynLinker hsc_env))
+            , action "linker"     $ do
+               msg <- liftIO $ showLinkerState (hsc_dynLinker hsc_env)
+               dflags <- getDynFlags
+               liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showPackages
