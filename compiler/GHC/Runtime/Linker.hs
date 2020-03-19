@@ -234,11 +234,10 @@ withExtendedLinkEnv dl new_env action
 
 
 -- | Display the persistent linker state.
-showLinkerState :: DynLinker -> DynFlags -> IO ()
-showLinkerState dl dflags
+showLinkerState :: DynLinker -> IO SDoc
+showLinkerState dl
   = do pls <- readPLS dl
-       putLogMsg dflags NoReason SevDump noSrcSpan
-          $ withPprStyle defaultDumpStyle
+       return $ withPprStyle defaultDumpStyle
                  (vcat [text "----- Linker state -----",
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
