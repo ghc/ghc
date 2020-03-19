@@ -923,3 +923,15 @@ Other
     is useful when debugging because it gives smaller modules and dumps, but the
     compiler will panic if you try to use Typeable instances of things that you
     built with this flag.
+
+.. ghc-flag:: -fcmm-assertions
+    :shortdesc: Add runtime checks when compiling inline primops to cmm
+    :type: dynamic
+
+    This helps hunt down out-of-bounds array accesses in projects with large
+    numbers of modules or dependencies. Operations that index into an array
+    of size ``n`` are guarded by a check that ``n`` is in the range ``[0,n)``.
+    This does not add checks to out-of-line primops, and it cannot. For
+    example, this flag affects operations like ``indexWord8Array#`` but not
+    ``copyArray#``. To add bounds-checking to out-of-line primops,
+    use :rts-flag:`-D`. 
