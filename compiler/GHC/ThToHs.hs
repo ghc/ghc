@@ -1998,7 +1998,7 @@ with the following parts:
 Due to the two forall quantifiers and constraint contexts (either of
 which might be empty), pattern synonym type signatures are treated
 specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
-`typecheck/TcSplice.hs`:
+`typecheck/GHC.Tc.Splice.hs`:
 
    (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
        `GHC.HsToCore.Quote`, we represent its *full* type signature in TH, i.e.:
@@ -2015,7 +2015,7 @@ specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
        where initial empty `univs` type variables or an empty `reqs`
        constraint context are represented *explicitly* as `() =>`.
 
-   (c) When reifying a pattern synonym in `typecheck/TcSplice.hs`, we always
+   (c) When reifying a pattern synonym in `typecheck/GHC.Tc.Splice.hs`, we always
        return its *full* type, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)

@@ -4,7 +4,7 @@
 --      instance (Show (f a), Show (g a)) => Show (Pair1 f g a)
 -- and that is not Haskell 98.
 --
--- See Note [Exotic derived instance contexts] in TcSimplify.
+-- See Note [Exotic derived instance contexts] in GHC.Tc.Solver.
 -- The rule is simple: the context of a derived instance decl must
 -- contain constraints of form (C tyvar) only, just as H98.
 

@@ -222,7 +222,7 @@ we should make sure that the first and third args match the instance
 header.
 
 Having the same variables for class and tycon is also used in checkValidRoles
-(in TcTyClsDecls) when checking a class's roles.
+(in GHC.Tc.TyCl) when checking a class's roles.
 
 
 ************************************************************************

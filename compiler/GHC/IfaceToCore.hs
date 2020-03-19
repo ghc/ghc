@@ -30,9 +30,9 @@ import TcTypeNats(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
-import BuildTyCl
-import TcRnMonad
-import TcType
+import GHC.Tc.TyCl.Build
+import GHC.Tc.Monad
+import GHC.Tc.Utils.Type
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
