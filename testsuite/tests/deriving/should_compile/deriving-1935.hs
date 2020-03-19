@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -XDeriveDataTypeable #-}
 
 -- #1935
--- See Note [Superclasses of derived instance] in TcDeriv
+-- See Note [Superclasses of derived instance] in GHC.Tc.Deriv
 
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 

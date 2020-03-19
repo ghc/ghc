@@ -52,8 +52,8 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 #include "HsVersions.h"
 
 import GHC.Hs
-import TcRnMonad
-import TcHsSyn             ( hsOverLitName )
+import GHC.Tc.Monad
+import GHC.Tc.Zonk       ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
@@ -732,7 +732,7 @@ rnHsRecUpdFields flds
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record fields] in TcExpr
+                      -- See Note [Disambiguating record fields] in GHC.Tc.Expr
                       if overload_ok
                           then do { mb <- lookupGlobalOccRn_overloaded
                                             overload_ok lbl

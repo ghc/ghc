@@ -34,19 +34,19 @@ import GHC.Core         -- All of it
 import GHC.Types.Module   ( Module, ModuleSet, elemModuleSet )
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
-import GHC.Core.FVs     ( exprFreeVars, exprsFreeVars, bindFreeVars
-                        , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
-import GHC.Core.Utils   ( exprType, eqExpr, mkTick, mkTicks
-                        , stripTicksTopT, stripTicksTopE
-                        , isJoinBind )
-import GHC.Core.Ppr     ( pprRules )
+import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
+                          , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
+import GHC.Core.Utils     ( exprType, eqExpr, mkTick, mkTicks
+                          , stripTicksTopT, stripTicksTopE
+                          , isJoinBind )
+import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
    , mkEmptyTCvSubst, substTy )
-import TcType           ( tcSplitTyConApp_maybe )
-import TysWiredIn       ( anyTypeOfKind )
+import GHC.Tc.Utils.Type  ( tcSplitTyConApp_maybe )
+import TysWiredIn         ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
-import GHC.Core.Op.Tidy ( tidyRules )
+import GHC.Core.Op.Tidy   ( tidyRules )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
 import GHC.Types.Var
@@ -58,7 +58,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Unique.FM
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
-import GHC.Driver.Session         ( DynFlags )
+import GHC.Driver.Session ( DynFlags )
 import Outputable
 import FastString
 import Maybes
@@ -971,7 +971,7 @@ match_ty :: RuleMatchEnv
          -> Type                -- Template
          -> Type                -- Target
          -> Maybe RuleSubst
--- Matching Core types: use the matcher in TcType.
+-- Matching Core types: use the matcher in GHC.Tc.Utils.Type.
 -- Notice that we treat newtypes as opaque.  For example, suppose
 -- we have a specialised version of a function at a newtype, say
 --      newtype T = MkT Int

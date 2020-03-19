@@ -492,7 +492,7 @@ Each instance declaration gives rise to one dictionary function binding.
 
 The type checker makes up new source-code instance declarations
 (e.g. from 'deriving' or generic default methods --- see
-TcInstDcls.tcInstDecls1).  So we can't generate the names for
+GHC.Tc.TyCl.Instance.tcInstDecls1).  So we can't generate the names for
 dictionary functions in advance (we don't know how many we need).
 
 On the other hand for interface-file instance declarations, the decl
@@ -1284,7 +1284,7 @@ type LHsDerivingClause pass = Located (HsDerivingClause pass)
 --       'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
 --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 data HsDerivingClause pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = HsDerivingClause
     { deriv_clause_ext :: XCHsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
@@ -1963,7 +1963,7 @@ data DerivDecl pass = DerivDecl
           --
           -- Which signifies that the context should be inferred.
 
-          -- See Note [Inferring the instance context] in TcDerivInfer.
+          -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Constraints.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
@@ -2004,7 +2004,7 @@ type LDerivStrategy pass = Located (DerivStrategy pass)
 
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
                      --   custom instance for the data type. This only works
                      --   for certain types that GHC knows about (e.g., 'Eq',
