@@ -222,12 +222,15 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
+        -- See Note [Precise exceptions and strictness analysis] in Demand
+        alt_ty3 | mayThrowPreciseException scrut_ty = deferAfterPreciseException alt_ty2
+                | otherwise                         = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
         scrut_dmd          = mkProdDmd id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
         bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
@@ -311,19 +314,6 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     in
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
-
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
-  | otherwise
-  = False
 
 dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
@@ -555,8 +545,6 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
       = mkRhsDmd env rhs_arity rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    -- TODO: Won't the following line unnecessarily trim down arity for join
-    --       points returning a lambda in a C(S) context?
     sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
     id'            = setIdStrictness id sig
         -- See Note [NOINLINE and strictness]
