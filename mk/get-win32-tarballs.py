@@ -5,6 +5,7 @@ from pathlib import Path
 import urllib.request
 import subprocess
 import argparse
+from sys import stderr
 
 TARBALL_VERSION = '0.1'
 BASE_URL = "https://downloads.haskell.org/ghc/mingw/{}".format(TARBALL_VERSION)
@@ -18,11 +19,13 @@ def file_url(arch: str, fname: str) -> str:
         fname=fname)
 
 def fetch(url: str, dest: Path):
-    print('Fetching', url, '=>', dest)
+    print('Fetching', url, '=>', dest, file=stderr)
     urllib.request.urlretrieve(url, dest)
 
 def fetch_arch(arch: str):
-    req = urllib.request.urlopen(file_url(arch, 'MANIFEST'))
+    manifest_url = file_url(arch, 'MANIFEST')
+    print('Fetching', manifest_url, file=stderr)
+    req = urllib.request.urlopen(manifest_url)
     files = req.read().decode('UTF-8').split('\n')
     d = DEST / arch
     if not d.is_dir():
@@ -35,6 +38,9 @@ def fetch_arch(arch: str):
     verify(arch)
 
 def verify(arch: str):
+    if not Path(DEST / arch / "SHA256SUMS").is_file():
+        raise IOError("SHA256SUMS doesn't exist; have you fetched?")
+
     cmd = ['sha256sum', '--quiet', '--check', '--ignore-missing', 'SHA256SUMS']
     subprocess.check_call(cmd, cwd=DEST / arch)
 
