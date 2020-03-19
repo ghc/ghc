@@ -21,7 +21,7 @@ import GhcPrelude
 
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Types.SrcLoc as SrcLoc
@@ -90,7 +90,7 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Right ispec =>  imported as specified by ispec
 
 
--- | Called from the typechecker (TcErrors) when we find an unbound variable
+-- | Called from the typechecker (GHC.Tc.Errors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails

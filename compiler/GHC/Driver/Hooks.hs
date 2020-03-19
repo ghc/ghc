@@ -37,7 +37,7 @@ import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
 import OrdList
-import TcRnTypes
+import GHC.Tc.Types
 import Bag
 import GHC.Types.Name.Reader
 import GHC.Types.Name

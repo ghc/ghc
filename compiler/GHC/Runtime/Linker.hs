@@ -38,7 +38,7 @@ import GHC.Iface.Load
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Driver.Packages as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder

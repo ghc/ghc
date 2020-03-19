@@ -20,7 +20,7 @@
 
 -- Sept 08: on further reflection (!) I'm changing it back
 -- See Note [Subtle interaction of recursion and overlap]
--- in TcInstDcls
+-- in GHC.Tc.TyCl.Instance
 
 module ShouldCompile  where
 

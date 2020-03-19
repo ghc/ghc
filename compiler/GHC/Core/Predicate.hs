@@ -51,7 +51,7 @@ data Pred
   | EqPred EqRel Type Type
   | IrredPred PredType
   | ForAllPred [TyVar] [PredType] PredType
-     -- ForAllPred: see Note [Quantified constraints] in TcCanonical
+     -- ForAllPred: see Note [Quantified constraints] in GHC.Tc.Solver.Canonical
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
   --     as ClassPred, as if we had a tuple class with two superclasses
@@ -144,7 +144,7 @@ Predicates on PredType
 {-
 Note [Evidence for quantified constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The superclass mechanism in TcCanonical.makeSuperClasses risks
+The superclass mechanism in GHC.Tc.Solver.Canonical.makeSuperClasses risks
 taking a quantified constraint like
    (forall a. C a => a ~ b)
 and generate superclass evidence
@@ -153,7 +153,7 @@ and generate superclass evidence
 This is a funny thing: neither isPredTy nor isCoVarType are true
 of it.  So we are careful not to generate it in the first place:
 see Note [Equality superclasses in quantified constraints]
-in TcCanonical.
+in GHC.Tc.Solver.Canonical.
 -}
 
 isEvVarType :: Type -> Bool

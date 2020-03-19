@@ -33,7 +33,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import GHC.Hs.Extension
 import GHC.Hs.Types
 import GHC.Core
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
@@ -198,7 +198,7 @@ data HsBindLR idL idR
     -- and variables                          @f = \x -> e@
     -- and strict variables                   @!x = x + 1@
     --
-    -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
+    -- Reason 1: Special case for type inference: see 'GHC.Tc.Gen.Bind.tcMonoBinds'.
     --
     -- Reason 2: Instance decls can only have FunBinds, which is convenient.
     --           If you change this, you'll need to change e.g. rnMethodBinds
@@ -291,7 +291,7 @@ data HsBindLR idL idR
         abs_exports :: [ABExport idL],
 
         -- | Evidence bindings
-        -- Why a list? See TcInstDcls
+        -- Why a list? See GHC.Tc.TyCl.Instance
         -- Note [Typechecking plan for instance declarations]
         abs_ev_binds :: [TcEvBinds],
 
@@ -590,7 +590,7 @@ This ultimately desugars to something like this:
 The abe_wrap field deals with impedance-matching between
     (/\a b. case tup a b of { (f,g) -> f })
 and the thing we really want, which may have fewer type
-variables.  The action happens in TcBinds.mkExport.
+variables.  The action happens in GHC.Tc.Gen.Bind.mkExport.
 
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -598,14 +598,14 @@ The bind_fvs field of FunBind and PatBind records the free variables
 of the definition.  It is used for the following purposes
 
 a) Dependency analysis prior to type checking
-    (see TcBinds.tc_group)
+    (see GHC.Tc.Gen.Bind.tc_group)
 
 b) Deciding whether we can do generalisation of the binding
-    (see TcBinds.decideGeneralisationPlan)
+    (see GHC.Tc.Gen.Bind.decideGeneralisationPlan)
 
 c) Deciding whether the binding can be used in static forms
-    (see TcExpr.checkClosedInStaticForm for the HsStatic case and
-     TcBinds.isClosedBndrGroup).
+    (see GHC.Tc.Gen.Expr.checkClosedInStaticForm for the HsStatic case and
+     GHC.Tc.Gen.Bind.isClosedBndrGroup).
 
 Specifically,
 

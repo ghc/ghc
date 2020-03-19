@@ -41,9 +41,9 @@ import GHC.Hs
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
-import TcType
-import TcEvidence
-import TcRnMonad
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Monad
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Utils
@@ -181,7 +181,7 @@ ds_val_bind (is_rec, binds) body
         -- mixed up, which is what happens in one rare case
         -- Namely, for an AbsBind with no tyvars and no dicts,
         --         but which does have dictionary bindings.
-        -- See notes with TcSimplify.inferLoop [NO TYVARS]
+        -- See notes with GHC.Tc.Solver.inferLoop [NO TYVARS]
         -- It turned out that wrapping a Rec here was the easiest solution
         --
         -- NB The previous case dealt with unlifted bindings, so we
@@ -242,7 +242,7 @@ dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e)
   = putSrcSpanDs loc $
     do { core_expr <- dsExpr e
-   -- uncomment this check to test the hsExprType function in TcHsSyn
+   -- uncomment this check to test the hsExprType function in GHC.Tc.Utils.Zonk
    --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
    --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
    --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
@@ -649,7 +649,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                    case con of
                      RealDataCon data_con -> dataConUserTyVars data_con
                      PatSynCon _          -> univ_tvs ++ ex_tvs
-                       -- The order here is because of the order in `TcPatSyn`.
+                       -- The order here is because of the order in `GHC.Tc.TyCl.PatSyn`.
                  in_subst  = zipTvSubst univ_tvs in_inst_tys
                  out_subst = zipTvSubst univ_tvs out_inst_tys
 

@@ -15,7 +15,7 @@ import GHC.Driver.Types
 import Outputable
 import GHC.Driver.Plugins
 import System.Environment
-import TcRnTypes
+import GHC.Tc.Types
 
 import Simple.SourcePlugin (plugin)
 

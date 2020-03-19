@@ -2,7 +2,7 @@
 
 -- !!! small class decl with local polymorphism;
 -- !!! "easy" to check default methods and such...
--- !!! (this is the example given in TcClassDcl)
+-- !!! (this is the example given in GHC.Tc.TyCl.Class)
 --
 module ShouldSucceed where
 

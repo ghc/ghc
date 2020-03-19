@@ -52,8 +52,8 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 #include "HsVersions.h"
 
 import GHC.Hs
-import TcRnMonad
-import TcHsSyn             ( hsOverLitName )
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
@@ -61,7 +61,7 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
-import GHC.Rename.Types
+import GHC.Rename.HsType
 import PrelNames
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -249,7 +249,7 @@ newPatName (LetMk is_top fix_env) rdr_name
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see GHC.Rename.Source).
+    --       before going on to the RHSes (see GHC.Rename.Module).
 
 {-
 Note [View pattern usage]
@@ -732,7 +732,7 @@ rnHsRecUpdFields flds
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record fields] in TcExpr
+                      -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
                       if overload_ok
                           then do { mb <- lookupGlobalOccRn_overloaded
                                             overload_ok lbl

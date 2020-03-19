@@ -348,7 +348,7 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
 
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here
-  -- See Note [Recursive superclasses] in TcInstDcls
+  -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance
   foldRegsUsed _      _ !z (PrimTarget _)      = z
   foldRegsUsed dflags f !z (ForeignTarget e _) = foldRegsUsed dflags f z e
 

@@ -4,7 +4,7 @@
 
 \section[InstEnv]{Utilities for typechecking instance declarations}
 
-The bits common to TcInstDcls and TcDeriv.
+The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
@@ -33,7 +33,7 @@ module GHC.Core.InstEnv (
 
 import GhcPrelude
 
-import TcType -- InstEnv is really part of the type checker,
+import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import GHC.Types.Module
@@ -453,7 +453,7 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
                 Nothing            -> []
 
 -- | Checks for an exact match of ClsInst in the instance environment.
--- We use this when we do signature checking in TcRnDriver
+-- We use this when we do signature checking in GHC.Tc.Module
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalDFunType ins_item) items)
@@ -732,7 +732,7 @@ type ClsInstLookupResult
        , [ClsInst]       -- These don't match but do unify
        , [InstMatch] )   -- Unsafe overlapped instances under Safe Haskell
                          -- (see Note [Safe Haskell Overlapping Instances] in
-                         -- TcSimplify).
+                         -- GHC.Tc.Solver).
 
 {-
 Note [DFunInstType: instantiating types]
@@ -835,8 +835,8 @@ lookupInstEnv :: Bool              -- Check Safe Haskell overlap restrictions
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
--- ^ See Note [Safe Haskell Overlapping Instances] in TcSimplify
--- ^ See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
+-- ^ See Note [Safe Haskell Overlapping Instances] in GHC.Tc.Solver
+-- ^ See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
 lookupInstEnv check_overlap_safe
               (InstEnvs { ie_global = pkg_ie
                         , ie_local = home_ie

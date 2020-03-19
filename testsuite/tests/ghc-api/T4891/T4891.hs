@@ -10,10 +10,10 @@ import GHC.Exts.Heap
 import GHC.Driver.Types
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect
-import TcEnv
+import GHC.Tc.Utils.Env
 import GHC.Core.Type
-import TcRnMonad
-import TcType
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcType
 import Control.Applicative
 import GHC.Types.Name (getOccString)
 import Unsafe.Coerce

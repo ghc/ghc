@@ -119,12 +119,12 @@ import GHC.Iface.Env    ( lookupOrigIO )
 import GhcPrelude
 import MonadUtils       ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
-import TcEnv            ( lookupGlobal )
+import GHC.Tc.Utils.Env ( lookupGlobal )
 
 import qualified Language.Haskell.TH as TH
 
 {- This instance is defined outside GHC.Core.Op.Monad.hs so that
-   GHC.Core.Op.Monad does not depend on TcEnv -}
+   GHC.Core.Op.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
                           ; liftIO $ lookupGlobal hsc_env name }

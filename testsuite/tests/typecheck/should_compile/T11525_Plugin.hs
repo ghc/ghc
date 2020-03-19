@@ -1,6 +1,6 @@
 module T11525_Plugin(plugin) where
 
-import TcRnMonad ( TcPlugin(..), TcPluginResult(..) )
+import GHC.Tc.Utils.Monad ( TcPlugin(..), TcPluginResult(..) )
 import GHC.Driver.Plugins ( defaultPlugin, Plugin(..), CommandLineOption )
 
 plugin :: Plugin

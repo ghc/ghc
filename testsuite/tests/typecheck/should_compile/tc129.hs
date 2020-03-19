@@ -4,7 +4,7 @@
 -- GHC 5.00.2 fails this test
 
 -- The thing is to do with whether an implicit parameter
--- constraint can be "inherited".  See notes in TcSimplify.lhs
+-- constraint can be "inherited".  See notes in GHC.Tc.Solver
 
 module ShouldCompile where
 

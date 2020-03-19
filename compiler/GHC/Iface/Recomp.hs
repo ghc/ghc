@@ -21,7 +21,7 @@ import FlagChecker
 
 import GHC.Types.Annotations
 import GHC.Core
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Driver.Finder

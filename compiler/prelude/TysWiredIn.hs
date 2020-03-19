@@ -679,7 +679,7 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
          instance (c1,c2) => (c1,c2)
-      See TcInteract.matchCTuple
+      See GHC.Tc.Solver.Interact.matchCTuple
     - Currently just go up to 62; beyond that
       you have to use manual nesting
     - Their OccNames look like (%,,,%), so they can easily be
@@ -730,7 +730,7 @@ nothing special about one-tuples in Core; in particular, they have no
 custom pretty-printing, just using `Unit`.
 
 Note that there is *not* a unary constraint tuple, unlike for other forms of
-tuples. See [Ignore unary constraint tuples] in TcHsType for more
+tuples. See [Ignore unary constraint tuples] in GHC.Tc.Gen.HsType for more
 details.
 
 See also Note [Flattening one-tuples] in GHC.Core.Make and

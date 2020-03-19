@@ -24,7 +24,7 @@ import GHC.Types.FieldLabel
 
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import Util
 import GHC.Iface.Env
 
@@ -59,8 +59,8 @@ import Control.Monad
 
 
 
--- The 'NameShape' type is defined in TcRnTypes, because TcRnTypes
--- needs to refer to NameShape, and having TcRnTypes import
+-- The 'NameShape' type is defined in GHC.Tc.Types, because GHC.Tc.Types
+-- needs to refer to NameShape, and having GHC.Tc.Types import
 -- NameShape (even by SOURCE) would cause a large number of
 -- modules to be pulled into the DynFlags cycle.
 {-

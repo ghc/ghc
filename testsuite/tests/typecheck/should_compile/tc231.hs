@@ -8,7 +8,7 @@
 --         => Q s (Z [Char]) t1 -> ST s ()
 
 -- Note the quantification over 'b', which was previously
--- omitted; see Note [Important subtlety in oclose] in FunDeps
+-- omitted; see Note [Important subtlety in oclose] in GHC.Tc.Instance.FunDeps
 
 
 module ShouldCompile where

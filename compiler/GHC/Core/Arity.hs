@@ -191,7 +191,7 @@ Note [Newtype classes and eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NB: this nasty special case is no longer required, because
     for newtype classes we don't use the class-op rule mechanism
-    at all.  See Note [Single-method classes] in TcInstDcls. SLPJ May 2013
+    at all.  See Note [Single-method classes] in GHC.Tc.TyCl.Instance. SLPJ May 2013
 
 -------- Old out of date comments, just for interest -----------
 We have to be careful when eta-expanding through newtypes.  In general

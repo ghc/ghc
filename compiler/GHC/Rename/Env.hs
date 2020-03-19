@@ -51,8 +51,8 @@ import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import TcEnv
-import TcRnMonad
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
 import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
 import GHC.Types.Name
@@ -400,7 +400,7 @@ lookupFamInstName :: Maybe Name -> Located RdrName
                   -> RnM (Located Name)
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
-lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Binds.rnMethodBind
+lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
   = wrapLocM (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRn tc_rdr
@@ -912,7 +912,7 @@ lookupOccRn rdr_name
            Nothing   -> reportUnboundName rdr_name }
 
 -- Only used in one place, to rename pattern synonym binders.
--- See Note [Renaming pattern synonym variables] in GHC.Rename.Binds
+-- See Note [Renaming pattern synonym variables] in GHC.Rename.Bind
 lookupLocalOccRn :: RdrName -> RnM Name
 lookupLocalOccRn rdr_name
   = do { mb_name <- lookupLocalOccRn_maybe rdr_name

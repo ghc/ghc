@@ -1,7 +1,7 @@
 module Simple.TrustworthyPlugin (plugin) where
 
 import GHC.Plugins
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 
 plugin :: Plugin
 plugin = defaultPlugin

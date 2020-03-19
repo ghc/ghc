@@ -1077,7 +1077,7 @@ the trees to reflect the fixities of the underlying operators:
   UInfixE x * (UInfixE y + z) ---> (x * y) + z
 
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
-@mkHsOpTyRn@ in GHC.Rename.Types), which expects that the input will be completely
+@mkHsOpTyRn@ in GHC.Rename.HsType), which expects that the input will be completely
 right-biased for types and left-biased for everything else. So we left-bias the
 trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
 
@@ -1998,7 +1998,7 @@ with the following parts:
 Due to the two forall quantifiers and constraint contexts (either of
 which might be empty), pattern synonym type signatures are treated
 specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
-`typecheck/TcSplice.hs`:
+`typecheck/GHC.Tc.Gen.Splice.hs`:
 
    (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
        `GHC.HsToCore.Quote`, we represent its *full* type signature in TH, i.e.:
@@ -2015,7 +2015,7 @@ specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
        where initial empty `univs` type variables or an empty `reqs`
        constraint context are represented *explicitly* as `() =>`.
 
-   (c) When reifying a pattern synonym in `typecheck/TcSplice.hs`, we always
+   (c) When reifying a pattern synonym in `typecheck/GHC.Tc.Gen.Splice.hs`, we always
        return its *full* type, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)

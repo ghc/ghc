@@ -19,7 +19,7 @@ import GHC.Hs.Utils
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
-import TcRnTypes
+import GHC.Tc.Types
 
 import Control.Applicative
 import Data.Bifunctor (first)

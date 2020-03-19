@@ -863,7 +863,7 @@ conditions hold:
        of last equation and check whether it is overlapped by any of previous
        equations. Since it is overlapped by the first equation we conclude
        that pair of last two equations does not violate injectivity
-       annotation. (Check done in TcValidity.checkValidCoAxiom#gather_conflicts)
+       annotation. (Check done in GHC.Tc.Validity.checkValidCoAxiom#gather_conflicts)
 
    A special case of B is when RHSs unify with an empty substitution ie. they
    are identical.
@@ -898,7 +898,7 @@ conditions hold:
    injective.  "Injective position" means either an argument to a type
    constructor or argument to a type family on injective position.
    There are subtleties here. See Note [Coverage condition for injective type families]
-   in FamInst.
+   in GHC.Tc.Instance.Family.
 
 Check (1) must be done for all family instances (transitively) imported. Other
 checks (2-4) should be done just for locally written equations, as they are checks
@@ -1189,7 +1189,7 @@ findBranch branches target_tys
 apartnessCheck :: [Type]     -- ^ /flattened/ target arguments. Make sure
                              -- they're flattened! See Note [Flattening].
                              -- (NB: This "flat" is a different
-                             -- "flat" than is used in TcFlatten.)
+                             -- "flat" than is used in GHC.Tc.Solver.Flatten.)
                -> CoAxBranch -- ^ the candidate equation we wish to use
                              -- Precondition: this matches the target
                -> Bool       -- ^ True <=> equation can fire
@@ -1445,7 +1445,7 @@ normalise_type ty
     go_app_tys :: Type   -- function
                -> [Type] -- args
                -> NormM (Coercion, Type)
-    -- cf. TcFlatten.flatten_app_ty_args
+    -- cf. GHC.Tc.Solver.Flatten.flatten_app_ty_args
     go_app_tys (AppTy ty1 ty2) tys = go_app_tys ty1 (ty2 : tys)
     go_app_tys fun_ty arg_tys
       = do { (fun_co, nfun) <- go fun_ty
@@ -1476,7 +1476,7 @@ normalise_args :: Kind    -- of the function
 -- and the res_co :: kind(f orig_args) ~ kind(f xis)
 -- NB: The xis might *not* have the same kinds as the input types,
 -- but the resulting application *will* be well-kinded
--- cf. TcFlatten.flatten_args_slow
+-- cf. GHC.Tc.Solver.Flatten.flatten_args_slow
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 roles args
        ; let (xis, cos, res_co) = simplifyArgsWorker ki_binders inner_ki fvs roles normed_args

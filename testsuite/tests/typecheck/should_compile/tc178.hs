@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE FlexibleInstances #-}
 
--- This one tickled the kind-check in TcType.matchTys,
+-- This one tickled the kind-check in GHC.Tc.Utils.TcType.matchTys,
 -- which should use sub-kinding
 
 module ShouldCompile where

@@ -1100,7 +1100,7 @@ inline 'f' in '$wf'.
 Note [DFuns should not be loop breakers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's particularly bad to make a DFun into a loop breaker.  See
-Note [How instance declarations are translated] in TcInstDcls
+Note [How instance declarations are translated] in GHC.Tc.TyCl.Instance
 
 We give DFuns a higher score than ordinary CONLIKE things because
 if there's a choice we want the DFun to be the non-loop breaker. Eg
@@ -2914,7 +2914,7 @@ from making it a join point.
 If it is recursive, and uselessly marked INLINE, this will stop us
 making it a join point, which is annoying.  But occasionally
 (notably in class methods; see Note [Instances and loop breakers] in
-TcInstDcls) we mark recursive things as INLINE but the recursion
+GHC.Tc.TyCl.Instance) we mark recursive things as INLINE but the recursion
 unravels; so ignoring INLINE pragmas on recursive things isn't good
 either.
 

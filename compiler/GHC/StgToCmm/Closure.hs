@@ -80,7 +80,7 @@ import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Types.RepType
 import GHC.Types.Basic
@@ -487,7 +487,7 @@ avoid a space leak, deliberately recomputing a thunk.  Also (and this
 really does happen occasionally) let-floating may make a function f smaller
 so it can be inlined, so now (f True) may generate a local no-fv closure.
 This actually happened during bootstrapping GHC itself, with f=mkRdrFunBind
-in TcGenDeriv.) -}
+in GHC.Tc.Deriv.Generate.) -}
 
 -----------------------------------------------------------------------------
 --                getCallMethod

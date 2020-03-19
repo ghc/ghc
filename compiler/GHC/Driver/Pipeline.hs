@@ -61,7 +61,7 @@ import GHC.Types.SrcLoc
 import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
-import TcRnTypes
+import GHC.Tc.Types
 import ToolSettings
 import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt

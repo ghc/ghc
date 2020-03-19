@@ -35,7 +35,7 @@ module GHC.Iface.Binary (
 
 import GhcPrelude
 
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
 import GHC.Driver.Types

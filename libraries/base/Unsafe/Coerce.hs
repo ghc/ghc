@@ -207,7 +207,7 @@ There are yet more wrinkles
       care about fast execution, but (annoyingly) we /do/ care about the
       GHCi debugger, and GHCi itself uses unsafeCoerce.
 
-      Moreover, in TcRnDriver.tcGhciStmts we use unsafeCoerce#, rather
+      Moreover, in GHC.Tc.Module.tcGhciStmts we use unsafeCoerce#, rather
       than the more kosher unsafeCoerce, becuase (with -O0) the latter
       may not be inlined.
 

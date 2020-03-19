@@ -44,10 +44,9 @@ import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
 import qualified Prelude
 
--- compiler/hsSyn
+-- compiler
 import GHC.Hs
 
--- compiler/main
 import GHC.Driver.Phases  ( HscSource(..) )
 import GHC.Driver.Types   ( IsBootInterface, WarningTxt(..) )
 import GHC.Driver.Session
@@ -60,6 +59,8 @@ import BooleanFormula   ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
 import FastString
 import Maybes           ( isJust, orElse )
 import Outputable
+import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
+import GhcPrelude
 
 -- compiler/basicTypes
 import GHC.Types.Name.Reader
@@ -68,8 +69,8 @@ import GHC.Core.DataCon          ( DataCon, dataConName )
 import GHC.Types.SrcLoc
 import GHC.Types.Module
 import GHC.Types.Basic
+import GHC.Types.ForeignCall
 
--- compiler/types
 import GHC.Core.Type    ( funTyCon )
 import GHC.Core.Class   ( FunDep )
 
@@ -79,19 +80,13 @@ import Lexer
 import HaddockUtils
 import ApiAnnotation
 
--- compiler/typecheck
-import TcEvidence       ( emptyTcEvBinds )
+import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
 -- compiler/prelude
-import GHC.Types.ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
-
--- compiler/utils
-import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
-import GhcPrelude
 }
 
 %expect 232 -- shift/reduce conflicts

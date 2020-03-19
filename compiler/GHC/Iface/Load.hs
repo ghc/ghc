@@ -46,7 +46,7 @@ import GHC.Iface.Env
 import GHC.Driver.Types
 
 import GHC.Types.Basic hiding (SuccessFlag(..))
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 
 import Constants
 import PrelNames
@@ -204,7 +204,7 @@ All of this is done by the type checker. The renamer plays no role.
 checkWiredInTyCon :: TyCon -> TcM ()
 -- Ensure that the home module of the TyCon (and hence its instances)
 -- are loaded. See Note [Loading instances for wired-in things]
--- It might not be a wired-in tycon (see the calls in TcUnify),
+-- It might not be a wired-in tycon (see the calls in GHC.Tc.Utils.Unify),
 -- in which case this is a no-op.
 checkWiredInTyCon tc
   | not (isWiredInName tc_name)
@@ -542,7 +542,7 @@ But there is a HORRIBLE HACK here.
 
 * At the end of tcRnImports, we call checkFamInstConsistency to
   check consistency of imported type-family instances
-  See Note [The type family instance consistency story] in FamInst
+  See Note [The type family instance consistency story] in GHC.Tc.Instance.Family
 
 * Alas, those instances may refer to data types defined in M,
   if there is a M.hs-boot.

@@ -22,7 +22,7 @@ import GHC.Iface.Load
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Module

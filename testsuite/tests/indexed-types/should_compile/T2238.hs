@@ -8,7 +8,7 @@
 -- #2238
 -- Notice that class CTF has just one value field, but
 -- it also has an equality predicate. 
--- See Note [Class newtypes and equality predicates] in BuildTyCl
+-- See Note [Class newtypes and equality predicates] in GHC.Tc.TyCl.Build
 
 module Foo where
 

@@ -7,7 +7,7 @@ import GHC.Core.Coercion
 import GHC.Core.Type hiding( substTyVarBndr, substTy, extendTCvSubst )
 import GHC.Core.InstEnv
 import GHC.Core.Coercion.Axiom
-import TcType       ( exactTyCoVarsOfType )
+import GHC.Tc.Utils.TcType       ( exactTyCoVarsOfType )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import Pair

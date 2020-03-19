@@ -60,13 +60,13 @@ import TysWiredIn
 import TysPrim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import TcSimplify     (tcNormalise, tcCheckSatisfiability)
-import GHC.Core.Unify (tcMatchTy)
-import TcRnTypes      (completeMatchConLikes)
+import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
+import GHC.Core.Unify    (tcMatchTy)
+import GHC.Tc.Types      (completeMatchConLikes)
 import GHC.Core.Coercion
 import MonadUtils hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
-import FamInst
+import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 
 import Control.Monad (guard, mzero, when)

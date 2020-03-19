@@ -411,7 +411,7 @@ readSymField fieldName readVal = do
 -- Note [Why readField]
 --
 -- Previously, the code for automatically deriving Read instance (in
--- typecheck/TcGenDeriv.hs) would generate inline code for parsing fields;
+-- typecheck/GHC.Tc.Deriv.Generate.hs) would generate inline code for parsing fields;
 -- this, however, turned out to produce massive amounts of intermediate code,
 -- and produced a considerable performance hit in the code generator.
 -- Since Read instances are not generally supposed to be performance critical,

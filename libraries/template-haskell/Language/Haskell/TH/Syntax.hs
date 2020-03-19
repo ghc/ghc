@@ -849,7 +849,7 @@ instance Lift a => Lift [a] where
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
 liftString :: Quote m => String -> m Exp
--- Used in TcExpr to short-circuit the lifting for strings
+-- Used in GHC.Tc.Gen.Expr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
 
 -- | @since 2.15.0.0

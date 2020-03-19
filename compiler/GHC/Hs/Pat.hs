@@ -55,7 +55,7 @@ import GHC.Hs.Binds
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Types
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import GHC.Types.Basic
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
@@ -243,7 +243,7 @@ data Pat p
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
                     (Located (IdP p))        -- n+k pattern
                     (Located (HsOverLit p))  -- It'll always be an HsIntegral
-                    (HsOverLit p)       -- See Note [NPlusK patterns] in TcPat
+                    (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
                      -- NB: This could be (PostTc ...), but that induced a
                      -- a new hs-boot file. Not worth it.
 
@@ -449,7 +449,7 @@ data HsRecField' id arg = HsRecField {
 --
 --     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 --
--- See also Note [Disambiguating record fields] in TcExpr.
+-- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
 
 hsRecFields :: HsRecFields p arg -> [XCFieldOcc p]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
@@ -556,7 +556,7 @@ pprPat (ConPatOut { pat_con = con
                   , pat_args = details })
   = sdocOption sdocPrintTypecheckerElaboration $ \case
       False -> pprUserCon (unLoc con) details
-      True  -> -- Tiresome; in TcBinds.tcRhs we print out a
+      True  -> -- Tiresome; in GHC.Tc.Gen.Bind.tcRhs we print out a
                -- typechecked Pat in an error message,
                -- and we want to make sure it prints nicely
                ppr con

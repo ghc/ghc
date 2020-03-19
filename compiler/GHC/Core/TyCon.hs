@@ -311,7 +311,7 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
   data type with some axioms that connect it to other data types.
 
 * The tyConTyVars of the representation tycon are the tyvars that the
-  user wrote in the patterns. This is important in TcDeriv, where we
+  user wrote in the patterns. This is important in GHC.Tc.Deriv, where we
   bring these tyvars into scope before type-checking the deriving
   clause. This fact is arranged for in TcInstDecls.tcDataFamInstDecl.
 
@@ -355,7 +355,7 @@ might happen, say, with the following declaration:
   data T a b c where
     MkT :: b -> T Int b c
 
-Data and class tycons have their roles inferred (see inferRoles in TcTyDecls),
+Data and class tycons have their roles inferred (see inferRoles in GHC.Tc.TyCl.Utils),
 as do vanilla synonym tycons. Family tycons have all parameters at role N,
 though it is conceivable that we could relax this restriction. (->)'s and
 tuples' parameters are at role R. Each primitive tycon declares its roles;
@@ -405,9 +405,9 @@ must be True.
 
 See also:
  * [Injectivity annotation] in GHC.Hs.Decls
- * [Renaming injectivity annotation] in GHC.Rename.Source
+ * [Renaming injectivity annotation] in GHC.Rename.Module
  * [Verifying injectivity annotation] in GHC.Core.FamInstEnv
- * [Type inference for type families with injectivity] in TcInteract
+ * [Type inference for type families with injectivity] in GHC.Tc.Solver.Interact
 
 ************************************************************************
 *                                                                      *
@@ -830,7 +830,7 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
             -- tyConTyVars connect an associated family TyCon
-            -- with its parent class; see TcValidity.checkConsistentFamInst
+            -- with its parent class; see GHC.Tc.Validity.checkConsistentFamInst
 
         famTcResVar  :: Maybe Name,   -- ^ Name of result type variable, used
                                       -- for pretty-printing with --show-iface
@@ -897,7 +897,7 @@ data TyCon
     }
 
   -- | These exist only during type-checking. See Note [How TcTyCons work]
-  -- in TcTyClsDecls
+  -- in GHC.Tc.TyCl
   | TcTyCon {
         tyConUnique :: Unique,
         tyConName   :: Name,
@@ -938,7 +938,7 @@ where
    * required_tvs the same as tyConTyVars
    * tyConArity = length required_tvs
 
-See also Note [How TcTyCons work] in TcTyClsDecls
+See also Note [How TcTyCons work] in GHC.Tc.TyCl
 -}
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
@@ -1297,7 +1297,7 @@ so the coercion tycon CoT must have
         kind:    T ~ []
  and    arity:   0
 
-This eta-reduction is implemented in BuildTyCl.mkNewTyConRhs.
+This eta-reduction is implemented in GHC.Tc.TyCl.Build.mkNewTyConRhs.
 
 
 ************************************************************************
@@ -1331,7 +1331,7 @@ tyConRepName_maybe _ = Nothing
 
 -- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
 mkPrelTyConRepName :: Name -> TyConRepName
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+-- See Note [Grand plan for Typeable] in 'GHC.Tc.Instance.Typeable'.
 mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
                             -- so nameModule will work
   = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
@@ -1346,7 +1346,7 @@ mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
 -- | The name (and defining module) for the Typeable representation (TyCon) of a
 -- type constructor.
 --
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+-- See Note [Grand plan for Typeable] in 'GHC.Tc.Instance.Typeable'.
 tyConRepModOcc :: Module -> OccName -> (Module, OccName)
 tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
   where
@@ -1702,12 +1702,12 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
 -- mutually-recursive group of tycons; it is then zonked to a proper
 -- TyCon in zonkTcTyCon.
 -- See also Note [Kind checking recursive type and class declarations]
--- in TcTyClsDecls.
+-- in GHC.Tc.TyCl.
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
-                                 -- see Note [How TcTyCons work] in TcTyClsDecls
+                                 -- see Note [How TcTyCons work] in GHC.Tc.TyCl
           -> Bool                -- ^ Is this TcTyCon generalised already?
           -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
@@ -1894,7 +1894,7 @@ isDataTyCon _ = False
 -- (where X is the role passed in):
 --   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
 -- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
--- See also Note [Decomposing equality] in TcCanonical
+-- See also Note [Decomposing equality] in GHC.Tc.Solver.Canonical
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon _                             Phantom          = False
 isInjectiveTyCon (FunTyCon {})                 _                = True
@@ -1910,12 +1910,12 @@ isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
 isInjectiveTyCon (TcTyCon {})                  _                = True
   -- Reply True for TcTyCon to minimise knock on type errors
-  -- See Note [How TcTyCons work] item (1) in TcTyClsDecls
+  -- See Note [How TcTyCons work] item (1) in GHC.Tc.TyCl
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
 --   If (T tys ~X t), then (t's head ~X T).
--- See also Note [Decomposing equality] in TcCanonical
+-- See also Note [Decomposing equality] in GHC.Tc.Solver.Canonical
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
 isGenerativeTyCon (FamilyTyCon {}) _ = False
@@ -2249,7 +2249,7 @@ setTcTyConKind :: TyCon -> Kind -> TyCon
 -- Update the Kind of a TcTyCon
 -- The new kind is always a zonked version of its previous
 -- kind, so we don't need to update any other fields.
--- See Note [The Purely Kinded Invariant] in TcHsType
+-- See Note [The Purely Kinded Invariant] in GHC.Tc.Gen.HsType
 setTcTyConKind tc@(TcTyCon {}) kind = tc { tyConKind = kind }
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
@@ -2304,7 +2304,7 @@ expandSynTyCon_maybe tc tys
 --  with user defined constructors rather than one from a class or other
 --  construction.
 
--- NB: This is only used in TcRnExports.checkPatSynParent to determine if an
+-- NB: This is only used in GHC.Tc.Gen.Export.checkPatSynParent to determine if an
 -- exported tycon can have a pattern synonym bundled with it, e.g.,
 -- module Foo (TyCon(.., PatSyn)) where
 isTyConWithSrcDataCons :: TyCon -> Bool

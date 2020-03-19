@@ -35,7 +35,7 @@ import GHC.Types.ForeignCall
 import GHC.Core.DataCon
 import GHC.HsToCore.Utils
 
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion

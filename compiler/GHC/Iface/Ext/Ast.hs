@@ -34,11 +34,11 @@ import MonadUtils                 ( concatMapM, liftIO )
 import GHC.Types.Name             ( Name, nameSrcSpan, setNameLoc )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
-import TcHsSyn                    ( hsLitType, hsPatType )
+import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
 import GHC.Core.Type              ( mkVisFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import GHC.Types.Var              ( Id, Var, setVarName, varName, varType )
-import TcRnTypes
+import GHC.Tc.Types
 import GHC.Iface.Make             ( mkIfaceExports )
 import Panic
 import Maybes

@@ -467,8 +467,8 @@ data HscEnv
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
-                -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
-                -- 'TcRnTypes.TcGblEnv'.  See also Note [hsc_type_env_var hack]
+                -- the 'IfGblEnv'. See 'GHC.Tc.Utils.tcg_type_env_var' for
+                -- 'GHC.Tc.Utils.TcGblEnv'.  See also Note [hsc_type_env_var hack]
 
         , hsc_interp :: Maybe Interp
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
@@ -1624,7 +1624,7 @@ Where do interactively-bound Ids come from?
     These start with an Internal Name because a Stmt is a local
     construct, so the renamer naturally builds an Internal name for
     each of its binders.  Then in tcRnStmt they are externalised via
-    TcRnDriver.externaliseAndTidyId, so they get Names like Ghic4.foo.
+    GHC.Tc.Module.externaliseAndTidyId, so they get Names like Ghic4.foo.
 
   - Ids bound by the debugger etc have Names constructed by
     GHC.Iface.Env.newInteractiveBinder; at the call sites it is followed by
@@ -2515,7 +2515,7 @@ data Dependencies
          }
   deriving( Eq )
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
-        -- See 'TcRnTypes.ImportAvails' for details on dependencies.
+        -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_mods deps)
@@ -2681,7 +2681,7 @@ data ExternalPackageState
                 --
                 -- The 'ModuleName' part is not necessary, but it's useful for
                 -- debug prints, and it's convenient because this field comes
-                -- direct from 'TcRnTypes.imp_dep_mods'
+                -- direct from 'GHC.Tc.Utils.imp_dep_mods'
 
         eps_PIT :: !PackageIfaceTable,
                 -- ^ The 'ModIface's for modules in external packages
@@ -3256,7 +3256,7 @@ And looking up the values in the CompleteMatchMap associated with Boolean
 would give you [CompleteMatch [F, T1] Boolean, CompleteMatch [F, T2] Boolean].
 dsGetCompleteMatches in GHC.HsToCore.Quote accomplishes this lookup.
 
-Also see Note [Typechecking Complete Matches] in TcBinds for a more detailed
+Also see Note [Typechecking Complete Matches] in GHC.Tc.Gen.Bind for a more detailed
 explanation for how GHC ensures that all the conlikes in a COMPLETE set are
 consistent.
 -}

@@ -2,7 +2,7 @@ module GHC.Rename.Expr where
 import GHC.Types.Name
 import GHC.Hs
 import GHC.Types.Name.Set ( FreeVars )
-import TcRnTypes
+import GHC.Tc.Types
 import GHC.Types.SrcLoc   ( Located )
 import Outputable  ( Outputable )
 

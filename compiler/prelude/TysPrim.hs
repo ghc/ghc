@@ -708,7 +708,7 @@ Type.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.
 (See Note [Coercion holes] in GHC.Core.TyCo.Rep.) But see also
-Note [Deferred errors for coercion holes] in TcErrors to see how
+Note [Deferred errors for coercion holes] in GHC.Tc.Errors to see how
 equality constraints are deferred.
 
 Within GHC, ~# is called eqPrimTyCon, and it is defined in TysPrim.
@@ -732,7 +732,7 @@ Here's what's unusual about it:
    solve a goal of type (a ~~ b) even if there is, say (Int ~~ c) in the
    context. (Normally, it waits to learn more, just in case the given
    influences what happens next.) See Note [Naturally coherent classes]
-   in TcInteract.
+   in GHC.Tc.Solver.Interact.
 
  * It always terminates. That is, in the UndecidableInstances checks, we
    don't worry if a (~~) constraint is too big, as we know that solving
@@ -741,7 +741,7 @@ Here's what's unusual about it:
 On the other hand, this behaves just like any class w.r.t. eager superclass
 unpacking in the solver. So a lifted equality given quickly becomes an unlifted
 equality given. This is good, because the solver knows all about unlifted
-equalities. There is some special-casing in TcInteract.matchClassInst to
+equalities. There is some special-casing in GHC.Tc.Solver.Interact.matchClassInst to
 pretend that there is an instance of this class, as we can't write the instance
 in Haskell.
 

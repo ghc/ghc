@@ -346,7 +346,7 @@ Library
         GHC.Hs.Dump
         GHC.Iface.Binary
         BinFingerprint
-        BuildTyCl
+        GHC.Tc.TyCl.Build
         GHC.Iface.Env
         GHC.Iface.Syntax
         GHC.Iface.Type
@@ -383,7 +383,7 @@ Library
         GHC.Driver.Packages
         PlatformConstants
         GHC.Driver.Plugins
-        TcPluginM
+        GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing
         Settings
         StaticPtrTable
@@ -415,15 +415,15 @@ Library
         TysWiredIn
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
-        GHC.Rename.Binds
+        GHC.Rename.Bind
         GHC.Rename.Env
         GHC.Rename.Expr
         GHC.Rename.Doc
         GHC.Rename.Names
         GHC.Rename.Pat
-        GHC.Rename.Source
+        GHC.Rename.Module
         GHC.Rename.Splice
-        GHC.Rename.Types
+        GHC.Rename.HsType
         GHC.Rename.Fixity
         GHC.Rename.Utils
         GHC.Rename.Unbound
@@ -464,63 +464,63 @@ Library
         GHC.Core.Op.Exitify
         GHC.Core.Op.WorkWrap
         GHC.Core.Op.WorkWrap.Lib
-        FamInst
-        ClsInst
-        Inst
-        TcAnnotations
-        TcArrows
-        TcBinds
-        TcSigs
-        TcClassDcl
-        TcDefaults
-        TcDeriv
-        TcDerivInfer
-        TcDerivUtils
-        TcEnv
-        TcExpr
-        TcForeign
-        TcGenDeriv
-        TcGenFunctor
-        TcGenGenerics
-        TcHsSyn
-        TcHsType
-        TcInstDcls
-        TcMType
-        TcValidity
-        TcMatches
-        TcPat
-        TcPatSyn
-        TcRnDriver
-        TcBackpack
-        TcRnExports
-        TcRnMonad
-        TcRnTypes
-        Constraint
-        TcOrigin
-        TcRules
-        TcSimplify
-        TcHoleErrors
-        TcHoleFitTypes
-        TcErrors
-        TcTyClsDecls
-        TcTyDecls
-        TcTypeable
-        TcType
-        TcEvidence
-        TcEvTerm
-        TcUnify
-        TcInteract
-        TcCanonical
-        TcFlatten
-        TcSMonad
+        GHC.Tc.Instance.Family
+        GHC.Tc.Instance.Class
+        GHC.Tc.Utils.Instantiate
+        GHC.Tc.Gen.Annotation
+        GHC.Tc.Gen.Arrow
+        GHC.Tc.Gen.Bind
+        GHC.Tc.Gen.Sig
+        GHC.Tc.TyCl.Class
+        GHC.Tc.Gen.Default
+        GHC.Tc.Deriv
+        GHC.Tc.Deriv.Infer
+        GHC.Tc.Deriv.Utils
+        GHC.Tc.Utils.Env
+        GHC.Tc.Gen.Expr
+        GHC.Tc.Gen.Foreign
+        GHC.Tc.Deriv.Generate
+        GHC.Tc.Deriv.Functor
+        GHC.Tc.Deriv.Generics
+        GHC.Tc.Utils.Zonk
+        GHC.Tc.Utils.TcType
+        GHC.Tc.TyCl.Instance
+        GHC.Tc.Utils.TcMType
+        GHC.Tc.Validity
+        GHC.Tc.Gen.Match
+        GHC.Tc.Gen.Pat
+        GHC.Tc.TyCl.PatSyn
+        GHC.Tc.Module
+        GHC.Tc.Utils.Backpack
+        GHC.Tc.Gen.Export
+        GHC.Tc.Utils.Monad
+        GHC.Tc.Types
+        GHC.Tc.Types.Constraint
+        GHC.Tc.Types.Origin
+        GHC.Tc.Gen.Rule
+        GHC.Tc.Errors.Hole
+        GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors
+        GHC.Tc.TyCl
+        GHC.Tc.TyCl.Utils
+        GHC.Tc.Instance.Typeable
+        GHC.Tc.Gen.HsType
+        GHC.Tc.Types.Evidence
+        GHC.Tc.Types.EvTerm
+        GHC.Tc.Utils.Unify
+        GHC.Tc.Solver
+        GHC.Tc.Solver.Interact
+        GHC.Tc.Solver.Canonical
+        GHC.Tc.Solver.Flatten
+        GHC.Tc.Solver.Monad
         TcTypeNats
-        TcSplice
+        GHC.Tc.Gen.Splice
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.HsToCore.Quote
         THNames
         GHC.Core.FamInstEnv
-        FunDeps
+        GHC.Tc.Instance.FunDeps
         GHC.Core.InstEnv
         GHC.Core.TyCon
         GHC.Core.Coercion.Axiom

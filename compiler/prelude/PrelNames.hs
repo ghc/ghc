@@ -1291,7 +1291,7 @@ mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrF
 typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
 typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
--- See Note [Grand plan for Typeable] in TcTypeable.
+-- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
 
 -- Typeable KindReps for some common cases
@@ -1620,11 +1620,11 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
--- KnownNat: see Note [KnowNat & KnownSymbol and EvLit] in TcEvidence
+-- KnownNat: see Note [KnowNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
 knownNatClassNameKey :: Unique
 knownNatClassNameKey = mkPreludeClassUnique 42
 
--- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in TcEvidence
+-- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
 knownSymbolClassNameKey :: Unique
 knownSymbolClassNameKey = mkPreludeClassUnique 43
 
@@ -2451,7 +2451,7 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
 
 {-
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@TcDeriv@).
+(@GHC.Tc.Deriv@).
 -}
 
 derivableClassKeys :: [Unique]

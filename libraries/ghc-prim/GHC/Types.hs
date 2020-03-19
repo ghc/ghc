@@ -191,7 +191,7 @@ type role IO representational
 because this role is significant in the normalisation of FFI
 types. Specifically, if this role were to become nominal (which would
 be very strange, indeed!), changes elsewhere in GHC would be
-necessary. See [FFI type roles] in TcForeign.  -}
+necessary. See [FFI type roles] in GHC.Tc.Gen.Foreign.  -}
 
 
 {- *********************************************************************
@@ -478,7 +478,7 @@ type KindBndr = Int
 -- | The representation produced by GHC for conjuring up the kind of a
 -- 'Data.Typeable.TypeRep'.
 
--- See Note [Representing TyCon kinds: KindRep] in TcTypeable.
+-- See Note [Representing TyCon kinds: KindRep] in GHC.Tc.Instance.Typeable.
 data KindRep = KindRepTyConApp TyCon [KindRep]
              | KindRepVar !KindBndr
              | KindRepApp KindRep KindRep

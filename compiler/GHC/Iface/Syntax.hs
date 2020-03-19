@@ -777,7 +777,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                               then isIfaceTauType kind
                                       -- Even in the presence of a standalone kind signature, a non-tau
                                       -- result kind annotation cannot be discarded as it determines the arity.
-                                      -- See Note [Arity inference in kcCheckDeclHeader_sig] in TcHsType
+                                      -- See Note [Arity inference in kcCheckDeclHeader_sig] in GHC.Tc.Gen.HsType
                               else isIfaceLiftedTypeKind kind)
                           (dcolon <+> ppr kind)
 

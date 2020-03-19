@@ -416,7 +416,7 @@ Note [Local bindings with Exact Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With Template Haskell we can make local bindings that have Exact Names.
 Computing shadowing etc may use elemLocalRdrEnv (at least it certainly
-does so in GHC.Rename.Types.bindHsQTyVars), so for an Exact Name we must consult
+does so in GHC.Rename.HsType.bindHsQTyVars), so for an Exact Name we must consult
 the in-scope-name-set.
 
 

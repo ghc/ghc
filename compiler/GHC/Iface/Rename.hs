@@ -31,7 +31,7 @@ import GHC.Types.Var
 import ErrUtils
 
 import GHC.Types.Name
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import Util
 import Fingerprint
 import GHC.Types.Basic

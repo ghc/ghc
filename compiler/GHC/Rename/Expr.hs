@@ -27,11 +27,11 @@ module GHC.Rename.Expr (
 
 import GhcPrelude
 
-import GHC.Rename.Binds ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
+import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
                         , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
-import TcEnv            ( isBrackStage )
-import TcRnMonad
+import GHC.Tc.Utils.Env ( isBrackStage )
+import GHC.Tc.Utils.Monad
 import GHC.Types.Module ( getModule )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
@@ -42,7 +42,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , checkUnusedRecordWildcard )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
-import GHC.Rename.Types
+import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
 import PrelNames
@@ -189,7 +189,7 @@ rnExpr (OpApp _ e1 op e2)
         -- Deal with fixity
         -- When renaming code synthesised from "deriving" declarations
         -- we used to avoid fixity stuff, but we can't easily tell any
-        -- more, so I've removed the test.  Adding HsPars in TcGenDeriv
+        -- more, so I've removed the test.  Adding HsPars in GHC.Tc.Deriv.Generate
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
@@ -457,7 +457,7 @@ rnCmd (HsCmdArrApp x arrow arg ho rtl)
     select_arrow_scope tc = case ho of
         HsHigherOrderApp -> tc
         HsFirstOrderApp  -> escapeArrowScope tc
-        -- See Note [Escaping the arrow scope] in TcRnTypes
+        -- See Note [Escaping the arrow scope] in GHC.Tc.Types
         -- Before renaming 'arrow', use the environment of the enclosing
         -- proc for the (-<) case.
         -- Local bindings, inside the enclosing proc, are not in scope
@@ -1507,7 +1507,7 @@ ApplicativeDo touches a few phases in the compiler:
   other form of expression. The only crux is that the typechecker has to
   be aware of the special ApplicativeDo statements in the do-notation, and
   typecheck them appropriately.
-  Relevant module: TcMatches
+  Relevant module: GHC.Tc.Gen.Match
 
 * Desugarer: Any do-block which contains applicative statements is desugared
   as outlined above, to use the Applicative combinators.

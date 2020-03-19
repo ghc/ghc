@@ -47,7 +47,7 @@ import HeaderInfo
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.IfaceToCore  ( typecheckIface )
-import TcRnMonad        ( initIfaceCheck )
+import GHC.Tc.Utils.Monad     ( initIfaceCheck )
 import GHC.Driver.Main
 
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
@@ -64,7 +64,7 @@ import GHC.Types.SrcLoc
 import StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
-import TcBackpack
+import GHC.Tc.Utils.Backpack
 import GHC.Driver.Packages
 import GHC.Types.Unique.Set
 import Util

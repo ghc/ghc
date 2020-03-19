@@ -308,16 +308,16 @@ import GHC.Driver.Make
 import GHC.Driver.Hooks
 import GHC.Driver.Pipeline   ( compileOne' )
 import GHC.Driver.Monad
-import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
-import GHC.Iface.Load   ( loadSysInterface )
-import TcRnTypes
+import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
+import GHC.Iface.Load        ( loadSysInterface )
+import GHC.Tc.Types
 import GHC.Core.Predicate
 import GHC.Driver.Packages
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Core.Type  hiding( typeKind )
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Types.Id
 import TysPrim          ( alphaTyVars )
 import GHC.Core.TyCon
@@ -357,9 +357,9 @@ import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
-import TcRnDriver
-import Inst
-import FamInst
+import GHC.Tc.Module
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Instance.Family
 import FileCleanup
 
 import Data.Foldable
@@ -1322,7 +1322,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
        -- We use Data.Sequence.Seq because we are creating left associated
        -- mappends.
-       -- cls_index and fam_index below are adapted from TcRnDriver.lookupInsts
+       -- cls_index and fam_index below are adapted from GHC.Tc.Module.lookupInsts
        ; let cls_index = Map.fromListWith mappend
                  [ (n, Seq.singleton ispec)
                  | ispec <- instEnvElts ie_local ++ instEnvElts ie_global

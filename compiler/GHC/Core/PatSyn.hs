@@ -295,12 +295,12 @@ would be a top-level declaration with an unboxed type.
 
 This means that when typechecking an occurrence of P in an expression,
 we must remember that the builder has this void argument. This is
-done by TcPatSyn.patSynBuilderOcc.
+done by GHC.Tc.TyCl.PatSyn.patSynBuilderOcc.
 
 Note [Pattern synonyms and the data type Type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The type of a pattern synonym is of the form (See Note
-[Pattern synonym signatures] in TcSigs):
+[Pattern synonym signatures] in GHC.Tc.Gen.Sig):
 
     forall univ_tvs. req => forall ex_tvs. prov => ...
 

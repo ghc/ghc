@@ -775,7 +775,7 @@ almost_devoid_co_var_of_types (ty:tys) cv
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                               -- See Note [Coverage condition for injective type families]
-                              -- in FamInst.
+                              -- in GHC.Tc.Instance.Family.
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
@@ -810,7 +810,7 @@ injectiveVarsOfType look_under_tfs = go
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfTypes :: Bool -- ^ look under injective type families?
                              -- See Note [Coverage condition for injective type families]
-                             -- in FamInst.
+                             -- in GHC.Tc.Instance.Family.
                      -> [Type] -> FV
 injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under_tfs)
 
@@ -933,7 +933,7 @@ types/kinds are fully settled and zonked.
 --
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in GHC.Rename.Types
+-- See also Note [Ordering of implicit variables] in GHC.Rename.HsType
 
 scopedSort :: [TyCoVar] -> [TyCoVar]
 scopedSort = go [] []

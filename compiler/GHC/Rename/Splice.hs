@@ -20,36 +20,36 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Hs
 import GHC.Types.Name.Reader
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 
 import GHC.Rename.Env
 import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
-import GHC.Rename.Source  ( rnSrcDecls, findSplice )
+import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
 import Outputable
 import GHC.Types.Module
 import GHC.Types.SrcLoc
-import GHC.Rename.Types ( rnLHsType )
+import GHC.Rename.HsType ( rnLHsType )
 
 import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import TcEnv            ( checkWellStaged )
+import GHC.Tc.Utils.Env ( checkWellStaged )
 import THNames          ( liftName )
 
 import GHC.Driver.Session
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
-import TcEnv            ( tcMetaTy )
+import GHC.Tc.Utils.Env ( tcMetaTy )
 import GHC.Driver.Hooks
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
-import {-# SOURCE #-} TcExpr   ( tcPolyExpr )
-import {-# SOURCE #-} TcSplice
+import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcPolyExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Splice
     ( runMetaD
     , runMetaE
     , runMetaP
@@ -57,7 +57,7 @@ import {-# SOURCE #-} TcSplice
     , tcTopSpliceExpr
     )
 
-import TcHsSyn
+import GHC.Tc.Utils.Zonk
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
@@ -91,7 +91,7 @@ rnBracket e br_body
            ; Splice Untyped -> checkTc (not (isTypedBracket br_body))
                                        illegalTypedBracket
            ; RunSplice _    ->
-               -- See Note [RunSplice ThLevel] in "TcRnTypes".
+               -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnBracket: Renaming bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
@@ -540,10 +540,10 @@ References:
 
 [1] https://gitlab.haskell.org/ghc/ghc/wikis/template-haskell/reify
 [2] 'rnSpliceExpr'
-[3] 'TcSplice.qAddModFinalizer'
-[4] 'TcExpr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
-[5] 'TcHsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
-[6] 'TcPat.tc_pat' ('SplicePat' ('HsSpliced' ...))
+[3] 'GHC.Tc.Gen.Splice.qAddModFinalizer'
+[4] 'GHC.Tc.Gen.Expr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
+[5] 'GHC.Tc.Gen.HsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
+[6] 'GHC.Tc.Gen.Pat.tc_pat' ('SplicePat' ('HsSpliced' ...))
 
 -}
 
@@ -600,7 +600,7 @@ are given names during renaming. These names are collected right after
 renaming. The names generated for anonymous wild cards in TH type splices will
 thus be collected as well.
 
-For more details about renaming wild cards, see GHC.Rename.Types.rnHsSigWcType
+For more details about renaming wild cards, see GHC.Rename.HsType.rnHsSigWcType
 
 Note that partial type signatures are fully supported in TH declaration
 splices, e.g.:
@@ -812,7 +812,7 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 -- Examples   \x -> [| x |]
 --            [| map |]
 --
--- This code is similar to checkCrossStageLifting in TcExpr, but
+-- This code is similar to checkCrossStageLifting in GHC.Tc.Gen.Expr, but
 -- this is only run on *untyped* brackets.
 
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
@@ -891,7 +891,7 @@ them in the keep-alive set.
 Note [Quoting names]
 ~~~~~~~~~~~~~~~~~~~~
 A quoted name 'n is a bit like a quoted expression [| n |], except that we
-have no cross-stage lifting (c.f. TcExpr.thBrackId).  So, after incrementing
+have no cross-stage lifting (c.f. GHC.Tc.Gen.Expr.thBrackId).  So, after incrementing
 the use-level to account for the brackets, the cases are:
 
         bind > use                      Error

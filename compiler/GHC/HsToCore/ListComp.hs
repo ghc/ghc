@@ -19,7 +19,7 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsHandleMonadicFailure, dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
-import TcHsSyn
+import GHC.Tc.Utils.Zonk
 import GHC.Core
 import GHC.Core.Make
 
@@ -35,7 +35,7 @@ import GHC.HsToCore.Match
 import PrelNames
 import GHC.Types.SrcLoc
 import Outputable
-import TcType
+import GHC.Tc.Utils.TcType
 import ListSetOps( getNth )
 import Util
 

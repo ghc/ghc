@@ -37,12 +37,12 @@ import GhcPrelude
 import GHC.Driver.Session
 import GHC.Core.TyCo.Ppr
 import GHC.Hs
-import TcEnv
+import GHC.Tc.Utils.Env
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import PrelNames
 import GHC.Types.Module
 import GHC.Types.Name

@@ -49,8 +49,8 @@ import GHC.Core.Predicate
 
 import PrelNames
 import GHC.Core.TyCon
-import TcEvidence
-import TcType
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
@@ -376,7 +376,7 @@ makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method    -- Default methods are *always* inlined
-                         -- See Note [INLINE and default methods] in TcInstDcls
+                         -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
   | otherwise
@@ -647,7 +647,7 @@ dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
         -> DsM ( OrdList (Id,CoreExpr)  -- Binding for specialised Ids
                , [CoreRule] )           -- Rules for the Global Ids
--- See Note [Handling SPECIALISE pragmas] in TcBinds
+-- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Bind
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
   = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
@@ -960,9 +960,9 @@ Consider
   {-# RULES "myrule"  foo C = 1 #-}
 
 After type checking the LHS becomes (foo alpha (C alpha)), where alpha
-is an unbound meta-tyvar.  The zonker in TcHsSyn is careful not to
+is an unbound meta-tyvar.  The zonker in GHC.Tc.Utils.Zonk is careful not to
 turn the free alpha into Any (as it usually does).  Instead it turns it
-into a TyVar 'a'.  See TcHsSyn Note [Zonking the LHS of a RULE].
+into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in Ghc.Tc.Syntax.
 
 Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
 in the zonker, because the HsExpr data type is very large.  But it's /easy/
@@ -1124,7 +1124,7 @@ dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
 dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; return (w1 . w2) }
- -- See comments on WpFun in TcEvidence for an explanation of what
+ -- See comments on WpFun in GHC.Tc.Types.Evidence for an explanation of what
  -- the specification of this clause is
 dsHsWrapper (WpFun c1 c2 t1 doc)
                               = do { x  <- newSysLocalDsNoLP t1
@@ -1285,7 +1285,7 @@ ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
-  = -- See Note [Typeable for Nat and Symbol] in TcInteract
+  = -- See Note [Typeable for Nat and Symbol] in GHC.Tc.Solver.Interact
     do { fun  <- dsLookupGlobalId tr_fun
        ; dict <- dsEvTerm ev       -- Of type KnownNat/KnownSymbol
        ; let proxy = mkTyApps (Var proxyHashId) [ty_kind, ty]

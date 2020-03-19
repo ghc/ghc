@@ -5,7 +5,7 @@ import Data.List (intercalate)
 import Data.Maybe (isJust)
 import GHC.Driver.Plugins
 import GHC.Driver.Types
-import TcRnTypes
+import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Types.Avail
 import GHC.Hs.Expr
