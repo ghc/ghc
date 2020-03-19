@@ -13,7 +13,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
-import TcType       ( exactTyCoVarsOfType )
+import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set

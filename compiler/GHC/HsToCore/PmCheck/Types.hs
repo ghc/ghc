@@ -8,7 +8,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE TupleSections #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
--- to be imported from "TcRnTypes". The exposed API is that of
+-- to be imported from "GHC.Tc.Types". The exposed API is that of
 -- "GHC.HsToCore.PmCheck.Oracle" and "GHC.HsToCore.PmCheck".
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
@@ -64,7 +64,7 @@ import GHC.Core.Utils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
-import TcType (evVarPred)
+import GHC.Tc.Utils.TcType (evVarPred)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -545,7 +545,7 @@ instance Outputable VarInfo where
 initTmState :: TmState
 initTmState = TmSt emptySDIE emptyCoreMap
 
--- | The type oracle state. A poor man's 'TcSMonad.InsertSet': The invariant is
+-- | The type oracle state. A poor man's 'GHC.Tc.Solver.Monad.InsertSet': The invariant is
 -- that all constraints in there are mutually compatible.
 newtype TyState = TySt (Bag EvVar)
 

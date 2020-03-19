@@ -16,4 +16,4 @@ bar = foo (\t -> t + t)
 -- the arg to foo.  But it might because it's Num (C u a)!
 
 -- This test tickles a bizarre corner case documented
--- as [Silly Type Synonym] in TcMType.lhs
+-- as [Silly Type Synonym] in GHC.Tc.Utils.TcMType

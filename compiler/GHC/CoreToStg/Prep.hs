@@ -35,7 +35,7 @@ import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Types.Literal
 import GHC.Core.Coercion
-import TcEnv
+import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
 import GHC.Types.Demand
 import GHC.Types.Var

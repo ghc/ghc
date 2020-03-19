@@ -10,8 +10,8 @@ which deal with the instantiated versions are located elsewhere:
    Parameterised by          Module
    ----------------          -------------
    GhcPs/RdrName             parser/RdrHsSyn
-   GhcRn/Name                rename/RnHsSyn
-   GhcTc/Id                  typecheck/TcHsSyn
+   GhcRn/Name                GHC.Rename.*
+   GhcTc/Id                  GHC.Tc.Utils.Zonk
 
 The @mk*@ functions attempt to construct a not-completely-useless SrcSpan
 from their components, compared with the @nl*@ functions which
@@ -109,13 +109,13 @@ import GHC.Hs.Types
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Types.Id
@@ -1023,7 +1023,7 @@ collect_bind _ (VarBind { var_id = f })            acc = f : acc
 collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
         -- I don't think we want the binders from the abe_binds
 
-        -- binding (hence see AbsBinds) is in zonking in TcHsSyn
+        -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
 collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
   | omitPatSyn                  = acc
   | otherwise                   = ps : acc

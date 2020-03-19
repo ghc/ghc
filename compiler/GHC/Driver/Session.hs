@@ -3630,7 +3630,7 @@ fFlagsDeps = [
 
 -- | These @-f\<blah\>@ flags have to do with the typed-hole error message or
 -- the valid hole fits in that message. See Note [Valid hole fits include ...]
--- in the TcHoleErrors module. These flags can all be reversed with
+-- in the GHC.Tc.Errors.Hole module. These flags can all be reversed with
 -- @-fno-\<blah\>@
 fHoleFlags :: [(Deprecation, FlagSpec GeneralFlag)]
 fHoleFlags = [
@@ -3925,7 +3925,7 @@ defaultFlags settings
 
 -- | These are the default settings for the display and sorting of valid hole
 --  fits in typed-hole error messages. See Note [Valid hole fits include ...]
- -- in the TcHoleErrors module.
+ -- in the GHC.Tc.Errors.Hole module.
 validHoleFitDefaults :: [GeneralFlag]
 validHoleFitDefaults
   =  [ Opt_ShowTypeAppOfHoleFits

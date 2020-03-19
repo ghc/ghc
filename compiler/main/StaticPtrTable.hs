@@ -65,7 +65,7 @@ Here is a running example:
 
 * The typechecker verifies that all free variables occurring in the
   static form are floatable to top level (see Note [Meaning of
-  IdBindingInfo] in TcRnTypes).  In our example, 'k' is floatable.
+  IdBindingInfo] in GHC.Tc.Types).  In our example, 'k' is floatable.
   Even though it is bound in a nested let, we are fine.
 
 * The desugarer replaces the static form with an application of the
@@ -137,7 +137,7 @@ import GHC.Types.Name
 import Outputable
 import GHC.Platform
 import PrelNames
-import TcEnv (lookupGlobal)
+import GHC.Tc.Utils.Env (lookupGlobal)
 import GHC.Core.Type
 
 import Control.Monad.Trans.Class (lift)

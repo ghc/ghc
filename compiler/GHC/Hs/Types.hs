@@ -143,7 +143,7 @@ Then we use a LHsBndrSig on the binder, so that the
 renamer can decorate it with the variables bound
 by the pattern ('a' in the first example, 'k' in the second),
 assuming that neither of them is in scope already
-See also Note [Kind and type-variable binders] in GHC.Rename.Types
+See also Note [Kind and type-variable binders] in GHC.Rename.HsType
 
 Note [HsType binders]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -231,7 +231,7 @@ Note carefully:
   determine whether or not to emit hole constraints on each wildcard
   (we don't if it's a visible type/kind argument or a type family pattern).
   See related notes Note [Wildcards in visible kind application]
-  and Note [Wildcards in visible type application] in TcHsType.hs
+  and Note [Wildcards in visible type application] in GHC.Tc.Gen.HsType
 
 * After type checking is done, we report what types the wildcards
   got unified with.
@@ -264,7 +264,7 @@ By "stable", we mean that any two variables who do not depend on each other
 preserve their existing left-to-right ordering.
 
 Implicitly bound variables are collected by the extract- family of functions
-(extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.) in GHC.Rename.Types.
+(extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.) in GHC.Rename.HsType.
 These functions thus promise to keep left-to-right ordering.
 Look for pointers to this note to see the places where the action happens.
 
@@ -366,7 +366,7 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
                                          -- Implicitly-bound kind & type vars
                                          -- Order is important; see
                                          -- Note [Ordering of implicit variables]
-                                         -- in GHC.Rename.Types
+                                         -- in GHC.Rename.HsType
 
          , hsib_body :: thing            -- Main payload (type or list of types)
     }
@@ -601,7 +601,7 @@ data HsType pass
   | HsParTy             (XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr
         -- Parenthesis preserved for the precedence re-arrangement in
-        -- GHC.Rename.Types
+        -- GHC.Rename.HsType
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
       --         'ApiAnnotation.AnnClose' @')'@
@@ -1013,7 +1013,7 @@ terms, such as this example:
 
 If we do not pattern-match on ForallInvis in hsScopedTvs, then `a` would
 erroneously be brought into scope over the body of `x` when renaming it.
-Although the typechecker would later reject this (see `TcValidity.vdqAllowed`),
+Although the typechecker would later reject this (see `GHC.Tc.Validity.vdqAllowed`),
 it is still possible for this to wreak havoc in the renamer before it gets to
 that point (see #17687 for an example of this).
 Bottom line: nip problems in the bud by matching on ForallInvis from the start.
@@ -1345,7 +1345,7 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- occurrences).
 --
 -- See Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat and
--- Note [Disambiguating record fields] in TcExpr.
+-- Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
 -- See Note [Located RdrNames] in GHC.Hs.Expr
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)

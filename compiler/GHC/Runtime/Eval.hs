@@ -65,9 +65,9 @@ import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
 import GHC.Types.RepType
-import TcType
-import Constraint
-import TcOrigin
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
 import GHC.Types.Var
 import GHC.Types.Id as Id
@@ -111,18 +111,18 @@ import Data.Array
 import Exception
 import Unsafe.Coerce ( unsafeCoerce )
 
-import TcRnDriver ( runTcInteractive, tcRnType, loadUnqualIfaces )
-import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
+import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
+import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
 
-import TcEnv (tcGetInstEnvs)
+import GHC.Tc.Utils.Env (tcGetInstEnvs)
 
-import Inst (instDFunType)
-import TcSimplify (solveWanteds)
-import TcRnMonad
-import TcEvidence
+import GHC.Tc.Utils.Instantiate (instDFunType)
+import GHC.Tc.Solver (solveWanteds)
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Types.Evidence
 import Data.Bifunctor (second)
 
-import TcSMonad (runTcS)
+import GHC.Tc.Solver.Monad (runTcS)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively

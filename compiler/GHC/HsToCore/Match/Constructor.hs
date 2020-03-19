@@ -24,7 +24,7 @@ import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Types.Basic ( Origin(..) )
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.Core.Make ( mkCoreLets )

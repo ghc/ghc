@@ -10,7 +10,7 @@ module ShouldFail where
 -- Reported by Thomas Hallgren Nov 00
 
 -- July 07: I'm changing this from "should fail" to "should succeed"
--- See Note [Important subtlety in oclose] in FunDeps
+-- See Note [Important subtlety in oclose] in GHC.Tc.Instance.FunDeps
 
 
 primDup :: Int -> IO Int
