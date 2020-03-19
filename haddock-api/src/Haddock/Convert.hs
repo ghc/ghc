@@ -34,7 +34,7 @@ import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Core.PatSyn
 import GHC.Types.SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
-import TcType
+import GHC.Tc.Utils.Type
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -800,7 +800,7 @@ synifyFamInst fi opaque = do
     eta_expanded_lhs
       -- eta-expand lhs types, because sometimes data/newtype
       -- instances are eta-reduced; See Trac #9692
-      -- See Note [Eta reduction for data family axioms] in TcInstDcls in GHC
+      -- See Note [Eta reduction for data family axioms] in GHC.Tc.TyCl.Instance in GHC
       | DataFamilyInst rep_tc <- fam_flavor
       = let (_, rep_tc_args) = splitTyConApp fam_rhs
             etad_tyvars      = dropList rep_tc_args $ tyConTyVars rep_tc
