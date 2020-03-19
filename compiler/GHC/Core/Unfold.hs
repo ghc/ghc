@@ -53,7 +53,7 @@ import GHC.Core.SimpleOpt
 import GHC.Core.Arity     ( manifestArity )
 import GHC.Core.Utils
 import Id
-import Demand          ( isBottomingSig )
+import Demand          ( isDeadEndSig )
 import GHC.Core.DataCon
 import Literal
 import PrimOp
@@ -1176,7 +1176,7 @@ certainlyWillInline dflags fn_info
         --    See Note [certainlyWillInline: INLINABLE]
     do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
       | arityInfo fn_info > 0  -- See Note [certainlyWillInline: be careful of thunks]
-      , not (isBottomingSig (strictnessInfo fn_info))
+      , not (isDeadEndSig (strictnessInfo fn_info))
               -- Do not unconditionally inline a bottoming functions even if
               -- it seems smallish. We've carefully lifted it out to top level,
               -- so we don't want to re-inline it.

@@ -39,7 +39,7 @@ import MkId             ( mkDictSelRhs )
 import IdInfo
 import GHC.Core.InstEnv
 import GHC.Core.Type    ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig )
+import Demand           ( appIsBottom, isTopSig, isDeadEndSig )
 import Cpr              ( mkCprSig, botCpr )
 import BasicTypes
 import Name hiding (varName)
@@ -726,7 +726,7 @@ addExternal omit_prags expose_all id
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
+    bottoming_fn   = isDeadEndSig (strictnessInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1240,7 +1240,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
       = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
     unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = isBottomingSig final_sig
+    is_bot = isDeadEndSig final_sig
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that

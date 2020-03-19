@@ -70,7 +70,7 @@ module Id (
         isDataConWrapId, isDataConWrapId_maybe,
         isDataConId_maybe,
         idDataCon,
-        isConLikeId, isBottomingId, idIsFrom,
+        isConLikeId, isDeadEndId, idIsFrom,
         hasNoBinding,
 
         -- ** Join variables
@@ -638,9 +638,9 @@ idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 
 -- | Returns true if an application to n args would diverge
-isBottomingId :: Var -> Bool
-isBottomingId v
-  | isId v    = isBottomingSig (idStrictness v)
+isDeadEndId :: Var -> Bool
+isDeadEndId v
+  | isId v    = isDeadEndSig (idStrictness v)
   | otherwise = False
 
 -- | Accesses the 'Id''s 'strictnessInfo'.
