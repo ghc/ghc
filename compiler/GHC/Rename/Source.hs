@@ -38,8 +38,8 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
 import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
-import TcAnnotations    ( annCtxt )
-import TcRnMonad
+import GHC.Tc.Annotations ( annCtxt )
+import GHC.Tc.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Module
@@ -594,7 +594,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                          quotes (text (lhs ++ " = " ++ rhs))
                        ]
 
-    -- stolen from TcInstDcls
+    -- stolen from GHC.Tc.TyCl.Instance
     instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
     instDeclCtxt1 hs_inst_ty
       = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
@@ -848,7 +848,7 @@ rnATInstDecls :: (AssocTyFamInfo ->           -- The function that renames
 -- and the family instance declarations in an instance
 --
 -- NB: We allow duplicate associated-type decls;
---     See Note [Associated type instances] in TcInstDcls
+--     See Note [Associated type instances] in GHC.Tc.TyCl.Instance
 rnATInstDecls rnFun cls tv_ns at_insts
   = rnList (rnFun (AssocTyFamInst cls tv_ns)) at_insts
     -- See Note [Renaming associated types]
@@ -873,7 +873,7 @@ it is handled pretty much the same way as the ones in partial type signatures.
 We however don't want to emit hole constraints on wildcards in family
 instances, so we turn on PartialTypeSignatures and turn off warning flag to
 let typechecker know this.
-See related Note [Wildcards in visible kind application] in TcHsType.hs
+See related Note [Wildcards in visible kind application] in GHC.Tc.HsType
 
 Note [Unused type variables in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -957,7 +957,7 @@ Even though `a` is not bound by the forall, this is still accepted because `a`
 was previously bound by the `instance C (Maybe a)` part. (see #16116).
 
 In each case, the function which detects improperly bound variables on the RHS
-is TcValidity.checkValidFamPats.
+is GHC.Tc.Validity.checkValidFamPats.
 -}
 
 
@@ -1184,7 +1184,7 @@ reasons:
   is jolly confusing.  See #4875
 
 
-* Increase kind polymorphism.  See TcTyClsDecls
+* Increase kind polymorphism.  See GHC.Tc.TyCl
   Note [Grouping of type and class declarations]
 
 Why do the instance declarations participate?  At least two reasons
@@ -1282,7 +1282,7 @@ with different dependency structure!)
 
 Ugh.  For now we simply don't allow promotion of data constructors for
 data instances.  See Note [AFamDataCon: not promoting data family
-constructors] in TcEnv
+constructors] in GHC.Tc.Env
 -}
 
 
