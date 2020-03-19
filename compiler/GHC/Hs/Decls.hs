@@ -260,7 +260,7 @@ data HsGroup p
 
 type instance XCHsGroup GhcPs = NoExtField
 type instance XCHsGroup GhcRn = KindedDecls
-type instance XCHsGroup GhcTc = KindedDecls
+type instance XCHsGroup GhcTc = Void
 type instance XXHsGroup (GhcPass _) = NoExtCon
 
 -- | Names of declarations that either have a CUSK or a SAKS.
@@ -275,9 +275,13 @@ instance Monoid KindedDecls where
 isKindedDecl :: KindedDecls -> TyClDecl GhcRn -> Bool
 isKindedDecl (KindedDecls nameSet) d = elemNameSet (tcdName d) nameSet
 
-emptyGroup, emptyRdrGroup, emptyRnGroup :: Monoid (XCHsGroup (GhcPass p)) => HsGroup (GhcPass p)
+emptyGroup :: Monoid (XCHsGroup (GhcPass p)) => HsGroup (GhcPass p)
+
+emptyRdrGroup :: HsGroup GhcPs
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
-emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
+
+emptyRnGroup :: HsGroup GhcRn
+emptyRnGroup = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_ext = mempty,
                        hs_tyclds = [],
