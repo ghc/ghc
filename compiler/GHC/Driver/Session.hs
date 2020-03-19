@@ -3523,7 +3523,7 @@ fFlagsDeps = [
   flagSpec "case-merge"                       Opt_CaseMerge,
   flagSpec "case-folding"                     Opt_CaseFolding,
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
-  flagSpec "cmm-bounds-check"                 Opt_CmmBoundsCheck,
+  flagSpec "cmm-assertions"                   Opt_CmmAssertions,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,

@@ -1344,7 +1344,7 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
 
--- Bounds checking with -fcmm-bounds-check
+-- Bounds checking with -fcmm-assertions
 boundsCheckExceptionName :: Name
 boundsCheckExceptionName = varQual
   gHC_IO_Exception (fsLit "boundsCheckException")
@@ -2414,7 +2414,7 @@ unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 unsafeCoerceIdKey        = mkPreludeMiscIdUnique 572
 
--- Bounds checking with -fcmm-bounds-check
+-- Bounds checking with -fcmm-assertions
 boundsCheckExceptionIdKey = mkPreludeMiscIdUnique 573
 
 {-

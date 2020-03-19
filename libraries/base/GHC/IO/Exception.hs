@@ -253,7 +253,7 @@ data ArrayException
 instance Exception ArrayException
 
 -- | Exception thrown by out-of-bounds primitive array
--- operations when compiling with @-fcmm-bounds-check@.
+-- operations when compiling with @-fcmm-assertions@.
 --
 -- @since 4.14.0.0
 data BoundsCheckException = BoundsCheckException
@@ -264,7 +264,7 @@ instance Exception BoundsCheckException where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
--- Using by Stg to Cmm when -fcmm-bounds-check is on.
+-- Used by Stg to Cmm when -fcmm-assertions is on.
 boundsCheckException :: SomeException
 {-# noinline boundsCheckException #-}
 boundsCheckException =

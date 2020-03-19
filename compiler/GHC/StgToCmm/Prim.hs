@@ -2056,7 +2056,7 @@ emitIndexBoundsCheck ::
   -> FCode ()
 emitIndexBoundsCheck arr_ty base width idx_ty idx = do
   dflags <- getDynFlags
-  when (gopt Opt_CmmBoundsCheck dflags) $ do
+  when (gopt Opt_CmmAssertions dflags) $ do
     let w = wordWidth dflags
         idxShifted = CmmMachOp
           (MO_Shl w)
@@ -2568,7 +2568,7 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
-    when (gopt Opt_CmmBoundsCheck dflags) $ do
+    when (gopt Opt_CmmAssertions dflags) $ do
         let src_len = sizeofByteArrayExpr dflags src
             dst_len = sizeofByteArrayExpr dflags dst
         emitAllCopyAssertions dst_len dst_off src_len src_off n
@@ -2587,7 +2587,7 @@ doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
-    when (gopt Opt_CmmBoundsCheck dflags) $ do
+    when (gopt Opt_CmmAssertions dflags) $ do
         emitAssertNonNegative src_off
         emitAssertNonNegative bytes
         let src_len = sizeofByteArrayExpr dflags src
@@ -2610,7 +2610,7 @@ doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
-    when (gopt Opt_CmmBoundsCheck dflags) $ do
+    when (gopt Opt_CmmAssertions dflags) $ do
         emitAssertNonNegative dst_off
         emitAssertNonNegative bytes
         let dst_len = sizeofByteArrayExpr dflags dst
@@ -2631,7 +2631,7 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
 
-    when (gopt Opt_CmmBoundsCheck dflags) $ do
+    when (gopt Opt_CmmAssertions dflags) $ do
         emitAssertNonNegative off
         emitAssertNonNegative len
         let ba_len = sizeofByteArrayExpr dflags ba
