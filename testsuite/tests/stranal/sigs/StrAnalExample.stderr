@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule:
-StrAnalExample.foo: <S,1*U>
+StrAnalExample.$trModule: c
+StrAnalExample.foo: <S,1*U>c
 
 
 
@@ -12,7 +12,7 @@ StrAnalExample.foo:
 
 
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule:
-StrAnalExample.foo: <S,1*U>
+StrAnalExample.$trModule: c
+StrAnalExample.foo: <S,1*U>c
 
 
