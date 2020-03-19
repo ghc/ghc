@@ -45,7 +45,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
                          , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
-import TcRnMonad
+import GHC.Tc.Monad
 import GHC.Types.Name.Reader
 import PrelNames
 import TysPrim          ( funTyConName )

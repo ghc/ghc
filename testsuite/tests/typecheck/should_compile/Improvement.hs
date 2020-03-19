@@ -8,7 +8,7 @@
 -- overkill.
 --
 -- See Note Note [No reduction for Derived class constraints]
--- in TcInteract
+-- in GHC.Tc.Solver.Interact
 
 module Foo where
 

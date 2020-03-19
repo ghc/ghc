@@ -3,13 +3,13 @@ module HoleFitPlugin where
 
 import GHC.Plugins hiding ((<>))
 
-import TcHoleErrors
+import GHC.Tc.Errors.Hole
 
 import Data.List (stripPrefix, sortOn)
 
-import Constraint
+import GHC.Tc.Utils.Constraint
 
-import TcRnMonad
+import GHC.Tc.Monad
 
 import Text.Read
 

@@ -534,7 +534,7 @@ version:
 We had to revert this patch because it made GHC itself slower.
 
 Why? It delayed inlining of /all/ functions with RULES, and that was
-very bad in TcFlatten.flatten_ty_con_app
+very bad in GHC.Tc.Solver.Flatten.flatten_ty_con_app
 
 * It delayed inlining of liftM
 * That delayed the unravelling of the recursion in some dictionary
