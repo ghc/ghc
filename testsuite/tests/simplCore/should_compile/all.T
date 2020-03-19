@@ -319,3 +319,4 @@ test('T17787',  [ grep_errmsg(r'foo') ], compile, ['-ddump-simpl -dsuppress-uniq
 test('T17901',
      normal,
      makefile_test, ['T17901'])
+test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques -dsuppress-idinfo'])
