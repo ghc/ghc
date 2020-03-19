@@ -30,9 +30,9 @@ import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 import GHC.Types.Basic ( Origin(..) )
 import GHC.Driver.Session
 import GHC.Hs
-import TcHsSyn
-import TcEvidence
-import TcRnMonad
+import GHC.Tc.Syntax
+import GHC.Tc.Evidence
+import GHC.Tc.Monad
 import GHC.HsToCore.PmCheck
 import GHC.Core
 import GHC.Types.Literal

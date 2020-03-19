@@ -283,7 +283,7 @@ data GeneralFlag
    | Opt_ShowHoleConstraints
     -- Options relating to the display of valid hole fits
     -- when generating an error message for a typed hole
-    -- See Note [Valid hole fits include] in TcHoleErrors.hs
+    -- See Note [Valid hole fits include] in GHC.Tc.Hole
    | Opt_ShowValidHoleFits
    | Opt_SortValidHoleFits
    | Opt_SortBySizeHoleFits

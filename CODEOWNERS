@@ -16,26 +16,26 @@
 /includes/                        @bgamari @simonmar @osa1
 
 # The compiler
-/compiler/parser/                 @int-index
-/compiler/hsSyn/                  @simonpj @rae
-/compiler/typecheck/              @simonpj @rae
-/compiler/rename/                 @simonpj @rae
-/compiler/types/                  @simonpj @rae
-/compiler/deSugar/                @simonpj @rae
-/compiler/typecheck/TcDeriv*      @RyanGlScott
-/compiler/nativeGen/              @simonmar @bgamari @AndreasK
-/compiler/llvmGen/                @angerman
-/compiler/codeGen/                @simonmar @osa1
-/compiler/cmm/                    @simonmar @osa1
-/compiler/ghci/                   @simonmar
-/compiler/simplCore/CallArity.hs  @nomeata
-/compiler/utils/UnVarGraph.hs     @nomeata
-/compiler/simplCore/Exitify.hs    @nomeata
-/compiler/simplStg/StgCse.hs      @nomeata
-/compiler/simplStg/StgLiftLams.hs @sgraf
-/compiler/cmm/CmmSwitch.hs        @nomeata
-/compiler/stranal/DmdAnal.hs      @simonpj @sgraf
-/compiler/hsSyn/Convert.hs        @rae
+/compiler/parser/                  @int-index
+/compiler/GHC/Hs/                  @simonpj @rae
+/compiler/GHC/Tc/                  @simonpj @rae
+/compiler/GHC/Rename/              @simonpj @rae
+/compiler/GHC/Types/               @simonpj @rae
+/compiler/GHC/HsToCore/            @simonpj @rae
+/compiler/GHC/Tc/Deriv/            @RyanGlScott
+/compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
+/compiler/GHC/CmmToLlvm/           @angerman
+/compiler/GHC/StgToCmm/            @simonmar @osa1
+/compiler/GHC/Cmm/                 @simonmar @osa1
+/compiler/ghci/                    @simonmar
+/compiler/GHC/Core/Op/CallArity.hs @nomeata
+/compiler/utils/UnVarGraph.hs      @nomeata
+/compiler/GHC/Core/Op/Exitify.hs   @nomeata
+/compiler/GHC/Stg/CSE.hs           @nomeata
+/compiler/GHC/Stg/Lift.hs          @sgraf
+/compiler/GHC/Cmm/Switch.hs        @nomeata
+/compiler/GHC/Core/Op/DmdAnal.hs   @simonpj @sgraf
+/compiler/GHC/ThToHs.hs            @rae
 
 # Core libraries
 /libraries/base/                  @hvr

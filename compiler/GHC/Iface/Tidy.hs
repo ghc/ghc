@@ -16,7 +16,7 @@ module GHC.Iface.Tidy (
 
 import GhcPrelude
 
-import TcRnTypes
+import GHC.Tc.Utils
 import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Unfold
@@ -47,8 +47,8 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
 import GHC.Types.Avail
 import GHC.Iface.Env
-import TcEnv
-import TcRnMonad
+import GHC.Tc.Env
+import GHC.Tc.Monad
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class

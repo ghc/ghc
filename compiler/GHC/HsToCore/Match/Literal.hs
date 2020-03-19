@@ -38,8 +38,8 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import TcHsSyn ( shortCutLit )
-import TcType
+import GHC.Tc.Syntax ( shortCutLit )
+import GHC.Tc.Utils.Type
 import GHC.Types.Name
 import GHC.Core.Type
 import PrelNames
