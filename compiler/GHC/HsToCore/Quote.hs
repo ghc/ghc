@@ -44,7 +44,7 @@ import GHC.Types.Id
 import GHC.Types.Name hiding( varName, tcName )
 import THNames
 import GHC.Types.Name.Env
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import TysWiredIn
 import GHC.Core
@@ -61,7 +61,7 @@ import GHC.Types.ForeignCall
 import Util
 import Maybes
 import MonadUtils
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import GHC.Core.Class
@@ -192,7 +192,7 @@ instantiated.
 > USE THE `wrapName` FUNCTION TO APPLY THE `m` TYPE VARIABLE TO A TYPE CONSTRUCTOR.
 
 What the arguments should be instantiated to is supplied by the `QuoteWrapper`
-datatype which is produced by `TcSplice`. It is a pair of an evidence variable
+datatype which is produced by `GHC.Tc.Gen.Splice`. It is a pair of an evidence variable
 for `Quote m` and a type variable `m`. All the polymorphic combinators in desugaring
 need to be applied to these two type variables.
 
@@ -1383,7 +1383,7 @@ repRole (L _ Nothing)                 = rep2_nw inferRName []
 -----------------------------------------------------------------------------
 
 repSplice :: HsSplice GhcRn -> MetaM (Core a)
--- See Note [How brackets and nested splices are handled] in TcSplice
+-- See Note [How brackets and nested splices are handled] in GHC.Tc.Gen.Splice
 -- We return a CoreExpr of any old type; the context should know
 repSplice (HsTypedSplice   _ _ n _) = rep_splice n
 repSplice (HsUntypedSplice _ _ n _) = rep_splice n

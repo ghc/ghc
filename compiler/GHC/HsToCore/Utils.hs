@@ -50,8 +50,8 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr )
 
 import GHC.Hs
-import TcHsSyn
-import TcType( tcSplitTyConApp )
+import GHC.Tc.Utils.Zonk
+import GHC.Tc.Utils.TcType( tcSplitTyConApp )
 import GHC.Core
 import GHC.HsToCore.Monad
 
@@ -81,7 +81,7 @@ import GHC.Driver.Session
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
 
-import TcEvidence
+import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))

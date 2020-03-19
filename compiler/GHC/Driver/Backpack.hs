@@ -30,8 +30,8 @@ import Parser
 import Lexer
 import GHC.Driver.Monad
 import GHC.Driver.Session
-import TcRnMonad
-import TcRnDriver
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Module
 import GHC.Types.Module
 import GHC.Driver.Types
 import StringBuffer

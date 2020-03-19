@@ -13,4 +13,4 @@ type family X :: F a
     --      The type variable ‘a1’ is ambiguous
     --    • In the type family declaration for ‘X’
     --
-    -- See Note [Unifying implicit CUSK variables] in TcHsType
+    -- See Note [Unifying implicit CUSK variables] in GHC.Tc.Gen.HsType

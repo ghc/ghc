@@ -25,11 +25,11 @@ import GhcPrelude
 
 import GHC.Core.Type
 import Pair
-import TcType            ( TcType, tcEqType )
+import GHC.Tc.Utils.TcType ( TcType, tcEqType )
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                          , Injectivity(..) )
 import GHC.Core.Coercion ( Role(..) )
-import Constraint ( Xi )
+import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import TysWiredIn

@@ -132,7 +132,7 @@ import GHC.Driver.Session
 
 -- Turgid imports for showTypeCategory
 import PrelNames
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 

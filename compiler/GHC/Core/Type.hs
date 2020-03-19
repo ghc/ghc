@@ -615,7 +615,7 @@ data TyCoMapper env m
           -- a) To zonk TcTyCons
           -- b) To turn TcTyCons into TyCons.
           --    See Note [Type checking recursive type and class declarations]
-          --    in TcTyClsDecls
+          --    in GHC.Tc.TyCl
       }
 
 {-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
@@ -809,7 +809,7 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Here Id is partially applied in the type sig for Foo,
         -- but once the type synonyms are expanded all is well
         --
-        -- Moreover in TcHsTypes.tcInferApps we build up a type
+        -- Moreover in GHC.Tc.Types.tcInferApps we build up a type
         --   (T t1 t2 t3) one argument at a type, thus forming
         --   (T t1), (T t1 t2), etc
 
@@ -1325,7 +1325,7 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- have enough info to extract the runtime-rep arguments that
 -- the funTyCon requires.  This will usually be true;
 -- but may be temporarily false during canonicalization:
---     see Note [FunTy and decomposing tycon applications] in TcCanonical
+--     see Note [FunTy and decomposing tycon applications] in GHC.Tc.Solver.Canonical
 --
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ arg res)
@@ -1456,7 +1456,7 @@ we want
 not                                ([a], a -> a)
 
 The reason is that we then get better (shorter) type signatures in
-interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
+interfaces.  Notably this plays a role in tcTySigs in GHC.Tc.Gen.Bind.
 
 
 ---------------------------------------------------------------------
@@ -2455,7 +2455,7 @@ occCheckExpand to expand any type synonyms in the kind of 'ty'
 to eliminate 'a'.  See kinding rule (FORALL) in
 Note [Kinding rules for types]
 
-And in TcValidity.checkEscapingKind, we use also use
+And in GHC.Tc.Validity.checkEscapingKind, we use also use
 occCheckExpand, for the same reason.
 -}
 
@@ -3024,7 +3024,7 @@ Note [When does a tycon application need an explicit kind signature?]
 There are a couple of places in GHC where we convert Core Types into forms that
 more closely resemble user-written syntax. These include:
 
-1. Template Haskell Type reification (see, for instance, TcSplice.reify_tc_app)
+1. Template Haskell Type reification (see, for instance, GHC.Tc.Gen.Splice.reify_tc_app)
 2. Converting Types to LHsTypes (in GHC.Hs.Utils.typeToLHsType, or in Haddock)
 
 This conversion presents a challenge: how do we ensure that the resulting type
@@ -3064,7 +3064,7 @@ Suppose we have a tycon application (T ty_1 ... ty_n). Why might this type
 require a kind signature? It might require it when we need to fill in any of
 T's omitted arguments. By "omitted argument", we mean one that is dropped when
 reifying ty_1 ... ty_n. Sometimes, the omitted arguments are inferred and
-specified arguments (e.g., TH reification in TcSplice), and sometimes the
+specified arguments (e.g., TH reification in GHC.Tc.Gen.Splice), and sometimes the
 omitted arguments are only the inferred ones (e.g., in GHC.Hs.Utils.typeToLHsType,
 which reifies specified arguments through visible kind application).
 Regardless, the key idea is that _some_ arguments are going to be omitted after

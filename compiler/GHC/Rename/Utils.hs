@@ -38,8 +38,8 @@ import GhcPrelude
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import TcEnv
-import TcRnMonad
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -506,7 +506,7 @@ pprHsDocContext TypBrCtx              = text "a Template-Haskell quoted type"
 pprHsDocContext HsTypeCtx             = text "a type argument"
 pprHsDocContext GHCiCtx               = text "GHCi input"
 pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
-pprHsDocContext ClassInstanceCtx      = text "TcSplice.reifyInstances"
+pprHsDocContext ClassInstanceCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
 
 pprHsDocContext (ForeignDeclCtx name)
    = text "the foreign declaration for" <+> quotes (ppr name)

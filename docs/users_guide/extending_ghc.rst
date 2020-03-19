@@ -768,7 +768,7 @@ displayed.
     import GHC.Driver.Session (getDynFlags)
     import GHC.Driver.Plugins
     import GHC.Driver.Types
-    import TcRnTypes
+    import GHC.Tc.Types
     import GHC.Hs.Extension
     import GHC.Hs.Decls
     import GHC.Hs.Expr
@@ -963,9 +963,9 @@ spent on searching for valid hole fits, after which new searches are aborted.
 
     import Data.List (stripPrefix, sortOn)
 
-    import TcRnTypes
+    import GHC.Tc.Types
 
-    import TcRnMonad
+    import GHC.Tc.Utils.Monad
 
     import Data.Time (UTCTime, NominalDiffTime)
     import qualified Data.Time as Time
@@ -1315,7 +1315,7 @@ this idea can be seen below:
     import GHC.Hs.Extension
     import GHC.Hs.Lit
     import Hooks
-    import TcRnMonad
+    import GHC.Tc.Utils.Monad
 
     plugin :: Plugin
     plugin = defaultPlugin { dynflagsPlugin = hooksP }

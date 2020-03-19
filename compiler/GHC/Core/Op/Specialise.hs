@@ -16,7 +16,7 @@ module GHC.Core.Op.Specialise ( specProgram, specUnfolding ) where
 import GhcPrelude
 
 import GHC.Types.Id
-import TcType hiding( substTy )
+import GHC.Tc.Utils.TcType hiding( substTy )
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
 import GHC.Core.Predicate
 import GHC.Types.Module( Module, HasModule(..) )

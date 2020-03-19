@@ -111,10 +111,10 @@ import StringBuffer
 import Parser
 import Lexer
 import GHC.Types.SrcLoc
-import TcRnDriver
+import GHC.Tc.Module
 import GHC.IfaceToCore  ( typecheckIface )
-import TcRnMonad
-import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 import GHC.Types.Name.Cache ( initNameCache )
 import PrelInfo
 import GHC.Core.Op.Simplify.Driver
@@ -143,7 +143,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import Fingerprint      ( Fingerprint )
 import GHC.Driver.Hooks
-import TcEnv
+import GHC.Tc.Utils.Env
 import PrelNames
 import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
@@ -728,7 +728,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     let hsc_env'' = hsc_env' { hsc_dflags = dflags }
 
     -- One-shot mode needs a knot-tying mutable variable for interface
-    -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
+    -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
@@ -1762,7 +1762,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
             -- that might later be looked up by name.  But we can exclude
             --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in GHC.Driver.Types
             --    - Implicit Ids, which are implicit in tcs
-            -- c.f. TcRnDriver.runTcInteractive, which reconstructs the TypeEnv
+            -- c.f. GHC.Tc.Module.runTcInteractive, which reconstructs the TypeEnv
 
         new_tythings = map AnId ext_ids ++ map ATyCon tcs ++ map (AConLike . PatSynCon) patsyns
         ictxt        = hsc_IC hsc_env
@@ -1788,7 +1788,7 @@ hscAddSptEntries hsc_env entries = do
 
   To support fixity declarations on types defined within GHCi (as requested
   in #10018) we record the fixity environment in InteractiveContext.
-  When we want to evaluate something TcRnDriver.runTcInteractive pulls out this
+  When we want to evaluate something GHC.Tc.Module.runTcInteractive pulls out this
   fixity environment and uses it to initialize the global typechecker environment.
   After the typechecker has finished its business, an updated fixity environment
   (reflecting whatever fixity declarations were present in the statements we

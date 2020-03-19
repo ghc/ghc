@@ -24,9 +24,9 @@ import GHC.HsToCore.Usage
 import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Hs
-import TcRnTypes
-import TcRnMonad  ( finalSafeMode, fixSafeInstances )
-import TcRnDriver ( runTcInteractive )
+import GHC.Tc.Types
+import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
+import GHC.Tc.Module ( runTcInteractive )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name

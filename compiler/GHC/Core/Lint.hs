@@ -35,7 +35,7 @@ import GHC.Types.Literal
 import GHC.Core.DataCon
 import TysWiredIn
 import TysPrim
-import TcType ( isFloatingTy )
+import GHC.Tc.Utils.TcType ( isFloatingTy )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -440,7 +440,7 @@ interactiveInScope :: HscEnv -> [Var]
 interactiveInScope hsc_env
   = tyvars ++ ids
   where
-    -- C.f. TcRnDriver.setInteractiveContext, Desugar.deSugarExpr
+    -- C.f. GHC.Tc.Module.setInteractiveContext, Desugar.deSugarExpr
     ictxt                   = hsc_IC hsc_env
     (cls_insts, _fam_insts) = ic_instances ictxt
     te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
@@ -1491,7 +1491,7 @@ Here 'cls' appears free in b's kind, which would usually be illegal
 #in this case (Alg cls *) = *, so all is well.  Currently we allow
 this, and make Lint expand synonyms where necessary to make it so.
 
-c.f. TcUnify.occCheckExpand and GHC.Core.Utils.coreAltsType which deal
+c.f. GHC.Tc.Utils.Unify.occCheckExpand and GHC.Core.Utils.coreAltsType which deal
 with the same problem. A single systematic solution eludes me.
 -}
 
@@ -1499,7 +1499,7 @@ with the same problem. A single systematic solution eludes me.
 lintTySynFamApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
 -- The TyCon is a type synonym or a type family (not a data family)
 -- See Note [Linting type synonym applications]
--- c.f. TcValidity.check_syn_tc_app
+-- c.f. GHC.Tc.Validity.check_syn_tc_app
 lintTySynFamApp report_unsat ty tc tys
   | report_unsat   -- Report unsaturated only if report_unsat is on
   , tys `lengthLessThan` tyConArity tc

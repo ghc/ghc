@@ -121,7 +121,7 @@ The Class and its associated TyCon have the same Name.
 
 -- | A global typecheckable-thing, essentially anything that has a name.
 -- Not to be confused with a 'TcTyThing', which is also a typecheckable
--- thing but in the *local* context.  See 'TcEnv' for how to retrieve
+-- thing but in the *local* context.  See 'GHC.Tc.Utils.Env' for how to retrieve
 -- a 'TyThing' given a 'Name'.
 data TyThing
   = AnId     Id
@@ -356,7 +356,7 @@ promote MkT as well.
 
 How does this work?
 
-* In TcValidity.checkConstraintsOK we reject kinds that
+* In GHC.Tc.Validity.checkConstraintsOK we reject kinds that
   have constraints other than (a~b) and (a~~b).
 
 * In Inst.tcInstInvisibleTyBinder we instantiate a call
@@ -380,7 +380,7 @@ How does this work?
   in TysPrim for a primer on these equality types.)
 
 * How do we prevent a MkT having an illegal constraint like
-  Eq a?  We check for this at use-sites; see TcHsType.tcTyVar,
+  Eq a?  We check for this at use-sites; see GHC.Tc.Gen.HsType.tcTyVar,
   specifically dc_theta_illegal_constraint.
 
 * Notice that nothing special happens if
@@ -663,7 +663,7 @@ are truly unrelated.
 
 -- | A type labeled 'KnotTied' might have knot-tied tycons in it. See
 -- Note [Type checking recursive type and class declarations] in
--- TcTyClsDecls
+-- GHC.Tc.TyCl
 type KnotTied ty = ty
 
 {- **********************************************************************
@@ -856,7 +856,7 @@ Here Foo's TyConBinders are
 and its kind prints as
    Foo :: forall a -> forall b. (a -> b -> Type) -> Type
 
-See also Note [Required, Specified, and Inferred for types] in TcTyClsDecls
+See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
 
 ---- Printing -----
 
@@ -892,7 +892,7 @@ We could change this decision, but Required, Named TyCoBinders are rare
 anyway.  (Most are Anons.)
 
 However the type of a term can (just about) have a required quantifier;
-see Note [Required quantifiers in the type of a term] in TcExpr.
+see Note [Required quantifiers in the type of a term] in GHC.Tc.Gen.Expr.
 -}
 
 
@@ -1603,7 +1603,7 @@ equality types story] in TysPrim for background on equality constraints.
 For unboxed equalities:
   - Generate a CoercionHole, a mutable variable just like a unification
     variable
-  - Wrap the CoercionHole in a Wanted constraint; see TcRnTypes.TcEvDest
+  - Wrap the CoercionHole in a Wanted constraint; see GHC.Tc.Utils.TcEvDest
   - Use the CoercionHole in a Coercion, via HoleCo
   - Solve the constraint later
   - When solved, fill in the CoercionHole by side effect, instead of
@@ -1650,7 +1650,7 @@ Note [CoercionHoles and coercion free variables]
 Why does a CoercionHole contain a CoVar, as well as reference to
 fill in?  Because we want to treat that CoVar as a free variable of
 the coercion.  See #14584, and Note [What prevents a
-constraint from floating] in TcSimplify, item (4):
+constraint from floating] in GHC.Tc.Solver, item (4):
 
         forall k. [W] co1 :: t1 ~# t2 |> co2
                   [W] co2 :: k ~# *
