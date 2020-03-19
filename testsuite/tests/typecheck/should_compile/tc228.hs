@@ -6,7 +6,7 @@
 -- Reason: we get an implication constraint (forall a. Typeable a => Typeable b),
 -- when generalising unExTypeable.  We want to infer a context for the 
 -- whole thing of (Typeable b).
--- See Note [Inference and implication constraints] in TcSimplify
+-- See Note [Inference and implication constraints] in GHC.Tc.Solver
 
 
 module Foo where
