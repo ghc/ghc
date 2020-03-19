@@ -300,7 +300,7 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
     fixds ++ cls_fixds
   where
     cls_fixds = [ L loc sig
-                | L _ ClassDecl{tcdSigs = sigs} <- concatMap tyClGroupTyClDecls tyclds
+                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
                 , L loc (FixSig _ sig) <- sigs
                 ]
 hsGroupTopLevelFixitySigs (XHsGroup nec) = noExtCon nec
@@ -385,10 +385,10 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
-             ppr_ds (concatMap tyClGroupRoleDecls tycl_decls),
-             ppr_ds (concatMap tyClGroupKindSigs  tycl_decls),
-             ppr_ds (concatMap tyClGroupTyClDecls tycl_decls),
-             ppr_ds (concatMap tyClGroupInstDecls tycl_decls),
+             ppr_ds (tyClGroupRoleDecls tycl_decls),
+             ppr_ds (tyClGroupKindSigs  tycl_decls),
+             ppr_ds (tyClGroupTyClDecls tycl_decls),
+             ppr_ds (tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,
              ppr_ds foreign_decls]
         where
@@ -1053,29 +1053,29 @@ newtype instance TyClGroup GhcTc = TcgTc Void
 tcg_tc_absurd :: TyClGroup GhcTc -> a
 tcg_tc_absurd (TcgTc a) = absurd a
 
-tyClGroupTyClDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LTyClDecl (GhcPass p)]
-tyClGroupTyClDecls tcg =
+tyClGroupTyClDecls :: forall p. IsPass p => [TyClGroup (GhcPass p)] -> [LTyClDecl (GhcPass p)]
+tyClGroupTyClDecls = concatMap $ \tcg ->
   case ghcPass @p of
     GhcPs -> [a | TcgPsDecl a <- [tcg] ]
     GhcRn -> tcg_rn_tyclds tcg
     GhcTc -> tcg_tc_absurd tcg
 
-tyClGroupInstDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LInstDecl (GhcPass p)]
-tyClGroupInstDecls tcg =
+tyClGroupInstDecls :: forall p. IsPass p => [TyClGroup (GhcPass p)] -> [LInstDecl (GhcPass p)]
+tyClGroupInstDecls = concatMap $ \tcg ->
   case ghcPass @p of
     GhcPs -> [a | TcgPsInst a <- [tcg] ]
     GhcRn -> tcg_rn_instds tcg
     GhcTc -> tcg_tc_absurd tcg
 
-tyClGroupRoleDecls :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LRoleAnnotDecl (GhcPass p)]
-tyClGroupRoleDecls tcg =
+tyClGroupRoleDecls :: forall p. IsPass p => [TyClGroup (GhcPass p)] -> [LRoleAnnotDecl (GhcPass p)]
+tyClGroupRoleDecls = concatMap $ \tcg ->
   case ghcPass @p of
     GhcPs -> [a | TcgPsRole a <- [tcg] ]
     GhcRn -> tcg_rn_roles tcg
     GhcTc -> tcg_tc_absurd tcg
 
-tyClGroupKindSigs :: forall p. IsPass p => TyClGroup (GhcPass p) -> [LStandaloneKindSig (GhcPass p)]
-tyClGroupKindSigs tcg =
+tyClGroupKindSigs :: forall p. IsPass p => [TyClGroup (GhcPass p)] -> [LStandaloneKindSig (GhcPass p)]
+tyClGroupKindSigs = concatMap $ \tcg ->
   case ghcPass @p of
     GhcPs -> [a | TcgPsKiSig a <- [tcg] ]
     GhcRn -> [a | DeclSigRnSAKS _ a <- tcg_rn_kisigs tcg ]

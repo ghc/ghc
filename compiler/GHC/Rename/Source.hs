@@ -1293,11 +1293,11 @@ rnTyClDecls :: [TyClGroup GhcPs]
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
-       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (concatMap tyClGroupTyClDecls tycl_ds)
+       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (concatMap tyClGroupKindSigs tycl_ds)
-       ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (concatMap tyClGroupInstDecls tycl_ds)
-       ; role_annots  <- rnRoleAnnots tc_names (concatMap tyClGroupRoleDecls tycl_ds)
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
+       ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
+       ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
        ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
                    -- See Note [CUSKs and PolyKinds] in TcTyClsDecls

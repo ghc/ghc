@@ -270,7 +270,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
  = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
                        ++ hsPatSynSelectors valds
-            ; instds = tyclds >>= tyClGroupInstDecls } ;
+            ; instds = tyClGroupInstDecls tyclds } ;
         ss <- mkGenSyms bndrs ;
 
         -- Bind all the names mainly to avoid repeated use of explicit strings.
@@ -283,9 +283,9 @@ repTopDs group@(HsGroup { hs_valds   = valds
         decls <- addBinds ss (
                   do { val_ds   <- rep_val_binds valds
                      ; _        <- mapM no_splice splcds
-                     ; tycl_ds  <- mapM repTyClD (concatMap tyClGroupTyClDecls tyclds)
-                     ; role_ds  <- mapM repRoleD (concatMap tyClGroupRoleDecls tyclds)
-                     ; kisig_ds <- mapM repKiSigD (concatMap tyClGroupKindSigs tyclds)
+                     ; tycl_ds  <- mapM repTyClD (tyClGroupTyClDecls tyclds)
+                     ; role_ds  <- mapM repRoleD (tyClGroupRoleDecls tyclds)
+                     ; kisig_ds <- mapM repKiSigD (tyClGroupKindSigs tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repLFixD fixds

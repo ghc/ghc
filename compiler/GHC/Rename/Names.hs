@@ -669,11 +669,11 @@ getLocalNonValBinders fixity_env
                 hs_tyclds = tycl_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
-        ; let inst_decls = tycl_decls >>= tyClGroupInstDecls
+        ; let inst_decls = tyClGroupInstDecls tycl_decls
         ; overload_ok <- xoptM LangExt.DuplicateRecordFields
         ; (tc_avails, tc_fldss)
             <- fmap unzip $ mapM (new_tc overload_ok)
-                                 (concatMap tyClGroupTyClDecls tycl_decls)
+                                 (tyClGroupTyClDecls tycl_decls)
         ; traceRn "getLocalNonValBinders 1" (ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
