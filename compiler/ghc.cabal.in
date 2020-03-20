@@ -567,7 +567,6 @@ Library
         GHC.Types.Unique.DFM
         GHC.Types.Unique.DSet
         GHC.Types.Unique.FM
-        GHC.Types.Unique.Map
         GHC.Types.Unique.Set
         Util
         GHC.Cmm.Dataflow
