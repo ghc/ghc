@@ -1161,6 +1161,28 @@ of ``-W(no-)*``.
     The flag :ghc-flag:`-Worphans` warns about user-written orphan rules or
     instances.
 
+.. ghc-flag:: -faccept-orphans=⟨packagename⟩
+    :shortdesc: Suppress :ref:`orphan instance <orphan-modules>` warnings
+     for instances of types or classes from specified package
+    :type: dynamic
+    :reverse: -faccept-no-orphans
+    :category:
+
+    .. index::
+       single: orphan instances, warning
+       single: orphan rules, warning
+
+    An instance is "orphan" if it appears in a module in which
+    neither the class nor the type being instanced are declared in the
+    same module.
+    These flags allow selectively suppress a :ghc-flag:`-Worphans`
+    warning if the class or the type is defined in a module of given package.
+
+    The flag may be specified multiple times.
+    Use :ghc-flag:`-faccept-no-orphans` to reset the list.
+
+    The instances are still orphan. This flag only affects warning reporting.
+
 .. ghc-flag:: -Woverlapping-patterns
     :shortdesc: warn about overlapping patterns
     :type: dynamic
