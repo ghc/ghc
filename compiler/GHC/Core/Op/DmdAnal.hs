@@ -623,10 +623,11 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
 -- For example, a call of the form @mkRhsDmd _ 2 (\x y -> (x, y))@ returns a
 -- clean usage demand of @C1(C1(U(U,U)))@.
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkRhsDmd env rhs_arity rhs =
-  case peelTsFuns rhs_arity (findTypeShape (ae_fam_envs env) (exprType rhs)) of
-    Just (TsProd tss) -> mkCallDmds rhs_arity (cleanEvalProdDmd (length tss))
-    _                 -> mkCallDmds rhs_arity cleanEvalDmd
+mkRhsDmd _env rhs_arity _rhs =
+    mkCallDmds rhs_arity cleanEvalDmd
+--  case peelTsFuns rhs_arity (findTypeShape (ae_fam_envs env) (exprType rhs)) of
+--    Just (TsProd tss) -> mkCallDmds rhs_arity (cleanEvalProdDmd (length tss))
+--    _                 -> mkCallDmds rhs_arity cleanEvalDmd
 
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
