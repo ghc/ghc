@@ -2088,8 +2088,8 @@ stg_newBCOzh ( P_ instrs,
     StgBCO_instrs(bco)     = instrs;
     StgBCO_literals(bco)   = literals;
     StgBCO_ptrs(bco)       = ptrs;
-    StgBCO_arity(bco)      = HALF_W_(arity);
-    StgBCO_size(bco)       = HALF_W_(words);
+    StgBCO_arity(bco)      = TO_HALF_W_(arity);
+    StgBCO_size(bco)       = TO_HALF_W_(words);
 
     // Copy the arity/bitmap info into the BCO
     W_ i;
@@ -2111,8 +2111,8 @@ stg_mkApUpd0zh ( P_ bco )
     // This function is *only* used to wrap zero-arity BCOs in an
     // updatable wrapper (see GHC.ByteCode.Linker).  An AP thunk is always
     // saturated and always points directly to a FUN or BCO.
-    ASSERT(%INFO_TYPE(%GET_STD_INFO(bco)) == HALF_W_(BCO) &&
-           StgBCO_arity(bco) == HALF_W_(0));
+    ASSERT(%INFO_TYPE(%GET_STD_INFO(bco)) == TO_HALF_W_(BCO) &&
+           StgBCO_arity(bco) == TO_HALF_W_(0));
 
     HP_CHK_P(SIZEOF_StgAP, stg_mkApUpd0zh, bco);
     TICK_ALLOC_UP_THK(0, 0);
@@ -2122,7 +2122,7 @@ stg_mkApUpd0zh ( P_ bco )
     // No memory barrier necessary as this is a new allocation.
     SET_HDR(ap, stg_AP_info, CCS_MAIN);
 
-    StgAP_n_args(ap) = HALF_W_(0);
+    StgAP_n_args(ap) = TO_HALF_W_(0);
     StgAP_fun(ap) = bco;
 
     return (ap);

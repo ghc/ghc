@@ -12,6 +12,7 @@ module GHC.Cmm.Info (
   infoTable,
   infoTableConstrTag,
   infoTableSrtBitmap,
+  infoTableSRT,
   infoTableClosureType,
   infoTablePtrs,
   infoTableNonPtrs,
@@ -28,7 +29,7 @@ module GHC.Cmm.Info (
   conInfoTableSizeB,
   stdSrtBitmapOffset,
   stdClosureTypeOffset,
-  stdPtrsOffset, stdNonPtrsOffset,
+  stdPtrsOffset, stdNonPtrsOffset, stdSrtOffset
 ) where
 
 #include "HsVersions.h"
@@ -511,6 +512,10 @@ infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTableNonPtrs dflags info_tbl
   = CmmLoad (cmmOffsetB dflags info_tbl (stdNonPtrsOffset dflags)) (bHalfWord dflags)
 
+infoTableSRT :: DynFlags -> CmmExpr -> CmmExpr
+infoTableSRT dflags info_tbl
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdSrtOffset dflags)) (bHalfWord dflags)
+
 funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the info pointer of a function,
 -- and returns a pointer to the first word of the StgFunInfoExtra struct
@@ -583,9 +588,10 @@ stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word
 stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
-stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
+stdPtrsOffset, stdNonPtrsOffset, stdSrtOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
 stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + halfWordSize dflags
+stdSrtOffset     dflags = stdInfoTableSizeB dflags - halfWordSize dflags
 
 conInfoTableSizeB :: DynFlags -> Int
 conInfoTableSizeB dflags = stdInfoTableSizeB dflags + wORD_SIZE dflags

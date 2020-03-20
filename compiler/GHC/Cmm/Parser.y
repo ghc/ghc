@@ -916,7 +916,8 @@ exprMacros dflags = listToUFM [
   ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr dflags x) ),
   ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
   ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs dflags x ),
-  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x )
+  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x ),
+  ( fsLit "INFO_SRT",     \ [x] -> infoTableSRT dflags x )
   ]
 
 -- we understand a subset of C-- primitives:
