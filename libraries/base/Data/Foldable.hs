@@ -215,6 +215,8 @@ class Foldable t where
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
     --
+    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
+    --
     -- @'foldr1' f = 'List.foldr1' f . 'toList'@
     foldr1 :: (a -> a -> a) -> t a -> a
     foldr1 f xs = fromMaybe (errorWithoutStackTrace "foldr1: empty structure")
@@ -226,6 +228,8 @@ class Foldable t where
 
     -- | A variant of 'foldl' that has no base case,
     -- and thus may only be applied to non-empty structures.
+    --
+    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
     --
     -- @'foldl1' f = 'List.foldl1' f . 'toList'@
     foldl1 :: (a -> a -> a) -> t a -> a
@@ -267,12 +271,28 @@ class Foldable t where
 
     -- | The largest element of a non-empty structure.
     --
+    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
+    --
+    -- === __Examples__
+    -- >>> maximum [1..10]
+    -- 10
+    -- >>> maximum []
+    -- *** Exception: Prelude.maximum: empty list
+    --
     -- @since 4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
        getMax . foldMap (Max #. (Just :: a -> Maybe a))
 
     -- | The least element of a non-empty structure.
+    --
+    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty
+    --
+    -- === __Examples__
+    -- >>> minimum [1..10]
+    -- 1
+    -- >>> minimum []
+    -- *** Exception: Prelude.minimum: empty list
     --
     -- @since 4.8.0.0
     minimum :: forall a . Ord a => t a -> a
