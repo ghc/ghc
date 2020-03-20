@@ -132,7 +132,8 @@ runRW# = runRW#   -- The realWorld# is too much for haddock
 
 -- | @with# x action@ performs the given action, ensuring that heap object @x@
 -- remains alive for the duration of the execution.
-with# :: forall a (r :: RuntimeRep) (o :: TYPE r).
+with# :: forall (ra :: RuntimeRep) (a :: TYPE ra)
+                (ro :: RuntimeRep) (o :: TYPE ro).
          a
       -> (State# RealWorld -> (# State# RealWorld, o #))
       -> State# RealWorld -> (# State# RealWorld, o #)
