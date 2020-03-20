@@ -221,8 +221,9 @@ of ``-W(no-)*``.
         encountered on the command line.
     :type: dynamic
     :reverse: -Wno-unrecognised-warning-flags
-    :default: on
     :category:
+
+    :default: on
 
     Enables warnings when the compiler encounters a ``-W...`` flag that is not
     recognised.
@@ -253,8 +254,9 @@ of ``-W(no-)*``.
         :ghc-flag:`-fdefer-typed-holes`.
     :type: dynamic
     :reverse: -Wno-typed-holes
-    :default: on
     :category:
+
+    :default: on
 
     Determines whether the compiler reports typed holes warnings. Has no
     effect unless typed holes errors are deferred until runtime. See

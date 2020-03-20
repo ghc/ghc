@@ -347,7 +347,7 @@ set_up_tarballs() {
     else
         action="download"
     fi
-    mk/get-win32-tarballs.sh $action $HostArch > missing-win32-tarballs
+    $PYTHON mk/get-win32-tarballs.py $action $mingw_arch > missing-win32-tarballs
     case $? in
         0)
            rm missing-win32-tarballs
@@ -359,7 +359,7 @@ set_up_tarballs() {
            echo
            echo "  * run configure with the --enable-tarballs-autodownload option"
            echo
-           echo "  * run mk/get-win32-tarballs.sh download ${HostArch}"
+           echo "  * run mk/get-win32-tarballs.py download $mingw_arch"
            echo
            echo "  * manually download the files listed in ./missing-win32-tarballs and place"
            echo "    them in the ghc-tarballs directory."

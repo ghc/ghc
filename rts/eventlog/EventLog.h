@@ -22,8 +22,10 @@
  */
 extern char *EventTagDesc[];
 
-void initEventLogging(const EventLogWriter *writer);
-void endEventLogging(void);
+extern bool eventlog_enabled;
+
+void initEventLogging(void);
+void restartEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort
 void flushEventLog(void);     // event log inherited from parent
