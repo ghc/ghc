@@ -58,12 +58,15 @@ import TcMType
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( debugPprType )
+import GHC.PackageDb (unitId, packageName)
 import TcType
+import GHC.Driver.Packages (listUnitInfoMap)
 import GHC.Driver.Types
 import GHC.Core.Class( Class )
 import MkId( mkDictFunId )
 import GHC.Core( Expr(..) )  -- For the Coercion constructor
 import Id
+import Module   ( UnitId (..), DefUnitId (..))
 import Name
 import Var      ( EvVar, tyVarName, VarBndr(..) )
 import GHC.Core.DataCon
@@ -72,12 +75,13 @@ import PrelNames
 import SrcLoc
 import GHC.Driver.Session
 import Util
+import UniqSet
 import Outputable
 import BasicTypes ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List ( sortBy )
-import Control.Monad( unless )
+import Control.Monad( unless, when )
 import Data.Function ( on )
 
 {-
@@ -700,9 +704,24 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIfFlag Opt_WarnOrphans
-                    (isOrphan (is_orphan inst))
-                    (instOrphWarn inst)
+       ; warn_on <- woptM Opt_WarnOrphans
+       ; when (warn_on && isOrphan (is_orphan inst)) $
+         do { dflags <- getDynFlags
+            ; let okParents = orphanParents dflags
+            ; let warn = addWarn (Reason Opt_WarnOrphans) (instOrphWarn inst)
+            ; if isEmptyUniqSet okParents
+              then warn
+              -- Recompute orphanhood. We know that instance
+              -- is not nameIsLocalOrFrom
+              else do { let pseudoLocalUnits = addListToUniqSet emptyUniqSet
+                              [ DefiniteUnitId (DefUnitId (unitId ui))
+                              | ui <- listUnitInfoMap dflags
+                              , elementOfUniqSet (packageName ui) okParents
+                              ]
+                            is_local = nameIsFromOneOfTheUnits pseudoLocalUnits
+                            orph = orphanhood (is_cls inst) (is_tys inst) is_local
+                        -- if the instance is still considered orphan, warn.
+                      ; when (isOrphan orph) warn }}
        ; return inst }
 
 instOrphWarn :: ClsInst -> SDoc

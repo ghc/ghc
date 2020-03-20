@@ -15,7 +15,7 @@ module GHC.Core.InstEnv (
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
         instanceDFunId, updateClsInstDFun, instanceRoughTcs,
-        fuzzyClsInstCmp, orphNamesOfClsInst,
+        fuzzyClsInstCmp, orphNamesOfClsInst, orphanhood,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
         emptyInstEnv, extendInstEnv,
@@ -35,7 +35,7 @@ import GhcPrelude
 
 import TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
-import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
+import GHC.Core ( IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor )
 import Module
 import GHC.Core.Class
 import Var
@@ -274,19 +274,23 @@ mkLocalInstance dfun oflag tvs cls tys
     cls_name = className cls
     dfun_name = idName dfun
     this_mod = ASSERT( isExternalName dfun_name ) nameModule dfun_name
-    is_local name = nameIsLocalOrFrom this_mod name
+    orph = orphanhood cls tys (nameIsLocalOrFrom this_mod)
 
-        -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
+-- | Compute orphanhood.  See Note [Orphans] in GHC.Core
+-- See Note [When exactly is an instance decl an orphan?]
+--
+-- Usually called with (nameIsLocalOrFrom this_mod),
+-- but we can change what is considered as a local module.
+--
+orphanhood :: Class -> [Type] -> (Name -> Bool) -> IsOrphan
+orphanhood cls tys is_local
+  | is_local cls_name   = NotOrphan (nameOccName cls_name)
+  | all notOrphan mb_ns = ASSERT (not (null mb_ns)) head mb_ns
+  | otherwise           = IsOrphan
+  where
+    cls_name = className cls
     (cls_tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
-
-    -- See Note [When exactly is an instance decl an orphan?]
-    orph | is_local cls_name = NotOrphan (nameOccName cls_name)
-         | all notOrphan mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
-         | otherwise         = IsOrphan
-
-    notOrphan NotOrphan{} = True
-    notOrphan _ = False
 
     mb_ns :: [IsOrphan]    -- One for each fundep; a locally-defined name
                            -- that is not in the "determined" arguments
@@ -294,7 +298,6 @@ mkLocalInstance dfun oflag tvs cls tys
           | otherwise  = map do_one fds
     do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
                                             , not (tv `elem` rtvs)]
-
     choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
 mkImportedInstance :: Name         -- ^ the name of the class

@@ -273,6 +273,7 @@ import FileSettings
 import Outputable
 import Settings
 import ToolSettings
+import UnitInfo (PackageName (..))
 
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, DumpAction, TraceAction
@@ -310,6 +311,9 @@ import Text.ParserCombinators.ReadP as R
 
 import EnumSet (EnumSet)
 import qualified EnumSet
+
+import UniqSet (UniqSet)
+import qualified UniqSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
@@ -669,6 +673,7 @@ data DynFlags = DynFlags {
   generalFlags          :: EnumSet GeneralFlag,
   warningFlags          :: EnumSet WarningFlag,
   fatalWarningFlags     :: EnumSet WarningFlag,
+  orphanParents         :: UniqSet PackageName,
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
   -- | Safe Haskell mode
@@ -1413,6 +1418,7 @@ defaultDynFlags mySettings llvmConfig =
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
         warningFlags = EnumSet.fromList standardWarnings,
         fatalWarningFlags = EnumSet.empty,
+        orphanParents = UniqSet.emptyUniqSet,
         ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_None,
@@ -2907,6 +2913,9 @@ dynamic_flags_deps = [
                                                setWarningFlag minusWcompatOpts))
   , make_ord_flag defFlag "Wno-compat"     (NoArg (mapM_
                                              unSetWarningFlag minusWcompatOpts))
+
+  , make_ord_flag defFlag "forphan-parent"
+      $ hasArg $ \s d -> d { orphanParents = UniqSet.addOneToUniqSet (orphanParents d) (PackageName (mkFastString s)) }
 
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)

@@ -44,6 +44,7 @@ import Unique
 -- Our UnitInfo type is the InstalledPackageInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
+-- TODO: look at this
 type UnitInfo = InstalledPackageInfo
                        ComponentId
                        SourcePackageId
