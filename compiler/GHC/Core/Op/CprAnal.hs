@@ -13,7 +13,6 @@ module GHC.Core.Op.CprAnal ( cprAnalProgram ) where
 
 import GhcPrelude
 
-import GHC.Core.Op.WorkWrap.Lib ( deepSplitProductType_maybe )
 import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -30,6 +29,7 @@ import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
+import GHC.Core.Op.WorkWrap.Lib
 import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust, isNothing )
@@ -88,7 +88,8 @@ Ideally, we would want the following pipeline:
 4. worker/wrapper (for CPR)
 
 Currently, we omit 2. and anticipate the results of worker/wrapper.
-See Note [CPR in a DataAlt case alternative] and Note [CPR for strict binders].
+See Note [CPR in a DataAlt case alternative]
+and Note [CPR for binders that will be unboxed].
 An additional w/w pass would simplify things, but probably add slight overhead.
 So currently we have
 
@@ -175,7 +176,7 @@ cprAnal' env (Lam var body)
   | otherwise
   = (lam_ty, Lam var body')
   where
-    env'             = extendSigsWithLam env var
+    env'             = extendAnalEnvForDemand env var (idDemandInfo var)
     (body_ty, body') = cprAnal env' body
     lam_ty           = abstractCprTy body_ty
 
@@ -392,15 +393,25 @@ lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
-extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
--- Extend the AnalEnv when we meet a lambda binder
-extendSigsWithLam env id
+-- | A version of 'extendAnalEnv' for a binder of which we don't see the RHS
+-- needed to compute a 'CprSig' (e.g. lambdas and DataAlt field binders).
+-- In this case, we can still look at their demand to attach CPR signatures
+-- anticipating the unboxing done by worker/wrapper.
+-- See Note [CPR for binders that will be unboxed].
+extendAnalEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
+extendAnalEnvForDemand env id dmd
   | isId id
-  , isStrictDmd (idDemandInfo id) -- See Note [CPR for strict binders]
-  , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
+  , Just (_, DataConAppContext { dcac_dc = dc })
+      <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
   = extendAnalEnv env id (CprSig (conCprType (dataConTag dc)))
   | otherwise
   = env
+  where
+    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
+    -- function, we just assume that we aren't. That flag is only relevant
+    -- to Note [Do not unpack class dictionaries], the few unboxing
+    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
+    has_inlineable_prag = False
 
 extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
@@ -425,18 +436,16 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     -- propagate available unboxed things from the scrutinee, getting rid of
     -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
     -- Giving strict binders the CPR property only makes sense for products, as
-    -- the arguments in Note [CPR for strict binders] don't apply to sums (yet);
-    -- we lack WW for strict binders of sum type.
+    -- the arguments in Note [CPR for binders that will be unboxed] don't apply
+    -- to sums (yet); we lack WW for strict binders of sum type.
     do_con_arg env (id, str)
-       | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
-       , is_var_scrut && is_strict
-       , let fam_envs = ae_fam_envs env
-       , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv env id (CprSig (conCprType (dataConTag dc)))
+       | is_var scrut
+       -- See Note [Add demands for strict constructors] in WorkWrap.Lib
+       , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
+       = extendAnalEnvForDemand env id dmd
        | otherwise
        = env
 
-    is_var_scrut = is_var scrut
     is_var (Cast e _) = is_var e
     is_var (Var v)    = isLocalId v
     is_var _          = False
@@ -472,7 +481,8 @@ Specifically
    box.  If the wrapper doesn't cancel with its caller, we'll end up
    re-boxing something that we did have available in boxed form.
 
- * Any strict binders with product type, can use Note [CPR for strict binders]
+ * Any strict binders with product type, can use
+   Note [CPR for binders that will be unboxed]
    to anticipate worker/wrappering for strictness info.
    But we can go a little further. Consider
 
@@ -499,11 +509,11 @@ Specifically
    sub-component thereof.  But it's simple, and nothing terrible
    happens if we get it wrong.  e.g. Trac #10694.
 
-Note [CPR for strict binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If a lambda-bound variable is marked demanded with a strict demand, then give it
-a CPR signature, anticipating the results of worker/wrapper. Here's a concrete
-example ('f1' in test T10482a), assuming h is strict:
+Note [CPR for binders that will be unboxed]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a lambda-bound variable will be unboxed by worker/wrapper (so it must be
+demanded strictly), then give it a CPR signature. Here's a concrete example
+('f1' in test T10482a), assuming h is strict:
 
   f1 :: Int -> Int
   f1 x = case h x of
@@ -526,6 +536,9 @@ Note that
   * We only want to do this for something that definitely
     has product type, else we may get over-optimistic CPR results
     (e.g. from \x -> x!).
+
+  * This also (approximately) applies to DataAlt field binders;
+    See Note [CPR in a DataAlt case alternative].
 
   * See Note [CPR examples]
 
@@ -628,21 +641,6 @@ point: all of these functions can have the CPR property.
             True  -> x
             False -> f1 (x-1)
 
-
-    ------- f2 -----------
-    -- x is a strict field of MkT2, so we'll pass it unboxed
-    -- to $wf2, so it's available unboxed.  This depends on
-    -- the case expression analysing (a subcomponent of) one
-    -- of the original arguments to the function, so it's
-    -- a bit more delicate.
-
-    data T2 = MkT2 !Int Int
-
-    f2 :: T2 -> Int
-    f2 (MkT2 x y) | y>0       = f2 (MkT2 x (y-1))
-                  | otherwise = x
-
-
     ------- f3 -----------
     -- h is strict in x, so x will be unboxed before it
     -- is rerturned in the otherwise case.
@@ -652,18 +650,4 @@ point: all of these functions can have the CPR property.
     f1 :: T3 -> Int
     f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
                   | otherwise = x
-
-
-    ------- f4 -----------
-    -- Just like f2, but MkT4 can't unbox its strict
-    -- argument automatically, as f2 can
-
-    data family Foo a
-    newtype instance Foo Int = Foo Int
-
-    data T4 a = MkT4 !(Foo a) Int
-
-    f4 :: T4 Int -> Int
-    f4 (MkT4 x@(Foo v) y) | y>0       = f4 (MkT4 x (y-1))
-                          | otherwise = v
 -}
