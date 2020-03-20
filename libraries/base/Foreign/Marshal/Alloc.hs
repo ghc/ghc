@@ -116,19 +116,6 @@ alloca :: forall a b . Storable a => (Ptr a -> IO b) -> IO b
 alloca  =
   allocaBytesAligned (sizeOf (undefined :: a)) (alignment (undefined :: a))
 
--- Note [NOINLINE for touch#]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Both allocaBytes and allocaBytesAligned use the touch#, which is notoriously
--- fragile in the presence of simplification (see #14346). In particular, the
--- simplifier may drop the continuation containing the touch# if it can prove
--- that the action passed to allocaBytes will not return. The hack introduced to
--- fix this for 8.2.2 is to mark allocaBytes as NOINLINE, ensuring that the
--- simplifier can't see the divergence.
---
--- These can be removed once #14375 is fixed, which suggests that we instead do
--- away with touch# in favor of a primitive that will capture the scoping left
--- implicit in the case of touch#.
-
 -- |@'allocaBytes' n f@ executes the computation @f@, passing as argument
 -- a pointer to a temporarily allocated block of memory of @n@ bytes.
 -- The block of memory is sufficiently aligned for any of the basic
@@ -142,13 +129,9 @@ allocaBytes (I# size) action = IO $ \ s0 ->
      case newPinnedByteArray# size s0      of { (# s1, mbarr# #) ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
      let addr = Ptr (byteArrayContents# barr#) in
-     case action addr     of { IO action' ->
-     case action' s2      of { (# s3, r #) ->
-     case touch# barr# s3 of { s4 ->
-     (# s4, r #)
-  }}}}}
--- See Note [NOINLINE for touch#]
-{-# NOINLINE allocaBytes #-}
+     case action addr                      of { IO action' ->
+     with# barr# action' s2
+  }}}
 
 allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
 allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
@@ -156,12 +139,8 @@ allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
      let addr = Ptr (byteArrayContents# barr#) in
      case action addr     of { IO action' ->
-     case action' s2      of { (# s3, r #) ->
-     case touch# barr# s3 of { s4 ->
-     (# s4, r #)
-  }}}}}
--- See Note [NOINLINE for touch#]
-{-# NOINLINE allocaBytesAligned #-}
+     with# barr# action' s2
+  }}}
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
 -- to the size needed to store values of type @b@.  The returned pointer
