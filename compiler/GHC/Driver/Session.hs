@@ -248,7 +248,7 @@ import Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase)
+import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkComponentId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -1962,13 +1962,14 @@ setJsonLogAction d = d { log_action = jsonLogAction }
 
 thisComponentId :: DynFlags -> ComponentId
 thisComponentId dflags =
-  case thisComponentId_ dflags of
-    Just cid -> cid
+  let pkgstate = pkgState dflags
+  in case thisComponentId_ dflags of
+    Just (ComponentId raw _) -> mkComponentId pkgstate raw
     Nothing  ->
       case thisUnitIdInsts_ dflags of
         Just _  ->
           throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-        Nothing -> ComponentId (unitIdFS (thisPackage dflags))
+        Nothing -> mkComponentId pkgstate (unitIdFS (thisPackage dflags))
 
 thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
 thisUnitIdInsts dflags =
@@ -2005,7 +2006,7 @@ setUnitIdInsts s d =
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
-    d { thisComponentId_ = Just (ComponentId (fsLit s)) }
+    d { thisComponentId_ = Just (ComponentId (fsLit s) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
