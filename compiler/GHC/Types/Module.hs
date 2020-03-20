@@ -29,6 +29,7 @@ module GHC.Types.Module
 
         -- * The UnitId type
         ComponentId(..),
+        ComponentDetails(..),
         UnitId(..),
         unitIdFS,
         unitIdKey,
@@ -148,7 +149,8 @@ import Binary
 import Util
 import Data.List (sortBy, sort)
 import Data.Ord
-import GHC.PackageDb (BinaryStringRep(..), DbUnitIdModuleRep(..), DbModule(..), DbUnitId(..))
+import Data.Version
+import GHC.PackageDb
 import Fingerprint
 
 import qualified Data.ByteString as BS
@@ -170,7 +172,7 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (componentIdString, improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId)
+import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, componentIdString, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -515,22 +517,39 @@ instance DbUnitIdModuleRep InstalledUnitId ComponentId UnitId ModuleName Module 
 -- multiple components and a 'ComponentId' uniquely identifies a component
 -- within a package.  When a package only has one component, the 'ComponentId'
 -- coincides with the 'InstalledPackageId'
-newtype ComponentId        = ComponentId        FastString deriving (Eq, Ord)
+data ComponentId = ComponentId
+   { componentIdRaw     :: FastString             -- ^ Raw
+   , componentIdDetails :: Maybe ComponentDetails -- ^ Cache of component details retrieved from the DB
+   }
+
+instance Eq ComponentId where
+   a == b = componentIdRaw a == componentIdRaw b
+
+instance Ord ComponentId where
+   compare a b = compare (componentIdRaw a) (componentIdRaw b)
+
+data ComponentDetails = ComponentDetails
+   { componentPackageName    :: String
+   , componentPackageVersion :: Version
+   , componentName           :: Maybe String
+   , componentSourcePkdId    :: String
+   }
 
 instance BinaryStringRep ComponentId where
-  fromStringRep = ComponentId . mkFastStringByteString
-  toStringRep (ComponentId s) = bytesFS s
+  fromStringRep bs = ComponentId (mkFastStringByteString bs) Nothing
+  toStringRep (ComponentId s _) = bytesFS s
 
 instance Uniquable ComponentId where
-  getUnique (ComponentId n) = getUnique n
+  getUnique (ComponentId n _) = getUnique n
 
 instance Outputable ComponentId where
-  ppr cid@(ComponentId fs) =
+  ppr cid@(ComponentId fs _) =
     getPprStyle $ \sty ->
-    sdocWithDynFlags $ \dflags ->
-      case componentIdString dflags cid of
-        Just str | not (debugStyle sty) -> text str
-        _ -> ftext fs
+      if debugStyle sty
+         then ftext fs
+         else text (componentIdString cid)
+
+
 
 {-
 ************************************************************************
@@ -699,7 +718,7 @@ instance Outputable InstalledUnitId where
     ppr uid@(InstalledUnitId fs) =
         getPprStyle $ \sty ->
         sdocWithDynFlags $ \dflags ->
-          case displayInstalledUnitId dflags uid of
+          case displayInstalledUnitId (getPackageState dflags) uid of
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
 
@@ -745,7 +764,7 @@ fsToInstalledUnitId :: FastString -> InstalledUnitId
 fsToInstalledUnitId fs = InstalledUnitId fs
 
 componentIdToInstalledUnitId :: ComponentId -> InstalledUnitId
-componentIdToInstalledUnitId (ComponentId fs) = fsToInstalledUnitId fs
+componentIdToInstalledUnitId (ComponentId fs _) = fsToInstalledUnitId fs
 
 stringToInstalledUnitId :: String -> InstalledUnitId
 stringToInstalledUnitId = fsToInstalledUnitId . mkFastString
@@ -908,12 +927,12 @@ instance Binary UnitId where
                 _ -> fmap IndefiniteUnitId (get bh)
 
 instance Binary ComponentId where
-  put_ bh (ComponentId fs) = put_ bh fs
-  get bh = do { fs <- get bh; return (ComponentId fs) }
+  put_ bh (ComponentId fs _) = put_ bh fs
+  get bh = do { fs <- get bh; return (ComponentId fs Nothing) }
 
 -- | Create a new simple unit identifier (no holes) from a 'ComponentId'.
 newSimpleUnitId :: ComponentId -> UnitId
-newSimpleUnitId (ComponentId fs) = fsToUnitId fs
+newSimpleUnitId (ComponentId fs _) = fsToUnitId fs
 
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
@@ -1026,7 +1045,7 @@ parseUnitId = parseFullUnitId <++ parseDefiniteUnitId <++ parseSimpleUnitId
         return (newSimpleUnitId cid)
 
 parseComponentId :: ReadP ComponentId
-parseComponentId = (ComponentId . mkFastString)  `fmap` Parse.munch1 abi_char
+parseComponentId = (flip ComponentId Nothing . mkFastString)  `fmap` Parse.munch1 abi_char
    where abi_char c = isAlphaNum c || c `elem` "-_."
 
 parseModuleId :: ReadP Module

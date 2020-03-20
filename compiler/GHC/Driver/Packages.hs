@@ -47,6 +47,7 @@ module GHC.Driver.Packages (
         getPackageFrameworkPath,
         getPackageFrameworks,
         getUnitInfoMap,
+        getPackageState,
         getPreloadPackagesAnd,
 
         collectArchives,
@@ -54,6 +55,8 @@ module GHC.Driver.Packages (
         packageHsLibs, getLibs,
 
         -- * Utils
+        mkComponentId,
+        updateComponentId,
         unwireUnitId,
         pprFlag,
         pprPackages,
@@ -408,21 +411,21 @@ lookupUnit' True m@(UnitInfoMap pkg_map _) uid =
 -- | Find the indefinite package for a given 'ComponentId'.
 -- The way this works is just by fiat'ing that every indefinite package's
 -- unit key is precisely its component ID; and that they share uniques.
-lookupComponentId :: DynFlags -> ComponentId -> Maybe UnitInfo
-lookupComponentId dflags (ComponentId cid_fs) = lookupUDFM pkg_map cid_fs
+lookupComponentId :: PackageState -> ComponentId -> Maybe UnitInfo
+lookupComponentId pkgstate (ComponentId cid_fs) = lookupUDFM pkg_map cid_fs
   where
-    UnitInfoMap pkg_map = unitInfoMap (pkgState dflags)
+    UnitInfoMap pkg_map = unitInfoMap pkgstate
 -}
 
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
-lookupPackageName :: DynFlags -> PackageName -> Maybe ComponentId
-lookupPackageName dflags n = Map.lookup n (packageNameMap (pkgState dflags))
+lookupPackageName :: PackageState -> PackageName -> Maybe ComponentId
+lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
 
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
-searchPackageId :: DynFlags -> SourcePackageId -> [UnitInfo]
-searchPackageId dflags pid = filter ((pid ==) . sourcePackageId)
-                               (listUnitInfoMap dflags)
+searchPackageId :: PackageState -> SourcePackageId -> [UnitInfo]
+searchPackageId pkgstate pid = filter ((pid ==) . sourcePackageId)
+                               (listUnitInfoMap pkgstate)
 
 -- | Extends the package configuration map with a list of package configs.
 extendUnitInfoMap
@@ -442,15 +445,15 @@ getPackageDetails dflags pid =
       Just config -> config
       Nothing -> pprPanic "getPackageDetails" (ppr pid)
 
-lookupInstalledPackage :: DynFlags -> InstalledUnitId -> Maybe UnitInfo
-lookupInstalledPackage dflags uid = lookupInstalledPackage' (unitInfoMap (pkgState dflags)) uid
+lookupInstalledPackage :: PackageState -> InstalledUnitId -> Maybe UnitInfo
+lookupInstalledPackage pkgstate uid = lookupInstalledPackage' (unitInfoMap pkgstate) uid
 
 lookupInstalledPackage' :: UnitInfoMap -> InstalledUnitId -> Maybe UnitInfo
 lookupInstalledPackage' (UnitInfoMap db _) uid = lookupUDFM db uid
 
-getInstalledPackageDetails :: HasDebugCallStack => DynFlags -> InstalledUnitId -> UnitInfo
-getInstalledPackageDetails dflags uid =
-    case lookupInstalledPackage dflags uid of
+getInstalledPackageDetails :: HasDebugCallStack => PackageState -> InstalledUnitId -> UnitInfo
+getInstalledPackageDetails pkgstate uid =
+    case lookupInstalledPackage pkgstate uid of
       Just config -> config
       Nothing -> pprPanic "getInstalledPackageDetails" (ppr uid)
 
@@ -458,10 +461,10 @@ getInstalledPackageDetails dflags uid =
 -- this function, although all packages in this map are "visible", this
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
-listUnitInfoMap :: DynFlags -> [UnitInfo]
-listUnitInfoMap dflags = eltsUDFM pkg_map
+listUnitInfoMap :: PackageState -> [UnitInfo]
+listUnitInfoMap pkgstate = eltsUDFM pkg_map
   where
-    UnitInfoMap pkg_map _ = unitInfoMap (pkgState dflags)
+    UnitInfoMap pkg_map _ = unitInfoMap pkgstate
 
 -- ----------------------------------------------------------------------------
 -- Loading the package db files and building up the package state
@@ -1074,6 +1077,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wired_in_unitids
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
+        pkgstate = pkgState dflags
 
         -- this is old: we used to assume that if there were
         -- multiple versions of wired-in packages installed that
@@ -1102,7 +1106,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
                     in pkg {
                       unitId = fsToInstalledUnitId fs,
-                      componentId = ComponentId fs
+                      componentId = mkComponentId pkgstate fs
                     }
                   | otherwise
                   = pkg
@@ -2054,7 +2058,7 @@ getPreloadPackagesAnd dflags pkgids0 =
       pairs = zip pkgids (repeat Nothing)
   in do
   all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload pairs)
-  return (map (getInstalledPackageDetails dflags) all_pkgs)
+  return (map (getInstalledPackageDetails state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
@@ -2107,20 +2111,48 @@ missingDependencyMsg (Just parent)
 
 -- -----------------------------------------------------------------------------
 
-componentIdString :: DynFlags -> ComponentId -> Maybe String
-componentIdString dflags cid = do
-    conf <- lookupInstalledPackage dflags (componentIdToInstalledUnitId cid)
-    return $
-        case sourceLibName conf of
-            Nothing -> sourcePackageIdString conf
-            Just (PackageName libname) ->
-                packageNameString conf
-                    ++ "-" ++ showVersion (packageVersion conf)
-                    ++ ":" ++ unpackFS libname
+componentIdString :: ComponentId -> String
+componentIdString (ComponentId  raw Nothing)        = unpackFS raw
+componentIdString (ComponentId _raw (Just details)) =
+   case componentName details of
+     Nothing    -> componentSourcePkdId details
+     Just cname -> componentPackageName details
+                     ++ "-" ++ showVersion (componentPackageVersion details)
+                     ++ ":" ++ cname
 
-displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
-displayInstalledUnitId dflags uid =
-    fmap sourcePackageIdString (lookupInstalledPackage dflags uid)
+-- Cabal packages may contain several components (programs, libraries, etc.).
+-- As far as GHC is concerned, installed package components ("units") are
+-- identified by an opaque ComponentId string provided by Cabal. As the string
+-- contains a hash, we don't want to display it to users so GHC queries the
+-- database to retrieve some infos about the original source package (name,
+-- version, component name).
+--
+-- Instead we want to display: packagename-version[:componentname]
+--
+-- Component name is only displayed if it isn't the default library
+--
+-- To do this we need to query the database (cached in DynFlags). We cache
+-- these details in the ComponentId itself because we don't want to query
+-- DynFlags each time we pretty-print the ComponentId
+--
+mkComponentId :: PackageState -> FastString -> ComponentId
+mkComponentId pkgstate raw =
+    case lookupInstalledPackage pkgstate (InstalledUnitId raw) of
+      Nothing -> ComponentId raw Nothing -- we didn't find the unit at all
+      Just c  -> ComponentId raw $ Just $ ComponentDetails
+                                             (packageNameString c)
+                                             (packageVersion c)
+                                             ((unpackFS . unPackageName) <$> sourceLibName c)
+                                             (sourcePackageIdString c)
+
+-- | Update component ID details from the database
+updateComponentId :: PackageState -> ComponentId -> ComponentId
+updateComponentId pkgstate (ComponentId raw _) = mkComponentId pkgstate raw
+
+
+displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
+displayInstalledUnitId pkgstate uid =
+    fmap sourcePackageIdString (lookupInstalledPackage pkgstate uid)
 
 -- | Will the 'Name' come from a dynamically linked package?
 isDynLinkName :: DynFlags -> Module -> Name -> Bool
@@ -2159,18 +2191,18 @@ isDynLinkName dflags this_mod name
 -- Displaying packages
 
 -- | Show (very verbose) package info
-pprPackages :: DynFlags -> SDoc
+pprPackages :: PackageState -> SDoc
 pprPackages = pprPackagesWith pprUnitInfo
 
-pprPackagesWith :: (UnitInfo -> SDoc) -> DynFlags -> SDoc
-pprPackagesWith pprIPI dflags =
-    vcat (intersperse (text "---") (map pprIPI (listUnitInfoMap dflags)))
+pprPackagesWith :: (UnitInfo -> SDoc) -> PackageState -> SDoc
+pprPackagesWith pprIPI pkgstate =
+    vcat (intersperse (text "---") (map pprIPI (listUnitInfoMap pkgstate)))
 
 -- | Show simplified package info.
 --
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-pprPackagesSimple :: DynFlags -> SDoc
+pprPackagesSimple :: PackageState -> SDoc
 pprPackagesSimple = pprPackagesWith pprIPI
     where pprIPI ipi = let i = installedUnitIdFS (unitId ipi)
                            e = if exposed ipi then text "E" else text " "
@@ -2211,3 +2243,8 @@ improveUnitId pkg_map uid =
 -- in the @hs-boot@ loop-breaker.
 getUnitInfoMap :: DynFlags -> UnitInfoMap
 getUnitInfoMap = unitInfoMap . pkgState
+
+-- | Retrieve the 'PackageState' from 'DynFlags'; used
+-- in the @hs-boot@ loop-breaker.
+getPackageState :: DynFlags -> PackageState
+getPackageState = pkgState

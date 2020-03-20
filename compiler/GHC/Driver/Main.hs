@@ -1227,7 +1227,7 @@ checkPkgTrust pkgs = do
     dflags <- getDynFlags
     let errors = S.foldr go [] pkgs
         go pkg acc
-            | trusted $ getInstalledPackageDetails dflags pkg
+            | trusted $ getInstalledPackageDetails (pkgState dflags) pkg
             = acc
             | otherwise
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)

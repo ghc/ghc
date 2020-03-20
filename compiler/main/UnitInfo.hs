@@ -58,7 +58,10 @@ type UnitInfo = InstalledPackageInfo
 --       other compact string types, e.g. plain ByteString or Text.
 
 newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
-newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
+newtype PackageName = PackageName
+   { unPackageName :: FastString
+   }
+   deriving (Eq, Ord)
 
 instance BinaryStringRep SourcePackageId where
   fromStringRep = SourcePackageId . mkFastStringByteString
