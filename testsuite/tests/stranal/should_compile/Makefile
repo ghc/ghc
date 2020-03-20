@@ -10,3 +10,7 @@ T13031:
 # take only one Int# argument
 T16029:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T16029.hs -dsuppress-uniques -ddump-simpl | grep '::.*Int'
+
+# The grep for Str= shows how many args the worker gets; should be only two
+T17932:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -fforce-recomp T17932.hs -O -ddump-worker-wrapper -dno-typeable-binds | grep 'Str='
