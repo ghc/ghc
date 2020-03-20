@@ -9,7 +9,7 @@ DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>
 DmdAnalGADTs.g: <S,1*U>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U(U)>
+DmdAnalGADTs.hasStrSig: <S,1*U>
 
 
 
@@ -23,7 +23,7 @@ DmdAnalGADTs.f:
 DmdAnalGADTs.f': m1
 DmdAnalGADTs.g:
 DmdAnalGADTs.hasCPR: m1
-DmdAnalGADTs.hasStrSig: m1
+DmdAnalGADTs.hasStrSig:
 
 
 
@@ -37,6 +37,6 @@ DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>
 DmdAnalGADTs.g: <S,1*U>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U(U)>
+DmdAnalGADTs.hasStrSig: <S,1*U>
 
 

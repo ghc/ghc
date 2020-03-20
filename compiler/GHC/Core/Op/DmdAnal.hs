@@ -617,16 +617,11 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
--- unleashing on the given function's @rhs@, by creating a call demand of
--- @rhs_arity@ with a body demand appropriate for possible product types.
--- See Note [Product demands for function body].
--- For example, a call of the form @mkRhsDmd _ 2 (\x y -> (x, y))@ returns a
--- clean usage demand of @C1(C1(U(U,U)))@.
+-- unleashing on the given function's @rhs@, by creating
+-- a call demand of @rhs_arity@
+-- See Historical Note [Product demands for function body]
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkRhsDmd env rhs_arity rhs =
-  case peelTsFuns rhs_arity (findTypeShape (ae_fam_envs env) (exprType rhs)) of
-    Just (TsProd tss) -> mkCallDmds rhs_arity (cleanEvalProdDmd (length tss))
-    _                 -> mkCallDmds rhs_arity cleanEvalDmd
+mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
 
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
@@ -857,9 +852,9 @@ forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
 GHC.Core.Arity)! A small example is the test case NewtypeArity.
 
 
-Note [Product demands for function body]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This example comes from shootout/binary_trees:
+Historical Note [Product demands for function body]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In 2013 I spotted this example, in shootout/binary_trees:
 
     Main.check' = \ b z ds. case z of z' { I# ip ->
                                 case ds_d13s of
@@ -878,8 +873,12 @@ Here we *really* want to unbox z, even though it appears to be used boxed in
 the Nil case.  Partly the Nil case is not a hot path.  But more specifically,
 the whole function gets the CPR property if we do.
 
-So for the demand on the body of a RHS we use a product demand if it's
-a product type.
+That motivated using a demand of C(C(C(S(L,L)))) for the RHS, where
+(solely because the result was a product) we used a product demand
+(albeit with lazy components) for the body. But that gives very silly
+behaviour -- see #17932.   Happily it turns out now to be entirely
+unnecessary: we get good results with C(C(C(S))).   So I simply
+deleted the special case.
 
 ************************************************************************
 *                                                                      *
