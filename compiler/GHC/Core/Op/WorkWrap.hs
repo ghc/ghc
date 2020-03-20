@@ -204,6 +204,23 @@ unfolding to the *worker*.  So we will get something like this:
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
 in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
 
+Note [No worker-wrapper for record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We sometimes generate a lot of record selectors, and generally the
+don't benefit from worker/wrapper.  Yes, mkWwBodies would find a w/w split,
+but it is then suppressed by the certainlyWillInline test in splitFun.
+
+The wasted effort in mkWwBodies makes a measurable difference in
+compile time (see MR !2873), so although it's a terribly ad-hoc test,
+we just check here for record selectors, and do a no-op in that case.
+
+I did look for a generalisation, so that it's not just record
+selectors that benefit.  But you'd need a cheap test for "this
+function will definitely get a w/w split" and that's hard to predict
+in advance...the logic in mkWwBodies is complex. So I've left the
+super-simple test, with this Note to explain.
+
+
 Note [Worker-wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to disable worker/wrapper for NOINLINE things, but it turns out
@@ -563,22 +580,26 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
-    -- The arity should match the signature
-    mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
-    case mb_stuff of
-      Nothing -> return [(fn_id, rhs)]
+  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
+  = return [ (fn_id, rhs ) ]
 
-      Just stuff
-         | Just stable_unf <- certainlyWillInline dflags fn_info
-         ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
-             -- See Note [Don't w/w INLINE things]
-             -- See Note [Don't w/w inline small non-loop-breaker things]
+  | otherwise
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
+          -- The arity should match the signature
+    do { mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
+       ; case mb_stuff of
+            Nothing -> return [(fn_id, rhs)]
 
-         | otherwise
-         -> do { work_uniq <- getUniqueM
-               ; return (mkWWBindPair dflags fn_id fn_info arity rhs
-                                      work_uniq div cpr stuff) }
+            Just stuff
+              | Just stable_unf <- certainlyWillInline dflags fn_info
+              ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+                  -- See Note [Don't w/w INLINE things]
+                  -- See Note [Don't w/w inline small non-loop-breaker things]
+
+              | otherwise
+              -> do { work_uniq <- getUniqueM
+                    ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                                           work_uniq div cpr stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
