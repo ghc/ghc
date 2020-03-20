@@ -22,9 +22,9 @@
     CCCS_ALLOC(size);                                   \
     pap = Hp + WDS(1) - size;                           \
     SET_HDR(pap, stg_PAP_info, CCCS);                   \
-    StgPAP_arity(pap) = HALF_W_(arity - m);             \
+    StgPAP_arity(pap) = TO_HALF_W_(arity - m);          \
     StgPAP_fun(pap)   = R1;                             \
-    StgPAP_n_args(pap) = HALF_W_(n);                    \
+    StgPAP_n_args(pap) = TO_HALF_W_(n);                 \
     i = 0;                                              \
   for##x:                                               \
     if (i < n) {                                        \
@@ -64,10 +64,10 @@
      ENTER_FUN_CCS_NEW_PAP(pap);                                \
      new_pap = Hp + WDS(1) - size;                              \
      SET_HDR(new_pap, stg_PAP_info, CCCS);                      \
-     StgPAP_arity(new_pap) = HALF_W_(arity - m);                \
+     StgPAP_arity(new_pap) = TO_HALF_W_(arity - m);             \
      W_ n_args;                                                 \
      n_args = TO_W_(StgPAP_n_args(pap));                        \
-     StgPAP_n_args(new_pap) = HALF_W_(n_args + n);              \
+     StgPAP_n_args(new_pap) = TO_HALF_W_(n_args + n);           \
      StgPAP_fun(new_pap) = StgPAP_fun(pap);                     \
      i = 0;                                                     \
    for1##x:                                                     \

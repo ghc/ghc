@@ -122,8 +122,12 @@ eval:
         COMPACT_NFDATA: {
         jump stg_raisezh(base_GHCziIOziException_cannotCompactMutable_closure);
     }
+    case
+        BCO,
+        PAP: {
+        jump stg_raisezh(base_GHCziIOziException_cannotCompactFunction_closure);
+    }
 
-    // We shouldn't see any functions, if this data structure was NFData.
     case
         FUN,
         FUN_1_0,
@@ -131,10 +135,16 @@ eval:
         FUN_2_0,
         FUN_1_1,
         FUN_0_2,
-        FUN_STATIC,
-        BCO,
-        PAP: {
-        jump stg_raisezh(base_GHCziIOziException_cannotCompactFunction_closure);
+        FUN_STATIC: {
+
+        HALF_W_ srt;
+        srt = TO_HALF_W_(%INFO_SRT(%STD_INFO(info)));
+
+        if (srt == TO_HALF_W_(0)) {
+            goto constructor;
+        } else {
+            jump stg_raisezh(base_GHCziIOziException_cannotCompactFunction_closure);
+        }
     }
 
     case ARR_WORDS: {

@@ -60,10 +60,12 @@
 #define P_  gcptr
 
 #if SIZEOF_VOID_P == 4
+#define HALF_W_ bits16
 #define W_ bits32
 /* Maybe it's better to include MachDeps.h */
 #define TAG_BITS                2
 #elif SIZEOF_VOID_P == 8
+#define HALF_W_ bits32
 #define W_ bits64
 /* Maybe it's better to include MachDeps.h */
 #define TAG_BITS                3
@@ -167,12 +169,12 @@
 #define TO_I64(x) %sx64(x)
 #define TO_W_(x) %sx32(x)
 #define TO_ZXW_(x) %zx32(x)
-#define HALF_W_(x) %lobits16(x)
+#define TO_HALF_W_(x) %lobits16(x)
 #elif SIZEOF_W == 8
 #define TO_I64(x) (x)
 #define TO_W_(x) %sx64(x)
 #define TO_ZXW_(x) %zx64(x)
-#define HALF_W_(x) %lobits32(x)
+#define TO_HALF_W_(x) %lobits32(x)
 #endif
 
 #if SIZEOF_INT == 4 && SIZEOF_W == 8
