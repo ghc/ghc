@@ -24,7 +24,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, with# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in MkId.hs
@@ -129,20 +129,4 @@ runRW# m = m realWorld#
 #else
 runRW# = runRW#   -- The realWorld# is too much for haddock
 #endif
-
--- | @with# x action@ performs the given action, ensuring that heap object @x@
--- remains alive for the duration of the execution.
-with# :: forall (ra :: RuntimeRep) (a :: TYPE ra)
-                (ro :: RuntimeRep) (o :: TYPE ro).
-         a
-      -> (State# RealWorld -> (# State# RealWorld, o #))
-      -> State# RealWorld -> (# State# RealWorld, o #)
-with# = with#
--- This is morally but inlined by CorePrep. See Note [CorePrep handling of with#].
---
---  case action s of
---    (# s', y #) ->
---      case touch# x s' of
---        s'' -> (# s'', y #)
-{-# NOINLINE with# #-}  -- with# is inlined manually in CorePrep, see Note [CorePrep handling of with#]
 

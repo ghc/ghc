@@ -24,7 +24,7 @@ import GHC.Core.Op.OccurAnal
 import GHC.Driver.Types
 import PrelNames
 import MkId             ( realWorldPrimId, mkPrimOpId )
-import PrimOp           ( PrimOp(TouchOp) )
+import PrimOp           ( PrimOp(TouchOp, WithOp) )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
@@ -853,12 +853,13 @@ cpeApp top_env expr
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
     -- See Note [CorePrep handling of with#]
-    cpe_app env (Var f) [CpeApp (Type ty), CpeApp (Type runtimeRep), CpeApp (Type resultTy),
-                         CpeApp x, CpeApp k, CpeApp s0] 3
-        | f `hasKey` withIdKey
+    cpe_app env (Var f) [CpeApp (Type argRep), CpeApp (Type argTy),
+                         CpeApp (Type resultRep), CpeApp (Type resultTy),
+                         CpeApp x, CpeApp k, CpeApp s0] _depth
+        | Just WithOp <- isPrimOpId_maybe f
         = do { let voidRepTy = primRepToRuntimeRep VoidRep
              ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
-                                         [voidRepTy, runtimeRep, realWorldStatePrimTy, resultTy]
+                                         [voidRepTy, resultRep, realWorldStatePrimTy, resultTy]
              ; y <- newVar resultTy
              ; s1 <- newVar realWorldStatePrimTy
              ; s2 <- newVar realWorldStatePrimTy
@@ -871,7 +872,7 @@ cpeApp top_env expr
                      (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
 
                    expr = Case (App k s0) b0 (varType b0) [stateResultAlt s1 y rhs1]
-                   rhs1 = Case (mkApps (Var touchId) [Type ty, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
+                   rhs1 = Case (mkApps (Var touchId) [Type argTy, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
                    rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
              ; cpeBody env expr
              }
