@@ -1,12 +1,15 @@
 module GHC.Driver.Packages where
 import GhcPrelude
+import FastString
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Types.Module(ComponentId, UnitId, InstalledUnitId)
 data PackageState
 data UnitInfoMap
 data PackageDatabase
 emptyPackageState :: PackageState
-componentIdString :: DynFlags -> ComponentId -> Maybe String
-displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
+componentIdString :: ComponentId -> String
+mkComponentId :: PackageState -> FastString -> ComponentId
+displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
 improveUnitId :: UnitInfoMap -> UnitId -> UnitId
 getUnitInfoMap :: DynFlags -> UnitInfoMap
+getPackageState :: DynFlags -> PackageState

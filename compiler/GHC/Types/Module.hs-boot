@@ -1,13 +1,12 @@
 module GHC.Types.Module where
 
 import GhcPrelude
-import FastString
 
 data Module
 data ModuleName
 data UnitId
 data InstalledUnitId
-newtype ComponentId = ComponentId FastString
+data ComponentId
 
 moduleName :: Module -> ModuleName
 moduleUnitId :: Module -> UnitId

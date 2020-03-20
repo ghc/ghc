@@ -865,9 +865,9 @@ dumpFastStringStats dflags = do
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
-showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
-dumpPackages       dflags = putMsg dflags (pprPackages dflags)
-dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
+showPackages       dflags = putStrLn (showSDoc dflags (pprPackages (pkgState dflags)))
+dumpPackages       dflags = putMsg dflags (pprPackages (pkgState dflags))
+dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple (pkgState dflags))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support

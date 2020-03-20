@@ -1248,6 +1248,7 @@ linkPackages' hsc_env new_pks pls = do
     return $! pls { pkgs_loaded = pkgs' }
   where
      dflags = hsc_dflags hsc_env
+     pkgstate = pkgState dflags
 
      link :: [LinkerUnitId] -> [LinkerUnitId] -> IO [LinkerUnitId]
      link pkgs new_pkgs =
@@ -1257,7 +1258,7 @@ linkPackages' hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupInstalledPackage dflags new_pkg
+        | Just pkg_cfg <- lookupInstalledPackage pkgstate new_pkg
         = do {  -- Link dependents first
                pkgs' <- link pkgs (depends pkg_cfg)
                 -- Now link the package itself

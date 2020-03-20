@@ -2345,7 +2345,8 @@ isSafeModule m = do
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg = trusted $ getInstalledPackageDetails dflags pkg
+        where part pkg = trusted $ getInstalledPackageDetails pkgstate pkg
+              pkgstate = pkgState dflags
 
 -----------------------------------------------------------------------------
 -- :browse

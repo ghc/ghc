@@ -2008,7 +2008,7 @@ mkQualPackage dflags uid
         -- database!
      = False
      | Just pkgid <- mb_pkgid
-     , searchPackageId dflags pkgid `lengthIs` 1
+     , searchPackageId (pkgState dflags) pkgid `lengthIs` 1
         -- this says: we are given a package pkg-0.1@MMM, are there only one
         -- exposed packages whose package ID is pkg-0.1?
      = False

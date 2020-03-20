@@ -87,7 +87,8 @@ doBackpack [src_filename] = do
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
-            let bkp = renameHsUnits dflags (packageNameMap pkgname_bkp) pkgname_bkp
+            let pkgstate = pkgState dflags
+            let bkp = renameHsUnits pkgstate (packageNameMap pkgstate pkgname_bkp) pkgname_bkp
             initBkpM src_filename bkp $
                 forM_ (zip [1..] bkp) $ \(i, lunit) -> do
                     let comp_name = unLoc (hsunitName (unLoc lunit))
@@ -95,7 +96,7 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == ComponentId (fsLit "main")
+                            then if cid == ComponentId (fsLit "main") Nothing
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
@@ -136,7 +137,7 @@ withBkpSession :: ComponentId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let (ComponentId cid_fs) = cid
+    let (ComponentId cid_fs _) = cid
         is_primary = False
         uid_str = unpackFS (hashUnitId cid insts)
         cid_str = unpackFS cid_fs
@@ -205,7 +206,7 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(UnitId, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (ComponentId (fsLit "main")) [] deps ExeSession do_this
+    withBkpSession (ComponentId (fsLit "main") Nothing) [] deps ExeSession do_this
 
 getSource :: ComponentId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
@@ -303,7 +304,7 @@ buildUnit session cid insts lunit = do
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
 
-        let compat_fs = (case cid of ComponentId fs -> fs)
+        let compat_fs = (case cid of ComponentId fs _ -> fs)
             compat_pn = PackageName compat_fs
 
         return InstalledPackageInfo {
@@ -560,22 +561,22 @@ type PackageNameMap a = Map PackageName a
 
 -- For now, something really simple, since we're not actually going
 -- to use this for anything
-unitDefines :: LHsUnit PackageName -> (PackageName, HsComponentId)
-unitDefines (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (ComponentId fs))
+unitDefines :: PackageState -> LHsUnit PackageName -> (PackageName, HsComponentId)
+unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
+    = (pn, HsComponentId pn (mkComponentId pkgstate fs))
 
-packageNameMap :: [LHsUnit PackageName] -> PackageNameMap HsComponentId
-packageNameMap units = Map.fromList (map unitDefines units)
+packageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
+packageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
 
-renameHsUnits :: DynFlags -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
-renameHsUnits dflags m units = map (fmap renameHsUnit) units
+renameHsUnits :: PackageState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
+renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
   where
 
     renamePackageName :: PackageName -> HsComponentId
     renamePackageName pn =
         case Map.lookup pn m of
             Nothing ->
-                case lookupPackageName dflags pn of
+                case lookupPackageName pkgstate pn of
                     Nothing -> error "no package name"
                     Just cid -> HsComponentId pn cid
             Just hscid -> hscid
@@ -824,7 +825,7 @@ hsModuleToModSummary pn hsc_src modname
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
 newInstalledUnitId :: ComponentId -> Maybe FastString -> InstalledUnitId
-newInstalledUnitId (ComponentId cid_fs) (Just fs)
+newInstalledUnitId (ComponentId cid_fs _) (Just fs)
     = InstalledUnitId (cid_fs `appendFS` mkFastString "+" `appendFS` fs)
-newInstalledUnitId (ComponentId cid_fs) Nothing
+newInstalledUnitId (ComponentId cid_fs _) Nothing
     = InstalledUnitId cid_fs
