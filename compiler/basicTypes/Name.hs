@@ -66,6 +66,7 @@ module Name (
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
+        nameIsFromOneOfTheUnits,
         stableNameCmp,
 
         -- * Class 'NamedThing' and overloaded friends
@@ -92,6 +93,7 @@ import Maybes
 import Binary
 import FastString
 import Outputable
+import UniqSet (UniqSet, elementOfUniqSet)
 
 import Control.DeepSeq
 import Data.Data
@@ -307,6 +309,17 @@ nameIsFromExternalPackage this_pkg name
   | Just mod <- nameModule_maybe name
   , moduleUnitId mod /= this_pkg    -- Not this package
   , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  = True
+  | otherwise
+  = False
+
+-- | Returns True if the name comes from some of the provided units,
+-- neither is interactive package.
+nameIsFromOneOfTheUnits :: UniqSet UnitId -> Name -> Bool
+nameIsFromOneOfTheUnits modules name
+  | Just mod <- nameModule_maybe name
+  , elementOfUniqSet (moduleUnitId mod) modules
+  , not (isInteractiveModule mod)
   = True
   | otherwise
   = False
