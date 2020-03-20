@@ -8,7 +8,8 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 module GHC.Core.Op.WorkWrap.Lib
    ( mkWwBodies, mkWWstr, mkWorkerArgs
-   , deepSplitProductType_maybe, findTypeShape
+   , DataConAppContext(..), deepSplitProductType_maybe, wantToUnbox
+   , findTypeShape
    , isWorkerSmallEnough
    )
 where
@@ -588,21 +589,8 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
      -- (that's what mk_absent_let does)
   = return (True, [], nop_fn, work_fn)
 
-  | isStrictDmd dmd
-  , Just cs <- splitProdDmd_maybe dmd
-      -- See Note [Unpacking arguments with product and polymorphic demands]
-  , not (has_inlineable_prag && isClassPred arg_ty)
-      -- See Note [Do not unpack class dictionaries]
-  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
-  , cs `equalLength` inst_con_arg_tys
-      -- See Note [mkWWstr and unsafeCoerce]
-  = unbox_one dflags fam_envs arg cs stuff
-
-  | isSeqDmd dmd   -- For seqDmd, splitProdDmd_maybe will return Nothing, but
-                   -- it should behave like <S, U(AAAA)>, for some suitable arity
-  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
-  , let abs_dmds = map (const absDmd) inst_con_arg_tys
-  = unbox_one dflags fam_envs arg abs_dmds stuff
+  | Just (cs, acdc) <- wantToUnbox fam_envs has_inlineable_prag arg_ty dmd
+  = unbox_one dflags fam_envs arg cs acdc
 
   | otherwise   -- Other cases
   = return (False, [arg], nop_fn, nop_fn)
@@ -611,12 +599,36 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
     arg_ty = idType arg
     dmd    = idDemandInfo arg
 
+wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConAppContext)
+wantToUnbox fam_envs has_inlineable_prag ty dmd =
+  case deepSplitProductType_maybe fam_envs ty of
+    Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
+      | isStrictDmd dmd
+      -- See Note [Unpacking arguments with product and polymorphic demands]
+      , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
+      -- See Note [Do not unpack class dictionaries]
+      , not (has_inlineable_prag && isClassPred ty)
+      -- See Note [mkWWstr and unsafeCoerce]
+      , cs `equalLength` con_arg_tys
+      -> Just (cs, dcac)
+    _ -> Nothing
+  where
+    split_prod_dmd_arity dmd arty
+      -- For seqDmd, splitProdDmd_maybe will return Nothing (because how would
+      -- it know the arity?), but it should behave like <S, U(AAAA)>, for some
+      -- suitable arity
+      | isSeqDmd dmd = Just (replicate arty absDmd)
+      -- Otherwise splitProdDmd_maybe does the job
+      | otherwise    = splitProdDmd_maybe dmd
+
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]
-          -> (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
+          -> DataConAppContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 unbox_one dflags fam_envs arg cs
-          (data_con, inst_tys, inst_con_arg_tys, co)
+          DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
+                            , dcac_arg_tys = inst_con_arg_tys
+                            , dcac_co = co }
   = do { (uniq1:uniqs) <- getUniquesM
         ; let   -- See Note [Add demands for strict constructors]
                 cs'       = addDataConStrictness data_con cs
@@ -898,8 +910,8 @@ If we have
    f :: Ord a => [a] -> Int -> a
    {-# INLINABLE f #-}
 and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Op.WorkWrap), which
-can still be specialised by the type-class specialiser, something like
+(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Op.WorkWrap),
+which can still be specialised by the type-class specialiser, something like
    fw :: Ord a => [a] -> Int# -> a
 
 BUT if f is strict in the Ord dictionary, we might unpack it, to get
@@ -915,9 +927,29 @@ Historical note: #14955 describes how I got this fix wrong
 the first time.
 -}
 
-deepSplitProductType_maybe
-    :: FamInstEnvs -> Type
-    -> Maybe (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
+-- | Context for a 'DataCon' application with a hole for every field, including
+-- surrounding coercions.
+-- The result of 'deepSplitProductType_maybe' and 'deepSplitCprType_maybe'.
+--
+-- Example:
+--
+-- > DataConAppContext Just [Int] [(Lazy, Int)] (co :: Maybe Int ~ First Int)
+--
+-- represents
+--
+-- > Just @Int (_1 :: Int) |> co :: First Int
+--
+-- where _1 is a hole for the first argument. The number of arguments is
+-- determined by the length of @arg_tys@.
+data DataConAppContext
+  = DataConAppContext
+  { dcac_dc      :: !DataCon
+  , dcac_tys     :: ![Type]
+  , dcac_arg_tys :: ![(Type, StrictnessMark)]
+  , dcac_co      :: !Coercion
+  }
+
+deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe DataConAppContext
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -930,12 +962,14 @@ deepSplitProductType_maybe fam_envs ty
   , Just con <- isDataProductTyCon_maybe tc
   , let arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
-  = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)
+  = Just DataConAppContext { dcac_dc = con
+                           , dcac_tys = tc_args
+                           , dcac_arg_tys = zipEqual "dspt" arg_tys strict_marks
+                           , dcac_co = co }
 deepSplitProductType_maybe _ _ = Nothing
 
 deepSplitCprType_maybe
-    :: FamInstEnvs -> ConTag -> Type
-    -> Maybe (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
+  :: FamInstEnvs -> ConTag -> Type -> Maybe DataConAppContext
 -- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -952,7 +986,10 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , let con = cons `getNth` (con_tag - fIRST_TAG)
         arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
-  = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
+  = Just DataConAppContext { dcac_dc = con
+                           , dcac_tys = tc_args
+                           , dcac_arg_tys = zipEqual "dspt" arg_tys strict_marks
+                           , dcac_co = co }
 deepSplitCprType_maybe _ _ _ = Nothing
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
@@ -1009,17 +1046,18 @@ mkWWcpr opt_CprAnal fam_envs body_ty cpr
   | otherwise
   = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just stuff <- deepSplitCprType_maybe fam_envs con_tag body_ty
-                    -> mkWWcpr_help stuff
+       Just con_tag | Just dcac <- deepSplitCprType_maybe fam_envs con_tag body_ty
+                    -> mkWWcpr_help dcac
                     |  otherwise
                        -- See Note [non-algebraic or open body type warning]
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
                        return (False, id, id, body_ty)
 
-mkWWcpr_help :: (DataCon, [Type], [(Type,StrictnessMark)], Coercion)
+mkWWcpr_help :: DataConAppContext
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
-mkWWcpr_help (data_con, inst_tys, arg_tys, co)
+mkWWcpr_help (DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
+                                , dcac_arg_tys = arg_tys, dcac_co = co })
   | [arg1@(arg_ty1, _)] <- arg_tys
   , isUnliftedType arg_ty1
         -- Special case when there is a single result of unlifted type

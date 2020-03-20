@@ -22,6 +22,9 @@ f1 x = case h x x of
 
 
 ------- f2 -----------
+-- We used to unbox x here and rebox it in the wrapper. After #17932, we don't.
+-- After #17932, we don't.
+-- Historical comment:
 -- x is a strict field of MkT2, so we'll pass it unboxed
 -- to $wf2, so it's available unboxed.  This depends on
 -- the case expression analysing (a subcomponent of) one
@@ -48,6 +51,8 @@ f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
 
 
 ------- f4 -----------
+-- We used to unbox x here and rebox it in the wrapper. After #17932, we don't.
+-- Historical comment:
 -- Just like f2, but MkT4 can't unbox its strict
 -- argument automatically, as f2 can
 

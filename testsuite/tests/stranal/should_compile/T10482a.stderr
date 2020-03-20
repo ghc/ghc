@@ -1,407 +1,366 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 353, types: 155, coercions: 3, joins: 0/0}
+Result size of Tidy Core = {terms: 342, types: 152, coercions: 3, joins: 0/0}
 
 -- RHS size: {terms: 9, types: 8, coercions: 0, joins: 0/0}
-Foo.$WMkT4 [InlPrag=INLINE[2]] :: forall a. Foo a -> Int -> T4 a
+Foo.$WMkT4 [InlPrag=INLINE[0]] :: forall a. Foo a -> Int -> T4 a
 [GblId[DataConWrapper],
  Arity=2,
  Caf=NoCafRefs,
- Str=<S,U><L,U>m,
+ Str=<S,U><L,U>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a_atA) (dt_a21M [Occ=Once] :: Foo a_atA[sk:1]) (dt_a21N [Occ=Once] :: Int) ->
-                 case dt_a21M of dt_X21Q { __DEFAULT -> Foo.MkT4 @ a_atA dt_X21Q dt_a21N }}]
+         Tmpl= \ (@a_agw) (dt_a1hl [Occ=Once] :: Foo a_agw) (dt_a1hm [Occ=Once] :: Int) ->
+                 case dt_a1hl of dt_X0 [Occ=Once] { __DEFAULT -> Foo.MkT4 @a_agw dt_X0 dt_a1hm }}]
 Foo.$WMkT4
-  = \ (@ a_atA) (dt_a21M [Occ=Once] :: Foo a_atA[sk:1]) (dt_a21N [Occ=Once] :: Int) ->
-      case dt_a21M of dt_X21Q { __DEFAULT -> Foo.MkT4 @ a_atA dt_X21Q dt_a21N }
+  = \ (@a_agw) (dt_a1hl [Occ=Once] :: Foo a_agw) (dt_a1hm [Occ=Once] :: Int) ->
+      case dt_a1hl of dt_X0 [Occ=Once] { __DEFAULT -> Foo.MkT4 @a_agw dt_X0 dt_a1hm }
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
-Foo.$WMkT2 [InlPrag=INLINE[2]] :: Int -> Int -> T2
+Foo.$WMkT2 [InlPrag=INLINE[0]] :: Int -> Int -> T2
 [GblId[DataConWrapper],
  Arity=2,
  Caf=NoCafRefs,
- Str=<S,U><L,U>m,
+ Str=<S,U><L,U>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (dt_a20w [Occ=Once] :: Int) (dt_a20x [Occ=Once] :: Int) ->
-                 case dt_a20w of dt_X20z { __DEFAULT -> Foo.MkT2 dt_X20z dt_a20x }}]
+         Tmpl= \ (dt_a1gu [Occ=Once] :: Int) (dt_a1gv [Occ=Once] :: Int) ->
+                 case dt_a1gu of dt_X0 [Occ=Once] { __DEFAULT -> Foo.MkT2 dt_X0 dt_a1gv }}]
 Foo.$WMkT2
-  = \ (dt_a20w [Occ=Once] :: Int) (dt_a20x [Occ=Once] :: Int) -> case dt_a20w of dt_X20z { __DEFAULT -> Foo.MkT2 dt_X20z dt_a20x }
+  = \ (dt_a1gu [Occ=Once] :: Int) (dt_a1gv [Occ=Once] :: Int) ->
+      case dt_a1gu of dt_X0 [Occ=Once] { __DEFAULT -> Foo.MkT2 dt_X0 dt_a1gv }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$trModule4 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$trModule3 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$trModule3 = GHC.Types.TrNameS Foo.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$trModule2 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$trModule2 = "Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$trModule1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$trModule1 = GHC.Types.TrNameS Foo.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Foo.$trModule :: GHC.Types.Module
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Foo.$trModule = GHC.Types.Module Foo.$trModule3 Foo.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep_r2oJ :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep_r2oJ = GHC.Types.KindRepTyConApp GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+$krep_r1x7 :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep_r1x7 = GHC.Types.KindRepTyConApp GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$krep1_r2oK :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []]
-$krep1_r2oK = GHC.Types.KindRepVar 0#
+$krep1_r1x8 :: GHC.Types.KindRep
+[GblId, Cpr=m2, Unf=OtherCon []]
+$krep1_r1x8 = GHC.Types.KindRepVar 0#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT5 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$tcT5 = "T2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tcT1 = GHC.Types.TrNameS Foo.$tcT5
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT2 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tcT2 = GHC.Types.TyCon 12492463661685256209## 1082997131366389398## Foo.$trModule Foo.$tcT1 0# GHC.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2_r2oL :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep2_r2oL = GHC.Types.KindRepTyConApp Foo.$tcT2 (GHC.Types.[] @ GHC.Types.KindRep)
+$krep2_r1x9 :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep2_r1x9 = GHC.Types.KindRepTyConApp Foo.$tcT2 (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3_r2oM :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-$krep3_r2oM = GHC.Types.KindRepFun $krep_r2oJ $krep2_r2oL
+$krep3_r1xa :: GHC.Types.KindRep
+[GblId, Cpr=m4, Unf=OtherCon []]
+$krep3_r1xa = GHC.Types.KindRepFun $krep_r1x7 $krep2_r1x9
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT1 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-Foo.$tc'MkT1 = GHC.Types.KindRepFun $krep_r2oJ $krep3_r2oM
+[GblId, Cpr=m4, Unf=OtherCon []]
+Foo.$tc'MkT1 = GHC.Types.KindRepFun $krep_r1x7 $krep3_r1xa
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT6 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 Foo.$tc'MkT6 = "'MkT2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT5 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tc'MkT5 = GHC.Types.TrNameS Foo.$tc'MkT6
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT2 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tc'MkT2 = GHC.Types.TyCon 5707542518475997625## 9584804394183763875## Foo.$trModule Foo.$tc'MkT5 0# Foo.$tc'MkT1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT7 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$tcT7 = "T3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT6 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tcT6 = GHC.Types.TrNameS Foo.$tcT7
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT3 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tcT3 = GHC.Types.TyCon 8915518733037212359## 16476420519216613869## Foo.$trModule Foo.$tcT6 0# GHC.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep4_r2oN :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep4_r2oN = GHC.Types.KindRepTyConApp Foo.$tcT3 (GHC.Types.[] @ GHC.Types.KindRep)
+$krep4_r1xb :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep4_r1xb = GHC.Types.KindRepTyConApp Foo.$tcT3 (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep5_r2oO :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-$krep5_r2oO = GHC.Types.KindRepFun $krep_r2oJ $krep4_r2oN
+$krep5_r1xc :: GHC.Types.KindRep
+[GblId, Cpr=m4, Unf=OtherCon []]
+$krep5_r1xc = GHC.Types.KindRepFun $krep_r1x7 $krep4_r1xb
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT7 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-Foo.$tc'MkT7 = GHC.Types.KindRepFun $krep_r2oJ $krep5_r2oO
+[GblId, Cpr=m4, Unf=OtherCon []]
+Foo.$tc'MkT7 = GHC.Types.KindRepFun $krep_r1x7 $krep5_r1xc
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT9 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 Foo.$tc'MkT9 = "'MkT3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT8 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tc'MkT8 = GHC.Types.TrNameS Foo.$tc'MkT9
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT3 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tc'MkT3 = GHC.Types.TyCon 7218783144619306039## 13236146459150723629## Foo.$trModule Foo.$tc'MkT8 0# Foo.$tc'MkT7
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcFoo :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tcFoo = GHC.Types.TyCon 11236787750777559483## 2472662601374496863## Foo.$trModule Foo.$trModule1 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep6_r2oP :: [GHC.Types.KindRep]
-[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []]
-$krep6_r2oP = GHC.Types.: @ GHC.Types.KindRep $krep1_r2oK (GHC.Types.[] @ GHC.Types.KindRep)
+$krep6_r1xd :: [GHC.Types.KindRep]
+[GblId, Cpr=m2, Unf=OtherCon []]
+$krep6_r1xd = GHC.Types.: @GHC.Types.KindRep $krep1_r1x8 (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep7_r2oQ :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep7_r2oQ = GHC.Types.KindRepTyConApp Foo.$tcFoo $krep6_r2oP
+$krep7_r1xe :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep7_r1xe = GHC.Types.KindRepTyConApp Foo.$tcFoo $krep6_r1xd
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep8_r2oR :: [GHC.Types.KindRep]
-[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []]
-$krep8_r2oR = GHC.Types.: @ GHC.Types.KindRep $krep_r2oJ (GHC.Types.[] @ GHC.Types.KindRep)
+$krep8_r1xf :: [GHC.Types.KindRep]
+[GblId, Cpr=m2, Unf=OtherCon []]
+$krep8_r1xf = GHC.Types.: @GHC.Types.KindRep $krep_r1x7 (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep9_r2oS :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep9_r2oS = GHC.Types.KindRepTyConApp Foo.$tcFoo $krep8_r2oR
+$krep9_r1xg :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep9_r1xg = GHC.Types.KindRepTyConApp Foo.$tcFoo $krep8_r1xf
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'Foo1 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-Foo.$tc'Foo1 = GHC.Types.KindRepFun $krep_r2oJ $krep9_r2oS
+[GblId, Cpr=m4, Unf=OtherCon []]
+Foo.$tc'Foo1 = GHC.Types.KindRepFun $krep_r1x7 $krep9_r1xg
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'Foo3 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$tc'Foo3 = "'Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'Foo2 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tc'Foo2 = GHC.Types.TrNameS Foo.$tc'Foo3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'Foo :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tc'Foo = GHC.Types.TyCon 10641757595611461765## 13961773224584044648## Foo.$trModule Foo.$tc'Foo2 0# Foo.$tc'Foo1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT9 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Foo.$tcT9 = "T4"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT8 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tcT8 = GHC.Types.TrNameS Foo.$tcT9
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tcT4 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tcT4 = GHC.Types.TyCon 15961711399118996930## 13694522307176382499## Foo.$trModule Foo.$tcT8 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep10_r2oT :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-$krep10_r2oT = GHC.Types.KindRepTyConApp Foo.$tcT4 $krep6_r2oP
+$krep10_r1xh :: GHC.Types.KindRep
+[GblId, Cpr=m1, Unf=OtherCon []]
+$krep10_r1xh = GHC.Types.KindRepTyConApp Foo.$tcT4 $krep6_r1xd
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep11_r2oU :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-$krep11_r2oU = GHC.Types.KindRepFun $krep_r2oJ $krep10_r2oT
+$krep11_r1xi :: GHC.Types.KindRep
+[GblId, Cpr=m4, Unf=OtherCon []]
+$krep11_r1xi = GHC.Types.KindRepFun $krep_r1x7 $krep10_r1xh
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT10 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
-Foo.$tc'MkT10 = GHC.Types.KindRepFun $krep7_r2oQ $krep11_r2oU
+[GblId, Cpr=m4, Unf=OtherCon []]
+Foo.$tc'MkT10 = GHC.Types.KindRepFun $krep7_r1xe $krep11_r1xi
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT12 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 Foo.$tc'MkT12 = "'MkT4"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT11 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Foo.$tc'MkT11 = GHC.Types.TrNameS Foo.$tc'MkT12
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Foo.$tc'MkT4 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 Foo.$tc'MkT4 = GHC.Types.TyCon 6077781708614236332## 14823286043222481570## Foo.$trModule Foo.$tc'MkT11 1# Foo.$tc'MkT10
 
 Rec {
--- RHS size: {terms: 14, types: 3, coercions: 0, joins: 0/0}
-Foo.$wf4 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<S,1*U><S,U>, Unf=OtherCon []]
+-- RHS size: {terms: 14, types: 4, coercions: 3, joins: 0/0}
+Foo.$wf4 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: Foo Int -> GHC.Prim.Int# -> Int
+[GblId, Arity=2, Str=<S,1*U><L,U>, Unf=OtherCon []]
 Foo.$wf4
-  = \ (ww_s2jL :: GHC.Prim.Int#) (ww1_s2jQ :: GHC.Prim.Int#) ->
-      case GHC.Prim.># ww1_s2jQ 0# of {
-        __DEFAULT -> ww_s2jL;
-        1# -> Foo.$wf4 ww_s2jL (GHC.Prim.-# ww1_s2jQ 1#)
+  = \ (ww_s1tc
+         :: Foo Int
+         Unf=OtherCon [])
+      (ww1_s1tg :: GHC.Prim.Int#) ->
+      case GHC.Prim.># ww1_s1tg 0# of {
+        __DEFAULT -> ww_s1tc `cast` (Foo.D:R:FooInt0[0] ; Foo.N:R:FooInt[0] :: Foo Int ~R# Int);
+        1# -> Foo.$wf4 ww_s1tc (GHC.Prim.-# ww1_s1tg 1#)
       }
 end Rec }
 
--- RHS size: {terms: 17, types: 12, coercions: 3, joins: 0/0}
+-- RHS size: {terms: 10, types: 9, coercions: 0, joins: 0/0}
 f4 [InlPrag=NOUSERINLINE[2]] :: T4 Int -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
- Str=<S(S(S)S(S)),1*U(U(1*U),1*U(U))>m,
+ Str=<S(SS),1*U(1*U,1*U(U))>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_s2jF [Occ=Once!] :: T4 Int) ->
-                 case w_s2jF of { MkT4 ww1_s2jI [Occ=Once] ww2_s2jN [Occ=Once!] ->
-                 case ww1_s2jI `cast` (Foo.D:R:FooInt0[0] ; Foo.N:R:FooInt[0] :: (Foo Int :: *) ~R# (Int :: *)) of
-                 { GHC.Types.I# ww4_s2jL [Occ=Once] ->
-                 case ww2_s2jN of { GHC.Types.I# ww6_s2jQ [Occ=Once] ->
-                 case Foo.$wf4 ww4_s2jL ww6_s2jQ of ww7_s2jV { __DEFAULT -> GHC.Types.I# ww7_s2jV }
-                 }
-                 }
+         Tmpl= \ (w_s1t9 [Occ=Once!] :: T4 Int) ->
+                 case w_s1t9 of { MkT4 ww1_s1tc [Occ=Once] ww2_s1td [Occ=Once!] ->
+                 case ww2_s1td of { GHC.Types.I# ww4_s1tg [Occ=Once] -> Foo.$wf4 ww1_s1tc ww4_s1tg }
                  }}]
 f4
-  = \ (w_s2jF :: T4 Int) ->
-      case w_s2jF of { MkT4 ww1_s2jI ww2_s2jN ->
-      case ww1_s2jI `cast` (Foo.D:R:FooInt0[0] ; Foo.N:R:FooInt[0] :: (Foo Int :: *) ~R# (Int :: *)) of { GHC.Types.I# ww4_s2mW ->
-      case ww2_s2jN of { GHC.Types.I# ww6_s2jQ -> case Foo.$wf4 ww4_s2mW ww6_s2jQ of ww7_s2jV { __DEFAULT -> GHC.Types.I# ww7_s2jV } }
-      }
-      }
+  = \ (w_s1t9 :: T4 Int) ->
+      case w_s1t9 of { MkT4 ww1_s1tc ww2_s1td -> case ww2_s1td of { GHC.Types.I# ww4_s1tg -> Foo.$wf4 ww1_s1tc ww4_s1tg } }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl_r1xj :: Int
+[GblId, Cpr=m1, Unf=OtherCon []]
+lvl_r1xj = GHC.Types.I# 1#
 
 Rec {
 -- RHS size: {terms: 21, types: 4, coercions: 0, joins: 0/0}
-Foo.$wf2 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<L,1*U><S,U>, Unf=OtherCon []]
+Foo.$wf2 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: Int -> GHC.Prim.Int# -> Int
+[GblId, Arity=2, Str=<L,1*U><L,U>, Unf=OtherCon []]
 Foo.$wf2
-  = \ (ww_s2k3 :: GHC.Prim.Int#) (ww1_s2k8 :: GHC.Prim.Int#) ->
-      case GHC.Prim.># ww1_s2k8 0# of {
+  = \ (ww_s1tn
+         :: Int
+         Unf=OtherCon [])
+      (ww1_s1tr :: GHC.Prim.Int#) ->
+      case GHC.Prim.># ww1_s1tr 0# of {
         __DEFAULT ->
-          case GHC.Prim.># ww1_s2k8 1# of {
-            __DEFAULT -> ww_s2k3;
-            1# -> 1#
+          case GHC.Prim.># ww1_s1tr 1# of {
+            __DEFAULT -> ww_s1tn;
+            1# -> lvl_r1xj
           };
-        1# -> Foo.$wf2 ww_s2k3 (GHC.Prim.-# ww1_s2k8 1#)
+        1# -> Foo.$wf2 ww_s1tn (GHC.Prim.-# ww1_s1tr 1#)
       }
 end Rec }
 
--- RHS size: {terms: 17, types: 9, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 10, types: 6, coercions: 0, joins: 0/0}
 f2 [InlPrag=NOUSERINLINE[2]] :: T2 -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
- Str=<S(S(S)S(S)),1*U(U(1*U),1*U(U))>m,
+ Str=<S(LS),1*U(1*U,1*U(U))>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_s2jX [Occ=Once!] :: T2) ->
-                 case w_s2jX of { MkT2 ww1_s2k0 [Occ=Once!] ww2_s2k5 [Occ=Once!] ->
-                 case ww1_s2k0 of { GHC.Types.I# ww4_s2k3 [Occ=Once] ->
-                 case ww2_s2k5 of { GHC.Types.I# ww6_s2k8 [Occ=Once] ->
-                 case Foo.$wf2 ww4_s2k3 ww6_s2k8 of ww7_s2kd { __DEFAULT -> GHC.Types.I# ww7_s2kd }
-                 }
-                 }
+         Tmpl= \ (w_s1tk [Occ=Once!] :: T2) ->
+                 case w_s1tk of { MkT2 ww1_s1tn [Occ=Once] ww2_s1to [Occ=Once!] ->
+                 case ww2_s1to of { GHC.Types.I# ww4_s1tr [Occ=Once] -> Foo.$wf2 ww1_s1tn ww4_s1tr }
                  }}]
 f2
-  = \ (w_s2jX :: T2) ->
-      case w_s2jX of { MkT2 ww1_s2k0 ww2_s2k5 ->
-      case ww1_s2k0 of { GHC.Types.I# ww4_s2mZ ->
-      case ww2_s2k5 of { GHC.Types.I# ww6_s2k8 -> case Foo.$wf2 ww4_s2mZ ww6_s2k8 of ww7_s2kd { __DEFAULT -> GHC.Types.I# ww7_s2kd } }
-      }
-      }
+  = \ (w_s1tk :: T2) ->
+      case w_s1tk of { MkT2 ww1_s1tn ww2_s1to -> case ww2_s1to of { GHC.Types.I# ww4_s1tr -> Foo.$wf2 ww1_s1tn ww4_s1tr } }
 
 Rec {
 -- RHS size: {terms: 15, types: 4, coercions: 0, joins: 0/0}
 Foo.$wh [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int# -> Bool
-[GblId, Arity=2, Caf=NoCafRefs, Str=<S,1*U><S,U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<S,1*U><L,U>, Unf=OtherCon []]
 Foo.$wh
-  = \ (ww_s2kj :: GHC.Prim.Int#) (ww1_s2kn :: GHC.Prim.Int#) ->
-      case ww_s2kj of ds_X2gt {
-        __DEFAULT -> Foo.$wh (GHC.Prim.-# ds_X2gt 1#) ww1_s2kn;
-        0# -> GHC.Prim.tagToEnum# @ Bool (GHC.Prim.># ww1_s2kn 0#)
+  = \ (ww_s1tz :: GHC.Prim.Int#) (ww1_s1tD :: GHC.Prim.Int#) ->
+      case ww_s1tz of ds_X2 {
+        __DEFAULT -> Foo.$wh (GHC.Prim.-# ds_X2 1#) ww1_s1tD;
+        0# -> GHC.Prim.tagToEnum# @Bool (GHC.Prim.># ww1_s1tD 0#)
       }
 end Rec }
 
@@ -409,26 +368,25 @@ end Rec }
 h [InlPrag=NOUSERINLINE[2]] :: Int -> Int -> Bool
 [GblId,
  Arity=2,
- Caf=NoCafRefs,
- Str=<S(S),1*U(1*U)><S(S),1*U(U)>,
+ Str=<S(S),1*U(1*U)><S,1*U(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_s2kf [Occ=Once!] :: Int) (w1_s2kg [Occ=Once!] :: Int) ->
-                 case w_s2kf of { GHC.Types.I# ww1_s2kj [Occ=Once] ->
-                 case w1_s2kg of { GHC.Types.I# ww3_s2kn [Occ=Once] -> Foo.$wh ww1_s2kj ww3_s2kn }
+         Tmpl= \ (w_s1tv [Occ=Once!] :: Int) (w1_s1tw [Occ=Once!] :: Int) ->
+                 case w_s1tv of { GHC.Types.I# ww1_s1tz [Occ=Once] ->
+                 case w1_s1tw of { GHC.Types.I# ww3_s1tD [Occ=Once] -> Foo.$wh ww1_s1tz ww3_s1tD }
                  }}]
-h = \ (w_s2kf :: Int) (w1_s2kg :: Int) ->
-      case w_s2kf of { GHC.Types.I# ww1_s2kj -> case w1_s2kg of { GHC.Types.I# ww3_s2kn -> Foo.$wh ww1_s2kj ww3_s2kn } }
+h = \ (w_s1tv :: Int) (w1_s1tw :: Int) ->
+      case w_s1tv of { GHC.Types.I# ww1_s1tz -> case w1_s1tw of { GHC.Types.I# ww3_s1tD -> Foo.$wh ww1_s1tz ww3_s1tD } }
 
 Rec {
 -- RHS size: {terms: 12, types: 2, coercions: 0, joins: 0/0}
 Foo.$wf1 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<S,U>, Unf=OtherCon []]
 Foo.$wf1
-  = \ (ww_s2kt :: GHC.Prim.Int#) ->
-      case Foo.$wh ww_s2kt ww_s2kt of {
-        False -> Foo.$wf1 (GHC.Prim.-# ww_s2kt 1#);
-        True -> ww_s2kt
+  = \ (ww_s1tJ :: GHC.Prim.Int#) ->
+      case Foo.$wh ww_s1tJ ww_s1tJ of {
+        False -> Foo.$wf1 (GHC.Prim.-# ww_s1tJ 1#);
+        True -> ww_s1tJ
       }
 end Rec }
 
@@ -436,25 +394,27 @@ end Rec }
 f1 [InlPrag=NOUSERINLINE[2]] :: Int -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
- Str=<S(S),1*U(U)>m,
+ Str=<S(S),1*U(U)>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_s2kq [Occ=Once!] :: Int) ->
-                 case w_s2kq of { GHC.Types.I# ww1_s2kt [Occ=Once] -> case Foo.$wf1 ww1_s2kt of ww2_s2kx { __DEFAULT -> GHC.Types.I# ww2_s2kx } }}]
+         Tmpl= \ (w_s1tG [Occ=Once!] :: Int) ->
+                 case w_s1tG of { GHC.Types.I# ww1_s1tJ [Occ=Once] ->
+                 case Foo.$wf1 ww1_s1tJ of ww2_s1tN [Occ=Once] { __DEFAULT -> GHC.Types.I# ww2_s1tN }
+                 }}]
 f1
-  = \ (w_s2kq :: Int) ->
-      case w_s2kq of { GHC.Types.I# ww1_s2kt -> case Foo.$wf1 ww1_s2kt of ww2_s2kx { __DEFAULT -> GHC.Types.I# ww2_s2kx } }
+  = \ (w_s1tG :: Int) ->
+      case w_s1tG of { GHC.Types.I# ww1_s1tJ -> case Foo.$wf1 ww1_s1tJ of ww2_s1tN { __DEFAULT -> GHC.Types.I# ww2_s1tN } }
 
 Rec {
 -- RHS size: {terms: 14, types: 3, coercions: 0, joins: 0/0}
 Foo.$wf3 [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<S,U><S,U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<S,U><L,U>, Unf=OtherCon []]
 Foo.$wf3
-  = \ (ww_s2kF :: GHC.Prim.Int#) (ww1_s2kK :: GHC.Prim.Int#) ->
-      case Foo.$wh ww_s2kF ww1_s2kK of {
-        False -> ww_s2kF;
-        True -> Foo.$wf3 ww_s2kF (GHC.Prim.-# ww1_s2kK 1#)
+  = \ (ww_s1tV :: GHC.Prim.Int#) (ww1_s1u0 :: GHC.Prim.Int#) ->
+      case Foo.$wh ww_s1tV ww1_s1u0 of {
+        False -> ww_s1tV;
+        True -> Foo.$wf3 ww_s1tV (GHC.Prim.-# ww1_s1u0 1#)
       }
 end Rec }
 
@@ -462,23 +422,23 @@ end Rec }
 f3 [InlPrag=NOUSERINLINE[2]] :: T3 -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
- Str=<S(S(S)S(S)),1*U(1*U(U),1*U(U))>m,
+ Str=<S(S(S)S),1*U(1*U(U),1*U(U))>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_s2kz [Occ=Once!] :: T3) ->
-                 case w_s2kz of { MkT3 ww1_s2kC [Occ=Once!] ww2_s2kH [Occ=Once!] ->
-                 case ww1_s2kC of { GHC.Types.I# ww4_s2kF [Occ=Once] ->
-                 case ww2_s2kH of { GHC.Types.I# ww6_s2kK [Occ=Once] ->
-                 case Foo.$wf3 ww4_s2kF ww6_s2kK of ww7_s2kP { __DEFAULT -> GHC.Types.I# ww7_s2kP }
+         Tmpl= \ (w_s1tP [Occ=Once!] :: T3) ->
+                 case w_s1tP of { MkT3 ww1_s1tS [Occ=Once!] ww2_s1tX [Occ=Once!] ->
+                 case ww1_s1tS of { GHC.Types.I# ww4_s1tV [Occ=Once] ->
+                 case ww2_s1tX of { GHC.Types.I# ww6_s1u0 [Occ=Once] ->
+                 case Foo.$wf3 ww4_s1tV ww6_s1u0 of ww7_s1u5 [Occ=Once] { __DEFAULT -> GHC.Types.I# ww7_s1u5 }
                  }
                  }
                  }}]
 f3
-  = \ (w_s2kz :: T3) ->
-      case w_s2kz of { MkT3 ww1_s2kC ww2_s2kH ->
-      case ww1_s2kC of { GHC.Types.I# ww4_s2kF ->
-      case ww2_s2kH of { GHC.Types.I# ww6_s2kK -> case Foo.$wf3 ww4_s2kF ww6_s2kK of ww7_s2kP { __DEFAULT -> GHC.Types.I# ww7_s2kP } }
+  = \ (w_s1tP :: T3) ->
+      case w_s1tP of { MkT3 ww1_s1tS ww2_s1tX ->
+      case ww1_s1tS of { GHC.Types.I# ww4_s1tV ->
+      case ww2_s1tX of { GHC.Types.I# ww6_s1u0 -> case Foo.$wf3 ww4_s1tV ww6_s1u0 of ww7_s1u5 { __DEFAULT -> GHC.Types.I# ww7_s1u5 } }
       }
       }
 
