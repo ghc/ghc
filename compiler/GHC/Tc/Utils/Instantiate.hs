@@ -51,7 +51,6 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Core.InstEnv
 import GHC.Builtin.Types  ( heqDataCon, eqDataCon )
-import GHC.Core    ( isOrphan )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type
@@ -61,7 +60,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Driver.Types
 import GHC.Core.Class( Class )
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Core( Expr(..) )  -- For the Coercion constructor
+import GHC.Core( Expr(..), isOrphan )  -- For the Coercion constructor
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
@@ -69,14 +68,17 @@ import GHC.Core.DataCon
 import GHC.Types.Var.Env
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Unique.Set
 import GHC.Driver.Session
+import GHC.Unit.Database ( unitId, unitPackageName )
+import GHC.Unit.State ( listUnitInfoMap )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List ( sortBy )
-import Control.Monad( unless )
+import Control.Monad( unless, when )
 import Data.Function ( on )
 
 {-
@@ -699,9 +701,24 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIfFlag Opt_WarnOrphans
-                    (isOrphan (is_orphan inst))
-                    (instOrphWarn inst)
+       ; warn_on <- woptM Opt_WarnOrphans
+       ; when (warn_on && isOrphan (is_orphan inst)) $
+         do { dflags <- getDynFlags
+            ; let okParents = orphanParents dflags
+            ; let warn = addWarn (Reason Opt_WarnOrphans) (instOrphWarn inst)
+            ; if isEmptyUniqSet okParents
+              then warn
+              -- Recompute orphanhood. We know that instance
+              -- is not nameIsLocalOrFrom
+              else do { let pseudoLocalUnits = addListToUniqSet emptyUniqSet
+                              [ unitId unitInfo
+                              | unitInfo <- listUnitInfoMap (pkgState dflags)
+                              , elementOfUniqSet (unitPackageName unitInfo) okParents
+                              ]
+                            is_local = nameIsFromOneOfTheUnits pseudoLocalUnits
+                            orph = orphanhood (is_cls inst) (is_tys inst) is_local
+                        -- if the instance is still considered orphan, warn.
+                      ; when (isOrphan orph) warn }}
        ; return inst }
 
 instOrphWarn :: ClsInst -> SDoc
