@@ -17,6 +17,6 @@ function onDomReady(callback: () => void) {
 onDomReady(() => {
   document.body.classList.add('js-enabled');
   styleMenu.init();
-  detailsHelper.init();
   quickJump.init();
+  detailsHelper.init();
 });

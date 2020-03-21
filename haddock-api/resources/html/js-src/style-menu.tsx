@@ -4,91 +4,14 @@ import {getCookie, setCookie, clearCookie} from "./cookies";
 import preact = require("preact");
 
 const { h, Component } = preact;
-const rspace = /\s\s+/g,
-    rtrim = /^\s+|\s+$/g;
 
-function spaced(s: string) { return (" " + s + " ").replace(rspace, " "); }
-function trim(s: string)   { return s.replace(rtrim, ""); }
-
-function hasClass(elem: Element, value: string) {
-  const className = spaced(elem.className || "");
-  return className.indexOf( " " + value + " " ) >= 0;
-}
-
-function addClass(elem: Element, value: string) {
-  const className = spaced(elem.className || "");
-  if ( className.indexOf( " " + value + " " ) < 0 ) {
-    elem.className = trim(className + " " + value);
-  }
-}
-
-function removeClass(elem: Element, value: string) {
-  let className = spaced(elem.className || "");
-  className = className.replace(" " + value + " ", " ");
-  elem.className = trim(className);
-}
-
-function toggleClass(elem: Element, valueOn: string, valueOff: string, bool?: boolean): boolean {
-  if (bool == null) { bool = ! hasClass(elem, valueOn); }
-  if (bool) {
-    removeClass(elem, valueOff);
-    addClass(elem, valueOn);
-  }
-  else {
-    removeClass(elem, valueOn);
-    addClass(elem, valueOff);
-  }
-  return bool;
-}
-
-function makeClassToggle(valueOn: string, valueOff: string): (elem: Element, bool?: boolean) => boolean {
-  return function(elem, bool) {
-    return toggleClass(elem, valueOn, valueOff, bool);
-  }
-}
-
-const toggleShow = makeClassToggle("show", "hide");
-
+// Get all of the styles that are available
 function styles(): HTMLLinkElement[] {
   const es = Array.prototype.slice.call(document.getElementsByTagName("link"));
   return es.filter((a: HTMLLinkElement) => a.rel.indexOf("style") != -1 && a.title);
 }
 
-class StyleMenuButton extends Component<any, any> {
-
-  render(props: { stys: string[] }) {
-    function action() {
-      styleMenu();
-      return false;
-    };
-
-    return <li><div id='style-menu-holder' onClick={action}>
-      <a href='#'>Style &#9662;</a>
-      <ul id='style-menu' class='hide'>
-        {props.stys.map((sty) => {
-              function action() {
-                setActiveStyleSheet(sty);
-                return false;
-              };
-
-              return <li><a href='#' onClick={action}>{sty}</a></li>;
-        })}
-      </ul>
-    </div></li>;
-  }
-
-}
-
-function addStyleMenu() {
-  const stys = styles().map((s) => s.title);
-  if (stys.length > 1) {
-    const pageMenu = document.querySelector('#page-menu') as HTMLUListElement;
-    const dummy = document.createElement('li');
-    pageMenu.appendChild(dummy);
-    preact.render(<StyleMenuButton stys={stys} title="Style"/>, pageMenu, dummy);
-  }
-}
-
+// Set a style (including setting the cookie)
 function setActiveStyleSheet(title: string) {
   const as = styles();
   let found: null | HTMLLinkElement = null;
@@ -110,17 +33,103 @@ function setActiveStyleSheet(title: string) {
   }
 }
 
+// Reset the style based on the cookie
 function resetStyle() {
   const s = getCookie("haddock-style");
   if (s) setActiveStyleSheet(s);
 }
 
-function styleMenu(show?: boolean) {
-  const m = document.getElementById('style-menu');
-  if (m) toggleShow(m, show);
+class StylesButton extends Component<any, any> {
+  render(props: { title: string, onClick: () => void }) {
+    function onClick(e: Event) {
+      e.preventDefault();
+      props.onClick();
+    }
+    return <li><a href="#" onClick={onClick}>{props.title}</a></li>;
+  }
 }
 
-export function init() {
-  addStyleMenu();
+// Add the style menu button
+function addStyleMenu(stys: string[], action: () => void) {
+  if (stys.length > 1) {
+    const pageMenu = document.querySelector('#page-menu') as HTMLUListElement;
+    const dummy = document.createElement('li');
+    pageMenu.appendChild(dummy);
+    preact.render(<StylesButton onClick={action} title="Styles"/>, pageMenu, dummy);
+  }
+}
+
+type StyleProps = {
+  styles: string[]
+  showHideTrigger: (action: () => void) => void
+}
+
+type StyleState = {
+  isVisible: boolean
+}
+
+// Represents the full style dropdown
+class Styles extends Component<StyleProps, StyleState> {
+
+  componentWillMount() {
+    document.addEventListener('mousedown', this.hide.bind(this));
+
+    document.addEventListener('keydown', (e) => {
+      if (this.state.isVisible) {
+        if (e.key === 'Escape') {
+          this.hide();
+        }
+      }
+    })
+  }
+
+  hide() {
+    this.setState({ isVisible: false });
+  }
+
+  show() {
+    if (!this.state.isVisible) {
+      this.setState({ isVisible: true });
+    }
+  }
+
+  toggleVisibility() {
+    if (this.state.isVisible) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  }
+
+  componentDidMount() {
+    this.props.showHideTrigger(this.toggleVisibility.bind(this));
+  }
+
+  render(props: StyleProps, state: StyleState) {
+    const stopPropagation = (e: Event) => { e.stopPropagation(); };
+
+    return <div id="style" class={state.isVisible ? '' : 'hidden'}>
+        <div id="style-menu" class="dropdown-menu" onMouseDown={stopPropagation}>
+          {
+            props.styles.map((sty) =>
+              <button type="button"
+                      onClick={(e) => { this.hide(); setActiveStyleSheet(sty) }}>
+                {sty}
+              </button>
+            )
+          }
+        </div>
+      </div>;
+  }
+}
+
+
+export function init(showHide?: (action: () => void) => void) {
+  const stys = styles().map((s) => s.title);
+  const addStylesButton = (action: () => void) => addStyleMenu(stys, action)
   resetStyle();
+  preact.render(
+    <Styles showHideTrigger={showHide || addStylesButton} styles={stys} />,
+    document.body
+  );
 }

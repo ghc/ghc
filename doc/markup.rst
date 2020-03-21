@@ -913,6 +913,16 @@ If ``M.T`` is not otherwise in scope, then Haddock will simply emit a
 link pointing to the entity ``T`` exported from module ``M`` (without
 checking to see whether either ``M`` or ``M.T`` exist).
 
+Since values and types live in different namespaces in Haskell, it is
+possible for a reference such as ``'X'`` to be ambiguous. In such a case,
+Haddock defaults to pointing to the type. The ambiguity can be overcome by explicitly specifying a namespace, by way of a ``v`` (for value) or ``t``
+(for type) immediately before the link: ::
+
+    -- | An implicit reference to  'X', the type constructor
+    --   An explicit reference to v'X', the data constructor
+    --   An explicit reference to t'X', the type constructor
+    data X = X
+
 To make life easier for documentation writers, a quoted identifier is
 only interpreted as such if the quotes surround a lexically valid
 Haskell identifier. This means, for example, that it normally isn't
@@ -922,14 +932,9 @@ necessary to escape the single quote when used as an apostrophe: ::
 
 Nothing special is needed to hyperlink identifiers which contain
 apostrophes themselves: to hyperlink ``foo'`` one would simply type
-``'foo''``. Hyperlinking operators works in exactly the same way.
+``'foo''``. Hyperlinking operators works in exactly the same way. ::
 
-Note that it is not possible to directly hyperlink an identifier in infix
-form or an operator in prefix form. The next best thing to do is to wrap
-the whole identifier in monospaced text and put the parentheses/backticks
-outside of the identifier, but inside the link: ::
-
-    -- | A prefix operator @('++')@ and an infix identifier @\``elem`\`@.
+    -- | A prefix operator @'(++)'@ and an infix identifier @'`elem`'@.
 
 Emphasis, Bold and Monospaced Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

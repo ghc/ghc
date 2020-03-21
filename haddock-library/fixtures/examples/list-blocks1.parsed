@@ -1,0 +1,12 @@
+DocUnorderedList
+  [DocAppend
+     (DocParagraph (DocString "Something about foo"))
+     (DocCodeBlock
+        (DocString
+           (concat ["foo :: a -> b -> c\n", "foo a b = bar c b\n"]))),
+   DocAppend
+     (DocParagraph (DocString "Something about bar"))
+     (DocCodeBlock
+        (DocString
+           (concat ["bar :: a -> b -> c\n", "bar a b = foo b a\n"]))),
+   DocParagraph (DocString "And then we continue")]

@@ -9,7 +9,7 @@ import qualified Data.ByteString as BS
 
 import BasicTypes          ( IntegralLit(..) )
 import DynFlags
-import ErrUtils            ( emptyMessages, pprLocErrMsg )
+import ErrUtils            ( pprLocErrMsg )
 import FastString          ( mkFastString )
 import Lexer               ( P(..), ParseResult(..), PState(..), Token(..)
                            , mkPStatePure, lexer, mkParserFlags', getErrorMessages, addFatalError )

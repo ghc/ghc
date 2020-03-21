@@ -1,1 +1,0 @@
-:set -isrc -ivendor/attoparsec-0.12.1.1 -itest -idist/build -idist/build/autogen -optP-include -optPdist/build/autogen/cabal_macros.h

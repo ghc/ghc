@@ -42,7 +42,7 @@ import GHC
 import DynFlags (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import OccName
-import Outputable
+import Outputable hiding ((<>))
 
 -----------------------------------------------------------------------------
 -- * Convenient synonyms
@@ -284,6 +284,12 @@ noDocForDecl = (Documentation Nothing Nothing, mempty)
 -- | Type of environment used to cross-reference identifiers in the syntax.
 type LinkEnv = Map Name Module
 
+-- | An 'RdrName' tagged with some type/value namespace information.
+data NsRdrName = NsRdrName
+  { namespace :: !Namespace
+  , rdrName :: !RdrName
+  }
+
 -- | Extends 'Name' with cross-reference information.
 data DocName
   = Documented Name Module
@@ -328,7 +334,30 @@ instance SetName DocName where
     setName name' (Documented _ mdl) = Documented name' mdl
     setName name' (Undocumented _) = Undocumented name'
 
+-- | Adds extra "wrapper" information to a name.
+--
+-- This is to work around the fact that most name types in GHC ('Name', 'RdrName',
+-- 'OccName', ...) don't include backticks or parens.
+data Wrap n
+  = Unadorned { unwrap :: n  }     -- ^ don't do anything to the name
+  | Parenthesized { unwrap :: n }  -- ^ add parentheses around the name
+  | Backticked { unwrap :: n }     -- ^ add backticks around the name
+  deriving (Show, Functor, Foldable, Traversable)
 
+-- | Useful for debugging
+instance Outputable n => Outputable (Wrap n) where
+  ppr (Unadorned n)     = ppr n
+  ppr (Parenthesized n) = hcat [ char '(', ppr n, char ')' ]
+  ppr (Backticked n)    = hcat [ char '`', ppr n, char '`' ]
+
+showWrapped :: (a -> String) -> Wrap a -> String
+showWrapped f (Unadorned n) = f n
+showWrapped f (Parenthesized n) = "(" ++ f n ++ ")"
+showWrapped f (Backticked n) = "`" ++ f n ++ "`"
+
+instance HasOccName DocName where
+
+    occName = occName . getName
 
 -----------------------------------------------------------------------------
 -- * Instances
@@ -423,10 +452,10 @@ instance NamedThing name => NamedThing (InstOrigin name) where
 
 type LDoc id = Located (Doc id)
 
-type Doc id = DocH (ModuleName, OccName) id
-type MDoc id = MetaDoc (ModuleName, OccName) id
+type Doc id = DocH (Wrap (ModuleName, OccName)) (Wrap id)
+type MDoc id = MetaDoc (Wrap (ModuleName, OccName)) (Wrap id)
 
-type DocMarkup id a = DocMarkupH (ModuleName, OccName) id a
+type DocMarkup id a = DocMarkupH (Wrap (ModuleName, OccName)) id a
 
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where

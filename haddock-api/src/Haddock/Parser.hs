@@ -15,26 +15,32 @@ module Haddock.Parser ( parseParas
 
 import qualified Documentation.Haddock.Parser as P
 import Documentation.Haddock.Types
+import Haddock.Types
 
 import DynFlags     ( DynFlags )
 import FastString   ( fsLit )
 import Lexer        ( mkPState, unP, ParseResult(POk) )
 import Parser       ( parseIdentifier )
-import RdrName      ( RdrName )
-import SrcLoc       ( mkRealSrcLoc, unLoc )
+import SrcLoc       ( mkRealSrcLoc, GenLocated(..) )
 import StringBuffer ( stringToStringBuffer )
 
-parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod RdrName
+
+parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod (Wrap NsRdrName)
 parseParas d p = overDoc (P.overIdentifier (parseIdent d)) . P.parseParas p
 
-parseString :: DynFlags -> String -> DocH mod RdrName
+parseString :: DynFlags -> String -> DocH mod (Wrap NsRdrName)
 parseString d = P.overIdentifier (parseIdent d) . P.parseString
 
-parseIdent :: DynFlags -> String -> Maybe RdrName
-parseIdent dflags str0 =
-  let buffer = stringToStringBuffer str0
+parseIdent :: DynFlags -> Namespace -> String -> Maybe (Wrap NsRdrName)
+parseIdent dflags ns str0 =
+  let buffer = stringToStringBuffer str1
       realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
       pstate = mkPState dflags buffer realSrcLc
+      (wrap,str1) = case str0 of
+                      '(' : s@(c : _) | c /= ',', c /= ')'  -- rule out tuple names
+                                      -> (Parenthesized, init s)
+                      '`' : s@(_ : _) -> (Backticked,    init s)
+                      _               -> (Unadorned,     str0)
   in case unP parseIdentifier pstate of
-    POk _ name -> Just (unLoc name)
+    POk _ (L _ name) -> Just (wrap (NsRdrName ns name))
     _ -> Nothing

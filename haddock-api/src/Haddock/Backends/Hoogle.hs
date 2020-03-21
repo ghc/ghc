@@ -254,13 +254,14 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        tyVarArg (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
-        tyVarArg (KindedTyVar _ n lty) = HsKindSig noExtField (reL (HsTyVar noExtField NotPromoted n)) lty
-        tyVarArg _ = panic "ppCtor"
+        resType = let c  = HsTyVar noExtField NotPromoted (reL (tcdName dat))
+                      as = map (tyVarBndr2Type . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
+                  in apps (map reL (c : as))
 
-        resType = apps $ map reL $
-                        (HsTyVar noExtField NotPromoted (reL (tcdName dat))) :
-                        map (tyVarArg . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
+        tyVarBndr2Type :: HsTyVarBndr GhcRn -> HsType GhcRn
+        tyVarBndr2Type (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
+        tyVarBndr2Type (KindedTyVar _ n k) = HsKindSig noExtField (reL (HsTyVar noExtField NotPromoted n)) k
+        tyVarBndr2Type (XTyVarBndr _) = panic "haddock:ppCtor"
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
@@ -325,7 +326,7 @@ markupTag dflags = Markup {
   markupString               = str,
   markupAppend               = (++),
   markupIdentifier           = box (TagInline "a") . str . out dflags,
-  markupIdentifierUnchecked  = box (TagInline "a") . str . out dflags . snd,
+  markupIdentifierUnchecked  = box (TagInline "a") . str . showWrapped (out dflags . snd),
   markupModule               = box (TagInline "a") . str,
   markupWarning              = box (TagInline "i"),
   markupEmphasis             = box (TagInline "i"),

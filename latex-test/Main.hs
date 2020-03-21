@@ -19,7 +19,9 @@ checkConfig = CheckConfig
 
 
 dirConfig :: DirConfig
-dirConfig = defaultDirConfig $ takeDirectory __FILE__
+dirConfig = (defaultDirConfig $ takeDirectory __FILE__)
+  { dcfgCheckIgnore = (`elem` ["haddock.sty", "main.tex"]) . takeFileName
+  }
 
 
 main :: IO ()

@@ -38,7 +38,8 @@ import Var       ( VarBndr(..), TyVarBinder, tyVarKind, updateTyVarKind,
                    isInvisibleArgFlag )
 import VarSet    ( VarSet, emptyVarSet )
 import VarEnv    ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
-import TyCoRep   ( Type(..), isRuntimeRepVar )
+import TyCoRep   ( Type(..) )
+import Type      ( isRuntimeRepVar )
 import TysWiredIn( liftedRepDataConTyCon )
 
 import           StringBuffer ( StringBuffer )
@@ -260,6 +261,8 @@ getGADTConTypeG (XConDecl nec) = noExtCon nec
 data Precedence
   = PREC_TOP  -- ^ precedence of 'type' production in GHC's parser
 
+  | PREC_SIG  -- ^ explicit type signature
+
   | PREC_CTX  -- ^ Used for single contexts, eg. ctx => type
               -- (as opposed to (ctx1, ctx2) => type)
 
@@ -286,18 +289,21 @@ reparenTypePrec = go
   go _ (HsBangTy x b ty)     = HsBangTy x b (reparenLType ty)
   go _ (HsTupleTy x con tys) = HsTupleTy x con (map reparenLType tys)
   go _ (HsSumTy x tys)       = HsSumTy x (map reparenLType tys)
-  go _ (HsKindSig x ty kind) = HsKindSig x (reparenLType ty) (reparenLType kind)
   go _ (HsListTy x ty)       = HsListTy x (reparenLType ty)
   go _ (HsRecTy x flds)      = HsRecTy x (map (fmap reparenConDeclField) flds)
   go p (HsDocTy x ty d)      = HsDocTy x (goL p ty) d
   go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
   go _ (HsExplicitTupleTy x tys) = HsExplicitTupleTy x (map reparenLType tys)
+  go p (HsKindSig x ty kind)
+    = paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) (goL PREC_SIG kind)
   go p (HsIParamTy x n ty)
-    = paren p PREC_CTX $ HsIParamTy x n (reparenLType ty)
+    = paren p PREC_SIG $ HsIParamTy x n (reparenLType ty)
   go p (HsForAllTy x fvf tvs ty)
     = paren p PREC_CTX $ HsForAllTy x fvf (map (fmap reparenTyVar) tvs) (reparenLType ty)
   go p (HsQualTy x ctxt ty)
-    = paren p PREC_FUN $ HsQualTy x (fmap (map reparenLType) ctxt) (reparenLType ty)
+    = let p' [_] = PREC_CTX
+          p' _   = PREC_TOP -- parens will get added anyways later...
+      in paren p PREC_CTX $ HsQualTy x (fmap (\xs -> map (goL (p' xs)) xs) ctxt) (goL PREC_TOP ty)
   go p (HsFunTy x ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)

@@ -171,18 +171,18 @@ flatten x = [x]
 -- extract/append the underlying 'Doc' and convert it to 'Html'. For
 -- 'CollapsingHeader', we attach extra info to the generated 'Html'
 -- that allows us to expand/collapse the content.
-hackMarkup :: DocMarkup id Html -> Maybe Package -> Hack (ModuleName, OccName) id -> Html
+hackMarkup :: DocMarkup id Html -> Maybe Package -> Hack (Wrap (ModuleName, OccName)) id -> Html
 hackMarkup fmt' currPkg h' =
   let (html, ms) = hackMarkup' fmt' h'
   in html +++ renderMeta fmt' currPkg (metaConcat ms)
   where
-    hackMarkup' :: DocMarkup id Html -> Hack (ModuleName, OccName) id
+    hackMarkup' :: DocMarkup id Html -> Hack (Wrap (ModuleName, OccName)) id
                 -> (Html, [Meta])
     hackMarkup' fmt h = case h of
       UntouchedDoc d -> (markup fmt $ _doc d, [_meta d])
       CollapsingHeader (Header lvl titl) par n nm ->
         let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
-            col' = collapseControl id_ "caption"
+            col' = collapseControl id_ "subheading"
             summary = thesummary ! [ theclass "hide-when-js-enabled" ] << "Expand"
             instTable contents = collapseDetails id_ DetailsClosed (summary +++ contents)
             lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
@@ -206,7 +206,7 @@ renderMeta _ _ _ = noHtml
 -- | Goes through 'hackMarkup' to generate the 'Html' rather than
 -- skipping straight to 'markup': this allows us to employ XHtml
 -- specific hacks to the tree first.
-markupHacked :: DocMarkup id Html
+markupHacked :: DocMarkup (Wrap id) Html
              -> Maybe Package      -- this package
              -> Maybe String
              -> MDoc id
@@ -220,7 +220,7 @@ docToHtml :: Maybe String  -- ^ Name of the thing this doc is for. See
           -> Maybe Package -- ^ Current package
           -> Qualification -> MDoc DocName -> Html
 docToHtml n pkg qual = markupHacked fmt pkg n . cleanup
-  where fmt = parHtmlMarkup qual True (ppDocName qual Raw)
+  where fmt = parHtmlMarkup qual True (ppWrappedDocName qual Raw)
 
 -- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
 -- in links. This is used to generate the Contents box elements.
@@ -228,16 +228,16 @@ docToHtmlNoAnchors :: Maybe String  -- ^ See 'toHack'
                    -> Maybe Package -- ^ Current package
                    -> Qualification -> MDoc DocName -> Html
 docToHtmlNoAnchors n pkg qual = markupHacked fmt pkg n . cleanup
-  where fmt = parHtmlMarkup qual False (ppDocName qual Raw)
+  where fmt = parHtmlMarkup qual False (ppWrappedDocName qual Raw)
 
 origDocToHtml :: Maybe Package -> Qualification -> MDoc Name -> Html
 origDocToHtml pkg qual = markupHacked fmt pkg Nothing . cleanup
-  where fmt = parHtmlMarkup qual True (const $ ppName Raw)
+  where fmt = parHtmlMarkup qual True (const (ppWrappedName Raw))
 
 
 rdrDocToHtml :: Maybe Package -> Qualification -> MDoc RdrName -> Html
 rdrDocToHtml pkg qual = markupHacked fmt pkg Nothing . cleanup
-  where fmt = parHtmlMarkup qual True (const ppRdrName)
+  where fmt = parHtmlMarkup qual True (const (ppRdrName . unwrap))
 
 
 docElement :: (Html -> Html) -> Html -> Html
@@ -273,7 +273,7 @@ cleanup = overDoc (markup fmtUnParagraphLists)
     unParagraph (DocParagraph d) = d
     unParagraph doc              = doc
 
-    fmtUnParagraphLists :: DocMarkup a (Doc a)
+    fmtUnParagraphLists :: DocMarkup (Wrap a) (Doc a)
     fmtUnParagraphLists = idMarkup {
       markupUnorderedList = DocUnorderedList . map unParagraph,
       markupOrderedList   = DocOrderedList   . map unParagraph

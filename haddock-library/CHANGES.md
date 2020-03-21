@@ -1,3 +1,7 @@
+## Changes in version 1.8.0.1
+
+ * Fix build-time regression for `base < 4.7` (#1119)
+
 ## Changes in version 1.8.0
 
  * Support inline markup in markdown-style links (#875)

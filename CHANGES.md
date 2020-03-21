@@ -1,6 +1,6 @@
-## Changes in TBA
+## Changes in 2.23.0
 
- * NewOcean is the new default theme (#721, #782, #949)
+ * "Linuwial" is the new default theme (#721, #782, #949)
 
  * Fix style switcher (enabled by `--built-in-themes`) (#949)
 
@@ -11,6 +11,25 @@
 
  * The hyperlinker backend lexer is now more incremental, faster, and
    more memory efficient (#977)
+
+ * Add an "Instances" menu item to the HTML backend for controlling
+   settings related to expanding/collapsing instances (#1007)
+
+ * Improved identifier links including value/type namespaces, and
+   hyperlinking of parenthesized/backticked identifiers
+
+ * Substantial bugfixes for converting `TyThing` back into source
+   declarations (#1003, #1005, #1022, #1020)
+
+ * `--show-interface` now outputs to stdout (instead of stderr)
+
+ * Render associated type defaults and also improve rendering of
+   default method signatures
+
+ * Many fixes to the LaTeX backend, mostly focused on not crashing
+   as well as generating LaTeX source that compiles
+
+ * More flexible parsing of the module header
 
 ## Changes in version 2.22.0
 

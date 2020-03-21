@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
@@ -11,12 +12,12 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
-import Control.Monad (mplus)
+import Control.Applicative (Alternative (..))
+import Control.Monad (ap)
 import Data.Char
 import DynFlags
 import Haddock.Parser
 import Haddock.Types
-import RdrName
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers
@@ -24,37 +25,47 @@ import RdrName
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo RdrName, MDoc RdrName)
+parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
 parseModuleHeader dflags pkgName str0 =
    let
-      getKey :: String -> String -> (Maybe String,String)
-      getKey key str = case parseKey key str of
-         Nothing -> (Nothing,str)
-         Just (value,rest) -> (Just value,rest)
+      kvs :: [(String, String)]
+      str1 :: String
 
-      (_moduleOpt,str1) = getKey "Module" str0
-      (descriptionOpt,str2) = getKey "Description" str1
-      (copyrightOpt,str3) = getKey "Copyright" str2
-      (licenseOpt,str4) = getKey "License" str3
-      (licenceOpt,str5) = getKey "Licence" str4
-      (spdxLicenceOpt,str6) = getKey "SPDX-License-Identifier" str5
-      (maintainerOpt,str7) = getKey "Maintainer" str6
-      (stabilityOpt,str8) = getKey "Stability" str7
-      (portabilityOpt,str9) = getKey "Portability" str8
+      (kvs, str1) = maybe ([], str0) id $ runP fields str0
+
+      -- trim whitespaces
+      trim :: String -> String
+      trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
+
+      getKey :: String -> Maybe String
+      getKey key = fmap trim (lookup key kvs)
+
+      descriptionOpt = getKey "Description"
+      copyrightOpt   = getKey "Copyright"
+      licenseOpt     = getKey "License"
+      licenceOpt     = getKey "Licence"
+      spdxLicenceOpt = getKey "SPDX-License-Identifier"
+      maintainerOpt  = getKey "Maintainer"
+      stabilityOpt   = getKey "Stability"
+      portabilityOpt = getKey "Portability"
 
    in (HaddockModInfo {
           hmi_description = parseString dflags <$> descriptionOpt,
           hmi_copyright = copyrightOpt,
-          hmi_license = spdxLicenceOpt `mplus` licenseOpt `mplus` licenceOpt,
+          hmi_license = spdxLicenceOpt <|> licenseOpt <|> licenceOpt,
           hmi_maintainer = maintainerOpt,
           hmi_stability = stabilityOpt,
           hmi_portability = portabilityOpt,
           hmi_safety = Nothing,
           hmi_language = Nothing, -- set in LexParseRn
           hmi_extensions = [] -- also set in LexParseRn
-          }, parseParas dflags pkgName str9)
+          }, parseParas dflags pkgName str1)
 
--- | This function is how we read keys.
+-------------------------------------------------------------------------------
+-- Small parser to parse module header.
+-------------------------------------------------------------------------------
+
+-- | The below is a small parser framework how we read keys.
 --
 -- all fields in the header are optional and have the form
 --
@@ -73,78 +84,105 @@ parseModuleHeader dflags pkgName str0 =
 --
 -- the value will be "this is a .. description" and the rest will begin
 -- at "The module comment".
-parseKey :: String -> String -> Maybe (String,String)
-parseKey key toParse0 =
-   do
-      let
-         (spaces0,toParse1) = extractLeadingSpaces (dropWhile (`elem` ['\r', '\n']) toParse0)
 
-         indentation = spaces0
-      afterKey0 <- extractPrefix key toParse1
-      let
-         afterKey1 = extractLeadingSpaces afterKey0
-      afterColon0 <- case snd afterKey1 of
-         ':':afterColon -> return afterColon
-         _ -> Nothing
-      let
-         (_,afterColon1) = extractLeadingSpaces afterColon0
+-- | 'C' is a 'Char' carrying its column.
+--
+-- This let us make an indentation-aware parser, as we know current indentation.
+-- by looking at the next character in the stream ('curInd').
+--
+-- Thus we can munch all spaces but only not-spaces which are indented.
+--
+data C = C {-# UNPACK #-} !Int Char
 
-      return (scanKey True indentation afterColon1)
-   where
-      scanKey :: Bool -> String -> String -> (String,String)
-      scanKey _       _           [] = ([],[])
-      scanKey isFirst indentation str =
-         let
-            (nextLine,rest1) = extractNextLine str
+newtype P a = P { unP :: [C] -> Maybe ([C], a) }
+  deriving Functor
 
-            accept = isFirst || sufficientIndentation || allSpaces
+instance Applicative P where
+    pure x = P $ \s -> Just (s, x)
+    (<*>)  = ap
 
-            sufficientIndentation = case extractPrefix indentation nextLine of
-               Just (c:_) | isSpace c -> True
-               _ -> False
+instance Monad P where
+    return = pure
+    m >>= k = P $ \s0 -> do
+        (s1, x) <- unP m s0
+        unP (k x) s1
 
-            allSpaces = case extractLeadingSpaces nextLine of
-               (_,[]) -> True
-               _ -> False
-         in
-            if accept
-               then
-                  let
-                     (scanned1,rest2) = scanKey False indentation rest1
+instance Alternative P where
+    empty   = P $ \_ -> Nothing
+    a <|> b = P $ \s -> unP a s <|> unP b s
 
-                     scanned2 = case scanned1 of
-                        "" -> if allSpaces then "" else nextLine
-                        _ -> nextLine ++ "\n" ++ scanned1
-                  in
-                     (scanned2,rest2)
-               else
-                  ([],str)
+runP :: P a -> String -> Maybe a
+runP p input = fmap snd (unP p input')
+  where
+    input' = concat
+        [ zipWith C [0..] l ++ [C (length l) '\n']
+        | l <- lines input
+        ]
 
-      extractLeadingSpaces :: String -> (String,String)
-      extractLeadingSpaces [] = ([],[])
-      extractLeadingSpaces (s@(c:cs))
-         | isSpace c =
-            let
-               (spaces1,cs1) = extractLeadingSpaces cs
-            in
-               (c:spaces1,cs1)
-         | otherwise = ([],s)
+-------------------------------------------------------------------------------
+--
+-------------------------------------------------------------------------------
 
-      extractNextLine :: String -> (String,String)
-      extractNextLine [] = ([],[])
-      extractNextLine (c:cs)
-         | c == '\n' =
-            ([],cs)
-         | otherwise =
-            let
-               (line,rest) = extractNextLine cs
-            in
-               (c:line,rest)
+curInd :: P Int
+curInd = P $ \s -> Just . (,) s $ case s of
+    []        -> 0
+    C i _ : _ -> i
 
-      -- comparison is case-insensitive.
-      extractPrefix :: String -> String -> Maybe String
-      extractPrefix [] s = Just s
-      extractPrefix _ [] = Nothing
-      extractPrefix (c1:cs1) (c2:cs2)
-         | toUpper c1 == toUpper c2 = extractPrefix cs1 cs2
-         | otherwise = Nothing
+rest :: P String
+rest = P $ \cs -> Just ([], [ c | C _ c <- cs ])
+
+munch :: (Int -> Char -> Bool) -> P String
+munch p = P $ \cs ->
+    let (xs,ys) = takeWhileMaybe p' cs in Just (ys, xs)
+  where
+    p' (C i c)
+        | p i c  = Just c
+        | otherwise = Nothing
+
+munch1 :: (Int -> Char -> Bool) -> P String
+munch1 p = P $ \s -> case s of
+    [] -> Nothing
+    (c:cs) | Just c' <- p' c -> let (xs,ys) = takeWhileMaybe p' cs in Just (ys, c' : xs)
+           | otherwise -> Nothing
+  where
+    p' (C i c)
+        | p i c  = Just c
+        | otherwise = Nothing
+
+char :: Char -> P Char
+char c = P $ \s -> case s of
+    []                        -> Nothing
+    (C _ c' : cs) | c == c'   -> Just (cs, c)
+                  | otherwise -> Nothing
+
+skipSpaces :: P ()
+skipSpaces = P $ \cs -> Just (dropWhile (\(C _ c) -> isSpace c) cs, ())
+
+takeWhileMaybe :: (a -> Maybe b) -> [a] -> ([b], [a])
+takeWhileMaybe f = go where
+    go xs0@[] = ([], xs0)
+    go xs0@(x:xs) = case f x of
+        Just y  -> let (ys, zs) = go xs in (y : ys, zs)
+        Nothing -> ([], xs0)
+
+-------------------------------------------------------------------------------
+-- Fields
+-------------------------------------------------------------------------------
+
+field :: Int -> P (String, String)
+field i = do
+    fn <- munch1 $ \_ c -> isAlpha c || c == '-'
+    skipSpaces
+    _ <- char ':'
+    skipSpaces
+    val <- munch $ \j c -> isSpace c || j > i
+    return (fn, val)
+
+fields :: P ([(String, String)], String)
+fields = do
+    skipSpaces
+    i  <- curInd
+    fs <- many (field i)
+    r  <- rest
+    return (fs, r)
+

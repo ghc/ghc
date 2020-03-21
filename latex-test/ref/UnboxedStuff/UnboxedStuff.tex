@@ -3,34 +3,34 @@
 \haddockbeginheader
 {\haddockverb\begin{verbatim}
 module UnboxedStuff (
-    X,  Y,  Z,  unboxedUnit,  unboxedTuple,  unboxedSum
+    X, Y, Z, unboxedUnit, unboxedTuple, unboxedSum
   ) where\end{verbatim}}
 \haddockendheader
 
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-data\ X
+data X
 \end{tabular}]
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-data\ Y
+data Y
 \end{tabular}]
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-data\ Z
+data Z
 \end{tabular}]
 \end{haddockdesc}
 \section{Unboxed type constructors}
 \begin{haddockdesc}
-\item[
-unboxedUnit\ ::\ ({\char '43}\ {\char '43})\ ->\ ({\char '43}\ {\char '43})
-]
-\item[
-unboxedTuple\ ::\ ({\char '43}\ X,\ Y\ {\char '43})\ ->\ ({\char '43}\ X,\ Y,\ Z\ {\char '43})
-]
-\item[
-unboxedSum\ ::\ ({\char '43}\ X\ |\ Y\ {\char '43})\ ->\ ({\char '43}\ X\ |\ Y\ |\ Z\ {\char '43})
-]
+\item[\begin{tabular}{@{}l}
+unboxedUnit :: ({\char '43} {\char '43}) -> ({\char '43} {\char '43})
+\end{tabular}]
+\item[\begin{tabular}{@{}l}
+unboxedTuple :: ({\char '43} X, Y {\char '43}) -> ({\char '43} X, Y, Z {\char '43})
+\end{tabular}]
+\item[\begin{tabular}{@{}l}
+unboxedSum :: ({\char '43} X | Y {\char '43}) -> ({\char '43} X | Y | Z {\char '43})
+\end{tabular}]
 \end{haddockdesc}

@@ -19,9 +19,9 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import Avail
 import Control.Arrow
 import Control.Monad
+import Data.Functor (($>))
 import Data.List
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
@@ -34,8 +34,8 @@ import Haddock.Types
 import Name
 import Outputable ( showPpr, showSDoc )
 import RdrName
+import RdrHsSyn (setRdrNameSpace)
 import EnumSet
-import RnEnv (dataTcOccs)
 
 processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
@@ -89,24 +89,38 @@ processModuleHeader dflags pkgName gre safety mayStr = do
 -- fallbacks in case we can't locate the identifiers.
 --
 -- See the comments in the source for implementation commentary.
-rename :: DynFlags -> GlobalRdrEnv -> Doc RdrName -> ErrMsgM (Doc Name)
+rename :: DynFlags -> GlobalRdrEnv -> Doc NsRdrName -> ErrMsgM (Doc Name)
 rename dflags gre = rn
   where
     rn d = case d of
       DocAppend a b -> DocAppend <$> rn a <*> rn b
       DocParagraph doc -> DocParagraph <$> rn doc
-      DocIdentifier x -> do
+      DocIdentifier i -> do
+        let NsRdrName ns x = unwrap i
+            occ = rdrNameOcc x
+            isValueName = isDataOcc occ || isVarOcc occ
+
+        let valueNsChoices | isValueName = [x]
+                           | otherwise   = [] -- is this ever possible?
+            typeNsChoices  | isValueName = [setRdrNameSpace x tcName]
+                           | otherwise   = [x]
+
         -- Generate the choices for the possible kind of thing this
-        -- is.
-        let choices = dataTcOccs x
+        -- is. We narrow down the possibilities with the namespace (if
+        -- there is one).
+        let choices = case ns of
+                        Value -> valueNsChoices
+                        Type  -> typeNsChoices
+                        None  -> valueNsChoices ++ typeNsChoices
 
         -- Lookup any GlobalRdrElts that match the choices.
         case concatMap (\c -> lookupGRE_RdrName c gre) choices of
           -- We found no names in the env so we start guessing.
           [] ->
             case choices of
-              -- This shouldn't happen as 'dataTcOccs' always returns at least its input.
-              [] -> pure (DocMonospaced (DocString (showPpr dflags x)))
+              -- The only way this can happen is if a value namespace was
+              -- specified on something that cannot be a value.
+              [] -> invalidValue dflags i
 
               -- There was nothing in the environment so we need to
               -- pick some default from what's available to us. We
@@ -116,14 +130,14 @@ rename dflags gre = rn
               -- type constructor names (such as in #253). So now we
               -- only get type constructor links if they are actually
               -- in scope.
-              a:_ -> outOfScope dflags a
+              a:_ -> outOfScope dflags ns (i $> a)
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure (DocIdentifier (gre_name a))
+          [a] -> pure (DocIdentifier (i $> gre_name a))
 
           -- There are multiple names available.
-          gres -> ambiguous dflags x gres
+          gres -> ambiguous dflags i gres
 
       DocWarning doc -> DocWarning <$> rn doc
       DocEmphasis doc -> DocEmphasis <$> rn doc
@@ -155,19 +169,25 @@ rename dflags gre = rn
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.
-outOfScope :: DynFlags -> RdrName -> ErrMsgM (Doc a)
-outOfScope dflags x =
-  case x of
-    Unqual occ -> warnAndMonospace occ
-    Qual mdl occ -> pure (DocIdentifierUnchecked (mdl, occ))
-    Orig _ occ -> warnAndMonospace occ
-    Exact name -> warnAndMonospace name  -- Shouldn't happen since x is out of scope
+outOfScope :: DynFlags -> Namespace -> Wrap RdrName -> ErrMsgM (Doc a)
+outOfScope dflags ns x =
+  case unwrap x of
+    Unqual occ -> warnAndMonospace (x $> occ)
+    Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
+    Orig _ occ -> warnAndMonospace (x $> occ)
+    Exact name -> warnAndMonospace (x $> name)  -- Shouldn't happen since x is out of scope
   where
+    prefix = case ns of
+               Value -> "the value "
+               Type -> "the type "
+               None -> ""
+
     warnAndMonospace a = do
-      tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope.\n" ++
+      let a' = showWrapped (showPpr dflags) a
+      tell ["Warning: " ++ prefix ++ "'" ++ a' ++ "' is out of scope.\n" ++
             "    If you qualify the identifier, haddock can try to link it anyway."]
-      pure (monospaced a)
-    monospaced a = DocMonospaced (DocString (showPpr dflags a))
+      pure (monospaced a')
+    monospaced = DocMonospaced . DocString
 
 -- | Handle ambiguous identifiers.
 --
@@ -175,26 +195,39 @@ outOfScope dflags x =
 --
 -- Emits a warning if the 'GlobalRdrElts's don't belong to the same type or class.
 ambiguous :: DynFlags
-          -> RdrName
+          -> Wrap NsRdrName
           -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
           -> ErrMsgM (Doc Name)
 ambiguous dflags x gres = do
-  let noChildren = map availName (gresToAvailInfo gres)
-      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
-      msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map gre_name gres) ++
+  let dflt = maximumBy (comparing (gre_lcl &&& isTyConName . gre_name)) gres
+      msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") gres ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
-            "    by hiding some imports.\n" ++
-            "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt
+            "    by specifying the type/value namespace explicitly.\n" ++
+            "    Defaulting to the one defined " ++ defnLoc dflt
   -- TODO: Once we have a syntax for namespace qualification (#667) we may also
   -- want to emit a warning when an identifier is a data constructor for a type
   -- of the same name, but not the only constructor.
   -- For example, for @data D = C | D@, someone may want to reference the @D@
   -- constructor.
-  when (length noChildren > 1) $ tell [msg]
-  pure (DocIdentifier dflt)
+  when (length (gresToAvailInfo gres) > 1) $ tell [msg]
+  pure (DocIdentifier (x $> gre_name dflt))
   where
-    isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
-    isLocalName _ = False
-    x_str = '\'' : showPpr dflags x ++ "'"
-    defnLoc = showSDoc dflags . pprNameDefnLoc
+    defnLoc = showSDoc dflags . pprNameDefnLoc . gre_name
+
+-- | Handle value-namespaced names that cannot be for values.
+--
+-- Emits a warning that the value-namespace is invalid on a non-value identifier.
+invalidValue :: DynFlags -> Wrap NsRdrName -> ErrMsgM (Doc a)
+invalidValue dflags x = do
+  tell ["Warning: " ++ showNsRdrName dflags x ++ " cannot be value, yet it is\n" ++
+            "    namespaced as such. Did you mean to specify a type namespace\n" ++
+            "    instead?"]
+  pure (DocMonospaced (DocString (showNsRdrName dflags x)))
+
+-- | Printable representation of a wrapped and namespaced name
+showNsRdrName :: DynFlags -> Wrap NsRdrName -> String
+showNsRdrName dflags = (\p i -> p ++ "'" ++ i ++ "'") <$> prefix <*> ident
+  where
+    ident = showWrapped (showPpr dflags . rdrName)
+    prefix = renderNs . namespace . unwrap
