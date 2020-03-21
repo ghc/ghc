@@ -679,7 +679,7 @@ class Functor f => Applicative f where
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 --
--- | Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
+-- Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
 -- @do@ expression
 --
 --
