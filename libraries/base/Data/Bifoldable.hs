@@ -66,6 +66,15 @@ import GHC.Generics (K1(..))
 -- > instance Bifoldable (,) where
 -- >   bifoldr f g z (a, b) = f a (g b z)
 --
+-- Some examples below also use the following BiList to showcase empty
+-- Bifoldable behaviors when relevant ('Either' and '(,)' containing always exactly
+-- resp. 1 and 2 elements):
+-- 
+-- > data BiList a b = BiList [a] [b]
+-- >
+-- > instance Bifoldable BiList where 
+-- >   bifoldr f g z (BiList as bs) = foldr f (foldr g z bs) as
+--
 -- A minimal 'Bifoldable' definition consists of either 'bifoldMap' or
 -- 'bifoldr'. When defining more than this minimal set, one should ensure
 -- that the following identities hold:
@@ -92,9 +101,20 @@ import GHC.Generics (K1(..))
 class Bifoldable p where
   {-# MINIMAL bifoldr | bifoldMap #-}
 
-  -- | Combines the elements of a structure using a monoid.
+  -- | Combines the elements of a structure using a monoid, when both types are the same.
   --
   -- @'bifold' ≡ 'bifoldMap' 'id' 'id'@
+  --
+  -- >>> bifold (Right [1, 2, 3])
+  -- [1,2,3]
+  -- >>> bifold (Left [5, 6])
+  -- [5,6]
+  -- >>> bifold ([1, 2, 3], [4, 5])
+  -- [1,2,3,4,5]
+  -- >>> bifold (Product 6, Product 7)
+  -- Product {getProduct = 42}
+  -- >>> bifold (Sum 6, Sum 7)
+  -- Sum {getSum = 13}
   --
   -- @since 4.10.0.0
   bifold :: Monoid m => p m m -> m
@@ -103,8 +123,14 @@ class Bifoldable p where
   -- | Combines the elements of a structure, given ways of mapping them to a
   -- common monoid.
   --
-  -- @'bifoldMap' f g
-  --     ≡ 'bifoldr' ('mappend' . f) ('mappend' . g) 'mempty'@
+  -- @'bifoldMap' f g ≡ 'bifoldr' ('mappend' . f) ('mappend' . g) 'mempty'@
+  --
+  -- >>> bifoldMap (take 3) (fmap digitToInt) ([1..], "89")
+  -- [1,2,3,8,9]
+  -- >>> bifoldMap (take 3) (fmap digitToInt) (Left [1..])
+  -- [1,2,3]
+  -- >>> bifoldMap (take 3) (fmap digitToInt) (Right "89")
+  -- [8,9]
   --
   -- @since 4.10.0.0
   bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> p a b -> m
@@ -116,6 +142,15 @@ class Bifoldable p where
   -- would hold:
   --
   -- @'bifoldr' f g z ≡ 'foldr' ('either' f g) z . toEitherList@
+  --
+  -- >>> bifoldr (+) (*) 3 (5, 7)
+  -- 26 -- 5 + (7 * 3)
+  -- >>> bifoldr (+) (*) 3 (7, 5)
+  -- 22 -- 7 + (5 * 3)
+  -- >>> bifoldr (+) (*) 3 (Right 5)
+  -- 15 -- 5 * 3
+  -- >>> bifoldr (+) (*) 3 (Left 5)
+  -- 8 -- 5 + 3
   --
   -- @since 4.10.0.0
   bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> p a b -> c
@@ -132,6 +167,15 @@ class Bifoldable p where
   -- 'bifoldl'' instead of 'bifoldl'. The reason is that the latter does not
   -- force the "inner" results, resulting in a thunk chain which then must be
   -- evaluated from the outside-in.
+  --
+  -- >>> bifoldl (+) (*) 3 (5, 7)
+  -- 56 -- (5 + 3) * 7
+  -- >>> bifoldl (+) (*) 3 (7, 5)
+  -- 50 -- (7 + 3) * 5
+  -- >>> bifoldl (+) (*) 3 (Right 5)
+  -- 15 -- 5 * 3
+  -- >>> bifoldl (+) (*) 3 (Left 5)
+  -- 8 -- 5 + 3
   --
   -- @since 4.10.0.0
   bifoldl :: (c -> a -> c) -> (c -> b -> c) -> c -> p a b -> c
@@ -187,6 +231,21 @@ bifoldr' f g z0 xs = bifoldl f' g' id xs z0 where
 -- | A variant of 'bifoldr' that has no base case,
 -- and thus may only be applied to non-empty structures.
 --
+-- >>> bifoldr1 (*) (5, 7)
+-- 35
+-- >>> bifoldr1 (+) (5, 7)
+-- 12
+-- >>> bifoldr1 (+) (Right 7)
+-- 7
+-- >>> bifoldr1 (+) (Left 5)
+-- 5
+-- >>> bifoldr1 (+) (BiList [1, 2] [3, 4])
+-- 10 -- 1 + (2 + (3 + 4))
+-- >>> bifoldr1 (+) (BiList [1, 2] [])
+-- 3
+-- >>> bifoldr1 (+) (BiList [] [])
+-- Exception: bifoldr1: empty structure
+--
 -- @since 4.10.0.0
 bifoldr1 :: Bifoldable t => (a -> a -> a) -> t a a -> a
 bifoldr1 f xs = fromMaybe (error "bifoldr1: empty structure")
@@ -222,6 +281,21 @@ bifoldl' f g z0 xs = bifoldr f' g' id xs z0 where
 -- | A variant of 'bifoldl' that has no base case,
 -- and thus may only be applied to non-empty structures.
 --
+-- >>> bifoldl1 (*) (5, 7)
+-- 35
+-- >>> bifoldl1 (+) (5, 7)
+-- 12
+-- >>> bifoldl1 (+) (Right 7)
+-- 7
+-- >>> bifoldl1 (+) (Left 5)
+-- 5
+-- >>> bifoldl1 (+) (BiList [1, 2] [3, 4])
+-- 10 -- ((1 + 2) + 3) + 4
+-- >>> bifoldl1 (+) (BiList [1, 2] [])
+-- 3
+-- >>> bifoldl1 (+) (BiList [] [])
+-- Exception: bifoldl1: empty structure
+--
 -- @since 4.10.0.0
 bifoldl1 :: Bifoldable t => (a -> a -> a) -> t a a -> a
 bifoldl1 f xs = fromMaybe (error "bifoldl1: empty structure")
@@ -232,6 +306,17 @@ bifoldl1 f xs = fromMaybe (error "bifoldl1: empty structure")
                       Just x  -> f x y)
 
 -- | Left associative monadic bifold over a structure.
+--
+-- >>> bifoldlM (\a b -> print b >> pure a) (\a c -> print (show c) >> pure a) 42 ("Hello", True)
+-- "Hello"
+-- "True"
+-- 42
+-- >>> bifoldlM (\a b -> print b >> pure a) (\a c -> print (show c) >> pure a) 42 (Right True)
+-- "True"
+-- 42
+-- >>> bifoldlM (\a b -> print b >> pure a) (\a c -> print (show c) >> pure a) 42 (Left "Hello")
+-- "Hello"
+-- 42
 --
 -- @since 4.10.0.0
 bifoldlM :: (Bifoldable t, Monad m)
@@ -244,6 +329,14 @@ bifoldlM f g z0 xs = bifoldr f' g' return xs z0 where
 -- actions from left to right, and ignore the results. For a version that
 -- doesn't ignore the results, see 'Data.Bitraversable.bitraverse'.
 --
+-- >>> bitraverse_ print (print . show) ("Hello", True)
+-- "Hello"
+-- "True"
+-- >>> bitraverse_ print (print . show) (Right True)
+-- "True"
+-- >>> bitraverse_ print (print . show) (Left "Hello")
+-- "Hello"
+--
 -- @since 4.10.0.0
 bitraverse_ :: (Bifoldable t, Applicative f)
             => (a -> f c) -> (b -> f d) -> t a b -> f ()
@@ -252,9 +345,13 @@ bitraverse_ f g = bifoldr ((*>) . f) ((*>) . g) (pure ())
 -- | As 'bitraverse_', but with the structure as the primary argument. For a
 -- version that doesn't ignore the results, see 'Data.Bitraversable.bifor'.
 --
--- >>> > bifor_ ('a', "bc") print (print . reverse)
--- 'a'
--- "cb"
+-- >>> bifor_ ("Hello", True) print (print . show)
+-- "Hello"
+-- "True"
+-- >>> bifor_ (Right True) print (print . show)
+-- "True"
+-- >>> bifor_ (Left "Hello") print (print . show)
+-- "Hello"
 --
 -- @since 4.10.0.0
 bifor_ :: (Bifoldable t, Applicative f)
@@ -285,11 +382,28 @@ bisequenceA_ = bisequence_
 -- results. For a version that doesn't ignore the results, see
 -- 'Data.Bitraversable.bisequence'.
 --
+-- >>> bisequence_ (print "Hello", print "World")
+-- "Hello"
+-- "World"
+-- >>> bisequence_ (Left (print "Hello"))
+-- "Hello"
+-- >>> bisequence_ (Right (print "World"))
+-- "World"
+--
 -- @since 4.10.0.0
 bisequence_ :: (Bifoldable t, Applicative f) => t (f a) (f b) -> f ()
 bisequence_ = bifoldr (*>) (*>) (pure ())
 
 -- | The sum of a collection of actions, generalizing 'biconcat'.
+--
+-- >>> biasum (Nothing, Nothing)
+-- Nothing
+-- >>> biasum (Nothing, Just 42)
+-- Just 42
+-- >>> biasum (Just 18, Nothing)
+-- Just 18
+-- >>> biasum (Just 18, Just 42)
+-- Just 18
 --
 -- @since 4.10.0.0
 biasum :: (Bifoldable t, Alternative f) => t (f a) (f a) -> f a
@@ -303,11 +417,23 @@ bimsum = biasum
 
 -- | Collects the list of elements of a structure, from left to right.
 --
+-- >>> biList (18, 42)
+-- [18,42]
+-- >>> biList (Left 18)
+-- [18]
+-- 
 -- @since 4.10.0.0
 biList :: Bifoldable t => t a a -> [a]
 biList = bifoldr (:) (:) []
 
 -- | Test whether the structure is empty.
+--
+-- >>> binull (18, 42)
+-- False
+-- >>> binull (Right 42)
+-- False
+-- >>> binull (BiList [] [])
+-- True
 --
 -- @since 4.10.0.0
 binull :: Bifoldable t => t a b -> Bool
@@ -315,11 +441,35 @@ binull = bifoldr (\_ _ -> False) (\_ _ -> False) True
 
 -- | Returns the size/length of a finite structure as an 'Int'.
 --
+-- >>> bilength (True, 42)
+-- 2
+-- >>> bilength (Right 42)
+-- 1
+-- >>> bilength (BiList [1,2,3] [4,5])
+-- 5
+-- >>> bilength (BiList [] [])
+-- 0
+-- >>> bilength (BiList [1..] [])
+-- * Hangs forever *
+--
 -- @since 4.10.0.0
 bilength :: Bifoldable t => t a b -> Int
 bilength = bifoldl' (\c _ -> c+1) (\c _ -> c+1) 0
 
 -- | Does the element occur in the structure?
+--
+-- >>> bielem 42 (17, 42)
+-- True
+-- >>> bielem 42 (17, 43)
+-- False
+-- >>> bielem 42 (Left 42)
+-- True
+-- >>> bielem 42 (Right 13)
+-- False
+-- >>> bielem 42 (BiList [1..5] [1..100])
+-- True
+-- >>> bielem 42 (BiList [1..5] [1..41])
+-- False
 --
 -- @since 4.10.0.0
 bielem :: (Bifoldable t, Eq a) => a -> t a a -> Bool
@@ -327,11 +477,29 @@ bielem x = biany (== x) (== x)
 
 -- | Reduces a structure of lists to the concatenation of those lists.
 --
+-- >>> biconcat ([1, 2, 3], [4, 5])
+-- [1,2,3,4,5]
+-- >>> biconcat (Left [1, 2, 3])
+-- [1,2,3]
+-- >>> biconcat (BiList [[1, 2, 3, 4, 5], [6, 7, 8]] [[9]])
+-- [1,2,3,4,5,6,7,8,9]
+--
 -- @since 4.10.0.0
 biconcat :: Bifoldable t => t [a] [a] -> [a]
 biconcat = bifold
 
 -- | The largest element of a non-empty structure.
+--
+-- >>> bimaximum (42, 17)
+-- 42
+-- >>> bimaximum (Right 42)
+-- 42
+-- >>> bimaximum (BiList [13, 29, 4] [18, 1, 7])
+-- 29
+-- >>> bimaximum (BiList [13, 29, 4] [])
+-- 29
+-- >>> bimaximum (BiList [] [])
+-- Exception: bimaximum: empty structure
 --
 -- @since 4.10.0.0
 bimaximum :: forall t a. (Bifoldable t, Ord a) => t a a -> a
@@ -341,6 +509,17 @@ bimaximum = fromMaybe (error "bimaximum: empty structure") .
 
 -- | The least element of a non-empty structure.
 --
+-- >>> biminimum (42, 17)
+-- 17
+-- >>> biminimum (Right 42)
+-- 42
+-- >>> biminimum (BiList [13, 29, 4] [18, 1, 7])
+-- 1
+-- >>> biminimum (BiList [13, 29, 4] [])
+-- 4
+-- >>> biminimum (BiList [] [])
+-- Exception: biminimum: empty structure
+--
 -- @since 4.10.0.0
 biminimum :: forall t a. (Bifoldable t, Ord a) => t a a -> a
 biminimum = fromMaybe (error "biminimum: empty structure") .
@@ -348,6 +527,17 @@ biminimum = fromMaybe (error "biminimum: empty structure") .
   where mj = Min #. (Just :: a -> Maybe a)
 
 -- | The 'bisum' function computes the sum of the numbers of a structure.
+--
+-- >>> bisum (42, 17)
+-- 59
+-- >>> bisum (Right 42)
+-- 42
+-- >>> bisum (BiList [13, 29, 4] [18, 1, 7])
+-- 1
+-- >>> bisum (BiList [13, 29, 4] [])
+-- 4
+-- >>> bisum (BiList [] [])
+-- Exception: bisum: empty structure
 --
 -- @since 4.10.0.0
 bisum :: (Bifoldable t, Num a) => t a a -> a
