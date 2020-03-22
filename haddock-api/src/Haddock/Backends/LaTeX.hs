@@ -38,7 +38,7 @@ import System.FilePath
 import Data.Char
 import Control.Monad
 import Data.Maybe
-import Data.List
+import Data.List            ( sort )
 import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)
@@ -516,12 +516,6 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     gadtEnd = hcat (replicate (if unicode then 3 else 4) (char ' ')) <> char '}'
     gadtOpen = char '{'
 
-
-ppForAllSeparator :: Bool -> ForallVisFlag -> LaTeX
-ppForAllSeparator unicode fvf =
-  case fvf of
-    ForallVis   -> text "\\ " <> arrow unicode
-    ForallInvis -> dot
 
 ppTypeSig :: [Name] -> HsType DocNameI  -> Bool -> LaTeX
 ppTypeSig nms ty unicode =
@@ -1062,7 +1056,6 @@ ppForAllPart unicode tvs fvf = hsep (forallSymbol unicode : tvs') <> fv
     fv = case fvf of
            ForallVis   -> text "\\ " <> arrow unicode
            ForallInvis -> dot
-
 
 ppr_mono_lty :: LHsType DocNameI -> Bool -> LaTeX
 ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode

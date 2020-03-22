@@ -22,7 +22,7 @@ module Haddock.Interface.LexParseRn
 import Control.Arrow
 import Control.Monad
 import Data.Functor (($>))
-import Data.List
+import Data.List (maximumBy, (\\))
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
 import DynFlags (languageExtensions)

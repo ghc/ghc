@@ -87,6 +87,7 @@ executable haddock
       transformers
 
     other-modules:
+      CompatPrelude
       Documentation.Haddock.Parser
       Documentation.Haddock.Parser.Monad
       Documentation.Haddock.Parser.Identifier

@@ -27,10 +27,9 @@ import Haddock.Utils hiding (out)
 
 import GHC
 import Outputable
-import NameSet
 
 import Data.Char
-import Data.List
+import Data.List (isPrefixOf, intercalate)
 import Data.Maybe
 import Data.Version
 

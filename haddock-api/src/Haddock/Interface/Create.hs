@@ -32,7 +32,7 @@ import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.Map as M
 import Data.Map (Map)
-import Data.List
+import Data.List (find, foldl', sortBy)
 import Data.Maybe
 import Data.Ord
 import Control.Applicative

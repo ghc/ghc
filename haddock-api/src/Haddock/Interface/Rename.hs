@@ -22,14 +22,12 @@ import Haddock.Types
 import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
-import Outputable ( panic )
 import RdrName (RdrName(Exact))
 import TysWiredIn (eqTyCon_RDR)
 
 import Control.Applicative
 import Control.Arrow ( first )
 import Control.Monad hiding (mapM)
-import Data.List
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
 

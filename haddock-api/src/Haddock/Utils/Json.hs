@@ -19,7 +19,7 @@ import Data.Char
 import Data.Int
 import Data.String
 import Data.Word
-import Data.List
+import Data.List (intersperse)
 import Data.Monoid
 
 import Data.ByteString.Builder (Builder)

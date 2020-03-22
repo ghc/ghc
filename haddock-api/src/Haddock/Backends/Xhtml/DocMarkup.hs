@@ -19,7 +19,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docElement, docSection, docSection_,
 ) where
 
-import Data.List
+import Data.List (intersperse)
 import Documentation.Haddock.Markup
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils

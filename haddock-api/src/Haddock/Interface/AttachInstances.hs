@@ -21,7 +21,7 @@ import Haddock.GhcUtils
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
-import Data.List
+import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map

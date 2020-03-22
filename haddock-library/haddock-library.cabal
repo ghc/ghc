@@ -59,22 +59,20 @@ test-suite spec
   type:             exitcode-stdio-1.0
   main-is:          Spec.hs
   hs-source-dirs:
-      test
-      src
-
-  cpp-options:
-      -DTEST
+    test
+    src
 
   other-modules:
-      Documentation.Haddock.Doc
-      Documentation.Haddock.Markup
-      Documentation.Haddock.Parser
-      Documentation.Haddock.Parser.Monad
-      Documentation.Haddock.Parser.Util
-      Documentation.Haddock.Parser.UtilSpec
-      Documentation.Haddock.ParserSpec
-      Documentation.Haddock.Types
-      Documentation.Haddock.Parser.Identifier
+    CompatPrelude
+    Documentation.Haddock.Doc
+    Documentation.Haddock.Markup
+    Documentation.Haddock.Parser
+    Documentation.Haddock.Parser.Monad
+    Documentation.Haddock.Parser.Util
+    Documentation.Haddock.Parser.UtilSpec
+    Documentation.Haddock.ParserSpec
+    Documentation.Haddock.Types
+    Documentation.Haddock.Parser.Identifier
 
   build-depends:
     , base-compat  ^>= 0.9.3 || ^>= 0.11.0

@@ -44,7 +44,7 @@ import Haddock.Utils
 
 import Control.Monad
 import Control.Exception (evaluate)
-import Data.List
+import Data.List (foldl', isPrefixOf, nub)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.Printf

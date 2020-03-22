@@ -65,7 +65,6 @@ import BasicTypes ( PromotionFlag(..) )
 import Exception (ExceptionMonad)
 import GHC
 import Name
-import Outputable ( panic )
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )

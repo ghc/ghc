@@ -36,7 +36,6 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 
 import BasicTypes (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..))
-import qualified GHC
 import GHC.Exts
 import Name
 import BooleanFormula
