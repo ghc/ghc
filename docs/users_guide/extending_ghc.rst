@@ -749,6 +749,33 @@ NOT be invoked with your own modules.
 In the ``ModIface`` datatype you can find lots of useful information, including
 the exported definitions and type class instances.
 
+The ``ModIface`` datatype also contains facilities for extending it with extra
+data, stored in a ``Map`` of serialised fields, indexed by field names and using
+GHC's internal ``Binary`` class. The interface to work with these fields is:
+
+::
+
+    readIfaceField :: Binary a => FieldName -> ModIface -> IO (Maybe a)
+    writeIfaceField :: Binary a => FieldName -> a -> ModIface -> IO ModIface
+    deleteIfaceField :: FieldName -> ModIface -> ModIface
+
+The ``FieldName`` is open-ended, but typically it should contain the producing
+package name, along with the actual field name. Then, the version number can either
+be attached to the serialised data for that field, or in cases where multiple versions
+of a field could exist in the same interface file, included in the field name.
+
+Depending on if the field version advances with the package version, or independently,
+the version can be attached to either the package name or the field name. Examples of
+each case:
+
+::
+
+    package/field
+    ghc-n.n.n/core
+    package/field-n
+
+To read an interface file from an external tool without linking to GHC, the format
+is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
