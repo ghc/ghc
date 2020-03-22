@@ -278,4 +278,4 @@ test('T16737',
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
 
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])
-test('T17786', [unless(opsys('mingw32'), skip), exit_code(1)], makefile_test, [])
+test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])
