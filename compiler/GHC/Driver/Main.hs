@@ -425,7 +425,7 @@ extract_renamed_stuff mod_summary tc_result = do
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
-        liftIO $ dumpIfSet_dyn dflags Opt_D_dump_hie "HIE AST" (ppr $ hie_asts hieFile)
+        liftIO $ dumpIfSet_dyn dflags Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
