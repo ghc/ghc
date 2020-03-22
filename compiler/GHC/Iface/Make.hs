@@ -268,7 +268,8 @@ mkIface_ hsc_env
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
-          mi_final_exts  = () }
+          mi_final_exts  = (),
+          mi_ext_fields  = emptyExtensibleFields }
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,

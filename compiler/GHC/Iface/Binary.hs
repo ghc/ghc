@@ -148,7 +148,15 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
-    getWithUserData ncu bh
+
+    extFields_p <- get bh
+
+    mod_iface <- getWithUserData ncu bh
+
+    seekBin bh extFields_p
+    extFields <- get bh
+
+    return mod_iface{mi_ext_fields = extFields}
 
 
 -- | This performs a get action after reading the dictionary and symbol
@@ -200,8 +208,16 @@ writeBinIface dflags hi_path mod_iface = do
     let way_descr = getWayDescr dflags
     put_  bh way_descr
 
+    extFields_p_p <- tellBin bh
+    put_ bh extFields_p_p
 
     putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+
+    extFields_p <- tellBin bh
+    putAt bh extFields_p_p extFields_p
+    seekBin bh extFields_p
+    put_ bh (mi_ext_fields mod_iface)
+
     -- And send the result to the file
     writeBinMem bh hi_path
 
