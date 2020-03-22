@@ -92,9 +92,20 @@ import GHC.Generics (K1(..))
 class Bifoldable p where
   {-# MINIMAL bifoldr | bifoldMap #-}
 
-  -- | Combines the elements of a structure using a monoid.
+  -- | Combines the elements of a structure using a monoid, when both types are the same.
   --
   -- @'bifold' ≡ 'bifoldMap' 'id' 'id'@
+  --
+  -- >>> bifold (Right [1, 2, 3])
+  -- [1,2,3]
+  -- >>> bifold (Left [5, 6])
+  -- [5,6]
+  -- >>> bifold ([1, 2, 3], [4, 5])
+  -- [1,2,3,4,5]
+  -- >>> bifold (Product 6, Product 7)
+  -- Product {getProduct = 42}
+  -- >>> bifold (Sum 6, Sum 7)
+  -- Sum {getSum = 13}
   --
   -- @since 4.10.0.0
   bifold :: Monoid m => p m m -> m
@@ -103,8 +114,14 @@ class Bifoldable p where
   -- | Combines the elements of a structure, given ways of mapping them to a
   -- common monoid.
   --
-  -- @'bifoldMap' f g
-  --     ≡ 'bifoldr' ('mappend' . f) ('mappend' . g) 'mempty'@
+  -- @'bifoldMap' f g ≡ 'bifoldr' ('mappend' . f) ('mappend' . g) 'mempty'@
+  --
+  -- >>> bifoldMap (take 3) (fmap digitToInt) ([1..], "89")
+  -- [1,2,3,8,9]
+  -- >>> bifoldMap (take 3) (fmap digitToInt) (Left [1..])
+  -- [1,2,3]
+  -- >>> bifoldMap (take 3) (fmap digitToInt) (Right "89")
+  -- [8,9]
   --
   -- @since 4.10.0.0
   bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> p a b -> m
@@ -116,6 +133,15 @@ class Bifoldable p where
   -- would hold:
   --
   -- @'bifoldr' f g z ≡ 'foldr' ('either' f g) z . toEitherList@
+  --
+  -- >>> bifoldr (+) (*) 3 (5, 7)
+  -- 26 -- 5 + (7 * 3)
+  -- >>> bifoldr (+) (*) 3 (7, 5)
+  -- 22 -- 7 + (5 * 3)
+  -- >>> bifoldr (+) (*) 3 (Right 5)
+  -- 15 -- 5 * 3
+  -- >>> bifoldr (+) (*) 3 (Left 5)
+  -- 8 -- 5 + 3
   --
   -- @since 4.10.0.0
   bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> p a b -> c
@@ -133,6 +159,15 @@ class Bifoldable p where
   -- force the "inner" results, resulting in a thunk chain which then must be
   -- evaluated from the outside-in.
   --
+  --
+  -- >>> bifoldl (+) (*) 3 (5, 7)
+  -- 56 -- (5 + 3) * 7
+  -- >>> bifoldl (+) (*) 3 (7, 5)
+  -- 50 -- (7 + 3) * 5
+  -- >>> bifoldl (+) (*) 3 (Right 5)
+  -- 15 -- 5 * 3
+  -- >>> bifoldl (+) (*) 3 (Left 5)
+  -- 8 -- 5 + 3
   -- @since 4.10.0.0
   bifoldl :: (c -> a -> c) -> (c -> b -> c) -> c -> p a b -> c
   bifoldl f g z t = appEndo (getDual (bifoldMap (Dual . Endo . flip f)
@@ -187,6 +222,15 @@ bifoldr' f g z0 xs = bifoldl f' g' id xs z0 where
 -- | A variant of 'bifoldr' that has no base case,
 -- and thus may only be applied to non-empty structures.
 --
+-- >>> bifoldr1 (*) (5, 7)
+-- 35
+-- >>> bifoldr1 (+) (7, 5)
+-- 12
+-- >>> bifoldr1 (*) (Right 5)
+-- 5
+-- >>> bifoldr1 (+) (*) 3 (Left 5)
+-- 8 -- 5 + 3
+--
 -- @since 4.10.0.0
 bifoldr1 :: Bifoldable t => (a -> a -> a) -> t a a -> a
 bifoldr1 f xs = fromMaybe (error "bifoldr1: empty structure")
@@ -221,6 +265,22 @@ bifoldl' f g z0 xs = bifoldr f' g' id xs z0 where
 
 -- | A variant of 'bifoldl' that has no base case,
 -- and thus may only be applied to non-empty structures.
+--
+-- >>> bifoldr1 (*) (5, 7)
+-- 35
+-- >>> bifoldr1 (*) (Left 42)
+-- 42
+--
+-- Since 'Either' and '(,)' are never empty, let's create a double list:
+--
+-- >>> data BiList a b = BiList [a] [b]
+-- >>> instance Bifoldable BiList where bifoldr f g z (BiList as bs) = foldr f (foldr g z bs) as
+-- >>> bifoldr (*) (+) 5 (BiList [1,2] [3,4])
+-- 24 -- 1 * 2 * (3 + 4 + 5)
+-- >>> bifoldr1 (+) (BiList [] [3])
+-- 3
+-- >>> bifoldr1 (+) (BiList [] [])
+-- Exception: bifoldr1: empty structure
 --
 -- @since 4.10.0.0
 bifoldl1 :: Bifoldable t => (a -> a -> a) -> t a a -> a
