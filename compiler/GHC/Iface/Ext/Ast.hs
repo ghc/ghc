@@ -505,21 +505,6 @@ instance HasRealDataConName GhcTc where
   getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
     L sp (setVarName var (conLikeName con))
 
-{- Note [Real DataCon Name]
-The typechecker subtitutes the conLikeWrapId for the name, but we don't want
-this showing up in the hieFile, so we replace the name in the Id with the
-original datacon name
-See also Note [Data Constructor Naming]
--}
-class HasRealDataConName p where
-  getRealDataCon :: XRecordCon p -> Located (IdP p) -> Located (IdP p)
-
-instance HasRealDataConName GhcRn where
-  getRealDataCon _ n = n
-instance HasRealDataConName GhcTc where
-  getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
-    L sp (setVarName var (conLikeName con))
-
 -- | The main worker class
 -- See Note [Updating HieAst for changes in the GHC AST] for more information
 -- on how to add/modify instances for this.
