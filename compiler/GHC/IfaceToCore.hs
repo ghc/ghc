@@ -894,7 +894,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
     univ_tvs :: [TyVar]
-    univ_tvs = binderVars (tyConTyVarBinders tc_tybinders)
+    univ_tvs = binderVars tc_tybinders
 
     tag_map :: NameEnv ConTag
     tag_map = mkTyConTagMap tycon
@@ -1771,14 +1771,14 @@ bindIfaceBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 -----------------------
-bindIfaceForAllBndrs :: [IfaceForAllBndr] -> ([TyCoVarBinder] -> IfL a) -> IfL a
+bindIfaceForAllBndrs :: [VarBndr IfaceBndr vis] -> ([VarBndr TyCoVar vis] -> IfL a) -> IfL a
 bindIfaceForAllBndrs [] thing_inside = thing_inside []
 bindIfaceForAllBndrs (bndr:bndrs) thing_inside
   = bindIfaceForAllBndr bndr $ \tv vis ->
     bindIfaceForAllBndrs bndrs $ \bndrs' ->
-    thing_inside (mkTyCoVarBinder vis tv : bndrs')
+    thing_inside (Bndr tv vis : bndrs')
 
-bindIfaceForAllBndr :: IfaceForAllBndr -> (TyCoVar -> ArgFlag -> IfL a) -> IfL a
+bindIfaceForAllBndr :: (VarBndr IfaceBndr vis) -> (TyCoVar -> vis -> IfL a) -> IfL a
 bindIfaceForAllBndr (Bndr (IfaceTvBndr tv) vis) thing_inside
   = bindIfaceTyVar tv $ \tv' -> thing_inside tv' vis
 bindIfaceForAllBndr (Bndr (IfaceIdBndr tv) vis) thing_inside
