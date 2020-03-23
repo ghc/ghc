@@ -219,7 +219,7 @@ matchNameMaker ctxt = LamMk report_unused
                       _                     -> True
 
 rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
+rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx Nothing sig)
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)

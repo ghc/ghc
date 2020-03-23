@@ -907,7 +907,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
        ; (binders, theta') <- chooseInferredQuantifiers inferred_theta
                                 (tyCoVarsOfType mono_ty') qtvs mb_sig_inst
 
-       ; let inferred_poly_ty = mkForAllTys binders (mkPhiTy theta' mono_ty')
+       ; let inferred_poly_ty = mkInvisForAllTys binders (mkPhiTy theta' mono_ty')
 
        ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr theta'
                                           , ppr inferred_poly_ty])
@@ -926,13 +926,13 @@ chooseInferredQuantifiers :: TcThetaType   -- inferred
                           -> TcTyVarSet    -- tvs free in tau type
                           -> [TcTyVar]     -- inferred quantified tvs
                           -> Maybe TcIdSigInst
-                          -> TcM ([TyVarBinder], TcThetaType)
+                          -> TcM ([InvisTVBinder], TcThetaType)
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
   = -- No type signature (partial or complete) for this binder,
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  #7916
              my_theta = pickCapturedPreds free_tvs inferred_theta
-             binders  = [ mkTyVarBinder Inferred tv
+             binders  = [ mkTyVarBinder InferredSpec tv
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
        ; return (binders, my_theta) }
@@ -943,7 +943,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                       , sig_inst_theta = annotated_theta
                                       , sig_inst_skols = annotated_tvs }))
   = -- Choose quantifiers for a partial type signature
-    do { psig_qtv_prs <- zonkTyVarTyVarPairs annotated_tvs
+    do { psig_qtvbndr_prs <- zonkTyVarTyVarPairs annotated_tvs
+       ; let psig_qtv_prs = mapSnd binderVar psig_qtvbndr_prs
 
             -- Check whether the quantified variables of the
             -- partial signature have been unified together
@@ -957,7 +958,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
        ; mapM_ report_mono_sig_tv_err [ n | (n,tv) <- psig_qtv_prs
                                           , not (tv `elem` qtvs) ]
 
-       ; let psig_qtvs = mkVarSet (map snd psig_qtv_prs)
+       ; let psig_qtvbndrs = map snd psig_qtvbndr_prs
+             psig_qtvs     = mkVarSet (map snd psig_qtv_prs)
 
        ; annotated_theta      <- zonkTcTypes annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
@@ -966,8 +968,9 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
              final_qtvs = [ mkTyVarBinder vis tv
                           | tv <- qtvs -- Pulling from qtvs maintains original order
                           , tv `elemVarSet` keep_me
-                          , let vis | tv `elemVarSet` psig_qtvs = Specified
-                                    | otherwise                 = Inferred ]
+                          , let vis = case lookupVarBndr tv psig_qtvbndrs of
+                                  Just spec -> spec
+                                  Nothing   -> InferredSpec ]
 
        ; return (final_qtvs, my_theta) }
   where
@@ -1447,7 +1450,7 @@ tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
   = tcExtendNameTyVarEnv wcs $
-    tcExtendNameTyVarEnv skol_prs $
+    tcExtendNameTyVarEnv (mapSnd binderVar skol_prs) $
     thing_inside
 
 tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
