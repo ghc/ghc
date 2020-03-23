@@ -1,0 +1,6 @@
+
+ExplicitSpecificity6.hs:8:1: error:
+    An instance head cannot contain inferred type variables
+
+ExplicitSpecificity6.hs:9:3: error:
+    A SPECIALISE signature cannot contain inferred type variables

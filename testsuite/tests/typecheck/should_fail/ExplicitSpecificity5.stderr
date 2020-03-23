@@ -1,0 +1,3 @@
+
+ExplicitSpecificity5.hs:7:1: error:
+    An instance head cannot contain inferred type variables

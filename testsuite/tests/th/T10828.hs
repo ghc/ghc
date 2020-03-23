@@ -31,7 +31,7 @@ $( do { decl <- [d| data family D a :: Type -> Type
 
 $( return
    [ DataD [] (mkName "T")
-           [ PlainTV (mkName "a") ]
+           [ PlainTV (mkName "a") () ]
            (Just StarT)
            [ GadtC [(mkName "MkT")]
                    [ ( Bang NoSourceUnpackedness NoSourceStrictness
@@ -43,7 +43,7 @@ $( return
                    ]
                    (AppT (ConT (mkName "T"))
                          (VarT (mkName "a")))
-           , ForallC [PlainTV (mkName "a"), PlainTV (mkName "b")]
+           , ForallC [PlainTV (mkName "a") SpecifiedSpec, PlainTV (mkName "b") SpecifiedSpec]
                      [AppT (AppT EqualityT (VarT $ mkName "a"  ) )
                                            (ConT $ mkName "Int") ] $
              RecGadtC [(mkName "MkC")]
