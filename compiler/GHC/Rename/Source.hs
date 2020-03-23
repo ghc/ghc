@@ -1059,8 +1059,8 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
 
-bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr GhcPs]
-               -> (Maybe [LHsTyVarBndr GhcRn]  -> RnM (b, FreeVars))
+bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr () GhcPs]
+               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
                -> RnM (b, FreeVars)
 bindRuleTyVars doc in_doc (Just bndrs) thing_inside
   = bindLHsTyVarBndrs doc (Just in_doc) Nothing bndrs (thing_inside . Just)
@@ -2103,7 +2103,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_forall  = L _ explicit_forall
-                            , con_qvars   = qtvs
+                            , con_qvars   = explicit_tkvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
                             , con_res_ty  = res_ty
@@ -2112,8 +2112,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; new_names <- mapM lookupLocatedTopBndrRn names
         ; mb_doc'   <- rnMbLHsDoc mb_doc
 
-        ; let explicit_tkvs = hsQTvExplicit qtvs
-              theta         = hsConDeclTheta mcxt
+        ; let theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
 
           -- We must ensure that we extract the free tkvs in left-to-right
@@ -2144,12 +2143,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                       -- See Note [GADT abstract syntax] in GHC.Hs.Decls
                                       (PrefixCon arg_tys, final_res_ty)
 
-              new_qtvs =  HsQTvs { hsq_ext = implicit_tkvs
-                                 , hsq_explicit  = explicit_tkvs }
-
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
-        ; return (decl { con_g_ext = noExtField, con_names = new_names
-                       , con_qvars = new_qtvs, con_mb_cxt = new_cxt
+        ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
+                       , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
                   all_fvs) } }

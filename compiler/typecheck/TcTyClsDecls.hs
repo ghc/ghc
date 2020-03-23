@@ -1373,8 +1373,8 @@ get_fam_decl_initial_kind mb_parent_tycon
                , fdInfo      = info }
   = kcDeclHeader InitialKindInfer name flav ktvs $
     case resultSig of
-      KindSig _ ki                          -> TheKind <$> tcLHsKindSig ctxt ki
-      TyVarSig _ (L _ (KindedTyVar _ _ ki)) -> TheKind <$> tcLHsKindSig ctxt ki
+      KindSig _ ki                            -> TheKind <$> tcLHsKindSig ctxt ki
+      TyVarSig _ (L _ (KindedTyVar _ _ _ ki)) -> TheKind <$> tcLHsKindSig ctxt ki
       _ -- open type families have * return kind by default
         | tcFlavourIsOpen flav              -> return (TheKind liftedTypeKind)
                -- closed type families have their return kind inferred
@@ -1614,10 +1614,8 @@ kcConDecl new_or_data res_kind (ConDeclH98
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
-    { con_names = names, con_qvars = qtvs, con_mb_cxt = cxt
-    , con_args = args, con_res_ty = res_ty })
-  | HsQTvs { hsq_ext = implicit_tkv_nms
-           , hsq_explicit = explicit_tkv_nms } <- qtvs
+    { con_names = names, con_qvars = explicit_tkv_nms, con_mb_cxt = cxt
+    , con_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
   = -- Even though the GADT-style data constructor's type is closed,
     -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
@@ -1634,7 +1632,6 @@ kcConDecl new_or_data res_kind (ConDeclGADT
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
-kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _) = noExtCon nec
 kcConDecl _ _ (XConDecl nec) = noExtCon nec
 
 {- Note [kcConDecls result kind]
@@ -2881,10 +2878,10 @@ a very similar design when generalising over the type of a rewrite rule.
 
 --------------------------
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
-                   -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
-                   -> HsTyPats GhcRn                  -- Patterns
-                   -> LHsType GhcRn                   -- RHS
-                   -> TcM ([TyVar], [TcType], TcType)      -- (tyvars, pats, rhs)
+                   -> [Name] -> [LHsTyVarBndr () GhcRn] -- Implicit and explicicit binder
+                   -> HsTyPats GhcRn                    -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ([TyVar], [TcType], TcType)   -- (tyvars, pats, rhs)
 -- Used only for type families, not data families
 tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
   = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc)
@@ -3143,7 +3140,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts))
+       ; (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts))
            <- pushTcLevelM_                             $
               solveEqualities                           $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
@@ -3155,12 +3152,14 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
 
+       ; let tmpl_tvs = binderVars tmpl_bndrs
+
          -- exp_tvs have explicit, user-written binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- kindGeneralizeAll (mkSpecForAllTys (binderVars tmpl_bndrs) $
-                                   mkSpecForAllTys exp_tvs $
+       ; kvs <- kindGeneralizeAll (mkSpecForAllTys tmpl_tvs $
+                                   mkInvisForAllTys exp_tvbndrs $
                                    mkPhiTy ctxt $
                                    mkVisFunTys arg_tys $
                                    unitTy)
@@ -3172,20 +3171,21 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  -- quantify over, and this type is fine for that purpose.
 
              -- Zonk to Types
-       ; (ze, qkvs)      <- zonkTyBndrs kvs
-       ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
-       ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
-       ; ctxt            <- zonkTcTypesToTypesX ze ctxt
+       ; (ze, qkvs)          <- zonkTyBndrs kvs
+       ; (ze, user_qtvbndrs) <- zonkTyVarBindersX ze exp_tvbndrs
+       ; let user_qtvs       = binderVars user_qtvbndrs
+       ; arg_tys             <- zonkTcTypesToTypesX ze arg_tys
+       ; ctxt                <- zonkTcTypesToTypesX ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
 
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
        ; let
-           univ_tvbs = tyConTyVarBinders tmpl_bndrs
+           univ_tvbs = tyConInvisTVBinders tmpl_bndrs
            univ_tvs  = binderVars univ_tvbs
-           ex_tvbs   = mkTyVarBinders Inferred qkvs ++
-                       mkTyVarBinders Specified user_qtvs
+           ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++
+                       user_qtvbndrs
            ex_tvs    = qkvs ++ user_qtvs
            -- For H98 datatypes, the user-written tyvar binders are precisely
            -- the universals followed by the existentials.
@@ -3211,17 +3211,16 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
   -- the res_kind by typechecking the result type.
-          (ConDeclGADT { con_names = names
-                       , con_qvars = qtvs
+          (ConDeclGADT { con_g_ext = implicit_tkv_nms
+                       , con_names = names
+                       , con_qvars = explicit_tkv_nms
                        , con_mb_cxt = cxt, con_args = hs_args
                        , con_res_ty = hs_res_ty })
-  | HsQTvs { hsq_ext = implicit_tkv_nms
-           , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
-       ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
+       ; (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
                                   -- want an error cascade
@@ -3244,32 +3243,26 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
        ; imp_tvs <- zonkAndScopedSort imp_tvs
-       ; let user_tvs = imp_tvs ++ exp_tvs
 
-       ; tkvs <- kindGeneralizeAll (mkSpecForAllTys user_tvs $
+       ; tkvs <- kindGeneralizeAll (mkSpecForAllTys imp_tvs $
+                                    mkInvisForAllTys exp_tvbndrs $
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
 
+       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
+                     ++ (mkTyVarBinders SpecifiedSpec imp_tvs)
+                     ++ exp_tvbndrs
+
              -- Zonk to Types
-       ; (ze, tkvs)     <- zonkTyBndrs tkvs
-       ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
-       ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
-       ; ctxt    <- zonkTcTypesToTypesX ze ctxt
-       ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
+       ; (ze, tvbndrs) <- zonkTyVarBinders       tvbndrs
+       ; arg_tys       <- zonkTcTypesToTypesX ze arg_tys
+       ; ctxt          <- zonkTcTypesToTypesX ze ctxt
+       ; res_ty        <- zonkTcTypeToTypeX   ze res_ty
 
-       ; let (univ_tvs, ex_tvs, tkvs', user_tvs', eq_preds, arg_subst)
-               = rejigConRes tmpl_bndrs res_tmpl tkvs user_tvs res_ty
-             -- NB: this is a /lazy/ binding, so we pass six thunks to
-             --     buildDataCon without yet forcing the guards in rejigConRes
+       ; let (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)
+               = rejigConRes tmpl_bndrs res_tmpl tvbndrs res_ty
              -- See Note [Checking GADT return types]
-
-             -- Compute the user-written tyvar binders. These have the same
-             -- tyvars as univ_tvs/ex_tvs, but perhaps in a different order.
-             -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-             tkv_bndrs      = mkTyVarBinders Inferred  tkvs'
-             user_tv_bndrs  = mkTyVarBinders Specified user_tvs'
-             all_user_bndrs = tkv_bndrs ++ user_tv_bndrs
 
              ctxt'      = substTys arg_subst ctxt
              arg_tys'   = substTys arg_subst arg_tys
@@ -3288,7 +3281,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
              ; buildDataCon fam_envs name is_infix
                             rep_nm
                             stricts Nothing field_lbls
-                            univ_tvs ex_tvs all_user_bndrs eq_preds
+                            univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
@@ -3297,8 +3290,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
-tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _)
-  = noExtCon nec
 tcConDecl _ _ _ _ _ _ (XConDecl nec) = noExtCon nec
 
 -- | Produce an "expected kind" for the arguments of a data/newtype.
@@ -3418,22 +3409,18 @@ errors reported in one pass.  See #7175, and #10836.
 rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result type; e.g.
                                   -- data instance T [a] b c ...
                                   --      gives template ([a,b,c], T [a] b c)
-            -> [TyVar]            -- The constructor's inferred type variables
-            -> [TyVar]            -- The constructor's user-written, specified
-                                  -- type variables
+            -> [InvisTVBinder]    -- The constructor's type variables (both inferred and user-written)
             -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
-                [TyVar],          -- The constructor's rejigged, user-written,
-                                  -- inferred type variables
-                [TyVar],          -- The constructor's rejigged, user-written,
-                                  -- specified type variables
-                [EqSpec],      -- Equality predicates
-                TCvSubst)      -- Substitution to apply to argument types
+                [InvisTVBinder],  -- The constructor's rejigged, user-written
+                                  -- type variables
+                [EqSpec],         -- Equality predicates
+                TCvSubst)         -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied
-rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
+rejigConRes tmpl_bndrs res_tmpl dc_tvbndrs res_ty
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- The {a,b,c} are the tmpl_tvs, and the {x,y,z} are the dc_tvs
@@ -3460,14 +3447,12 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- since the dcUserTyVarBinders invariant guarantees that the
         -- substitution has *all* the tyvars in its domain.
         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-        subst_user_tvs = map (getTyVar "rejigConRes" . substTyVar arg_subst)
-        substed_inferred_tvs  = subst_user_tvs dc_inferred_tvs
-        substed_specified_tvs = subst_user_tvs dc_specified_tvs
+        subst_user_tvs  = mapVarBndrs (getTyVar "rejigConRes" . substTyVar arg_subst)
+        substed_tvbndrs = subst_user_tvs dc_tvbndrs
 
         substed_eqs = map (substEqSpec arg_subst) raw_eqs
     in
-    (univ_tvs, substed_ex_tvs, substed_inferred_tvs, substed_specified_tvs,
-     substed_eqs, arg_subst)
+    (univ_tvs, substed_ex_tvs, substed_tvbndrs, substed_eqs, arg_subst)
 
   | otherwise
         -- If the return type of the data constructor doesn't match the parent
@@ -3480,10 +3465,9 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [Checking GADT return types]
-  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, dc_inferred_tvs, dc_specified_tvs,
-     [], emptyTCvSubst)
+  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, dc_tvbndrs, [], emptyTCvSubst)
   where
-    dc_tvs   = dc_inferred_tvs ++ dc_specified_tvs
+    dc_tvs   = binderVars dc_tvbndrs
     tmpl_tvs = binderVars tmpl_bndrs
 
 {- Note [mkGADTVars]
