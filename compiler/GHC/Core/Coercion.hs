@@ -2284,7 +2284,7 @@ coercionRKind co
     go_forall subst (ForAllCo tv1 k_co co)
       -- See Note [Nested ForAllCos]
       | isTyVar tv1
-      = mkInvForAllTy tv2 (go_forall subst' co)
+      = mkInfForAllTy tv2 (go_forall subst' co)
       where
         k2  = coercionRKind k_co
         tv2 = setTyVarKind tv1 (substTy subst k2)

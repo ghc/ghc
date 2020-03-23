@@ -106,7 +106,7 @@ buildDataCon :: FamInstEnvs
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
            -> [TyCoVar]                -- Existentials
-           -> [TyVarBinder]            -- User-written 'TyVarBinder's
+           -> [InvisTVBinder]          -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
@@ -170,12 +170,12 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
             -> (Id,Bool) -> Maybe (Id, Bool)
-            -> ([TyVarBinder], ThetaType) -- ^ Univ and req
-            -> ([TyVarBinder], ThetaType) -- ^ Ex and prov
-            -> [Type]               -- ^ Argument types
-            -> Type                 -- ^ Result type
-            -> [FieldLabel]         -- ^ Field labels for
-                                    --   a record pattern synonym
+            -> ([InvisTVBinder], ThetaType) -- ^ Univ and req
+            -> ([InvisTVBinder], ThetaType) -- ^ Ex and prov
+            -> [Type]                       -- ^ Argument types
+            -> Type                         -- ^ Result type
+            -> [FieldLabel]                 -- ^ Field labels for
+                                            --   a record pattern synonym
             -> PatSyn
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
@@ -298,7 +298,7 @@ buildClass tycon_name binders roles fds
               op_names   = [op | (op,_,_) <- sig_stuff]
               arg_tys    = sc_theta ++ op_tys
               rec_tycon  = classTyCon rec_clas
-              univ_bndrs = tyConTyVarBinders binders
+              univ_bndrs = tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
 
         ; rep_nm   <- newTyConRepName datacon_name

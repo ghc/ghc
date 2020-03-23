@@ -15,6 +15,8 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -1618,7 +1620,7 @@ reifyThing (AGlobal (AConLike (RealDataCon dc)))
 
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = do { let name = reifyName ps
-       ; ty <- reifyPatSynType (patSynSig ps)
+       ; ty <- reifyPatSynType (patSynSigBndr ps)
        ; return (TH.PatSynI name ty) }
 
 reifyThing (ATcId {tct_id = id})
@@ -1673,7 +1675,7 @@ reifyTyCon tc
                    Just name ->
                      let thName   = reifyName name
                          injAnnot = tyConInjectivityInfo tc
-                         sig = TH.TyVarSig (TH.KindedTV thName kind')
+                         sig = TH.TyVarSig (TH.KindedTV thName () kind')
                          inj = case injAnnot of
                                  NotInjective -> Nothing
                                  Injective ms ->
@@ -1737,7 +1739,7 @@ reifyDataCon isGadtDataCon tys dc
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             g_user_tvs' = dataConUserTyVars dc
+             g_user_tvs' = dataConUserTyVarBinders dc
              (g_univ_tvs, _, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
@@ -1753,7 +1755,7 @@ reifyDataCon isGadtDataCon tys dc
               -- See Note [Freshen reified GADT constructors' universal tyvars]
            <- freshenTyVarBndrs $
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
-       ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
+       ; let (tvb_subst, g_user_tvs) = subst_tv_binders univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
              g_arg_tys = substTys tvb_subst g_arg_tys'
              g_res_ty  = substTy  tvb_subst g_res_ty'
@@ -1786,14 +1788,23 @@ reifyDataCon isGadtDataCon tys dc
        ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
                                | otherwise     = ASSERT( all isTyVar ex_tvs )
                                                  -- no covars for haskell syntax
-                                                 (ex_tvs, theta)
+                                                 (map mk_specified ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
-                         ; ex_tvs'' <- reifyTyVars ex_tvs'
+                         ; ex_tvs'' <- reifyTyVarBndrs ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; ASSERT( r_arg_tys `equalLength` dcdBangs )
          ret_con }
+  where
+    mk_specified tv = Bndr tv SpecifiedSpec
+
+    subst_tv_binders subst tv_bndrs =
+      let tvs            = binderVars tv_bndrs
+          flags          = map binderArgFlag tv_bndrs
+          (subst', tvs') = substTyVarBndrs subst tvs
+          tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
+      in (subst', tv_bndrs')
 
 {-
 Note [Freshen reified GADT constructors' universal tyvars]
@@ -1868,9 +1879,9 @@ reifyClass cls
       = (n, map bndrName args)
     tfNames d = pprPanic "tfNames" (text (show d))
 
-    bndrName :: TH.TyVarBndr -> TH.Name
-    bndrName (TH.PlainTV n)    = n
-    bndrName (TH.KindedTV n _) = n
+    bndrName :: TH.TyVarBndr flag -> TH.Name
+    bndrName (TH.PlainTV n _)    = n
+    bndrName (TH.KindedTV n _ _) = n
 
 ------------------------------
 -- | Annotate (with TH.SigT) a type if the first parameter is True
@@ -2113,16 +2124,18 @@ reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
 reify_for_all argf ty = do
-  tvs' <- reifyTyVars tvs
+  tvbndrs' <- reifyTyVarBndrs tvbndrs
   case argToForallVisFlag argf of
     ForallVis   -> do phi' <- reifyType phi
-                      pure $ TH.ForallVisT tvs' phi'
+                      let tvs = map (() <$) tvbndrs'
+                      -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+                      pure $ TH.ForallVisT tvs phi'
     ForallInvis -> do let (cxt, tau) = tcSplitPhiTy phi
                       cxt' <- reifyCxt cxt
                       tau' <- reifyType tau
-                      pure $ TH.ForallT tvs' cxt' tau'
+                      pure $ TH.ForallT tvbndrs' cxt' tau'
   where
-    (tvs, phi) = tcSplitForAllTysSameVis argf ty
+    (tvbndrs, phi) = tcSplitForAllTysSameVis argf ty
 
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
@@ -2132,14 +2145,14 @@ reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+  :: ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
 reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
-  = do { univTyVars' <- reifyTyVars univTyVars
+  = do { univTyVars' <- reifyTyVarBndrs univTyVars
        ; req'        <- reifyCxt req
-       ; exTyVars'   <- reifyTyVars exTyVars
+       ; exTyVars'   <- reifyTyVarBndrs exTyVars
        ; prov'       <- reifyCxt prov
        ; tau'        <- reifyType (mkVisFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
@@ -2154,18 +2167,37 @@ reifyCxt   = mapM reifyType
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
-reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
-reifyTyVars tvs = mapM reify_tv tvs
+class ReifyFlag flag flag' | flag -> flag' where
+    reifyFlag :: flag -> flag'
+
+instance ReifyFlag () () where
+    reifyFlag () = ()
+
+instance ReifyFlag Specificity TH.Specificity where
+    reifyFlag SpecifiedSpec = TH.SpecifiedSpec
+    reifyFlag InferredSpec  = TH.InferredSpec
+
+instance ReifyFlag ArgFlag TH.Specificity where
+    reifyFlag Required      = TH.SpecifiedSpec
+    reifyFlag (Invisible s) = reifyFlag s
+
+reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr ()]
+reifyTyVars = reifyTyVarBndrs . map mk_bndr
+  where
+    mk_bndr tv = Bndr tv ()
+
+reifyTyVarBndrs :: ReifyFlag flag flag'
+                => [VarBndr TyVar flag] -> TcM [TH.TyVarBndr flag']
+reifyTyVarBndrs = mapM reify_tvbndr
   where
     -- even if the kind is *, we need to include a kind annotation,
     -- in case a poly-kind would be inferred without the annotation.
     -- See #8953 or test th/T8953
-    reify_tv tv = TH.KindedTV name <$> reifyKind kind
-      where
-        kind = tyVarKind tv
-        name = reifyName tv
+    reify_tvbndr (Bndr tv fl) = TH.KindedTV (reifyName tv)
+                                            (reifyFlag fl)
+                                            <$> reifyKind (tyVarKind tv)
 
-reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr])
+reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr ()])
 reifyTyVarsToMaybe []  = pure Nothing
 reifyTyVarsToMaybe tys = Just <$> reifyTyVars tys
 
@@ -2289,7 +2321,7 @@ reifyTypeOfThing th_name = do
     AGlobal (AConLike (RealDataCon dc)) ->
       reifyType (idType (dataConWrapId dc))
     AGlobal (AConLike (PatSynCon ps)) ->
-      reifyPatSynType (patSynSig ps)
+      reifyPatSynType (patSynSigBndr ps)
     ATcId{tct_id = id} -> zonkTcType (idType id) >>= reifyType
     ATyVar _ tctv -> zonkTcTyVar tctv >>= reifyType
     -- Impossible cases, supposedly:

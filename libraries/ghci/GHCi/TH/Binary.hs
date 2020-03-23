@@ -26,7 +26,8 @@ instance Binary TH.Module
 instance Binary TH.Info
 instance Binary TH.Type
 instance Binary TH.TyLit
-instance Binary TH.TyVarBndr
+instance Binary TH.Specificity
+instance Binary flag => Binary (TH.TyVarBndr flag)
 instance Binary TH.Role
 instance Binary TH.Lit
 instance Binary TH.Range

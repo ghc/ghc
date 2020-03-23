@@ -206,10 +206,10 @@ toIfaceTyVar = occNameFS . getOccName
 toIfaceCoVar :: CoVar -> FastString
 toIfaceCoVar = occNameFS . getOccName
 
-toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndr :: (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 
-toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndrX :: VarSet -> (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
 ----------------

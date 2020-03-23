@@ -6,7 +6,7 @@ import Language.Haskell.TH
 
 $$(return [
    SigD (mkName "m")
-        (ForallT [PlainTV (mkName "a")]
+        (ForallT [PlainTV (mkName "a") SpecifiedSpec]
                  []
                  (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a"))))
  , FunD (mkName "m")

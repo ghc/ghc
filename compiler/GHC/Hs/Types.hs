@@ -31,6 +31,7 @@ module GHC.Hs.Types (
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs,
         LHsTypeArg,
+        OutputableBndrFlag,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
@@ -50,7 +51,7 @@ module GHC.Hs.Types (
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, mkHsPatSigType, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
-        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
+        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
@@ -61,9 +62,9 @@ module GHC.Hs.Types (
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
-        hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
         hsTyKindSig,
         hsConDetailsArgs,
+        setHsTyVarBndrFlag, hsTyVarBndrFlag,
 
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
@@ -328,14 +329,14 @@ type LHsKind pass = Located (HsKind pass)
 --  The explicitly-quantified binders in a data/type declaration
 
 -- | Located Haskell Type Variable Binder
-type LHsTyVarBndr pass = Located (HsTyVarBndr pass)
+type LHsTyVarBndr flag pass = Located (HsTyVarBndr flag pass)
                          -- See Note [HsType binders]
 
 -- | Located Haskell Quantified Type Variables
 data LHsQTyVars pass   -- See Note [HsType binders]
   = HsQTvs { hsq_ext :: XHsQTvs pass
 
-           , hsq_explicit :: [LHsTyVarBndr pass]
+           , hsq_explicit :: [LHsTyVarBndr () pass]
                 -- Explicit variables, written by the user
     }
   | XLHsQTyVars !(XXLHsQTyVars pass)
@@ -350,18 +351,14 @@ type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
 
-mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
+mkHsQTvs :: [LHsTyVarBndr () GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }
 
-hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr pass]
+hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr () pass]
 hsQTvExplicit = hsq_explicit
 
 emptyLHsQTvs :: LHsQTyVars GhcRn
 emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
-
-isEmptyLHsQTvs :: LHsQTyVars GhcRn -> Bool
-isEmptyLHsQTvs (HsQTvs { hsq_ext = imp, hsq_explicit = exp })
-  = null imp && null exp
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -591,13 +588,18 @@ instance OutputableBndr HsIPName where
 --------------------------------------------------
 
 -- | Haskell Type Variable Binder
-data HsTyVarBndr pass
+-- The flag annotates the binder. It is 'Specificity' in places where
+-- explicit specificity is allowed (e.g. x :: forall {a} b. ...) or
+-- '()' in other places.
+data HsTyVarBndr flag pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
+         flag
          (Located (IdP pass))
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | KindedTyVar
          (XKindedTyVar pass)
+         flag
          (Located (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
@@ -614,8 +616,19 @@ type instance XKindedTyVar  (GhcPass _) = NoExtField
 
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
+-- | Return the attached flag
+hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
+hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
+hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+
+-- | Set the attached flag
+setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)
+  -> HsTyVarBndr flag (GhcPass pass)
+setHsTyVarBndrFlag f (UserTyVar x _ l)     = UserTyVar x f l
+setHsTyVarBndrFlag f (KindedTyVar x _ l k) = KindedTyVar x f l k
+
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
-isHsKindedTyVar :: HsTyVarBndr pass -> Bool
+isHsKindedTyVar :: HsTyVarBndr flag pass -> Bool
 isHsKindedTyVar (UserTyVar {})   = False
 isHsKindedTyVar (KindedTyVar {}) = True
 isHsKindedTyVar (XTyVarBndr {})  = False
@@ -624,9 +637,24 @@ isHsKindedTyVar (XTyVarBndr {})  = False
 hsTvbAllKinded :: LHsQTyVars pass -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 
-instance NamedThing (HsTyVarBndr GhcRn) where
-  getName (UserTyVar _ v) = unLoc v
-  getName (KindedTyVar _ v _) = unLoc v
+instance NamedThing (HsTyVarBndr flag GhcRn) where
+  getName (UserTyVar _ _ v) = unLoc v
+  getName (KindedTyVar _ _ v _) = unLoc v
+
+{- Note [Specificity in HsForAllTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All type variables in a `HsForAllTy` type are annotated with their
+`Specificity`. The meaning of this `Specificity` depends on the visibility of
+the binder `hst_fvf`:
+
+* In an invisible forall type, the `Specificity` denotes whether type variables
+  are `Specified` (`forall a. ...`) or `Inferred` (`forall {a}. ...`). For more
+  information, see Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
+  in GHC.Core.TyCo.Rep.
+
+* In a visible forall type, the `Specificity` has no particular meaning. We
+  uphold the convention that all visible forall types use `Specified` binders.
+-}
 
 -- | Haskell Type
 data HsType pass
@@ -634,9 +662,10 @@ data HsType pass
       { hst_xforall :: XForAllTy pass
       , hst_fvf     :: ForallVisFlag -- Is this `forall a -> {...}` or
                                      --         `forall a. {...}`?
-      , hst_bndrs   :: [LHsTyVarBndr pass]
-                                       -- Explicit, user-supplied 'forall a b c'
-      , hst_body    :: LHsType pass      -- body type
+      , hst_bndrs   :: [LHsTyVarBndr Specificity pass]
+                                     -- Explicit, user-supplied 'forall a {b} c'
+                                     -- see Note [Specificity in HsForAllTy]
+      , hst_body    :: LHsType pass  -- body type
       }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForall',
       --         'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
@@ -1123,14 +1152,14 @@ Bottom line: nip problems in the bud by matching on ForallInvis from the start.
 -}
 
 ---------------------
-hsTyVarName :: HsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
-hsTyVarName (UserTyVar _ (L _ n))     = n
-hsTyVarName (KindedTyVar _ (L _ n) _) = n
+hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
+hsTyVarName (UserTyVar _ _ (L _ n))     = n
+hsTyVarName (KindedTyVar _ _ (L _ n) _) = n
 
-hsLTyVarName :: LHsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
+hsLTyVarName :: LHsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
 hsLTyVarName = hsTyVarName . unLoc
 
-hsLTyVarNames :: [LHsTyVarBndr (GhcPass p)] -> [IdP (GhcPass p)]
+hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = map hsLTyVarName
 
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
@@ -1143,25 +1172,11 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
 
-hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
+hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> Located (IdP (GhcPass p))
 hsLTyVarLocName = mapLoc hsTyVarName
 
 hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
-
--- | Convert a LHsTyVarBndr to an equivalent LHsType.
-hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
-hsLTyVarBndrToType = mapLoc cvt
-  where cvt :: HsTyVarBndr (GhcPass p) -> HsType (GhcPass p)
-        cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
-        cvt (KindedTyVar _ (L name_loc n) kind)
-          = HsKindSig noExtField
-                   (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
-
--- | Convert a LHsTyVarBndrs to a list of types.
--- Works on *type* variable only, no kind vars.
-hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
-hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
 
 -- | Get the kind signature of a type, ignoring parentheses:
 --
@@ -1299,9 +1314,9 @@ The SrcSpan is the span of the original HsPar
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
 splitLHsPatSynTy :: LHsType pass
-                 -> ( [LHsTyVarBndr pass]    -- universals
+                 -> ( [LHsTyVarBndr Specificity pass]    -- universals
                     , LHsContext pass        -- required constraints
-                    , [LHsTyVarBndr pass]    -- existentials
+                    , [LHsTyVarBndr Specificity pass]    -- existentials
                     , LHsContext pass        -- provided constraints
                     , LHsType pass)          -- body type
 splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
@@ -1312,9 +1327,9 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
     (provs, ty4) = splitLHsQualTy ty3
 
 -- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
--- into its constituent parts. Note that only /invisible/ @forall@s
--- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
--- (i.e., @forall a ->@, with an arrow) are left untouched.
+-- into its constituent parts.
+-- Only splits type variable binders that were
+-- quantified invisibly (e.g., @forall a.@, with a dot).
 --
 -- This function is used to split apart certain types, such as instance
 -- declaration types, which disallow visible @forall@s. For instance, if GHC
@@ -1326,16 +1341,15 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
 splitLHsSigmaTyInvis :: LHsType pass
-                     -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
+                     -> ([LHsTyVarBndr Specificity pass], LHsContext pass, LHsType pass)
 splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
--- parts. Note that only /invisible/ @forall@s
--- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
--- (i.e., @forall a ->@, with an arrow) are left untouched.
+-- parts. Only splits type variable binders that
+-- were quantified invisibly (e.g., @forall a.@, with a dot).
 --
 -- This function is used to split apart certain types, such as instance
 -- declaration types, which disallow visible @forall@s. For instance, if GHC
@@ -1346,7 +1360,7 @@ splitLHsSigmaTyInvis ty
 -- such as @(forall a. <...>)@. The downside to this is that it is not
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
-splitLHsForAllTyInvis :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
+splitLHsForAllTyInvis :: LHsType pass -> ([LHsTyVarBndr Specificity pass], LHsType pass)
 splitLHsForAllTyInvis lty@(L _ ty) =
   case ty of
     HsParTy _ ty' -> splitLHsForAllTyInvis ty'
@@ -1494,6 +1508,19 @@ ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
 ************************************************************************
 -}
 
+class OutputableBndrFlag flag where
+    pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
+
+instance OutputableBndrFlag () where
+    pprTyVarBndr (UserTyVar _ _ n)     = ppr n
+    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+
+instance OutputableBndrFlag Specificity where
+    pprTyVarBndr (UserTyVar _ SpecifiedSpec n)     = ppr n
+    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
+    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
+
 instance OutputableBndrId p => Outputable (HsType (GhcPass p)) where
     ppr ty = pprHsType ty
 
@@ -1504,10 +1531,9 @@ instance OutputableBndrId p
        => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
-instance OutputableBndrId p
-       => Outputable (HsTyVarBndr (GhcPass p)) where
-    ppr (UserTyVar _ n)     = ppr n
-    ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+instance (OutputableBndrId p, OutputableBndrFlag flag)
+       => Outputable (HsTyVarBndr flag (GhcPass p)) where
+    ppr = pprTyVarBndr
 
 instance Outputable thing
        => Outputable (HsImplicitBndrs (GhcPass p) thing) where
@@ -1526,8 +1552,8 @@ pprAnonWildCard = char '_'
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
-pprHsForAll :: (OutputableBndrId p)
-            => ForallVisFlag -> [LHsTyVarBndr (GhcPass p)]
+pprHsForAll :: (OutputableBndrId p, OutputableBndrFlag flag)
+            => ForallVisFlag -> [LHsTyVarBndr flag (GhcPass p)]
             -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
 
@@ -1538,9 +1564,9 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- function for this is needed, as the extra-constraints wildcard is removed
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: (OutputableBndrId p)
+pprHsForAllExtra :: (OutputableBndrId p, OutputableBndrFlag flag)
                  => Maybe SrcSpan -> ForallVisFlag
-                 -> [LHsTyVarBndr (GhcPass p)]
+                 -> [LHsTyVarBndr flag (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
 pprHsForAllExtra extra fvf qtvs cxt
   = pp_forall <+> pprLHsContextExtra (isJust extra) cxt
@@ -1554,7 +1580,7 @@ pprHsForAllExtra extra fvf qtvs cxt
 -- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
 pprHsExplicitForAll :: (OutputableBndrId p)
                     => ForallVisFlag
-                    -> Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
+                    -> Maybe [LHsTyVarBndr () (GhcPass p)] -> SDoc
 pprHsExplicitForAll fvf (Just qtvs) = forAllLit <+> interppSP qtvs
                                                  <> ppr_forall_separator fvf
 pprHsExplicitForAll _   Nothing     = empty

@@ -178,4 +178,81 @@ the rules in the subtler cases:
 The section in this manual on kind polymorphism describes how variables
 in type and class declarations are ordered (:ref:`inferring-variable-order`).
 
+.. _Manually-defining-inferred-variables:
 
+Manually defining inferred variables
+------------------------------------
+
+While user-written type or kind variables are specified by default, GHC permits
+labelling these variables as inferred. By writing the type variable binder in
+braces as ``{tyvar}`` or ``{tyvar :: kind}``, the new variable will be
+classified as inferred, not specified. Doing so gives the programmer control
+over which variables can be manually instantiated and which can't.
+Note that the braces do not influence scoping: variables in braces are still
+brought into scope just the same.
+Consider for example::
+
+  myConst :: forall {a} b. a -> b -> a
+  myConst x _ = x
+
+In this example, despite both variables appearing in a type signature, ``a`` is
+an inferred variable while ``b`` is specified. This means that the expression
+``myConst @Int`` has type ``forall {a}. a -> Int -> a``.
+
+The braces are allowed in the following places:
+
+- In the type signatures of functions, variables, class methods, as well as type
+  annotations on expressions. Consider the example above.
+
+- In data constructor declarations, using the GADT syntax. Consider::
+
+    data T a where MkT :: forall {k} (a :: k). Proxy a -> T a
+
+  The constructor ``MkT`` defined in this example is kind polymorphic, which is
+  emphasized to the reader by explicitly abstracting over the ``k`` variable.
+  As this variable is marked as inferred, it can not be manually instantiated.
+
+- In existential variable quantifications, e.g.::
+
+    data HList = HNil
+               | forall {a}. HCons a HList
+
+- In pattern synonym signatures. Consider for instance::
+
+    data T a where MkT :: forall a b. a -> b -> T a
+
+    pattern Pat :: forall {c}. () => forall {d}. c -> d -> T c
+    pattern Pat x y = MkT x y
+
+  Note that in this example, ``a`` is a universal variable in the data type
+  ``T``, where ``b`` is existential. When writing the pattern synonym, both
+  types are allowed to be specified or inferred.
+
+- On the right-hand side of a type synonym, e.g.::
+
+    type Foo = forall a {b}. Either a b
+
+- In type signatures on variables bound in RULES, e.g.::
+
+    {-# RULES "parametricity" forall (f :: forall {a}. a -> a). map f = id #-}
+
+The braces are *not* allowed in the following places:
+
+- In visible dependent quantifiers. Consider::
+
+    data T :: forall {k} -> k -> Type
+
+  This example is rejected, as a visible argument should by definition be
+  explicitly applied. Making them inferred (and thus not appliable) would be
+  conflicting.
+
+- In default type signatures for class methods, in SPECIALISE pragmas or in
+  instance declaration heads, e.g.::
+
+    instance forall {a}. Eq (Maybe a) where ...
+
+  The reason for this is, essentially, that none of these define a new
+  construct. This means that no new type is being defined where specificity
+  could play a role.
+
+- On the left-hand sides of type declarations, such as classes, data types, etc.

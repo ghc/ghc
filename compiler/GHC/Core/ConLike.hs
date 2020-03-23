@@ -119,7 +119,7 @@ conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
 -- followed by the existentially quantified type variables. For data
 -- constructors, the situation is slightly more complicated—see
 -- @Note [DataCon user type variable binders]@ in "GHC.Core.DataCon".
-conLikeUserTyVarBinders :: ConLike -> [TyVarBinder]
+conLikeUserTyVarBinders :: ConLike -> [InvisTVBinder]
 conLikeUserTyVarBinders (RealDataCon data_con) =
     dataConUserTyVarBinders data_con
 conLikeUserTyVarBinders (PatSynCon pat_syn) =

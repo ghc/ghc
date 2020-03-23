@@ -1,0 +1,6 @@
+
+ExplicitSpecificity10.hs:8:10: error:
+    • Cannot apply expression of type ‘a0 -> a0’
+      to a visible type argument ‘Bool’
+    • In the expression: unT t @Bool
+      In an equation for ‘test’: test t = unT t @Bool

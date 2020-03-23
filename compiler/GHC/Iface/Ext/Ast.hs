@@ -394,8 +394,8 @@ patScopes rsp useScope patScope xs =
 tvScopes
   :: TyVarScope
   -> Scope
-  -> [LHsTyVarBndr a]
-  -> [TVScoped (LHsTyVarBndr a)]
+  -> [LHsTyVarBndr flag a]
+  -> [TVScoped (LHsTyVarBndr flag a)]
 tvScopes tvScope rhsScope xs =
   map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
 
@@ -1395,10 +1395,11 @@ instance ToHie (Located OverlapMode) where
 
 instance ToHie (LConDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
-      ConDeclGADT { con_names = names, con_qvars = qvars
+      ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
                   , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
-        , toHie $ TS (ResolvedScopes [ctxScope, rhsScope]) qvars
+        , concatM $ [ pure $ bindingsOnly bindings
+                    , toHie $ tvScopes resScope NoScope exp_vars ]
         , toHie ctx
         , toHie args
         , toHie typ
@@ -1408,6 +1409,8 @@ instance ToHie (LConDecl GhcRn) where
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = condecl_scope args
           tyScope = mkLScope typ
+          resScope = ResolvedScopes [ctxScope, rhsScope]
+          bindings = map (C $ TyVarBind (mkScope (loc exp_vars)) resScope) imp_vars
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets } ->
         [ toHie $ C (Decl ConDec $ getRealSpan span) name
@@ -1582,12 +1585,12 @@ instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = pure $ locOnly sp
 
-instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
+instance Data flag => ToHie (TVScoped (LHsTyVarBndr flag GhcRn)) where
   toHie (TVS tsc sc (L span bndr)) = concatM $ makeNode bndr span : case bndr of
-      UserTyVar _ var ->
+      UserTyVar _ _ var ->
         [ toHie $ C (TyVarBind sc tsc) var
         ]
-      KindedTyVar _ var kind ->
+      KindedTyVar _ _ var kind ->
         [ toHie $ C (TyVarBind sc tsc) var
         , toHie kind
         ]

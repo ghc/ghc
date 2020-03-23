@@ -1,0 +1,4 @@
+
+ExplicitSpecificity9.hs:6:1: error:
+    Inferred type variables are not allowed
+    In a deriving declaration

@@ -660,7 +660,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- as this is needed to be able to manipulate
   -- them properly
    let quant_old_ty@(old_tvs, old_tau) = quantifyType old_ty
-       sigma_old_ty = mkInvForAllTys old_tvs old_tau
+       sigma_old_ty = mkInfForAllTys old_tvs old_tau
    traceTR (text "Term reconstruction started with initial type " <> ppr old_ty)
    term <-
      if null old_tvs

@@ -392,9 +392,9 @@ deriving instance Data (HsPatSigType GhcRn)
 deriving instance Data (HsPatSigType GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
-deriving instance Data (HsTyVarBndr GhcPs)
-deriving instance Data (HsTyVarBndr GhcRn)
-deriving instance Data (HsTyVarBndr GhcTc)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcPs)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcRn)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsType p)
 deriving instance Data (HsType GhcPs)

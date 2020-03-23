@@ -30,7 +30,7 @@ main
 ----------------------------------------
 Becomes
 
-[DataD [] Foo_0 [PlainTV a_2] Nothing
+[DataD [] Foo_0 [PlainTV a_2 ()] Nothing
   [NormalC Foo_1 [(Bang NoSourceUnpackedness NoSourceStrictness,VarT a_2)]]
   [DerivClause Nothing
     [AppT (AppT EqualityT (VarT a_2))

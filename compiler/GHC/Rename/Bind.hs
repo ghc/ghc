@@ -955,7 +955,7 @@ renameSig _ (IdSig _ x)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; (new_ty, fvs) <- rnHsSigWcType doc Nothing ty
         ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
@@ -963,16 +963,21 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
+        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel inf_msg ty
         ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs
     ty_ctxt = GenericCtx (text "a class method signature for"
                           <+> quotes (ppr v1))
+    inf_msg = if is_deflt
+      then Just (text "A default type signature cannot contain inferred type variables")
+      else Nothing
 
 renameSig _ (SpecInstSig _ src ty)
-  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx TypeLevel ty
+  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx TypeLevel inf_msg ty
         ; return (SpecInstSig noExtField src new_ty,fvs) }
+  where
+    inf_msg = Just (text "Inferred type variables are not allowed")
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
@@ -988,7 +993,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
     ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
                           <+> quotes (ppr v))
     do_one (tys,fvs) ty
-      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
+      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel Nothing ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig _ v s)
@@ -1005,7 +1010,7 @@ renameSig ctxt sig@(MinimalSig _ s (L l bf))
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel ty
+        ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel Nothing ty
         ; return (PatSynSig noExtField new_vs ty', fvs) }
   where
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"

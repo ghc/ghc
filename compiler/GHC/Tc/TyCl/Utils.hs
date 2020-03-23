@@ -784,7 +784,7 @@ mkDefaultMethodType cls _   (GenericDM dm_ty) = mkSigmaTy tv_bndrs [pred] dm_ty
    where
      pred      = mkClassPred cls (mkTyVarTys (binderVars cls_bndrs))
      cls_bndrs = tyConBinders (classTyCon cls)
-     tv_bndrs  = tyConTyVarBinders cls_bndrs
+     tv_bndrs  = tyVarSpecToBinders $ tyConInvisTVBinders cls_bndrs
      -- NB: the Class doesn't have TyConBinders; we reach into its
      --     TyCon to get those.  We /do/ need the TyConBinders because
      --     we need the correct visibility: these default methods are
@@ -877,7 +877,7 @@ mkOneRecordSelector all_cons idDetails fl
     data_tv_set= tyCoVarsOfTypes inst_tys
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys data_tvbs             $
+           | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $

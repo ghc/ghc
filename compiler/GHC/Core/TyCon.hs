@@ -100,7 +100,7 @@ module GHC.Core.TyCon(
         newTyConDataCon_maybe,
         algTcFields,
         tyConRuntimeRepInfo,
-        tyConBinders, tyConResKind, tyConTyVarBinders,
+        tyConBinders, tyConResKind, tyConInvisTVBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
         mkTyConTagMap,
 
@@ -492,19 +492,19 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk (Bndr tv (AnonTCB af))   k = mkFunTy af (varType tv) k
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
-tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
-                  -> [TyVarBinder]   -- Suitable for the foralls of a term function
+tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
+                    -> [InvisTVBinder] -- Suitable for the foralls of a term function
 -- See Note [Building TyVarBinders from TyConBinders]
-tyConTyVarBinders tc_bndrs
+tyConInvisTVBinders tc_bndrs
  = map mk_binder tc_bndrs
  where
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB VisArg    -> Specified
-                AnonTCB InvisArg  -> Inferred   -- See Note [AnonTCB InvisArg]
-                NamedTCB Required -> Specified
-                NamedTCB vis      -> vis
+                AnonTCB VisArg           -> SpecifiedSpec
+                AnonTCB InvisArg         -> InferredSpec   -- See Note [AnonTCB InvisArg]
+                NamedTCB Required        -> SpecifiedSpec
+                NamedTCB (Invisible vis) -> vis
 
 -- Returns only tyvars, as covars are always inferred
 tyConVisibleTyVars :: TyCon -> [TyVar]
@@ -655,8 +655,10 @@ instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
       ppr_bi (NamedTCB Required)  = text "req"
-      ppr_bi (NamedTCB Specified) = text "spec"
-      ppr_bi (NamedTCB Inferred)  = text "inf"
+      -- See Note [Explicit Case Statement for Specificity]
+      ppr_bi (NamedTCB (Invisible spec)) = case spec of
+        SpecifiedSpec -> text "spec"
+        InferredSpec  -> text "inf"
 
 instance Binary TyConBndrVis where
   put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }

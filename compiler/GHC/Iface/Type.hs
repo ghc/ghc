@@ -6,11 +6,19 @@
 This module defines interface types and binders
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+  -- FlexibleInstances for Binary (DefMethSpec IfaceType)
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
-    -- FlexibleInstances for Binary (DefMethSpec IfaceType)
+
+#if !MIN_VERSION_GLASGOW_HASKELL(8,10,0,0)
+{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-incomplete-patterns #-}
+  -- N.B. This can be dropped once GHC 8.8 can be dropped as a
+  -- bootstrap compiler.
+#endif
 
 module GHC.Iface.Type (
         IfExtName, IfLclName,
@@ -22,10 +30,12 @@ module GHC.Iface.Type (
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
+        IfaceForAllSpecBndr,
         IfaceForAllBndr, ArgFlag(..), AnonArgFlag(..),
         ForallVisFlag(..), ShowForAllFlag(..),
         mkIfaceForAllTvBndr,
         mkIfaceTyConKind,
+        ifaceForAllSpecToBndrs, ifaceForAllSpecToBndr,
 
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
@@ -168,8 +178,9 @@ data IfaceTyLit
   | IfaceStrTyLit FastString
   deriving (Eq)
 
-type IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
-type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
+type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+type IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+type IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 
 -- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
 mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
@@ -183,6 +194,12 @@ mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
     mk (Bndr tv (AnonTCB af))   k = IfaceFunTy af (ifaceBndrType tv) k
     mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
+
+ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
+ifaceForAllSpecToBndrs = map ifaceForAllSpecToBndr
+
+ifaceForAllSpecToBndr :: IfaceForAllSpecBndr -> IfaceForAllBndr
+ifaceForAllSpecToBndr (Bndr tv spec) = Bndr tv (Invisible spec)
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.
@@ -781,8 +798,10 @@ pprIfaceTyConBinders suppress_sig = sep . map go
           -- The above case is rare. (See Note [AnonTCB InvisArg] in GHC.Core.TyCon.)
           -- Should we print these differently?
         NamedTCB Required  -> ppr_bndr (UseBndrParens True)
-        NamedTCB Specified -> char '@' <> ppr_bndr (UseBndrParens True)
-        NamedTCB Inferred  -> char '@' <> braces (ppr_bndr (UseBndrParens False))
+        -- See Note [Explicit Case Statement for Specificity]
+        NamedTCB (Invisible spec) -> case spec of
+          SpecifiedSpec    -> char '@' <> ppr_bndr (UseBndrParens True)
+          InferredSpec     -> char '@' <> braces (ppr_bndr (UseBndrParens False))
       where
         ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 

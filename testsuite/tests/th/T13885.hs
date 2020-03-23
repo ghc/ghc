@@ -17,8 +17,8 @@ main = print
   $(do TyConI (DataD _ _ tycon_tyvars _
                      [ForallC con_tyvars _ _] _) <- reify ''(:~:)
 
-       let tvbName :: TyVarBndr -> Name
-           tvbName (PlainTV  n)   = n
-           tvbName (KindedTV n _) = n
+       let tvbName :: TyVarBndr flag -> Name
+           tvbName (PlainTV  n _)   = n
+           tvbName (KindedTV n _ _) = n
 
-       lift $ and $ zipWith ((/=) `on` tvbName) tycon_tyvars con_tyvars)
+       lift $ and $ zipWith (/=) (map tvbName tycon_tyvars) (map tvbName con_tyvars))

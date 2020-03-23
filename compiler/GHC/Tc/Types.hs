@@ -1516,7 +1516,7 @@ sig_extra_cts is Nothing.
 data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSigInfo
 
-         , sig_inst_skols :: [(Name, TcTyVar)]
+         , sig_inst_skols :: [(Name, InvisTVBinder)]
                -- Instantiated type and kind variables, TyVarTvs
                -- The Name is the Name that the renamer chose;
                --   but the TcTyVar may come from instantiating
@@ -1602,12 +1602,12 @@ Here we get
 data TcPatSynInfo
   = TPSI {
         patsig_name           :: Name,
-        patsig_implicit_bndrs :: [TyVarBinder], -- Implicitly-bound kind vars (Inferred) and
-                                                -- implicitly-bound type vars (Specified)
+        patsig_implicit_bndrs :: [InvisTVBinder], -- Implicitly-bound kind vars (Inferred) and
+                                                  -- implicitly-bound type vars (Specified)
           -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.TyCl.PatSyn
-        patsig_univ_bndrs     :: [TyVar],       -- Bound by explicit user forall
+        patsig_univ_bndrs     :: [InvisTVBinder], -- Bound by explicit user forall
         patsig_req            :: TcThetaType,
-        patsig_ex_bndrs       :: [TyVar],       -- Bound by explicit user forall
+        patsig_ex_bndrs       :: [InvisTVBinder], -- Bound by explicit user forall
         patsig_prov           :: TcThetaType,
         patsig_body_ty        :: TcSigmaType
     }
