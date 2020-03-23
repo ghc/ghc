@@ -15,6 +15,7 @@ module GHC.StgToCmm.Bind (
 
 import GhcPrelude hiding ((<*>))
 
+import GHC.StgToCmm.Types
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
@@ -374,7 +375,7 @@ mkRhsClosure dflags bndr cc fvs upd_flag args body
 -------------------------
 cgRhsStdThunk
         :: Id
-        -> LambdaFormInfo
+        -> LocalLFI
         -> [StgArg]             -- payload
         -> FCode (CgIdInfo, FCode CmmAGraph)
 
@@ -418,7 +419,7 @@ mkClosureLFInfo :: DynFlags
                 -> [NonVoid Id] -- Free vars
                 -> UpdateFlag   -- Update flag
                 -> [Id]         -- Args
-                -> LambdaFormInfo
+                -> LocalLFI
 mkClosureLFInfo dflags bndr top fvs upd_flag args
   | null args =
         mkLFThunk (idType bndr) top (map fromNonVoid fvs) upd_flag
@@ -524,7 +525,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 bind_fv :: (NonVoid Id, ByteOff) -> FCode (LocalReg, ByteOff)
 bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 
-load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, ByteOff)] -> FCode ()
+load_fvs :: LocalReg -> LocalLFI -> [(LocalReg, ByteOff)] -> FCode ()
 load_fvs node lf_info = mapM_ (\ (reg, off) ->
    do dflags <- getDynFlags
       platform <- getPlatform

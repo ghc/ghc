@@ -50,18 +50,17 @@ import UniqFM
 import Util
 import VarEnv
 import GHC.Core.DataCon
-import BasicTypes
 
 -------------------------------------
 --        Manipulating CgIdInfo
 -------------------------------------
 
-mkCgIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
+mkCgIdInfo :: Id -> LambdaFormInfo a -> CmmExpr -> CgIdInfo
 mkCgIdInfo id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr }
 
-litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
+litIdInfo :: DynFlags -> Id -> LambdaFormInfo a -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc (addDynTag platform (CmmLit lit) tag) }
@@ -78,13 +77,13 @@ lneIdInfo platform id regs
     blk_id = mkBlockId (idUnique id)
 
 
-rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
+rhsIdInfo :: Id -> LocalLFI -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
   = do platform <- getPlatform
        reg <- newTemp (gcWord platform)
        return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
-mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
+mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo a -> CmmExpr -> CmmAGraph
 mkRhsInit dflags reg lf_info expr
   = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag dflags lf_info))
   where platform = targetPlatform dflags
@@ -149,7 +148,7 @@ getCgIdInfo id
               cgLookupPanic id -- Bug
         }}}
 
-mkLFImported :: Id -> LambdaFormInfo
+mkLFImported :: Id -> ImportedLFI
 mkLFImported id =
     case idLFInfo_maybe id of
       Just lf_info ->
@@ -157,12 +156,13 @@ mkLFImported id =
       Nothing
         | Just con <- isDataConWorkId_maybe id
         , isNullaryRepDataCon con
-        -> LFCon con   -- An imported nullary constructor
+        -> LFCon (dataConName con) (dataConTag con)
+                      -- An imported nullary constructor
                       -- We assume that the constructor is evaluated so that
                       -- the id really does point directly to the constructor
 
         | arity > 0
-        -> LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
+        -> LFReEntrant (LFR_Imported arity)
 
         | otherwise
         -> mkLFArgument id -- Not sure of exact arity
@@ -200,7 +200,7 @@ getNonVoidArgAmodes (arg:args)
 --        Interface functions for binding and re-binding names
 ------------------------------------------------------------------------
 
-bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
+bindToReg :: NonVoid Id -> LambdaFormInfo a -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do platform <- getPlatform
@@ -212,8 +212,8 @@ rebindToReg :: NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
-  = do  { info <- getCgIdInfo id
-        ; bindToReg nvid (cg_lf info) }
+  = do  { CgIdInfo _ lfi _ <- getCgIdInfo id
+        ; bindToReg nvid lfi }
 
 bindArgToReg :: NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
