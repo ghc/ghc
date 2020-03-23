@@ -13,7 +13,7 @@ import T10267a
 
 $(return [
    SigD (mkName "k")
-        (ForallT [PlainTV (mkName "a")]
+        (ForallT [PlainTV (mkName "a") SpecifiedSpec]
                  []
                  (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a"))))
  , FunD (mkName "k")
@@ -22,7 +22,7 @@ $(return [
 
 $(return [
    SigD (mkName "l")
-        (ForallT [PlainTV (mkName "a")]
+        (ForallT [PlainTV (mkName "a") SpecifiedSpec]
                  []
                  (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a"))))
  , FunD (mkName "l")
