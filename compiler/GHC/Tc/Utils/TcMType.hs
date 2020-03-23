@@ -59,7 +59,7 @@ module GHC.Tc.Utils.TcMType (
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
   newPatSigTyVar, newSkolemTyVar, newWildCardX,
-  tcInstType,
+  tcInstType, tcInstTypeBndrs,
   tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
   tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
@@ -79,7 +79,7 @@ module GHC.Tc.Utils.TcMType (
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
   defaultTyVar, quantifyTyVars, isQuantifiableTv,
   zonkTcType, zonkTcTypes, zonkCo,
-  zonkTyCoVarKind,
+  zonkTyCoVarKind, zonkTyCoVarKindBinder,
 
   zonkEvVar, zonkWC, zonkSimples,
   zonkId, zonkCoVar,
@@ -507,23 +507,55 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
 *                                                                      *
 ********************************************************************* -}
 
+tc_inst_internal :: ([VarBndr TyVar flag] -> TcM (TCvSubst, [VarBndr TcTyVar flag]))
+                        -- ^ How to instantiate the type variables
+                 -> [VarBndr TyVar flag] -- ^ Type variable to instantiate
+                 -> Type                 -- ^ rho
+                 -> TcM ([(Name, VarBndr TcTyVar flag)], TcThetaType, TcType) -- ^ Result
+                       -- (type vars, preds (incl equalities), rho)
+tc_inst_internal _inst_tyvars []     rho =
+  let -- There may be overloading despite no type variables;
+      --      (?x :: Int) => Int -> Int
+    (theta, tau) = tcSplitPhiTy rho
+  in
+    return ([], theta, tau)
+tc_inst_internal  inst_tyvars tyvars rho =
+  do { (subst, tyvars') <- inst_tyvars tyvars
+     ; let (theta, tau) = tcSplitPhiTy (substTyAddInScope subst rho)
+           tv_prs       = map (tyVarName . binderVar) tyvars `zip` tyvars'
+     ; return (tv_prs, theta, tau) }
+
 tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
                    -- ^ How to instantiate the type variables
-           -> Id                                            -- ^ Type to instantiate
-           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType)  -- ^ Result
+           -> Id                                           -- ^ Type to instantiate
+           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
                 -- (type vars, preds (incl equalities), rho)
-tcInstType inst_tyvars id
-  = case tcSplitForAllTys (idType id) of
-        ([],    rho) -> let     -- There may be overloading despite no type variables;
-                                --      (?x :: Int) => Int -> Int
-                                (theta, tau) = tcSplitPhiTy rho
-                            in
-                            return ([], theta, tau)
+tcInstType inst_tyvars id =
+  do { let (tyvars, rho)    = splitForAllTys (idType id)
+           tyvars'          = mkTyVarBinders () tyvars
+     ;     (tv_prs, preds, rho) <- tc_inst_internal inst_tyvar_bndrs tyvars' rho
+     ; let tv_prs'          = map (\(name, bndr) -> (name, binderVar bndr)) tv_prs
+     ; return (tv_prs', preds, rho) }
+  where
+    inst_tyvar_bndrs :: [VarBndr TyVar ()] -> TcM (TCvSubst, [VarBndr TcTyVar ()])
+    inst_tyvar_bndrs bndrs = do { (subst, tvs) <- inst_tyvars $ binderVars bndrs
+                                ; let tvbnds = map (\tv -> Bndr tv ()) tvs
+                                ; return (subst, tvbnds) }
 
-        (tyvars, rho) -> do { (subst, tyvars') <- inst_tyvars tyvars
-                            ; let (theta, tau) = tcSplitPhiTy (substTyAddInScope subst rho)
-                                  tv_prs       = map tyVarName tyvars `zip` tyvars'
-                            ; return (tv_prs, theta, tau) }
+tcInstTypeBndrs :: ([VarBndr TyVar Specificity] -> TcM (TCvSubst, [VarBndr TcTyVar Specificity]))
+                        -- ^ How to instantiate the type variables
+                -> Id                                                               -- ^ Type to instantiate
+                -> TcM ([(Name, VarBndr TcTyVar Specificity)], TcThetaType, TcType) -- ^ Result
+                     -- (type vars, preds (incl equalities), rho)
+tcInstTypeBndrs inst_tyvars id =
+  let (tyvars, rho) = splitForAllVarBndrs (idType id)
+      tyvars'       = map argf_to_spec tyvars
+  in tc_inst_internal inst_tyvars tyvars' rho
+  where
+    argf_to_spec :: VarBndr TyCoVar ArgFlag -> VarBndr TyCoVar Specificity
+    argf_to_spec (Bndr tv Required)      = Bndr tv SpecifiedSpec
+    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+    argf_to_spec (Bndr tv (Invisible s)) = Bndr tv s
 
 tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
@@ -1000,12 +1032,16 @@ newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX subst tyvar = new_meta_tv_x TauTv subst tyvar
 
-newMetaTyVarTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaTyVarTyVars :: [VarBndr TyVar Specificity]
+                   -> TcM (TCvSubst, [VarBndr TcTyVar Specificity])
 newMetaTyVarTyVars = mapAccumLM newMetaTyVarTyVarX emptyTCvSubst
 
-newMetaTyVarTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+newMetaTyVarTyVarX :: TCvSubst -> (VarBndr TyVar Specificity)
+                   -> TcM (TCvSubst, VarBndr TcTyVar Specificity)
 -- Just like newMetaTyVarX, but make a TyVarTv
-newMetaTyVarTyVarX subst tyvar = new_meta_tv_x TyVarTv subst tyvar
+newMetaTyVarTyVarX subst (Bndr tv spec) =
+  do { (subst', tv') <- new_meta_tv_x TyVarTv subst tv
+     ; return (subst', (Bndr tv' spec)) }
 
 newWildCardX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 newWildCardX subst tv
@@ -1972,6 +2008,10 @@ zonkTyCoVarKind :: TyCoVar -> TcM TyCoVar
 zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind') }
 
+zonkTyCoVarKindBinder :: (VarBndr TyCoVar fl) -> TcM (VarBndr TyCoVar fl)
+zonkTyCoVarKindBinder (Bndr tv fl) = do { kind' <- zonkTcType (tyVarKind tv)
+                                        ; return $ Bndr (setTyVarKind tv kind') fl }
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2178,12 +2218,12 @@ zonkTcTyVarToTyVar tv
                                           (ppr tv $$ ppr ty)
        ; return tv' }
 
-zonkTyVarTyVarPairs :: [(Name,TcTyVar)] -> TcM [(Name,TcTyVar)]
+zonkTyVarTyVarPairs :: [(Name,VarBndr TcTyVar Specificity)] -> TcM [(Name,VarBndr TcTyVar Specificity)]
 zonkTyVarTyVarPairs prs
   = mapM do_one prs
   where
-    do_one (nm, tv) = do { tv' <- zonkTcTyVarToTyVar tv
-                         ; return (nm, tv') }
+    do_one (nm, Bndr tv spec) = do { tv' <- zonkTcTyVarToTyVar tv
+                                   ; return (nm, Bndr tv' spec) }
 
 -- zonkId is used *during* typechecking just to zonk the Id's type
 zonkId :: TcId -> TcM TcId
