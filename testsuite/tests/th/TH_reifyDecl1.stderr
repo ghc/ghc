@@ -9,7 +9,7 @@ data TH_reifyDecl1.Tree (a_0 :: k_1)
     | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 type TH_reifyDecl1.IntList = [GHC.Types.Int]
 newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Types.Int
-Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall (k_0 :: *) (a_1 :: k_0) .
+Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall {k_0 :: *} (a_1 :: k_0) .
                                                            TH_reifyDecl1.Tree a_1
 Class op from TH_reifyDecl1.C1: TH_reifyDecl1.m1 :: forall (a_0 :: *) . TH_reifyDecl1.C1 a_0 =>
                                                     a_0 -> GHC.Types.Int
