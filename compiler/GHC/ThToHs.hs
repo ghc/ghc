@@ -11,6 +11,8 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -35,7 +37,7 @@ import GHC.Unit.Module
 import GHC.Parser.PostProcess
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
-import GHC.Core.Type
+import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
 import GHC.Types.Basic as Hs
@@ -477,7 +479,7 @@ cvt_ci_decs doc decs
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
-cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr ()]
              -> CvtM ( LHsContext GhcPs
                      , Located RdrName
                      , LHsQTyVars GhcPs)
@@ -485,13 +487,13 @@ cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
        ; tvs' <- cvtTvs tvs
-       ; return (cxt', tc', tvs')
+       ; return (cxt', tc', mkHsQTvs tvs')
        }
 
-cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
+cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr ()] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , Located RdrName
-                       , Maybe [LHsTyVarBndr GhcPs]
+                       , Maybe [LHsTyVarBndr () GhcPs]
                        , HsTyPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
   = do { cxt' <- cvtContext funPrec cxt
@@ -594,17 +596,19 @@ cvtConstr (ForallC tvs ctxt con)
 
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
-            , con_qvars  = mkHsQTvs all_tvs
+            , con_qvars  = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
+        all_tvs = tvs' ++ qvars
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
             , con_ex_tvs = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = hsQTvExplicit tvs' ++ ex_tvs
+        all_tvs = tvs' ++ ex_tvs
+
+    add_forall _    _    (XConDecl nec) = noExtCon nec
 
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")
@@ -763,7 +767,7 @@ cvtPragmaD (SpecialiseInstP ty)
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
        ; let act = cvtPhases phases AlwaysActive
-       ; ty_bndrs' <- traverse (mapM cvt_tv) ty_bndrs
+       ; ty_bndrs' <- traverse cvtTvs ty_bndrs
        ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
@@ -1342,17 +1346,29 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --      Types and type variables
 
-cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
-cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
+class CvtFlag flag flag' | flag -> flag' where
+  cvtFlag :: flag -> flag'
 
-cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr GhcPs)
-cvt_tv (TH.PlainTV nm)
+instance CvtFlag () () where
+  cvtFlag () = ()
+
+instance CvtFlag TH.Specificity Hs.Specificity where
+  cvtFlag TH.SpecifiedSpec = Hs.SpecifiedSpec
+  cvtFlag TH.InferredSpec  = Hs.InferredSpec
+
+cvtTvs :: CvtFlag flag flag' => [TH.TyVarBndr flag] -> CvtM [LHsTyVarBndr flag' GhcPs]
+cvtTvs tvs = mapM cvt_tv tvs
+
+cvt_tv :: CvtFlag flag flag' => (TH.TyVarBndr flag) -> CvtM (LHsTyVarBndr flag' GhcPs)
+cvt_tv (TH.PlainTV nm fl)
   = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar noExtField nm' }
-cvt_tv (TH.KindedTV nm ki)
+       ; let fl' = cvtFlag fl
+       ; returnL $ UserTyVar noExtField fl' nm' }
+cvt_tv (TH.KindedTV nm fl ki)
   = do { nm' <- tNameL nm
+       ; let fl' = cvtFlag fl
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar noExtField nm' ki' }
+       ; returnL $ KindedTyVar noExtField fl' nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal
@@ -1458,17 +1474,19 @@ cvtTypeKind ty_str ty
                    ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
-                   ; let hs_ty  = mkHsForAllTy tvs loc ForallInvis tvs' rho_ty
+                   ; let hs_ty  = mkHsForAllTy loc ForallInvis tvs' rho_ty
                          rho_ty = mkHsQualTy cxt loc cxt' ty'
 
                    ; return hs_ty }
 
            ForallVisT tvs ty
              | null tys'
-             -> do { tvs' <- cvtTvs tvs
-                   ; ty'  <- cvtType ty
-                   ; loc  <- getL
-                   ; pure $ mkHsForAllTy tvs loc ForallVis tvs' ty' }
+             -> do { let tvs_spec = map (TH.SpecifiedSpec <$) tvs
+                   -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+                   ; tvs_spec' <- cvtTvs tvs_spec
+                   ; ty'       <- cvtType ty
+                   ; loc       <- getL
+                   ; pure $ mkHsForAllTy loc ForallVis tvs_spec' ty' }
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1705,7 +1723,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l      <- getL
-                               ; univs' <- hsQTvExplicit <$> cvtTvs univs
+                               ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
                                               { hst_fvf = ForallInvis
@@ -1755,27 +1773,25 @@ unboxedSumChecks alt arity
     | otherwise
     = return ()
 
--- | If passed an empty list of 'TH.TyVarBndr's, this simply returns the
+-- | If passed an empty list of 'LHsTyVarBndr's, this simply returns the
 -- third argument (an 'LHsType'). Otherwise, return an 'HsForAllTy'
 -- using the provided 'LHsQTyVars' and 'LHsType'.
-mkHsForAllTy :: [TH.TyVarBndr]
-             -- ^ The original Template Haskell type variable binders
-             -> SrcSpan
+mkHsForAllTy :: SrcSpan
              -- ^ The location of the returned 'LHsType' if it needs an
              --   explicit forall
              -> ForallVisFlag
              -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
              --   or invisible (e.g., @forall a.@)
-             -> LHsQTyVars GhcPs
+             -> [LHsTyVarBndr Hs.Specificity GhcPs]
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type
              -> LHsType GhcPs
              -- ^ The complete type, quantified with a forall if necessary
-mkHsForAllTy tvs loc fvf tvs' rho_ty
+mkHsForAllTy loc fvf tvs rho_ty
   | null tvs  = rho_ty
   | otherwise = L loc $ HsForAllTy { hst_fvf = fvf
-                                   , hst_bndrs = hsQTvExplicit tvs'
+                                   , hst_bndrs = tvs
                                    , hst_xforall = noExtField
                                    , hst_body = rho_ty }
 

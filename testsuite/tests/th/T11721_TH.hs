@@ -12,8 +12,8 @@ $(return [])
 
 main :: IO ()
 main = print
-  $(do let rightOrder :: [TyVarBndr] -> Bool
-           rightOrder [KindedTV b _, KindedTV a _]
+  $(do let rightOrder :: [TyVarBndr flag] -> Bool
+           rightOrder [KindedTV b _ _, KindedTV a _ _]
              = nameBase b == "b" && nameBase a == "a"
            rightOrder _ = False
 
