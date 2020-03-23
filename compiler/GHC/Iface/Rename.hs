@@ -735,7 +735,7 @@ rnIfaceType (IfaceCoercionTy co)
 rnIfaceType (IfaceCastTy ty co)
     = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
 
-rnIfaceForAllBndr :: Rename IfaceForAllBndr
+rnIfaceForAllBndr :: Rename (VarBndr IfaceBndr flag)
 rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAppArgs :: Rename IfaceAppArgs
