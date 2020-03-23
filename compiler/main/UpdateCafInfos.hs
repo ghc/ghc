@@ -17,7 +17,7 @@ import NameSet
 import Util
 import Var
 import Outputable
-import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.StgToCmm.Types (ModuleLFInfos, toImportedLFI)
 
 #include "HsVersions.h"
 
@@ -106,7 +106,7 @@ updateIdCafInfo non_cafs lf_infos id =
       id1 = if not_caffy then setIdCafInfo id NoCafRefs else id
       id2 = case mb_lf_info of
               Nothing -> id1
-              Just lf_info -> setIdLFInfo id1 lf_info
+              Just lf_info -> setIdLFInfo id1 (toImportedLFI lf_info)
     in
       id2
 

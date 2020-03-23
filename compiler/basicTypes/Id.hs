@@ -734,15 +734,15 @@ setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
         ---------------------------------
         -- Lambda form info
-idLFInfo :: HasCallStack => Id -> LambdaFormInfo
+idLFInfo :: HasCallStack => Id -> ImportedLFI
 idLFInfo id = case lfInfo (idInfo id) of
                 Nothing -> pprPanic "idLFInfo" (text "LFInfo not available for Id" <+> ppr id)
-                Just lf_info -> lf_info
+                Just lfi -> lfi
 
-idLFInfo_maybe :: Id -> Maybe LambdaFormInfo
+idLFInfo_maybe :: Id -> Maybe ImportedLFI
 idLFInfo_maybe = lfInfo . idInfo
 
-setIdLFInfo :: Id -> LambdaFormInfo -> Id
+setIdLFInfo :: Id -> ImportedLFI -> Id
 setIdLFInfo id lf = modifyIdInfo (`setLFInfo` lf) id
 
         ---------------------------------

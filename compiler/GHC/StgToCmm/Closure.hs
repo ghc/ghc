@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP, RecordWildCards, ImplicitParams, GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -50,7 +50,6 @@ module GHC.StgToCmm.Closure (
         -- These are really just functions on LambdaFormInfo
         closureUpdReqd, closureSingleEntry,
         closureReEntrant, closureFunInfo,
-        isToplevClosure,
         mightBeAFunction,
 
         blackHoleOnEntry,  -- Needs LambdaFormInfo and SMRep
@@ -118,10 +117,10 @@ instance Outputable CgLoc where
 type SelfLoopInfo = (Id, BlockId, [LocalReg])
 
 -- used by ticky profiling
-isKnownFun :: LambdaFormInfo -> Bool
+isKnownFun :: LambdaFormInfo a -> Bool
 isKnownFun LFReEntrant{} = True
 isKnownFun LFLetNoEscape = True
-isKnownFun _             = False
+isKnownFun _ = False
 
 
 -------------------------------------
@@ -194,7 +193,7 @@ argPrimRep arg = typePrimRep1 (stgArgType arg)
 --                Building LambdaFormInfo
 ------------------------------------------------------
 
-mkLFArgument :: Id -> LambdaFormInfo
+mkLFArgument :: Id -> LambdaFormInfo a
 mkLFArgument id
   | isUnliftedType ty   = LFUnlifted
   | mightBeAFunction ty = LFUnknown True
@@ -203,7 +202,7 @@ mkLFArgument id
     ty = idType id
 
 -------------
-mkLFLetNoEscape :: LambdaFormInfo
+mkLFLetNoEscape :: LambdaFormInfo a
 mkLFLetNoEscape = LFLetNoEscape
 
 -------------
@@ -211,22 +210,19 @@ mkLFReEntrant :: TopLevelFlag    -- True of top level
               -> [Id]            -- Free vars
               -> [Id]            -- Args
               -> ArgDescr        -- Argument descriptor
-              -> LambdaFormInfo
+              -> LocalLFI
 
 mkLFReEntrant _ _ [] _
   = pprPanic "mkLFReEntrant" empty
 mkLFReEntrant top fvs args arg_descr
-  = LFReEntrant top os_info (length args) (null fvs) arg_descr
+  = LFReEntrant (LFR_Local top os_info (length args) (null fvs) arg_descr)
   where os_info = idOneShotInfo (head args)
 
 -------------
-mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
+mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LocalLFI
 mkLFThunk thunk_ty top fvs upd_flag
   = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
-    LFThunk top (null fvs)
-            (isUpdatable upd_flag)
-            NonStandardThunk
-            (mightBeAFunction thunk_ty)
+    LFThunk (LFT_Local top (null fvs) (isUpdatable upd_flag) NonStandardThunk (mightBeAFunction thunk_ty))
 
 --------------
 mightBeAFunction :: Type -> Bool
@@ -241,23 +237,21 @@ mightBeAFunction ty
   = True
 
 -------------
-mkConLFInfo :: DataCon -> LambdaFormInfo
-mkConLFInfo con = LFCon con
+mkConLFInfo :: DataCon -> LambdaFormInfo a
+mkConLFInfo con = LFCon (dataConName con) (dataConTag con)
 
 -------------
-mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
+mkSelectorLFInfo :: Id -> Int -> Bool -> LocalLFI
 mkSelectorLFInfo id offset updatable
-  = LFThunk NotTopLevel False updatable (SelectorThunk offset)
-        (mightBeAFunction (idType id))
+  = LFThunk (LFT_Local NotTopLevel False updatable (SelectorThunk offset) (mightBeAFunction (idType id)))
 
 -------------
-mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
+mkApLFInfo :: Id -> UpdateFlag -> Arity -> LocalLFI
 mkApLFInfo id upd_flag arity
-  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
-        (mightBeAFunction (idType id))
+  = LFThunk (LFT_Local NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity) (mightBeAFunction (idType id)))
 
 -------------
-mkLFStringLit :: LambdaFormInfo
+mkLFStringLit :: LambdaFormInfo a
 mkLFStringLit = LFUnlifted
 
 -----------------------------------------------------
@@ -295,37 +289,37 @@ tagForArity dflags arity
  | isSmallFamily dflags arity = arity
  | otherwise                  = 0
 
-lfDynTag :: DynFlags -> LambdaFormInfo -> DynTag
+lfDynTag :: DynFlags -> LambdaFormInfo a -> DynTag
 -- Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
-lfDynTag dflags (LFCon con)                 = tagForCon dflags con
-lfDynTag dflags (LFReEntrant _ _ arity _ _) = tagForArity dflags arity
-lfDynTag _      _other                      = 0
-
+lfDynTag dflags lfi =
+    case lfi of
+      LFCon _ tag -> min tag (mAX_PTR_TAG dflags)
+      LFReEntrant lfr -> tagForArity dflags (lfr_rep_arity lfr)
+      _ -> 0
 
 -----------------------------------------------------------------------------
 --                Observing LambdaFormInfo
 -----------------------------------------------------------------------------
 
 ------------
-isLFThunk :: LambdaFormInfo -> Bool
-isLFThunk (LFThunk {})  = True
+isLFThunk :: LambdaFormInfo a -> Bool
+isLFThunk LFThunk{} = True
 isLFThunk _ = False
 
-isLFReEntrant :: LambdaFormInfo -> Bool
-isLFReEntrant (LFReEntrant {}) = True
-isLFReEntrant _                = False
+isLFReEntrant :: LambdaFormInfo a -> Bool
+isLFReEntrant LFReEntrant{} = True
+isLFReEntrant _ = False
 
 -----------------------------------------------------------------------------
 --                Choosing SM reps
 -----------------------------------------------------------------------------
 
-lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
-lfClosureType (LFReEntrant _ _ arity _ argd) = Fun arity argd
-lfClosureType (LFCon con)                    = Constr (dataConTagZ con)
-                                                      (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _)       = thunkClosureType is_sel
-lfClosureType _                              = panic "lfClosureType"
+lfClosureType :: LocalLFI -> ClosureTypeInfo
+lfClosureType (LFReEntrant lfr) = Fun (lfr_rep_arity lfr) (lfr_arg_descr lfr)
+lfClosureType (LFCon name tag) = Constr (tag - 1) (dataConIdentity name)
+lfClosureType (LFThunk lft) = thunkClosureType (lft_sfi lft)
+lfClosureType _ = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
 thunkClosureType (SelectorThunk off) = ThunkSelector off
@@ -340,22 +334,23 @@ thunkClosureType _                   = Thunk
 --                nodeMustPointToIt
 -----------------------------------------------------------------------------
 
-nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
+nodeMustPointToIt :: DynFlags -> LambdaFormInfo a -> Bool
 -- If nodeMustPointToIt is true, then the entry convention for
 -- this closure has R1 (the "Node" register) pointing to the
 -- closure itself --- the "self" argument
 
-nodeMustPointToIt _ (LFReEntrant top _ _ no_fvs _)
-  =  not no_fvs          -- Certainly if it has fvs we need to point to it
-  || isNotTopLevel top   -- See Note [GC recovery]
+nodeMustPointToIt _ (LFReEntrant lfr)
+  =  not (lfr_no_fvs lfr) -- Certainly if it has fvs we need to point to it
+  || isNotTopLevel (lfr_top_lvl lfr) -- See Note [GC recovery]
         -- For lex_profiling we also access the cost centre for a
         -- non-inherited (i.e. non-top-level) function.
         -- The isNotTopLevel test above ensures this is ok.
 
-nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
-  =  not no_fvs            -- Self parameter
-  || isNotTopLevel top     -- Note [GC recovery]
-  || updatable             -- Need to push update frame
+nodeMustPointToIt dflags (LFThunk lft)
+  | NonStandardThunk <- lft_sfi lft
+  =  not (lft_no_fvs lft)             -- Self parameter
+  || isNotTopLevel (lft_top_lvl lft)  -- Note [GC recovery]
+  || lft_updatable lft                -- Need to push update frame
   || gopt Opt_SccProfilingOn dflags
           -- For the non-updatable (single-entry case):
           --
@@ -369,7 +364,7 @@ nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
 nodeMustPointToIt _ (LFThunk {})        -- Node must point to a standard-form thunk
   = True
 
-nodeMustPointToIt _ (LFCon _) = True
+nodeMustPointToIt _ (LFCon _ _) = True
 
         -- Strictly speaking, the above two don't need Node to point
         -- to it if the arity = 0.  But this is a *really* unlikely
@@ -456,7 +451,8 @@ getCallMethod :: DynFlags
               -> Id             -- Function Id used to chech if it can refer to
                                 -- CAF's and whether the function is tail-calling
                                 -- itself
-              -> LambdaFormInfo -- Its info
+              -> LambdaFormInfo a
+                                -- Its info
               -> RepArity       -- Number of available arguments
               -> RepArity       -- Number of them being void arguments
               -> CgLoc          -- Passed in from cgIdApp so that we can
@@ -480,31 +476,30 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
-getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
+getCallMethod dflags name id (LFReEntrant lfr) n_args _v_args _cg_loc
               _self_loop_info
   | n_args == 0 -- No args at all
   && not (gopt Opt_SccProfilingOn dflags)
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
-  = ASSERT( arity /= 0 ) ReturnIt
-  | n_args < arity = SlowCall        -- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel dflags name (idCafInfo id)) arity
+  = ASSERT( lfr_rep_arity lfr /= 0 ) ReturnIt
+  | n_args < lfr_rep_arity lfr = SlowCall -- Not enough args
+  | otherwise = DirectEntry (enterIdLabel dflags name (idCafInfo id)) (lfr_rep_arity lfr)
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ (LFCon _ _) n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
-getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
-              n_args _v_args _cg_loc _self_loop_info
-  | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
-  = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
-                -- is the fast-entry code]
+getCallMethod dflags name id (LFThunk lft) n_args _v_args _cg_loc _self_loop_info
+  | lft_mb_fun lft -- it *might* be a function, so we must "call" it (which is always safe)
+  = SlowCall       -- We cannot just enter it [in eval/apply, the entry code
+                   -- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || gopt Opt_Ticky dflags -- to catch double entry
+  | lft_updatable lft || gopt Opt_Ticky dflags -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
          if we enter the same thunk multiple times, so the optimisation
@@ -514,7 +509,7 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
   -- even a non-updatable selector thunk can be updated by the garbage
   -- collector, so we must enter it. (#8817)
-  | SelectorThunk{} <- std_form_info
+  | SelectorThunk{} <- lft_sfi lft
   = EnterIt
 
     -- We used to have ASSERT( n_args == 0 ), but actually it is
@@ -526,8 +521,7 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
   | otherwise        -- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info
-                updatable) 0
+    DirectEntry (thunkEntryLabel dflags name (idCafInfo id) (lft_sfi lft) (lft_updatable lft)) 0
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
@@ -570,7 +564,7 @@ data ClosureInfo
            -- code for ticky and profiling, and we could pass the information
            -- around separately, but it doesn't do much harm to keep it here.
 
-        closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon
+        closureLFInfo :: !LocalLFI, -- NOTE: not an LFCon
           -- this tells us about what the closure contains: it's right-hand-side.
 
           -- the rest is just an unpacked CmmInfoTable.
@@ -595,10 +589,10 @@ mkCmmInfo ClosureInfo {..} id ccs
 --------------------------------------
 
 mkClosureInfo :: DynFlags
-              -> Bool                -- Is static
+              -> Bool           -- Is static
               -> Id
-              -> LambdaFormInfo
-              -> Int -> Int        -- Total and pointer words
+              -> LocalLFI
+              -> Int -> Int     -- Total and pointer words
               -> String         -- String descriptor
               -> ClosureInfo
 mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
@@ -643,9 +637,9 @@ blackHoleOnEntry cl_info
 
   | otherwise
   = case closureLFInfo cl_info of
-      LFReEntrant {}            -> False
-      LFLetNoEscape             -> False
-      LFThunk _ _no_fvs upd _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
+      LFReEntrant {} -> False
+      LFLetNoEscape -> False
+      LFThunk lft -> lft_updatable lft -- See Note [Black-holing non-updatable thunks]
       _other -> panic "blackHoleOnEntry"
 
 {- Note [Black-holing non-updatable thunks]
@@ -721,13 +715,13 @@ isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 closureUpdReqd :: ClosureInfo -> Bool
 closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
 
-lfUpdatable :: LambdaFormInfo -> Bool
-lfUpdatable (LFThunk _ _ upd _ _)  = upd
+lfUpdatable :: LambdaFormInfo a -> Bool
+lfUpdatable (LFThunk lft) = lft_updatable lft
 lfUpdatable _ = False
 
 closureSingleEntry :: ClosureInfo -> Bool
-closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
-closureSingleEntry (ClosureInfo { closureLFInfo = LFReEntrant _ OneShotLam _ _ _}) = True
+closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk lft }) = not (lft_updatable lft)
+closureSingleEntry (ClosureInfo { closureLFInfo = LFReEntrant (LFR_Local _ OneShotLam _ _ _) }) = True
 closureSingleEntry _ = False
 
 closureReEntrant :: ClosureInfo -> Bool
@@ -737,20 +731,13 @@ closureReEntrant _ = False
 closureFunInfo :: ClosureInfo -> Maybe (RepArity, ArgDescr)
 closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
 
-lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
-lfFunInfo (LFReEntrant _ _ arity _ arg_desc)  = Just (arity, arg_desc)
-lfFunInfo _                                   = Nothing
+lfFunInfo :: LocalLFI ->  Maybe (RepArity, ArgDescr)
+lfFunInfo (LFReEntrant lfr) = Just (lfr_rep_arity lfr, lfr_arg_descr lfr)
+lfFunInfo _ = Nothing
 
 funTag :: DynFlags -> ClosureInfo -> DynTag
 funTag dflags (ClosureInfo { closureLFInfo = lf_info })
     = lfDynTag dflags lf_info
-
-isToplevClosure :: ClosureInfo -> Bool
-isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
-  = case lf_info of
-      LFReEntrant TopLevel _ _ _ _ -> True
-      LFThunk TopLevel _ _ _ _     -> True
-      _other                       -> False
 
 --------------------------------------
 --   Label generation
@@ -767,14 +754,14 @@ closureLocalEntryLabel dflags
   | tablesNextToCode dflags = toInfoLbl  . closureInfoLabel
   | otherwise               = toEntryLbl . closureInfoLabel
 
-mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
+mkClosureInfoTableLabel :: Id -> LocalLFI -> CLabel
 mkClosureInfoTableLabel id lf_info
   = case lf_info of
-        LFThunk _ _ upd_flag (SelectorThunk offset) _
-                      -> mkSelectorInfoLabel upd_flag offset
+        LFThunk lft | SelectorThunk offset <- lft_sfi lft
+                      -> mkSelectorInfoLabel (lft_updatable lft) offset
 
-        LFThunk _ _ upd_flag (ApThunk arity) _
-                      -> mkApInfoTableLabel upd_flag arity
+        LFThunk lft | ApThunk arity <- lft_sfi lft
+                      -> mkApInfoTableLabel (lft_updatable lft) arity
 
         LFThunk{}     -> std_mk_lbl name cafs
         LFReEntrant{} -> std_mk_lbl name cafs
@@ -878,7 +865,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
-   cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
+   cl_type = Constr (dataConTagZ data_con) (dataConIdentity (dataConName data_con))
                   -- We keep the *zero-indexed* tag in the srt_len field
                   -- of the info table of a data constructor.
 

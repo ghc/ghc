@@ -406,7 +406,7 @@ tickyUnknownCall         = ifTicky $ bumpTickyCounter (fsLit "UNKNOWN_CALL_ctr")
 
 -- Tick for the call pattern at slow call site (i.e. in addition to
 -- tickyUnknownCall, tickyKnownCallExtraArgs, etc.)
-tickySlowCall :: LambdaFormInfo -> [StgArg] -> FCode ()
+tickySlowCall :: LambdaFormInfo a -> [StgArg] -> FCode ()
 tickySlowCall _ [] = return ()
 tickySlowCall lf_info args = do
  -- see Note [Ticky for slow calls]
@@ -445,7 +445,7 @@ bad for both space and time).
 -- -----------------------------------------------------------------------------
 -- Ticky allocation
 
-tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
+tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo a -> FCode ()
 -- Called when doing a dynamic heap allocation; the LambdaFormInfo
 -- used to distinguish between closure types
 --
