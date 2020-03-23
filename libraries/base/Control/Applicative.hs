@@ -146,7 +146,7 @@ instance Alternative ZipList where
 --
 -- ==== __Examples__
 --
--- Using the Control.Monad.Except as an Alternative, a couple of functions:
+-- Using the 'Alternative' instance of `Control.Monad.Except`, the following functions:
 --
 -- >>> canFail = throwError "it failed" :: Except String Int
 -- >>> final = return 42                :: Except String Int
