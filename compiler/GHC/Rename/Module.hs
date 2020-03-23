@@ -370,7 +370,7 @@ rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let unitId = thisPackage $ hsc_dflags topEnv
@@ -382,7 +382,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
                                , fd_fe = spec }
@@ -602,7 +602,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
   = do { (inst_ty', inst_fvs)
-           <- rnHsSigType (GenericCtx $ text "an instance declaration") TypeLevel inst_ty
+           <- rnHsSigType (GenericCtx $ text "an instance declaration") TypeLevel inf_err inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
        ; cls <-
            case hsTyGetAppHead_maybe head_ty' of
@@ -659,6 +659,8 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     the instance context after renaming.  This is a bit
              --     strange, but should not matter (and it would be more work
              --     to remove the context).
+  where
+    inf_err = Just (text "Inferred type variables are not allowed")
 
 rnFamInstEqn :: HsDocContext
              -> AssocTyFamInfo
@@ -1039,8 +1041,8 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
 
-bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr GhcPs]
-               -> (Maybe [LHsTyVarBndr GhcRn]  -> RnM (b, FreeVars))
+bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr () GhcPs]
+               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
                -> RnM (b, FreeVars)
 bindRuleTyVars doc in_doc (Just bndrs) thing_inside
   = bindLHsTyVarBndrs doc (Just in_doc) Nothing bndrs (thing_inside . Just)
@@ -1369,7 +1371,7 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
-        ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
+        ; (new_ki, fvs) <- rnHsSigType doc KindLevel Nothing ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
   where
@@ -1768,7 +1770,7 @@ rnLHsDerivingClause doc
                               , deriv_clause_strategy = dcs
                               , deriv_clause_tys = L loc' dct }))
   = do { (dcs', dct', fvs)
-           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc TypeLevel) dct
+           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc TypeLevel Nothing) dct
        ; warnNoDerivStrat dcs' loc
        ; pure ( L loc (HsDerivingClause { deriv_clause_ext = noExtField
                                         , deriv_clause_strategy = dcs'
@@ -1806,7 +1808,7 @@ rnLDerivStrategy doc mds thing_inside
         AnyclassStrategy -> boring_case AnyclassStrategy
         NewtypeStrategy  -> boring_case NewtypeStrategy
         ViaStrategy via_ty ->
-          do (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
+          do (via_ty', fvs1) <- rnHsSigType doc TypeLevel Nothing via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, _, _) = splitLHsSigmaTyInvis via_body
@@ -2073,7 +2075,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_forall  = L _ explicit_forall
-                            , con_qvars   = qtvs
+                            , con_qvars   = explicit_tkvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
                             , con_res_ty  = res_ty
@@ -2082,8 +2084,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; new_names <- mapM lookupLocatedTopBndrRn names
         ; mb_doc'   <- rnMbLHsDoc mb_doc
 
-        ; let explicit_tkvs = hsQTvExplicit qtvs
-              theta         = hsConDeclTheta mcxt
+        ; let theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
 
           -- We must ensure that we extract the free tkvs in left-to-right
@@ -2114,12 +2115,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                       -- See Note [GADT abstract syntax] in GHC.Hs.Decls
                                       (PrefixCon arg_tys, final_res_ty)
 
-              new_qtvs =  HsQTvs { hsq_ext = implicit_tkvs
-                                 , hsq_explicit  = explicit_tkvs }
-
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
-        ; return (decl { con_g_ext = noExtField, con_names = new_names
-                       , con_qvars = new_qtvs, con_mb_cxt = new_cxt
+        ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
+                       , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
                   all_fvs) } }
