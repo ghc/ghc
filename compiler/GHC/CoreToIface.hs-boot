@@ -1,9 +1,9 @@
 module GHC.CoreToIface where
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, TyLit, Coercion )
-import {-# SOURCE #-} GHC.Iface.Type( IfaceType, IfaceTyCon, IfaceForAllBndr
-                                    , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
-import Var ( TyCoVarBinder )
+import {-# SOURCE #-} GHC.Iface.Type ( IfaceType, IfaceTyCon, IfaceBndr
+                                     , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
+import Var ( VarBndr, TyCoVar )
 import VarEnv ( TidyEnv )
 import GHC.Core.TyCon ( TyCon )
 import VarSet( VarSet )
@@ -11,7 +11,7 @@ import VarSet( VarSet )
 -- For GHC.Core.TyCo.Rep
 toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTyLit :: TyLit -> IfaceTyLit
-toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndr :: (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion
