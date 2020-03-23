@@ -105,6 +105,9 @@ templateHaskellNames = [
     numTyLitName, strTyLitName,
     -- TyVarBndr
     plainTVName, kindedTVName,
+    plainInvisTVName, kindedInvisTVName,
+    -- Specificity
+    specifiedSpecName, inferredSpecName,
     -- Role
     nominalRName, representationalRName, phantomRName, inferRName,
     -- Kind
@@ -152,7 +155,7 @@ templateHaskellNames = [
     expQTyConName, fieldExpTyConName, predTyConName,
     stmtTyConName,  decsTyConName, conTyConName, bangTypeTyConName,
     varBangTypeTyConName, typeQTyConName, expTyConName, decTyConName,
-    typeTyConName, tyVarBndrTyConName, clauseTyConName,
+    typeTyConName, tyVarBndrUnitTyConName, tyVarBndrSpecTyConName, clauseTyConName,
     patQTyConName, funDepTyConName, decsQTyConName,
     ruleBndrTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
@@ -471,6 +474,15 @@ plainTVName, kindedTVName :: Name
 plainTVName  = libFun (fsLit "plainTV")  plainTVIdKey
 kindedTVName = libFun (fsLit "kindedTV") kindedTVIdKey
 
+plainInvisTVName, kindedInvisTVName :: Name
+plainInvisTVName  = libFun (fsLit "plainInvisTV")  plainInvisTVIdKey
+kindedInvisTVName = libFun (fsLit "kindedInvisTV") kindedInvisTVIdKey
+
+-- data Specificity = ...
+specifiedSpecName, inferredSpecName :: Name
+specifiedSpecName = libFun (fsLit "specifiedSpec") specifiedSpecKey
+inferredSpecName  = libFun (fsLit "inferredSpec")  inferredSpecKey
+
 -- data Role = ...
 nominalRName, representationalRName, phantomRName, inferRName :: Name
 nominalRName          = libFun (fsLit "nominalR")          nominalRIdKey
@@ -546,7 +558,8 @@ patQTyConName, expQTyConName, stmtTyConName,
     conTyConName, bangTypeTyConName,
     varBangTypeTyConName, typeQTyConName,
     decsQTyConName, ruleBndrTyConName, tySynEqnTyConName, roleTyConName,
-    derivClauseTyConName, kindTyConName, tyVarBndrTyConName,
+    derivClauseTyConName, kindTyConName,
+    tyVarBndrUnitTyConName, tyVarBndrSpecTyConName,
     derivStrategyTyConName :: Name
 -- These are only used for the types of top-level splices
 expQTyConName           = libTc (fsLit "ExpQ")           expQTyConKey
@@ -564,7 +577,8 @@ tySynEqnTyConName       = thTc  (fsLit "TySynEqn")       tySynEqnTyConKey
 roleTyConName           = libTc (fsLit "Role")           roleTyConKey
 derivClauseTyConName   = thTc (fsLit "DerivClause")   derivClauseTyConKey
 kindTyConName          = thTc (fsLit "Kind")          kindTyConKey
-tyVarBndrTyConName      = thTc (fsLit "TyVarBndr")     tyVarBndrTyConKey
+tyVarBndrUnitTyConName = libTc (fsLit "TyVarBndrUnit") tyVarBndrUnitTyConKey
+tyVarBndrSpecTyConName = libTc (fsLit "TyVarBndrSpec") tyVarBndrSpecTyConKey
 derivStrategyTyConName = thTc (fsLit "DerivStrategy") derivStrategyTyConKey
 
 -- quasiquoting
@@ -628,7 +642,8 @@ quoteClassKey = mkPreludeClassUnique 201
 expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     patTyConKey,
     stmtTyConKey, conTyConKey, typeQTyConKey, typeTyConKey,
-    tyVarBndrTyConKey, decTyConKey, bangTypeTyConKey, varBangTypeTyConKey,
+    tyVarBndrUnitTyConKey, tyVarBndrSpecTyConKey,
+    decTyConKey, bangTypeTyConKey, varBangTypeTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
     funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
@@ -655,7 +670,8 @@ patQTyConKey            = mkPreludeTyConUnique 219
 funDepTyConKey          = mkPreludeTyConUnique 222
 predTyConKey            = mkPreludeTyConUnique 223
 predQTyConKey           = mkPreludeTyConUnique 224
-tyVarBndrTyConKey      = mkPreludeTyConUnique 225
+tyVarBndrUnitTyConKey   = mkPreludeTyConUnique 225
+tyVarBndrSpecTyConKey   = mkPreludeTyConUnique 237
 decsQTyConKey           = mkPreludeTyConUnique 226
 ruleBndrTyConKey       = mkPreludeTyConUnique 227
 tySynEqnTyConKey        = mkPreludeTyConUnique 228
@@ -985,6 +1001,10 @@ plainTVIdKey, kindedTVIdKey :: Unique
 plainTVIdKey       = mkPreludeMiscIdUnique 413
 kindedTVIdKey      = mkPreludeMiscIdUnique 414
 
+plainInvisTVIdKey, kindedInvisTVIdKey :: Unique
+plainInvisTVIdKey       = mkPreludeMiscIdUnique 482
+kindedInvisTVIdKey      = mkPreludeMiscIdUnique 483
+
 -- data Role = ...
 nominalRIdKey, representationalRIdKey, phantomRIdKey, inferRIdKey :: Unique
 nominalRIdKey          = mkPreludeMiscIdUnique 415
@@ -1059,6 +1079,11 @@ stockStrategyIdKey    = mkPreludeDataConUnique 494
 anyclassStrategyIdKey = mkPreludeDataConUnique 495
 newtypeStrategyIdKey  = mkPreludeDataConUnique 496
 viaStrategyIdKey      = mkPreludeDataConUnique 497
+
+-- data Specificity = ...
+specifiedSpecKey, inferredSpecKey :: Unique
+specifiedSpecKey = mkPreludeMiscIdUnique 498
+inferredSpecKey  = mkPreludeMiscIdUnique 499
 
 {-
 ************************************************************************
