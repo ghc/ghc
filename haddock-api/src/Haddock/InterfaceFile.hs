@@ -83,7 +83,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if (__GLASGOW_HASKELL__ >= 809) && (__GLASGOW_HASKELL__ < 811)
-binaryInterfaceVersion = 35
+binaryInterfaceVersion = 36
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]

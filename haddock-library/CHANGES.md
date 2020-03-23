@@ -1,6 +1,8 @@
-## Changes in version 1.8.0.1
+## Changes in version 1.9.0
 
  * Fix build-time regression for `base < 4.7` (#1119)
+
+ * Update parsing to strip whitespace from table cells (#1074)
 
 ## Changes in version 1.8.0
 

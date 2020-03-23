@@ -260,7 +260,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         tyVarBndr2Type :: HsTyVarBndr GhcRn -> HsType GhcRn
         tyVarBndr2Type (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
         tyVarBndr2Type (KindedTyVar _ n k) = HsKindSig noExtField (reL (HsTyVar noExtField NotPromoted n)) k
-        tyVarBndr2Type (XTyVarBndr _) = panic "haddock:ppCtor"
+        tyVarBndr2Type (XTyVarBndr nec) = noExtCon nec
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
