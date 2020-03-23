@@ -26,6 +26,7 @@ module Language.Haskell.TH.Syntax
       -- * Language extensions
     , module Language.Haskell.TH.LanguageExtensions
     , ForeignSrcLang(..)
+    , Specificity(..)
     ) where
 
 import Data.Data hiding (Fixity(..))
@@ -2023,19 +2024,19 @@ data Range = FromR Exp | FromThenR Exp Exp
 data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
-  | DataD Cxt Name [TyVarBndr]
+  | DataD Cxt Name [TyVarBndr ()]
           (Maybe Kind)            -- Kind signature (allowed only for GADTs)
           [Con] [DerivClause]
                                   -- ^ @{ data Cxt x => T x = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
-  | NewtypeD Cxt Name [TyVarBndr]
+  | NewtypeD Cxt Name [TyVarBndr ()]
              (Maybe Kind)         -- Kind signature
              Con [DerivClause]    -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W Q)
                                   --       deriving stock Eq }@
-  | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
-  | ClassD Cxt Name [TyVarBndr]
+  | TySynD Name [TyVarBndr ()] Type -- ^ @{ type T x = (x,x) }@
+  | ClassD Cxt Name [TyVarBndr ()]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
   | InstanceD (Maybe Overlap) Cxt Type [Dec]
                                   -- ^ @{ instance {\-\# OVERLAPS \#-\}
@@ -2051,18 +2052,18 @@ data Dec
   | PragmaD Pragma                -- ^ @{ {\-\# INLINE [1] foo \#-\} }@
 
   -- | data families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | DataFamilyD Name [TyVarBndr]
+  | DataFamilyD Name [TyVarBndr ()]
                (Maybe Kind)
          -- ^ @{ data family T a b c :: * }@
 
-  | DataInstD Cxt (Maybe [TyVarBndr]) Type
+  | DataInstD Cxt (Maybe [TyVarBndr ()]) Type
              (Maybe Kind)         -- Kind signature
              [Con] [DerivClause]  -- ^ @{ data instance Cxt x => T [x]
                                   --       = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
 
-  | NewtypeInstD Cxt (Maybe [TyVarBndr]) Type -- Quantified type vars
+  | NewtypeInstD Cxt (Maybe [TyVarBndr ()]) Type -- Quantified type vars
                  (Maybe Kind)      -- Kind signature
                  Con [DerivClause] -- ^ @{ newtype instance Cxt x => T [x]
                                    --        = A (B x)
@@ -2175,7 +2176,7 @@ type PatSynType = Type
 -- @TypeFamilyHead@ is defined to be the elements of the declaration
 -- between @type family@ and @where@.
 data TypeFamilyHead =
-  TypeFamilyHead Name [TyVarBndr] FamilyResultSig (Maybe InjectivityAnn)
+  TypeFamilyHead Name [TyVarBndr ()] FamilyResultSig (Maybe InjectivityAnn)
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | One equation of a type family instance or closed type family. The
@@ -2195,7 +2196,7 @@ data TypeFamilyHead =
 --            ('AppT' ('AppKindT' ('ConT' ''Foo) ('VarT' k)) ('VarT' a))
 --            ('VarT' a)
 -- @
-data TySynEqn = TySynEqn (Maybe [TyVarBndr]) Type Type
+data TySynEqn = TySynEqn (Maybe [TyVarBndr ()]) Type Type
   deriving( Show, Eq, Ord, Data, Generic )
 
 data FunDep = FunDep [Name] [Name]
@@ -2215,7 +2216,7 @@ data Safety = Unsafe | Safe | Interruptible
 data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseP     Name Type (Maybe Inline) Phases
             | SpecialiseInstP Type
-            | RuleP           String (Maybe [TyVarBndr]) [RuleBndr] Exp Exp Phases
+            | RuleP           String (Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
             | LineP           Int String
             | CompleteP       [Name] (Maybe Name)
@@ -2304,7 +2305,7 @@ data DecidedStrictness = DecidedLazy
 data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
-         | ForallC [TyVarBndr] Cxt Con   -- ^ @forall a. Eq a => C [a]@
+         | ForallC [TyVarBndr Specificity] Cxt Con -- ^ @forall a. Eq a => C [a]@
          | GadtC [Name] [BangType]
                  Type                    -- See Note [GADT return type]
                                          -- ^ @C :: a -> b -> T b Int@
@@ -2373,8 +2374,8 @@ data PatSynArgs
   | RecordPatSyn [Name]        -- ^ @pattern P { {x,y,z} } = p@
   deriving( Show, Eq, Ord, Data, Generic )
 
-data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
-          | ForallVisT [TyVarBndr] Type   -- ^ @forall \<vars\> -> \<type\>@
+data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
+          | ForallVisT [TyVarBndr ()] Type  -- ^ @forall \<vars\> -> \<type\>@
           | AppT Type Type                -- ^ @T a b@
           | AppKindT Type Kind            -- ^ @T \@k t@
           | SigT Type Kind                -- ^ @t :: k@
@@ -2404,14 +2405,23 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<t
           | ImplicitParamT String Type    -- ^ @?x :: t@
       deriving( Show, Eq, Ord, Data, Generic )
 
-data TyVarBndr = PlainTV  Name            -- ^ @a@
-               | KindedTV Name Kind       -- ^ @(a :: k)@
+data Specificity = SpecifiedSpec          -- ^ @a@
+                 | InferredSpec           -- ^ @{a}@
       deriving( Show, Eq, Ord, Data, Generic )
+
+data TyVarBndr flag = PlainTV  Name flag      -- ^ @a@
+                    | KindedTV Name flag Kind -- ^ @(a :: k)@
+      deriving( Show, Eq, Ord, Data, Generic )
+
+setTyVarBndrFlag :: flag -> TyVarBndr flag'
+                 -> TyVarBndr flag
+setTyVarBndrFlag fl (PlainTV n _)    = PlainTV n fl
+setTyVarBndrFlag fl (KindedTV n _ k) = KindedTV n fl k
 
 -- | Type family result signature
 data FamilyResultSig = NoSig              -- ^ no signature
                      | KindSig  Kind      -- ^ @k@
-                     | TyVarSig TyVarBndr -- ^ @= r, = (r :: k)@
+                     | TyVarSig (TyVarBndr ()) -- ^ @= r, = (r :: k)@
       deriving( Show, Eq, Ord, Data, Generic )
 
 -- | Injectivity annotation

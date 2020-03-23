@@ -1,0 +1,8 @@
+
+ExplicitSpecificity6.hs:8:1: error:
+    Inferred type variables are not allowed
+    In an instance declaration
+
+ExplicitSpecificity6.hs:9:3: error:
+    Inferred type variables are not allowed
+    In a SPECIALISE instance pragma
