@@ -75,7 +75,7 @@ module IdInfo (
         cafInfo, setCafInfo,
 
         -- ** The LambdaFormInfo type
-        LambdaFormInfo(..),
+        LambdaFormInfo(..), ImportedLFI,
         lfInfo, setLFInfo,
 
         -- ** Tick-box Info
@@ -108,7 +108,7 @@ import Demand
 import Cpr
 import Util
 
-import GHC.StgToCmm.Types (LambdaFormInfo (..))
+import GHC.StgToCmm.Types (LambdaFormInfo (..), ImportedLFI)
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -278,7 +278,11 @@ data IdInfo
         -- n <=> all calls have at least n arguments
         levityInfo      :: LevityInfo,
         -- ^ when applied, will this Id ever have a levity-polymorphic type?
-        lfInfo          :: !(Maybe LambdaFormInfo)
+        lfInfo          :: !(Maybe ImportedLFI)
+        -- ^ Lambda form info of the Id. Not available in two cases:
+        --
+        -- 1. The Id is wired-in and we haven't given it an LFI
+        -- 2. The Id is local to the module being compiled
     }
 
 -- Setters
@@ -308,7 +312,7 @@ setCallArityInfo info ar  = info { callArityInfo = ar  }
 setCafInfo :: IdInfo -> CafInfo -> IdInfo
 setCafInfo info caf = info { cafInfo = caf }
 
-setLFInfo :: IdInfo -> LambdaFormInfo -> IdInfo
+setLFInfo :: IdInfo -> ImportedLFI -> IdInfo
 setLFInfo info lf = info { lfInfo = Just lf }
 
 setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo

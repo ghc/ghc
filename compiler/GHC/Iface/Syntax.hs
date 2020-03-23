@@ -389,8 +389,8 @@ data IfaceIdDetails
 
 -- Lambda form info
 data IfaceLFInfo
-  = IfLFReEntrant !IfaceOneShot !RepArity !Bool
-  | IfLFThunk !Bool !Bool !IfaceStandardFormInfo !Bool
+  = IfLFReEntrant !RepArity
+  | IfLFThunk !Bool !IfaceStandardFormInfo !Bool
   | IfLFCon              -- A saturated constructor application
         !Name            -- The constructor Name
   | IfLFUnknown !Bool
@@ -407,10 +407,10 @@ tcStandardFormInfo (IfStandardFormInfo w)
       | otherwise = SelectorThunk
 
 instance Outputable IfaceLFInfo where
-    ppr (IfLFReEntrant oneshot rep fvs_flag) =
-        text "LFReEntrant" <+> ppr (oneshot, rep, fvs_flag)
-    ppr (IfLFThunk fvs_flag upd_flag sfi fun_flag) =
-        text "LFThunk" <+> ppr (fvs_flag, upd_flag, fun_flag) <+> ppr (tcStandardFormInfo sfi)
+    ppr (IfLFReEntrant arity) =
+        text "LFReEntrant" <+> ppr arity
+    ppr (IfLFThunk updatable sfi mb_fun) =
+        text "LFThunk" <+> ppr (updatable, tcStandardFormInfo sfi, mb_fun)
     ppr (IfLFCon con) = text "LFCon" <> brackets (ppr con)
     ppr IfLFUnlifted = text "LFUnlifted"
     ppr (IfLFUnknown fun_flag) = text "LFUnknown" <+> ppr fun_flag
@@ -423,17 +423,14 @@ instance Binary IfaceStandardFormInfo where
 
 instance Binary IfaceLFInfo where
     -- TODO: We could pack the bytes somewhat
-    put_ bh (IfLFReEntrant oneshot rep fvs_flag) = do
+    put_ bh (IfLFReEntrant arity) = do
         putByte bh 0
-        put_ bh oneshot
-        put_ bh rep
-        put_ bh fvs_flag
-    put_ bh (IfLFThunk top_lvl no_fvs std_form maybe_fun) = do
+        put_ bh arity
+    put_ bh (IfLFThunk updatable sfi mb_fun) = do
         putByte bh 1
-        put_ bh top_lvl
-        put_ bh no_fvs
-        put_ bh std_form
-        put_ bh maybe_fun
+        put_ bh updatable
+        put_ bh sfi
+        put_ bh mb_fun
     put_ bh (IfLFCon con_name) = do
         putByte bh 2
         put_ bh con_name
@@ -445,8 +442,8 @@ instance Binary IfaceLFInfo where
     get bh = do
         tag <- getByte bh
         case tag of
-            0 -> IfLFReEntrant <$> get bh <*> get bh <*> get bh
-            1 -> IfLFThunk <$> get bh <*> get bh <*> get bh <*> get bh
+            0 -> IfLFReEntrant <$> get bh
+            1 -> IfLFThunk <$> get bh <*> get bh <*> get bh
             2 -> IfLFCon <$> get bh
             3 -> IfLFUnknown <$> get bh
             4 -> pure IfLFUnlifted

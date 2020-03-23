@@ -595,7 +595,7 @@ stdPattern reps
 
 emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> Id                      -- name of the closure
-                            -> LambdaFormInfo
+                            -> LambdaFormInfo a
                             -> CmmInfoTable
                             -> [NonVoid Id]            -- incoming arguments
                             -> ((Int, LocalReg, [LocalReg]) -> FCode ()) -- function body
