@@ -441,10 +441,12 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
  where name =  getName hfCand
        tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
          where pprArg b arg = case binderArgFlag b of
-                                Specified -> text "@" <> pprParendType arg
-                                -- Do not print type application for inferred
-                                -- variables (#16456)
-                                Inferred  -> empty
+                                -- See Note [Explicit Case Statement for Specificity]
+                                (Invisible spec) -> case spec of
+                                  SpecifiedSpec -> text "@" <> pprParendType arg
+                                  -- Do not print type application for inferred
+                                  -- variables (#16456)
+                                  InferredSpec  -> empty
                                 Required  -> pprPanic "pprHoleFit: bad Required"
                                                          (ppr b <+> ppr arg)
        tyAppVars = sep $ punctuate comma $

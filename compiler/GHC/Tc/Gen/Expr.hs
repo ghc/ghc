@@ -1709,7 +1709,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
                 do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendNameTyVarEnv (sig_inst_skols sig_inst) $
+                   ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
                               tcCheckExprNC expr (sig_inst_tau sig_inst)
                    ; return (expr', sig_inst) }
@@ -1730,7 +1730,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
        ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
                                    tau_tvs qtvs (Just sig_inst)
        ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
-             my_sigma       = mkForAllTys binders (mkPhiTy  my_theta tau)
+             my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
        ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType

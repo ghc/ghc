@@ -1,0 +1,4 @@
+
+ExplicitSpecificity4.hs:8:3: error:
+    A default type signature cannot contain inferred type variables
+    In a class method signature for ‘f’
