@@ -37,6 +37,13 @@ int FS(_stat) (const char *path, struct _stat *buffer);
 int FS(_stat64) (const char *path, struct __stat64 *buffer);
 int FS(_wstat) (const wchar_t *path, struct _stat *buffer);
 int FS(_wstat64) (const wchar_t *path, struct __stat64 *buffer);
+int FS(_wrename) (const wchar_t *from, const wchar_t *to);
+int FS(rename) (const char *from, const char *to);
+int FS(unlink) (const char *filename);
+int FS(_unlink) (const char *filename);
+int FS(_wunlink) (const wchar_t *filename);
+int FS(remove) (const char *path);
+int FS(_wremove) (const wchar_t *path);
 #else
 
 FILE *FS(fopen) (const char* filename, const char* mode);
