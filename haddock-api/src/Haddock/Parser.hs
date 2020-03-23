@@ -20,7 +20,7 @@ import GHC.Driver.Session ( DynFlags )
 import FastString   ( fsLit )
 import Lexer        ( mkPState, unP, ParseResult(POk) )
 import Parser       ( parseIdentifier )
-import GHC.Types.Name.RdrName ( RdrName )
+import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.SrcLoc ( mkRealSrcLoc, unLoc )
 import StringBuffer ( stringToStringBuffer )
 

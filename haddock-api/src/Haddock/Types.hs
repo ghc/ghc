@@ -41,7 +41,7 @@ import GHC.Types.Basic (Fixity(..), PromotionFlag(..))
 import GHC
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Types.Name.OccName
+import GHC.Types.Name.Occurrence
 import Outputable
 
 -----------------------------------------------------------------------------

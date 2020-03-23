@@ -30,8 +30,8 @@ import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
 import GHC.Hs
 import GHC.Types.Name
-import GHC.Types.Name.Set     ( emptyNameSet )
-import GHC.Types.Name.RdrName ( mkVarUnqual )
+import GHC.Types.Name.Set    ( emptyNameSet )
+import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Core.PatSyn
 import GHC.Types.SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
 import TcType

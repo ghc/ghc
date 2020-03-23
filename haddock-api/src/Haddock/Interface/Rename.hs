@@ -23,7 +23,7 @@ import Bag (emptyBag)
 import GHC hiding (NoLink)
 import GHC.Types.Name
 import Outputable ( panic )
-import GHC.Types.Name.RdrName (RdrName(Exact))
+import GHC.Types.Name.Reader (RdrName(Exact))
 import TysWiredIn (eqTyCon_RDR)
 
 import Control.Applicative

@@ -51,7 +51,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
-import GHC.Types.Name.RdrName
+import GHC.Types.Name.Reader
 import TcRnTypes
 import FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
@@ -869,7 +869,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         constructor_names =
           filter isDataConName (availSubordinates avail)
 
--- this heavily depends on the invariants stated in GHC.Types.Avail
+-- this heavily depends on the invariants stated in Avail
 availExportsDecl :: AvailInfo -> Bool
 availExportsDecl (AvailTC ty_name names _)
   | n : _ <- names = ty_name == n

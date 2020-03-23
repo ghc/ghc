@@ -26,9 +26,9 @@ import qualified Pretty
 
 import GHC.Types.Basic        ( PromotionFlag(..) )
 import GHC
-import GHC.Types.Name.OccName
-import GHC.Types.Name         ( nameOccName )
-import GHC.Types.Name.RdrName ( rdrNameOcc )
+import GHC.Types.Name.Occurrence
+import GHC.Types.Name        ( nameOccName )
+import GHC.Types.Name.Reader ( rdrNameOcc )
 import FastString           ( unpackFS )
 import Outputable           ( panic)
 

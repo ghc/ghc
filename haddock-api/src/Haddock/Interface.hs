@@ -58,8 +58,8 @@ import GHC.Driver.Types
 import FastString (unpackFS)
 import TcRnTypes (tcg_rdr_env)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
-import GHC.Types.Name.OccName (isTcOcc)
-import GHC.Types.Name.RdrName (unQualOK, gre_name, globalRdrEnvElts)
+import GHC.Types.Name.Occurrence (isTcOcc)
+import GHC.Types.Name.Reader (unQualOK, gre_name, globalRdrEnvElts)
 import ErrUtils (withTimingD)
 
 #if defined(mingw32_HOST_OS)

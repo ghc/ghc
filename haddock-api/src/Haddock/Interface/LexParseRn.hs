@@ -33,7 +33,7 @@ import Haddock.Parser
 import Haddock.Types
 import GHC.Types.Name
 import Outputable ( showPpr, showSDoc )
-import GHC.Types.Name.RdrName
+import GHC.Types.Name.Reader
 import EnumSet
 import GHC.Rename.Env (dataTcOccs)
 

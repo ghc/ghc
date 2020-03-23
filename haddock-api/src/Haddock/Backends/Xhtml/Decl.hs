@@ -39,7 +39,7 @@ import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import GHC.Types.Name
 import BooleanFormula
-import GHC.Types.Name.RdrName ( rdrNameOcc )
+import GHC.Types.Name.Reader ( rdrNameOcc )
 import Outputable ( panic )
 
 -- | Pretty print a declaration

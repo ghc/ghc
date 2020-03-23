@@ -28,7 +28,7 @@ import qualified Data.List as List
 
 import GHC hiding (LexicalFixity(..))
 import GHC.Types.Name
-import GHC.Types.Name.RdrName
+import GHC.Types.Name.Reader
 import FastString (unpackFS)
 
 
