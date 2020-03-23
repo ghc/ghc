@@ -9,6 +9,12 @@
     written in terms of `Q` are now disallowed. The types of `unsafeTExpCoerce`
     and `unTypeQ` are also generalised in terms of `Quote` rather than specific
     to `Q`.
+    
+  * Implement Explicit specificity in type variable binders (GHC Proposal #99).
+    In `Language.Haskell.TH.Syntax`, `TyVarBndr` is now annotated with a `flag`,
+    denoting the additional argument to its constructors `PlainTV` and `KindedTV`.
+    `flag` is either the `Specificity` of the type variable (`SpecifiedSpec` or
+    `InferredSpec`) or `()`.
 
   * Fix Eq/Ord instances for `Bytes`: we were comparing pointers while we should
     compare the actual bytes (#16457).

@@ -371,7 +371,7 @@ data DataCon
         --            of tyvars (*not* covars) of dcExTyCoVars unioned with the
         --            set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- See Note [DataCon user type variable binders]
-        dcUserTyVarBinders :: [TyVarBinder],
+        dcUserTyVarBinders :: [InvisTVBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
                                 -- _as written by the programmer_.
@@ -939,10 +939,10 @@ mkDataCon :: Name
                             -- if it is a record, otherwise empty
           -> [TyVar]        -- ^ Universals.
           -> [TyCoVar]      -- ^ Existentials.
-          -> [TyVarBinder]  -- ^ User-written 'TyVarBinder's.
-                            --   These must be Inferred/Specified.
-                            --   See @Note [TyVarBinders in DataCons]@
-          -> [EqSpec]       -- ^ GADT equalities
+          -> [InvisTVBinder]    -- ^ User-written 'TyVarBinder's.
+                                --   These must be Inferred/Specified.
+                                --   See @Note [TyVarBinders in DataCons]@
+          -> [EqSpec]           -- ^ GADT equalities
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied Type]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
@@ -1006,13 +1006,13 @@ mkDataCon name declared_infix prom_info
         NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInvForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
+        DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
                  mkVisFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
-    prom_tv_bndrs = [ mkNamedTyConBinder vis tv
-                    | Bndr tv vis <- user_tvbs ]
+    prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
+                    | Bndr tv spec <- user_tvbs ]
 
     fresh_names = freshNames (map getName user_tvbs)
       -- fresh_names: make sure that the "anonymous" tyvars don't
@@ -1102,9 +1102,9 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 
 -- See Note [DataCon user type variable binders]
--- | 'TyCoVarBinder's for the type variables of the constructor, in the order the
+-- | 'InvisTVBinder's for the type variables of the constructor, in the order the
 -- user wrote them
-dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
+dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Equalities derived from the result type of the data constructor, as written
@@ -1327,7 +1327,7 @@ dataConUserType :: DataCon -> Type
 dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkForAllTys user_tvbs $
+  = mkInvisForAllTys user_tvbs $
     mkInvisFunTys theta $
     mkVisFunTys arg_tys $
     res_ty

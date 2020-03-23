@@ -8,7 +8,7 @@ import System.IO
 -- attempting to place a kind signature on a H98 data type
 $( return
    [ DataD [] (mkName "T")
-           [ PlainTV (mkName "a") ]
+           [ PlainTV (mkName "a") () ]
            (Just StarT)
            [ NormalC (mkName "MkT")
                    [ ( Bang NoSourceUnpackedness NoSourceStrictness

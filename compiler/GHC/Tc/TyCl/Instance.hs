@@ -836,7 +836,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 
 -----------------------
 tcDataFamInstHeader
-    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
+    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr () GhcRn]
     -> LexicalFixity -> LHsContext GhcRn
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
     -> NewOrData
@@ -1306,7 +1306,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
-           ; let sc_top_ty = mkInvForAllTys tyvars $
+           ; let sc_top_ty = mkInfForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_ext  = noExtField
