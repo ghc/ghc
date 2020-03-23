@@ -2274,22 +2274,31 @@ pprStmt (ApplicativeStmt _ args mb_join)
        (if lengthAtLeast args 2 then parens else id) ap_expr
 
    pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
-   pp_arg (_, ApplicativeArgOne _ pat expr isBody _)
-     | isBody =  -- See Note [Applicative BodyStmt]
-     ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
+   pp_arg (_, applicativeArg) = ppr applicativeArg
+
+pprStmt (XStmtLR x) = ppr x
+
+
+instance (OutputableBndrId idL)
+      => Outputable (ApplicativeArg (GhcPass idL)) where
+  ppr = pprArg
+
+pprArg :: forall idL . (OutputableBndrId idL) => ApplicativeArg (GhcPass idL) -> SDoc
+pprArg (ApplicativeArgOne _ pat expr isBody _)
+  | isBody =  -- See Note [Applicative BodyStmt]
+    ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
             :: ExprStmt (GhcPass idL))
-     | otherwise =
-     ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr noSyntaxExpr
+  | otherwise =
+    ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr noSyntaxExpr
             :: ExprStmt (GhcPass idL))
-   pp_arg (_, ApplicativeArgMany _ stmts return pat) =
+pprArg (ApplicativeArgMany _ stmts return pat) =
      ppr pat <+>
      text "<-" <+>
      ppr (HsDo (panic "pprStmt") DoExpr (noLoc
                (stmts ++
                    [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)])))
-   pp_arg (_, XApplicativeArg x) = ppr x
 
-pprStmt (XStmtLR x) = ppr x
+pprArg (XApplicativeArg x) = ppr x
 
 pprTransformStmt :: (OutputableBndrId p)
                  => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
