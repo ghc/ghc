@@ -298,7 +298,7 @@ copy(StgClosure **p, const StgInfoTable *info,
    that has been evacuated, or unset otherwise.
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+static void
 evacuate_large(StgPtr p)
 {
   bdescr *bd;
