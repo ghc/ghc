@@ -15,6 +15,7 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHC.Driver.Session
 import GHC.Driver.Types
+import GHC.Core.DataCon
 import Name             ( Name, getName )
 import NameEnv
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
@@ -69,7 +70,7 @@ make_constr_itbls hsc_env cons =
             | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
             | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
 
-         descr = dataConIdentity dcon
+         descr = dataConIdentity (dataConName dcon)
 
      r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs_really
                               conNo (tagForCon dflags dcon) descr)

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
+{-# LANGUAGE LambdaCase #-}
 
 -- | Functions for converting Core things to interface file things.
 module GHC.CoreToIface
@@ -442,8 +443,7 @@ toIfaceIdDetails (RecSelId { sel_naughty = n
 
   -- The remaining cases are all "implicit Ids" which don't
   -- appear in interface files at all
-toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
-                         IfVanillaId   -- Unexpected; the other
+toIfaceIdDetails other = IfVanillaId   -- Unexpected; the other
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
@@ -626,18 +626,14 @@ toIfaceVar v
 
 
 ---------------------
-toIfaceLFInfo :: LambdaFormInfo -> IfaceLFInfo
-toIfaceLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
-    IfLFReEntrant (toIfaceOneShot oneshot) rep fvs_flag
-toIfaceLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
-   -- Assert that arity fits in 14 bits
-   ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
-   IfLFThunk hasfv updateable (toIfaceStandardFormInfo sfi) m_function
-toIfaceLFInfo LFUnlifted = IfLFUnlifted
-toIfaceLFInfo (LFCon con) = IfLFCon (dataConName con)
--- All other cases are not possible at the top level.
-toIfaceLFInfo lf = pprPanic "Invalid IfaceLFInfo conversion:"
-                   (ppr lf <+> text "should not be exported")
+toIfaceLFInfo :: ImportedLFI -> IfaceLFInfo
+toIfaceLFInfo = \case
+    LFReEntrant lfr -> IfLFReEntrant (lfr_rep_arity lfr)
+    LFThunk lft -> IfLFThunk (lft_updatable lft) (toIfaceStandardFormInfo (lft_sfi lft)) (lft_mb_fun lft)
+    LFCon name _ -> IfLFCon name
+    LFUnknown mb_fun -> IfLFUnknown mb_fun
+    LFUnlifted -> IfLFUnlifted
+    LFLetNoEscape -> panic "toIfaceLFInfo: LFLetNoEscape"
 
 toIfaceStandardFormInfo :: StandardFormInfo -> IfaceStandardFormInfo
 toIfaceStandardFormInfo NonStandardThunk = IfStandardFormInfo 1

@@ -1507,16 +1507,17 @@ addIdLFInfo id = case idLFInfo_maybe id of
                    Just _  -> id
 
 -- Make a LambdaFormInfo for the Ids without a LFInfo in the iface file
-mkLFImported :: IdDetails -> IdInfo -> Type -> LambdaFormInfo
+mkLFImported :: IdDetails -> IdInfo -> Type -> ImportedLFI
 mkLFImported details info ty
   | DataConWorkId con <- details
   , isNullaryRepDataCon con
-  = LFCon con   -- An imported nullary constructor
+  = LFCon (dataConName con) (dataConTag con)
+                -- An imported nullary constructor
                 -- We assume that the constructor is evaluated so that
                 -- the id really does point directly to the constructor
 
   | arity > 0
-  = LFReEntrant TopLevel noOneShotInfo arity True ArgUnknown
+  = LFReEntrant (LFR_Imported arity)
 
   | isUnliftedType ty
   = LFUnlifted
@@ -1533,16 +1534,18 @@ tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
 tcJoinInfo (IfaceJoinPoint ar) = Just ar
 tcJoinInfo IfaceNotJoinPoint   = Nothing
 
-tcLFInfo :: IfaceLFInfo -> IfL LambdaFormInfo
-tcLFInfo (IfLFReEntrant oneshot rep fvs_flag) =
-    return (LFReEntrant TopLevel (tcIfaceOneShot oneshot) rep fvs_flag ArgUnknown)
+tcLFInfo :: IfaceLFInfo -> IfL ImportedLFI
 
-tcLFInfo (IfLFThunk fvs_flag upd_flag sfi fun_flag ) = do
-    return (LFThunk TopLevel fvs_flag upd_flag (tcStandardFormInfo sfi) fun_flag)
+tcLFInfo (IfLFReEntrant arity) = return (LFReEntrant (LFR_Imported arity))
+
+tcLFInfo (IfLFThunk updatable sfi mb_fun) =
+    return (LFThunk (LFT_Imported updatable (tcStandardFormInfo sfi) mb_fun))
 
 tcLFInfo IfLFUnlifted = return LFUnlifted
 
-tcLFInfo (IfLFCon con_name) = LFCon <$!> tcIfaceDataCon con_name
+tcLFInfo (IfLFCon name) = do
+    con <- tcIfaceDataCon name
+    return (LFCon name (dataConTag con))
 
 tcLFInfo (IfLFUnknown fun_flag) = return (LFUnknown fun_flag)
 

@@ -26,7 +26,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
-import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.StgToCmm.Types (ModuleLFInfos, toImportedLFI)
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -112,15 +112,14 @@ codeGen dflags this_mod data_tycons
 
         -- Only external names are actually visible to codeGen. So they are the
         -- only ones we care about.
-        ; let extractInfo info = lf `seq` Just (name,lf)
-                where
-                  id = cg_id info
-                  !name = idName id
-                  lf = cg_lf info
+        ; let extractInfo (CgIdInfo !id !lf _) =
+                let !lf' = toImportedLFI lf
+                    !name = idName id
+                 in Just (name, lf')
 
         ; let !generatedInfo = mkNameEnv (mapMaybe extractInfo (eltsUFM cg_id_infos))
 
-        ; return $! generatedInfo
+        ; return generatedInfo
         }
 
 ---------------------------------------------------------------

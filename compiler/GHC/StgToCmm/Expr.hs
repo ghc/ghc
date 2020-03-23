@@ -858,13 +858,14 @@ cgIdApp fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
+    case fun_info of
+      { CgIdInfo _ lf_info _ ->
     let fun_arg     = StgVarArg fun_id
         fun_name    = idName    fun_id
         fun         = idInfoToAmode fun_info
-        lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
-        node_points dflags = nodeMustPointToIt dflags lf_info
+        node_points dflags = nodeMustPointToIt dflags lf_info in
     case getCallMethod dflags fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
             -- A value in WHNF, so we can just return it.
         ReturnIt
@@ -893,7 +894,7 @@ cgIdApp fun_id args = do
           ; cmm_args <- getNonVoidArgAmodes args
           ; emitMultiAssign lne_regs cmm_args
           ; emit (mkBranch blk_id)
-          ; return AssignedDirectly }
+          ; return AssignedDirectly } }
 
 -- Note [Self-recursive tail calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
