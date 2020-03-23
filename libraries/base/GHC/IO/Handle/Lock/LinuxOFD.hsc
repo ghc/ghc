@@ -12,6 +12,9 @@ module GHC.IO.Handle.Lock.LinuxOFD where
 import GHC.Base () -- Make implicit dependency known to build system
 #else
 
+-- Not only is this a good idea but it also works around #17950.
+#define _FILE_OFFSET_BITS 64
+
 #include <unistd.h>
 #include <fcntl.h>
 
