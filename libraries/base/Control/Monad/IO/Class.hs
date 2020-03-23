@@ -30,8 +30,42 @@ module Control.Monad.IO.Class (
 
 class (Monad m) => MonadIO m where
     -- | Lift a computation from the 'IO' monad.
+    -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
+    -- (i.e. 'IO' is the base monad for the stack).
+    --
+    -- === __Example__
+    --
+    --
+    -- > import Control.Monad.Trans.State -- from the "transformers" library
+    -- >
+    -- > printState :: Show s => StateT s IO ()
+    -- > printState = do
+    -- >   state <- get
+    -- >   liftIO $ print state
+    --
+    --
+    -- Had we omitted @'liftIO'@, we would have ended up with this error:
+    --
+    -- > • Couldn't match type ‘IO’ with ‘StateT s IO’
+    -- >  Expected type: StateT s IO ()
+    -- >    Actual type: IO ()
+    --
+    -- The important part here is the mismatch between @StateT s IO ()@ and @'IO' ()@.
+    --
+    -- Luckily, we know of a function that takes an @'IO' a@ and returns an @(m a)@: @'liftIO'@,
+    -- enabling us to run the program and see the expected results:
+    --
+    -- @
+    -- > evalStateT printState "hello"
+    -- "hello"
+    --
+    -- > evalStateT printState 3
+    -- 3
+    -- @
+    --
     liftIO :: IO a -> m a
 
 -- | @since 4.9.0.0
 instance MonadIO IO where
     liftIO = id
+
