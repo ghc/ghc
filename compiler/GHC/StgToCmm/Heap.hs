@@ -18,7 +18,7 @@ module GHC.StgToCmm.Heap (
 
         mkStaticClosureFields, mkStaticClosure,
 
-        allocDynClosure, allocDynClosureCmm, allocHeapClosure,
+        allocDynClosure, allocHeapClosure,
         emitSetDynHdr
     ) where
 
@@ -33,6 +33,7 @@ import GHC.StgToCmm.Prof (profDynAlloc, dynProfHdr, staticProfHdr)
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Env
+import GHC.StgToCmm.Types
 
 import GHC.Cmm.Graph
 
@@ -59,7 +60,7 @@ import Data.Maybe (isJust)
 allocDynClosure
         :: Maybe Id
         -> CmmInfoTable
-        -> LambdaFormInfo
+        -> LocalLFI
         -> CmmExpr              -- Cost Centre to stick in the object
         -> CmmExpr              -- Cost Centre to blame for this alloc
                                 -- (usually the same; sometimes "OVERHEAD")
@@ -70,7 +71,11 @@ allocDynClosure
         -> FCode CmmExpr -- returns Hp+n
 
 allocDynClosureCmm
-        :: Maybe Id -> CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
+        :: Maybe Id
+        -> CmmInfoTable
+        -> LocalLFI
+        -> CmmExpr
+        -> CmmExpr
         -> [(CmmExpr, ByteOff)]
         -> FCode CmmExpr -- returns Hp+n
 

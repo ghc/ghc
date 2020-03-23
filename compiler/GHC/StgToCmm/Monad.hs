@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -----------------------------------------------------------------------------
 --
@@ -63,6 +64,7 @@ import GhcPrelude hiding( sequence, succ )
 
 import GHC.Cmm
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Types
 import GHC.Driver.Session
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Graph as CmmGraph
@@ -171,15 +173,15 @@ data CgInfoDownwards        -- information only passed *downwards* by the monad
 type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
-  = CgIdInfo
+  = forall a . CgIdInfo
         { cg_id :: Id   -- Id that this is the info for
-        , cg_lf  :: LambdaFormInfo
-        , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
+        , cg_lf :: LambdaFormInfo a -- LFI, local or imported
+        , cg_loc :: CgLoc  -- CmmExpr for the *tagged* value
         }
 
 instance Outputable CgIdInfo where
-  ppr (CgIdInfo { cg_id = id, cg_loc = loc })
-    = ppr id <+> text "-->" <+> ppr loc
+  ppr (CgIdInfo { cg_id = id, cg_loc = loc, cg_lf = lf })
+    = ppr id <+> text "-->" <+> ppr loc <+> parens (ppr lf)
 
 -- Sequel tells what to do with the result of this expression
 data Sequel

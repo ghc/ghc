@@ -1339,17 +1339,16 @@ dataConRepArgTys (MkData { dcRep = rep
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler
-dataConIdentity :: DataCon -> ByteString
+dataConIdentity :: Name -> ByteString
 -- We want this string to be UTF-8, so we get the bytes directly from the FastStrings.
-dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
+dataConIdentity name = LBS.toStrict $ BSB.toLazyByteString $ mconcat
    [ BSB.byteString $ bytesFS (unitIdFS (moduleUnitId mod))
    , BSB.int8 $ fromIntegral (ord ':')
    , BSB.byteString $ bytesFS (moduleNameFS (moduleName mod))
    , BSB.int8 $ fromIntegral (ord '.')
    , BSB.byteString $ bytesFS (occNameFS (nameOccName name))
    ]
-  where name = dataConName dc
-        mod  = ASSERT( isExternalName name ) nameModule name
+  where mod  = ASSERT( isExternalName name ) nameModule name
 
 isTupleDataCon :: DataCon -> Bool
 isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
