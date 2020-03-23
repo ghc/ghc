@@ -1,0 +1,6 @@
+
+ExplicitSpecificity8.hs:9:12: error:
+    • Unexpected inferred variable in visible forall binder:
+        forall {k} -> k -> Type
+    • In the kind ‘forall {k} -> k -> Type’
+      In the data type declaration for ‘T2’

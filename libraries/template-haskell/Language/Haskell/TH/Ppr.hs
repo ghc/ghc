@@ -511,7 +511,7 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
     maybeInj | (Just inj') <- inj = ppr inj'
              | otherwise          = empty
 
-ppr_bndrs :: Maybe [TyVarBndr] -> Doc
+ppr_bndrs :: PprFlag flag => Maybe [TyVarBndr flag] -> Doc
 ppr_bndrs (Just bndrs) = text "forall" <+> sep (map ppr bndrs) <> text "."
 ppr_bndrs Nothing = empty
 
@@ -660,13 +660,13 @@ instance Ppr PatSynArgs where
 commaSepApplied :: [Name] -> Doc
 commaSepApplied = commaSepWith (pprName' Applied)
 
-pprForall :: [TyVarBndr] -> Cxt -> Doc
+pprForall :: [TyVarBndr Specificity] -> Cxt -> Doc
 pprForall = pprForall' ForallInvis
 
-pprForallVis :: [TyVarBndr] -> Cxt -> Doc
+pprForallVis :: [TyVarBndr ()] -> Cxt -> Doc
 pprForallVis = pprForall' ForallVis
 
-pprForall' :: ForallVisFlag -> [TyVarBndr] -> Cxt -> Doc
+pprForall' :: PprFlag flag => ForallVisFlag -> [TyVarBndr flag] -> Cxt -> Doc
 pprForall' fvf tvs cxt
   -- even in the case without any tvs, there could be a non-empty
   -- context cxt (e.g., in the case of pattern synonyms, where there
@@ -859,9 +859,21 @@ instance Ppr TyLit where
   ppr = pprTyLit
 
 ------------------------------
-instance Ppr TyVarBndr where
-    ppr (PlainTV nm)    = ppr nm
-    ppr (KindedTV nm k) = parens (ppr nm <+> dcolon <+> ppr k)
+class PprFlag flag where
+    pprTyVarBndr :: (TyVarBndr flag) -> Doc
+
+instance PprFlag () where
+    pprTyVarBndr (PlainTV nm ())    = ppr nm
+    pprTyVarBndr (KindedTV nm () k) = parens (ppr nm <+> dcolon <+> ppr k)
+
+instance PprFlag Specificity where
+    pprTyVarBndr (PlainTV nm SpecifiedSpec)    = ppr nm
+    pprTyVarBndr (PlainTV nm InferredSpec)     = braces (ppr nm)
+    pprTyVarBndr (KindedTV nm SpecifiedSpec k) = parens (ppr nm <+> dcolon <+> ppr k)
+    pprTyVarBndr (KindedTV nm InferredSpec  k) = braces (ppr nm <+> dcolon <+> ppr k)
+
+instance PprFlag flag => Ppr (TyVarBndr flag) where
+    ppr bndr = pprTyVarBndr bndr
 
 instance Ppr Role where
     ppr NominalR          = text "nominal"
