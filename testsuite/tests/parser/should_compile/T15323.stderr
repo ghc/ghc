@@ -21,6 +21,7 @@
        [({ T15323.hs:5:19 }
          (UserTyVar
           (NoExtField)
+          (())
           ({ T15323.hs:5:19 }
            (Unqual
             {OccName: v}))))])
@@ -40,14 +41,13 @@
              {OccName: TestParens}))]
           ({ T15323.hs:6:21-55 }
            (True))
-          (HsQTvs
-           (NoExtField)
-           [({ T15323.hs:6:28 }
-             (UserTyVar
-              (NoExtField)
-              ({ T15323.hs:6:28 }
-               (Unqual
-                {OccName: v}))))])
+          [({ T15323.hs:6:28 }
+            (UserTyVar
+             (NoExtField)
+             (SpecifiedSpec)
+             ({ T15323.hs:6:28 }
+              (Unqual
+               {OccName: v}))))]
           (Just
            ({ T15323.hs:6:32-37 }
             [({ T15323.hs:6:32-37 }
