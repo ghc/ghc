@@ -307,7 +307,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
-        ; let e_ty = mkInvForAllTy alphaTyVar $
+        ; let e_ty = mkInfForAllTy alphaTyVar $
                      mkVisFunTys cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
         ; expr' <- tcCheckExpr expr e_ty

@@ -42,7 +42,7 @@ import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
 
 import GHC.Driver.Session
-import GHC.Types.Var ( TyVar, tyVarKind )
+import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
@@ -293,11 +293,11 @@ no_anon_wc lty = go lty
 
     gos = all go
 
-no_anon_wc_bndrs :: [LHsTyVarBndr GhcRn] -> Bool
+no_anon_wc_bndrs :: [LHsTyVarBndr flag GhcRn] -> Bool
 no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
   where
-    go (UserTyVar _ _)      = True
-    go (KindedTyVar _ _ ki) = no_anon_wc ki
+    go (UserTyVar _ _ _)      = True
+    go (KindedTyVar _ _ _ ki) = no_anon_wc ki
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -374,15 +374,15 @@ tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 tcPatSynSig name sig_ty
   | HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
-  , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
-  , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
+  , (univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
+  , (ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
+       ; (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
            <- pushTcLevelM_   $
               solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
               bindImplicitTKBndrs_Skol implicit_hs_tvs $
-              bindExplicitTKBndrs_Skol univ_hs_tvs     $
-              bindExplicitTKBndrs_Skol ex_hs_tvs       $
+              bindExplicitTKBndrs_Skol univ_hs_tvbndrs $
+              bindExplicitTKBndrs_Skol ex_hs_tvbndrs   $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -390,8 +390,8 @@ tcPatSynSig name sig_ty
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
-       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs
-                                                 req ex_tvs prov body_ty
+       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs
+                                                 req ex_tvbndrs prov body_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralizeAll ungen_patsyn_ty
@@ -401,8 +401,8 @@ tcPatSynSig name sig_ty
        -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
-       ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
-       ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
+       ; univ_tvbndrs <- mapM zonkTyCoVarKindBinder univ_tvbndrs
+       ; ex_tvbndrs   <- mapM zonkTyCoVarKindBinder ex_tvbndrs
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty
@@ -421,15 +421,15 @@ tcPatSynSig name sig_ty
              body_ty'              = substTy  env3 body_ty
 -}
       ; let implicit_tvs' = implicit_tvs
-            univ_tvs'     = univ_tvs
-            ex_tvs'       = ex_tvs
+            univ_tvbndrs' = univ_tvbndrs
+            ex_tvbndrs'   = ex_tvbndrs
             req'          = req
             prov'         = prov
             body_ty'      = body_ty
 
        -- Now do validity checking
        ; checkValidType ctxt $
-         build_patsyn_type kvs implicit_tvs' univ_tvs' req' ex_tvs' prov' body_ty'
+         build_patsyn_type kvs implicit_tvs' univ_tvbndrs' req' ex_tvbndrs' prov' body_ty'
 
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
@@ -439,27 +439,28 @@ tcPatSynSig name sig_ty
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
               , text "kvs" <+> ppr_tvs kvs
-              , text "univ_tvs" <+> ppr_tvs univ_tvs'
+              , text "univ_tvs" <+> ppr_tvs (binderVars univ_tvbndrs')
               , text "req" <+> ppr req'
-              , text "ex_tvs" <+> ppr_tvs ex_tvs'
+              , text "ex_tvs" <+> ppr_tvs (binderVars ex_tvbndrs')
               , text "prov" <+> ppr prov'
               , text "body_ty" <+> ppr body_ty' ]
        ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = mkTyVarBinders Inferred  kvs ++
-                                                mkTyVarBinders Specified implicit_tvs'
-                      , patsig_univ_bndrs     = univ_tvs'
+                      , patsig_implicit_bndrs = mkTyVarBinders InferredSpec kvs ++
+                                                mkTyVarBinders SpecifiedSpec implicit_tvs'
+                      , patsig_univ_bndrs     = univ_tvbndrs'
                       , patsig_req            = req'
-                      , patsig_ex_bndrs       = ex_tvs'
+                      , patsig_ex_bndrs       = ex_tvbndrs'
                       , patsig_prov           = prov'
                       , patsig_body_ty        = body_ty' }) }
   where
     ctxt = PatSynCtxt name
 
-    build_patsyn_type kvs imp univ req ex prov body
-      = mkInvForAllTys kvs $
-        mkSpecForAllTys (imp ++ univ) $
+    build_patsyn_type kvs imp univ_bndrs req ex_bndrs prov body
+      = mkInfForAllTys kvs $
+        mkSpecForAllTys imp $
+        mkInvisForAllTys univ_bndrs $
         mkPhiTy req $
-        mkSpecForAllTys ex $
+        mkInvisForAllTys ex_bndrs $
         mkPhiTy prov $
         body
 
@@ -479,7 +480,7 @@ tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
 tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (tv_prs, theta, tau) <- tcInstType newMetaTyVarTyVars poly_id
+    do { (tv_prs, theta, tau) <- tcInstTypeBndrs newMetaTyVarTyVars poly_id
               -- See Note [Pattern bindings and complete signatures]
 
        ; return (TISI { sig_inst_sig   = sig

@@ -65,7 +65,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import GHC.Types.Var( VarBndr(..), binderVar )
+import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
@@ -163,8 +163,8 @@ data IfaceDecl
                   ifPatBuilder    :: Maybe (IfExtName, Bool),
                   -- Everything below is redundant,
                   -- but needed to implement pprIfaceDecl
-                  ifPatUnivBndrs  :: [IfaceForAllBndr],
-                  ifPatExBndrs    :: [IfaceForAllBndr],
+                  ifPatUnivBndrs  :: [IfaceForAllSpecBndr],
+                  ifPatExBndrs    :: [IfaceForAllSpecBndr],
                   ifPatProvCtxt   :: IfaceContext,
                   ifPatReqCtxt    :: IfaceContext,
                   ifPatArgs       :: [IfaceType],
@@ -248,7 +248,7 @@ data IfaceConDecl
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
         ifConExTCvs   :: [IfaceBndr],  -- Existential ty/covars
-        ifConUserTvBinders :: [IfaceForAllBndr],
+        ifConUserTvBinders :: [IfaceForAllSpecBndr],
           -- The tyvars, in the order the user wrote them
           -- INVARIANT: the set of tyvars in ifConUserTvBinders is exactly the
           --            set of tyvars (*not* covars) of ifConExTCvs, unioned
@@ -970,8 +970,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , pprIfaceContextArr prov_ctxt
                              , pprIfaceType $ foldr (IfaceFunTy VisArg) pat_ty arg_tys ])
       where
-        univ_msg = pprUserIfaceForAll univ_bndrs
-        ex_msg   = pprUserIfaceForAll ex_bndrs
+        univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
+        ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
@@ -1099,9 +1099,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- the visibilities of the existential tyvar binders, we can simply drop
     -- the universal tyvar binders from user_tvbs.
     ex_tvbs = dropList tc_binders user_tvbs
-    ppr_ex_quant = pprIfaceForAllPartMust ex_tvbs ctxt
+    ppr_ex_quant = pprIfaceForAllPartMust (ifaceForAllSpecToBndrs ex_tvbs) ctxt
     pp_gadt_res_ty = mk_user_con_res_ty eq_spec
-    ppr_gadt_ty = pprIfaceForAllPart user_tvbs ctxt pp_tau
+    ppr_gadt_ty = pprIfaceForAllPart (ifaceForAllSpecToBndrs user_tvbs) ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
