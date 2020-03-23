@@ -814,7 +814,8 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
 
     -- Unfoldings
     -- See Note [Unfoldings and join points]
-    (unf_usage, unf') = occAnalUnfolding rhs_env mb_join_arity bndr
+    unf = idUnfolding bndr
+    (unf_usage, unf') = occAnalUnfolding rhs_env mb_join_arity unf
     rhs_usage2 = rhs_usage1 `andUDs` unf_usage
 
     -- Rules
@@ -1180,6 +1181,8 @@ type LetrecNode = Node Unique Details  -- Node comes from Digraph
                                        -- The Unique key is gotten from the Id
 data Details
   = ND { nd_bndr :: Id          -- Binder
+       , nd_unf  :: Unfolding   -- Original unfolding of this binder
+                                -- (used for size information in nodeScore)
        , nd_rhs  :: CoreExpr    -- RHS, already occ-analysed
        , nd_rhs_bndrs :: [CoreBndr] -- Outer lambdas of RHS
                                     -- INVARIANT: (nd_rhs_bndrs nd, _) ==
@@ -1208,6 +1211,7 @@ data Details
 instance Outputable Details where
    ppr nd = text "ND" <> braces
              (sep [ text "bndr =" <+> ppr (nd_bndr nd)
+                  , text "unf =" <+> ppr (nd_unf nd)
                   , text "uds =" <+> ppr (nd_uds nd)
                   , text "inl =" <+> ppr (nd_inl nd)
                   , text "weak =" <+> ppr (nd_weak nd)
@@ -1238,6 +1242,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     -- explained in Note [Deterministic SCC] in Digraph.
   where
     details = ND { nd_bndr            = bndr'
+                 , nd_unf             = unf   -- The original unfolding
                  , nd_rhs             = rhs'
                  , nd_rhs_bndrs       = bndrs'
                  , nd_uds             = rhs_usage3
@@ -1287,7 +1292,9 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                                         , is_active a]
 
     -- Finding the usage details of the INLINE pragma (if any)
-    (unf_uds, unf') = occAnalUnfolding rhs_env mb_join_arity bndr
+    unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
+                               -- here because that is what we are setting!
+    (unf_uds, unf') = occAnalUnfolding rhs_env mb_join_arity unf
 
     -- Find the "nd_inl" free vars; for the loop-breaker phase
     -- These are the vars that would become free if the function
@@ -1323,15 +1330,16 @@ mkLoopBreakerNodes env lvl bndr_set body_uds details_s
             | ND { nd_bndr = bndr, nd_uds = uds, nd_rhs_bndrs = rhs_bndrs }
                  <- details_s ]
 
-    mk_lb_node nd@(ND { nd_bndr = bndr, nd_rhs = rhs, nd_inl = inl_fvs }) bndr'
-      = DigraphNode nd' (varUnique bndr) (nonDetKeysUniqSet lb_deps)
+    mk_lb_node nd@(ND { nd_bndr = old_bndr, nd_unf = old_unf
+                      , nd_rhs = rhs, nd_inl = inl_fvs }) new_bndr
+      = DigraphNode nd' (varUnique old_bndr) (nonDetKeysUniqSet lb_deps)
               -- It's OK to use nonDetKeysUniqSet here as
               -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
               -- in nondeterministic order as explained in
               -- Note [Deterministic SCC] in Digraph.
       where
-        nd'     = nd { nd_bndr = bndr', nd_score = score }
-        score   = nodeScore env bndr bndr' rhs lb_deps
+        nd'     = nd { nd_bndr = new_bndr, nd_score = score }
+        score   = nodeScore env old_bndr old_unf new_bndr rhs lb_deps
         lb_deps = extendFvs_ rule_fv_env inl_fvs
 
     rule_fv_env :: IdEnv IdSet
@@ -1349,11 +1357,13 @@ mkLoopBreakerNodes env lvl bndr_set body_uds details_s
 ------------------------------------------
 nodeScore :: OccEnv
           -> Id        -- Binder has old occ-info (just for loop-breaker-ness)
+                       --   but its unfolding may have been zapped by now
+          -> Unfolding -- Old unfolding (for size info etc)
           -> Id        -- Binder with new occ-info
           -> CoreExpr  -- RHS
           -> VarSet    -- Loop-breaker dependencies
           -> NodeScore
-nodeScore env old_bndr new_bndr bind_rhs lb_deps
+nodeScore env old_bndr old_unf new_bndr bind_rhs lb_deps
   | not (isId old_bndr)     -- A type or coercion variable is never a loop breaker
   = (100, 0, False)
 
@@ -1371,7 +1381,7 @@ nodeScore env old_bndr new_bndr bind_rhs lb_deps
     -- where df is the exported dictionary. Then df makes a really
     -- bad choice for loop breaker
 
-  | DFunUnfolding { df_args = args } <- id_unfolding
+  | DFunUnfolding { df_args = args } <- old_unf
     -- Never choose a DFun as a loop breaker
     -- Note [DFuns should not be loop breakers]
   = (9, length args, is_lb)
@@ -1379,13 +1389,13 @@ nodeScore env old_bndr new_bndr bind_rhs lb_deps
     -- Data structures are more important than INLINE pragmas
     -- so that dictionary/method recursion unravels
 
-  | CoreUnfolding { uf_guidance = UnfWhen {} } <- id_unfolding
+  | CoreUnfolding { uf_guidance = UnfWhen {} } <- old_unf
   = mk_score 6
 
   | is_con_app rhs   -- Data types help with cases:
   = mk_score 5       -- Note [Constructor applications]
 
-  | isStableUnfolding id_unfolding
+  | isStableUnfolding old_unf
   , can_unfold
   = mk_score 3
 
@@ -1403,22 +1413,20 @@ nodeScore env old_bndr new_bndr bind_rhs lb_deps
     mk_score rank = (rank, rhs_size, is_lb)
 
     is_lb    = isStrongLoopBreaker (idOccInfo old_bndr)
-    rhs      = case id_unfolding of
-                 CoreUnfolding { uf_src = src, uf_tmpl = unf_rhs }
-                    | isStableSource src
-                    -> unf_rhs
-                 _  -> bind_rhs
+
+    can_unfold = canUnfold old_unf
+    rhs        = case old_unf of
+                   CoreUnfolding { uf_src = src, uf_tmpl = unf_rhs }
+                     | isStableSource src
+                     -> unf_rhs
+                   _ -> bind_rhs
        -- 'bind_rhs' is irrelevant for inlining things with a stable unfolding
-    rhs_size = case id_unfolding of
+    rhs_size = case old_unf of
                  CoreUnfolding { uf_guidance = guidance }
                     | UnfIfGoodArgs { ug_size = size } <- guidance
                     -> size
                  _  -> cheapExprSize rhs
 
-    can_unfold   = canUnfold id_unfolding
-    id_unfolding = realIdUnfolding old_bndr
-       -- realIdUnfolding: Ignore loop-breaker-ness here because
-       -- that is what we are setting!
 
         -- Checking for a constructor application
         -- Cheap and cheerful; the simplifier moves casts out of the way
@@ -1572,11 +1580,12 @@ occAnalRhs env mb_join_arity rhs
 
 occAnalUnfolding :: OccEnv
                  -> Maybe JoinArity   -- See Note [Join points and unfoldings/rules]
-                 -> Id -> (UsageDetails, Unfolding)
+                 -> Unfolding
+                 -> (UsageDetails, Unfolding)
 -- Occurrence-analyse a stable unfolding;
 -- discard a non-stable one altogether.
-occAnalUnfolding env mb_join_arity id
-  = case realIdUnfolding id of -- ignore previous loop-breaker flag
+occAnalUnfolding env mb_join_arity unf
+  = case unf of
       unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
         | isStableSource src -> (usage,        unf')
         | otherwise          -> (emptyDetails, NoUnfolding)
