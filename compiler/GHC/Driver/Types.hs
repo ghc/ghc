@@ -201,7 +201,6 @@ import GHC.Driver.Phases
    , isHsBootOrSig, isHsigFile )
 import qualified GHC.Driver.Phases as Phase
 import BasicTypes
-import Binary           ( BinData(..) )
 import GHC.Iface.Syntax
 import Maybes
 import Outputable
