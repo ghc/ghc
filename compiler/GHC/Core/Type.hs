@@ -2308,6 +2308,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between the two types
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
+    -- See Note [Comparing nullary type synonyms].
+    go env (TyConApp tc1 []) (TyConApp tc2 [])
+      | tc1 == tc2
+      = True
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
       | Just t2' <- coreView t2 = go env t1 t2'

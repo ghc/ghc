@@ -969,6 +969,11 @@ can_eq_nc'
    -> Type -> Type    -- RHS, after and before type-synonym expansion, resp
    -> TcS (StopOrContinue Ct)
 
+-- See Note [Comparing nullary type synonyms].
+can_eq_nc' _flat _rdr_env _envs ev _eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TcConApp tc2 []) _ps_ty2
+  | tc1 == tc2
+  = canEqReflexive ev ReprEq ty1
+
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
 can_eq_nc' flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- TODO: Handle nullary synonyms
