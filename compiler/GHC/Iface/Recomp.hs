@@ -400,12 +400,12 @@ checkHpcHash hsc_env iface = do
 -- If the -unit-id flags change, this can change too.
 checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompileRequired
 checkMergedSignatures mod_summary iface = do
-    dflags <- getDynFlags
+    pkgstate <- pkgState <$> getDynFlags
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext (pkgState dflags)) of
+                                     (requirementContext pkgstate) of
                         Nothing -> []
-                        Just r -> sort $ map (indefModuleToModule dflags) r
+                        Just r -> sort $ map (indefModuleToModule pkgstate) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")

@@ -306,6 +306,7 @@ warnUnusedPackages = do
     eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
+        pkgstate = pkgState dflags
         pit = eps_PIT eps
 
     let loadedPackages
@@ -318,7 +319,7 @@ warnUnusedPackages = do
         requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
-          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+          = filter (\arg -> not $ any (matching pkgstate arg) loadedPackages)
                    requestedArgs
 
     let warn = makeIntoWarning
@@ -346,15 +347,15 @@ warnUnusedPackages = do
                 =  str == sourcePackageIdString p
                 || str == packageNameString p
 
-        matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
+        matching :: PackageState -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
-        matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
+        matching pkgstate (UnitIdArg uid) p = uid == realUnitId pkgstate p
 
         -- For wired-in packages, we have to unwire their id,
         -- otherwise they won't match package flags
-        realUnitId :: DynFlags -> UnitInfo -> UnitId
-        realUnitId dflags
-          = unwireUnitId dflags
+        realUnitId :: PackageState -> UnitInfo -> UnitId
+        realUnitId pkgstate
+          = unwireUnitId pkgstate
           . DefiniteUnitId
           . DefUnitId
           . installedUnitInfoId

@@ -7,7 +7,7 @@ module GHC.Driver.Packages (
         module UnitInfo,
 
         -- * Reading the package config, and processing cmdline args
-        PackageState(preloadPackages, explicitPackages, moduleNameProvidersMap, requirementContext),
+        PackageState(preloadPackages, explicitPackages, moduleNameProvidersMap, requirementContext,unitInfoMap),
         PackageDatabase (..),
         UnitInfoMap,
         emptyPackageState,
@@ -1645,9 +1645,9 @@ mkPackageState dflags dbs preload0 = do
 
 -- | Given a wired-in 'UnitId', "unwire" it into the 'UnitId'
 -- that it was recorded as in the package database.
-unwireUnitId :: DynFlags -> UnitId -> UnitId
-unwireUnitId dflags uid@(DefiniteUnitId def_uid) =
-    maybe uid DefiniteUnitId (Map.lookup def_uid (unwireMap (pkgState dflags)))
+unwireUnitId :: PackageState -> UnitId -> UnitId
+unwireUnitId pkgstate uid@(DefiniteUnitId def_uid) =
+    maybe uid DefiniteUnitId (Map.lookup def_uid (unwireMap pkgstate))
 unwireUnitId _ uid = uid
 
 -- -----------------------------------------------------------------------------

@@ -169,8 +169,7 @@ import qualified Data.Set as Set
 import qualified FiniteMap as Map
 import System.FilePath
 
-import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (componentIdString, improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId)
+import {-# SOURCE #-} GHC.Driver.Packages (componentIdString, improveUnitId, UnitInfoMap, PackageState, unitInfoMap, displayInstalledUnitId)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -634,15 +633,15 @@ newIndefUnitId cid insts =
 -- | Injects an 'IndefUnitId' (indefinite library which
 -- was on-the-fly instantiated) to a 'UnitId' (either
 -- an indefinite or definite library).
-indefUnitIdToUnitId :: DynFlags -> IndefUnitId -> UnitId
-indefUnitIdToUnitId dflags iuid =
+indefUnitIdToUnitId :: PackageState -> IndefUnitId -> UnitId
+indefUnitIdToUnitId pkgstate iuid =
     -- NB: suppose that we want to compare the indefinite
     -- unit id p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
     -- IndefiniteUnitId, they won't compare equal; only
     -- after improvement will the equality hold.
-    improveUnitId (getUnitInfoMap dflags) $
+    improveUnitId (unitInfoMap pkgstate) $
         IndefiniteUnitId iuid
 
 data IndefModule = IndefModule {
@@ -656,9 +655,9 @@ instance Outputable IndefModule where
 
 -- | Injects an 'IndefModule' to 'Module' (see also
 -- 'indefUnitIdToUnitId'.
-indefModuleToModule :: DynFlags -> IndefModule -> Module
-indefModuleToModule dflags (IndefModule iuid mod_name) =
-    mkModule (indefUnitIdToUnitId dflags iuid) mod_name
+indefModuleToModule :: PackageState -> IndefModule -> Module
+indefModuleToModule pkgstate (IndefModule iuid mod_name) =
+    mkModule (indefUnitIdToUnitId pkgstate iuid) mod_name
 
 -- | An installed unit identifier identifies a library which has
 -- been installed to the package database.  These strings are
@@ -942,15 +941,15 @@ type ShHoleSubst = ModuleNameEnv Module
 -- directly on a 'nameModule', see Note [Representation of module/name variable].
 -- @p[A=<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @<A>@ maps to @q():A@.
-renameHoleModule :: DynFlags -> ShHoleSubst -> Module -> Module
-renameHoleModule dflags = renameHoleModule' (getUnitInfoMap dflags)
+renameHoleModule :: PackageState -> ShHoleSubst -> Module -> Module
+renameHoleModule pkgstate = renameHoleModule' (unitInfoMap pkgstate)
 
 -- | Substitutes holes in a 'UnitId', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
 -- @p[A=<A>]@ maps to @p[A=<B>]@ with @A=<B>@.
-renameHoleUnitId :: DynFlags -> ShHoleSubst -> UnitId -> UnitId
-renameHoleUnitId dflags = renameHoleUnitId' (getUnitInfoMap dflags)
+renameHoleUnitId :: PackageState -> ShHoleSubst -> UnitId -> UnitId
+renameHoleUnitId pkgstate = renameHoleUnitId' (unitInfoMap pkgstate)
 
 -- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
 -- so it can be used by "Packages".

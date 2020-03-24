@@ -191,7 +191,8 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnitId dflags (improveUnitId (getUnitInfoMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
+          let pkgstate = pkgState dflags
+              uid = unwireUnitId pkgstate (improveUnitId (unitInfoMap pkgstate) $ renameHoleUnitId pkgstate (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -255,11 +256,11 @@ buildUnit session cid insts lunit = do
     -- any object files.
     let deps_w_rns = hsunitDeps (session == TcSession) (unLoc lunit)
         raw_deps = map fst deps_w_rns
-    dflags <- getDynFlags
+    pkgstate <- pkgState <$> getDynFlags
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnitId dflags hsubst) raw_deps
+        deps0 = map (renameHoleUnitId pkgstate hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -270,9 +271,9 @@ buildUnit session cid insts lunit = do
             TcSession -> return ()
             _ -> compileInclude (length deps0) (i, dep)
 
-    dflags <- getDynFlags
+    pkgstate <- pkgState <$> getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnitId (getUnitInfoMap dflags)) deps0
+    let deps = map (improveUnitId (unitInfoMap pkgstate)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc

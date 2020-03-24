@@ -939,12 +939,12 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
               -- Figure out what is recorded in mi_module.  If this is
               -- a fully definite interface, it'll match exactly, but
               -- if it's indefinite, the inside will be uninstantiated!
-              dflags <- getDynFlags
+              pkgstate <- pkgState <$> getDynFlags
               let wanted_mod =
                     case splitModuleInsts wanted_mod_with_insts of
                         (_, Nothing) -> wanted_mod_with_insts
                         (_, Just indef_mod) ->
-                          indefModuleToModule dflags
+                          indefModuleToModule pkgstate
                             (generalizeIndefModule indef_mod)
               read_result <- readIface wanted_mod file_path
               case read_result of

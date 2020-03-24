@@ -9,4 +9,4 @@ emptyPackageState :: PackageState
 componentIdString :: DynFlags -> ComponentId -> Maybe String
 displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
 improveUnitId :: UnitInfoMap -> UnitId -> UnitId
-getUnitInfoMap :: DynFlags -> UnitInfoMap
+unitInfoMap :: PackageState -> UnitInfoMap
