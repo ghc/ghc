@@ -7,5 +7,5 @@ import GHC.Types
 main :: IO ()
 main = do
   print (typeOf (Proxy :: Proxy 'Just))
-  print (typeOf (Proxy :: Proxy (TYPE 'LiftedRep)))
-  print (typeOf (Proxy :: Proxy (TYPE 'UnliftedRep)))
+  print (typeOf (Proxy :: Proxy (TYPE ('BoxedRep 'Lifted))))
+  print (typeOf (Proxy :: Proxy (TYPE ('BoxedRep 'Unlifted))))

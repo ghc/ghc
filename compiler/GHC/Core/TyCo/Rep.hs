@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf         #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -52,6 +53,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
         mkTyConApp,
+        tYPE,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -90,8 +92,9 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, boxedRepDataConKey, liftedDataConKey, manyDataConKey, tYPETyConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, liftedTypeKind, manyDataConTy )
+import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( hasKey, Uniquable(..) )
 import GHC.Utils.Outputable
@@ -1018,12 +1021,54 @@ mkTyConApp tycon tys
   -- avoid reboxing every time `mkTyConApp` is called.
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     manyDataConTy
+  -- See Note [Prefer Type over TYPE 'LiftedRep].
+  | tycon `hasKey` tYPETyConKey
+  , [rep] <- tys
+  = tYPE rep
+  -- The catch-all case
   | otherwise
   = TyConApp tycon tys
 
+-- Note [Prefer Type over TYPE 'LiftedRep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The Core of nearly any program will have numerous occurrences of
+-- @TYPE 'LiftedRep@ floating about. Consequently, we try hard to ensure
+-- that operations on such types are efficient:
+--
+--   * Instead of representing the lifted kind as
+--     @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
+--     use the 'GHC.Types.Type' type synonym (available in GHC as
+--     'GHC.Builtin.Types.Prim.liftedTypeKind'). Note only is this a
+--     smaller AST but it also guarantees sharing on the heap.
+--
+--   * To avoid allocating 'TyConApp' constructors
+--     'GHC.Builtin.Types.Prim.tYPE' catches the lifted case and uses
+--     `liftedTypeKind` instead of building an application.
+--
+--   * Similarly, 'Type.mkTyConApp' catches applications of TYPE and
+--     handles them using 'GHC.Builtin.Types.Prim.tYPE', ensuring
+--     that it benefits from the optimisation described above.
+--
+--   * Since 'liftedTypeKind' is a nullary type synonym application,
+--     it benefits from the optimisation described in Note [Comparing
+--     nullary type synonyms] in "GHC.Core.Type".
+
+-- | Given a RuntimeRep, applies TYPE to it.
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+tYPE :: Type -> Type
+tYPE rr@(TyConApp tc [arg])
+  -- See Note [Prefer Type of TYPE 'LiftedRep]
+  | tc `hasKey` boxedRepDataConKey
+  , TyConApp tc' [] <- arg
+  = if | tc' `hasKey` liftedDataConKey  -> liftedTypeKind
+       -- | tc' `hasKey` unlifedDataConKey -> unliftedTypeKind
+       | otherwise                      -> TyConApp tYPETyCon [rr]
+tYPE rr = TyConApp tYPETyCon [rr]
+
 -- This is a single, global definition of the type `Type`
 -- Defined here so it is only allocated once.
--- See Note [mkTyConApp and Type]
+-- See Note [mkTyConApp and Type] in this module.
 liftedTypeKindTyConApp :: Type
 liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
 

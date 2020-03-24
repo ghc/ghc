@@ -139,7 +139,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
-   ( runtimeRepTyCon, constraintKind
+   ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -1073,6 +1073,8 @@ data RuntimeRepInfo
       -- be the list of arguments to the promoted datacon.
   | VecCount Int         -- ^ A constructor of @VecCount@
   | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
+  | LiftedInfo
+  | UnliftedInfo
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -2235,8 +2237,8 @@ isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
 -- -XDataKinds.
 kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
-  ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
-  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey ]
+  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, levityTyCon
                                           , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
@@ -2327,12 +2329,14 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case tys `listLengthCmp` arity of
-        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
-        EQ -> Just (tvs `zip` tys, rhs, [])
-        LT -> Nothing
-  | otherwise
-  = Nothing
+  = case tys of
+      [] -> Just ([], rhs, []) -- Avoid a bit of work in the case of nullary synonyms
+      _  -> case tys `listLengthCmp` arity of
+              GT -> Just (tvs `zip` tys, rhs, drop arity tys)
+              EQ -> Just (tvs `zip` tys, rhs, [])
+              LT -> Nothing
+   | otherwise
+   = Nothing
 
 ----------------
 
