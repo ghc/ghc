@@ -306,6 +306,7 @@ buildUnit session cid insts lunit = do
 
         let compat_fs = (case cid of ComponentId fs -> fs)
             compat_pn = PackageName compat_fs
+        pkgstate <- pkgState <$> getDynFlags
 
         return InstalledPackageInfo {
             -- Stub data
@@ -327,7 +328,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toInstalledUnitId . unwireUnitId dflags)
+                        _ -> map (toInstalledUnitId . unwireUnitId pkgstate)
                                 $ deps ++ [ moduleUnitId mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
