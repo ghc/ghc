@@ -71,7 +71,8 @@ module Pretty (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, ptext, ztext, sizedText, zeroWidthText,
+        char, text, ftext, ptext, ztext, sizedText,
+        zeroWidthText, zeroWidthFText, zeroWidthPText,
         int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
@@ -309,11 +310,32 @@ text s = textBeside_ (Str s) (length s) Empty
     forall p n. text (unpackNBytes# p n) = ptext (PtrString (Ptr p) (I# n))
   #-}
 
+-- | Some text, but without any width. Use for non-printing text
+-- such as a HTML or Latex tags
+zeroWidthText :: String -> Doc
+zeroWidthText = sizedText 0
+{-# NOINLINE [0] zeroWidthText #-}
+
+{-# RULES "zeroWidthText/str"
+    forall a. zeroWidthText (unpackCString# a)  = zeroWidthPText (mkPtrString# a)
+  #-}
+{-# RULES "zeroWidthText/unpackNBytes#"
+    forall p n. zeroWidthText (unpackNBytes# p n) = zeroWidthPText (PtrString (Ptr p) (I# n))
+  #-}
+
 ftext :: FastString -> Doc
 ftext s = textBeside_ (PStr s) (lengthFS s) Empty
 
+-- | Like 'zeroWidthText', but for 'FastString'.
+zeroWidthFText :: FastString -> Doc
+zeroWidthFText s = textBeside_ (PStr s) 0 Empty
+
 ptext :: PtrString -> Doc
 ptext s = textBeside_ (LStr s) (lengthPS s) Empty
+
+-- | Like 'zeroWidthText', but for 'PtrString'.
+zeroWidthPText :: PtrString -> Doc
+zeroWidthPText s = textBeside_ (LStr s) 0 Empty
 
 ztext :: FastZString -> Doc
 ztext s = textBeside_ (ZStr s) (lengthFZS s) Empty
@@ -321,11 +343,6 @@ ztext s = textBeside_ (ZStr s) (lengthFZS s) Empty
 -- | Some text with any width. (@text s = sizedText (length s) s@)
 sizedText :: Int -> String -> Doc
 sizedText l s = textBeside_ (Str s) l Empty
-
--- | Some text, but without any width. Use for non-printing text
--- such as a HTML or Latex tags
-zeroWidthText :: String -> Doc
-zeroWidthText = sizedText 0
 
 -- | The empty document, with no height and no width.
 -- 'empty' is the identity for '<>', '<+>', '$$' and '$+$', and anywhere

@@ -195,7 +195,7 @@ pprNode platform node = pp_node <+> pp_debug
          <+> ppUnlessOption sdocSuppressTicks (text "//" <+> ppr tscope)
 
       -- // text
-      CmmComment s -> text "//" <+> ftext s
+      CmmComment s -> text "//" <+> zeroWidthFText s
 
       -- //tick bla<...>
       CmmTick t -> ppUnlessOption sdocSuppressTicks

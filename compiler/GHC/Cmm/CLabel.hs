@@ -371,20 +371,20 @@ data ForeignLabelSource
 pprDebugCLabel :: CLabel -> SDoc
 pprDebugCLabel lbl
  = case lbl of
-        IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
-                                       <> whenPprDebug (text ":" <> text (show info)))
+        IdLabel _ _ info-> ppr lbl <> (parens $ zeroWidthText "IdLabel"
+                                       <> whenPprDebug (zeroWidthText ":" <> text (show info)))
         CmmLabel pkg _name _info
-         -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
+         -> ppr lbl <> (parens $ zeroWidthText "CmmLabel" <+> ppr pkg)
 
-        RtsLabel{}      -> ppr lbl <> (parens $ text "RtsLabel")
+        RtsLabel{}      -> ppr lbl <> (parens $ zeroWidthText "RtsLabel")
 
         ForeignLabel _name mSuffix src funOrData
-            -> ppr lbl <> (parens $ text "ForeignLabel"
+            -> ppr lbl <> (parens $ zeroWidthText "ForeignLabel"
                                 <+> ppr mSuffix
                                 <+> ppr src
                                 <+> ppr funOrData)
 
-        _               -> ppr lbl <> (parens $ text "other CLabel")
+        _               -> ppr lbl <> (parens $ zeroWidthText "other CLabel")
 
 
 data IdLabelInfo
@@ -1177,7 +1177,7 @@ pprCLabel dynFlags (AsmTempDerivedLabel l suf)
      <> case l of AsmTempLabel u    -> pprUniqueAlways u
                   LocalBlockLabel u -> pprUniqueAlways u
                   _other            -> pprCLabel dynFlags l
-     <> ftext suf
+     <> zeroWidthFText suf
 
 pprCLabel dynFlags (DynamicLinkerLabel info lbl)
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
@@ -1185,7 +1185,7 @@ pprCLabel dynFlags (DynamicLinkerLabel info lbl)
 
 pprCLabel dynFlags PicBaseLabel
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
-   = text "1b"
+   = zeroWidthText "1b"
 
 pprCLabel dynFlags (DeadStripPreventer lbl)
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
@@ -1196,8 +1196,8 @@ pprCLabel dynFlags (DeadStripPreventer lbl)
       optional `_` (underscore) because this is how you mark non-temp symbols
       on some platforms (Darwin)
    -}
-   maybe_underscore dynFlags $ text "dsp_"
-   <> pprCLabel dynFlags lbl <> text "_dsp"
+   maybe_underscore dynFlags $ zeroWidthText "dsp_"
+   <> pprCLabel dynFlags lbl <> zeroWidthText "_dsp"
 
 pprCLabel dynFlags (StringLitLabel u)
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
@@ -1220,38 +1220,38 @@ pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
  | platformOS platform == OSMinGW32
     -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
     -- (The C compiler does this itself).
-    = ftext fs <> char '@' <> int sz
+    = zeroWidthFText fs <> char '@' <> int sz
 pprAsmCLbl _ lbl
    = pprCLbl lbl
 
 pprCLbl :: CLabel -> SDoc
 pprCLbl (StringLitLabel u)
-  = pprUniqueAlways u <> text "_str"
+  = pprUniqueAlways u <> zeroWidthText "_str"
 
 pprCLbl (SRTLabel u)
-  = tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+  = tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> zeroWidthText "srt"
 
 pprCLbl (LargeBitmapLabel u)  =
   tempLabelPrefixOrUnderscore
-  <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
+  <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> zeroWidthText "btm"
 -- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
 -- until that gets resolved we'll just force them to start
 -- with a letter so the label will be legal assembly code.
 
 
-pprCLbl (CmmLabel _ str CmmCode)        = ftext str
-pprCLbl (CmmLabel _ str CmmData)        = ftext str
-pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
+pprCLbl (CmmLabel _ str CmmCode)        = zeroWidthFText str
+pprCLbl (CmmLabel _ str CmmData)        = zeroWidthFText str
+pprCLbl (CmmLabel _ str CmmPrimCall)    = zeroWidthFText str
 
 pprCLbl (LocalBlockLabel u)             =
-    tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
+    tempLabelPrefixOrUnderscore <> zeroWidthText "blk_" <> pprUniqueAlways u
 
-pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> text "_fast"
+pprCLbl (RtsLabel (RtsApFast str))   = zeroWidthFText str <> zeroWidthText "_fast"
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = sdocWithDynFlags $ \dflags ->
     ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
-    hcat [text "stg_sel_", text (show offset),
+    hcat [zeroWidthText "stg_sel_", text (show offset),
           ptext (if upd_reqd
                  then (sLit "_upd_info")
                  else (sLit "_noupd_info"))
@@ -1260,7 +1260,7 @@ pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
   = sdocWithDynFlags $ \dflags ->
     ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
-    hcat [text "stg_sel_", text (show offset),
+    hcat [zeroWidthText "stg_sel_", text (show offset),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
@@ -1269,7 +1269,7 @@ pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
 pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
   = sdocWithDynFlags $ \dflags ->
     ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
-    hcat [text "stg_ap_", text (show arity),
+    hcat [zeroWidthText "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_info")
                         else (sLit "_noupd_info"))
@@ -1278,35 +1278,35 @@ pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
 pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
   = sdocWithDynFlags $ \dflags ->
     ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
-    hcat [text "stg_ap_", text (show arity),
+    hcat [zeroWidthText "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
         ]
 
 pprCLbl (CmmLabel _ fs CmmInfo)
-  = ftext fs <> text "_info"
+  = zeroWidthFText fs <> zeroWidthText "_info"
 
 pprCLbl (CmmLabel _ fs CmmEntry)
-  = ftext fs <> text "_entry"
+  = zeroWidthFText fs <> zeroWidthText "_entry"
 
 pprCLbl (CmmLabel _ fs CmmRetInfo)
-  = ftext fs <> text "_info"
+  = zeroWidthFText fs <> zeroWidthText "_info"
 
 pprCLbl (CmmLabel _ fs CmmRet)
-  = ftext fs <> text "_ret"
+  = zeroWidthFText fs <> zeroWidthText "_ret"
 
 pprCLbl (CmmLabel _ fs CmmClosure)
-  = ftext fs <> text "_closure"
+  = zeroWidthFText fs <> zeroWidthText "_closure"
 
 pprCLbl (RtsLabel (RtsPrimOp primop))
-  = text "stg_" <> ppr primop
+  = zeroWidthText "stg_" <> ppr primop
 
 pprCLbl (RtsLabel (RtsSlowFastTickyCtr pat))
-  = text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
+  = zeroWidthText "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
 pprCLbl (ForeignLabel str _ _ _)
-  = ftext str
+  = zeroWidthFText str
 
 pprCLbl (IdLabel name _cafs flavor) =
   internalNamePrefix name <> ppr name <> ppIdFlavor flavor
@@ -1315,7 +1315,7 @@ pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs
 
 pprCLbl (HpcTicksLabel mod)
-  = text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
+  = zeroWidthText "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
 
 pprCLbl (AsmTempLabel {})       = panic "pprCLbl AsmTempLabel"
 pprCLbl (AsmTempDerivedLabel {})= panic "pprCLbl AsmTempDerivedLabel"
@@ -1348,9 +1348,9 @@ pp_cSEP = char '_'
 instance Outputable ForeignLabelSource where
  ppr fs
   = case fs of
-        ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
-        ForeignLabelInThisPackage       -> parens $ text "this package"
-        ForeignLabelInExternalPackage   -> parens $ text "external package"
+        ForeignLabelInPackage pkgId     -> parens $ zeroWidthText "package: " <> ppr pkgId
+        ForeignLabelInThisPackage       -> parens $ zeroWidthText "this package"
+        ForeignLabelInExternalPackage   -> parens $ zeroWidthText "external package"
 
 internalNamePrefix :: Name -> SDoc
 internalNamePrefix name = getPprStyle $ \ sty ->
@@ -1385,26 +1385,26 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
       OSDarwin
         | platformArch platform == ArchX86_64 ->
           case dllInfo of
-            CodeStub        -> char 'L' <> ppr lbl <> text "$stub"
-            SymbolPtr       -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
-            GotSymbolPtr    -> ppr lbl <> text "@GOTPCREL"
+            CodeStub        -> char 'L' <> ppr lbl <> zeroWidthText "$stub"
+            SymbolPtr       -> char 'L' <> ppr lbl <> zeroWidthText "$non_lazy_ptr"
+            GotSymbolPtr    -> ppr lbl <> zeroWidthText "@GOTPCREL"
             GotSymbolOffset -> ppr lbl
         | otherwise ->
           case dllInfo of
-            CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
-            SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+            CodeStub  -> char 'L' <> ppr lbl <> zeroWidthText "$stub"
+            SymbolPtr -> char 'L' <> ppr lbl <> zeroWidthText "$non_lazy_ptr"
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       OSAIX ->
           case dllInfo of
-            SymbolPtr -> text "LC.." <> ppr lbl -- GCC's naming convention
+            SymbolPtr -> zeroWidthText "LC.." <> ppr lbl -- GCC's naming convention
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       _ | osElfTarget (platformOS platform) -> elfLabel
 
       OSMinGW32 ->
           case dllInfo of
-            SymbolPtr -> text "__imp_" <> ppr lbl
+            SymbolPtr -> zeroWidthText "__imp_" <> ppr lbl
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       _ -> panic "pprDynamicLinkerAsmLabel"
@@ -1413,32 +1413,32 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
       | platformArch platform == ArchPPC
       = case dllInfo of
           CodeStub  -> -- See Note [.LCTOC1 in PPC PIC code]
-                       ppr lbl <> text "+32768@plt"
-          SymbolPtr -> text ".LC_" <> ppr lbl
+                       ppr lbl <> zeroWidthText "+32768@plt"
+          SymbolPtr -> zeroWidthText ".LC_" <> ppr lbl
           _         -> panic "pprDynamicLinkerAsmLabel"
 
       | platformArch platform == ArchX86_64
       = case dllInfo of
-          CodeStub        -> ppr lbl <> text "@plt"
-          GotSymbolPtr    -> ppr lbl <> text "@gotpcrel"
+          CodeStub        -> ppr lbl <> zeroWidthText "@plt"
+          GotSymbolPtr    -> ppr lbl <> zeroWidthText "@gotpcrel"
           GotSymbolOffset -> ppr lbl
-          SymbolPtr       -> text ".LC_" <> ppr lbl
+          SymbolPtr       -> zeroWidthText ".LC_" <> ppr lbl
 
       | platformArch platform == ArchPPC_64 ELF_V1
         || platformArch platform == ArchPPC_64 ELF_V2
       = case dllInfo of
-          GotSymbolPtr    -> text ".LC_"  <> ppr lbl
-                                  <> text "@toc"
+          GotSymbolPtr    -> zeroWidthText ".LC_"  <> ppr lbl
+                                  <> zeroWidthText "@toc"
           GotSymbolOffset -> ppr lbl
-          SymbolPtr       -> text ".LC_" <> ppr lbl
+          SymbolPtr       -> zeroWidthText ".LC_" <> ppr lbl
           _               -> panic "pprDynamicLinkerAsmLabel"
 
       | otherwise
       = case dllInfo of
-          CodeStub        -> ppr lbl <> text "@plt"
-          SymbolPtr       -> text ".LC_" <> ppr lbl
-          GotSymbolPtr    -> ppr lbl <> text "@got"
-          GotSymbolOffset -> ppr lbl <> text "@gotoff"
+          CodeStub        -> ppr lbl <> zeroWidthText "@plt"
+          SymbolPtr       -> zeroWidthText ".LC_" <> ppr lbl
+          GotSymbolPtr    -> ppr lbl <> zeroWidthText "@got"
+          GotSymbolOffset -> ppr lbl <> zeroWidthText "@gotoff"
 
 -- Figure out whether `symbol` may serve as an alias
 -- to `target` within one compilation unit.
