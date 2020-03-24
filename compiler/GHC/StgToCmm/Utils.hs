@@ -94,7 +94,7 @@ import Data.Ord
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (LitString s) = newByteStringCLit s
+cgLit (LitString s) = newByteStringCLit (bytesFS s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit     = do platform <- getPlatform
                          return (mkSimpleLit platform other_lit)

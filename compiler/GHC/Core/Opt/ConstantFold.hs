@@ -62,7 +62,6 @@ import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
 import Data.Bits as Bits
-import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
@@ -1456,7 +1455,7 @@ match_append_lit _ id_unf _
   = ASSERT( ty1 `eqType` ty2 )
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
-                    `App` Lit (LitString (s1 `BS.append` s2))
+                    `App` Lit (LitString (s1 `appendFS` s2))
                     `App` mkTicks (c1Ticks ++ c2Ticks) c1'
                     `App` n
 

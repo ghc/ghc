@@ -46,6 +46,7 @@ module GHC.Core.Unfold (
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
@@ -69,7 +70,6 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Utils.Error
 
-import qualified Data.ByteString as BS
 import Data.List
 
 {-
@@ -793,7 +793,7 @@ litSize :: Literal -> Int
 -- Used by GHC.Core.Unfold.sizeExpr
 litSize (LitNumber LitNumInteger _ _) = 100   -- Note [Size of literal integers]
 litSize (LitNumber LitNumNatural _ _) = 100
-litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
+litSize (LitString str) = 10 + 10 * ((lengthFS str + 3) `div` 4)
         -- If size could be 0 then @f "x"@ might be too small
         -- [Sept03: make literal strings a bit bigger to avoid fruitless
         --  duplication of little strings]

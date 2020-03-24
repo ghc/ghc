@@ -313,7 +313,7 @@ mkStringExprFSWith lookupM str
   where
     chars = unpackFS str
     safeChar c = ord c >= 1 && ord c <= 0x7F
-    lit = Lit (LitString (bytesFS str))
+    lit = Lit (LitString str)
 
 {-
 ************************************************************************

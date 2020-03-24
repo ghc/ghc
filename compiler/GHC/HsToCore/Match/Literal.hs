@@ -91,7 +91,7 @@ dsLit l = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   case l of
-    HsStringPrim _ s -> return (Lit (LitString s))
+    HsStringPrim _ s -> return (Lit (LitString (mkFastStringByteString s)))
     HsCharPrim   _ c -> return (Lit (LitChar c))
     HsIntPrim    _ i -> return (Lit (mkLitIntWrap platform i))
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
@@ -437,8 +437,7 @@ matchLiterals (var :| vars) ty sub_groups
     wrap_str_guard eq_str (LitString s, mr)
         = do { -- We now have to convert back to FastString. Perhaps there
                -- should be separate LitBytes and LitString constructors?
-               let s'  = mkFastStringByteString s
-             ; lit    <- mkStringExprFS s'
+             ; lit    <- mkStringExprFS s
              ; let pred = mkApps (Var eq_str) [Var var, lit]
              ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)
@@ -462,7 +461,7 @@ hsLitKey platform (HsWord64Prim _ w) = mkLitWord64Wrap platform w
 hsLitKey _        (HsCharPrim   _ c) = mkLitChar            c
 hsLitKey _        (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
 hsLitKey _        (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
-hsLitKey _        (HsString _ s)     = LitString (bytesFS s)
+hsLitKey _        (HsString _ s)     = LitString s
 hsLitKey _        l                  = pprPanic "hsLitKey" (ppr l)
 
 {-

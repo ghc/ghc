@@ -29,7 +29,7 @@ evDelayedError ty msg
     Var errorId `mkTyApps` [getRuntimeRep ty, ty] `mkApps` [litMsg]
   where
     errorId = tYPE_ERROR_ID
-    litMsg  = Lit (LitString (bytesFS msg))
+    litMsg  = Lit (LitString msg)
 
 -- Dictionary for CallStack implicit parameters
 evCallStack :: (MonadThings m, HasModule m, HasDynFlags m) =>
