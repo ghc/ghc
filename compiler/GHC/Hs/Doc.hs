@@ -28,25 +28,26 @@ module GHC.Hs.Doc
 import GHC.Prelude
 
 import GHC.Utils.Binary
-import GHC.Utils.Encoding
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as C8
+import Data.List
 import Data.Data
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
+import GHC.Data.FastString
 
 -- | Haskell Documentation String
 --
 -- Internally this is a UTF8-Encoded 'ByteString'.
-newtype HsDocString = HsDocString ByteString
+-- Should probably just be ShortByteString, can't be ByteString as it ends up
+-- in interface files.
+newtype HsDocString = HsDocString FastString
   -- There are at least two plausible Semigroup instances for this type:
   --
   -- 1. Simple string concatenation.
@@ -66,20 +67,20 @@ instance Outputable HsDocString where
   ppr = doubleQuotes . text . unpackHDS
 
 isEmptyDocString :: HsDocString -> Bool
-isEmptyDocString (HsDocString bs) = BS.null bs
+isEmptyDocString (HsDocString bs) = nullFS bs
 
 mkHsDocString :: String -> HsDocString
-mkHsDocString s = HsDocString (utf8EncodeString s)
+mkHsDocString s = HsDocString (mkFastString s)
 
--- | Create a 'HsDocString' from a UTF8-encoded 'ByteString'.
+-- | Create a 'HsDocString' from a UTF8-encoded 'ShortByteString'.
 mkHsDocStringUtf8ByteString :: ByteString -> HsDocString
-mkHsDocStringUtf8ByteString = HsDocString
+mkHsDocStringUtf8ByteString = HsDocString . mkFastStringByteString
 
 unpackHDS :: HsDocString -> String
-unpackHDS = utf8DecodeByteString . hsDocStringToByteString
+unpackHDS = unpackFS . hsDocStringToByteString
 
 -- | Return the contents of a 'HsDocString' as a UTF8-encoded 'ByteString'.
-hsDocStringToByteString :: HsDocString -> ByteString
+hsDocStringToByteString :: HsDocString -> FastString
 hsDocStringToByteString (HsDocString bs) = bs
 
 ppr_mbDoc :: Maybe LHsDocString -> SDoc
@@ -93,7 +94,7 @@ ppr_mbDoc Nothing    = empty
 appendDocs :: HsDocString -> HsDocString -> HsDocString
 appendDocs x y =
   fromMaybe
-    (HsDocString BS.empty)
+    (HsDocString nilFS)
     (concatDocs [x, y])
 
 -- | Concat docstrings with two newlines in between.
@@ -103,12 +104,13 @@ appendDocs x y =
 -- If all inputs are empty, 'Nothing' is returned.
 concatDocs :: [HsDocString] -> Maybe HsDocString
 concatDocs xs =
-    if BS.null b
+    if nullFS b
       then Nothing
       else Just (HsDocString b)
   where
-    b = BS.intercalate (C8.pack "\n\n")
-      . filter (not . BS.null)
+    b = concatFS .
+        intersperse (mkFastString "\n\n")
+      . filter (not . nullFS)
       . map hsDocStringToByteString
       $ xs
 
