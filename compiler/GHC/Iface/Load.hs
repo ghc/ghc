@@ -520,13 +520,13 @@ loadInterface doc_str mod from
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
-        ; let { final_iface = iface {
-                                mi_decls     = panic "No mi_decls in PIT",
-                                mi_insts     = panic "No mi_insts in PIT",
-                                mi_fam_insts = panic "No mi_fam_insts in PIT",
-                                mi_rules     = panic "No mi_rules in PIT",
-                                mi_anns      = panic "No mi_anns in PIT"
-                              }
+        ; let { final_iface = iface {- {
+                                mi_decls     = [],
+                                mi_insts     = [],
+                                mi_fam_insts = [],
+                                mi_rules     = [],
+                                mi_anns      = []
+                              } -}
                }
 
         ; let bad_boot = mi_boot iface == IsBoot && fmap fst (if_rec_types gbl_env) == Just mod
