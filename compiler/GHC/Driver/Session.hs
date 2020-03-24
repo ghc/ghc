@@ -3568,8 +3568,6 @@ fFlagsDeps = [
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
   flagSpec "irrefutable-tuples"               Opt_IrrefutableTuples,
   flagSpec "keep-going"                       Opt_KeepGoing,
-  flagSpec "kill-absence"                     Opt_KillAbsence,
-  flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
   flagSpec "late-specialise"                  Opt_LateSpecialise,
   flagSpec "liberate-case"                    Opt_LiberateCase,
