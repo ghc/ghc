@@ -1,6 +1,7 @@
 module Main where
 
 import GHC
+import Lexer
 import GHC.Driver.Session
 import System.Environment
 import GHC.Driver.Monad
@@ -52,7 +53,8 @@ main = do
   where
     testWithParser parser = do
       dflags <- getSessionDynFlags
-      liftIO . putStrLn . unlines $ map (testExpr (parser dflags)) testStrings
+      let pflags = mkParserFlags dflags
+      liftIO . putStrLn . unlines $ map (testExpr (parser pflags)) testStrings
 
     testExpr parser expr = do
       expr ++ ": " ++ show (parser expr)
