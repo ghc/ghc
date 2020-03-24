@@ -753,7 +753,7 @@ instance ( a ~ GhcPass p
           in toHie $ patScopes Nothing rhsScope NoScope pats
       , toHie grhss
       ]
-    XMatch _ -> []
+    XMatch nec -> noExtCon nec
 
 instance ( ToHie (Context (Located (IdP a)))
          ) => ToHie (HsMatchContext a) where
@@ -842,7 +842,7 @@ instance ( a ~ GhcPass p
         ]
       CoPat _ _ _ _ ->
         []
-      XPat _ -> []
+      XPat nec -> noExtCon nec
     where
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
@@ -1039,7 +1039,7 @@ instance ( a ~ GhcPass p
       [ toHie expr
       ]
     Missing _ -> []
-    XTupArg _ -> []
+    XTupArg nec -> noExtCon nec
 
 instance ( a ~ GhcPass p
          , ToHie (PScoped (LPat a))
@@ -1081,7 +1081,7 @@ instance ( a ~ GhcPass p
       RecStmt {recS_stmts = stmts} ->
         [ toHie $ map (RS $ combineScopes scope (mkScope span)) stmts
         ]
-      XStmtLR _ -> []
+      XStmtLR nec -> noExtCon nec
 
 instance ( ToHie (LHsExpr a)
          , ToHie (PScoped (LPat a))
@@ -1145,7 +1145,7 @@ instance ToHie (RFContext (LFieldOcc GhcRn)) where
     FieldOcc name _ ->
       [ toHie $ C (RecField c rhs) (L nspan $ removeDefSrcSpan name)
       ]
-    XFieldOcc _ -> []
+    XFieldOcc nec -> noExtCon nec
 
 instance ToHie (RFContext (LFieldOcc GhcTc)) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
@@ -1153,7 +1153,7 @@ instance ToHie (RFContext (LFieldOcc GhcTc)) where
       let var' = setVarName var (removeDefSrcSpan $ varName var)
       in [ toHie $ C (RecField c rhs) (L nspan var')
          ]
-    XFieldOcc _ -> []
+    XFieldOcc nec -> noExtCon nec
 
 instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcRn))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
@@ -1162,7 +1162,7 @@ instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcRn))) where
       ]
     Ambiguous _name _ ->
       [ ]
-    XAmbiguousFieldOcc _ -> []
+    XAmbiguousFieldOcc nec -> noExtCon nec
 
 instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcTc))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
@@ -1174,7 +1174,7 @@ instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcTc))) where
       let var' = setVarName var (removeDefSrcSpan $ varName var)
       in [ toHie $ C (RecField c rhs) (L nspan var')
          ]
-    XAmbiguousFieldOcc _ -> []
+    XAmbiguousFieldOcc nec -> noExtCon nec
 
 instance ( a ~ GhcPass p
          , ToHie (PScoped (LPat a))
@@ -1193,7 +1193,7 @@ instance ( a ~ GhcPass p
     [ toHie $ listScopes NoScope stmts
     , toHie $ PS Nothing sc NoScope pat
     ]
-  toHie (RS _ (XApplicativeArg _)) = pure []
+  toHie (RS _ (XApplicativeArg nec)) = noExtCon nec
 
 instance (ToHie arg, ToHie rec) => ToHie (HsConDetails arg rec) where
   toHie (PrefixCon args) = toHie args
@@ -1271,7 +1271,7 @@ instance ToHie (TyClGroup GhcRn) where
     , toHie roles
     , toHie instances
     ]
-  toHie (XTyClGroup _) = pure []
+  toHie (XTyClGroup nec) = noExtCon nec
 
 instance ToHie (LTyClDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1317,7 +1317,7 @@ instance ToHie (LTyClDecl GhcRn) where
           context_scope = mkLScope context
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
-      XTyClDecl _ -> []
+      XTyClDecl nec -> noExtCon nec
 
 instance ToHie (LFamilyDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1332,7 +1332,7 @@ instance ToHie (LFamilyDecl GhcRn) where
           rhsSpan = sigSpan `combineScopes` injSpan
           sigSpan = mkScope $ getLoc sig
           injSpan = maybe NoScope (mkScope . getLoc) inj
-      XFamilyDecl _ -> []
+      XFamilyDecl nec -> noExtCon nec
 
 instance ToHie (FamilyInfo GhcRn) where
   toHie (ClosedTypeFamily (Just eqns)) = concatM $
@@ -1353,7 +1353,7 @@ instance ToHie (RScoped (LFamilyResultSig GhcRn)) where
       TyVarSig _ bndr ->
         [ toHie $ TVS (ResolvedScopes [sc]) NoScope bndr
         ]
-      XFamilyResultSig _ -> []
+      XFamilyResultSig nec -> noExtCon nec
 
 instance ToHie (Located (FunDep (Located Name))) where
   toHie (L span fd@(lhs, rhs)) = concatM $
@@ -1377,7 +1377,7 @@ instance (ToHie rhs, HasLoc rhs)
     where scope = combineScopes patsScope rhsScope
           patsScope = mkScope (loc pats)
           rhsScope = mkScope (loc rhs)
-  toHie (XFamEqn _) = pure []
+  toHie (XFamEqn nec) = noExtCon nec
 
 instance ToHie (LInjectivityAnn GhcRn) where
   toHie (L span ann) = concatM $ makeNode ann span : case ann of
@@ -1393,7 +1393,7 @@ instance ToHie (HsDataDefn GhcRn) where
     , toHie cons
     , toHie derivs
     ]
-  toHie (XHsDataDefn _) = pure []
+  toHie (XHsDataDefn nec) = noExtCon nec
 
 instance ToHie (HsDeriving GhcRn) where
   toHie (L span clauses) = concatM
@@ -1408,7 +1408,7 @@ instance ToHie (LHsDerivingClause GhcRn) where
         , pure $ locOnly ispan
         , toHie $ map (TS (ResolvedScopes [])) tys
         ]
-      XHsDerivingClause _ -> []
+      XHsDerivingClause nec -> noExtCon nec
 
 instance ToHie (Located (DerivStrategy GhcRn)) where
   toHie (L span strat) = concatM $ makeNode strat span : case strat of
@@ -1446,7 +1446,7 @@ instance ToHie (LConDecl GhcRn) where
           rhsScope = combineScopes ctxScope argsScope
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = condecl_scope dets
-      XConDecl _ -> []
+      XConDecl nec -> noExtCon nec
     where condecl_scope args = case args of
             PrefixCon xs -> foldr combineScopes NoScope $ map mkLScope xs
             InfixCon a b -> combineScopes (mkLScope a) (mkLScope b)
@@ -1466,7 +1466,7 @@ instance ( HasLoc thing
       , toHie $ TS sc a
       ]
     where span = loc a
-  toHie (TS _ (XHsImplicitBndrs _)) = pure []
+  toHie (TS _ (XHsImplicitBndrs nec)) = noExtCon nec
 
 instance ( HasLoc thing
          , ToHie (TScoped thing)
@@ -1476,7 +1476,7 @@ instance ( HasLoc thing
       , toHie $ TS sc a
       ]
     where span = loc a
-  toHie (TS _ (XHsWildCardBndrs _)) = pure []
+  toHie (TS _ (XHsWildCardBndrs nec)) = noExtCon nec
 
 instance ToHie (LStandaloneKindSig GhcRn) where
   toHie (L sp sig) = concatM [makeNode sig sp, toHie sig]
@@ -1487,7 +1487,7 @@ instance ToHie (StandaloneKindSig GhcRn) where
       [ toHie $ C TyDecl name
       , toHie $ TS (ResolvedScopes []) typ
       ]
-    XStandaloneKindSig _ -> []
+    XStandaloneKindSig nec -> noExtCon nec
 
 instance ToHie (SigContext (LSig GhcRn)) where
   toHie (SC (SI styp msp) (L sp sig)) = concatM $ makeNode sig sp : case sig of
@@ -1531,7 +1531,7 @@ instance ToHie (SigContext (LSig GhcRn)) where
         , toHie $ map (C Use) names
         , toHie $ fmap (C Use) typ
         ]
-      XSig _ -> []
+      XSig nec -> noExtCon nec
 
 instance ToHie (LHsType GhcRn) where
   toHie x = toHie $ TS (ResolvedScopes []) x
@@ -1623,7 +1623,7 @@ instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
         [ toHie $ C (TyVarBind sc tsc) var
         , toHie kind
         ]
-      XTyVarBndr _ -> []
+      XTyVarBndr nec -> noExtCon nec
 
 instance ToHie (TScoped (LHsQTyVars GhcRn)) where
   toHie (TS sc (HsQTvs implicits vars)) = concatM $
@@ -1633,7 +1633,7 @@ instance ToHie (TScoped (LHsQTyVars GhcRn)) where
     where
       varLoc = loc vars
       bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
-  toHie (TS _ (XLHsQTyVars _)) = pure []
+  toHie (TS _ (XLHsQTyVars nec)) = noExtCon nec
 
 instance ToHie (LHsContext GhcRn) where
   toHie (L span tys) = concatM $
@@ -1647,7 +1647,7 @@ instance ToHie (LConDeclField GhcRn) where
         [ toHie $ map (RFC RecFieldDecl (getRealSpan $ loc typ)) fields
         , toHie typ
         ]
-      XConDeclField _ -> []
+      XConDeclField nec -> noExtCon nec
 
 instance ToHie (LHsExpr a) => ToHie (ArithSeqInfo a) where
   toHie (From expr) = toHie expr
@@ -1670,7 +1670,7 @@ instance ToHie (LSpliceDecl GhcRn) where
       SpliceDecl _ splice _ ->
         [ toHie splice
         ]
-      XSpliceDecl _ -> []
+      XSpliceDecl nec -> noExtCon nec
 
 instance ToHie (HsBracket a) where
   toHie _ = pure []
@@ -1728,7 +1728,7 @@ instance ToHie (LRoleAnnotDecl GhcRn) where
         [ toHie $ C Use var
         , concatMapM (pure . locOnly . getLoc) roles
         ]
-      XRoleAnnotDecl _ -> []
+      XRoleAnnotDecl nec -> noExtCon nec
 
 instance ToHie (LInstDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1741,7 +1741,7 @@ instance ToHie (LInstDecl GhcRn) where
       TyFamInstD _ d ->
         [ toHie $ L span d
         ]
-      XInstDecl _ -> []
+      XInstDecl nec -> noExtCon nec
 
 instance ToHie (LClsInstDecl GhcRn) where
   toHie (L span decl) = concatM
@@ -1775,21 +1775,21 @@ instance ToHie (LDerivDecl GhcRn) where
         , toHie strat
         , toHie overlap
         ]
-      XDerivDecl _ -> []
+      XDerivDecl nec -> noExtCon nec
 
 instance ToHie (LFixitySig GhcRn) where
   toHie (L span sig) = concatM $ makeNode sig span : case sig of
       FixitySig _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
-      XFixitySig _ -> []
+      XFixitySig nec -> noExtCon nec
 
 instance ToHie (LDefaultDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       DefaultDecl _ typs ->
         [ toHie typs
         ]
-      XDefaultDecl _ -> []
+      XDefaultDecl nec -> noExtCon nec
 
 instance ToHie (LForeignDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1803,7 +1803,7 @@ instance ToHie (LForeignDecl GhcRn) where
         , toHie $ TS (ResolvedScopes []) sig
         , toHie fe
         ]
-      XForeignDecl _ -> []
+      XForeignDecl nec -> noExtCon nec
 
 instance ToHie ForeignImport where
   toHie (CImport (L a _) (L b _) _ _ (L c _)) = pure $ concat $
@@ -1823,14 +1823,14 @@ instance ToHie (LWarnDecls GhcRn) where
       Warnings _ _ warnings ->
         [ toHie warnings
         ]
-      XWarnDecls _ -> []
+      XWarnDecls nec -> noExtCon nec
 
 instance ToHie (LWarnDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       Warning _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
-      XWarnDecl _ -> []
+      XWarnDecl nec  -> noExtCon nec
 
 instance ToHie (LAnnDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1838,7 +1838,7 @@ instance ToHie (LAnnDecl GhcRn) where
         [ toHie prov
         , toHie expr
         ]
-      XAnnDecl _ -> []
+      XAnnDecl nec -> noExtCon nec
 
 instance ToHie (Context (Located a)) => ToHie (AnnProvenance a) where
   toHie (ValueAnnProvenance a) = toHie $ C Use a
@@ -1850,10 +1850,10 @@ instance ToHie (LRuleDecls GhcRn) where
       HsRules _ _ rules ->
         [ toHie rules
         ]
-      XRuleDecls _ -> []
+      XRuleDecls nec -> noExtCon nec
 
 instance ToHie (LRuleDecl GhcRn) where
-  toHie (L _ (XRuleDecl _)) = pure []
+  toHie (L _ (XRuleDecl nec)) = noExtCon nec
   toHie (L span r@(HsRule _ rname _ tybndrs bndrs exprA exprB)) = concatM
         [ makeNode r span
         , pure $ locOnly $ getLoc rname
@@ -1876,7 +1876,7 @@ instance ToHie (RScoped (LRuleBndr GhcRn)) where
         [ toHie $ C (ValBind RegularBind sc Nothing) var
         , toHie $ TS (ResolvedScopes [sc]) typ
         ]
-      XRuleBndr _ -> []
+      XRuleBndr nec -> noExtCon nec
 
 instance ToHie (LImportDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
@@ -1885,7 +1885,7 @@ instance ToHie (LImportDecl GhcRn) where
         , toHie $ fmap (IEC ImportAs) as
         , maybe (pure []) goIE hidden
         ]
-      XImportDecl _ -> []
+      XImportDecl nec -> noExtCon nec
     where
       goIE (hiding, (L sp liens)) = concatM $
         [ pure $ locOnly sp
@@ -1916,7 +1916,7 @@ instance ToHie (IEContext (LIE GhcRn)) where
       IEGroup _ _ _ -> []
       IEDoc _ _ -> []
       IEDocNamed _ _ -> []
-      XIE _ -> []
+      XIE nec -> noExtCon nec
 
 instance ToHie (IEContext (LIEWrappedName Name)) where
   toHie (IEC c (L span iewn)) = concatM $ makeNode iewn span : case iewn of

@@ -2231,7 +2231,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     isUnambiguous x = case unLoc (hsRecFieldLbl (unLoc x)) of
                         Unambiguous sel_name _ -> Just (x, sel_name)
                         Ambiguous{}            -> Nothing
-                        XAmbiguousFieldOcc{}   -> Nothing
+                        XAmbiguousFieldOcc nec -> noExtCon nec
 
     -- Look up the possible parents and selector GREs for each field
     getUpdFieldsParents :: TcM [(LHsRecUpdField GhcRn
