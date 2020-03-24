@@ -1243,8 +1243,7 @@ mkTyConApp tycon tys
   -- Note [mkTyConApp and Type]
   | tycon == tYPETyCon
   , [rep] <- tys
-  , isLiftedRuntimeRep rep
-  = tYPE liftedRepDataConTy
+  = tYPE rep
   | otherwise
   = TyConApp tycon tys
 
