@@ -603,7 +603,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     -- TODO: Won't the following line unnecessarily trim down arity for join
     --       points returning a lambda in a C(S) context?
     sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
-    id'            = set_idStrictness env id sig
+    id'            = setIdStrictness id sig
         -- See Note [NOINLINE and strictness]
 
 
@@ -1171,8 +1171,7 @@ findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where
-    dmd' = killUsageDemand (ae_dflags env) $
-           strictify $
+    dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
 
     (dmd_ty', starting_dmd) = peelFV dmd_ty id
@@ -1190,10 +1189,6 @@ findBndrDmd env arg_of_dfun dmd_ty id
       = dmd
 
     fam_envs = ae_fam_envs env
-
-set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
-set_idStrictness env id sig
-  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
 
 {- Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
