@@ -970,7 +970,7 @@ can_eq_nc'
    -> TcS (StopOrContinue Ct)
 
 -- See Note [Comparing nullary type synonyms].
-can_eq_nc' _flat _rdr_env _envs ev _eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TcConApp tc2 []) _ps_ty2
+can_eq_nc' _flat _rdr_env _envs ev _eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp tc2 []) _ps_ty2
   | tc1 == tc2
   = canEqReflexive ev ReprEq ty1
 

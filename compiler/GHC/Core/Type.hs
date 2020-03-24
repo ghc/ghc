@@ -243,7 +243,7 @@ import GHC.Core.TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
-                                 , liftedTypeKindTyCon
+                                 , liftedTypeKindTyCon, liftedRepDataConTy
                                  , constraintKind )
 import Name( Name )
 import PrelNames
@@ -1244,7 +1244,7 @@ mkTyConApp tycon tys
   | tycon == tYPETyCon
   , [rep] <- tys
   , isLiftedRuntimeRep rep
-  = tYPE liftedRepTy
+  = tYPE liftedRepDataConTy
   | otherwise
   = TyConApp tycon tys
 
@@ -2309,9 +2309,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
     -- See Note [Comparing nullary type synonyms].
-    go env (TyConApp tc1 []) (TyConApp tc2 [])
+    go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
-      = True
+      = TEQ
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
       | Just t2' <- coreView t2 = go env t1 t2'
