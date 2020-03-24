@@ -25,6 +25,7 @@ import GHC.Driver.CmdLine
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import GHC.Iface.Load       ( showIface )
 import GHC.Driver.Main      ( newHscEnv )
+import GHC.Core.Type     ( mkTyConAppCounters, reportCounters)
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
@@ -278,6 +279,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats dflags6
+  liftIO $ reportCounters mkTyConAppCounters
 
 ghciUI :: HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
        -> Ghc ()

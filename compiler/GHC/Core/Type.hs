@@ -32,6 +32,7 @@ module GHC.Core.Type (
         splitFunTys, funResultTy, funArgTy,
 
         mkTyConApp, mkTyConTy,
+        reportCounters, mkTyConAppCounters,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
@@ -232,6 +233,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
+import System.IO.Unsafe (unsafePerformIO)
+import Data.IORef
 
 -- friends:
 import Var
@@ -1227,20 +1230,80 @@ compilation. In order to avoid a potentially expensive series of checks in
                                 ~~~~~~~~
 -}
 
+data Counter = Counter {counterName :: String, counterRef :: IORef Int}
+
+-- | Counters created with this must be @NOINLINE@.
+newCounter :: String -> Counter
+newCounter s = unsafePerformIO (Counter s <$> newIORef 0)
+
+bumpCounter :: Counter -> a -> a
+bumpCounter (Counter _ ref) x = unsafePerformIO $ do
+    atomicModifyIORef' ref (\n -> (n+1, ()))
+    return x
+{-# NOINLINE bumpCounter #-}
+
+bumpCounter' :: Counter -> b -> a -> a
+bumpCounter' (Counter _ ref) y x = unsafePerformIO $ do
+    atomicModifyIORef' ref (\n -> (n+1, ()))
+    y `seq` return x
+{-# NOINLINE bumpCounter' #-}
+
+getCounter :: Counter -> IO Int
+getCounter = readIORef  . counterRef
+
+reportCounters :: [Counter] -> IO ()
+reportCounters = mapM_ f
+  where
+    f c = do
+      n <- getCounter c
+      putStrLn $ counterName c ++ " " ++ show n
+
+mkTyConAppCounters :: [Counter]
+mkTyConAppCounters =
+  [ mkTyConAppCnt
+  , mkTyConAppFunCnt
+  , mkTyConAppTypeCnt
+  , mkTyConAppTYPECnt
+  , mkTyConAppNewCnt
+  ]
+
+mkTyConAppCnt :: Counter 
+mkTyConAppCnt = newCounter "mkTyConApp"
+{-# NOINLINE mkTyConAppCnt #-}
+
+mkTyConAppFunCnt :: Counter 
+mkTyConAppFunCnt = newCounter "mkTyConAppFun"
+{-# NOINLINE mkTyConAppFunCnt #-}
+
+mkTyConAppTypeCnt :: Counter 
+mkTyConAppTypeCnt = newCounter "mkTyConAppType"
+{-# NOINLINE mkTyConAppTypeCnt #-}
+
+mkTyConAppTYPECnt :: Counter 
+mkTyConAppTYPECnt = newCounter "mkTyConAppTYPE"
+{-# NOINLINE mkTyConAppTYPECnt #-}
+
+mkTyConAppNewCnt :: Counter 
+mkTyConAppNewCnt = newCounter "mkTyConAppNew"
+{-# NOINLINE mkTyConAppNewCnt #-}
+
 -- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | isFunTyCon tycon
+  | bumpCounter mkTyConAppCnt $ isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
   -- The FunTyCon (->) is always a visible one
-  = FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
+  = bumpCounter mkTyConAppFunCnt $ FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
   -- Note [mkTyConApp and Type]
   | tycon == liftedTypeKindTyCon
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
-    liftedTypeKindTyConApp
+    bumpCounter' mkTyConAppTypeCnt tys $ liftedTypeKindTyConApp
+  | tycon == tYPETyCon
+  , [rep] <- tys
+  = bumpCounter' mkTyConAppTYPECnt rep $ tYPE rep
   | otherwise
-  = TyConApp tycon tys
+  = bumpCounter mkTyConAppNewCnt $ TyConApp tycon tys
 
 -- This is a single, global definition of the type `Type`
 -- Defined here so it is only allocated once.
