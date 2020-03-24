@@ -98,6 +98,12 @@ import GHC.Serialized
 
 type BinArray = ForeignPtr Word8
 
+
+
+---------------------------------------------------------------
+-- BinData
+---------------------------------------------------------------
+
 data BinData = BinData Int BinArray
 
 instance NFData BinData where
@@ -129,7 +135,6 @@ dataHandle (BinData size bin) = do
 
 handleData :: BinHandle -> IO BinData
 handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
-
 
 ---------------------------------------------------------------
 -- BinHandle
