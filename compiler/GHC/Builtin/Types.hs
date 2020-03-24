@@ -170,6 +170,7 @@ import GHC.Types.Var (VarBndr (Bndr))
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
+import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -688,8 +689,9 @@ constraintKindTyCon :: TyCon
 -- 'TyCon.isConstraintKindCon' assumes that this is an AlgTyCon!
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
+-- See Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = TyCoRep.TyConApp liftedTypeKindTyCon []
 typeToTypeKind   = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1410,11 +1412,12 @@ runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim
+-- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
 -- type Type = tYPE 'LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
+                                       [] liftedTypeKind [] rhs
+  where rhs = TyCoRep.TyConApp tYPETyCon [liftedRepTy]
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcTyCon runtimeRepTyConName Nothing []

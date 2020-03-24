@@ -16,13 +16,12 @@ Derived class instances:
       = GHC.Prim.coerce
           @(T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a
-            -> T14578.App (Data.Functor.Compose.Compose f g) a)
+               -> T14578.App (Data.Functor.Compose.Compose f g) a)
           @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
           ((GHC.Base.<>) @(T14578.App (Data.Functor.Compose.Compose f g) a))
     GHC.Base.sconcat
       = GHC.Prim.coerce
-          @(GHC.Base.NonEmpty
-              (T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose f g) a)
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
           @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
           (GHC.Base.sconcat
@@ -31,7 +30,7 @@ Derived class instances:
       = GHC.Prim.coerce
           @(b
             -> T14578.App (Data.Functor.Compose.Compose f g) a
-            -> T14578.App (Data.Functor.Compose.Compose f g) a)
+               -> T14578.App (Data.Functor.Compose.Compose f g) a)
           @(b -> T14578.Wat f g a -> T14578.Wat f g a)
           (GHC.Base.stimes
              @(T14578.App (Data.Functor.Compose.Compose f g) a))

@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 106, types: 47, coercions: 0, joins: 0/0}
+  = {terms: 106, types: 45, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
@@ -31,7 +31,7 @@ T7360.fun4 :: ()
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
 T7360.fun4 = fun1 T7360.Foo1
 
--- RHS size: {terms: 11, types: 8, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 11, types: 7, coercions: 0, joins: 0/0}
 fun2 :: forall {a}. [a] -> ((), Int)
 [GblId,
  Arity=1,

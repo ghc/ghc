@@ -10,9 +10,9 @@ Dependent packages: [base-4.16.0.0, ghc-bignum-1.0, ghc-prim-0.8.0]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 24, types: 61, coercions: 0, joins: 0/0}
+  = {terms: 24, types: 52, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 7, types: 6, coercions: 0, joins: 0/0}
 T18052a.$b:||: :: forall {a} {b}. a -> b -> (a, b)
 [GblId, Arity=2, Unf=OtherCon []]
 T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
@@ -22,7 +22,7 @@ T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 [GblId]
 (+++) = ++
 
--- RHS size: {terms: 13, types: 20, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 13, types: 18, coercions: 0, joins: 0/0}
 T18052a.$m:||:
   :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep} {a} {b}.
      (a, b) -> (a -> b -> r) -> ((# #) -> r) -> r

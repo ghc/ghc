@@ -551,10 +551,6 @@ mkPrimTcName built_in_syntax occ key tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (mkATyCon tycon) built_in_syntax
 
 -----------------------------
--- | Given a RuntimeRep, applies TYPE to it.
--- see Note [TYPE and RuntimeRep]
-tYPE :: Type -> Type
-tYPE rr = TyConApp tYPETyCon [rr]
 
 -- Given a Multiplicity, applies FUN to it.
 functionWithMultiplicity :: Type -> Type
