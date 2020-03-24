@@ -168,10 +168,14 @@ class Eq a => Bits a where
     -- | @x \`complementBit\` i@ is the same as @x \`xor\` bit i@
     complementBit     :: a -> Int -> a
 
-    -- | Return 'True' if the @n@th bit of the argument is 1
-    --
-    -- Can be implemented using `testBitDefault' if @a@ is also an
-    -- instance of 'Num'.
+    {-| @x \`testBit\` i@ is the same as @x .&. bit n == 1@
+
+        In other words it returns True if the bit at offset @n
+        is set.
+
+        Can be implemented using `testBitDefault' if @a@ is also an
+        instance of 'Num'.
+        -}
     testBit           :: a -> Int -> Bool
 
     {-| Return the number of bits in the type of the argument.  The actual
