@@ -343,10 +343,10 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                 -- modules accumulate in the PIT not HPT.  Sigh.
 
         Just iface   = maybe_iface
-        finsts_mod   = mi_finsts (mi_final_exts iface)
-        hash_env     = mi_hash_fn (mi_final_exts iface)
-        mod_hash     = mi_mod_hash (mi_final_exts iface)
-        export_hash | depend_on_exports = Just (mi_exp_hash (mi_final_exts iface))
+        finsts_mod   = mi_finsts (mi_backend iface)
+        hash_env     = mi_hash_fn (mi_caches iface)
+        mod_hash     = mi_mod_hash (mi_backend iface)
+        export_hash | depend_on_exports = Just (mi_exp_hash (mi_backend iface))
                     | otherwise         = Nothing
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

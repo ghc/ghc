@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.Unit.Module.ModIface
    ( ModIface
@@ -14,6 +15,8 @@ module GHC.Unit.Module.ModIface
    , IfaceExport
    , WhetherHasOrphans
    , WhetherHasFamInst
+   , mi_backend
+   , mi_caches
    , mi_boot
    , mi_fix
    , mi_semantic_module
@@ -23,6 +26,9 @@ module GHC.Unit.Module.ModIface
    , emptyFullModIface
    , mkIfaceHashCache
    , emptyIfaceHashCache
+   , ModIfaceCaches(..)
+   , initModIfaceCaches
+   , forgetModIfaceCaches
    )
 where
 
@@ -71,8 +77,41 @@ We can build a full interface file two ways:
   Then we store the provided information and fingerprint both.
 -}
 
+mi_caches :: ModIface -> ModIfaceCaches
+mi_caches = snd . mi_final_exts
+
+mi_backend :: ModIface -> ModIfaceBackend
+mi_backend = fst . mi_final_exts
+
+
+initModIfaceCaches :: RawModIface -> ModIface
+initModIfaceCaches m@ModIface{mi_warns, mi_decls, mi_fixities, mi_final_exts} =
+  m { mi_decls = map convert mi_decls
+    , mi_final_exts = (mi_final_exts, caches)}
+  where
+    convert :: IfaceDeclExts ('ModIfaceFinal 'NoCaches) -> IfaceDeclExts ('ModIfaceFinal 'WithCaches)
+    convert x = x
+    caches =
+        ModIfaceCaches {
+                   mi_warn_fn = mkIfaceWarnCache mi_warns,
+                   mi_fix_fn = mkIfaceFixCache mi_fixities,
+                   mi_hash_fn = mkIfaceHashCache mi_decls
+                 }
+-- | Use this function just before we serialise or compact a 'ModIface'
+forgetModIfaceCaches :: ModIface -> RawModIface
+forgetModIfaceCaches m@ModIface{mi_decls, mi_final_exts = (exts, _)} =
+  m { mi_decls = map convert mi_decls
+    , mi_final_exts = exts }
+  where
+    convert :: IfaceDeclExts ('ModIfaceFinal 'WithCaches) -> IfaceDeclExts ('ModIfaceFinal 'NoCaches)
+    convert x = x
+
+
+
 type PartialModIface = ModIface_ 'ModIfaceCore
-type ModIface = ModIface_ 'ModIfaceFinal
+type ModIface = ModIface_ ('ModIfaceFinal 'WithCaches)
+type RawModIface = ModIface_ ('ModIfaceFinal 'NoCaches)
+
 
 -- | Extends a PartialModIface with information which is either:
 -- * Computed after codegen
@@ -101,12 +140,34 @@ data ModIfaceBackend = ModIfaceBackend
     -- ^ Hash of export list
   , mi_orphan_hash :: !Fingerprint
     -- ^ Hash for orphan rules, class and family instances combined
+  }
 
+data ModIfacePhase
+  = ModIfaceCore
+  -- ^ Partial interface built based on output of core pipeline.
+  | ModIfaceFinal WithCaches
+
+data WithCaches = NoCaches | WithCaches
+
+-- | Selects a IfaceDecl representation.
+-- For fully instantiated interfaces we also maintain
+-- a fingerprint, which is used for recompilation checks.
+type family IfaceDeclExts (phase :: ModIfacePhase) where
+  IfaceDeclExts 'ModIfaceCore = IfaceDecl
+  IfaceDeclExts ('ModIfaceFinal 'NoCaches) = (Fingerprint, IfaceDecl)
+  IfaceDeclExts ('ModIfaceFinal 'WithCaches) = (Fingerprint, IfaceDecl)
+
+type family IfaceBackendExts (phase :: ModIfacePhase) where
+  IfaceBackendExts 'ModIfaceCore = ()
+  IfaceBackendExts ('ModIfaceFinal 'NoCaches) = ModIfaceBackend
+  IfaceBackendExts ('ModIfaceFinal 'WithCaches) = (ModIfaceBackend, ModIfaceCaches)
+
+data ModIfaceCaches = ModIfaceCaches {
     -- Cached environments for easy lookup. These are computed (lazily) from
     -- other fields and are not put into the interface file.
     -- Not really produced by the backend but there is no need to create them
     -- any earlier.
-  , mi_warn_fn :: !(OccName -> Maybe WarningTxt)
+    mi_warn_fn :: !(OccName -> Maybe WarningTxt)
     -- ^ Cached lookup for 'mi_warns'
   , mi_fix_fn :: !(OccName -> Maybe Fixity)
     -- ^ Cached lookup for 'mi_fixities'
@@ -115,23 +176,7 @@ data ModIfaceBackend = ModIfaceBackend
     -- the thing isn't in decls. It's useful to know that when seeing if we are
     -- up to date wrt. the old interface. The 'OccName' is the parent of the
     -- name, if it has one.
-  }
-
-data ModIfacePhase
-  = ModIfaceCore
-  -- ^ Partial interface built based on output of core pipeline.
-  | ModIfaceFinal
-
--- | Selects a IfaceDecl representation.
--- For fully instantiated interfaces we also maintain
--- a fingerprint, which is used for recompilation checks.
-type family IfaceDeclExts (phase :: ModIfacePhase) where
-  IfaceDeclExts 'ModIfaceCore = IfaceDecl
-  IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
-
-type family IfaceBackendExts (phase :: ModIfacePhase) where
-  IfaceBackendExts 'ModIfaceCore = ()
-  IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
+}
 
 
 
@@ -261,7 +306,7 @@ mi_boot iface = if mi_hsc_src iface == HsBootFile
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.
 mi_fix :: ModIface -> OccName -> Fixity
-mi_fix iface name = mi_fix_fn (mi_final_exts iface) name `orElse` defaultFixity
+mi_fix iface name = mi_fix_fn (mi_caches iface) name `orElse` defaultFixity
 
 -- | The semantic module for this interface; e.g., if it's a interface
 -- for a signature, if 'mi_module' is @p[A=<A>]:A@, 'mi_semantic_module'
@@ -300,7 +345,7 @@ renameFreeHoles fhs insts =
         | otherwise                           = emptyUniqDSet
 
 
-instance Binary ModIface where
+instance Binary RawModIface where
    put_ bh (ModIface {
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
@@ -438,10 +483,7 @@ instance Binary ModIface where
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash,
-                   mi_warn_fn = mkIfaceWarnCache warns,
-                   mi_fix_fn = mkIfaceFixCache fixities,
-                   mi_hash_fn = mkIfaceHashCache decls
+                   mi_orphan_hash = orphan_hash
                  }})
 
 -- | The original names declared of a certain module that are exported
@@ -479,7 +521,7 @@ emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
       { mi_decls = []
-      , mi_final_exts = ModIfaceBackend
+      , mi_final_exts = ((ModIfaceBackend
         { mi_iface_hash = fingerprint0,
           mi_mod_hash = fingerprint0,
           mi_flag_hash = fingerprint0,
@@ -489,10 +531,10 @@ emptyFullModIface mod =
           mi_orphan = False,
           mi_finsts = False,
           mi_exp_hash = fingerprint0,
-          mi_orphan_hash = fingerprint0,
+          mi_orphan_hash = fingerprint0}),(ModIfaceCaches{
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
-          mi_hash_fn = emptyIfaceHashCache } }
+          mi_hash_fn = emptyIfaceHashCache })) }
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]

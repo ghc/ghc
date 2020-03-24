@@ -112,7 +112,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     -- implementation cases.
     checkBootDeclM False sig_thing real_thing
     real_fixity <- lookupFixityRn name
-    let sig_fixity = case mi_fix_fn (mi_final_exts sig_iface) (occName name) of
+    let sig_fixity = case mi_fix_fn (mi_caches sig_iface) (occName name) of
                         Nothing -> defaultFixity
                         Just f -> f
     when (real_fixity /= sig_fixity) $
@@ -886,7 +886,8 @@ mergeSignatures
             -- This is a HACK to prevent calculateAvails from including imp_mod
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
-            iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
+            (ifi, caches) = mi_final_exts iface
+            iface' = iface { mi_final_exts = (ifi{ mi_orphan = False, mi_finsts = False }, caches) }
             home_unit = hsc_home_unit hsc_env
             avails = plusImportAvails (tcg_imports tcg_env) $
                         calculateAvails home_unit iface' False NotBoot ImportedBySystem
@@ -898,7 +899,7 @@ mergeSignatures
                 if outer_mod == mi_module iface
                     -- Don't add ourselves!
                     then tcg_merged tcg_env
-                    else (mi_module iface, mi_mod_hash (mi_final_exts iface)) : tcg_merged tcg_env
+                    else (mi_module iface, mi_mod_hash (mi_backend iface)) : tcg_merged tcg_env
             }
 
     -- Note [Signature merging DFuns]
