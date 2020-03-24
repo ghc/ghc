@@ -3992,9 +3992,6 @@ checkValidDataCon dflags existential_ok tc con
           -- Reason: it's really the argument of an equality constraint
         ; checkValidMonoType orig_res_ty
 
-          -- Check all argument types for validity
-        ; checkValidType ctxt (dataConUserType con)
-
           -- If we are dealing with a newtype, we allow levity polymorphism
           -- regardless of whether or not UnliftedNewtypes is enabled. A
           -- later check in checkNewDataCon handles this, producing a
@@ -4002,8 +3999,15 @@ checkValidDataCon dflags existential_ok tc con
         ; unless (isNewTyCon tc)
             (mapM_ (checkForLevPoly empty) (dataConOrigArgTys con))
 
-          -- Extra checks for newtype data constructors
+          -- Extra checks for newtype data constructors. Importantly, these
+          -- checks /must/ come before the call to checkValidType below. This
+          -- is because checkValidType invokes the constraint solver, and
+          -- invoking the solver on an ill formed newtype constructor can
+          -- confuse GHC to the point of panicking. See #17955 for an example.
         ; when (isNewTyCon tc) (checkNewDataCon con)
+
+          -- Check all argument types for validity
+        ; checkValidType ctxt (dataConUserType con)
 
           -- Check that existentials are allowed if they are used
         ; checkTc (existential_ok || isVanillaDataCon con)
