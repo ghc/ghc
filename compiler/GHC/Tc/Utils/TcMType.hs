@@ -120,7 +120,6 @@ import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Utils.Misc
