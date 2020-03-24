@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 module GHC.Unit.External
    ( ExternalUnitCache (..)
    , initExternalUnitCache
@@ -12,6 +13,12 @@ module GHC.Unit.External
    , PackageRuleBase
    , PackageCompleteMatches
    , emptyPackageIfaceTable
+
+   , extendPITFake
+   , extendPIT
+   , elemPIT
+   , pitKeys
+   , lookupPIT
    )
 where
 
@@ -33,6 +40,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM
 
 import Data.IORef
+import GHC.Compact
 
 
 type PackageTypeEnv          = TypeEnv
@@ -42,13 +50,41 @@ type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatches = CompleteMatches
 
+data CompactRegion = forall a . CompactRegion (Compact a) | EmptyRegion
+
 -- | Helps us find information about modules in the imported packages
-type PackageIfaceTable = ModuleEnv ModIface
+data PackageIfaceTable = PackageIfaceTable CompactRegion (ModuleEnv ModIface)
         -- Domain = modules in the imported packages
 
 -- | Constructs an empty PackageIfaceTable
 emptyPackageIfaceTable :: PackageIfaceTable
-emptyPackageIfaceTable = emptyModuleEnv
+emptyPackageIfaceTable = PackageIfaceTable EmptyRegion emptyModuleEnv
+
+
+lookupPIT :: PackageIfaceTable -> Module -> Maybe ModIface
+lookupPIT (PackageIfaceTable _ pit) m = lookupModuleEnv pit m
+
+extendPIT :: PackageIfaceTable -> Module -> ModIface -> IO PackageIfaceTable
+extendPIT (PackageIfaceTable comp pit) m mi = do
+  let raw_iface = forgetModIfaceCaches mi
+  compact_region <- case comp of
+    CompactRegion c -> do
+      compactAdd c raw_iface
+    EmptyRegion -> do
+      compact raw_iface
+  let compacted_iface = initModIfaceCaches $ getCompact compact_region
+  return (PackageIfaceTable (CompactRegion compact_region) (extendModuleEnv pit m compacted_iface))
+
+extendPITFake :: PackageIfaceTable -> Module -> PackageIfaceTable
+extendPITFake (PackageIfaceTable c pit) mod =
+  let fake_iface = emptyFullModIface mod
+  in PackageIfaceTable c (extendModuleEnv pit mod fake_iface)
+
+elemPIT :: Module -> PackageIfaceTable  -> Bool
+elemPIT m (PackageIfaceTable _ pit) = elemModuleEnv m pit
+
+pitKeys :: PackageIfaceTable -> [Module]
+pitKeys (PackageIfaceTable _ pit) = moduleEnvKeys pit
 
 -- | Information about the currently loaded external packages.
 -- This is mutable because packages will be demand-loaded during

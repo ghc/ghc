@@ -283,7 +283,7 @@ lookupIfaceByModule
 lookupIfaceByModule hpt pit mod
   = case lookupHptByModule hpt mod of
        Just hm -> Just (hm_iface hm)
-       Nothing -> lookupModuleEnv pit mod
+       Nothing -> lookupPIT pit mod
    -- If the module does come from the home package, why do we look in the PIT as well?
    -- (a) In OneShot mode, even home-package modules accumulate in the PIT
    -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
