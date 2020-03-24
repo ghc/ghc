@@ -966,7 +966,8 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                   r <- read_file dynFilePath
                   case r of
                       Succeeded (dynIface, _)
-                       | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
+                       | mi_mod_hash (mi_backend iface)
+                          == mi_mod_hash (mi_backend dynIface) ->
                           return ()
                        | otherwise ->
                           do traceIf (text "Dynamic hash doesn't match")
@@ -1048,8 +1049,10 @@ ghcPrimIface
         mi_exports  = ghcPrimExports,
         mi_decls    = [],
         mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities },
-        mi_decl_docs = ghcPrimDeclDocs -- See Note [GHC.Prim Docs]
+        mi_decl_docs = ghcPrimDeclDocs, -- See Note [GHC.Prim Docs]
+        mi_final_exts =
+          (mi_backend empty_iface,
+          (mi_caches empty_iface){ mi_fix_fn = mkIfaceFixCache fixities })
         }
   where
     empty_iface = emptyFullModIface gHC_PRIM
@@ -1126,11 +1129,11 @@ pprModIfaceSimple iface = ppr (mi_module iface) $$ pprDeps (mi_deps iface) $$ ne
 
 pprModIface :: ModIface -> SDoc
 -- Show a ModIface
-pprModIface iface@ModIface{ mi_final_exts = exts }
+pprModIface iface
  = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
-                <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
-                <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
+                <+> (if mi_orphan (mi_backend iface) then text "[orphan module]" else Outputable.empty)
+                <+> (if mi_finsts (mi_backend iface) then text "[family instance module]" else Outputable.empty)
                 <+> (if mi_hpc iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash exts))
@@ -1164,6 +1167,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , text "extensible fields:" $$ nest 2 (pprExtensibleFields (mi_ext_fields iface))
         ]
   where
+    exts = mi_backend iface
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile = text "[hsig]"
     pp_hsc_src HsSrcFile = Outputable.empty
