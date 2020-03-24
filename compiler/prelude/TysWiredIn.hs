@@ -642,7 +642,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = TyConApp liftedTypeKindTyCon []
 typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
