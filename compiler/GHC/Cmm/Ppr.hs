@@ -194,7 +194,8 @@ pprNode platform node = pp_node <+> pp_debug
          <+> ppUnlessOption sdocSuppressTicks (text "//" <+> ppr tscope)
 
       -- // text
-      CmmComment s -> text "//" <+> ftext s
+      -- See Note [zeroWidthFText in Cmm]
+      CmmComment s -> text "//" <+> zeroWidthFText s
 
       -- //tick bla<...>
       CmmTick t -> ppUnlessOption sdocSuppressTicks
@@ -308,3 +309,11 @@ pprNode platform node = pp_node <+> pp_debug
 
     commafy :: [SDoc] -> SDoc
     commafy xs = hsep $ punctuate comma xs
+
+{- Note [zeroWidthFText in Cmm]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In an effort to remove the length field of 'FastString' (!1675), we decided to
+use 'zeroWidthFText' when pretty-printing Cmm, even though the involved strings
+are not actually of zero width. That works because the Cmm pretty-printer
+assumes an infinite ribbon anyway, so will never insert line breaks itself.
+-}

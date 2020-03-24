@@ -1248,7 +1248,7 @@ pprCLabel_NCG platform lbl = getPprStyle $ \sty ->
          <> case l of AsmTempLabel u    -> pprUniqueAlways u
                       LocalBlockLabel u -> pprUniqueAlways u
                       _other            -> pprCLabel_NCG platform l
-         <> ftext suf
+         <> zeroWidthFText suf
 
    DynamicLinkerLabel info lbl
       -> pprDynamicLinkerAsmLabel platform info lbl
@@ -1274,7 +1274,7 @@ pprCLabel_NCG platform lbl = getPprStyle $ \sty ->
       , OSMinGW32 <- platformOS platform
       -> -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
          -- (The C compiler does this itself).
-         maybe_underscore $ ftext fs <> char '@' <> int sz
+         maybe_underscore $ zeroWidthFText fs <> char '@' <> int sz
 
    _  | asmStyle sty -> maybe_underscore $ pprCLabel_common platform lbl
       | otherwise    -> pprCLabel_common platform lbl
@@ -1302,13 +1302,13 @@ pprCLabel_common platform = \case
                            -- until that gets resolved we'll just force them to start
                            -- with a letter so the label will be legal assembly code.
 
-   (CmmLabel _ _ str CmmCode)     -> ftext str
-   (CmmLabel _ _ str CmmData)     -> ftext str
-   (CmmLabel _ _ str CmmPrimCall) -> ftext str
+   (CmmLabel _ _ str CmmCode)     -> zeroWidthFText str
+   (CmmLabel _ _ str CmmData)     -> zeroWidthFText str
+   (CmmLabel _ _ str CmmPrimCall) -> zeroWidthFText str
 
    (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
 
-   (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
+   (RtsLabel (RtsApFast str)) -> zeroWidthFText str <> text "_fast"
 
    (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
     hcat [text "stg_sel_", text (show offset),
@@ -1338,17 +1338,17 @@ pprCLabel_common platform = \case
                         else (sLit "_noupd_entry"))
         ]
 
-   (CmmLabel _ _ fs CmmInfo)    -> ftext fs <> text "_info"
-   (CmmLabel _ _ fs CmmEntry)   -> ftext fs <> text "_entry"
-   (CmmLabel _ _ fs CmmRetInfo) -> ftext fs <> text "_info"
-   (CmmLabel _ _ fs CmmRet)     -> ftext fs <> text "_ret"
-   (CmmLabel _ _ fs CmmClosure) -> ftext fs <> text "_closure"
+   (CmmLabel _ _ fs CmmInfo)    -> zeroWidthFText fs <> text "_info"
+   (CmmLabel _ _ fs CmmEntry)   -> zeroWidthFText fs <> text "_entry"
+   (CmmLabel _ _ fs CmmRetInfo) -> zeroWidthFText fs <> text "_info"
+   (CmmLabel _ _ fs CmmRet)     -> zeroWidthFText fs <> text "_ret"
+   (CmmLabel _ _ fs CmmClosure) -> zeroWidthFText fs <> text "_closure"
 
    (RtsLabel (RtsPrimOp primop)) -> text "stg_" <> ppr primop
    (RtsLabel (RtsSlowFastTickyCtr pat)) ->
       text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
-   (ForeignLabel str _ _ _) -> ftext str
+   (ForeignLabel str _ _ _) -> zeroWidthFText str
 
    (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
 

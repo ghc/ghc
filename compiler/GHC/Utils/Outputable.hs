@@ -25,6 +25,7 @@ module GHC.Utils.Outputable (
         empty, isEmpty, nest,
         char,
         text, ftext, ptext, ztext,
+        zeroWidthText, zeroWidthFText, zeroWidthPText,
         int, intWithCommas, integer, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets,
@@ -610,6 +611,14 @@ rational n  = docToSDoc $ Pretty.rational n
 word n      = sdocOption sdocHexWordLiterals $ \case
                True  -> docToSDoc $ Pretty.hex n
                False -> docToSDoc $ Pretty.integer n
+
+zeroWidthText  :: String -> SDoc
+zeroWidthFText :: FastString -> SDoc
+zeroWidthPText :: PtrString -> SDoc
+
+zeroWidthText  s = docToSDoc $ Pretty.zeroWidthText  s
+zeroWidthFText s = docToSDoc $ Pretty.zeroWidthFText s
+zeroWidthPText s = docToSDoc $ Pretty.zeroWidthPText s
 
 -- | @doublePrec p n@ shows a floating point number @n@ with @p@
 -- digits of precision after the decimal point.
