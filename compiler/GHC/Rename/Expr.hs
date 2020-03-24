@@ -1853,7 +1853,8 @@ isStrictPattern lpat =
     NPat{}          -> True
     NPlusKPat{}     -> True
     SplicePat{}     -> True
-    _otherwise -> panic "isStrictPattern"
+    CoPat{}         -> panic "isStrictPattern: CoPat"
+    XPat nec        -> noExtCon nec
 
 {-
 Note [ApplicativeDo and refutable patterns]

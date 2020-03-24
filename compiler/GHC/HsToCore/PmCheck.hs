@@ -642,7 +642,7 @@ translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grh
   grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
   -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
   return (mkGrdTreeMany pats' grhss')
-translateMatch _ _ (L _ (XMatch _)) = panic "translateMatch"
+translateMatch _ _ (L _ (XMatch nec)) = noExtCon nec
 
 -- -----------------------------------------------------------------------
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
@@ -657,7 +657,7 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
         | null gs   = L match_loc (sep (map ppr pats))
         | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
-translateLGRHS _ _ _ (L _ (XGRHS _)) = panic "translateLGRHS"
+translateLGRHS _ _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 -- | Translate a guard statement to a 'GrdVec'
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec
