@@ -27,6 +27,7 @@ import GHC.Utils.Outputable(ppr)
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Types.Avail            ( Avails )
 import GHC.Data.Bag               ( Bag, bagToList )
 import GHC.Types.Basic
@@ -60,7 +61,7 @@ import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
-import GHC.Data.FastString
+import qualified Data.ByteString.Short as SBS
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -309,7 +310,7 @@ mkHieFileWithSource src_file src ms ts rs = do
       , hie_asts = asts'
       -- mkIfaceExports sorts the AvailInfos for stability
       , hie_exports = mkIfaceExports (tcg_exports ts)
-      , hie_hs_src = src
+      , hie_hs_src = SBS.toShort src
       }
 
 getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]

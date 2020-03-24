@@ -20,6 +20,7 @@ import GHC.Settings.Config
 import GHC.Utils.Binary
 import GHC.Data.FastString
 import GHC.Builtin.Utils
+import Data.ByteString.Short      ( ShortByteString )
 import GHC.Iface.Type
 import GHC.Unit.Module            ( ModuleName, Module )
 import GHC.Types.Name
@@ -34,7 +35,6 @@ import GHC.Utils.Panic
 import qualified Data.Array as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.ByteString            ( ByteString )
 import Data.Data                  ( Typeable, Data )
 import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
@@ -82,7 +82,8 @@ data HieFile = HieFile
     , hie_exports :: [AvailInfo]
     -- ^ The names that this module exports
 
-    , hie_hs_src :: ByteString
+    -- Should be ShortByteString
+    , hie_hs_src :: ShortByteString
     -- ^ Raw bytes of the initial Haskell source
     }
 instance Binary HieFile where

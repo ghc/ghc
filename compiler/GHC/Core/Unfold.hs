@@ -64,9 +64,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Tickish
 
-import qualified Data.ByteString as BS
 import Data.List (isPrefixOf)
-import Data.List
 
 
 -- | Unfolding options

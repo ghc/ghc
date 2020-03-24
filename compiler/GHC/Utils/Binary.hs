@@ -92,6 +92,8 @@ import Data.Array.Unsafe
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
+import qualified Data.ByteString.Short as BSS
+import Data.ByteString.Short ( ShortByteString )
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
@@ -1044,6 +1046,23 @@ getBS bh = do
 instance Binary ByteString where
   put_ bh f = putBS bh f
   get bh = getBS bh
+
+putSBS :: BinHandle -> ShortByteString -> IO ()
+putSBS bh bs =
+  BSS.useAsCStringLen bs $ \(ptr, l) -> do
+    put_ bh l
+    putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
+
+getSBS :: BinHandle -> IO ShortByteString
+getSBS bh = do
+  l <- get bh :: IO Int
+  bs <- BS.create l $ \dest -> do
+          getPrim bh l (\src -> BS.memcpy dest src l)
+  return (BSS.toShort bs)
+
+instance Binary ShortByteString where
+  put_ bh f = putSBS bh f
+  get bh = getSBS bh
 
 instance Binary FastString where
   put_ bh f =
