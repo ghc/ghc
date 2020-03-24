@@ -81,6 +81,7 @@ import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
 import GHC.Driver.Plugins
 
+
 import Control.Monad
 import Control.Exception
 import Data.IORef
@@ -426,10 +427,8 @@ loadInterface doc_str mod from
                            Succeeded hi_boot_file -> computeInterface doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let fake_iface = emptyFullModIface mod
-
-                ; updateEps_ $ \eps ->
-                        eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
+                { updateEps_ $ \eps ->
+                        eps { eps_PIT = extendPITFake (eps_PIT eps) mod  }
                         -- Not found, so add an empty iface to
                         -- the EPS map so that we don't look again
 
@@ -490,16 +489,17 @@ loadInterface doc_str mod from
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
 
+        ; new_pit <- liftIO $ extendPIT (eps_PIT eps) mod final_iface
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig dflags iface
+           if elemPIT mod (eps_PIT eps) || is_external_sig dflags iface
                 then eps
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PIT          = new_pit,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,

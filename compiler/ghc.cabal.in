@@ -75,7 +75,8 @@ Library
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
-                   ghci == @ProjectVersionMunged@
+                   ghci == @ProjectVersionMunged@,
+                   ghc-compact >= 0.1.0.0
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.7

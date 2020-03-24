@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-
 (c) The University of Glasgow, 2006
 
@@ -60,6 +62,7 @@ module GHC.Driver.Types (
         ExternalPackageState(..), EpsStats(..), addEpsInStats,
         PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
         lookupIfaceByModule, emptyPartialModIface, emptyFullModIface, lookupHptByModule,
+        extendPITFake, extendPIT, elemPIT, pitKeys,
 
         PackageInstEnv, PackageFamInstEnv, PackageRuleBase,
         PackageCompleteMatchMap,
@@ -168,6 +171,7 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Eval.Types ( Resume )
 import GHC.Runtime.Interpreter.Types (Interp)
 import GHC.ForeignSrcLang
+import GHC.Compact
 
 import GHC.Types.Unique.FM
 import GHC.Hs
@@ -626,8 +630,10 @@ type HomePackageTable  = DModuleNameEnv HomeModInfo
         -- Domain = modules in the home package that have been fully compiled
         -- "home" unit id cached here for convenience
 
+data CompactRegion = forall a . CompactRegion (Compact a) | EmptyRegion
+
 -- | Helps us find information about modules in the imported packages
-type PackageIfaceTable = ModuleEnv ModIface
+data PackageIfaceTable = PackageIfaceTable CompactRegion (ModuleEnv ModIface)
         -- Domain = modules in the imported packages
 
 -- | Constructs an empty HomePackageTable
@@ -636,7 +642,32 @@ emptyHomePackageTable  = emptyUDFM
 
 -- | Constructs an empty PackageIfaceTable
 emptyPackageIfaceTable :: PackageIfaceTable
-emptyPackageIfaceTable = emptyModuleEnv
+emptyPackageIfaceTable = PackageIfaceTable EmptyRegion emptyModuleEnv
+
+lookupPIT :: PackageIfaceTable -> Module -> Maybe ModIface
+lookupPIT (PackageIfaceTable _ pit) m = lookupModuleEnv pit m
+
+extendPIT :: PackageIfaceTable -> Module -> ModIface -> IO PackageIfaceTable
+extendPIT (PackageIfaceTable comp pit) m mi = do
+  let raw_iface = forgetModIfaceCaches mi
+  compact_region <- case comp of
+    CompactRegion c -> do
+      compactAdd c raw_iface
+    EmptyRegion -> do
+      compact raw_iface
+  let compacted_iface = initModIfaceCaches $ getCompact compact_region
+  return (PackageIfaceTable (CompactRegion compact_region) (extendModuleEnv pit m compacted_iface))
+
+extendPITFake :: PackageIfaceTable -> Module -> PackageIfaceTable
+extendPITFake (PackageIfaceTable c pit) mod =
+  let fake_iface = emptyFullModIface mod
+  in PackageIfaceTable c (extendModuleEnv pit mod fake_iface)
+
+elemPIT :: Module -> PackageIfaceTable  -> Bool
+elemPIT m (PackageIfaceTable _ pit) = elemModuleEnv m pit
+
+pitKeys :: PackageIfaceTable -> [Module]
+pitKeys (PackageIfaceTable _ pit) = moduleEnvKeys pit
 
 pprHPT :: HomePackageTable -> SDoc
 -- A bit arbitrary for now
@@ -722,7 +753,7 @@ lookupIfaceByModule
 lookupIfaceByModule hpt pit mod
   = case lookupHptByModule hpt mod of
        Just hm -> Just (hm_iface hm)
-       Nothing -> lookupModuleEnv pit mod
+       Nothing -> lookupPIT pit mod
 
 -- If the module does come from the home package, why do we look in the PIT as well?
 -- (a) In OneShot mode, even home-package modules accumulate in the PIT
