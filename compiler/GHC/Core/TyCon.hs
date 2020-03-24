@@ -2327,12 +2327,14 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case tys `listLengthCmp` arity of
-        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
-        EQ -> Just (tvs `zip` tys, rhs, [])
-        LT -> Nothing
-  | otherwise
-  = Nothing
+  = case tys of
+      [] -> Just ([], rhs, []) -- Avoid a bit of work in the case of nullary synonyms
+      _  -> case tys `listLengthCmp` arity of
+              GT -> Just (tvs `zip` tys, rhs, drop arity tys)
+              EQ -> Just (tvs `zip` tys, rhs, [])
+              LT -> Nothing
+   | otherwise
+   = Nothing
 
 ----------------
 

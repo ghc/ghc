@@ -383,15 +383,16 @@ how roles in kinds might work out.
 -}
 
 -- | Gives the typechecker view of a type. This unwraps synonyms but
--- leaves 'Constraint' alone. c.f. coreView, which turns Constraint into
--- TYPE LiftedRep. Returns Nothing if no unwrapping happens.
+-- leaves 'Constraint' alone. c.f. 'coreView', which turns 'Constraint' into
+-- @TYPE LiftedRep@. Returns 'Nothing' if no unwrapping happens.
 -- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
-tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+tcView (TyConApp tc tys)
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
-               -- ok to use 'substTy' here.
+               -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
@@ -400,17 +401,16 @@ tcView _ = Nothing
 
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
--- ^ This function Strips off the /top layer only/ of a type synonym
+-- ^ This function strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
--- Returns Nothing if there is nothing to look through.
+-- Returns 'Nothing' if there is nothing to look through.
 -- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView ty@(TyConApp tc tys)
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
-    -- This equation is exactly like tcView
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
 
   -- At the Core level, Constraint = Type
   -- See Note [coreView vs tcView]
@@ -419,6 +419,30 @@ coreView ty@(TyConApp tc tys)
     Just liftedTypeKind
 
 coreView _ = Nothing
+
+-----------------------------------------------
+expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
+expandSynTyConApp_maybe tc tys
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc
+  , n_tys >= arity
+  = Just (expand_syn arity tvs rhs n_tys tys)
+  | otherwise
+  = Nothing
+  where
+    n_tys = length tys
+    arity = tyConArity tc
+-- Without this INLINE the call to expandSynTyConApp_maybe in coreView
+-- will result in an avoidable allocation.
+{-# INLINE expandSynTyConApp_maybe #-}
+
+-- | A helper for 'expandSynTyConApp_maybe' to avoid inlining this cold path
+-- into call-sites.
+expand_syn :: Int -> [TyVar] -> Type -> Int -> [Type] -> Type
+expand_syn arity tvs rhs n_tys tys
+  | n_tys > arity = mkAppTys rhs' (drop arity tys)
+  | otherwise     = rhs'
+  where
+    rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
 
 {-# INLINE coreFullView #-}
 coreFullView :: Type -> Type
@@ -2207,6 +2231,36 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
+
+Note [Comparing nullary type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the task of testing equality between two 'Type's of the form
+
+  TyConApp tc []
+
+where @tc@ is a type synonym. A naive way to perform this comparison these
+would first expand the synonym and then compare the resulting expansions.
+
+However, this is obviously wasteful and the RHS of @tc@ may be large; it is
+much better to rather compare the TyCons directly. Consequently, before
+expanding type synonyms in type comparisons we first look for a nullary
+TyConApp and simply compare the TyCons if we find one. Of course, if we find
+that the TyCons are *not* equal then we still need to perform the expansion as
+their RHSs may still be equal.
+
+We perform this optimisation in a number of places:
+
+ * GHC.Core.Types.eqType
+ * GHC.Core.Types.nonDetCmpType
+ * GHC.Core.Unify.unify_ty
+ * TcCanonical.can_eq_nc'
+ * TcUnify.uType
+
+This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
+since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
+whenever possible. See [Prefer Type over TYPE 'LiftedRep] in
+GHC.Core.TyCo.Rep for details.
+
 -}
 
 eqType :: Type -> Type -> Bool
@@ -2318,6 +2372,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between the two types
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
+    -- See Note [Comparing nullary type synonyms].
+    go _   (TyConApp tc1 []) (TyConApp tc2 [])
+      | tc1 == tc2
+      = TEQ
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
       | Just t2' <- coreView t2 = go env t1 t2'
