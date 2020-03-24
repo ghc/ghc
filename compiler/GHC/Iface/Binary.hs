@@ -143,7 +143,7 @@ readBinIface_ profile checkHiWay traceBinIFace hi_path ncu = do
     seekBin bh extFields_p
     extFields <- get bh
 
-    return mod_iface{mi_ext_fields = extFields}
+    return $ initModIfaceCaches (mod_iface{mi_ext_fields = extFields})
 
 
 -- | This performs a get action after reading the dictionary and symbol
@@ -192,7 +192,7 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
 
-    putWithUserData traceBinIface bh mod_iface
+    putWithUserData traceBinIface bh (forgetModIfaceCaches mod_iface)
 
     extFields_p <- tellBin bh
     putAt bh extFields_p_p extFields_p

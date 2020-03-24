@@ -279,7 +279,7 @@ checkVersions hsc_env mod_summary iface
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
 checkPlugins hsc_env iface = liftIO $ do
   new_fingerprint <- fingerprintPlugins hsc_env
-  let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
+  let old_fingerprint = mi_plugin_hash (mi_backend iface)
   pr <- mconcat <$> mapM pluginRecompile' (plugins hsc_env)
   return $
     pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
@@ -377,7 +377,7 @@ checkHie mod_summary = do
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
-    let old_hash = mi_flag_hash (mi_final_exts iface)
+    let old_hash = mi_flag_hash (mi_backend iface)
     new_hash <- liftIO $ fingerprintDynFlags hsc_env
                                              (mi_module iface)
                                              putNameLiterally
@@ -390,7 +390,7 @@ checkFlagHash hsc_env iface = do
 -- | Check the optimisation flags haven't changed
 checkOptimHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkOptimHash hsc_env iface = do
-    let old_hash = mi_opt_hash (mi_final_exts iface)
+    let old_hash = mi_opt_hash (mi_backend iface)
     new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -405,7 +405,7 @@ checkOptimHash hsc_env iface = do
 -- | Check the HPC flags haven't changed
 checkHpcHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkHpcHash hsc_env iface = do
-    let old_hash = mi_hpc_hash (mi_final_exts iface)
+    let old_hash = mi_hpc_hash (mi_backend iface)
     new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -589,7 +589,7 @@ checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod_hash = old_mod_hash }
   = needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_backend iface))
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
@@ -598,7 +598,7 @@ checkModUsage _this_pkg UsagePackageModule{
 checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash }
   = needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed (raw)"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_backend iface))
 
 checkModUsage this_pkg UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -610,9 +610,9 @@ checkModUsage this_pkg UsageHomeModule{
     needInterface mod $ \iface -> do
 
        let
-           new_mod_hash    = mi_mod_hash (mi_final_exts iface)
-           new_decl_hash   = mi_hash_fn  (mi_final_exts iface)
-           new_export_hash = mi_exp_hash (mi_final_exts iface)
+           new_mod_hash    = mi_mod_hash (mi_backend iface)
+           new_decl_hash   = mi_hash_fn  (mi_caches iface)
+           new_export_hash = mi_exp_hash (mi_backend iface)
 
            reason = moduleNameString mod_name ++ " changed"
 
@@ -1108,12 +1108,13 @@ addFingerprints hsc_env iface0
                               && null orph_fis)
       , mi_finsts      = not (null (mi_fam_insts iface0))
       , mi_exp_hash    = export_hash
-      , mi_orphan_hash = orphan_hash
-      , mi_warn_fn     = warn_fn
+      , mi_orphan_hash = orphan_hash }
+    caches = ModIfaceCaches {
+        mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = (final_iface_exts, caches) }
    --
    return final_iface
 
@@ -1164,11 +1165,11 @@ getOrphanHashes hsc_env mods = do
     pit        = eps_PIT eps
     get_orph_hash mod =
           case lookupIfaceByModule hpt pit mod of
-            Just iface -> return (mi_orphan_hash (mi_final_exts iface))
+            Just iface -> return (mi_orphan_hash (mi_backend iface))
             Nothing    -> do -- similar to 'mkHashFun'
                 iface <- initIfaceLoad hsc_env . withException
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
-                return (mi_orphan_hash (mi_final_exts iface))
+                return (mi_orphan_hash (mi_backend iface))
 
   --
   mapM get_orph_hash mods
@@ -1474,7 +1475,7 @@ mkHashFun hsc_env eps name
                             -- interfaces are looked up and some tests fail
                             -- (e.g. T16219).
                           $ loadInterface (text "lookupVers2") mod ImportBySystem
-        return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
+        return $ snd (mi_hash_fn (mi_caches iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
 
