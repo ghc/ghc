@@ -6,7 +6,6 @@ interfacePlugin: GHC.Float
 interfacePlugin: GHC.Base
 interfacePlugin: Language.Haskell.TH.Syntax
 typeCheckPlugin (rn)
-interfacePlugin: GHC.Types
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Integer.Type
 interfacePlugin: GHC.Natural

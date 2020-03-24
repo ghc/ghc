@@ -1,9 +1,9 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 63, types: 43, coercions: 1, joins: 0/0}
+  = {terms: 63, types: 39, coercions: 1, joins: 0/0}
 
--- RHS size: {terms: 2, types: 4, coercions: 1, joins: 0/0}
+-- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
 T2431.$WRefl [InlPrag=INLINE[0] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
@@ -15,7 +15,7 @@ T2431.$WRefl [InlPrag=INLINE[0] CONLIKE] :: forall a. a :~: a
 T2431.$WRefl
   = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)
 
--- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Str=<L,U>b, Cpr=b, Unf=OtherCon []]
 absurd = \ (@a) (x :: Int :~: Bool) -> case x of { }
@@ -110,6 +110,3 @@ T2431.$tc'Refl
       $tc'Refl2
       1#
       $krep3
-
-
-

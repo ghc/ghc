@@ -1528,6 +1528,11 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
   = go orig_env orig_ty1 orig_ty2
   where
     go :: RnEnv2 -> Type -> Type -> Bool
+    -- See Note [Comparing nullary type synonyms].
+    go _   (TyConApp tc1 []) (TyConApp tc2 [])
+      | tc1 == tc2
+      = True
+
     go env t1 t2 | not keep_syns, Just t1' <- tcView t1 = go env t1' t2
     go env t1 t2 | not keep_syns, Just t2' <- tcView t2 = go env t1 t2'
 
@@ -1560,6 +1565,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
       = go env s1 s2 && go env t1 t2
 
     go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
+    -- TODO: nullary synonym optimisation
       = tc1 == tc2 && gos env (tc_vis tc1) ts1 ts2
 
     go env (CastTy t1 _)   t2              = go env t1 t2

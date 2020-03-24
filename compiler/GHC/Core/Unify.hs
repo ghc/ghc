@@ -956,6 +956,11 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 
 unify_ty env ty1 ty2 kco
+  -- See Note [Comparing nullary type synonyms].
+  | TyConApp tc1 [] <- ty1
+  , TyConApp tc2 [] <- ty2
+  , tc1 == tc2                = return ()
+
     -- TODO: More commentary needed here
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco

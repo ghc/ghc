@@ -1,17 +1,17 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 71, types: 44, coercions: 0, joins: 0/0}
+  = {terms: 71, types: 40, coercions: 0, joins: 0/0}
 
 Rec {
--- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall {a}. GHC.Prim.Void# -> a
 [GblId, Arity=1, Str=<B,A>b, Cpr=b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 end Rec }
 
--- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
 [GblId,
  Arity=1,
