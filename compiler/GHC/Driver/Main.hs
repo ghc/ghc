@@ -130,7 +130,6 @@ import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.Types.CostCentre
-import GHC.Types.CostCentre.Init
 import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Set

@@ -415,7 +415,6 @@ Library
         TysWiredIn
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
-        GHC.Types.CostCentre.Init
         GHC.Rename.Binds
         GHC.Rename.Env
         GHC.Rename.Expr
