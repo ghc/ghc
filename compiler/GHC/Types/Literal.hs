@@ -6,12 +6,14 @@
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Types.Literal
         (
         -- * Main data type
-          Literal(..)           -- Exported to ParseIface
+          Literal           -- Exported to ParseIface
+        , LiteralX(..)
         , LitNumType(..)
 
         -- ** Creating Literals
@@ -103,12 +105,14 @@ import Numeric ( fromRat )
 -- * A character
 -- * A string
 -- * The NULL pointer
---
-data Literal
+
+type Literal = LiteralX Type
+
+data LiteralX a
   = LitChar    Char             -- ^ @Char#@ - at least 31 bits. Create with
                                 -- 'mkLitChar'
 
-  | LitNumber !LitNumType !Integer Type
+  | LitNumber !LitNumType !Integer a
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer.
                                 -- See Note [Types of LitNumbers] below for the
@@ -146,7 +150,7 @@ data Literal
                                 --
                                 -- 3) Flag indicating whether the symbol
                                 --    references a function or a data
-  deriving Data
+  deriving (Data, Functor, Foldable, Traversable)
 
 -- | Numeric literal type
 data LitNumType
@@ -212,7 +216,7 @@ instance Binary LitNumType where
       h <- getByte bh
       return (toEnum (fromIntegral h))
 
-instance Binary Literal where
+instance Binary (LiteralX ()) where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
     put_ bh (LitNullAddr)    = do putByte bh 2
@@ -254,30 +258,19 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     -- Note [Types of LitNumbers]
-                    let t = case nt of
-                            LitNumInt     -> intPrimTy
-                            LitNumInt64   -> int64PrimTy
-                            LitNumWord    -> wordPrimTy
-                            LitNumWord64  -> word64PrimTy
-                            -- See Note [Integer literals]
-                            LitNumInteger ->
-                              panic "Evaluated the place holder for mkInteger"
-                            -- and Note [Natural literals]
-                            LitNumNatural ->
-                              panic "Evaluated the place holder for mkNatural"
-                    return (LitNumber nt i t)
+                    return (LitNumber nt i ())
               _ -> do
                     return (LitRubbish)
 
-instance Outputable Literal where
+instance Outputable (LiteralX a) where
     ppr = pprLiteral id
 
-instance Eq Literal where
+instance Eq (LiteralX a) where
     a == b = compare a b == EQ
 
 -- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
 -- 'TrieMap.CoreMap'.
-instance Ord Literal where
+instance Ord (LiteralX a) where
     compare = cmpLit
 
 {-
@@ -696,7 +689,7 @@ absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
         ~~~~~~~~~~
 -}
 
-cmpLit :: Literal -> Literal -> Ordering
+cmpLit :: LiteralX a -> LiteralX a -> Ordering
 cmpLit (LitChar      a)     (LitChar       b)     = a `compare` b
 cmpLit (LitString    a)     (LitString     b)     = a `compare` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
@@ -711,7 +704,7 @@ cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
 
-litTag :: Literal -> Int
+litTag :: LiteralX a -> Int
 litTag (LitChar      _)   = 1
 litTag (LitString    _)   = 2
 litTag (LitNullAddr)      = 3
@@ -727,7 +720,7 @@ litTag (LitRubbish)       = 8
 * See Note [Printing of literals in Core]
 -}
 
-pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
+pprLiteral :: (SDoc -> SDoc) -> LiteralX a -> SDoc
 pprLiteral _       (LitChar c)     = pprPrimChar c
 pprLiteral _       (LitString s)   = pprHsBytes s
 pprLiteral _       (LitNullAddr)   = text "__NULL"

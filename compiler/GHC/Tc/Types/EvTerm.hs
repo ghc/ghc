@@ -10,7 +10,7 @@ import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
-import GHC.Types.Literal ( Literal(..) )
+import GHC.Types.Literal ( LiteralX(..) )
 import GHC.Tc.Types.Evidence
 import GHC.Driver.Types
 import GHC.Driver.Session

@@ -531,7 +531,7 @@ toIfUnfolding _ NoUnfolding = Nothing
 
 toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
-toIfaceExpr (Lit l)         = IfaceLit l
+toIfaceExpr (Lit l)         = IfaceLit (() <$ l)
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
 toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
@@ -574,7 +574,7 @@ toIfaceAlt (c,bs,r) = (toIfaceCon c, map getOccFS bs, toIfaceExpr r)
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
 toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
-toIfaceCon (LitAlt l)   = IfaceLitAlt l
+toIfaceCon (LitAlt l)   = IfaceLitAlt (() <$ l)
 toIfaceCon DEFAULT      = IfaceDefault
 
 ---------------------

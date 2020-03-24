@@ -27,6 +27,7 @@ module GHC.IfaceToCore (
 import GHC.Prelude
 
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
+import GHC.Builtin.Types.Prim
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -1381,20 +1382,33 @@ tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
 
 -------------------------
-tcIfaceLit :: Literal -> IfL Literal
--- Integer literals deserialise to (LitInteger i <error thunk>)
--- so tcIfaceLit just fills in the type.
--- See Note [Integer literals] in GHC.Types.Literal
-tcIfaceLit (LitNumber LitNumInteger i _)
-  = do t <- tcIfaceTyConByName integerTyConName
-       return (mkLitInteger i (mkTyConTy t))
--- Natural literals deserialise to (LitNatural i <error thunk>)
--- so tcIfaceLit just fills in the type.
--- See Note [Natural literals] in GHC.Types.Literal
-tcIfaceLit (LitNumber LitNumNatural i _)
-  = do t <- tcIfaceTyConByName naturalTyConName
-       return (mkLitNatural i (mkTyConTy t))
-tcIfaceLit lit = return lit
+tcIfaceLit :: LiteralX () -> IfL Literal
+tcIfaceLit (LitChar c) = return $ LitChar c
+tcIfaceLit (LitNumber t i _) =
+  let normal = return . LitNumber t i
+  in case t of
+    LitNumInt     -> normal intPrimTy
+    LitNumInt64   -> normal int64PrimTy
+    LitNumWord    -> normal wordPrimTy
+    LitNumWord64  -> normal word64PrimTy
+    -- Integer literals deserialise to (LitInteger i <error thunk>)
+    -- so tcIfaceLit just fills in the type.
+    -- See Note [Integer literals] in GHC.Types.Literal
+    LitNumInteger -> do
+      ty <- tcIfaceTyConByName integerTyConName
+      return (mkLitInteger i (mkTyConTy ty))
+    -- Natural literals deserialise to (LitNatural i <error thunk>)
+    -- so tcIfaceLit just fills in the type.
+    -- See Note [Natural literals] in GHC.Types.Literal
+    LitNumNatural -> do
+       ty <- tcIfaceTyConByName naturalTyConName
+       return (mkLitNatural i (mkTyConTy ty))
+tcIfaceLit (LitString s) = return (LitString s)
+tcIfaceLit LitNullAddr = return LitNullAddr
+tcIfaceLit LitRubbish = return LitRubbish
+tcIfaceLit (LitFloat f) = return (LitFloat f)
+tcIfaceLit (LitDouble d) = return (LitDouble d)
+tcIfaceLit (LitLabel l d e) = return (LitLabel l d e)
 
 -------------------------
 tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
