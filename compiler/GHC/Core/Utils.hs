@@ -1982,7 +1982,7 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 -- different shape.
 -- Used to "look through" Ticks in places that need to handle literal strings.
 exprIsTickedString_maybe :: CoreExpr -> Maybe ByteString
-exprIsTickedString_maybe (Lit (LitString bs)) = Just bs
+exprIsTickedString_maybe (Lit (LitString bs)) = Just (bytesFS bs)
 exprIsTickedString_maybe (Tick t e)
   -- we don't tick literals with CostCentre ticks, compare to mkTick
   | tickishPlace t == PlaceCostCentre = Nothing

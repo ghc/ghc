@@ -2087,7 +2087,7 @@ match_append_lit foldVariant _ id_unf _
   = ASSERT( ty1 `eqType` ty2 )
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
-                    `App` Lit (LitString (s1 `BS.append` s2))
+                    `App` Lit (LitString (s1 `appendFS` s2))
                     `App` mkTicks (c1Ticks ++ c2Ticks) c1'
                     `App` n
 
@@ -2135,7 +2135,7 @@ match_cstring_length env id_unf _ [lit1]
     -- If elemIndex returns Just, it has the index of the first embedded NUL
     -- in the string. If no NUL bytes are present (the common case) then use
     -- full length of the byte string.
-  = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
+  = let len = fromMaybe (lengthFS str) (BS.elemIndex 0 (bytesFS str))
      in Just (Lit (mkLitInt (roPlatform env) (fromIntegral len)))
 match_cstring_length _ _ _ _ = Nothing
 

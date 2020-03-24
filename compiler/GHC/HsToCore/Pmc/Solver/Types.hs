@@ -511,7 +511,7 @@ literalToPmLit ty l = PmLit ty <$> go l
     go (LitChar c)       = Just (PmLitChar c)
     go (LitFloat r)      = Just (PmLitRat r)
     go (LitDouble r)     = Just (PmLitRat r)
-    go (LitString s)     = Just (PmLitString (mkFastStringByteString s))
+    go (LitString s)     = Just (PmLitString s)
     go (LitNumber _ i)   = Just (PmLitInt i)
     go _                 = Nothing
 

@@ -41,6 +41,7 @@ module GHC.Core.Unfold (
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Core
@@ -65,6 +66,7 @@ import GHC.Types.Tickish
 
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf)
+import Data.List
 
 
 -- | Unfolding options
@@ -613,9 +615,9 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by GHC.Core.Unfold.sizeExpr
-litSize (LitNumber LitNumInteger _) = 100   -- Note [Size of literal integers]
-litSize (LitNumber LitNumNatural _) = 100
-litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
+litSize (LitNumber LitNumInteger _ ) = 100   -- Note [Size of literal integers]
+litSize (LitNumber LitNumNatural _ ) = 100
+litSize (LitString str) = 10 + 10 * ((lengthFS str + 3) `div` 4)
         -- If size could be 0 then @f "x"@ might be too small
         -- [Sept03: make literal strings a bit bigger to avoid fruitless
         --  duplication of little strings]

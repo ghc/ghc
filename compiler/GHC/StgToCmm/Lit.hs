@@ -30,6 +30,7 @@ import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.FastString
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
@@ -49,7 +50,7 @@ newByteStringCLit bytes
 
 cgLit :: Literal -> FCode CmmExpr
 cgLit (LitString s) =
-  CmmLit <$> newByteStringCLit s
+  CmmLit <$> newByteStringCLit (bytesFS s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit (LitRubbish preps) =
   case expectOnly "cgLit:Rubbish" preps of -- Note [Post-unarisation invariants]
@@ -102,4 +103,3 @@ mkSimpleLit platform = \case
             labelSrc = ForeignLabelInThisPackage
         in CmmLabel (mkForeignLabel fs ms labelSrc fod)
    other -> pprPanic "mkSimpleLit" (ppr other)
-

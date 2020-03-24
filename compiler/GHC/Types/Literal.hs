@@ -80,7 +80,6 @@ import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import Data.ByteString (ByteString)
 import Data.Int
 import Data.Word
 import Data.Char
@@ -125,7 +124,7 @@ data Literal
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer.
 
-  | LitString !ByteString       -- ^ A string-literal: stored and emitted
+  | LitString  FastString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'
@@ -546,7 +545,7 @@ mkLitChar = LitChar
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkLitString :: String -> Literal
 -- stored UTF-8 encoded
-mkLitString s = LitString (bytesFS $ mkFastString s)
+mkLitString s = LitString (mkFastString s)
 
 mkLitInteger :: Integer -> Literal
 mkLitInteger x = LitNumber LitNumInteger x
@@ -836,7 +835,7 @@ literalType (LitRubbish preps) = mkForAllTy a Inferred (mkTyVarTy a)
 
 cmpLit :: Literal -> Literal -> Ordering
 cmpLit (LitChar      a)     (LitChar       b)     = a `compare` b
-cmpLit (LitString    a)     (LitString     b)     = a `compare` b
+cmpLit (LitString    a)     (LitString     b)     = a `lexicalCompareFS` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
@@ -856,7 +855,7 @@ cmpLit lit1 lit2
 
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 pprLiteral _       (LitChar c)     = pprPrimChar c
-pprLiteral _       (LitString s)   = pprHsBytes s
+pprLiteral _       (LitString s)   = pprHsBytes (bytesFS s)
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
