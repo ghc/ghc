@@ -52,6 +52,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
         mkTyConApp,
+        tYPE,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -90,8 +91,9 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, liftedRepDataConKey, manyDataConKey, tYPETyConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, liftedTypeKind, manyDataConTy )
+import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( hasKey, Uniquable(..) )
 import GHC.Utils.Outputable
@@ -1018,12 +1020,64 @@ mkTyConApp tycon tys
   -- avoid reboxing every time `mkTyConApp` is called.
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     manyDataConTy
+  -- See Note [Prefer Type over TYPE 'LiftedRep].
+  | tycon `hasKey` tYPETyConKey
+  , [rep] <- tys
+  = tYPE rep
+  -- The catch-all case
   | otherwise
   = TyConApp tycon tys
 
+{-
+Note [Prefer Type over TYPE 'LiftedRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Core of nearly any program will have numerous occurrences of
+@TYPE 'LiftedRep@ floating about. Consequently, we try hard to ensure
+that operations on such types are efficient. Specifically, we strive to
+
+ a. Avoid heap allocation of such types
+ b. Use a small (shallow in the tree-depth sense) representation
+    for such types
+
+Goal (b) is particularly useful as it makes traversals (e.g. free variable
+traversal, substitution, and comparison) more efficient.
+Comparison in particular takes special advantage of nullary type synonym
+applications, Note [Comparing nullary type synonyms] in "GHC.Core.Type".
+
+To accomplish these we use a number of tricks:
+
+  * Instead of representing the lifted kind as
+    @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
+    use the 'GHC.Types.Type' type synonym. This serves goal (b)
+    since there are no applied type arguments to traverse, e.g., during
+    comparison.
+
+  * We have a top-level binding to represent `TyConApp GHC.Types.Type []`
+    (namely 'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we
+    don't need to allocate such types (goal (a)).
+
+  * To avoid allocating 'TyConApp' constructors
+    'GHC.Builtin.Types.Prim.tYPE' catches the lifted case and returns
+    `liftedTypeKind` instead of building an application (goal (a)).
+
+  * Similarly, 'Type.mkTyConApp' catches applications of `TYPE` and
+    handles them using 'GHC.Builtin.Types.Prim.tYPE', ensuring
+    that it benefits from the optimisation described above (goal (a)).
+
+See #17958.
+-}
+
+-- | Given a RuntimeRep, applies TYPE to it.
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+tYPE :: Type -> Type
+tYPE (TyConApp tc [])
+  -- See Note [Prefer Type of TYPE 'LiftedRep]
+  | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedRep
+tYPE rr = TyConApp tYPETyCon [rr]
+
 -- This is a single, global definition of the type `Type`
 -- Defined here so it is only allocated once.
--- See Note [mkTyConApp and Type]
+-- See Note [mkTyConApp and Type] in this module.
 liftedTypeKindTyConApp :: Type
 liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
 
