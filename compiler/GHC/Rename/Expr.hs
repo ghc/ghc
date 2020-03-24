@@ -1853,6 +1853,7 @@ isStrictPattern lpat =
     NPat{}          -> True
     NPlusKPat{}     -> True
     SplicePat{}     -> True
+    XPat nec        -> noExtCon nec
     _otherwise -> panic "isStrictPattern"
 
 {-

@@ -737,7 +737,7 @@ isIrrefutableHsPat
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
 
-    go (XPat {})           = False
+    go (XPat nec)          = noExtCon nec
 
 -- | Is the pattern any of combination of:
 --
