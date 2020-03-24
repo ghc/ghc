@@ -1231,6 +1231,7 @@ compilation. In order to avoid a potentially expensive series of checks in
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
+-- TODO: TYPE 'LiftedRep
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
   -- The FunTyCon (->) is always a visible one
@@ -1239,6 +1240,11 @@ mkTyConApp tycon tys
   | tycon == liftedTypeKindTyCon
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     liftedTypeKindTyConApp
+  -- Note [mkTyConApp and Type]
+  | tycon == tYPETyCon
+  , [rep] <- tys
+  , isLiftedRuntimeRep rep
+  = tYPE liftedRepTy
   | otherwise
   = TyConApp tycon tys
 
@@ -2266,6 +2272,7 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   | TGT  -- ^ @t1 > t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
+-- TODO: nullary synonym optimization
 nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
 nonDetCmpTypeX env orig_t1 orig_t2 =

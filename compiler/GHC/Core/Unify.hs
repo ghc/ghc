@@ -958,6 +958,7 @@ unify_ty :: UMEnv
 
 unify_ty env ty1 ty2 kco
     -- TODO: More commentary needed here
+-- TODO: nullary synonym check? Not hammered
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env

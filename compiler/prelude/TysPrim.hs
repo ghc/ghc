@@ -527,7 +527,11 @@ mkPrimTcName built_in_syntax occ key tycon
 -- | Given a RuntimeRep, applies TYPE to it.
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
-tYPE rr = TyConApp tYPETyCon [rr]
+tYPE rr
+  -- static cases
+  | isLiftedRuntimeRep rr   = liftedTypeKind
+  -- everything else
+  | otherwise               = mkTyConApp tYPETyCon [rr]
 
 {-
 ************************************************************************

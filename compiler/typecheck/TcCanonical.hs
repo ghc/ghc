@@ -971,6 +971,7 @@ can_eq_nc'
 
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
 can_eq_nc' flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+-- TODO: Handle nullary synonyms
   | Just ty1' <- tcView ty1 = can_eq_nc' flat rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- tcView ty2 = can_eq_nc' flat rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
