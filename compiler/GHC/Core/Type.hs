@@ -367,15 +367,16 @@ See also #11715, which tracks removing this inconsistency.
 -}
 
 -- | Gives the typechecker view of a type. This unwraps synonyms but
--- leaves 'Constraint' alone. c.f. coreView, which turns Constraint into
--- TYPE LiftedRep. Returns Nothing if no unwrapping happens.
+-- leaves 'Constraint' alone. c.f. 'coreView', which turns 'Constraint' into
+-- @TYPE LiftedRep@. Returns 'Nothing' if no unwrapping happens.
 -- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
-tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+tcView (TyConApp tc tys)
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
-               -- ok to use 'substTy' here.
+               -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
@@ -384,17 +385,16 @@ tcView _ = Nothing
 
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
--- ^ This function Strips off the /top layer only/ of a type synonym
+-- ^ This function strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
--- Returns Nothing if there is nothing to look through.
+-- Returns 'Nothing' if there is nothing to look through.
 -- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView ty@(TyConApp tc tys)
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
-    -- This equation is exactly like tcView
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
 
   -- At the Core level, Constraint = Type
   -- See Note [coreView vs tcView]
@@ -403,6 +403,22 @@ coreView ty@(TyConApp tc tys)
     Just liftedTypeKind
 
 coreView _ = Nothing
+
+-----------------------------------------------
+expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
+expandSynTyConApp_maybe tc tys
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc
+  = case tys of
+      [] -> Just (mkAppTys rhs tys)
+      _  -> case tys `listLengthCmp` arity of
+              GT -> Just (mkAppTys rhs' (drop arity tys))
+              EQ -> Just rhs'
+              LT -> Nothing
+        where
+          arity = tyConArity tc
+          rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
+  | otherwise
+  = Nothing
 
 {-# INLINE coreFullView #-}
 coreFullView :: Type -> Type
@@ -1243,6 +1259,33 @@ We have
 So again we must instantiate.
 
 The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
+
+--------------------------------------
+Note [mkTyConApp and Type]
+
+Whilst benchmarking it was observed in #17292 that GHC allocated a lot
+of `TyConApp` constructors. Upon further inspection a large number of these
+TyConApp constructors were all duplicates of `Type` applied to no arguments.
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
+only one `TyConApp 'Type []` closure is allocated during the course of
+compilation.
+
+We also have a similar special-case for applications of TYPE; see
+Note [Prefer Type over TYPE 'LiftedPtrRep] for details.
+
 
 ---------------------------------------------------------------------
                                 TyConApp
@@ -2188,6 +2231,36 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
+
+Note [Comparing nullary type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the task of testing equality between two 'Type's of the form
+
+  TyConApp tc []
+
+where @tc@ is a type synonym. A naive way to perform this comparison these
+would first expand the synonym and then compare the resulting expansions.
+
+However, this is obviously wasteful and the RHS of @tc@ may be large; it is
+much better to rather compare the TyCons directly. Consequently, before
+expanding type synonyms in type comparisons we first look for a nullary
+TyConApp and simply compare the TyCons if we find one. Of course, if we find
+that the TyCons are *not* equal then we still need to perform the expansion as
+their RHSs may still be equal.
+
+We perform this optimisation in a number of places:
+
+ * GHC.Core.Types.eqType
+ * GHC.Core.Types.nonDetCmpType
+ * GHC.Core.Unify.unify_ty
+ * TcCanonical.can_eq_nc'
+ * TcUnify.uType
+
+This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
+since GHC prefers to use the type synonym over @TYPE 'LiftedPtr@ applications
+whenever possible. See [Prefer Type over TYPE 'LiftedPtrRep] in TysPrim for
+details.
+
 -}
 
 eqType :: Type -> Type -> Bool
@@ -2299,6 +2372,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between the two types
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
+    -- See Note [Comparing nullary type synonyms].
+    go _   (TyConApp tc1 []) (TyConApp tc2 [])
+      | tc1 == tc2
+      = TEQ
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
       | Just t2' <- coreView t2 = go env t1 t2'

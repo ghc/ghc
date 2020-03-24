@@ -2033,7 +2033,6 @@ arguments are simply value arguments, and should not get in the way.
 
 
 -- | Is this a 'TyCon' representing a regular H98 type synonym (@type@)?
-{-# INLINE isTypeSynonymTyCon #-}  -- See Note [Inlining coreView] in GHC.Core.Type
 isTypeSynonymTyCon :: TyCon -> Bool
 isTypeSynonymTyCon (SynonymTyCon {}) = True
 isTypeSynonymTyCon _                 = False
@@ -2216,7 +2215,6 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
-                                          , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
@@ -2306,10 +2304,12 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case tys `listLengthCmp` arity of
-        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
-        EQ -> Just (tvs `zip` tys, rhs, [])
-        LT -> Nothing
+  = case tys of
+      [] -> Just ([], rhs, []) -- Avoid a bit of work in the case of nullary synonyms
+      _  -> case tys `listLengthCmp` arity of
+              GT -> Just (tvs `zip` tys, rhs, drop arity tys)
+              EQ -> Just (tvs `zip` tys, rhs, [])
+              LT -> Nothing
   | otherwise
   = Nothing
 

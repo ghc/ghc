@@ -1,9 +1,9 @@
 
 ==================== Desugar (after optimization) ====================
 Result size of Desugar (after optimization)
-  = {terms: 13, types: 24, coercions: 0, joins: 0/0}
+  = {terms: 13, types: 18, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 6, types: 11, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 f :: forall a b. (a ~ b) => a -> b -> Bool
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
