@@ -5,11 +5,11 @@ interfacePlugin: GHC.Float
 interfacePlugin: GHC.Base
 interfacePlugin: System.IO
 typeCheckPlugin (rn)
-interfacePlugin: GHC.Prim
-interfacePlugin: GHC.Show
 interfacePlugin: GHC.Types
+interfacePlugin: GHC.Show
 interfacePlugin: GHC.TopHandler
 typeCheckPlugin (tc)
+interfacePlugin: GHC.Prim
 interfacePlugin: GHC.CString
 interfacePlugin: GHC.Integer.Type
 interfacePlugin: GHC.Natural

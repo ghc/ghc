@@ -541,6 +541,9 @@ mkPrimTcName built_in_syntax occ key tycon
 -- | Given a RuntimeRep, applies TYPE to it.
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
+  -- static cases
+tYPE (TyConApp tc [])
+  | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedPtrRep
 tYPE rr = TyConApp tYPETyCon [rr]
 
 {-

@@ -145,6 +145,7 @@ import GHC.Types.Id
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
+import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Core.ConLike
@@ -643,7 +644,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = TyCoRep.TyConApp liftedTypeKindTyCon []
 typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1211,8 +1212,8 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 -- type Type = tYPE 'LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
+                                       [] liftedTypeKind [] rhs
+  where rhs = TyCoRep.TyConApp tYPETyCon [liftedRepTy]
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcTyCon runtimeRepTyConName Nothing []
