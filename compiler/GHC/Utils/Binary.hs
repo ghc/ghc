@@ -1037,16 +1037,6 @@ putBS bh bs =
     put_ bh l
     putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
 
-getBS :: BinHandle -> IO ByteString
-getBS bh = do
-  l <- get bh :: IO Int
-  BS.create l $ \dest -> do
-    getPrim bh l (\src -> BS.memcpy dest src l)
-
-instance Binary ByteString where
-  put_ bh f = putBS bh f
-  get bh = getBS bh
-
 putSBS :: BinHandle -> ShortByteString -> IO ()
 putSBS bh bs =
   BSS.useAsCStringLen bs $ \(ptr, l) -> do
