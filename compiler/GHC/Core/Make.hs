@@ -647,7 +647,7 @@ mkBuildExpr :: (MonadFail.MonadFail m, MonadThings m, MonadUnique m)
                                                         -- the body of that worker
             -> m CoreExpr
 mkBuildExpr elt_ty mk_build_inside = do
-    [n_tyvar] <- newTyVars [alphaTyVar]
+    n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkVisFunTys [elt_ty, n_ty] n_ty
     [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
@@ -657,9 +657,9 @@ mkBuildExpr elt_ty mk_build_inside = do
     build_id <- lookupId buildName
     return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
   where
-    newTyVars tyvar_tmpls = do
-      uniqs <- getUniquesM
-      return (zipWith setTyVarUnique tyvar_tmpls uniqs)
+    newTyVar tyvar_tmpl = do
+      uniq <- getUniqueM
+      return (setTyVarUnique tyvar_tmpl uniq)
 
 {-
 ************************************************************************
