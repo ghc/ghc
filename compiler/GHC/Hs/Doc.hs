@@ -63,7 +63,7 @@ instance Outputable HsDocString where
   ppr = doubleQuotes . text . unpackHDS
 
 isEmptyDocString :: HsDocString -> Bool
-isEmptyDocString (HsDocString bs) = BS.null bs
+isEmptyDocString (HsDocString bs) = nullFS bs
 
 mkHsDocString :: String -> HsDocString
 mkHsDocString s = HsDocString (mkFastString s)
