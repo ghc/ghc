@@ -50,7 +50,7 @@ module Demand (
         TypeShape(..), peelTsFuns, trimToType,
 
         useCount, isUsedOnce, reuseEnv,
-        killUsageDemand, killUsageSig, zapUsageDemand, zapUsageEnvSig,
+        zapUsageDemand, zapUsageEnvSig,
         zapUsedOnceDemand, zapUsedOnceSig,
         strictifyDictDmd, strictifyDmd
 
@@ -60,7 +60,6 @@ module Demand (
 
 import GhcPrelude
 
-import GHC.Driver.Session
 import Outputable
 import Var ( Var )
 import VarEnv
@@ -1754,14 +1753,6 @@ that it is going to diverge. This is the reason why we use the
 function appIsBottom, which, given a strictness signature and a number
 of arguments, says conservatively if the function is going to diverge
 or not.
-
-Zap absence or one-shot information, under control of flags
-
-Note [Killing usage information]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The flags -fkill-one-shot and -fkill-absence let you switch off the generation
-of absence or one-shot information altogether.  This is only used for performance
-tests, to see how important they are.
 -}
 
 zapUsageEnvSig :: StrictSig -> StrictSig
@@ -1790,33 +1781,11 @@ zapUsedOnceSig :: StrictSig -> StrictSig
 zapUsedOnceSig (StrictSig (DmdType env ds r))
     = StrictSig (DmdType env (map zapUsedOnceDemand ds) r)
 
-killUsageDemand :: DynFlags -> Demand -> Demand
--- See Note [Killing usage information]
-killUsageDemand dflags dmd
-  | Just kfs <- killFlags dflags = kill_usage kfs dmd
-  | otherwise                    = dmd
-
-killUsageSig :: DynFlags -> StrictSig -> StrictSig
--- See Note [Killing usage information]
-killUsageSig dflags sig@(StrictSig (DmdType env ds r))
-  | Just kfs <- killFlags dflags = StrictSig (DmdType env (map (kill_usage kfs) ds) r)
-  | otherwise                    = sig
-
 data KillFlags = KillFlags
     { kf_abs         :: Bool
     , kf_used_once   :: Bool
     , kf_called_once :: Bool
     }
-
-killFlags :: DynFlags -> Maybe KillFlags
--- See Note [Killing usage information]
-killFlags dflags
-  | not kf_abs && not kf_used_once = Nothing
-  | otherwise                      = Just (KillFlags {..})
-  where
-    kf_abs         = gopt Opt_KillAbsence dflags
-    kf_used_once   = gopt Opt_KillOneShot dflags
-    kf_called_once = kf_used_once
 
 kill_usage :: KillFlags -> Demand -> Demand
 kill_usage kfs (JD {sd = s, ud = u}) = JD {sd = s, ud = zap_musg kfs u}
