@@ -60,6 +60,4 @@ T5373:
 .PHONY: T13702
 T13702:
 	'$(TEST_HC)' -v0 -dynamic -rdynamic -fPIC -pie T13702.hs
-	'$(TEST_HC)' -v0 -dynamic T13702a.hs
-	./T13702  # first make sure executable itself works
-	./T13702a # then try dynamically loading it as library
+	./T13702
