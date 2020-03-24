@@ -424,6 +424,7 @@ zipTCvSubst tcvs tys
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the
 -- incoming environment. No CoVars, please!
 mkTvSubstPrs :: [(TyVar, Type)] -> TCvSubst
+mkTvSubstPrs []  = emptyTCvSubst
 mkTvSubstPrs prs =
     ASSERT2( onlyTyVarsAndNoCoercionTy, text "prs" <+> ppr prs )
     mkTvSubst in_scope tenv
@@ -741,7 +742,8 @@ subst_ty subst ty
     go (TyConApp tc tys) = (mkTyConApp $! tc) $! strictMap go tys
                                -- NB: mkTyConApp, not TyConApp.
                                -- mkTyConApp has optimizations.
-                               -- See Note [mkTyConApp and Type] in GHC.Core.TyCo.Rep
+                               -- See Note [Prefer Type over TYPE 'LiftedRep]
+                               -- in GHC.Core.TyCo.Rep
     go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
       = let !mult' = go mult
             !arg' = go arg

@@ -957,7 +957,12 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 
 unify_ty env ty1 ty2 kco
-    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
+  -- See Note [Comparing nullary type synonyms] in GHC.Core.Type.
+  | TyConApp tc1 [] <- ty1
+  , TyConApp tc2 [] <- ty2
+  , tc1 == tc2                = return ()
+
+    -- TODO: More commentary needed here
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
