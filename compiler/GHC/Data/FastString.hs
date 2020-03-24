@@ -116,6 +116,7 @@ import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
 import qualified Data.ByteString.Short.Internal as SBS
+import Data.ByteString.Internal (c2w)
 import Foreign.C
 import System.IO
 import Data.Data
@@ -145,7 +146,7 @@ fastStringToShortByteString :: FastString -> ShortByteString
 fastStringToShortByteString = fs_sbs
 
 fastZStringToByteString :: FastZString -> ByteString
-fastZStringToByteString (FastZString bs) = bs
+fastZStringToByteString (FastZString bs) = SBS.fromShort bs
 
 -- This will drop information if any character > '\xFF'
 unsafeMkByteString :: String -> ByteString
@@ -156,23 +157,30 @@ hashFastString fs = hashStr $ fs_sbs fs
 
 -- -----------------------------------------------------------------------------
 
-newtype FastZString = FastZString ByteString
+newtype FastZString = FastZString ShortByteString
   deriving NFData
 
 hPutFZS :: Handle -> FastZString -> IO ()
-hPutFZS handle (FastZString bs) = BS.hPut handle bs
+hPutFZS handle (FastZString bs) = BS.hPut handle (SBS.fromShort bs)
 
 zString :: FastZString -> String
 zString (FastZString bs) =
-    inlinePerformIO $ BS.unsafeUseAsCStringLen bs peekCAStringLen
+    inlinePerformIO $ useAsCStringLen bs peekCAStringLen
 
 lengthFZS :: FastZString -> Int
-lengthFZS (FastZString bs) = BS.length bs
+lengthFZS (FastZString bs) = SBS.length bs
 
 mkFastZStringString :: String -> FastZString
-mkFastZStringString str = FastZString (BSC.pack str)
+mkFastZStringString str = FastZString (SBS.pack (map c2w str))
 
 -- -----------------------------------------------------------------------------
+--
+useAsCStringLen :: ShortByteString -> (CStringLen -> IO a) -> IO a
+useAsCStringLen bs action =
+  allocaBytes l $ \buf -> do
+      SBS.copyToPtr bs 0 buf (fromIntegral l)
+      action (buf, l)
+  where l = SBS.length bs
 
 {-| A 'FastString' is a UTF-8 encoded string together with a unique ID. All
 'FastString's are stored in a global hashtable to support fast O(1)
