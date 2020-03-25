@@ -3468,6 +3468,8 @@ fFlagsDeps = [
   flagSpec "specialize-aggressively"          Opt_SpecialiseAggressively,
   flagSpec "cross-module-specialise"          Opt_CrossModuleSpecialise,
   flagSpec "cross-module-specialize"          Opt_CrossModuleSpecialise,
+  flagSpec "inline-generics"                  Opt_InlineGenerics,
+  flagSpec "inline-generics-aggressively"     Opt_InlineGenericsAggressively,
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
@@ -3981,6 +3983,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
     , ([1,2],   Opt_Specialise)
     , ([1,2],   Opt_CrossModuleSpecialise)
+    , ([1,2],   Opt_InlineGenerics)
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
     , ([1,2],   Opt_CprAnal)
