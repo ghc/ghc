@@ -2,6 +2,8 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Generics.Generic1 CanDoRep1_1.Dd where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -23,6 +25,8 @@ Derived class instances:
                  (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (CanDoRep1_1.Dd a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -43,6 +47,8 @@ Derived class instances:
             -> CanDoRep1_1.D1d g1 g2
   
   instance GHC.Generics.Generic (CanDoRep1_1.Dc a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -63,6 +69,8 @@ Derived class instances:
             -> CanDoRep1_1.D1c g1 g2
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Db where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -84,6 +92,8 @@ Derived class instances:
                  (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Dc where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -105,6 +115,8 @@ Derived class instances:
                  (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (CanDoRep1_1.Db a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -125,6 +137,8 @@ Derived class instances:
             -> CanDoRep1_1.D1b g1 g2
   
   instance GHC.Generics.Generic (CanDoRep1_1.Da a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -144,6 +158,8 @@ Derived class instances:
             -> CanDoRep1_1.D1 g1 g2
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Da where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
