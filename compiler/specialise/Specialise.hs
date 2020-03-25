@@ -683,41 +683,44 @@ isValueArg _            = False
 -- corresponding to its usage, compute everything necessary to build
 -- a specialisation.
 --
--- We will use a running example. Consider the function
+-- We will use the running example from Note [Specialising Calls]:
 --
---    foo :: forall a b. Eq a => Int -> blah
---    foo @a @b dEqA i = blah
+--     f :: forall a b c. Int -> Eq a => Show b => c -> Blah
+--     f @a @b @c i dEqA dShowA x = blah
 --
--- which is called with the 'CallInfo'
+-- Suppose we decide to specialise it at the following pattern:
 --
---    [SpecType T1, UnspecType, SpecDict dEqT1, UnspecArg]
+--     [ SpecType T1, SpecType T2, UnspecType, UnspecArg
+--     , SpecDict dEqT1, SpecDict ($dfShow dShowT2), UnspecArg ]
 --
 -- We'd eventually like to build the RULE
 --
---    RULE "SPEC foo @T1 _"
---      forall @a @b (dEqA' :: Eq a).
---        foo @T1 @b dEqA' = $sfoo @b
+--     RULE "SPEC f @T1 @T2 _"
+--       forall (@c :: Type) (i :: Int) (d1 :: Eq T1) (d2 :: Show T2).
+--         f @T1 @T2 @c i d1 d2 = $sf @c i
 --
--- and the specialisation '$sfoo'
+-- and the specialisation '$sf'
 --
---    $sfoo :: forall b. Int -> blah
---    $sfoo @b = \i -> SUBST[a->T1, dEqA->dEqA'] blah
+--     $sf :: forall c. Int -> c -> Blah
+--     $sf = SUBST[a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowA :-> dShow1] (\@c i x -> blah)
+--
+-- where dShow1 is a floated binding created by bindAuxiliaryDict.
 --
 -- The cases for 'specHeader' below are presented in the same order as this
 -- running example. The result of 'specHeader' for this example is as follows:
 --
 --    ( -- Returned arguments
---      env + [a -> T1, deqA -> dEqA']
---    , []
+--      env + [a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowA :-> dShow1]
+--    , [x]
 --
 --      -- RULE helpers
---    , [b, dx', i]
---    , [T1, b, dx', i]
+--    , [c, i, d1, d2]
+--    , [T1, T2, c, i, d1, d2]
 --
 --      -- Specialised function helpers
---    , [b, i]
---    , [dx]
---    , [T1, b, dx_spec, i]
+--    , [c, i, x]
+--    , [dShow1 = $dfShow dShowT2]
+--    , [T1, T2, dEqT1, dShow1]
 --    )
 specHeader
      :: SpecEnv
@@ -1584,8 +1587,8 @@ Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a function with a complicated type:
 
-    foo :: forall a b c. Int -> Eq a => Show b => c -> Blah
-    foo @a @b @c i dEqA dShowA x = blah
+    f :: forall a b c. Int -> Eq a => Show b => c -> Blah
+    f @a @b @c i dEqA dShowA x = blah
 
 and suppose it is called at:
 
