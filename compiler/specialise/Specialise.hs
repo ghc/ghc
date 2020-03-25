@@ -22,7 +22,7 @@ import GHC.Core.Predicate
 import Module( Module, HasModule(..) )
 import GHC.Core.Coercion( Coercion )
 import CoreMonad
-import qualified GHC.Core.Subst
+import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold
 import Var              ( isLocalVar )
 import VarSet
@@ -607,7 +607,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
         -- accidentally re-use a unique that's already in use
         -- Easiest thing is to do it all at once, as if all the top-level
         -- decls were mutually recursive
-    top_env = SE { se_subst = GHC.Core.Subst.mkEmptySubst $ mkInScopeSet $ mkVarSet $
+    top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSet $ mkVarSet $
                               bindersOfBinds binds
                  , se_interesting = emptyVarSet }
 
@@ -725,7 +725,8 @@ specHeader
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( -- Returned arguments
                 SpecEnv      -- Substitution to apply to the body of 'f'
-              , [CoreBndr]   -- All the remaining unspecialised args from the original function 'f'
+              , [CoreBndr]   -- Leftover binders from the original function 'f'
+                             --   that don’t have a corresponding SpecArg
 
                 -- RULE helpers
               , [CoreBndr]   -- Binders for the RULE
@@ -742,10 +743,10 @@ specHeader
 -- details.
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
-       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
        ; pure ( env''
-              , unused_bndrs
+              , leftover_bndrs
               , rule_bs
               , Type t : rule_es
               , bs'
@@ -760,10 +761,10 @@ specHeader env (bndr : bndrs) (SpecType t : args)
 -- /and/ a binder for the specialised body.
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
        ; pure ( env''
-              , unused_bndrs
+              , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
               , bndr' : bs'
@@ -776,12 +777,12 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
-  = do { rule_bndr <- newDictBndr env bndr
+  = do { rule_bndr <- newLocalBndr env bndr
        ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr d
-       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
-              , unused_bndrs
+              , leftover_bndrs
               -- See Note [Evidence foralls]
               , exprFreeIdsList (varToCoreExpr rule_bndr) ++ rule_bs
               , varToCoreExpr rule_bndr : rule_es
@@ -800,11 +801,26 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
 specHeader env (bndr : bndrs) (UnspecArg : args)
+  | isDeadBinder bndr -- see Note [Drop unused arguments from specialisations]
+  = do { rule_bndr <- newLocalBndr env bndr
+       ; (env', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+             <- specHeader env bndrs args
+       ; pure ( env'
+              , leftover_bndrs
+              , rule_bndr : rule_bs
+              , varToCoreExpr rule_bndr : rule_es
+              , bs'
+              , dx
+              , spec_args
+              )
+       }
+
+  | otherwise
   = do { let (env', bndr') = substBndr env bndr
-       ; (env'', unused_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
-              , unused_bndrs
+              , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
               , bndr' : bs'
@@ -1035,7 +1051,7 @@ Avoiding this recursive specialisation loop is the reason for the
 -}
 
 data SpecEnv
-  = SE { se_subst :: GHC.Core.Subst.Subst
+  = SE { se_subst :: Core.Subst
              -- We carry a substitution down:
              -- a) we must clone any binding that might float outwards,
              --    to avoid name clashes
@@ -1056,7 +1072,7 @@ instance Outputable SpecEnv where
         , text "interesting =" <+> ppr interesting ])
 
 specVar :: SpecEnv -> Id -> CoreExpr
-specVar env v = GHC.Core.Subst.lookupIdSubst (text "specVar") (se_subst env) v
+specVar env v = Core.lookupIdSubst (text "specVar") (se_subst env) v
 
 specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
@@ -1149,7 +1165,7 @@ specCase env scrut' case_bndr [(con, args, rhs)]
              subst_prs  = (case_bndr, Var case_bndr_flt)
                         : [ (arg, Var sc_flt)
                           | (arg, Just sc_flt) <- args `zip` mb_sc_flts ]
-             env_rhs' = env_rhs { se_subst = GHC.Core.Subst.extendIdSubstList (se_subst env_rhs) subst_prs
+             env_rhs' = env_rhs { se_subst = Core.extendIdSubstList (se_subst env_rhs) subst_prs
                                 , se_interesting = se_interesting env_rhs `extendVarSetList`
                                                    (case_bndr_flt : sc_args_flt) }
 
@@ -1407,7 +1423,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                  -- See Note [Account for casts in binding]
     rhs_tyvars = filter isTyVar rhs_bndrs
 
-    in_scope = GHC.Core.Subst.substInScope (se_subst env)
+    in_scope = Core.substInScope (se_subst env)
 
     already_covered :: DynFlags -> [CoreRule] -> [CoreExpr] -> Bool
     already_covered dflags new_rules args      -- Note [Specialisations already covered]
@@ -1427,9 +1443,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
       = ASSERT(call_arity <= fn_arity)
 
         -- See Note [Specialising Calls]
-        do { (rhs_env2, unused_bndrs, rule_bndrs, rule_args, unspec_bndrs, dx_binds, spec_args)
+        do { (rhs_env2, leftover_bndrs, rule_bndrs, rule_args, unspec_bndrs, dx_binds, spec_args)
                <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
-           ; let rhs_body' = mkLams unused_bndrs rhs_body
+           ; let rhs_body' = mkLams leftover_bndrs rhs_body
            ; dflags <- getDynFlags
            ; if already_covered dflags rules_acc rule_args
              then return spec_acc
@@ -1628,6 +1644,63 @@ Finally, we must also construct the usage-details
 where d1', d2' are cloned versions of d1,d2, with the type substitution
 applied.  These auxiliary bindings just avoid duplication of dx1, dx2.
 
+Note [Drop unused arguments from specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise a function with unused arguments, we want to drop
+them in the specialisation. For example, suppose we have:
+
+    f :: () -> Show a => a -> String
+    f x y = show y ++ "!"
+
+This is an odd type, to be certain, but we *are* able to specialise
+it. When we do, we want to take care to drop the unused argument
+completely in the specialisation.
+
+Why bother? Normally we wouldn’t care since worker/wrapper will clean
+things up for us, but leaving the argument behind creates trouble when
+we build the RULE. We’ll end up with a rule like
+
+    RULE "SPEC f @Int" forall x [Occ=Dead].
+      f @Int x $dShowInt = $sf x
+
+and now Core Lint complains that x shows up in expression position
+even though it’s supposed to be unused. The natural solution is to
+replace x with a fresh binder with no IdInfo to get
+
+    RULE "SPEC f @Int" forall x1.
+      f @Int x1 $dShowInt = $sf x1
+
+which is fine, but sadly it causes trouble elsewhere. Note that we
+*don’t* want to lose the occ-info in the binders to the generated
+definition of $sf itself, which should still use x:
+
+    $sf :: () -> Int -> String
+    $sf = \ x [Occ=Dead] y -> ...
+
+That seems okay, but currently we choose to reuse the argument
+expressions from the rule RHS when specialising an unfolding (see
+GHC.Core.Unfold.specUnfolding). In that context, we need to use the
+binders to $sf itself, so we’d end up with x in binding position but
+x1 in expression position.
+
+One solution to this dilemma would be to stop abusing the argument
+expressions from the rule RHS by repurposing them in that way, but
+that would require plumbing yet another result through specHeader,
+which is quite complicated enough already. So we sidestep the problem
+by dropping the x argument from the specialisation completely,
+generating:
+
+    RULE "SPEC f @Int" forall x1.
+      f @Int x1 $dShowInt = $sf
+
+    $sf :: Int -> String
+    $sf = \ y -> ...
+
+Now there’s no problem arising from the renamed x1 binder, since x1
+only appears on the rule LHS, not the RHS. Besides, the generated
+specialisation is nicer anyway: it doesn’t carry around that useless
+unused argument.
+
 Note [Account for casts in binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1686,8 +1759,8 @@ some other reason, which is actually pretty likely.
 -- | Binds a dictionary argument to a fresh name, to preserve sharing
 bindAuxiliaryDict
   :: SpecEnv
-  -> DictId -> CoreExpr      -- Original dict bndr, and the witnessing expression
-  -> SpecM (SpecEnv,         -- Substitute for orig_dict
+  -> DictId -> CoreExpr      -- Original dict binder, and the witnessing expression
+  -> SpecM (SpecEnv,         -- Substitute for orig_dict_id
             Maybe DictBind,  -- Auxiliary dict binding, if any
             CoreExpr)        -- Witnessing expression (always trivial)
 bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
@@ -1696,19 +1769,20 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
   -- If the dictionary argument is trivial, don’t bother creating a
   -- new dict binding.
   | Just spec_id <- getIdFromTrivialExpr_maybe spec_dict
-  = pure (extendEnv spec_id spec_dict, Nothing, spec_dict)
-        -- See Note [Keep the old dictionaries interesting]
+  = do let env' = env { se_subst = Core.extendSubst subst orig_dict_id spec_dict
+                                   `Core.extendInScope` spec_id
+                      -- See Note [Keep the old dictionaries interesting]
+                      , se_interesting = interesting `extendVarSet` spec_id }
+       pure (env', Nothing, spec_dict)
 
   | otherwise
-  = do spec_id <- newDictBndr env orig_dict_id
+  = do spec_id <- newLocalBndr env orig_dict_id
        let dict_bind = mkDB (NonRec spec_id spec_dict)
-       pure (extendEnv spec_id (Var spec_id), Just dict_bind, Var spec_id)
-           -- See Note [Make the new dictionaries interesting]
-  where
-    extendEnv spec_id spec_dict =
-      env { se_subst = GHC.Core.Subst.extendSubst subst orig_dict_id spec_dict
-                         `GHC.Core.Subst.extendInScope` spec_id
-          , se_interesting = interesting `extendVarSet` spec_id }
+           env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var spec_id)
+                                   `Core.extendInScope` spec_id
+                      -- See Note [Make the new dictionaries interesting]
+                      , se_interesting = interesting `extendVarSet` spec_id }
+       pure (env', Just dict_bind, Var spec_id)
 
 {-
 Note [Make the new dictionaries interesting]
@@ -2631,20 +2705,20 @@ mapAndCombineSM f (x:xs) = do (y, uds1) <- f x
 
 extendTvSubstList :: SpecEnv -> [(TyVar,Type)] -> SpecEnv
 extendTvSubstList env tv_binds
-  = env { se_subst = GHC.Core.Subst.extendTvSubstList (se_subst env) tv_binds }
+  = env { se_subst = Core.extendTvSubstList (se_subst env) tv_binds }
 
 substTy :: SpecEnv -> Type -> Type
-substTy env ty = GHC.Core.Subst.substTy (se_subst env) ty
+substTy env ty = Core.substTy (se_subst env) ty
 
 substCo :: SpecEnv -> Coercion -> Coercion
-substCo env co = GHC.Core.Subst.substCo (se_subst env) co
+substCo env co = Core.substCo (se_subst env) co
 
 substBndr :: SpecEnv -> CoreBndr -> (SpecEnv, CoreBndr)
-substBndr env bs = case GHC.Core.Subst.substBndr (se_subst env) bs of
+substBndr env bs = case Core.substBndr (se_subst env) bs of
                       (subst', bs') -> (env { se_subst = subst' }, bs')
 
 substBndrs :: SpecEnv -> [CoreBndr] -> (SpecEnv, [CoreBndr])
-substBndrs env bs = case GHC.Core.Subst.substBndrs (se_subst env) bs of
+substBndrs env bs = case Core.substBndrs (se_subst env) bs of
                       (subst', bs') -> (env { se_subst = subst' }, bs')
 
 cloneBindSM :: SpecEnv -> CoreBind -> SpecM (SpecEnv, SpecEnv, CoreBind)
@@ -2652,7 +2726,7 @@ cloneBindSM :: SpecEnv -> CoreBind -> SpecM (SpecEnv, SpecEnv, CoreBind)
 -- Return the substitution to use for RHSs, and the one to use for the body
 cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec bndr rhs)
   = do { us <- getUniqueSupplyM
-       ; let (subst', bndr') = GHC.Core.Subst.cloneIdBndr subst us bndr
+       ; let (subst', bndr') = Core.cloneIdBndr subst us bndr
              interesting' | interestingDict env rhs
                           = interesting `extendVarSet` bndr'
                           | otherwise = interesting
@@ -2661,19 +2735,19 @@ cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec 
 
 cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (Rec pairs)
   = do { us <- getUniqueSupplyM
-       ; let (subst', bndrs') = GHC.Core.Subst.cloneRecIdBndrs subst us (map fst pairs)
+       ; let (subst', bndrs') = Core.cloneRecIdBndrs subst us (map fst pairs)
              env' = env { se_subst = subst'
                         , se_interesting = interesting `extendVarSetList`
                                            [ v | (v,r) <- pairs, interestingDict env r ] }
        ; return (env', env', Rec (bndrs' `zip` map snd pairs)) }
 
-newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
+newLocalBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 -- Make up completely fresh binders for the dictionaries
 -- Their bindings are going to float outwards
-newDictBndr env b = do { uniq <- getUniqueM
-                       ; let n   = idName b
-                             ty' = substTy env (idType b)
-                       ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
+newLocalBndr env b = do { uniq <- getUniqueM
+                        ; let n   = idName b
+                              ty' = substTy env (idType b)
+                        ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
