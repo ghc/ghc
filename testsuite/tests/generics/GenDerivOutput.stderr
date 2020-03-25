@@ -2,6 +2,8 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Generics.Generic (GenDerivOutput.Rose a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -22,6 +24,8 @@ Derived class instances:
             -> GenDerivOutput.Rose g1 g2
   
   instance GHC.Generics.Generic1 GenDerivOutput.Rose where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -47,6 +51,8 @@ Derived class instances:
                     (GHC.Base.fmap GHC.Generics.unRec1) GHC.Generics.unComp1 g2)
   
   instance GHC.Generics.Generic (GenDerivOutput.List a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -67,6 +73,8 @@ Derived class instances:
             -> GenDerivOutput.Cons g1 g2
   
   instance GHC.Generics.Generic1 GenDerivOutput.List where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of

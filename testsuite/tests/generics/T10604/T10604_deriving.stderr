@@ -2,6 +2,8 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Generics.Generic (T10604_deriving.Starify a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -19,6 +21,8 @@ Derived class instances:
             -> T10604_deriving.Starify2 g1
   
   instance GHC.Generics.Generic1 @(*) T10604_deriving.Starify where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -37,6 +41,8 @@ Derived class instances:
   
   instance forall k (a :: k).
            GHC.Generics.Generic (T10604_deriving.SumOfProducts @{k} a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of
@@ -63,6 +69,8 @@ Derived class instances:
   
   instance GHC.Generics.Generic1
              @k (T10604_deriving.SumOfProducts @{k}) where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -91,6 +99,8 @@ Derived class instances:
   
   instance forall k (a :: k -> *).
            GHC.Generics.Generic (T10604_deriving.Wrap2 @k a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of {
@@ -103,6 +113,8 @@ Derived class instances:
   
   instance GHC.Generics.Generic1
              @(k -> *) (T10604_deriving.Wrap2 @k) where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of {
@@ -119,6 +131,8 @@ Derived class instances:
                     (GHC.Base.fmap GHC.Generics.unRec1) GHC.Generics.unComp1 g1) }
   
   instance GHC.Generics.Generic (T10604_deriving.Wrap a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of {
@@ -130,6 +144,8 @@ Derived class instances:
             -> T10604_deriving.Wrap g1 }
   
   instance GHC.Generics.Generic1 @(* -> *) T10604_deriving.Wrap where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of {
@@ -145,6 +161,8 @@ Derived class instances:
   
   instance forall k (a :: k).
            GHC.Generics.Generic (T10604_deriving.Proxy @k a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1
           (case x of {
@@ -154,6 +172,8 @@ Derived class instances:
           (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy }
   
   instance GHC.Generics.Generic1 @k (T10604_deriving.Proxy @k) where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of {
@@ -163,12 +183,16 @@ Derived class instances:
           (GHC.Generics.M1 GHC.Generics.U1) -> T10604_deriving.Proxy }
   
   instance GHC.Generics.Generic (T10604_deriving.Empty a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1 (case x of { x -> case x of })
     GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
   
   instance GHC.Generics.Generic1
              @GHC.Types.Bool T10604_deriving.Empty where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1 (case x of { x -> case x of })
     GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }

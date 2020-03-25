@@ -2,6 +2,8 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Generics.Generic1 GenDerivOutput1_0.List where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
