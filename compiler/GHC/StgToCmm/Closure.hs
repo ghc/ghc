@@ -24,7 +24,7 @@ module GHC.StgToCmm.Closure (
         LambdaFormInfo,         -- Abstract
         StandardFormInfo,        -- ...ditto...
         mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
-        mkApLFInfo, mkLFArgument, mkLFLetNoEscape,
+        mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
         mkLFStringLit,
         lfDynTag,
         isLFThunk, isLFReEntrant, lfUpdatable,
@@ -51,7 +51,6 @@ module GHC.StgToCmm.Closure (
         closureUpdReqd, closureSingleEntry,
         closureReEntrant, closureFunInfo,
         isToplevClosure,
-        mightBeAFunction,
 
         blackHoleOnEntry,  -- Needs LambdaFormInfo and SMRep
         isStaticClosure,   -- Needs SMPre
@@ -196,9 +195,9 @@ argPrimRep arg = typePrimRep1 (stgArgType arg)
 
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnliftedType ty   = LFUnlifted
-  | mightBeAFunction ty = LFUnknown True
-  | otherwise           = LFUnknown False
+  | isUnliftedType ty      = LFUnlifted
+  | might_be_a_function ty = LFUnknown True
+  | otherwise              = LFUnknown False
   where
     ty = idType id
 
@@ -226,13 +225,13 @@ mkLFThunk thunk_ty top fvs upd_flag
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
             NonStandardThunk
-            (mightBeAFunction thunk_ty)
+            (might_be_a_function thunk_ty)
 
 --------------
-mightBeAFunction :: Type -> Bool
+might_be_a_function :: Type -> Bool
 -- Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as poss
-mightBeAFunction ty
+might_be_a_function ty
   | [LiftedRep] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc
@@ -248,13 +247,34 @@ mkConLFInfo con = LFCon con
 mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
 mkSelectorLFInfo id offset updatable
   = LFThunk NotTopLevel False updatable (SelectorThunk offset)
-        (mightBeAFunction (idType id))
+        (might_be_a_function (idType id))
 
 -------------
 mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
   = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
-        (mightBeAFunction (idType id))
+        (might_be_a_function (idType id))
+
+-------------
+mkLFImported :: Id -> LambdaFormInfo
+mkLFImported id =
+    case idLFInfo_maybe id of
+      Just lf_info ->
+        lf_info
+      Nothing
+        | Just con <- isDataConWorkId_maybe id
+        , isNullaryRepDataCon con
+        -> LFCon con   -- An imported nullary constructor
+                       -- We assume that the constructor is evaluated so that
+                       -- the id really does point directly to the constructor
+
+        | arity > 0
+        -> LFReEntrant TopLevel noOneShotInfo arity True ArgUnknown
+
+        | otherwise
+        -> mkLFArgument id -- Not sure of exact arity
+  where
+    arity = idFunRepArity id
 
 -------------
 mkLFStringLit :: LambdaFormInfo

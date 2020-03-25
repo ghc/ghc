@@ -31,7 +31,6 @@ import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
-import GHC.StgToCmm.Types
 
 import GHC.Cmm.CLabel
 
@@ -49,8 +48,6 @@ import TysPrim
 import UniqFM
 import Util
 import VarEnv
-import GHC.Core.DataCon
-import BasicTypes
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -148,26 +145,6 @@ getCgIdInfo id
           else
               cgLookupPanic id -- Bug
         }}}
-
-mkLFImported :: Id -> LambdaFormInfo
-mkLFImported id =
-    case idLFInfo_maybe id of
-      Just lf_info ->
-        lf_info
-      Nothing
-        | Just con <- isDataConWorkId_maybe id
-        , isNullaryRepDataCon con
-        -> LFCon con   -- An imported nullary constructor
-                       -- We assume that the constructor is evaluated so that
-                       -- the id really does point directly to the constructor
-
-        | arity > 0
-        -> LFReEntrant TopLevel noOneShotInfo arity True ArgUnknown
-
-        | otherwise
-        -> mkLFArgument id -- Not sure of exact arity
-  where
-    arity = idFunRepArity id
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

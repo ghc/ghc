@@ -32,8 +32,6 @@ import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
 import GHC.StgToCmm.Types
-import GHC.StgToCmm.Closure
-import GHC.Types.RepType
 import BuildTyCl
 import TcRnMonad
 import TcType
@@ -645,7 +643,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
   = do  { ty <- tcIfaceType iface_type
         ; details <- tcIdDetails ty details
         ; info <- tcIdInfo ignore_prags TopLevel name ty info
-        ; return (AnId (addIdLFInfo (mkGlobalId details name ty info))) }
+        ; return (AnId (mkGlobalId details name ty info)) }
 
 tc_iface_decl _ _ (IfaceData {ifName = tc_name,
                           ifCType = cType,
@@ -1344,8 +1342,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = addIdLFInfo $
-                   mkLocalIdWithInfo name ty' id_info
+        ; let id = mkLocalIdWithInfo name ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1366,7 +1363,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                                 NotTopLevel (idName id) (idType id) info
-          ; return (addIdLFInfo (setIdInfo id id_info), rhs') }
+          ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
@@ -1500,34 +1497,6 @@ tcIdInfo ignore_prags toplvl name ty info = do
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfo` unf) }
-
-addIdLFInfo :: Id -> Id
-addIdLFInfo id = case idLFInfo_maybe id of
-                   Nothing -> setIdLFInfo id (mkLFImported (idDetails id) (idInfo id) (idType id))
-                   Just _  -> id
-
--- Make a LambdaFormInfo for the Ids without a LFInfo in the iface file
-mkLFImported :: IdDetails -> IdInfo -> Type -> LambdaFormInfo
-mkLFImported details info ty
-  | DataConWorkId con <- details
-  , isNullaryRepDataCon con
-  = LFCon con   -- An imported nullary constructor
-                -- We assume that the constructor is evaluated so that
-                -- the id really does point directly to the constructor
-
-  | arity > 0
-  = LFReEntrant TopLevel noOneShotInfo arity True ArgUnknown
-
-  | isUnliftedType ty
-  = LFUnlifted
-
-  | mightBeAFunction ty
-  = LFUnknown True
-
-  | otherwise
-  = LFUnknown False
-  where
-    arity = countFunRepArgs (arityInfo info) ty
 
 tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
 tcJoinInfo (IfaceJoinPoint ar) = Just ar
