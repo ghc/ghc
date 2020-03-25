@@ -28,7 +28,8 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isDeadEndDiv, topDiv, botDiv, exnDiv, conDiv,
+        Divergence(..), lubDivergence, isDeadEndDiv, removeExn,
+        topDiv, botDiv, exnDiv, conDiv,
         appIsBottom, isDeadEndSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         emptySig, botSig, cprProdSig,
@@ -39,8 +40,7 @@ module Demand (
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
-        splitDmdTy, splitFVs,
-        mayThrowPreciseException, deferAfterPreciseException,
+        splitDmdTy, splitFVs, deferAfterPreciseException,
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
@@ -1075,6 +1075,11 @@ isDeadEndDiv ExnOrDiv = True
 isDeadEndDiv ConOrDiv = False
 isDeadEndDiv Dunno    = False
 
+removeExn :: Divergence -> Divergence
+removeExn ExnOrDiv = Diverges
+removeExn Dunno    = ConOrDiv
+removeExn div      = div
+
 -- See Notes [Default demand on free variables and arguments]
 -- and [defaultFvDmd vs. defaultArgDmd]
 -- and Scenario 2 in [Precise exceptions and strictness analysis]
@@ -1345,11 +1350,6 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 -- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException d = lubDmdType d (emptyDmdType conDiv)
-
-mayThrowPreciseException :: DmdType -> Bool
-mayThrowPreciseException (DmdType _ _ Dunno)    = True
-mayThrowPreciseException (DmdType _ _ ExnOrDiv) = True
-mayThrowPreciseException (DmdType _ _ _)        = False
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
@@ -1804,15 +1804,17 @@ dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on
 -- the result into the constructor arguments.
-dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
-                             (JD { sd = str, ud = abs })
+-- NB: Its idStrictness will just be the special case of this transformer
+-- for a head-strict demand.
+dmdTransformDataConSig arity str_sig cd@(JD { sd = str, ud = abs })
+  -- TODO: I think this should be more like dmdTransformSig, using a
+  -- combination of postProcessUnsat, peelManyCalls and splitProdDmd_maybe.
   | Just str_dmds <- go_str arity str
   , Just abs_dmds <- go_abs arity abs
-  = DmdType emptyDmdEnv (mkJointDmds str_dmds abs_dmds) con_res
-                -- Must remember whether it's a product, hence con_res, not TopRes
-
-  | otherwise   -- Not saturated
-  = emptyDmdType conDiv
+  = DmdType emptyDmdEnv (mkJointDmds str_dmds abs_dmds) conDiv
+  -- Not saturated. Fall back to transforming the StrictSig (see MkId)
+  | otherwise
+  = dmdTransformSig str_sig cd
   where
     go_str 0 dmd        = splitStrProdDmd arity dmd
     go_str n (SCall s') = go_str (n-1) s'
