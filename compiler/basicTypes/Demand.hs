@@ -932,6 +932,28 @@ instance Outputable Divergence where
   ppr Diverges      = char 'b'
   ppr Dunno         = empty
 
+{- Note [Precise exceptions and strictness analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+raiseIO# needs to be a primop (rather than defining it in terms of raise#),
+because exceptions raised by it are considered  *precise* - we don't want the
+strictness analyser turning one kind of bottom into another, as it is allowed
+to do in pure code.
+
+This means that raiseIO# is lazy in its free variables, see the following
+example from #13380 (similarly #17676):
+    f x y | x>0       = raiseIO Exc
+          | y>0       = return 1
+          | otherwise = return 2
+@f@ strict in @y@? One might be tempted to say yes! But that plays fast and
+loose with the precise exception; after optimisation, @f 42 (error "boom")@
+turns from throwing the precise @Exc@ to throwing the imprecise user error
+"boom". So, the @defaultDmd@ of @raiseIO#@ should be lazy (@topDmd@), which can
+be achieved by giving it @topDiv@.
+But then the simplifier fails to drop a lot of dead code, hence we have special
+treatment for raiseIO# in @Simplifier.Utils.mkArgInfo@.
+-}
+
+
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------

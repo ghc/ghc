@@ -2644,27 +2644,12 @@ primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
--- raiseIO# needs to be a primop, because exceptions in the IO monad
--- must be *precise* - we don't want the strictness analyser turning
--- one kind of bottom into another, as it is allowed to do in pure code.
---
--- But we *do* want to know that it returns bottom after
--- being applied to two arguments, so that this function is strict in y
---     f x y | x>0       = raiseIO blah
---           | y>0       = return 1
---           | otherwise = return 2
---
--- TODO Check that the above notes on @f@ are valid. The function successfully
--- produces an IO exception when compiled without optimization. If we analyze
--- it as strict in @y@, won't we change that behavior under optimization?
--- I thought the rule was that it was okay to replace one valid imprecise
--- exception with another, but not to replace a precise exception with
--- an imprecise one (dfeuer, 2017-03-05).
-
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] botDiv }
+   -- See Note [Precise exceptions and strictness analysis] in Demand.hs
+   -- for why we give it topDiv
+   -- strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
