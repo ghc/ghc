@@ -43,6 +43,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Utils.Error( Validity(..), andValid )
 import GHC.Types.SrcLoc
@@ -76,10 +77,12 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, FamInst)
+                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
+  dflags <- getDynFlags
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  return (mkBindsRep gk tc, repTyInsts)
+  let (binds, sigs) = mkBindsRep dflags gk tc
+  return (binds, sigs, repTyInsts)
 
 {-
 ************************************************************************
@@ -332,12 +335,33 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
-mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
-  `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep dflags gk tycon = (binds, sigs)
       where
+        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+              `unionBags`
+                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+
+        -- See Note [Generics performance tricks]
+        sigs = if     gopt Opt_InlineGenericsAggressively dflags
+                  || (gopt Opt_InlineGenerics dflags && inlining_useful)
+               then [inline1 from01_RDR, inline1 to01_RDR]
+               else []
+         where
+           inlining_useful
+             | cons <= 1  = True
+             | cons <= 4  = max_fields <= 5
+             | cons <= 8  = max_fields <= 2
+             | cons <= 16 = max_fields <= 1
+             | cons <= 24 = max_fields == 0
+             | otherwise  = False
+             where
+               cons       = length datacons
+               max_fields = maximum $ map dataConSourceArity datacons
+
+           inline1 f = L loc . InlineSig noExtField (L loc f)
+                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.
@@ -1039,4 +1063,48 @@ factor it out reduce the typechecker's burden:
 
 A simple change, but one that pays off, since it goes turns an O(n) amount of
 coercions to an O(1) amount.
+
+Note [Generics performance tricks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generics-based algorithms tend to rely on GHC optimizing away the intermediate
+representation for optimal performance. However, the default unfolding threshold
+is usually too small for GHC to do that.
+
+The recommended approach thus far was to increase unfolding threshold, but this
+makes GHC inline more aggressively in general, whereas it should only be more
+aggresive with generics-based code.
+
+The solution is to use a heuristic that'll annotate Generic class methods with
+INLINE[1] pragmas (the explicit phase is used to give users phase control as
+they can annotate their functions with INLINE[2] or INLINE[0] if appropriate).
+
+The current heuristic was chosen by looking at how annotating Generic methods
+INLINE[1] helps with optimal code generation for several types of generic
+algorithms:
+
+* Round trip through the generic representation.
+
+* Generation of NFData instances.
+
+* Generation of field lenses.
+
+The experimentation was done by picking data types having N constructors with M
+fields each and using their derived Generic instances to generate code with the
+above algorithms.
+
+The results are threshold values for N and M (contained in
+`mkBindsRep.inlining_useful`) for which inlining is beneficial, i.e. it usually
+leads to performance improvements at both compile time (the simplifier has to do
+more work, but then there's much less code left for subsequent phases to work
+with) and run time (the generic representation of a data type is optimized
+away).
+
+The T11068 test case, which includes the algorithms mentioned above, tests that
+the generic representations of several data types optimize away using the
+threshold values in `mkBindsRep.inlining_useful`.
+
+If one uses threshold values higher what is found in
+`mkBindsRep.inlining_useful`, then annotating Generic class methods with INLINE
+pragmas tends to be at best useless and at worst lead to code size blowup
+without runtime performance improvements.
 -}

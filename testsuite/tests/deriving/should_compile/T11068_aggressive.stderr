@@ -1,0 +1,250 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Generics.Generic T11068_aggressive.X where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
+    GHC.Generics.from x
+      = GHC.Generics.M1
+          (case x of
+             T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+               -> GHC.Generics.L1
+                    (GHC.Generics.M1
+                       ((GHC.Generics.:*:)
+                          ((GHC.Generics.:*:)
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                (GHC.Generics.M1 (GHC.Generics.K1 g2)))
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g3))
+                                ((GHC.Generics.:*:)
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g4))
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g5)))))
+                          ((GHC.Generics.:*:)
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g6))
+                                (GHC.Generics.M1 (GHC.Generics.K1 g7)))
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g8))
+                                ((GHC.Generics.:*:)
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g9))
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g10)))))))
+             T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+               -> GHC.Generics.R1
+                    (GHC.Generics.M1
+                       ((GHC.Generics.:*:)
+                          ((GHC.Generics.:*:)
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                (GHC.Generics.M1 (GHC.Generics.K1 g2)))
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g3))
+                                ((GHC.Generics.:*:)
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g4))
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g5)))))
+                          ((GHC.Generics.:*:)
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g6))
+                                (GHC.Generics.M1 (GHC.Generics.K1 g7)))
+                             ((GHC.Generics.:*:)
+                                (GHC.Generics.M1 (GHC.Generics.K1 g8))
+                                ((GHC.Generics.:*:)
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g9))
+                                   (GHC.Generics.M1 (GHC.Generics.K1 g10))))))))
+    GHC.Generics.to (GHC.Generics.M1 x)
+      = case x of
+          (GHC.Generics.L1 (GHC.Generics.M1 ((GHC.Generics.:*:) ((GHC.Generics.:*:) ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                                                                                        (GHC.Generics.M1 (GHC.Generics.K1 g2)))
+                                                                                    ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g3))
+                                                                                                        ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g4))
+                                                                                                                            (GHC.Generics.M1 (GHC.Generics.K1 g5)))))
+                                                                ((GHC.Generics.:*:) ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g6))
+                                                                                                        (GHC.Generics.M1 (GHC.Generics.K1 g7)))
+                                                                                    ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g8))
+                                                                                                        ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g9))
+                                                                                                                            (GHC.Generics.M1 (GHC.Generics.K1 g10))))))))
+            -> T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+          (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) ((GHC.Generics.:*:) ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                                                                                        (GHC.Generics.M1 (GHC.Generics.K1 g2)))
+                                                                                    ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g3))
+                                                                                                        ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g4))
+                                                                                                                            (GHC.Generics.M1 (GHC.Generics.K1 g5)))))
+                                                                ((GHC.Generics.:*:) ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g6))
+                                                                                                        (GHC.Generics.M1 (GHC.Generics.K1 g7)))
+                                                                                    ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g8))
+                                                                                                        ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g9))
+                                                                                                                            (GHC.Generics.M1 (GHC.Generics.K1 g10))))))))
+            -> T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+
+
+Derived type family instances:
+  type GHC.Generics.Rep T11068_aggressive.X = GHC.Generics.D1
+                                                ('GHC.Generics.MetaData
+                                                   "X" "T11068_aggressive" "main" 'GHC.Types.False)
+                                                (GHC.Generics.C1
+                                                   ('GHC.Generics.MetaCons
+                                                      "X1" 'GHC.Generics.PrefixI 'GHC.Types.False)
+                                                   (((GHC.Generics.S1
+                                                        ('GHC.Generics.MetaSel
+                                                           'GHC.Maybe.Nothing
+                                                           'GHC.Generics.NoSourceUnpackedness
+                                                           'GHC.Generics.NoSourceStrictness
+                                                           'GHC.Generics.DecidedLazy)
+                                                        (GHC.Generics.Rec0 GHC.Types.Int)
+                                                      GHC.Generics.:*: GHC.Generics.S1
+                                                                         ('GHC.Generics.MetaSel
+                                                                            'GHC.Maybe.Nothing
+                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                            'GHC.Generics.NoSourceStrictness
+                                                                            'GHC.Generics.DecidedLazy)
+                                                                         (GHC.Generics.Rec0
+                                                                            GHC.Types.Int))
+                                                     GHC.Generics.:*: (GHC.Generics.S1
+                                                                         ('GHC.Generics.MetaSel
+                                                                            'GHC.Maybe.Nothing
+                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                            'GHC.Generics.NoSourceStrictness
+                                                                            'GHC.Generics.DecidedLazy)
+                                                                         (GHC.Generics.Rec0
+                                                                            GHC.Types.Int)
+                                                                       GHC.Generics.:*: (GHC.Generics.S1
+                                                                                           ('GHC.Generics.MetaSel
+                                                                                              'GHC.Maybe.Nothing
+                                                                                              'GHC.Generics.NoSourceUnpackedness
+                                                                                              'GHC.Generics.NoSourceStrictness
+                                                                                              'GHC.Generics.DecidedLazy)
+                                                                                           (GHC.Generics.Rec0
+                                                                                              GHC.Types.Int)
+                                                                                         GHC.Generics.:*: GHC.Generics.S1
+                                                                                                            ('GHC.Generics.MetaSel
+                                                                                                               'GHC.Maybe.Nothing
+                                                                                                               'GHC.Generics.NoSourceUnpackedness
+                                                                                                               'GHC.Generics.NoSourceStrictness
+                                                                                                               'GHC.Generics.DecidedLazy)
+                                                                                                            (GHC.Generics.Rec0
+                                                                                                               GHC.Types.Int))))
+                                                    GHC.Generics.:*: ((GHC.Generics.S1
+                                                                         ('GHC.Generics.MetaSel
+                                                                            'GHC.Maybe.Nothing
+                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                            'GHC.Generics.NoSourceStrictness
+                                                                            'GHC.Generics.DecidedLazy)
+                                                                         (GHC.Generics.Rec0
+                                                                            GHC.Types.Int)
+                                                                       GHC.Generics.:*: GHC.Generics.S1
+                                                                                          ('GHC.Generics.MetaSel
+                                                                                             'GHC.Maybe.Nothing
+                                                                                             'GHC.Generics.NoSourceUnpackedness
+                                                                                             'GHC.Generics.NoSourceStrictness
+                                                                                             'GHC.Generics.DecidedLazy)
+                                                                                          (GHC.Generics.Rec0
+                                                                                             GHC.Types.Int))
+                                                                      GHC.Generics.:*: (GHC.Generics.S1
+                                                                                          ('GHC.Generics.MetaSel
+                                                                                             'GHC.Maybe.Nothing
+                                                                                             'GHC.Generics.NoSourceUnpackedness
+                                                                                             'GHC.Generics.NoSourceStrictness
+                                                                                             'GHC.Generics.DecidedLazy)
+                                                                                          (GHC.Generics.Rec0
+                                                                                             GHC.Types.Int)
+                                                                                        GHC.Generics.:*: (GHC.Generics.S1
+                                                                                                            ('GHC.Generics.MetaSel
+                                                                                                               'GHC.Maybe.Nothing
+                                                                                                               'GHC.Generics.NoSourceUnpackedness
+                                                                                                               'GHC.Generics.NoSourceStrictness
+                                                                                                               'GHC.Generics.DecidedLazy)
+                                                                                                            (GHC.Generics.Rec0
+                                                                                                               GHC.Types.Int)
+                                                                                                          GHC.Generics.:*: GHC.Generics.S1
+                                                                                                                             ('GHC.Generics.MetaSel
+                                                                                                                                'GHC.Maybe.Nothing
+                                                                                                                                'GHC.Generics.NoSourceUnpackedness
+                                                                                                                                'GHC.Generics.NoSourceStrictness
+                                                                                                                                'GHC.Generics.DecidedLazy)
+                                                                                                                             (GHC.Generics.Rec0
+                                                                                                                                GHC.Types.Int)))))
+                                                 GHC.Generics.:+: GHC.Generics.C1
+                                                                    ('GHC.Generics.MetaCons
+                                                                       "X2"
+                                                                       'GHC.Generics.PrefixI
+                                                                       'GHC.Types.False)
+                                                                    (((GHC.Generics.S1
+                                                                         ('GHC.Generics.MetaSel
+                                                                            'GHC.Maybe.Nothing
+                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                            'GHC.Generics.NoSourceStrictness
+                                                                            'GHC.Generics.DecidedLazy)
+                                                                         (GHC.Generics.Rec0
+                                                                            GHC.Types.Int)
+                                                                       GHC.Generics.:*: GHC.Generics.S1
+                                                                                          ('GHC.Generics.MetaSel
+                                                                                             'GHC.Maybe.Nothing
+                                                                                             'GHC.Generics.NoSourceUnpackedness
+                                                                                             'GHC.Generics.NoSourceStrictness
+                                                                                             'GHC.Generics.DecidedLazy)
+                                                                                          (GHC.Generics.Rec0
+                                                                                             GHC.Types.Int))
+                                                                      GHC.Generics.:*: (GHC.Generics.S1
+                                                                                          ('GHC.Generics.MetaSel
+                                                                                             'GHC.Maybe.Nothing
+                                                                                             'GHC.Generics.NoSourceUnpackedness
+                                                                                             'GHC.Generics.NoSourceStrictness
+                                                                                             'GHC.Generics.DecidedLazy)
+                                                                                          (GHC.Generics.Rec0
+                                                                                             GHC.Types.Int)
+                                                                                        GHC.Generics.:*: (GHC.Generics.S1
+                                                                                                            ('GHC.Generics.MetaSel
+                                                                                                               'GHC.Maybe.Nothing
+                                                                                                               'GHC.Generics.NoSourceUnpackedness
+                                                                                                               'GHC.Generics.NoSourceStrictness
+                                                                                                               'GHC.Generics.DecidedLazy)
+                                                                                                            (GHC.Generics.Rec0
+                                                                                                               GHC.Types.Int)
+                                                                                                          GHC.Generics.:*: GHC.Generics.S1
+                                                                                                                             ('GHC.Generics.MetaSel
+                                                                                                                                'GHC.Maybe.Nothing
+                                                                                                                                'GHC.Generics.NoSourceUnpackedness
+                                                                                                                                'GHC.Generics.NoSourceStrictness
+                                                                                                                                'GHC.Generics.DecidedLazy)
+                                                                                                                             (GHC.Generics.Rec0
+                                                                                                                                GHC.Types.Int))))
+                                                                     GHC.Generics.:*: ((GHC.Generics.S1
+                                                                                          ('GHC.Generics.MetaSel
+                                                                                             'GHC.Maybe.Nothing
+                                                                                             'GHC.Generics.NoSourceUnpackedness
+                                                                                             'GHC.Generics.NoSourceStrictness
+                                                                                             'GHC.Generics.DecidedLazy)
+                                                                                          (GHC.Generics.Rec0
+                                                                                             GHC.Types.Int)
+                                                                                        GHC.Generics.:*: GHC.Generics.S1
+                                                                                                           ('GHC.Generics.MetaSel
+                                                                                                              'GHC.Maybe.Nothing
+                                                                                                              'GHC.Generics.NoSourceUnpackedness
+                                                                                                              'GHC.Generics.NoSourceStrictness
+                                                                                                              'GHC.Generics.DecidedLazy)
+                                                                                                           (GHC.Generics.Rec0
+                                                                                                              GHC.Types.Int))
+                                                                                       GHC.Generics.:*: (GHC.Generics.S1
+                                                                                                           ('GHC.Generics.MetaSel
+                                                                                                              'GHC.Maybe.Nothing
+                                                                                                              'GHC.Generics.NoSourceUnpackedness
+                                                                                                              'GHC.Generics.NoSourceStrictness
+                                                                                                              'GHC.Generics.DecidedLazy)
+                                                                                                           (GHC.Generics.Rec0
+                                                                                                              GHC.Types.Int)
+                                                                                                         GHC.Generics.:*: (GHC.Generics.S1
+                                                                                                                             ('GHC.Generics.MetaSel
+                                                                                                                                'GHC.Maybe.Nothing
+                                                                                                                                'GHC.Generics.NoSourceUnpackedness
+                                                                                                                                'GHC.Generics.NoSourceStrictness
+                                                                                                                                'GHC.Generics.DecidedLazy)
+                                                                                                                             (GHC.Generics.Rec0
+                                                                                                                                GHC.Types.Int)
+                                                                                                                           GHC.Generics.:*: GHC.Generics.S1
+                                                                                                                                              ('GHC.Generics.MetaSel
+                                                                                                                                                 'GHC.Maybe.Nothing
+                                                                                                                                                 'GHC.Generics.NoSourceUnpackedness
+                                                                                                                                                 'GHC.Generics.NoSourceStrictness
+                                                                                                                                                 'GHC.Generics.DecidedLazy)
+                                                                                                                                              (GHC.Generics.Rec0
+                                                                                                                                                 GHC.Types.Int))))))

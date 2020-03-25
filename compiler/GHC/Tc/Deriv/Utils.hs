@@ -222,19 +222,22 @@ data DerivSpecMechanism
         SrcSpan -> TyCon  -- dit_rep_tc
                 -> [Type] -- dit_rep_tc_args
                 -> [Type] -- inst_tys
-                -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
-      -- ^ This function returns three things:
+                -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
+      -- ^ This function returns four things:
       --
       -- 1. @LHsBinds GhcPs@: The derived instance's function bindings
       --    (e.g., @compare (T x) (T y) = compare x y@)
       --
-      -- 2. @BagDerivStuff@: Auxiliary bindings needed to support the derived
+      -- 2. @[LSig GhcPs]@: A list of instance specific signatures/pragmas.
+      --    Most likely INLINE pragmas for class methods.
+      --
+      -- 3. @BagDerivStuff@: Auxiliary bindings needed to support the derived
       --    instance. As examples, derived 'Generic' instances require
       --    associated type family instances, and derived 'Eq' and 'Ord'
       --    instances require top-level @con2tag@ functions.
       --    See @Note [Auxiliary binders]@ in "GHC.Tc.Deriv.Generate".
       --
-      -- 3. @[Name]@: A list of Names for which @-Wunused-binds@ should be
+      -- 4. @[Name]@: A list of Names for which @-Wunused-binds@ should be
       --    suppressed. This is used to suppress unused warnings for record
       --    selectors when deriving 'Read', 'Show', or 'Generic'.
       --    See @Note [Deriving and unused record selectors]@.
@@ -427,7 +430,7 @@ instance Outputable DerivContext where
 data OriginativeDerivStatus
   = CanDeriveStock            -- Stock class, can derive
       (SrcSpan -> TyCon -> [Type] -> [Type]
-               -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
+               -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
   | StockClassError SDoc      -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
   | NonDerivableClass SDoc    -- Cannot derive with either stock or anyclass
@@ -566,7 +569,7 @@ hasStockDeriving
                      -> TyCon
                      -> [Type]
                      -> [Type]
-                     -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
+                     -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
@@ -575,7 +578,7 @@ hasStockDeriving clas
                    -> TyCon
                    -> [Type]
                    -> [Type]
-                   -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))]
+                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))]
     gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
                , (ordClassKey,         simpleM gen_Ord_binds)
                , (enumClassKey,        simpleM gen_Enum_binds)
@@ -593,7 +596,7 @@ hasStockDeriving clas
 
     simple gen_fn loc tc tc_args _
       = let (binds, deriv_stuff) = gen_fn loc tc tc_args
-        in return (binds, deriv_stuff, [])
+        in return (binds, [], deriv_stuff, [])
 
     -- Like `simple`, but monadic. The only monadic thing that these functions
     -- do is allocate new Uniques, which are used for generating the names of
@@ -601,18 +604,18 @@ hasStockDeriving clas
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
     simpleM gen_fn loc tc tc_args _
       = do { (binds, deriv_stuff) <- gen_fn loc tc tc_args
-           ; return (binds, deriv_stuff, []) }
+           ; return (binds, [], deriv_stuff, []) }
 
     read_or_show gen_fn loc tc tc_args _
       = do { fix_env <- getDataConFixityFun tc
            ; let (binds, deriv_stuff) = gen_fn fix_env loc tc tc_args
                  field_names          = all_field_names tc
-           ; return (binds, deriv_stuff, field_names) }
+           ; return (binds, [], deriv_stuff, field_names) }
 
     generic gen_fn _ tc _ inst_tys
-      = do { (binds, faminst) <- gen_fn tc inst_tys
+      = do { (binds, sigs, faminst) <- gen_fn tc inst_tys
            ; let field_names = all_field_names tc
-           ; return (binds, unitBag (DerivFamInst faminst), field_names) }
+           ; return (binds, sigs, unitBag (DerivFamInst faminst), field_names) }
 
     -- See Note [Deriving and unused record selectors]
     all_field_names = map flSelector . concatMap dataConFieldLabels
