@@ -777,15 +777,16 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
-  = do { rule_bndr <- newLocalBndr env bndr
+  = do { let (_, bndr') -- see Note [Zap occ info in rule binders]
+               = substBndr env (zapIdOccInfo bndr)
        ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr d
        ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
               , leftover_bndrs
               -- See Note [Evidence foralls]
-              , exprFreeIdsList (varToCoreExpr rule_bndr) ++ rule_bs
-              , varToCoreExpr rule_bndr : rule_es
+              , exprFreeIdsList (varToCoreExpr bndr') ++ rule_bs
+              , varToCoreExpr bndr' : rule_es
               , bs'
               , maybeToList dx_bind ++ dx
               , spec_dict : spec_args
@@ -801,22 +802,8 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
 specHeader env (bndr : bndrs) (UnspecArg : args)
-  | isDeadBinder bndr -- see Note [Drop unused arguments from specialisations]
-  = do { rule_bndr <- newLocalBndr env bndr
-       ; (env', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env bndrs args
-       ; pure ( env'
-              , leftover_bndrs
-              , rule_bndr : rule_bs
-              , varToCoreExpr rule_bndr : rule_es
-              , bs'
-              , dx
-              , spec_args
-              )
-       }
-
-  | otherwise
-  = do { let (env', bndr') = substBndr env bndr
+  = do { let (env', bndr') -- see Note [Zap occ info in rule binders]
+               = substBndr env (zapIdOccInfo bndr)
        ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
@@ -1648,62 +1635,44 @@ In the rule, d1 and d2 are just wildcards, not used in the RHS.  Note
 additionally that 'x' isn't captured by this rule --- we bind only
 enough etas in order to capture all of the *specialised* arguments.
 
-Note [Drop unused arguments from specialisations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we specialise a function with unused arguments, we want to drop
-them in the specialisation. For example, suppose we have:
+Note [Zap occ info in rule binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we generate a specialisation RULE, we need to drop occurrence
+info on the binders. If we don’t, things go wrong when we specialise a
+function like
 
     f :: () -> Show a => a -> String
     f x y = show y ++ "!"
 
-This is an odd type, to be certain, but we *are* able to specialise
-it. When we do, we want to take care to drop the unused argument
-completely in the specialisation.
-
-Why bother? Normally we wouldn’t care since worker/wrapper will clean
-things up for us, but leaving the argument behind creates trouble when
-we build the RULE. We’ll end up with a rule like
+since we’ll generate a RULE like
 
     RULE "SPEC f @Int" forall x [Occ=Dead].
-      f @Int x $dShowInt = $sf x
+      f @Int x $dShow = $sf x
 
-and now Core Lint complains that x shows up in expression position
-even though it’s supposed to be unused. The natural solution is to
-replace x with a fresh binder with no IdInfo to get
+and Core Lint complains because x appears in expression position even
+though it’s supposed to be unused. (This might seem contrived, but it
+actually happened, albeit with an unused dictionary we opted not to
+specialise on rather than an unused argument.)
 
-    RULE "SPEC f @Int" forall x1.
-      f @Int x1 $dShowInt = $sf x1
+One might wonder why we include these arguments in the specialisation
+at all if they’re unused. It is true that we could do some extra work
+to detect them earlier in the process and drop them completely, but
+it isn’t clear the effort gets us very much:
 
-which is fine, but sadly it causes trouble elsewhere. Note that we
-*don’t* want to lose the occ-info in the binders to the generated
-definition of $sf itself, which should still use x:
+  * After the specialisation rule fires, worker/wrapper should remove
+    the dead argument anyway.
 
-    $sf :: () -> Int -> String
-    $sf = \ x [Occ=Dead] y -> ...
+  * If we do the check for dead binders in specHeader, it’s too late
+    to not actually specialise on them, so we don’t save ourselves
+    from generating junk specialisations. (Plumbing the information to
+    the right places to avoid that is not hard, but still not trivial.)
 
-That seems okay, but currently we choose to reuse the argument
-expressions from the rule RHS when specialising an unfolding (see
-GHC.Core.Unfold.specUnfolding). In that context, we need to use the
-binders to $sf itself, so we’d end up with x in binding position but
-x1 in expression position.
+  * Doing all this still doesn’t even save us from having to zap the
+    rule binders, since the binders still show up in the LHS of the
+    rule, and Core Lint still complains.
 
-One solution to this dilemma would be to stop abusing the argument
-expressions from the rule RHS by repurposing them in that way, but
-that would require plumbing yet another result through specHeader,
-which is quite complicated enough already. So we sidestep the problem
-by dropping the x argument from the specialisation completely,
-generating:
-
-    RULE "SPEC f @Int" forall x1.
-      f @Int x1 $dShowInt = $sf
-
-    $sf :: Int -> String
-    $sf = \ y -> ...
-
-Now there’s no problem arising from the renamed x1 binder, since x1
-only appears on the rule LHS, not the RHS. Besides, the generated
-specialisation is nicer anyway: it doesn’t carry around that useless
-unused argument.
+So for now we just do the simple thing and leave unnused arguments
+alone, but drop the occurrence info to keep Core Lint happy.
 
 Note [Account for casts in binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
