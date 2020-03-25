@@ -155,6 +155,7 @@ pprStatic platform s = case s of
     CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit platform lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
+    CmmFileEmbed path  -> nest 4 $ text "incbin " <+> text (show path)
 
 -- --------------------------------------------------------------------------
 -- data sections
