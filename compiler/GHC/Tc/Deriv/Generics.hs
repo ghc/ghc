@@ -75,10 +75,12 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, FamInst)
+                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  return (mkBindsRep gk tc, repTyInsts)
+  return (binds, sigs, repTyInsts)
+  where
+    (binds, sigs) = mkBindsRep gk tc
 
 {-
 ************************************************************************
@@ -331,12 +333,55 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
-mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
-  `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+mkBindsRep :: GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep gk tycon = (binds, sigs)
       where
+        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+              `unionBags`
+                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+
+        -- If the type is small enough mark both methods as INLINE[1] so that
+        -- GHC is able to optimize away intermediate Generic representation in
+        -- more cases (#11068).
+        sigs = if inlining_potentially_useful
+               then [ inline1 from01_RDR
+                    , inline1 to01_RDR
+                    ]
+               else []
+         where
+           -- The heuristic was chosen by looking at how marking Generic methods
+           -- INLINE[1] helps with optimal code generation for several types of
+           -- generic algorithms (round trip through the generic representation,
+           -- generation of NFData instances, generation of field lenses).
+           --
+           -- The experimentation was done by picking data types having N
+           -- constructors with M fields each and using their derived Generic
+           -- instances to generate code with the above algorithms.
+           --
+           -- The results are data type SOP threshold values for which the
+           -- inlining is beneficial, i.e. it leads to GHC optimizing away
+           -- generic representation of a data type in the generated code.
+           --
+           -- The data types at thresholds tested with the above algorithms can
+           -- be found in T11068.
+           --
+           -- Above the chosen thresholds INLINE pragmas start to become at best
+           -- useless and at worst lead to code size blowup without runtime
+           -- performance improvements.
+           inlining_potentially_useful
+             | cons <= 1  = True
+             | cons <= 4  = max_fields <= 5
+             | cons <= 8  = max_fields <= 2
+             | cons <= 16 = max_fields <= 1
+             | cons <= 24 = max_fields == 0
+             | otherwise  = False
+             where
+               cons       = length datacons
+               max_fields = maximum $ map dataConSourceArity datacons
+
+           inline1 f = L loc . InlineSig noExtField (L loc f)
+                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.

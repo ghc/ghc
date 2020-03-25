@@ -2049,8 +2049,7 @@ genDerivStuff mechanism loc clas inst_tys tyvars
                         , dit_rep_tc_args = rep_tc_args
                         }
                      , dsm_stock_gen_fn = gen_fn }
-        -> do (binds, faminsts, field_names) <- gen_fn loc rep_tc rep_tc_args inst_tys
-              pure (binds, [], faminsts, field_names)
+        -> gen_fn loc rep_tc rep_tc_args inst_tys
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do
