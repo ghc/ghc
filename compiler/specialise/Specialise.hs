@@ -1595,33 +1595,44 @@ preserve laziness.
 
 Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have a function:
+Suppose we have a function with a complicated type:
 
-    f :: Int -> forall a b c. (Foo a, Foo c) => Bar -> Qux
-    f = \x -> /\ a b c -> \d1 d2 bar -> rhs
+    foo :: forall a b c. Int -> Eq a => Show b => c -> Blah
+    foo @a @b @c i dEqA dShowA x = blah
 
 and suppose it is called at:
 
-    f 7 @T1 @T2 @T3 dFooT1 dFooT3 bar
+    f 7 @T1 @T2 @T3 dEqT1 ($dfShow dShowT2) t3
 
-This call is described as a 'CallInfo' whose 'ci_key' is
+This call is described as a 'CallInfo' whose 'ci_key' is:
 
-    [ UnspecArg, SpecType T1, UnspecType, SpecType T3, SpecDict dFooT1
-    , SpecDict dFooT3, UnspecArg ]
+    [ SpecType T1, SpecType T2, UnspecType, UnspecArg, SpecDict dEqT1
+    , SpecDict ($dfShow dShowT2), UnspecArg ]
 
-Why are 'a' and 'c' identified as 'SpecType', while 'b' is 'UnspecType'?
+Why are 'a' and 'b' identified as 'SpecType', while 'c' is 'UnspecType'?
 Because we must specialise the function on type variables that appear
 free in its *dictionary* arguments; but not on type variables that do not
 appear in any dictionaries, i.e. are fully polymorphic.
 
 Because this call has dictionaries applied, we'd like to specialise
 the call on any type argument that appears free in those dictionaries.
-In this case, those are (a ~ T1, c ~ T3).
+In this case, those are [a :-> T1, b :-> T2].
 
-As a result, we'd like to generate a function:
+We also need to substitute the dictionary binders with their
+specialised dictionaries. The simplest substitution would be
+[dEqA :-> dEqT1, dShowA :-> $dfShow dShowT2], but this duplicates
+work, since `$dfShow dShowT2` is a function application. Therefore, we
+also want to *float the dictionary out* (via bindAuxiliaryDict),
+creating a new dict binding
 
-    $sf :: Int -> forall b. Bar -> Qux
-    $sf = SUBST[a->T1, c->T3, d1->d1', d2->d2'] (\x -> /\ b -> \bar -> rhs)
+    dShow1 = $dfShow dShowT2
+
+and the substitution [dEqA :-> dEqT1, dShowA :-> dShow1].
+
+With the substitutions in hand, we can generate a specialised function:
+
+    $sf :: forall c. Int -> c -> Blah
+    $sf = SUBST[a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowA :-> dShow1] (\@c i x -> blah)
 
 Note that the substitution is applied to the whole thing.  This is
 convenient, but just slightly fragile.  Notably:
@@ -1629,20 +1640,13 @@ convenient, but just slightly fragile.  Notably:
 
 We must construct a rewrite rule:
 
-    RULE "SPEC f @T1 _ @T3"
-      forall (x :: Int) (@b :: Type) (d1' :: Foo T1) (d2' :: Foo T3).
-        f x @T1 @b @T3 d1' d2' = $sf x @b
+    RULE "SPEC f @T1 @T2 _"
+      forall (@c :: Type) (i :: Int) (d1 :: Eq T1) (d2 :: Show T2).
+        f @T1 @T2 @c i d1 d2 = $sf @c i
 
-In the rule, d1' and d2' are just wildcards, not used in the RHS.  Note
-additionally that 'bar' isn't captured by this rule --- we bind only
+In the rule, d1 and d2 are just wildcards, not used in the RHS.  Note
+additionally that 'x' isn't captured by this rule --- we bind only
 enough etas in order to capture all of the *specialised* arguments.
-
-Finally, we must also construct the usage-details
-
-     { d1' = dx1; d2' = dx2 }
-
-where d1', d2' are cloned versions of d1,d2, with the type substitution
-applied.  These auxiliary bindings just avoid duplication of dx1, dx2.
 
 Note [Drop unused arguments from specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
