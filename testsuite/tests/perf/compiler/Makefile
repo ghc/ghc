@@ -7,3 +7,8 @@ T4007:
 	$(RM) -f T4007.hi T4007.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-rule-firings T4007.hs
 
+T11068:
+	$(RM) -f T11068.hi T11068.o T11068.ddump-simpl T11068a.hi T11068a.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11068a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11068.hs -ddump-simpl -ddump-to-file
+	-grep 'Generic' T11068.dump-simpl
