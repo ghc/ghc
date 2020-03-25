@@ -16,7 +16,7 @@ module DmdAnal ( dmdAnalProgram ) where
 import GhcPrelude
 
 import GHC.Driver.Session
-import WwLib            ( findTypeShape )
+import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
@@ -34,6 +34,7 @@ import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import Util
 import Maybes           ( isJust )
+import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import UniqSet
 
@@ -220,9 +221,13 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
+        fam_envs                 = ae_fam_envs env
         -- See Note [Precise exceptions and strictness analysis] in Demand
-        alt_ty3 | mayThrowPreciseException scrut_ty = deferAfterPreciseException alt_ty2
-                | otherwise                         = alt_ty2
+        alt_ty3
+          | mayThrowPreciseException fam_envs (idType case_bndr) scrut_ty
+          = deferAfterPreciseException alt_ty2
+          | otherwise
+          = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -326,6 +331,49 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
+mayThrowPreciseException :: FamInstEnvs -> Type -> DmdType -> Bool
+mayThrowPreciseException _        _  (DmdType _ _ ConOrDiv) = False
+mayThrowPreciseException _        _  (DmdType _ _ Diverges) = False
+-- Anything that throws a precise exception must force the RealWorld#,
+-- disregarding black magic like unsafePerformIO (for which we give no
+-- guarantees to preserve precise exceptions).
+mayThrowPreciseException fam_envs ty _                      = forcesRealWorld fam_envs ty
+
+-- | Whether a 'seqDmd' on an expression of the given type may force the
+-- 'RealWorld#', incurring a side-effect (ignoring unsafe shenigans like
+-- 'unsafePerformIO'). Looks through
+forcesRealWorld :: FamInstEnvs -> Type -> Bool
+forcesRealWorld fam_envs = go initRecTc
+  where
+    go :: RecTcChecker -> Type -> Bool
+    go rec_tc ty
+      -- Found it!
+      | ty `eqType`  realWorldStatePrimTy
+      = True
+      -- search depth-first
+      | Just (dc, _, field_tys, _) <- deepSplitProductType_maybe fam_envs ty
+      -- don't check the same TyCon twice
+      , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
+      = any (strict_field_forces rec_tc') field_tys
+      | otherwise
+      = False
+
+    strict_field_forces rec_tc (field_ty, str_mark) =
+      (isMarkedStrict str_mark || isLiftedType_maybe field_ty == Just False)
+        && go rec_tc field_ty
+
+-- | Tries to reset the precise exception flag from the 'StrictSig's
+-- 'Divergence' if really it not 'mayThrowPreciseException'. Resetting the flag
+-- means that the (very conservative) precise exception "taint" won't spread
+-- unhindered. TODO explain
+tryClearPreciseException :: FamInstEnvs -> Type -> StrictSig -> StrictSig
+tryClearPreciseException fam_envs ty sig@(StrictSig dmd_ty@(DmdType fvs args div))
+  | (arg_tys, res_ty) <- splitPiTys ty
+  , args `equalLength` filter (not . isNamedBinder) arg_tys
+  , mayThrowPreciseException fam_envs res_ty dmd_ty
+  = sig
+  | otherwise
+  = StrictSig (DmdType fvs args (removeExn div))
 
 {- Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -488,7 +536,8 @@ dmdFix top_lvl env let_dmd orig_pairs
 
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id (emptySig topDiv), rhs) | (id, rhs) <- pairs ]
+    zapIdStrictness pairs
+      = [(setIdStrictnessResetExc env id (emptySig topDiv), rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
@@ -544,7 +593,8 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
     sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
-    id'            = set_idStrictness env id sig
+    id'            = -- pprTraceWith "dmdAnalRhsLetDown" (\sig'-> ppr id <+> ppr sig <+> ppr sig') $
+                     setIdStrictnessResetExc env id sig
         -- See Note [NOINLINE and strictness]
 
 
@@ -1132,9 +1182,9 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
-set_idStrictness env id sig
-  = setIdStrictness id (killUsageSig (ae_dflags env) sig)
+setIdStrictnessResetExc :: AnalEnv -> Id -> StrictSig -> Id
+setIdStrictnessResetExc env id sig
+  = setIdStrictness id (tryClearPreciseException (ae_fam_envs env) (idType id) sig)
 
 {- Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
