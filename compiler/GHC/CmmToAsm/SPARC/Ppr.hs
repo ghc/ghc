@@ -116,9 +116,11 @@ pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
 pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
 pprData :: Platform -> CmmStatic -> SDoc
-pprData _ (CmmString str)           = pprBytes str
-pprData _ (CmmUninitialised bytes)  = text ".skip " <> int bytes
-pprData platform (CmmStaticLit lit) = pprDataItem platform lit
+pprData platform d = case d of
+   CmmString str          -> pprString str
+   CmmFileEmbed path      -> pprFileEmbed path
+   CmmUninitialised bytes -> text ".skip " <> int bytes
+   CmmStaticLit lit       -> pprDataItem platform lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
