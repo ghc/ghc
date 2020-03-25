@@ -56,12 +56,13 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
 import GHC.Types.Demand
+import GHC.Types.Var.Set
+import GHC.Types.Basic
+import PrimOp
 import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
-import GHC.Types.Var.Set
-import GHC.Types.Basic
 import Util
 import OrdList          ( isNilOL )
 import MonadUtils
@@ -500,7 +501,9 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- calls to error.  But now we are more careful about
                         -- inlining lone variables, so it's ok
                         -- (see GHC.Core.Op.Simplify.Utils.analyseCont)
-                   if isBotDiv result_info then
+                        -- See Note [Precise exceptions and strictness analysis] in Demand.hs
+                        -- for the special case on raiseIO#
+                   if isBotDiv result_info || isPrimOpId_maybe fun == Just RaiseIOOp then
                         map isStrictDmd demands         -- Finite => result is bottom
                    else
                         map isStrictDmd demands ++ vanilla_stricts
