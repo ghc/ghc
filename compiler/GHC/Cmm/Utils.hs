@@ -195,10 +195,9 @@ zeroExpr platform = CmmLit (zeroCLit platform)
 mkWordCLit :: Platform -> Integer -> CmmLit
 mkWordCLit platform wd = CmmInt wd (wordWidth platform)
 
+-- | We make a top-level decl for the string, and return a label pointing to it
 mkByteStringCLit
   :: CLabel -> ByteString -> (CmmLit, GenCmmDecl RawCmmStatics info stmt)
--- We have to make a top-level decl for the string,
--- and return a literal pointing to it
 mkByteStringCLit lbl bytes
   = (CmmLabel lbl, CmmData (Section sec lbl) $ RawCmmStatics lbl [CmmString bytes])
   where
