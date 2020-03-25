@@ -178,6 +178,8 @@ test('T10370',
      compile,
      [''])
 
+test('T11068', normal, makefile_test, ['T11068'])
+
 test('T10547',
      [ collect_compiler_stats('bytes allocated', 4),
      ],
