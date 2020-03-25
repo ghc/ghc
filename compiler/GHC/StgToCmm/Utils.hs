@@ -38,7 +38,7 @@ module GHC.StgToCmm.Utils (
         cmmUntag, cmmIsTagged,
 
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
-        mkWordCLit, mkByteStringCLit,
+        mkWordCLit, mkByteStringCLit, mkFileEmbedLit,
         newStringCLit, newByteStringCLit,
         blankWord,
 
@@ -60,7 +60,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Platform.Regs
 import GHC.Cmm.CLabel
-import GHC.Cmm.Utils hiding (mkDataLits, mkRODataLits, mkByteStringCLit)
+import GHC.Cmm.Utils hiding (mkDataLits, mkRODataLits, mkByteStringCLit, mkFileEmbedLit)
 import GHC.Cmm.Switch
 import GHC.StgToCmm.CgUtils
 
@@ -302,6 +302,13 @@ mkByteStringCLit lbl bytes
     -- This can not happen for String literals (as there \NUL is replaced by
     -- C0 80). However, it can happen with Addr# literals.
     sec = if 0 `BS.elem` bytes then ReadOnlyData else CString
+
+mkFileEmbedLit
+  :: CLabel -> FilePath -> (CmmLit, GenCmmDecl CmmStatics info stmt)
+-- We have to make a top-level decl for the string,
+-- and return a literal pointing to it
+mkFileEmbedLit lbl path
+  = (CmmLabel lbl, CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl [CmmFileEmbed path]))
 
 emitRawDataLits :: CLabel -> [CmmLit] -> FCode ()
 -- Emit a data-segment data block
