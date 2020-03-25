@@ -177,7 +177,6 @@ import Maybes
 
 import GHC.Core.Map
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Data.IORef
 import Data.List ( partition, mapAccumL )
@@ -2699,12 +2698,9 @@ instance Applicative TcS where
   (<*>) = ap
 
 instance Monad TcS where
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 
-instance MonadFail.MonadFail TcS where
+instance MonadFail TcS where
   fail err  = TcS (\_ -> fail err)
 
 instance MonadUnique TcS where
