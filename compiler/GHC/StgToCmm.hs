@@ -110,17 +110,15 @@ codeGen dflags this_mod data_tycons
 
         ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
 
-        -- Only external names are actually visible to codeGen. So they are the
-        -- only ones we care about.
-        ; let extractInfo info = lf `seq` Just (name,lf)
+        ; let extractInfo info = (name, lf)
                 where
-                  id = cg_id info
+                  !id = cg_id info
                   !name = idName id
-                  lf = cg_lf info
+                  !lf = cg_lf info
 
-        ; let !generatedInfo = mkNameEnv (mapMaybe extractInfo (eltsUFM cg_id_infos))
+        ; let !generatedInfo = mkNameEnv (map extractInfo (eltsUFM cg_id_infos))
 
-        ; return $! generatedInfo
+        ; return generatedInfo
         }
 
 ---------------------------------------------------------------

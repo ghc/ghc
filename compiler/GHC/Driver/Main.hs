@@ -1586,7 +1586,7 @@ doCodeGen hsc_env this_mod data_tycons
         pipeline_stream =
           {-# SCC "cmmPipeline" #-}
           Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
-            <&> (first (srtMapNonCAFs . moduleSRTMap))
+            <&> first (srtMapNonCAFs . moduleSRTMap)
 
         dump2 a = do
           unless (null a) $
