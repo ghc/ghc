@@ -1,0 +1,6 @@
+
+T17955.hs:6:13: error:
+    • A newtype constructor cannot have a context in its type
+      T :: Coercible () T => () -> T
+    • In the definition of data constructor ‘T’
+      In the newtype declaration for ‘T’
