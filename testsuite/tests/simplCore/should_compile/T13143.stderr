@@ -26,6 +26,7 @@ f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
 [GblId,
+ Str=c,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T13143.$trModule4 = "main"#
@@ -33,6 +34,7 @@ T13143.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule3 :: GHC.Types.TrName
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -41,6 +43,7 @@ T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule2 :: GHC.Prim.Addr#
 [GblId,
+ Str=c,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T13143.$trModule2 = "T13143"#
@@ -48,6 +51,7 @@ T13143.$trModule2 = "T13143"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule1 :: GHC.Types.TrName
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -56,6 +60,7 @@ T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule :: GHC.Types.Module
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
@@ -71,7 +76,7 @@ Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=3, Str=<S,1*U><S,1*U><L,U>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<S,1*U><S,1*U><L,U>c, Unf=OtherCon []]
 T13143.$wg
   = \ (w :: Bool) (w1 :: Bool) (ww :: GHC.Prim.Int#) ->
       case w of {
@@ -92,7 +97,7 @@ end Rec }
 g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
- Str=<S,1*U><S,1*U><S,1*U(U)>,
+ Str=<S,1*U><S,1*U><S,1*U(U)>c,
  Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

@@ -6,6 +6,7 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule4 :: GHC.Prim.Addr#
 [GblId,
+ Str=c,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T3772.$trModule4 = "main"#
@@ -13,6 +14,7 @@ T3772.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule3 :: GHC.Types.TrName
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -21,6 +23,7 @@ T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule2 :: GHC.Prim.Addr#
 [GblId,
+ Str=c,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T3772.$trModule2 = "T3772"#
@@ -28,6 +31,7 @@ T3772.$trModule2 = "T3772"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -36,6 +40,7 @@ T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule :: GHC.Types.Module
 [GblId,
+ Str=c,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
@@ -45,7 +50,7 @@ T3772.$trModule
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 $wxs :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Str=<S,1*U>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<S,1*U>c, Unf=OtherCon []]
 $wxs
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds1 {
@@ -56,7 +61,7 @@ end Rec }
 
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Str=<L,U>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<L,U>c, Unf=OtherCon []]
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# 0# ww of {
@@ -68,7 +73,7 @@ T3772.$wfoo
 foo [InlPrag=NOUSERINLINE[0]] :: Int -> ()
 [GblId,
  Arity=1,
- Str=<S,1*U(U)>,
+ Str=<S,1*U(U)>c,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
