@@ -4,6 +4,7 @@
 
 -- See Note [Precise exceptions and strictness analysis] in Demand.hs
 -- This is similar to T17676, but with an extra putStrLn.
+-- See also #148, #1592.
 
 module Main where
 

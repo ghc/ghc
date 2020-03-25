@@ -331,17 +331,21 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
+-- | Returns True if an expression of the given Type and DmdType might throw a
+-- precise exception. In particular, that implies that the Type
+-- 'forcesRealWorld', because otherwise it can't call 'raiseIO#'.
+-- Except for black magic like 'unsafePerformIO' and friends, in which all
+-- precise exception guarantees are off the table.
+-- See Note [Precise exceptions and strictness analysis] in Demand.hs
 mayThrowPreciseException :: FamInstEnvs -> Type -> DmdType -> Bool
 mayThrowPreciseException _        _  (DmdType _ _ ConOrDiv) = False
 mayThrowPreciseException _        _  (DmdType _ _ Diverges) = False
--- Anything that throws a precise exception must force the RealWorld#,
--- disregarding black magic like unsafePerformIO (for which we give no
--- guarantees to preserve precise exceptions).
 mayThrowPreciseException fam_envs ty _                      = forcesRealWorld fam_envs ty
 
--- | Whether a 'seqDmd' on an expression of the given type may force the
--- 'RealWorld#', incurring a side-effect (ignoring unsafe shenigans like
--- 'unsafePerformIO'). Looks through
+-- | Whether a 'seqDmd' on an expression of the given type may force
+-- @State# RealWorld@, incurring a side-effect (ignoring unsafe shenigans like
+-- 'unsafePerformIO'). Looks through coercions and recurses into
+-- unlifted/strict fields.
 forcesRealWorld :: FamInstEnvs -> Type -> Bool
 forcesRealWorld fam_envs = go initRecTc
   where
@@ -365,7 +369,8 @@ forcesRealWorld fam_envs = go initRecTc
 -- | Tries to reset the precise exception flag from the 'StrictSig's
 -- 'Divergence' if really it not 'mayThrowPreciseException'. Resetting the flag
 -- means that the (very conservative) precise exception "taint" won't spread
--- unhindered. TODO explain
+-- from pure expressions for which the analysis failed to prove absence of
+-- precise excpetions.
 tryClearPreciseException :: FamInstEnvs -> Type -> StrictSig -> StrictSig
 tryClearPreciseException fam_envs ty sig@(StrictSig dmd_ty@(DmdType fvs args div))
   | (arg_tys, res_ty) <- splitPiTys ty

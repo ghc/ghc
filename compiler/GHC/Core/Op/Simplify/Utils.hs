@@ -55,7 +55,6 @@ import Name
 import Id
 import IdInfo
 import Var
-import PrimOp
 import Demand
 import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
