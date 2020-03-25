@@ -2,8 +2,6 @@
 
 module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
 
-import Data.List.Extra (splitOn)
-
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
