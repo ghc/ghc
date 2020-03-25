@@ -61,6 +61,9 @@ module GHC.Exts
         -- * Running 'RealWorld' state thread
         runRW#,
 
+        -- * Keeping values alive
+        with#,
+
         -- * Safe coercions
         --
         -- | These are available from the /Trustworthy/ module "Data.Coerce" as well

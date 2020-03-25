@@ -498,6 +498,7 @@ gen_latex_doc (Info defaults entries)
                    tvars = tvars_of typ
                    tbinds [] = ". "
                    tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
+                   tbinds ("p":tbs) = "(p::?) " ++ (tbinds tbs)
                    tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
            tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
            tvars_of (TyC t1 t2) = tvars_of t1 `union` tvars_of t2

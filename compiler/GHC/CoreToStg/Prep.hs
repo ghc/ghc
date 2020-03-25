@@ -764,6 +764,11 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
+instance Outputable ArgInfo where
+  ppr (CpeApp arg) = text "app" <+> ppr arg
+  ppr (CpeCast co) = text "cast" <+> ppr co
+  ppr (CpeTick tick) = text "tick" <+> ppr tick
+
 {-
 Note [runRW arg]
 ~~~~~~~~~~~~~~~~
@@ -876,6 +881,11 @@ cpeApp top_env expr
                    rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
              ; cpeBody env expr
              }
+
+    cpe_app env (Var f) args n
+        | Just WithOp <- isPrimOpId_maybe f
+        = pprPanic "cpe_app" (ppr f $$ ppr args $$ ppr n)
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
