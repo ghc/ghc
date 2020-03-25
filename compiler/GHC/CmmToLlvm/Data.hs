@@ -132,6 +132,7 @@ llvmSection (Section t suffix) = do
 -- | Handle static data
 genData :: CmmStatic -> LlvmM LlvmStatic
 
+genData (CmmFileEmbed {}) = panic "Unexpected CmmFileEmbed literal"
 genData (CmmString str) = do
     let v  = map (\x -> LMStaticLit $ LMIntLit (fromIntegral x) i8)
                  (BS.unpack str)

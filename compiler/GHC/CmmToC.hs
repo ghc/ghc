@@ -574,6 +574,7 @@ pprStatic dflags s = case s of
 
     -- these should be inlined, like the old .hc
     CmmString s'       -> nest 4 (mkW_ <> parens(pprStringInCStyle s'))
+    CmmFileEmbed {}    -> panic "Unexpected CmmFileEmbed literal"
 
 
 -- ---------------------------------------------------------------------------
