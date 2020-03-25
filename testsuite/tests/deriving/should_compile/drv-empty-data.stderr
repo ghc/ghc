@@ -34,11 +34,15 @@ Derived class instances:
     Data.Traversable.traverse _ z = GHC.Base.pure (case z of)
   
   instance GHC.Generics.Generic (DrvEmptyData.Void a) where
+    {-# INLINE [1] GHC.Generics.from #-}
+    {-# INLINE [1] GHC.Generics.to #-}
     GHC.Generics.from x
       = GHC.Generics.M1 (case x of { x -> case x of })
     GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
   
   instance GHC.Generics.Generic1 DrvEmptyData.Void where
+    {-# INLINE [1] GHC.Generics.from1 #-}
+    {-# INLINE [1] GHC.Generics.to1 #-}
     GHC.Generics.from1 x
       = GHC.Generics.M1 (case x of { x -> case x of })
     GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }
