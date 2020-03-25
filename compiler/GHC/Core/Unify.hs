@@ -46,7 +46,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import Control.Applicative hiding ( empty )
 import qualified Control.Applicative
 
@@ -1244,9 +1243,6 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
-#if !MIN_VERSION_base(4,13,0)
-  fail     = MonadFail.fail
-#endif
   m >>= k  = UM (\state ->
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })
@@ -1260,7 +1256,7 @@ instance Alternative UM where
 
 instance MonadPlus UM
 
-instance MonadFail.MonadFail UM where
+instance MonadFail UM where
     fail _   = UM (\_ -> SurelyApart) -- failed pattern match
 
 initUM :: TvSubstEnv  -- subst to extend

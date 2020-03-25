@@ -43,7 +43,6 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Control.Applicative (Alternative(..))
 
@@ -60,11 +59,8 @@ unIOEnv (IOEnv m) = m
 instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = (*>)
-#if !MIN_VERSION_base(4,13,0)
-    fail   = MonadFail.fail
-#endif
 
-instance MonadFail.MonadFail (IOEnv m) where
+instance MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string
 
 instance Applicative (IOEnv m) where

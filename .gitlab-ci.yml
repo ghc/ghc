@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 408eff66aef6ca2b44446c694c5a56d6ca0460cc
+  DOCKER_REV: 3f731f5d37a156e7ebe10cd32656946083baaf4a
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -390,7 +390,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.6.5
+    GHC_VERSION: 8.8.3
     CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
@@ -419,7 +419,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.6.3
+    GHC_VERSION: 8.8.3
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"

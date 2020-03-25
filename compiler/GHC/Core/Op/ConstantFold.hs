@@ -61,7 +61,6 @@ import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Int
@@ -796,11 +795,7 @@ instance Monad RuleM where
                 Nothing -> Nothing
                 Just r  -> runRuleM (g r) env iu fn args
 
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
-
-instance MonadFail.MonadFail RuleM where
+instance MonadFail RuleM where
     fail _ = mzero
 
 instance Alternative RuleM where

@@ -26,7 +26,7 @@ module GHC.ST (
 
 import GHC.Base
 import GHC.Show
-import qualified Control.Monad.Fail as Fail
+import Control.Monad.Fail
 
 default ()
 
@@ -79,7 +79,7 @@ instance Monad (ST s) where
         (k2 new_s) }})
 
 -- | @since 4.11.0.0
-instance Fail.MonadFail (ST s) where
+instance MonadFail (ST s) where
     fail s = errorWithoutStackTrace s
 
 -- | @since 4.11.0.0
