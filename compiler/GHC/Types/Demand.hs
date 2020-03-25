@@ -931,6 +931,54 @@ instance Outputable Divergence where
   ppr Diverges      = char 'b'
   ppr Dunno         = empty
 
+{- Note [Precise vs imprecise exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An exception is considered to be /precise/ when it is thrown by the 'raiseIO#'
+primop. It follows that all other primops (such as 'raise#' or
+division-by-zero) throw /imprecise/ exceptions. Note that the actual type of
+the exception thrown doesn't have any impact!
+
+GHC undertakes some effort not to apply an optimisation that would mask a
+/precise/ exception with some other source of nontermination, such as genuine
+divergence or an imprecise exception, so that the user can reliably
+intercept the precise exception with a catch handler before and after
+optimisations.
+
+See also the wiki page on precise exceptions:
+https://gitlab.haskell.org/ghc/ghc/wikis/exceptions/precise-exceptions
+Section 5 of "Tackling the awkward squad" talks about semantic concerns.
+Imprecise exceptions are actually more interesting than precise ones (which are
+fairly standard) from the perspective of semantics. See the paper "A Semantics
+for Imprecise Exceptions" for more details.
+
+Note [Precise exceptions and strictness analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+raiseIO# raises a *precise* exception, in contrast to raise# which
+raise an *imprecise* exception.  See Note [Precise vs imprecise exceptions]
+in XXXX.
+
+Unlike raise# (which returns botDiv), we want raiseIO# to return topDiv.
+Here's why. Consider this example from #13380 (similarly #17676):
+    f x y | x>0       = raiseIO Exc
+          | y>0       = return 1
+          | otherwise = return 2
+Is 'f' strict in 'y'? One might be tempted to say yes! But that plays fast and
+loose with the precise exception; after optimisation, (f 42 (error "boom"))
+turns from throwing the precise Exc to throwing the imprecise user error
+"boom". So, the defaultDmd of raiseIO# should be lazy (topDmd), which can be
+achieved by giving it divergence topDiv.
+
+But if it returns topDiv, the simplifier will fail to discard raiseIO#'s
+continuation in
+   case raiseIO# x s of { (# s', r #) -> <BIG> }
+which we'd like to optimise to
+   raiseIO# x s
+Temporary hack solution: special treatment for raiseIO# in
+Simplifier.Utils.mkArgInfo. For the non-hack solution, see
+https://gitlab.haskell.org/ghc/ghc/wikis/fixing-precise-exceptions#replacing-hacks-by-principled-program-analyses
+-}
+
+
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
