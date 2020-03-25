@@ -197,11 +197,13 @@ data Section = Section SectionType CLabel
 
 data CmmStatic
   = CmmStaticLit CmmLit
-        -- a literal value, size given by cmmLitRep of the literal.
+        -- ^ a literal value, size given by cmmLitRep of the literal.
   | CmmUninitialised Int
-        -- uninitialised data, N bytes long
+        -- ^ uninitialised data, N bytes long
   | CmmString ByteString
-        -- string of 8-bit values only, not zero terminated.
+        -- ^ string of 8-bit values only, not zero terminated.
+  | CmmFileEmbed FilePath
+        -- ^ an embedded binary file
 
 -- Static data before SRT generation
 data CmmStatics

@@ -14,7 +14,8 @@ module GHC.CmmToAsm.Ppr (
         floatToBytes,
         doubleToBytes,
         pprASCII,
-        pprBytes,
+        pprString,
+        pprFileEmbed,
         pprSectionHeader
 )
 
@@ -26,11 +27,9 @@ import AsmUtils
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
-import GHC.Driver.Session
 import FastString
 import Outputable
 import GHC.Platform
-import FileCleanup
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
@@ -43,7 +42,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Exts
 import GHC.Word
-import System.IO.Unsafe
 
 
 
@@ -129,24 +127,18 @@ pprASCII str
                  ]
        ord0 = 0x30 -- = ord '0'
 
--- | Pretty print binary data.
---
--- Use either the ".string" directive or a ".incbin" directive.
--- See Note [Embedding large binary blobs]
+-- | Emit a ".string" directive
+pprString :: ByteString -> SDoc
+pprString bs = text "\t.string " <> doubleQuotes (pprASCII bs)
+
+-- | Emit a ".incbin" directive
 --
 -- A NULL byte is added after the binary data.
---
-pprBytes :: ByteString -> SDoc
-pprBytes bs = sdocWithDynFlags $ \dflags ->
-  if binBlobThreshold dflags == 0
-     || fromIntegral (BS.length bs) <= binBlobThreshold dflags
-    then text "\t.string " <> doubleQuotes (pprASCII bs)
-    else unsafePerformIO $ do
-      bFile <- newTempName dflags TFL_CurrentModule ".dat"
-      BS.writeFile bFile bs
-      return $ text "\t.incbin "
-         <> pprFilePathString bFile -- proper escape (see #16389)
-         <> text "\n\t.byte 0"
+pprFileEmbed :: FilePath -> SDoc
+pprFileEmbed path
+   = text "\t.incbin "
+     <> pprFilePathString path -- proper escape (see #16389)
+     <> text "\n\t.byte 0"
 
 {-
 Note [Embedding large binary blobs]
