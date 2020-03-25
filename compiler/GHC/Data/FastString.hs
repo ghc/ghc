@@ -113,7 +113,6 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
-import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
 import qualified Data.ByteString.Short.Internal as SBS
 import Data.ByteString.Internal (c2w)
