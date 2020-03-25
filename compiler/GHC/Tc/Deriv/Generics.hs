@@ -75,10 +75,12 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, FamInst)
+                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  return (mkBindsRep gk tc, repTyInsts)
+  return (binds, sigs, repTyInsts)
+  where
+    (binds, sigs) = mkBindsRep gk tc
 
 {-
 ************************************************************************
@@ -331,12 +333,22 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
-mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
-  `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+mkBindsRep :: GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep gk tycon = (binds, sigs)
       where
+        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+              `unionBags`
+                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+
+        -- Both methods are marked as INLINE[1] so that GHC is able to optimize
+        -- away intermediate Generic representation for more types (#11068).
+        sigs = [ inline1 from01_RDR
+               , inline1 to01_RDR
+               ]
+         where
+           inline1 f = L loc . InlineSig noExtField (L loc f)
+                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.
