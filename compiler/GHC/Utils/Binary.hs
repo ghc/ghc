@@ -1038,10 +1038,12 @@ putBS bh bs =
     putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
 
 putSBS :: BinHandle -> ShortByteString -> IO ()
-putSBS bh bs =
+putSBS bh bs = putBS bh (BSS.fromShort bs)
+{-
   BSS.useAsCStringLen bs $ \(ptr, l) -> do
     put_ bh l
     putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
+    -}
 
 getSBS :: BinHandle -> IO ShortByteString
 getSBS bh = do
