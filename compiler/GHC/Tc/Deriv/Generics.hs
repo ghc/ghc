@@ -75,10 +75,12 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, FamInst)
+                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  return (mkBindsRep gk tc, repTyInsts)
+  return (binds, sigs, repTyInsts)
+  where
+    (binds, sigs) = mkBindsRep gk tc
 
 {-
 ************************************************************************
@@ -331,12 +333,55 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
-mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
-  `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+mkBindsRep :: GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep gk tycon = (binds, sigs)
       where
+        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+              `unionBags`
+                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+
+        -- If the type is small enough mark both methods as INLINE[1] so that
+        -- GHC is able to optimize away intermediate Generic representation in
+        -- more cases (#11068).
+        sigs = if tycon_too_big
+               then []
+               else [ inline1 from01_RDR
+                    , inline1 to01_RDR
+                    ]
+         where
+           tycon_too_big = case length datacons of
+             0  -> False
+             1  -> max_fields > 100
+             2  -> max_fields > 100
+             3  -> max_fields > 12
+             4  -> max_fields > 12
+             5  -> max_fields > 5
+             6  -> max_fields > 5
+             7  -> max_fields > 5
+             8  -> max_fields > 5
+             9  -> max_fields > 2
+             10 -> max_fields > 2
+             11 -> max_fields > 2
+             12 -> max_fields > 2
+             13 -> max_fields > 1
+             14 -> max_fields > 1
+             15 -> max_fields > 1
+             16 -> max_fields > 1
+             17 -> max_fields > 0
+             18 -> max_fields > 0
+             19 -> max_fields > 0
+             20 -> max_fields > 0
+             21 -> max_fields > 0
+             22 -> max_fields > 0
+             23 -> max_fields > 0
+             24 -> max_fields > 0
+             _  -> True
+             where
+               max_fields = maximum $ map dataConRepArity datacons
+
+           inline1 f = L loc . InlineSig noExtField (L loc f)
+                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.
