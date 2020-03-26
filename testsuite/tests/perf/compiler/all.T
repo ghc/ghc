@@ -355,7 +355,7 @@ test ('WWRec',
       ['-v0 -O'])
 
 test('T16190',
-      [req_th, collect_stats()],
+      [req_th, collect_compiler_stats()],
       multimod_compile,
       ['T16190.hs', '-v0'])
 
