@@ -423,6 +423,7 @@ zipTCvSubst tcvs tys
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the
 -- incoming environment. No CoVars, please!
 mkTvSubstPrs :: [(TyVar, Type)] -> TCvSubst
+mkTvSubstPrs []  = emptyTCvSubst
 mkTvSubstPrs prs =
     ASSERT2( onlyTyVarsAndNoCoercionTy, text "prs" <+> ppr prs )
     mkTvSubst in_scope tenv
