@@ -157,6 +157,7 @@ ghcPrimIds
     , seqId
     , magicDictId
     , coerceId
+    , withId
     , proxyHashId
     ]
 
@@ -1334,7 +1335,7 @@ another gun with which to shoot yourself in the foot.
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName :: Name
+   magicDictName, coerceName, proxyName, withName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
@@ -1343,11 +1344,34 @@ coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionT
 magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
+withName          = mkWiredInIdName gHC_PRIM  (fsLit "with#")          withKey            withId
 
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+
+------------------------------------------------
+withId :: Id
+withId
+  = pcMiscPrelId withName ty noCafIdInfo
+  where
+    -- with# :: forall (rep_a :: RuntimeRep) (a :: TYPE rep_a)
+    --                 (rep_r :: RuntimeRep) (r :: TYPE rep_r).
+    --          a
+    --       -> (State# RealWorld -> (# State# RealWorld, r #))
+    --       -> State# RealWorld
+    --       -> (# State# RealWorld, r #)
+    --
+    rep_a = runtimeRep1TyVar
+    a     = openAlphaTyVar
+    rep_r = runtimeRep2TyVar
+    r     = openBetaTyVar
+    ty    = mkInvForAllTys [rep_a, a, rep_r, r]
+            $ mkVisFunTys [mkTyVarTy a, cont_ty, realWorldStatePrimTy] result_ty
+    cont_ty = realWorldStatePrimTy `mkVisFunTy` result_ty
+    -- (# State# RealWorld, r #)
+    result_ty = mkTupleTy Unboxed [realWorldStatePrimTy, mkTyVarTy r]
 
 ------------------------------------------------
 proxyHashId :: Id
