@@ -12,7 +12,6 @@ module GHC.Llvm.Types where
 import GHC.Prelude
 
 import Data.Char
-import Data.Int
 import Numeric
 
 import GHC.Platform
@@ -64,24 +63,26 @@ data LlvmType
   deriving (Eq)
 
 instance Outputable LlvmType where
-  ppr (LMInt size     ) = char 'i' <> ppr size
-  ppr (LMFloat        ) = text "float"
-  ppr (LMDouble       ) = text "double"
-  ppr (LMFloat80      ) = text "x86_fp80"
-  ppr (LMFloat128     ) = text "fp128"
-  ppr (LMPointer x    ) = ppr x <> char '*'
-  ppr (LMArray nr tp  ) = char '[' <> ppr nr <> text " x " <> ppr tp <> char ']'
-  ppr (LMVector nr tp ) = char '<' <> ppr nr <> text " x " <> ppr tp <> char '>'
-  ppr (LMLabel        ) = text "label"
-  ppr (LMVoid         ) = text "void"
-  ppr (LMStruct tys   ) = text "<{" <> ppCommaJoin tys <> text "}>"
-  ppr (LMStructU tys  ) = text "{" <> ppCommaJoin tys <> text "}"
-  ppr (LMMetadata     ) = text "metadata"
+  ppr = ppType
 
-  ppr (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
-    = ppr r <+> lparen <> ppParams varg p <> rparen
-
-  ppr (LMAlias (s,_)) = char '%' <> ftext s
+ppType :: LlvmType -> SDoc
+ppType t = case t of
+  LMInt size     -> char 'i' <> ppr size
+  LMFloat        -> text "float"
+  LMDouble       -> text "double"
+  LMFloat80      -> text "x86_fp80"
+  LMFloat128     -> text "fp128"
+  LMPointer x    -> ppr x <> char '*'
+  LMArray nr tp  -> char '[' <> ppr nr <> text " x " <> ppr tp <> char ']'
+  LMVector nr tp -> char '<' <> ppr nr <> text " x " <> ppr tp <> char '>'
+  LMLabel        -> text "label"
+  LMVoid         -> text "void"
+  LMStruct tys   -> text "<{" <> ppCommaJoin tys <> text "}>"
+  LMStructU tys  -> text "{" <> ppCommaJoin tys <> text "}"
+  LMMetadata     -> text "metadata"
+  LMAlias (s,_)  -> char '%' <> ftext s
+  LMFunction (LlvmFunctionDecl _ _ _ r varg p _)
+    -> ppr r <+> lparen <> ppParams varg p <> rparen
 
 ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc
 ppParams varg p
@@ -115,11 +116,6 @@ data LlvmVar
   | LMLitVar LlvmLit
   deriving (Eq)
 
-instance Outputable LlvmVar where
-  ppr (LMLitVar x)  = ppr x
-  ppr (x         )  = ppr (getVarType x) <+> ppName x
-
-
 -- | Llvm Literal Data.
 --
 -- These can be used inline in expressions.
@@ -135,11 +131,6 @@ data LlvmLit
   -- | Undefined value, random bit pattern. Useful for optimisations.
   | LMUndefLit LlvmType
   deriving (Eq)
-
-instance Outputable LlvmLit where
-  ppr l@(LMVectorLit {}) = ppLit l
-  ppr l                  = ppr (getLitType l) <+> ppLit l
-
 
 -- | Llvm Static Data.
 --
@@ -162,89 +153,24 @@ data LlvmStatic
   | LMAdd LlvmStatic LlvmStatic        -- ^ Constant addition operation
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
 
-instance Outputable LlvmStatic where
-  ppr (LMComment       s) = text "; " <> ftext s
-  ppr (LMStaticLit   l  ) = ppr l
-  ppr (LMUninitType    t) = ppr t <> text " undef"
-  ppr (LMStaticStr   s t) = ppr t <> text " c\"" <> ftext s <> text "\\00\""
-  ppr (LMStaticArray d t) = ppr t <> text " [" <> ppCommaJoin d <> char ']'
-  ppr (LMStaticStruc d t) = ppr t <> text "<{" <> ppCommaJoin d <> text "}>"
-  ppr (LMStaticPointer v) = ppr v
-  ppr (LMTrunc v t)
-      = ppr t <> text " trunc (" <> ppr v <> text " to " <> ppr t <> char ')'
-  ppr (LMBitc v t)
-      = ppr t <> text " bitcast (" <> ppr v <> text " to " <> ppr t <> char ')'
-  ppr (LMPtoI v t)
-      = ppr t <> text " ptrtoint (" <> ppr v <> text " to " <> ppr t <> char ')'
-
-  ppr (LMAdd s1 s2)
-      = pprStaticArith s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
-  ppr (LMSub s1 s2)
-      = pprStaticArith s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
-
-
-pprSpecialStatic :: LlvmStatic -> SDoc
-pprSpecialStatic (LMBitc v t) =
-    ppr (pLower t) <> text ", bitcast (" <> ppr v <> text " to " <> ppr t
-        <> char ')'
-pprSpecialStatic v@(LMStaticPointer x) = ppr (pLower $ getVarType x) <> comma <+> ppr v
-pprSpecialStatic stat = ppr stat
-
-
-pprStaticArith :: LlvmStatic -> LlvmStatic -> PtrString -> PtrString
-                  -> String -> SDoc
-pprStaticArith s1 s2 int_op float_op op_name =
-  let ty1 = getStatType s1
-      op  = if isFloat ty1 then float_op else int_op
-  in if ty1 == getStatType s2
-     then ppr ty1 <+> ptext op <+> lparen <> ppr s1 <> comma <> ppr s2 <> rparen
-     else pprPanic "pprStaticArith" $
-            text op_name <> text " with different types! s1: " <> ppr s1
-                         <> text", s2: " <> ppr s2
-
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
 --
 
--- | Return the variable name or value of the 'LlvmVar'
--- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
-ppName :: LlvmVar -> SDoc
-ppName v@(LMGlobalVar {}) = char '@' <> ppPlainName v
-ppName v@(LMLocalVar  {}) = char '%' <> ppPlainName v
-ppName v@(LMNLocalVar {}) = char '%' <> ppPlainName v
-ppName v@(LMLitVar    {}) =             ppPlainName v
+-- | LLVM code generator options
+data LlvmOpts = LlvmOpts
+   { llvmOptsPlatform             :: !Platform -- ^ Target platform
+   , llvmOptsFillUndefWithGarbage :: !Bool     -- ^ Fill undefined literals with garbage values
+   , llvmOptsSplitSections        :: !Bool     -- ^ Split sections
+   }
 
--- | Return the variable name or value of the 'LlvmVar'
--- in a plain textual representation (e.g. @x@, @y@ or @42@).
-ppPlainName :: LlvmVar -> SDoc
-ppPlainName (LMGlobalVar x _ _ _ _ _) = ftext x
-ppPlainName (LMLocalVar  x LMLabel  ) = text (show x)
-ppPlainName (LMLocalVar  x _        ) = text ('l' : show x)
-ppPlainName (LMNLocalVar x _        ) = ftext x
-ppPlainName (LMLitVar    x          ) = ppLit x
-
--- | Print a literal value. No type.
-ppLit :: LlvmLit -> SDoc
-ppLit l = sdocWithDynFlags $ \dflags -> case l of
-   (LMIntLit i (LMInt 32))  -> ppr (fromInteger i :: Int32)
-   (LMIntLit i (LMInt 64))  -> ppr (fromInteger i :: Int64)
-   (LMIntLit   i _       )  -> ppr ((fromInteger i)::Int)
-   (LMFloatLit r LMFloat )  -> ppFloat (targetPlatform dflags) $ narrowFp r
-   (LMFloatLit r LMDouble)  -> ppDouble (targetPlatform dflags) r
-   f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppr f)
-   (LMVectorLit ls  )       -> char '<' <+> ppCommaJoin ls <+> char '>'
-   (LMNullLit _     )       -> text "null"
-   -- #11487 was an issue where we passed undef for some arguments
-   -- that were actually live. By chance the registers holding those
-   -- arguments usually happened to have the right values anyways, but
-   -- that was not guaranteed. To find such bugs reliably, we set the
-   -- flag below when validating, which replaces undef literals (at
-   -- common types) with values that are likely to cause a crash or test
-   -- failure.
-   (LMUndefLit t    )
-      | gopt Opt_LlvmFillUndefWithGarbage dflags
-      , Just lit <- garbageLit t   -> ppLit lit
-      | otherwise                  -> text "undef"
+-- | Get LlvmOptions from DynFlags
+initLlvmOpts :: DynFlags -> LlvmOpts
+initLlvmOpts dflags = LlvmOpts
+   { llvmOptsPlatform             = targetPlatform dflags
+   , llvmOptsFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
+   , llvmOptsSplitSections        = gopt Opt_SplitSections dflags
+   }
 
 garbageLit :: LlvmType -> Maybe LlvmLit
 garbageLit t@(LMInt w)     = Just (LMIntLit (0xbbbbbbbbbbbbbbb0 `mod` (2^w)) t)

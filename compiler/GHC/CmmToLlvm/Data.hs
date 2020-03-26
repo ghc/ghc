@@ -17,7 +17,6 @@ import GHC.CmmToLlvm.Base
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import GHC.Driver.Session
 import GHC.Platform
 
 import GHC.Data.FastString
@@ -71,7 +70,7 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
-    platform <- getLlvmPlatform
+    platform <- getPlatform
     let types   = map getStatType static
 
         strucTy = LMStruct types
@@ -113,9 +112,9 @@ llvmSectionType p t = case t of
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
-  dflags <- getDynFlags
-  let splitSect = gopt Opt_SplitSections dflags
-      platform  = targetPlatform dflags
+  opts <- getLlvmOpts
+  let splitSect = llvmOptsSplitSections opts
+      platform  = llvmOptsPlatform opts
   if not splitSect
   then return Nothing
   else do

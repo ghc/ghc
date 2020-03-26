@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Llvm.MetaData where
 
@@ -72,13 +73,6 @@ data MetaExpr = MetaStr !LMString
               | MetaVar !LlvmVar
               | MetaStruct [MetaExpr]
               deriving (Eq)
-
-instance Outputable MetaExpr where
-  ppr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
-  ppr (MetaStr    s ) = char '!' <> doubleQuotes (ftext s)
-  ppr (MetaNode   n ) = ppr n
-  ppr (MetaVar    v ) = ppr v
-  ppr (MetaStruct es) = char '!' <> braces (ppCommaJoin es)
 
 -- | Associates some metadata with a specific label for attaching to an
 -- instruction.

@@ -10,6 +10,8 @@
 --
 
 module GHC.Llvm (
+        LlvmOpts (..),
+        initLlvmOpts,
 
         -- * Modules, Functions and Blocks
         LlvmModule(..),
@@ -50,7 +52,7 @@ module GHC.Llvm (
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
         -- * Pretty Printing
-        ppLit, ppName, ppPlainName,
+        ppVar, ppLit, ppTypeLit, ppName, ppPlainName,
         ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
         ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
         ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, ppLlvmMetas, ppLlvmMeta,
