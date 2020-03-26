@@ -1525,7 +1525,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 --      See Note [Arity decrease] in Simplify
                 -- Copy InlinePragma information from the parent Id.
                 -- So if f has INLINE[1] so does spec_f
-                spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - n_dicts)
+                arity_decrease = length rhs_bndrs - (length unspec_bndrs + length leftover_bndrs)
+                spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - arity_decrease)
                                         `setInlinePragma` spec_inl_prag
                                         `setIdUnfolding`  spec_unf
                                         `asJoinId_maybe`  spec_join_arity
