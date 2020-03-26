@@ -47,7 +47,8 @@ import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
-import PrelNames        ( unsafeEqualityProofName )
+import PrelNames        ( unsafeEqualityProofName, unpackCStringName )
+
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -716,8 +717,14 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
   where
     unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
-    upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
-             | otherwise                      = Updatable
+    upd_flag
+      | StgApp fn [StgLitArg (LitString _)] <- rhs
+      , idName fn == unpackCStringName
+      = SingleEntry
+      | isUsedOnce (idDemandInfo bndr)
+      = SingleEntry
+      | otherwise
+      = Updatable
 
     -- CAF cost centres generated for -fcaf-all
     caf_cc = mkAutoCC bndr modl
