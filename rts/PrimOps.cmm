@@ -2034,13 +2034,31 @@ stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
  * be allowed to interrupt a blocked IOPort just because it thinks there's a
  * deadlock.  This is especially crucial for the non-threaded runtime.
  *
- * To avoid double reads/writes we set only the head when a reader queues up
- * on a port. We set the tail to the port itself upon reading. We can do this
+ * To avoid double reads/writes we set only the head to a MVarTSOQueue when
+ * a reader queues up on a port.
+ * We set the tail to the port itself upon reading. We can do this
  * since there can only be one reader/writer for the port. In contrast to MVars
  * which do need to keep a list of blocked threads.
  *
- * This allows us to detect any double uses of IOPorts and throw an exception
- * in that case for easier debugging.
+ * This means IOPorts have these valid states and transitions:
+ *
+                                ┌─────────┐
+                                │  Empty  │ head == tail == value == END_TSO_QUEUE
+                                ├─────────┤
+                                │         │
+                          write │         │ read
+                                v         v
+ value != END_TSO_QUEUE  ┌─────────┐    ┌─────────┐  value == END_TSO_QUEUE
+ head  == END_TSO_QUEUE  │   full  │    │ reading │  head  == queue with single reader
+ tail  == END_TSO_QUEUE  └─────────┘    └─────────┘  tail  == END_TSO_QUEUE
+                                │          │
+                          read  │          │ write
+                                │          │
+                                v          v
+                                ┌──────────┐ value != END_TSO_QUEUE
+                                │   Used   │ head  == END_TSO_QUEUE
+                                └──────────┘ tail  == ioport
+
  *
  * -------------------------------------------------------------------------- */
 
@@ -2051,13 +2069,14 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
 
     LOCK_CLOSURE(ioport, info);
 
-    /* If the MVar is empty, put ourselves on the blocked readers
+    /* If the Port is empty, put ourselves on the blocked readers
      * list and wait until we're woken up.
      */
     if (StgMVar_value(ioport) == stg_END_TSO_QUEUE_closure) {
 
-        // There is already another reader, throw exception.
-        if (StgMVar_head(ioport) != stg_END_TSO_QUEUE_closure) {
+        // There is or was already another reader, throw exception.
+        if (StgMVar_head(ioport) != stg_END_TSO_QUEUE_closure ||
+            StgMVar_tail(ioport) != stg_END_TSO_QUEUE_closure) {
                 unlockClosure(ioport, info);
                 jump stg_raiseIOzh(base_GHCziIOPort_doubleReadException_closure);
         }
@@ -2073,9 +2092,9 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
-        // readIOPorts are pushed to the front of the queue, so
-        // they get handled immediately
-        StgMVarTSOQueue_link(q) = StgMVar_head(ioport);
+        // link = stg_END_TSO_QUEUE_closure since we check that
+        // there is no other reader above.
+        StgMVarTSOQueue_link(q) = stg_END_TSO_QUEUE_closure;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
@@ -2092,10 +2111,11 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
 
     }
 
-    //Upon reading we set tail = ioport.
     //This way we can check of there has been a read already.
+    //Upon reading we set tail to indicate the port is now closed.
     if (StgMVar_tail(ioport) == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(ioport) = ioport;
+        StgMVar_head(ioport) = stg_END_TSO_QUEUE_closure;
     } else {
          //Or another thread has read already: Throw an exception.
         unlockClosure(ioport, info);
@@ -2143,6 +2163,7 @@ loop:
         unlockClosure(ioport, stg_MVAR_DIRTY_info);
         return (1);
     }
+    //Possibly IND added by removeFromMVarBlockedQueue
     if (StgHeader_info(q) == stg_IND_info ||
         StgHeader_info(q) == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
@@ -2151,6 +2172,15 @@ loop:
 
     // There is a readIOPort waiting: wake it up
     tso = StgMVarTSOQueue_tso(q);
+
+    // Assert no read has happened yet.
+    ASSERT(StgMVar_tail(ioport) == stg_END_TSO_QUEUE_closure);
+    // And there is only one reader queued up.
+    ASSERT(StgMVarTSOQueue_link(q) == stg_END_TSO_QUEUE_closure);
+
+    // We perform the read here, so set tail/head accordingly.
+    StgMVar_head(ioport) = stg_END_TSO_QUEUE_closure;
+    StgMVar_tail(ioport) = ioport;
 
     // In contrast to MVars we do not need to move on to the
     // next element in the waiting list here, as there can only ever
