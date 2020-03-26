@@ -27,21 +27,22 @@ import GHC.Types.Unique
 --
 
 -- | Pretty print LLVM data code
-pprLlvmData :: LlvmData -> SDoc
-pprLlvmData (globals, types) =
+pprLlvmData :: LlvmOpts -> LlvmData -> SDoc
+pprLlvmData opts (globals, types) =
     let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
         ppLlvmTys _other         = empty
 
         types'   = vcat $ map ppLlvmTys types
-        globals' = ppLlvmGlobals globals
+        globals' = ppLlvmGlobals opts globals
     in types' $+$ globals'
 
 
 -- | Pretty print LLVM code
 pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
-pprLlvmCmmDecl (CmmData _ lmdata)
-  = return (vcat $ map pprLlvmData lmdata, [])
+pprLlvmCmmDecl (CmmData _ lmdata) = do
+  opts <- getLlvmOpts
+  return (vcat $ map (pprLlvmData opts) lmdata, [])
 
 pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
   = do let lbl = case mb_info of
@@ -55,10 +56,11 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
 
        funDec <- llvmFunSig live lbl link
        dflags <- getDynFlags
+       opts <- getLlvmOpts
        platform <- getPlatform
-       let buildArg = fsLit . showSDoc dflags . ppPlainName
+       let buildArg = fsLit . showSDoc dflags . ppPlainName opts
            funArgs = map buildArg (llvmFunArgs platform live)
-           funSect = llvmFunSection dflags (decName funDec)
+           funSect = llvmFunSection opts (decName funDec)
 
        -- generate the info table
        prefix <- case mb_info of
@@ -92,7 +94,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            i8Ptr)
 
-       return (ppLlvmGlobal alias $+$ ppLlvmFunction platform fun', [])
+       return (ppLlvmGlobal opts alias $+$ ppLlvmFunction opts fun', [])
 
 
 -- | The section we are putting info tables and their entry code into, should

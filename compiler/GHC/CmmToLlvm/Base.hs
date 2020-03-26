@@ -23,7 +23,7 @@ module GHC.CmmToLlvm.Base (
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions, getPlatform,
+        ghcInternalFunctions, getPlatform, getLlvmOpts,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
@@ -148,10 +148,10 @@ llvmInfAlign :: Platform -> LMAlign
 llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
-llvmFunSection :: DynFlags -> LMString -> LMSection
-llvmFunSection dflags lbl
-    | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
-    | otherwise                     = Nothing
+llvmFunSection :: LlvmOpts -> LMString -> LMSection
+llvmFunSection opts lbl
+    | llvmOptsSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise                  = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
@@ -311,6 +311,7 @@ llvmVersionList = NE.toList . llvmVersionNE
 
 data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
+  , envOpts    :: LlvmOpts         -- ^ LLVM backend options
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
   , envMask :: !Char               -- ^ Mask for creating unique values
@@ -343,7 +344,10 @@ instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
 
 getPlatform :: LlvmM Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = llvmOptsPlatform <$> getLlvmOpts
+
+getLlvmOpts :: LlvmM LlvmOpts
+getLlvmOpts = LlvmM $ \env -> return (envOpts env, env)
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
@@ -370,6 +374,7 @@ runLlvm dflags ver out m = do
                       , envUsedVars = []
                       , envAliases = emptyUniqSet
                       , envVersion = ver
+                      , envOpts = initLlvmOpts dflags
                       , envDynFlags = dflags
                       , envOutput = out
                       , envMask = 'n'

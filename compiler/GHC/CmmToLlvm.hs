@@ -92,7 +92,8 @@ llvmCodeGen' dflags cmm_stream
         a <- Stream.consume cmm_stream llvmGroupLlvmGens
 
         -- Declare aliases for forward references
-        renderLlvm . pprLlvmData =<< generateExternDecls
+        opts <- getLlvmOpts
+        renderLlvm . pprLlvmData opts =<< generateExternDecls
 
         -- Postamble
         cmmUsedLlvmGens
@@ -150,7 +151,8 @@ cmmDataLlvmGens statics
        mapM_ regGlobal gs
        gss' <- mapM aliasify $ gs
 
-       renderLlvm $ pprLlvmData (concat gss', concat tss)
+       opts <- getLlvmOpts
+       renderLlvm $ pprLlvmData opts (concat gss', concat tss)
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen ::RawCmmDecl -> LlvmM ()
@@ -194,7 +196,8 @@ cmmMetaLlvmPrelude = do
               -- just a name on its own. Previously `null` was accepted as the
               -- name.
               Nothing -> [ MetaStr name ]
-  renderLlvm $ ppLlvmMetas metas
+  opts <- getLlvmOpts
+  renderLlvm $ ppLlvmMetas opts metas
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
@@ -217,6 +220,7 @@ cmmUsedLlvmGens = do
       sectName  = Just $ fsLit "llvm.metadata"
       lmUsedVar = LMGlobalVar (fsLit "llvm.used") ty Appending sectName Nothing Constant
       lmUsed    = LMGlobal lmUsedVar (Just usedArray)
+  opts <- getLlvmOpts
   if null ivars
      then return ()
-     else renderLlvm $ pprLlvmData ([lmUsed], [])
+     else renderLlvm $ pprLlvmData opts ([lmUsed], [])
