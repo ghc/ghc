@@ -9,6 +9,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
+tested-with:          GHC==8.10.*
 cabal-version:        >= 1.10
 stability:            experimental
 
