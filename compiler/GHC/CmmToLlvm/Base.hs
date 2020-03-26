@@ -21,9 +21,9 @@ module GHC.CmmToLlvm.Base (
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
-        funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
+        funLookup, funInsert, getLlvmVer, getDynFlags,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions, getPlatform,
+        ghcInternalFunctions, getPlatform, getLlvmOpts,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
@@ -114,10 +114,10 @@ widthToLlvmInt :: Width -> LlvmType
 widthToLlvmInt w = LMInt $ widthInBits w
 
 -- | GHC Call Convention for LLVM
-llvmGhcCC :: DynFlags -> LlvmCallConvention
-llvmGhcCC dflags
- | platformUnregisterised (targetPlatform dflags) = CC_Ccc
- | otherwise                                      = CC_Ghc
+llvmGhcCC :: Platform -> LlvmCallConvention
+llvmGhcCC platform
+ | platformUnregisterised platform = CC_Ccc
+ | otherwise                       = CC_Ghc
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
@@ -133,9 +133,8 @@ llvmFunSig' :: LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFuncti
 llvmFunSig' live lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                       | otherwise   = (x, [])
-       dflags <- getDynFlags
        platform <- getPlatform
-       return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
+       return $ LlvmFunctionDecl lbl link (llvmGhcCC platform) LMVoid FixedArgs
                                  (map (toParams . getVarType) (llvmFunArgs platform live))
                                  (llvmFunAlign platform)
 
@@ -148,10 +147,10 @@ llvmInfAlign :: Platform -> LMAlign
 llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
-llvmFunSection :: DynFlags -> LMString -> LMSection
-llvmFunSection dflags lbl
-    | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
-    | otherwise                     = Nothing
+llvmFunSection :: LlvmOpts -> LMString -> LMSection
+llvmFunSection opts lbl
+    | llvmOptsSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise                  = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
@@ -311,6 +310,7 @@ llvmVersionList = NE.toList . llvmVersionNE
 
 data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
+  , envOpts    :: LlvmOpts         -- ^ LLVM backend options
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
   , envMask :: !Char               -- ^ Mask for creating unique values
@@ -342,8 +342,13 @@ instance Monad LlvmM where
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
 
+-- | Get target platform
 getPlatform :: LlvmM Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = llvmOptsPlatform <$> getLlvmOpts
+
+-- | Get LLVM options
+getLlvmOpts :: LlvmM LlvmOpts
+getLlvmOpts = LlvmM $ \env -> return (envOpts env, env)
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
@@ -370,6 +375,7 @@ runLlvm dflags ver out m = do
                       , envUsedVars = []
                       , envAliases = emptyUniqSet
                       , envVersion = ver
+                      , envOpts = initLlvmOpts dflags
                       , envDynFlags = dflags
                       , envOutput = out
                       , envMask = 'n'
@@ -425,14 +431,6 @@ getMetaUniqueId = LlvmM $ \env ->
 -- | Get the LLVM version we are generating code for
 getLlvmVer :: LlvmM LlvmVersion
 getLlvmVer = getEnv envVersion
-
--- | Get the platform we are generating code for
-getDynFlag :: (DynFlags -> a) -> LlvmM a
-getDynFlag f = getEnv (f . envDynFlags)
-
--- | Get the platform we are generating code for
-getLlvmPlatform :: LlvmM Platform
-getLlvmPlatform = getDynFlag targetPlatform
 
 -- | Dumps the document if the corresponding flag has been set by the user
 dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
