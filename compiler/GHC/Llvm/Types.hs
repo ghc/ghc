@@ -74,8 +74,8 @@ instance Outputable LlvmType where
   ppr (LMVector nr tp ) = char '<' <> ppr nr <> text " x " <> ppr tp <> char '>'
   ppr (LMLabel        ) = text "label"
   ppr (LMVoid         ) = text "void"
-  ppr (LMStruct tys   ) = text "<{" <> ppCommaJoin tys <> text "}>"
-  ppr (LMStructU tys  ) = text "{" <> ppCommaJoin tys <> text "}"
+  ppr (LMStruct tys   ) = text "<{" <> ppCommaJoin (map ppr tys) <> text "}>"
+  ppr (LMStructU tys  ) = text "{" <> ppCommaJoin (map ppr tys) <> text "}"
   ppr (LMMetadata     ) = text "metadata"
 
   ppr (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
@@ -91,7 +91,7 @@ ppParams varg p
           _otherwise          -> sLit ""
         -- by default we don't print param attributes
         args = map fst p
-    in ppCommaJoin args <> ptext varg'
+    in ppCommaJoin (map ppr args) <> ptext varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
@@ -115,10 +115,10 @@ data LlvmVar
   | LMLitVar LlvmLit
   deriving (Eq)
 
-instance Outputable LlvmVar where
-  ppr (LMLitVar x)  = ppr x
-  ppr (x         )  = ppr (getVarType x) <+> ppName x
-
+ppVar :: LlvmOpts -> LlvmVar -> SDoc
+ppVar opts = \case
+  LMLitVar x -> ppTypeLit opts x
+  x          -> ppr (getVarType x) <+> ppName opts x
 
 -- | Llvm Literal Data.
 --
@@ -136,10 +136,10 @@ data LlvmLit
   | LMUndefLit LlvmType
   deriving (Eq)
 
-instance Outputable LlvmLit where
-  ppr l@(LMVectorLit {}) = ppLit l
-  ppr l                  = ppr (getLitType l) <+> ppLit l
-
+ppTypeLit :: LlvmOpts -> LlvmLit -> SDoc
+ppTypeLit opts l = case l of
+  LMVectorLit {} -> ppLit opts l
+  _              -> ppr (getLitType l) <+> ppLit opts l
 
 -- | Llvm Static Data.
 --
@@ -162,77 +162,92 @@ data LlvmStatic
   | LMAdd LlvmStatic LlvmStatic        -- ^ Constant addition operation
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
 
-instance Outputable LlvmStatic where
-  ppr (LMComment       s) = text "; " <> ftext s
-  ppr (LMStaticLit   l  ) = ppr l
-  ppr (LMUninitType    t) = ppr t <> text " undef"
-  ppr (LMStaticStr   s t) = ppr t <> text " c\"" <> ftext s <> text "\\00\""
-  ppr (LMStaticArray d t) = ppr t <> text " [" <> ppCommaJoin d <> char ']'
-  ppr (LMStaticStruc d t) = ppr t <> text "<{" <> ppCommaJoin d <> text "}>"
-  ppr (LMStaticPointer v) = ppr v
-  ppr (LMTrunc v t)
-      = ppr t <> text " trunc (" <> ppr v <> text " to " <> ppr t <> char ')'
-  ppr (LMBitc v t)
-      = ppr t <> text " bitcast (" <> ppr v <> text " to " <> ppr t <> char ')'
-  ppr (LMPtoI v t)
-      = ppr t <> text " ptrtoint (" <> ppr v <> text " to " <> ppr t <> char ')'
-
-  ppr (LMAdd s1 s2)
-      = pprStaticArith s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
-  ppr (LMSub s1 s2)
-      = pprStaticArith s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
+ppStatic :: LlvmOpts -> LlvmStatic -> SDoc
+ppStatic opts = \case
+  LMComment       s -> text "; " <> ftext s
+  LMStaticLit   l   -> ppTypeLit opts l
+  LMUninitType    t -> ppr t <> text " undef"
+  LMStaticStr   s t -> ppr t <> text " c\"" <> ftext s <> text "\\00\""
+  LMStaticArray d t -> ppr t <> text " [" <> ppCommaJoin (map (ppStatic opts) d) <> char ']'
+  LMStaticStruc d t -> ppr t <> text "<{" <> ppCommaJoin (map (ppStatic opts) d) <> text "}>"
+  LMStaticPointer v -> ppVar opts v
+  LMTrunc v t       -> ppr t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMBitc v t        -> ppr t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMPtoI v t        -> ppr t <> text " ptrtoint (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMAdd s1 s2       -> pprStaticArith opts s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
+  LMSub s1 s2       -> pprStaticArith opts s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
 
 
-pprSpecialStatic :: LlvmStatic -> SDoc
-pprSpecialStatic (LMBitc v t) =
-    ppr (pLower t) <> text ", bitcast (" <> ppr v <> text " to " <> ppr t
-        <> char ')'
-pprSpecialStatic v@(LMStaticPointer x) = ppr (pLower $ getVarType x) <> comma <+> ppr v
-pprSpecialStatic stat = ppr stat
+pprSpecialStatic :: LlvmOpts -> LlvmStatic -> SDoc
+pprSpecialStatic opts stat = case stat of
+   LMBitc v t        -> ppr (pLower t)
+                        <> text ", bitcast ("
+                        <> ppStatic opts v <> text " to " <> ppr t
+                        <> char ')'
+   LMStaticPointer x -> ppr (pLower $ getVarType x)
+                        <> comma <+> ppStatic opts stat
+   _                 -> ppStatic opts stat
 
 
-pprStaticArith :: LlvmStatic -> LlvmStatic -> PtrString -> PtrString
+pprStaticArith :: LlvmOpts -> LlvmStatic -> LlvmStatic -> PtrString -> PtrString
                   -> String -> SDoc
-pprStaticArith s1 s2 int_op float_op op_name =
+pprStaticArith opts s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
       op  = if isFloat ty1 then float_op else int_op
   in if ty1 == getStatType s2
-     then ppr ty1 <+> ptext op <+> lparen <> ppr s1 <> comma <> ppr s2 <> rparen
+     then ppr ty1 <+> ptext op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
      else pprPanic "pprStaticArith" $
-            text op_name <> text " with different types! s1: " <> ppr s1
-                         <> text", s2: " <> ppr s2
+            text op_name <> text " with different types! s1: " <> ppStatic opts s1
+                         <> text", s2: " <> ppStatic opts s2
 
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
 --
 
+-- | LLVM code generator options
+data LlvmOpts = LlvmOpts
+   { llvmOptsPlatform             :: !Platform -- ^ Target platform
+   , llvmOptsFillUndefWithGarbage :: !Bool     -- ^ Fill undefined literals with garbage values
+   , llvmOptsSplitSections        :: !Bool     -- ^ Split sections
+   }
+
+-- | Get LlvmOptions from DynFlags
+initLlvmOpts :: DynFlags -> LlvmOpts
+initLlvmOpts dflags = LlvmOpts
+   { llvmOptsPlatform             = targetPlatform dflags
+   , llvmOptsFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
+   , llvmOptsSplitSections        = gopt Opt_SplitSections dflags
+   }
+
 -- | Return the variable name or value of the 'LlvmVar'
 -- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
-ppName :: LlvmVar -> SDoc
-ppName v@(LMGlobalVar {}) = char '@' <> ppPlainName v
-ppName v@(LMLocalVar  {}) = char '%' <> ppPlainName v
-ppName v@(LMNLocalVar {}) = char '%' <> ppPlainName v
-ppName v@(LMLitVar    {}) =             ppPlainName v
+ppName :: LlvmOpts -> LlvmVar -> SDoc
+ppName opts v = case v of
+   LMGlobalVar {} -> char '@' <> ppPlainName opts v
+   LMLocalVar  {} -> char '%' <> ppPlainName opts v
+   LMNLocalVar {} -> char '%' <> ppPlainName opts v
+   LMLitVar    {} ->             ppPlainName opts v
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
-ppPlainName :: LlvmVar -> SDoc
-ppPlainName (LMGlobalVar x _ _ _ _ _) = ftext x
-ppPlainName (LMLocalVar  x LMLabel  ) = text (show x)
-ppPlainName (LMLocalVar  x _        ) = text ('l' : show x)
-ppPlainName (LMNLocalVar x _        ) = ftext x
-ppPlainName (LMLitVar    x          ) = ppLit x
+ppPlainName :: LlvmOpts -> LlvmVar -> SDoc
+ppPlainName opts = \case
+   (LMGlobalVar x _ _ _ _ _) -> ftext x
+   (LMLocalVar  x LMLabel  ) -> text (show x)
+   (LMLocalVar  x _        ) -> text ('l' : show x)
+   (LMNLocalVar x _        ) -> ftext x
+   (LMLitVar    x          ) -> ppLit opts x
 
 -- | Print a literal value. No type.
-ppLit :: LlvmLit -> SDoc
-ppLit l = sdocWithDynFlags $ \dflags -> case l of
+ppLit :: LlvmOpts -> LlvmLit -> SDoc
+ppLit opts l = case l of
    (LMIntLit i (LMInt 32))  -> ppr (fromInteger i :: Int32)
    (LMIntLit i (LMInt 64))  -> ppr (fromInteger i :: Int64)
    (LMIntLit   i _       )  -> ppr ((fromInteger i)::Int)
-   (LMFloatLit r LMFloat )  -> ppFloat (targetPlatform dflags) $ narrowFp r
-   (LMFloatLit r LMDouble)  -> ppDouble (targetPlatform dflags) r
-   f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppr f)
-   (LMVectorLit ls  )       -> char '<' <+> ppCommaJoin ls <+> char '>'
+   (LMFloatLit r LMFloat )  -> ppFloat (llvmOptsPlatform opts) $ narrowFp r
+   (LMFloatLit r LMDouble)  -> ppDouble (llvmOptsPlatform opts) r
+   f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppTypeLit opts f)
+   (LMVectorLit ls  )       -> char '<' <+> ppCommaJoin (map (ppTypeLit opts) ls) <+> char '>'
    (LMNullLit _     )       -> text "null"
    -- #11487 was an issue where we passed undef for some arguments
    -- that were actually live. By chance the registers holding those
@@ -242,8 +257,8 @@ ppLit l = sdocWithDynFlags $ \dflags -> case l of
    -- common types) with values that are likely to cause a crash or test
    -- failure.
    (LMUndefLit t    )
-      | gopt Opt_LlvmFillUndefWithGarbage dflags
-      , Just lit <- garbageLit t   -> ppLit lit
+      | llvmOptsFillUndefWithGarbage opts
+      , Just lit <- garbageLit t   -> ppLit opts lit
       | otherwise                  -> text "undef"
 
 garbageLit :: LlvmType -> Maybe LlvmLit
@@ -884,8 +899,8 @@ ppFloat platform = ppDouble platform . widenFp
 -- * Misc functions
 --------------------------------------------------------------------------------
 
-ppCommaJoin :: (Outputable a) => [a] -> SDoc
-ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
+ppCommaJoin :: [SDoc] -> SDoc
+ppCommaJoin strs = hsep $ punctuate comma strs
 
 ppSpaceJoin :: (Outputable a) => [a] -> SDoc
 ppSpaceJoin strs = hsep (map ppr strs)
