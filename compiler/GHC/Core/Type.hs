@@ -379,7 +379,9 @@ coreView :: Type -> Maybe Type
 -- joined onto the case analysis that the caller is already doing
 coreView ty@(TyConApp tc tys)
   | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+  = Just $ case tenv of
+            [] -> mkAppTys rhs tys'
+            _  -> mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
     -- This equation is exactly like tcView
 
   -- At the Core level, Constraint = Type
