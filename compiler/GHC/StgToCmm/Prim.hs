@@ -344,10 +344,6 @@ emitPrimOp dflags = \case
   GetSizeofMutableByteArrayOp -> \[arg] -> opAllDone $ \[res] -> do
     emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
-
-  WithOp -> \args ->
-    pprPanic "WithOp" (ppr args)
-
 --  #define touchzh(o)                  /* nothing */
   TouchOp -> \args@[_] -> opAllDone $ \res@[] -> do
     emitPrimCall res MO_Touch args

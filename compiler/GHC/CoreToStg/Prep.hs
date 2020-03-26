@@ -24,7 +24,7 @@ import GHC.Core.Op.OccurAnal
 import GHC.Driver.Types
 import PrelNames
 import MkId             ( realWorldPrimId, mkPrimOpId )
-import PrimOp           ( PrimOp(TouchOp, WithOp) )
+import PrimOp           ( PrimOp(TouchOp) )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
@@ -861,7 +861,7 @@ cpeApp top_env expr
     cpe_app env (Var f) [CpeApp (Type argRep), CpeApp (Type argTy),
                          CpeApp (Type resultRep), CpeApp (Type resultTy),
                          CpeApp x, CpeApp k, CpeApp s0] _depth
-        | Just WithOp <- isPrimOpId_maybe f
+        | f `hasKey` withKey
         = do { let voidRepTy = primRepToRuntimeRep VoidRep
              ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
                                          [voidRepTy, resultRep, realWorldStatePrimTy, resultTy]
@@ -877,13 +877,17 @@ cpeApp top_env expr
                      (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
 
                    expr = Case (App k s0) b0 (varType b0) [stateResultAlt s1 y rhs1]
-                   rhs1 = Case (mkApps (Var touchId) [Type argTy, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
-                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
+                   rhs1 =
+                     let scrut = mkApps (Var touchId) [Type argRep, Type argTy, x, Var s1]
+                     in Case scrut s2 (mkTupleTy Unboxed [realWorldStatePrimTy, resultTy]) [(DEFAULT, [], rhs2)]
+
+                   -- (# s2, y #)
+                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Type voidRepTy, Type resultRep, Type realWorldStatePrimTy, Type resultTy, Var s2, Var y]
              ; cpeBody env expr
              }
 
-    cpe_app env (Var f) args n
-        | Just WithOp <- isPrimOpId_maybe f
+    cpe_app _env (Var f) args n
+        | f `hasKey` withKey
         = pprPanic "cpe_app" (ppr f $$ ppr args $$ ppr n)
 
     cpe_app env (Var v) args depth

@@ -30,7 +30,6 @@ import GHC.Prim
 import GHC.Types
 import GHC.Word (Word8)
 
-import GHC.Magic (with#)
 import GHC.Ptr (Ptr(..), plusPtr)
 
 import Control.Concurrent

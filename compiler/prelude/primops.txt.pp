@@ -3025,12 +3025,6 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-primop WithOp "with#" GenPrimOp
-   o -> (State# RealWorld -> (# State# RealWorld, p #)) -> State# RealWorld -> (# State# RealWorld, p #)
-   { TODO. }
-   with
-   code_size = { 0 }
-
 primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
    with
@@ -3399,6 +3393,10 @@ pseudoop "proxy#"
    Proxy# a
    { Witness for an unboxed {\tt Proxy#} value, which has no runtime
    representation. }
+
+pseudoop "with#"
+   o -> (State# RealWorld -> (# State# RealWorld, p #)) -> State# RealWorld -> (# State# RealWorld, p #)
+   { TODO. }
 
 pseudoop   "seq"
    a -> b -> b
