@@ -178,7 +178,7 @@ barrier = do
 --   exceptions (where no code will be emitted instead).
 barrierUnless :: [Arch] -> LlvmM StmtData
 barrierUnless exs = do
-    platform <- getLlvmPlatform
+    platform <- getPlatform
     if platformArch platform `elem` exs
         then return (nilOL, [])
         else barrier
@@ -415,7 +415,7 @@ genCall target res args = do
                         ++ " 0 or 1, given " ++ show (length t) ++ "."
 
     -- extract Cmm call convention, and translate to LLVM call convention
-    platform <- lift $ getLlvmPlatform
+    platform <- lift $ getPlatform
     let lmconv = case target of
             ForeignTarget _ (ForeignConvention conv _ _ _) ->
               case conv of
@@ -993,6 +993,7 @@ genStore_slow addr val meta = do
     let stmts = stmts1 `appOL` stmts2
     dflags <- getDynFlags
     platform <- getPlatform
+    opts <- getLlvmOpts
     case getVarType vaddr of
         -- sometimes we need to cast an int to a pointer before storing
         LMPointer ty@(LMPointer _) | getVarType vval == llvmWord platform -> do
@@ -1015,7 +1016,7 @@ genStore_slow addr val meta = do
                     (PprCmm.pprExpr platform addr <+> text (
                         "Size of Ptr: " ++ show (llvmPtrBits platform) ++
                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                        ", Var: " ++ showSDoc dflags (ppr vaddr)))
+                        ", Var: " ++ showSDoc dflags (ppVar opts vaddr)))
 
 
 -- | Unconditional branch
@@ -1041,7 +1042,8 @@ genCondBranch cond idT idF likely = do
             return (stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
         else do
             dflags <- getDynFlags
-            panic $ "genCondBranch: Cond expr not bool! (" ++ showSDoc dflags (ppr vc) ++ ")"
+            opts <- getLlvmOpts
+            panic $ "genCondBranch: Cond expr not bool! (" ++ showSDoc dflags (ppVar opts vc) ++ ")"
 
 
 -- | Generate call to llvm.expect.x intrinsic. Assigning result to a new var.
@@ -1663,6 +1665,7 @@ genLoad_slow :: Atomic -> CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
 genLoad_slow atomic e ty meta = do
   platform <- getPlatform
   dflags <- getDynFlags
+  opts <- getLlvmOpts
   runExprData $ do
     iptr <- exprToVarW e
     case getVarType iptr of
@@ -1678,7 +1681,7 @@ genLoad_slow atomic e ty meta = do
                         (PprCmm.pprExpr platform e <+> text (
                             "Size of Ptr: " ++ show (llvmPtrBits platform) ++
                             ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                            ", Var: " ++ showSDoc dflags (ppr iptr)))
+                            ", Var: " ++ showSDoc dflags (ppVar opts iptr)))
   where
     loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
                   | otherwise = Load ptr
@@ -1873,7 +1876,7 @@ funEpilogue live = do
         loadUndef r = do
           let ty = (pLower . getVarType $ lmGlobalRegVar platform r)
           return (Just $ LMLitVar $ LMUndefLit ty, nilOL)
-    platform <- getDynFlag targetPlatform
+    platform <- getPlatform
     let allRegs = activeStgRegs platform
     loads <- flip mapM allRegs $ \r -> case () of
       _ | (False, r) `elem` livePadded
