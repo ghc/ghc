@@ -782,7 +782,7 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { let (_, bndr') -- see Note [Zap occ info in rule binders]
                = substBndr env (zapIdOccInfo bndr)
-       ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr d
+       ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr' d
        ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
@@ -813,9 +813,13 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
               , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
-              , bndr' : bs'
+              , if isDeadBinder bndr
+                  then bs' -- see Note [Drop dead args from specialisations]
+                  else bndr' : bs'
               , dx
-              , varToCoreExpr bndr' : spec_args
+              , if isDeadBinder bndr
+                  then spec_args -- see Note [Drop dead args from specialisations]
+                  else varToCoreExpr bndr' : spec_args
               )
        }
 
@@ -1638,44 +1642,63 @@ In the rule, d1 and d2 are just wildcards, not used in the RHS.  Note
 additionally that 'x' isn't captured by this rule --- we bind only
 enough etas in order to capture all of the *specialised* arguments.
 
+Note [Drop dead args from specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When specialising a function, it’s possible some of the arguments may
+actually be dead. For example, consider:
+
+    f :: forall a. () -> Show a => a -> String
+    f x y = show y ++ "!"
+
+We might generate the following CallInfo for `f @Int`:
+
+    [SpecType Int, UnspecArg, SpecDict $dShowInt, UnspecArg]
+
+Normally we’d include both the x and y arguments in the
+specialisation, since we’re not specialising on either of them. But
+that’s silly, since x is actually unused! So we might as well drop it
+in the specialisation:
+
+    $sf :: Int -> String
+    $sf y = show y ++ "!"
+
+    {-# RULE "SPEC f @Int" forall x. f @Int x $dShow = $sf #-}
+
+This doesn’t save us much, since the arg would be removed later by
+worker/wrapper, anyway, but it’s easy to do. Note, however, that we
+only drop dead arguments if:
+
+  1. We don’t specialise on them.
+  2. They come before an argument we do specialise on.
+
+Doing the latter would require eta-expanding the RULE, which could
+make it match less often, so it’s not worth it. Doing the former could
+be more useful --- it would stop us from generating pointless
+specialisations --- but it’s more involved to implement and unclear if
+it actually provides much benefit in practice.
+
 Note [Zap occ info in rule binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we generate a specialisation RULE, we need to drop occurrence
 info on the binders. If we don’t, things go wrong when we specialise a
 function like
 
-    f :: () -> Show a => a -> String
+    f :: forall a. () -> Show a => a -> String
     f x y = show y ++ "!"
 
 since we’ll generate a RULE like
 
     RULE "SPEC f @Int" forall x [Occ=Dead].
-      f @Int x $dShow = $sf x
+      f @Int x $dShow = $sf
 
-and Core Lint complains because x appears in expression position even
-though it’s supposed to be unused. (This might seem contrived, but it
-actually happened, albeit with an unused dictionary we opted not to
-specialise on rather than an unused argument.)
+and Core Lint complains, even though x only appears on the LHS (due to
+Note [Drop dead args from specialisations]).
 
-One might wonder why we include these arguments in the specialisation
-at all if they’re unused. It is true that we could do some extra work
-to detect them earlier in the process and drop them completely, but
-it isn’t clear the effort gets us very much:
-
-  * After the specialisation rule fires, worker/wrapper should remove
-    the dead argument anyway.
-
-  * If we do the check for dead binders in specHeader, it’s too late
-    to not actually specialise on them, so we don’t save ourselves
-    from generating junk specialisations. (Plumbing the information to
-    the right places to avoid that is not hard, but still not trivial.)
-
-  * Doing all this still doesn’t even save us from having to zap the
-    rule binders, since the binders still show up in the LHS of the
-    rule, and Core Lint still complains.
-
-So for now we just do the simple thing and leave unnused arguments
-alone, but drop the occurrence info to keep Core Lint happy.
+Why is that a Lint error? Because the arguments on the LHS of a rule
+are syntactically expressions, not patterns, so Lint treats the
+appearance of x as a use rather than a binding. Fortunately, the
+solution is simple: we just make sure to zap the occ info before
+using ids as wildcard binders in a rule.
 
 Note [Account for casts in binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
