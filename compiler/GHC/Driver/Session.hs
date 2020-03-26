@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
 --
@@ -39,6 +40,7 @@ module GHC.Driver.Session (
         lang_set,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
+        shouldBuildCoercions,
         dynamicTooMkDynamicDynFlags,
         dynamicOutputFile,
         DynFlags(..),

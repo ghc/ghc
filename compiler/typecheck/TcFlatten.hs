@@ -28,7 +28,7 @@ import Var
 import VarSet
 import VarEnv
 import Outputable
-import DynFlags
+import GHC.Driver.Session ( HasDynFlags(..) )
 import TcSMonad as TcS
 import BasicTypes( SwapFlag(..) )
 
@@ -1511,7 +1511,7 @@ flatten_exact_fam_app_fully tc tys
                              co' = mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
                              co'_kind = Pair xi' fam_ty
                                -- co' :: (xi |> kind_co) ~role fam_ty
-                             co'' = update_co $ mkZappedCoercion dflags co' co'_kind Nominal fvs
+                             co'' = update_co $ mkZappedCoercion dflags co' co'_kind role fvs
                              --co'' = update_co co'
                        ; return $ Just (xi', co'') }
                Nothing -> pure Nothing }
@@ -1533,9 +1533,10 @@ flatten_exact_fam_app_fully tc tys
                Just (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
+                       ; let role = eqRelRole eq_rel
                        ; let co  = mkSymCo (maybeTcSubCo eq_rel norm_co
                                             `mkTransCo` mkSymCo final_co)
-                             co' = mkZappedCoercion dflags co (Pair xi fam_ty) Nominal fvs
+                             co' = mkZappedCoercion dflags co (Pair xi fam_ty) role fvs
                              --co' = co
                        ; return $ Just (xi, co') }
                Nothing -> pure Nothing }

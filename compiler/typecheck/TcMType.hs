@@ -1383,7 +1383,7 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_co dv (KindCo co)           = go_co dv co
     go_co dv (SubCo co)            = go_co dv co
 
-    go_co dv (HoleCo hole)         = go_cohole dv coholes
+    go_co dv (HoleCo hole)         = go_cohole dv hole
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 
@@ -1412,12 +1412,12 @@ collect_cand_qtvs_co orig_ty bound = go_co
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
 
-    go_cohole :: CandidatesQTvs -> CoHole -> TcM CandidatesQTvs
+    go_cohole :: CandidatesQTvs -> CoercionHole -> TcM CandidatesQTvs
     go_cohole dv cohole
-      = do { m_co <- unpackCoercionHole_maybe hole
+      = do { m_co <- unpackCoercionHole_maybe cohole
            ; case m_co of
                Just co -> go_co dv co
-               Nothing -> go_cv dv (coHoleCoVar hole)
+               Nothing -> go_cv dv (coHoleCoVar cohole)
            }
 
     is_bound tv = tv `elemVarSet` bound

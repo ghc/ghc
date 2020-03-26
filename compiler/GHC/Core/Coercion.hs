@@ -139,10 +139,10 @@ import Var
 import VarEnv
 import VarSet
 import Name hiding ( varName )
-import Util
+import Util hiding ( seqList )
 import BasicTypes
 import Outputable
-import DynFlags         ( DynFlags, shouldBuildCoercions )
+import GHC.Driver.Session ( DynFlags, shouldBuildCoercions )
 import Unique
 import Pair
 import SrcLoc
@@ -1415,6 +1415,7 @@ promoteCoercion co = case co of
     UnivCo (PhantomProv kco) _ _ _    -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _) _ _ _       -> mkKindCo co
+    UnivCo (ZappedProv _) _ _ _       -> mkKindCo co
     UnivCo (TcZappedProv _ _) _ _ _   -> mkKindCo co
 
     SymCo g
