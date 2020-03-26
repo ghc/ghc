@@ -168,7 +168,7 @@ class Eq a => Bits a where
     -- | @x \`complementBit\` i@ is the same as @x \`xor\` bit i@
     complementBit     :: a -> Int -> a
 
-    {-| @x \`testBit\` i@ is the same as @x .&. bit n == 1@
+    {-| @x \`testBit\` i@ is the same as @x .&. bit n /= 0@
 
         In other words it returns True if the bit at offset @n
         is set.
