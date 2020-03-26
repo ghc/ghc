@@ -243,7 +243,7 @@ import GHC.Core.TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
-                                 , liftedTypeKindTyCon, liftedRepDataConTy
+                                 , liftedTypeKindTyCon,
                                  , constraintKind )
 import Name( Name )
 import PrelNames
