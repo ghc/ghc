@@ -1165,11 +1165,11 @@ instance Outputable CLabel where
 
 pprCLabel :: DynFlags -> CLabel -> SDoc
 pprCLabel dflags = \case
-   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
    (AsmTempLabel u)
       | not (platformUnregisterised platform)
-      -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+      -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
    (AsmTempDerivedLabel l suf)
       | useNCG
@@ -1227,8 +1227,8 @@ pprCLabel dflags = \case
 pprCLbl :: DynFlags -> CLabel -> SDoc
 pprCLbl dflags = \case
    (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
-   (SRTLabel u)         -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
-   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore
+   (SRTLabel u)         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore platform
                            <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
                            -- Some bitmaps for tuple constructors have a numeric tag (e.g. '7')
                            -- until that gets resolved we'll just force them to start
@@ -1238,7 +1238,7 @@ pprCLbl dflags = \case
    (CmmLabel _ str CmmData)     -> ftext str
    (CmmLabel _ str CmmPrimCall) -> ftext str
 
-   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
 
    (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
@@ -1286,7 +1286,7 @@ pprCLbl dflags = \case
 
    (ForeignLabel str _ _ _) -> ftext str
 
-   (IdLabel name _cafs flavor) -> internalNamePrefix name <> ppr name <> ppIdFlavor flavor
+   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs
@@ -1297,6 +1297,8 @@ pprCLbl dflags = \case
    (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
    (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
    (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
+  where
+   platform = targetPlatform dflags
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text
@@ -1327,21 +1329,20 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
 
-internalNamePrefix :: Name -> SDoc
-internalNamePrefix name = getPprStyle $ \ sty ->
+internalNamePrefix :: Platform -> Name -> SDoc
+internalNamePrefix platform name = getPprStyle $ \ sty ->
   if asmStyle sty && isRandomGenerated then
-    sdocWithDynFlags $ \dflags ->
-      ptext (asmTempLabelPrefix (targetPlatform dflags))
+      ptext (asmTempLabelPrefix platform)
   else
     empty
   where
     isRandomGenerated = not $ isExternalName name
 
-tempLabelPrefixOrUnderscore :: SDoc
-tempLabelPrefixOrUnderscore = sdocWithDynFlags $ \dflags ->
+tempLabelPrefixOrUnderscore :: Platform -> SDoc
+tempLabelPrefixOrUnderscore platform =
   getPprStyle $ \ sty ->
    if asmStyle sty then
-      ptext (asmTempLabelPrefix (targetPlatform dflags))
+      ptext (asmTempLabelPrefix platform)
    else
       char '_'
 
