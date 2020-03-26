@@ -71,7 +71,7 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
-    platform <- getLlvmPlatform
+    platform <- getPlatform
     let types   = map getStatType static
 
         strucTy = LMStruct types
