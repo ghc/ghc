@@ -1272,7 +1272,7 @@ updateDBCache verbosity db db_stack = do
     let definitelyBrokenPackages =
           nub
             . sort
-            . map (unPackageName . GhcPkg.packageName . fst)
+            . map (unPackageName . GhcPkg.unitPackageName . fst)
             . filter snd
             $ pkgsGhcCacheFormat
     when (definitelyBrokenPackages /= []) $ do
@@ -1306,7 +1306,7 @@ updateDBCache verbosity db db_stack = do
   case packageDbLock db of
     GhcPkg.DbOpenReadWrite lock -> GhcPkg.unlockPackageDb lock
 
-type PackageCacheFormat = GhcPkg.InstalledPackageInfo
+type PackageCacheFormat = GhcPkg.GenericUnitInfo
                             ComponentId
                             PackageIdentifier
                             PackageName
@@ -1353,49 +1353,49 @@ recomputeValidAbiDeps :: [InstalledPackageInfo]
                       -> PackageCacheFormat
                       -> (PackageCacheFormat, Bool)
 recomputeValidAbiDeps db pkg =
-  (pkg { GhcPkg.abiDepends = newAbiDeps }, abiDepsUpdated)
+  (pkg { GhcPkg.unitAbiDepends = newAbiDeps }, abiDepsUpdated)
   where
     newAbiDeps =
-      catMaybes . flip map (GhcPkg.abiDepends pkg) $ \(k, _) ->
+      catMaybes . flip map (GhcPkg.unitAbiDepends pkg) $ \(k, _) ->
         case filter (\d -> installedUnitId d == k) db of
           [x] -> Just (k, unAbiHash (abiHash x))
           _   -> Nothing
     abiDepsUpdated =
-      GhcPkg.abiDepends pkg /= newAbiDeps
+      GhcPkg.unitAbiDepends pkg /= newAbiDeps
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
-    GhcPkg.InstalledPackageInfo {
+    GhcPkg.GenericUnitInfo {
        GhcPkg.unitId             = installedUnitId pkg,
-       GhcPkg.componentId        = installedComponentId pkg,
-       GhcPkg.instantiatedWith   = instantiatedWith pkg,
-       GhcPkg.sourcePackageId    = sourcePackageId pkg,
-       GhcPkg.packageName        = packageName pkg,
-       GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
-       GhcPkg.sourceLibName      =
+       GhcPkg.unitInstanceOf     = installedComponentId pkg,
+       GhcPkg.unitInstantiations = instantiatedWith pkg,
+       GhcPkg.unitPackageId      = sourcePackageId pkg,
+       GhcPkg.unitPackageName    = packageName pkg,
+       GhcPkg.unitPackageVersion = Version.Version (versionNumbers (packageVersion pkg)) [],
+       GhcPkg.unitComponentName  =
          fmap (mkPackageName . unUnqualComponentName) (libraryNameString $ sourceLibName pkg),
-       GhcPkg.depends            = depends pkg,
-       GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
-       GhcPkg.abiHash            = unAbiHash (abiHash pkg),
-       GhcPkg.importDirs         = importDirs pkg,
-       GhcPkg.hsLibraries        = hsLibraries pkg,
-       GhcPkg.extraLibraries     = extraLibraries pkg,
-       GhcPkg.extraGHCiLibraries = extraGHCiLibraries pkg,
-       GhcPkg.libraryDirs        = libraryDirs pkg,
-       GhcPkg.libraryDynDirs     = libraryDynDirs pkg,
-       GhcPkg.frameworks         = frameworks pkg,
-       GhcPkg.frameworkDirs      = frameworkDirs pkg,
-       GhcPkg.ldOptions          = ldOptions pkg,
-       GhcPkg.ccOptions          = ccOptions pkg,
-       GhcPkg.includes           = includes pkg,
-       GhcPkg.includeDirs        = includeDirs pkg,
-       GhcPkg.haddockInterfaces  = haddockInterfaces pkg,
-       GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
-       GhcPkg.exposedModules     = map convertExposed (exposedModules pkg),
-       GhcPkg.hiddenModules      = hiddenModules pkg,
-       GhcPkg.indefinite         = indefinite pkg,
-       GhcPkg.exposed            = exposed pkg,
-       GhcPkg.trusted            = trusted pkg
+       GhcPkg.unitDepends        = depends pkg,
+       GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
+       GhcPkg.unitAbiHash        = unAbiHash (abiHash pkg),
+       GhcPkg.unitImportDirs     = importDirs pkg,
+       GhcPkg.unitLibraries      = hsLibraries pkg,
+       GhcPkg.unitExtDepLibsSys  = extraLibraries pkg,
+       GhcPkg.unitExtDepLibsGhc  = extraGHCiLibraries pkg,
+       GhcPkg.unitLibraryDirs    = libraryDirs pkg,
+       GhcPkg.unitLibraryDynDirs = libraryDynDirs pkg,
+       GhcPkg.unitExtDepFrameworks = frameworks pkg,
+       GhcPkg.unitExtDepFrameworkDirs = frameworkDirs pkg,
+       GhcPkg.unitLinkerOptions  = ldOptions pkg,
+       GhcPkg.unitCcOptions      = ccOptions pkg,
+       GhcPkg.unitIncludes       = includes pkg,
+       GhcPkg.unitIncludeDirs    = includeDirs pkg,
+       GhcPkg.unitHaddockInterfaces = haddockInterfaces pkg,
+       GhcPkg.unitHaddockHTMLs   = haddockHTMLs pkg,
+       GhcPkg.unitExposedModules = map convertExposed (exposedModules pkg),
+       GhcPkg.unitHiddenModules  = hiddenModules pkg,
+       GhcPkg.unitIsIndefinite   = indefinite pkg,
+       GhcPkg.unitIsExposed      = exposed pkg,
+       GhcPkg.unitIsTrusted      = trusted pkg
     }
   where
     convertExposed (ExposedModule n reexport) = (n, reexport)
