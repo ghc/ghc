@@ -2066,8 +2066,8 @@ generatePackageVersionMacros pkgs = concat
   -- Do not add any C-style comments. See #3389.
   [ generateMacros "" pkgname version
   | pkg <- pkgs
-  , let version = packageVersion pkg
-        pkgname = map fixchar (packageNameString pkg)
+  , let version = unitPackageVersion pkg
+        pkgname = map fixchar (unitPackageNameString pkg)
   ]
 
 fixchar :: Char -> Char

@@ -135,7 +135,7 @@ outputC dflags filenm cmm_stream packages
          --
          let rts = getPackageDetails dflags rtsUnitId
 
-         let cc_injects = unlines (map mk_include (includes rts))
+         let cc_injects = unlines (map mk_include (unitIncludes rts))
              mk_include h_file =
               case h_file of
                  '"':_{-"-} -> "#include "++h_file
@@ -226,7 +226,7 @@ outputForeignStubs dflags mod location stubs
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
                let rts_pkg = getPackageDetails dflags rtsUnitId in
-               concatMap mk_include (includes rts_pkg)
+               concatMap mk_include (unitIncludes rts_pkg)
             mk_include i = "#include \"" ++ i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h

@@ -17,14 +17,14 @@ module GHC.Unit.Info (
 
         -- * The UnitInfo type: information about a unit
         UnitInfo,
-        InstalledPackageInfo(..),
+        GenericUnitInfo(..),
         ComponentId(..),
-        SourcePackageId(..),
+        PackageId(..),
         PackageName(..),
         Version(..),
         defaultUnitInfo,
-        sourcePackageIdString,
-        packageNameString,
+        unitPackageNameString,
+        unitPackageIdString,
         pprUnitInfo,
     ) where
 
@@ -41,12 +41,12 @@ import GHC.Types.Module as Module
 import GHC.Types.Unique
 
 -- -----------------------------------------------------------------------------
--- Our UnitInfo type is the InstalledPackageInfo from ghc-boot,
+-- Our UnitInfo type is the GenericUnitInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
-type UnitInfo = InstalledPackageInfo
+type UnitInfo = GenericUnitInfo
                        ComponentId
-                       SourcePackageId
+                       PackageId
                        PackageName
                        Module.InstalledUnitId
                        Module.UnitId
@@ -57,70 +57,70 @@ type UnitInfo = InstalledPackageInfo
 --       feature, but ghc doesn't currently have convenient support for any
 --       other compact string types, e.g. plain ByteString or Text.
 
-newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
+newtype PackageId   = PackageId    FastString deriving (Eq, Ord)
 newtype PackageName = PackageName
    { unPackageName :: FastString
    }
    deriving (Eq, Ord)
 
-instance BinaryStringRep SourcePackageId where
-  fromStringRep = SourcePackageId . mkFastStringByteString
-  toStringRep (SourcePackageId s) = bytesFS s
+instance BinaryStringRep PackageId where
+  fromStringRep = PackageId . mkFastStringByteString
+  toStringRep (PackageId s) = bytesFS s
 
 instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
   toStringRep (PackageName s) = bytesFS s
 
-instance Uniquable SourcePackageId where
-  getUnique (SourcePackageId n) = getUnique n
+instance Uniquable PackageId where
+  getUnique (PackageId n) = getUnique n
 
 instance Uniquable PackageName where
   getUnique (PackageName n) = getUnique n
 
-instance Outputable SourcePackageId where
-  ppr (SourcePackageId str) = ftext str
+instance Outputable PackageId where
+  ppr (PackageId str) = ftext str
 
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
 defaultUnitInfo :: UnitInfo
-defaultUnitInfo = emptyInstalledPackageInfo
+defaultUnitInfo = emptyGenericUnitInfo
 
-sourcePackageIdString :: UnitInfo -> String
-sourcePackageIdString pkg = unpackFS str
+unitPackageIdString :: UnitInfo -> String
+unitPackageIdString pkg = unpackFS str
   where
-    SourcePackageId str = sourcePackageId pkg
+    PackageId str = unitPackageId pkg
 
-packageNameString :: UnitInfo -> String
-packageNameString pkg = unpackFS str
+unitPackageNameString :: UnitInfo -> String
+unitPackageNameString pkg = unpackFS str
   where
-    PackageName str = packageName pkg
+    PackageName str = unitPackageName pkg
 
 pprUnitInfo :: UnitInfo -> SDoc
-pprUnitInfo InstalledPackageInfo {..} =
+pprUnitInfo GenericUnitInfo {..} =
     vcat [
-      field "name"                 (ppr packageName),
-      field "version"              (text (showVersion packageVersion)),
+      field "name"                 (ppr unitPackageName),
+      field "version"              (text (showVersion unitPackageVersion)),
       field "id"                   (ppr unitId),
-      field "exposed"              (ppr exposed),
-      field "exposed-modules"      (ppr exposedModules),
-      field "hidden-modules"       (fsep (map ppr hiddenModules)),
-      field "trusted"              (ppr trusted),
-      field "import-dirs"          (fsep (map text importDirs)),
-      field "library-dirs"         (fsep (map text libraryDirs)),
-      field "dynamic-library-dirs" (fsep (map text libraryDynDirs)),
-      field "hs-libraries"         (fsep (map text hsLibraries)),
-      field "extra-libraries"      (fsep (map text extraLibraries)),
-      field "extra-ghci-libraries" (fsep (map text extraGHCiLibraries)),
-      field "include-dirs"         (fsep (map text includeDirs)),
-      field "includes"             (fsep (map text includes)),
-      field "depends"              (fsep (map ppr  depends)),
-      field "cc-options"           (fsep (map text ccOptions)),
-      field "ld-options"           (fsep (map text ldOptions)),
-      field "framework-dirs"       (fsep (map text frameworkDirs)),
-      field "frameworks"           (fsep (map text frameworks)),
-      field "haddock-interfaces"   (fsep (map text haddockInterfaces)),
-      field "haddock-html"         (fsep (map text haddockHTMLs))
+      field "exposed"              (ppr unitIsExposed),
+      field "exposed-modules"      (ppr unitExposedModules),
+      field "hidden-modules"       (fsep (map ppr unitHiddenModules)),
+      field "trusted"              (ppr unitIsTrusted),
+      field "import-dirs"          (fsep (map text unitImportDirs)),
+      field "library-dirs"         (fsep (map text unitLibraryDirs)),
+      field "dynamic-library-dirs" (fsep (map text unitLibraryDynDirs)),
+      field "hs-libraries"         (fsep (map text unitLibraries)),
+      field "extra-libraries"      (fsep (map text unitExtDepLibsSys)),
+      field "extra-ghci-libraries" (fsep (map text unitExtDepLibsGhc)),
+      field "include-dirs"         (fsep (map text unitIncludeDirs)),
+      field "includes"             (fsep (map text unitIncludes)),
+      field "depends"              (fsep (map ppr  unitDepends)),
+      field "cc-options"           (fsep (map text unitCcOptions)),
+      field "ld-options"           (fsep (map text unitLinkerOptions)),
+      field "framework-dirs"       (fsep (map text unitExtDepFrameworkDirs)),
+      field "frameworks"           (fsep (map text unitExtDepFrameworks)),
+      field "haddock-interfaces"   (fsep (map text unitHaddockInterfaces)),
+      field "haddock-html"         (fsep (map text unitHaddockHTMLs))
     ]
   where
     field name body = text name <> colon <+> nest 4 body
@@ -142,13 +142,13 @@ installedUnitInfoId = unitId
 
 packageConfigId :: UnitInfo -> UnitId
 packageConfigId p =
-    if indefinite p
-        then newUnitId (componentId p) (instantiatedWith p)
+    if unitIsIndefinite p
+        then newUnitId (unitInstanceOf p) (unitInstantiations p)
         else DefiniteUnitId (DefUnitId (unitId p))
 
 expandedUnitInfoId :: UnitInfo -> UnitId
 expandedUnitInfoId p =
-    newUnitId (componentId p) (instantiatedWith p)
+    newUnitId (unitInstanceOf p) (unitInstantiations p)
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =

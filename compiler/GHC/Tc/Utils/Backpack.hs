@@ -572,7 +572,7 @@ mergeSignatures
                 isFromSignaturePackage =
                     let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
                         pkg = getInstalledPackageDetails pkgstate inst_uid
-                    in null (exposedModules pkg)
+                    in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
             -- except for exports *from the signature itself* (which may

@@ -373,7 +373,7 @@ findPackageModule_ hsc_env mod pkg_conf =
 
      mk_hi_loc = mkHiOnlyModLocation dflags package_hisuf
 
-     import_dirs = importDirs pkg_conf
+     import_dirs = unitImportDirs pkg_conf
       -- we never look for a .hi-boot file in an external package;
       -- .hi-boot files only make sense for the home package.
   in
@@ -725,11 +725,11 @@ cantFindErr cannot_find _ dflags mod_name find_result
      | gopt Opt_BuildingCabalPackage dflags
         = let pkg = expectJust "pkg_hidden" (lookupUnit dflags uid)
            in text "Perhaps you need to add" <+>
-              quotes (ppr (packageName pkg)) <+>
+              quotes (ppr (unitPackageName pkg)) <+>
               text "to the build-depends in your .cabal file."
      | Just pkg <- lookupUnit dflags uid
          = text "You can run" <+>
-           quotes (text ":set -package " <> ppr (packageName pkg)) <+>
+           quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
            text "to expose it." $$
            text "(Note: this unloads all the modules in the current scope.)"
      | otherwise = Outputable.empty
@@ -810,9 +810,9 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
 
     looks_like_srcpkgid :: InstalledUnitId -> SDoc
     looks_like_srcpkgid pk
-     -- Unsafely coerce a unit id FastString into a source package ID
-     -- FastString and see if it means anything.
-     | (pkg:pkgs) <- searchPackageId pkgstate (SourcePackageId (installedUnitIdFS pk))
+     -- Unsafely coerce a unit id (i.e. an installed package component
+     -- identifier) into a PackageId and see if it means anything.
+     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (installedUnitIdFS pk))
      = parens (text "This unit ID looks like the source package ID;" $$
        text "the real unit ID is" <+> quotes (ftext (installedUnitIdFS (unitId pkg))) $$
        (if null pkgs then Outputable.empty

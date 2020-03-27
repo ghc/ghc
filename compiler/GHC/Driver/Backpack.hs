@@ -307,20 +307,20 @@ buildUnit session cid insts lunit = do
         let compat_fs = (case cid of ComponentId fs _ -> fs)
             compat_pn = PackageName compat_fs
 
-        return InstalledPackageInfo {
+        return GenericUnitInfo {
             -- Stub data
-            abiHash = "",
-            sourcePackageId = SourcePackageId compat_fs,
-            packageName = compat_pn,
-            packageVersion = makeVersion [0],
+            unitAbiHash = "",
+            unitPackageId = PackageId compat_fs,
+            unitPackageName = compat_pn,
+            unitPackageVersion = makeVersion [0],
             unitId = toInstalledUnitId (thisPackage dflags),
-            sourceLibName = Nothing,
-            componentId = cid,
-            instantiatedWith = insts,
+            unitComponentName = Nothing,
+            unitInstanceOf = cid,
+            unitInstantiations = insts,
             -- Slight inefficiency here haha
-            exposedModules = map (\(m,n) -> (m,Just n)) mods,
-            hiddenModules = [], -- TODO: doc only
-            depends = case session of
+            unitExposedModules = map (\(m,n) -> (m,Just n)) mods,
+            unitHiddenModules = [], -- TODO: doc only
+            unitDepends = case session of
                         -- Technically, we should state that we depend
                         -- on all the indefinite libraries we used to
                         -- typecheck this.  However, this field isn't
@@ -331,29 +331,29 @@ buildUnit session cid insts lunit = do
                                 $ deps ++ [ moduleUnitId mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
-            abiDepends = [],
-            ldOptions = case session of
-                            TcSession -> []
-                            _ -> obj_files,
-            importDirs = [ hi_dir ],
-            exposed = False,
-            indefinite = case session of
-                            TcSession -> True
-                            _ -> False,
+            unitAbiDepends = [],
+            unitLinkerOptions = case session of
+                                 TcSession -> []
+                                 _ -> obj_files,
+            unitImportDirs = [ hi_dir ],
+            unitIsExposed = False,
+            unitIsIndefinite = case session of
+                                 TcSession -> True
+                                 _ -> False,
             -- nope
-            hsLibraries = [],
-            extraLibraries = [],
-            extraGHCiLibraries = [],
-            libraryDynDirs = [],
-            libraryDirs = [],
-            frameworks = [],
-            frameworkDirs = [],
-            ccOptions = [],
-            includes = [],
-            includeDirs = [],
-            haddockInterfaces = [],
-            haddockHTMLs = [],
-            trusted = False
+            unitLibraries = [],
+            unitExtDepLibsSys = [],
+            unitExtDepLibsGhc = [],
+            unitLibraryDynDirs = [],
+            unitLibraryDirs = [],
+            unitExtDepFrameworks = [],
+            unitExtDepFrameworkDirs = [],
+            unitCcOptions = [],
+            unitIncludes = [],
+            unitIncludeDirs = [],
+            unitHaddockInterfaces = [],
+            unitHaddockHTMLs = [],
+            unitIsTrusted = False
             }
 
 
