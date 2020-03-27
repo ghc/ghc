@@ -238,7 +238,7 @@ data LambdaFormInfo
 -- a small number of standard forms
 
 data StandardFormInfo
-  = NonStandardThunk
+  = NonStandardThunk !Bool
         -- The usual case: not of the standard forms
 
   | SelectorThunk
@@ -249,6 +249,7 @@ data StandardFormInfo
        WordOff          -- 0-origin offset of ak within the "goods" of
                         -- constructor (Recall that the a1,...,an may be laid
                         -- out in the heap in a non-obvious order.)
+       !Bool
 
   | ApThunk
         -- An ApThunk is of form
@@ -257,6 +258,7 @@ data StandardFormInfo
         -- There are a few of these (for 1 <= n <= MAX_SPEC_AP_SIZE) pre-compiled
         -- in the RTS to save space.
         RepArity                -- Arity, n
+        !Bool
 
 
 ------------------------------------------------------
@@ -294,7 +296,7 @@ mkLFThunk thunk_ty top fvs upd_flag
   = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
-            NonStandardThunk
+            (NonStandardThunk (isSingleEntry upd_flag))
             (might_be_a_function thunk_ty)
 
 --------------
@@ -314,15 +316,15 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con = LFCon con
 
 -------------
-mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
-mkSelectorLFInfo id offset updatable
-  = LFThunk NotTopLevel False updatable (SelectorThunk offset)
+mkSelectorLFInfo :: Id -> Int -> UpdateFlag -> LambdaFormInfo
+mkSelectorLFInfo id offset upd_flag
+  = LFThunk NotTopLevel False (isUpdatable upd_flag) (SelectorThunk offset (isSingleEntry upd_flag))
         (might_be_a_function (idType id))
 
 -------------
 mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
-  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
+  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity (isSingleEntry upd_flag))
         (might_be_a_function (idType id))
 
 -------------
@@ -414,8 +416,9 @@ lfClosureType (LFThunk _ _ _ is_sel _)       = thunkClosureType is_sel
 lfClosureType _                              = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
-thunkClosureType (SelectorThunk off) = ThunkSelector off
-thunkClosureType _                   = Thunk
+thunkClosureType (SelectorThunk off se) = ThunkSelector off se
+thunkClosureType (NonStandardThunk se) = Thunk se
+thunkClosureType (ApThunk _ se) = Thunk se
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
@@ -438,7 +441,7 @@ nodeMustPointToIt _ (LFReEntrant top _ _ no_fvs _)
         -- non-inherited (i.e. non-top-level) function.
         -- The isNotTopLevel test above ensures this is ok.
 
-nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
+nodeMustPointToIt dflags (LFThunk top no_fvs updatable (NonStandardThunk _se) _)
   =  not no_fvs            -- Self parameter
   || isNotTopLevel top     -- Note [GC recovery]
   || updatable             -- Need to push update frame
@@ -856,10 +859,10 @@ closureLocalEntryLabel dflags
 mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel id lf_info
   = case lf_info of
-        LFThunk _ _ upd_flag (SelectorThunk offset) _
+        LFThunk _ _ upd_flag (SelectorThunk offset _se) _
                       -> mkSelectorInfoLabel upd_flag offset
 
-        LFThunk _ _ upd_flag (ApThunk arity) _
+        LFThunk _ _ upd_flag (ApThunk arity _se) _
                       -> mkApInfoTableLabel upd_flag arity
 
         LFThunk{}     -> std_mk_lbl name cafs
@@ -883,9 +886,9 @@ mkClosureInfoTableLabel id lf_info
 thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
 -- thunkEntryLabel is a local help function, not exported.  It's used from
 -- getCallMethod.
-thunkEntryLabel dflags _thunk_id _ (ApThunk arity) upd_flag
+thunkEntryLabel dflags _thunk_id _ (ApThunk arity _se) upd_flag
   = enterApLabel dflags upd_flag arity
-thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset) upd_flag
+thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset _se) upd_flag
   = enterSelectorLabel dflags upd_flag offset
 thunkEntryLabel dflags thunk_id c _ _
   = enterIdLabel dflags thunk_id c
