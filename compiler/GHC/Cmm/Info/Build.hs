@@ -631,7 +631,7 @@ getLabelledBlocks (CmmProc top_info _ _ _) =
   [ (BlockLabel blockId, caf_lbl)
   | (blockId, info) <- mapToList (info_tbls top_info)
   , let rep = cit_rep info
-  , not (isStaticRep rep) || not (isThunkRep rep)
+  , not (isStaticRep rep) || not (isUpdatableThunkRep rep)
   , let !caf_lbl = mkCAFLabel (cit_lbl info)
   ]
 
@@ -680,7 +680,7 @@ getCAFs cafEnv decls =
   | CmmProc top_info topLbl _ g <- decls
   , Just info <- [mapLookup (g_entry g) (info_tbls top_info)]
   , let rep = cit_rep info
-  , isStaticRep rep && isThunkRep rep
+  , isStaticRep rep && isUpdatableThunkRep rep
   , Just cafs <- [mapLookup (g_entry g) cafEnv]
   ]
 

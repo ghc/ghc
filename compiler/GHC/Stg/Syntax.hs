@@ -30,7 +30,7 @@ module GHC.Stg.Syntax (
         NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
-        UpdateFlag(..), isUpdatable,
+        UpdateFlag(..), isUpdatable, isSingleEntry,
 
         -- a set of synonyms for the vanilla parameterisation
         StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
@@ -581,6 +581,11 @@ isUpdatable :: UpdateFlag -> Bool
 isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
+
+isSingleEntry :: UpdateFlag -> Bool
+isSingleEntry SingleEntry = True
+isSingleEntry ReEntrant = False
+isSingleEntry Updatable = False
 
 {-
 ************************************************************************

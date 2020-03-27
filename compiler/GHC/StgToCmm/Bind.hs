@@ -287,7 +287,7 @@ mkRhsClosure    dflags bndr _cc
     -- will evaluate to.
     --
     -- srt is discarded; it must be empty
-    let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
+    let lf_info = mkSelectorLFInfo bndr offset_into_int upd_flag
     in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
 ---------- Note [Ap thunks] ------------------
