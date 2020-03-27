@@ -4,12 +4,11 @@ module GHC.Core.Coercion where
 
 import GhcPrelude
 
-import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCon
 
 import BasicTypes ( LeftOrRight )
 import GHC.Core.Coercion.Axiom
-import GHC.Core.TyCo.Rep (CoercionHole)
+import GHC.Core.TyCo.Rep
 import Var
 import VarSet
 import Pair
