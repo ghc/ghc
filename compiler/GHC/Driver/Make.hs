@@ -343,8 +343,8 @@ warnUnusedPackages = do
 
         matchingStr :: String -> UnitInfo -> Bool
         matchingStr str p
-                =  str == sourcePackageIdString p
-                || str == packageNameString p
+                =  str == unitPackageIdString p
+                || str == unitPackageNameString p
 
         matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
