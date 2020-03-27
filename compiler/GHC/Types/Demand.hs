@@ -185,91 +185,6 @@ only used by `raiseIO#` in order to preserve precise exceptions by strictness
 analysis, while not impacting the ability to eliminate dead code.
 See Note [Precise exceptions and strictness analysis].
 
-Note [What are precise exceptions?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An exception is considered to be /precise/ when it is thrown by the 'raiseIO#'
-primop. It follows that all other primops (such as 'raise#' or
-division-by-zero) throw /imprecise/ exceptions. Note that the actual type of
-the exception thrown doesn't have any impact!
-
-GHC undertakes some effort not to apply an optimisation that would mask a
-/precise/ exception with some other source of divergence, such as genuine
-non-termination or an imprecise exception, so that the user can reliably
-intercept the precise exception with a catch handler before and after
-optimisations.
-
-See the paper "A Semantics for Imprecise Exceptions" for more details.
-
-Note [Precise exceptions and strictness analysis]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have to take care to preserve precise exception semantics in strictness
-analysis (#17676). There are two scenarios that need careful hacks.
-
-Scenario 1: Precise exceptions in case scrutinees
--------------------------------------------------
-Consider
-
-     case foo x s of { (# s', r #) -> y }
-
-Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
-(ultimately via the 'raiseIO#' PrimOp), then we must not force 'y' (which may
-fail to terminate or throw an imprecise exception) until we have performed
-@foo x s@.
-
-Hackish solution: spot the exceptional situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated.
-
-To detect this scenario, why we track precise exceptions in the Divergence
-lattice. Specifically, if 'foo' throws an exception, the Divergence in its
-strictness signature will indicate so ('exnDiv' or 'topDiv'), in which case
-'Demand.deferAfterPreciseException' will lub with the strictness analysis
-results of the virtual branch when @dmdAnal'@ysing the @Case@.
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-Here, we want to defer, because @when (...) (exitWith ExitSuccess)@ might throw
-a precise exception.
-
-Note that Dunno is still the top of the lattice, hence we need a new element
-that denotes absence of precise exception, but still allows for convergence.
-That element is ConOrDiv.
-
-Scenario 2: Precise exceptions in case alternatives
----------------------------------------------------
-The motivating example for #13380 is the following:
-    f x y | x>0       = raiseIO blah
-          | y>0       = return 1
-          | otherwise = return 2
-'f' should not be strict in 'y'. If 'f' was inferred to be strict in 'y', WW
-would turn a precise into an imprecise exception in the call site
-@f 1 (error "boom")@. If the user wrote a catch block for the precise exception
-around that call site, it would no longer match.
-
-Contrast this with
-    g x y | x>0       = error "You won't see this"
-          | otherwise = return 2
-'error' throws an imprecise exception, which the compiler is free to mask
-with a different exception or non-termination as it sees fit.
-
-You might think that the solution is to give 'raiseIO#' 'topDiv' instead of
-'botDiv' (which we do for 'error' and other kinds of bottom), so that its
-'Demand.defaultFvDmd' is lazy (cf. Note [Default demand on free variables and arguments]).
-Then the first branch would no longer be strict in 'y'.
-
-But then the simplifier would fail to eliminate a lot of dead code (which
-happens in 'Simplifier.rebuildCall', feeding on the 'arg_stricts' constructed
-in 'SimplUtils.mkArgInfo', which in turn consults 'isDeadEndDiv') when
-'raiseIO#' occurs in a case scrutinee. Hence we need to give it 'exnDiv', which
-was conceived entirely for this reason. The default FV demand of 'exnDiv' is
-lazy (and its default arg dmd is absent), but otherwise (in terms of
-'Demand.isDeadEndDiv') it behaves exactly as 'botDiv', so that dead code
-elimination works as expected.
 -}
 
 -- | Vanilla strictness domain
@@ -1023,13 +938,13 @@ data Divergence
   = Diverges -- ^ Definitely throws an imprecise exception or diverges.
   | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
              --   exception or diverges. Never converges, hence 'isDeadEndDiv'!
-             --   See scenario 2 in Note [Precise exceptions and strictness analysis].
+             --   See scenario 1 in Note [Precise exceptions and strictness analysis].
   | ConOrDiv -- ^ Definitely converges, throws an imprecise exception or
              --   diverges. Never throws a precise exception! Important for
              --   its interaction with 'bothDivergence' and hence analysis of
              --   case expressions and function applications.
-             --   See scenario 1 in Note [Precise exceptions and strictness analysis]
-             --   and Note [Asymmetry of 'both' for DmdType and Divergence].
+             --   See scenario 2 in Note [Precise exceptions and strictness analysis]
+             --   and Note [Asymmetry of 'both*'].
   | Dunno    -- ^ Might diverge, throw any kind of exception or converge.
   deriving( Eq, Show )
 
@@ -1044,7 +959,7 @@ lubDivergence _        _        = Dunno
 -- (See Note [Default demand on free variables and arguments] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
--- See Note [Asymmetry of 'both' for DmdType and Divergence]
+-- See Note [Asymmetry of 'both*']
 -- The result
 --   * may throw a precise exception if /either/ result does
 --   * may converge                  if /both/   results do
@@ -1085,10 +1000,14 @@ for Imprecise Exceptions" for more details.
 
 Note [Precise exceptions and strictness analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-raiseIO# raises a *precise* exception, in contrast to raise# which
-raise an *imprecise* exception.  See Note [Precise vs imprecise exceptions]
-in XXXX.
+We have to take care to preserve precise exception semantics in strictness
+analysis (#17676). There are two scenarios that need careful hacks.
 
+Recall that raiseIO# raises a *precise* exception, in contrast to raise# which
+raises an *imprecise* exception. See Note [Precise vs imprecise exceptions].
+
+Scenario 1: Precise exceptions in case alternatives
+---------------------------------------------------
 Unlike raise# (which returns botDiv), we want raiseIO# to return topDiv.
 Here's why. Consider this example from #13380 (similarly #17676):
     f x y | x>0       = raiseIO Exc
@@ -1097,18 +1016,51 @@ Here's why. Consider this example from #13380 (similarly #17676):
 Is 'f' strict in 'y'? One might be tempted to say yes! But that plays fast and
 loose with the precise exception; after optimisation, (f 42 (error "boom"))
 turns from throwing the precise Exc to throwing the imprecise user error
-"boom". So, the defaultDmd of raiseIO# should be lazy (topDmd), which can be
+"boom". So, the defaultFvDmd of raiseIO# should be lazy (topDmd), which can be
 achieved by giving it divergence topDiv.
+See Note [Default demand on free variables and arguments].
 
 But if it returns topDiv, the simplifier will fail to discard raiseIO#'s
 continuation in
    case raiseIO# x s of { (# s', r #) -> <BIG> }
 which we'd like to optimise to
    raiseIO# x s
-Temporary hack solution: special treatment for raiseIO# in
-Simplifier.Utils.mkArgInfo.
--}
+Hence we came up with 'exnDiv'. The default FV demand of 'exnDiv' is lazy (and
+its default arg dmd is absent), but otherwise (in terms of 'isDeadEndDiv') it
+behaves exactly as 'botDiv', so that dead code elimination works as expected.
 
+Scenario 2: Precise exceptions in case scrutinees
+-------------------------------------------------
+Consider
+
+     case foo x s of { (# s', r #) -> y }
+
+Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
+(ultimately via raiseIO#), then we must not force 'y' (which may fail to
+terminate or throw an imprecise exception) until we have performed @foo x s@.
+
+Hackish solution: spot the exceptional situation and add a virtual branch,
+as if we had
+     case foo x s of
+        (# s, r #) -> y
+        other      -> return ()
+So the 'y' isn't necessarily going to be evaluated.
+(Historic note: This used to be called the "IO hack".)
+
+To detect this scenario, we track precise exceptions in the Divergence lattice.
+Specifically, if 'foo' might throw a precise exception, the Divergence in its
+strictness signature will indicate so ('exnDiv' or 'topDiv'), in which case
+'Demand.deferAfterPreciseException' will lub with the strictness analysis
+results of the virtual branch when @dmdAnal'@ysing the @Case@. Ordinary, pure
+expressions that don't throw an exception will have 'conDiv'.
+
+A more complete example (#148, #1592, testcase strun003) where this shows up is
+     do { let len = <expensive> ;
+        ; when (...) (exitWith ExitSuccess)
+        ; print len }
+Here, we want to defer, because @when (...) (exitWith ExitSuccess)@ might throw
+a precise exception.
+-}
 
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
@@ -1134,7 +1086,7 @@ removeExn div      = div
 
 -- See Notes [Default demand on free variables and arguments]
 -- and [defaultFvDmd vs. defaultArgDmd]
--- and Scenario 2 in [Precise exceptions and strictness analysis]
+-- and Scenario 1 in [Precise exceptions and strictness analysis]
 defaultFvDmd :: Divergence -> Demand
 defaultFvDmd Dunno    = absDmd
 defaultFvDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
@@ -1218,12 +1170,12 @@ turns it into
 Now the Divergence "b" does apply to us, even though "b1 `seq` ()" does not
 diverge, and we do not anything being passed to b.
 
-Note [Asymmetry of 'both' for DmdType and Divergence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'both' for DmdTypes is *asymmetrical*, because there is only one
-result!  For example, given (e1 e2), we get a DmdType dt1 for e1, use
-its arg demand to analyse e2 giving dt2, and then do (dt1 `bothType` dt2).
-Similarly with
+Note [Asymmetry of 'both*']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'both' for DmdTypes is *asymmetrical*, because there can only one
+be one type contributing argument demands!  For example, given (e1 e2), we get
+a DmdType dt1 for e1, use its arg demand to analyse e2 giving dt2, and then do
+(dt1 `bothType` dt2). Similarly with
   case e of { p -> rhs }
 we get dt_scrut from the scrutinee and dt_rhs from the RHS, and then
 compute (dt_rhs `bothType` dt_scrut).
@@ -1233,13 +1185,16 @@ We
  2. take the demand on arguments from the first argument
  3. combine the termination results, as in bothDivergence.
 
+Since we don't use argument demands of the second argument anyway, 'both's
+second argument is just a 'BothDmdType'.
+
 But note that the argument demand types are not guaranteed to be observed in
 left to right order. For example, analysis of a case expression will pass the
 demand type for the alts as the left argument and the type for the scrutinee as
 the right argument. Also, it is not at all clear if there is such an order;
 consider the LetUp case, where the RHS might be forced at any point while
-evaluating the let body. Therefore, it is crucial that 'bothDivergence' behaves
-symmetrically!
+evaluating the let body.
+Therefore, it is crucial that 'bothDivergence' is symmetric!
 -}
 
 -- Equality needed for fixpoints in GHC.Core.Op.DmdAnal
@@ -1265,16 +1220,6 @@ lubDmdType d1 d2
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
 
-{-
-Note [The need for BothDmdArg]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Previously, the right argument to bothDmdType, as well as the return value of
-dmdAnalStar via postProcessDmdType, was a DmdType. But bothDmdType only needs
-to know about the free variables and termination information, but nothing about
-the demand put on arguments, nor cpr information. So we make that explicit by
-only passing the relevant information.
--}
-
 type BothDmdArg = (DmdEnv, Divergence)
 
 mkBothDmdArg :: DmdEnv -> BothDmdArg
@@ -1285,7 +1230,7 @@ toBothDmdArg (DmdType fv _ r) = (fv, r)
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
-    -- See Note [Asymmetry of 'both' for DmdType and Divergence]
+    -- See Note [Asymmetry of 'both']
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
   = DmdType (plusVarEnv_CD bothDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
@@ -1436,7 +1381,7 @@ toCleanDmd (JD { sd = s, ud = u })
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
 -- does to free variables, and whether it terminates.
--- see Note [The need for BothDmdArg]
+-- see Note [Asymmetry of 'both*']
 postProcessDmdType :: DmdShell -> DmdType -> BothDmdArg
 postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
     = (postProcessDmdEnv du fv, postProcessDivergence ss res_ty)
