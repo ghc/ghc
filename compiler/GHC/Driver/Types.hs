@@ -2038,7 +2038,7 @@ mkQualPackage dflags uid
      = False
      | otherwise
      = True
-     where mb_pkgid = fmap sourcePackageId (lookupUnit dflags uid)
+     where mb_pkgid = fmap unitPackageId (lookupUnit dflags uid)
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.
