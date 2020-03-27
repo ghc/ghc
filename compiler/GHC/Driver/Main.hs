@@ -1199,7 +1199,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomePkg dflags m = True
-        | otherwise = trusted $ getPackageDetails dflags (moduleUnitId m)
+        | otherwise = unitIsTrusted $ getPackageDetails dflags (moduleUnitId m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1228,7 +1228,7 @@ checkPkgTrust pkgs = do
     dflags <- getDynFlags
     let errors = S.foldr go [] pkgs
         go pkg acc
-            | trusted $ getInstalledPackageDetails dflags pkg
+            | unitIsTrusted $ getInstalledPackageDetails dflags pkg
             = acc
             | otherwise
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
