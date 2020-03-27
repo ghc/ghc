@@ -119,10 +119,10 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     sig_info (ClassOpSig {}) = (0,0,0,0,1)
     sig_info _               = (0,0,0,0,0)
 
+    import_info :: LImportDecl GhcPs -> (Int, Int, Int, Int, Int, Int, Int)
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
                                  , ideclAs = as, ideclHiding = spec }))
         = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
-    import_info (L _ (XImportDecl nec)) = noExtCon nec
 
     safe_info False = 0
     safe_info True = 1
@@ -149,6 +149,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
         (_, classops, _, _, _) = count_sigs (map unLoc (tcdSigs decl))
     class_info _ = (0,0)
 
+    inst_info :: InstDecl GhcPs -> (Int, Int, Int, Int, Int)
     inst_info (TyFamInstD {}) = (0,0,0,1,0)
     inst_info (DataFamInstD {}) = (0,0,0,0,1)
     inst_info (ClsInstD { cid_inst = ClsInstDecl {cid_binds = inst_meths
@@ -161,8 +162,6 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                    ss, is, length ats, length adts)
       where
         methods = map unLoc $ bagToList inst_meths
-    inst_info (ClsInstD _ (XClsInstDecl nec)) = noExtCon nec
-    inst_info (XInstDecl nec)                 = noExtCon nec
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

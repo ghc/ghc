@@ -109,7 +109,6 @@ tcRuleDecls (HsRules { rds_src = src
         ; return $ HsRules { rds_ext   = noExtField
                            , rds_src   = src
                            , rds_rules = tc_decls } }
-tcRuleDecls (XRuleDecls nec) = noExtCon nec
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
 tcRule (HsRule { rd_ext  = ext
@@ -181,7 +180,6 @@ tcRule (HsRule { rd_ext  = ext
                                          (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
-tcRule (XRuleDecl nec) = noExtCon nec
 
 generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
@@ -239,7 +237,6 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
         ; (tyvars, tmvars) <- tcExtendNameTyVarEnv tvs $
                                    tcRuleTmBndrs rule_bndrs
         ; return (map snd tvs ++ tyvars, id : tmvars) }
-tcRuleTmBndrs (L _ (XRuleBndr nec) : _) = noExtCon nec
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>

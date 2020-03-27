@@ -328,7 +328,7 @@ data LHsQTyVars pass   -- See Note [HsType binders]
            , hsq_explicit :: [LHsTyVarBndr pass]
                 -- Explicit variables, written by the user
     }
-  | XLHsQTyVars (XXLHsQTyVars pass)
+  | XLHsQTyVars !(XXLHsQTyVars pass)
 
 type HsQTvsRn = [Name]  -- Implicit variables
   -- For example, in   data T (a :: k1 -> k2) = ...
@@ -352,7 +352,6 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 isEmptyLHsQTvs :: LHsQTyVars GhcRn -> Bool
 isEmptyLHsQTvs (HsQTvs { hsq_ext = imp, hsq_explicit = exp })
   = null imp && null exp
-isEmptyLHsQTvs _ = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -370,7 +369,7 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
 
          , hsib_body :: thing            -- Main payload (type or list of types)
     }
-  | XHsImplicitBndrs (XXHsImplicitBndrs pass thing)
+  | XHsImplicitBndrs !(XXHsImplicitBndrs pass thing)
 
 type instance XHsIB              GhcPs _ = NoExtField
 type instance XHsIB              GhcRn _ = [Name]
@@ -392,7 +391,7 @@ data HsWildCardBndrs pass thing
                 -- If there is an extra-constraints wildcard,
                 -- it's still there in the hsc_body.
     }
-  | XHsWildCardBndrs (XXHsWildCardBndrs pass thing)
+  | XHsWildCardBndrs !(XXHsWildCardBndrs pass thing)
 
 type instance XHsWC              GhcPs b = NoExtField
 type instance XHsWC              GhcRn b = [Name]
@@ -413,7 +412,6 @@ type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
 
 hsImplicitBody :: HsImplicitBndrs (GhcPass p) thing -> thing
 hsImplicitBody (HsIB { hsib_body = body }) = body
-hsImplicitBody (XHsImplicitBndrs nec) = noExtCon nec
 
 hsSigType :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
 hsSigType = hsImplicitBody
@@ -500,7 +498,7 @@ data HsTyVarBndr pass
         -- For details on above see note [Api annotations] in ApiAnnotation
 
   | XTyVarBndr
-      (XXTyVarBndr pass)
+      !(XXTyVarBndr pass)
 
 type instance XUserTyVar    (GhcPass _) = NoExtField
 type instance XKindedTyVar  (GhcPass _) = NoExtField
@@ -520,7 +518,6 @@ hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 instance NamedThing (HsTyVarBndr GhcRn) where
   getName (UserTyVar _ v) = unLoc v
   getName (KindedTyVar _ v _) = unLoc v
-  getName (XTyVarBndr nec) = noExtCon nec
 
 -- | Haskell Type
 data HsType pass
@@ -872,7 +869,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | XConDeclField (XXConDeclField pass)
+  | XConDeclField !(XXConDeclField pass)
 
 type instance XConDeclField  (GhcPass _) = NoExtField
 type instance XXConDeclField (GhcPass _) = NoExtCon
@@ -880,7 +877,6 @@ type instance XXConDeclField (GhcPass _) = NoExtCon
 instance OutputableBndrId p
        => Outputable (ConDeclField (GhcPass p)) where
   ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
-  ppr (XConDeclField x) = ppr x
 
 -- HsConDetails is used for patterns/expressions *and* for data type
 -- declarations
@@ -944,8 +940,6 @@ hsWcScopedTvs sig_ty
                       , hst_bndrs = tvs }) ->
         vars ++ nwcs ++ hsLTyVarNames tvs
       _                                    -> nwcs
-hsWcScopedTvs (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
-hsWcScopedTvs (XHsWildCardBndrs nec) = noExtCon nec
 
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
@@ -1023,7 +1017,6 @@ Bottom line: nip problems in the bud by matching on ForallInvis from the start.
 hsTyVarName :: HsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
 hsTyVarName (UserTyVar _ (L _ n))     = n
 hsTyVarName (KindedTyVar _ (L _ n) _) = n
-hsTyVarName (XTyVarBndr nec) = noExtCon nec
 
 hsLTyVarName :: LHsTyVarBndr (GhcPass p) -> IdP (GhcPass p)
 hsLTyVarName = hsTyVarName . unLoc
@@ -1040,7 +1033,6 @@ hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
-hsAllLTyVarNames (XLHsQTyVars nec) = noExtCon nec
 
 hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
 hsLTyVarLocName = mapLoc hsTyVarName
@@ -1051,17 +1043,16 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
 hsLTyVarBndrToType = mapLoc cvt
-  where cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
+  where cvt :: HsTyVarBndr (GhcPass p) -> HsType (GhcPass p)
+        cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExtField
                    (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
-        cvt (XTyVarBndr nec) = noExtCon nec
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
 hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
-hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
 
 -- | Get the kind signature of a type, ignoring parentheses:
 --
@@ -1282,7 +1273,6 @@ splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
   = (itkvs ++ hsLTyVarNames tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
-splitLHsInstDeclTy (XHsImplicitBndrs nec) = noExtCon nec
 
 getLHsInstDeclHead :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
 getLHsInstDeclHead inst_ty
@@ -1319,7 +1309,7 @@ data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
                               }
 
   | XFieldOcc
-      (XXFieldOcc pass)
+      !(XXFieldOcc pass)
 deriving instance Eq  (XCFieldOcc (GhcPass p)) => Eq  (FieldOcc (GhcPass p))
 
 type instance XCFieldOcc GhcPs = NoExtField
@@ -1350,7 +1340,7 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)
   | Ambiguous   (XAmbiguous pass)   (Located RdrName)
-  | XAmbiguousFieldOcc (XXAmbiguousFieldOcc pass)
+  | XAmbiguousFieldOcc !(XXAmbiguousFieldOcc pass)
 
 type instance XUnambiguous GhcPs = NoExtField
 type instance XUnambiguous GhcRn = Name
@@ -1375,23 +1365,17 @@ mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
 rdrNameAmbiguousFieldOcc (Unambiguous _ (L _ rdr)) = rdr
 rdrNameAmbiguousFieldOcc (Ambiguous   _ (L _ rdr)) = rdr
-rdrNameAmbiguousFieldOcc (XAmbiguousFieldOcc nec)
-  = noExtCon nec
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
 selectorAmbiguousFieldOcc (Unambiguous sel _) = sel
 selectorAmbiguousFieldOcc (Ambiguous   sel _) = sel
-selectorAmbiguousFieldOcc (XAmbiguousFieldOcc nec)
-  = noExtCon nec
 
 unambiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> FieldOcc GhcTc
 unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
 unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
-unambiguousFieldOcc (XAmbiguousFieldOcc nec) = noExtCon nec
 
 ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
 ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
-ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -1410,23 +1394,19 @@ instance Outputable HsTyLit where
 instance OutputableBndrId p
        => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
-    ppr (XLHsQTyVars x) = ppr x
 
 instance OutputableBndrId p
        => Outputable (HsTyVarBndr (GhcPass p)) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    ppr (XTyVarBndr nec)    = noExtCon nec
 
 instance Outputable thing
        => Outputable (HsImplicitBndrs (GhcPass p) thing) where
     ppr (HsIB { hsib_body = ty }) = ppr ty
-    ppr (XHsImplicitBndrs x) = ppr x
 
 instance Outputable thing
        => Outputable (HsWildCardBndrs (GhcPass p) thing) where
     ppr (HsWC { hswc_body = ty }) = ppr ty
-    ppr (XHsWildCardBndrs x) = ppr x
 
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'

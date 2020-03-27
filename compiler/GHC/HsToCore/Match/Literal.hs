@@ -103,7 +103,6 @@ dsLit l = do
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> mkIntegerExpr i
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
-    XLit nec         -> noExtCon nec
     HsRat _ (FL _ _ val) ty -> do
       num   <- mkIntegerExpr (numerator val)
       denom <- mkIntegerExpr (denominator val)
@@ -125,7 +124,6 @@ dsOverLit (OverLit { ol_val = val, ol_ext = OverLitTc rebindable ty
   case shortCutLit platform val ty of
     Just expr | not rebindable -> dsExpr expr        -- Note [Literal short cut]
     _                          -> dsExpr witness
-dsOverLit (XOverLit nec) = noExtCon nec
 {-
 Note [Literal short cut]
 ~~~~~~~~~~~~~~~~~~~~~~~~
