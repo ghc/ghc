@@ -62,6 +62,7 @@ module GHC.Core.Coercion (
         splitFunCo_maybe,
         splitForAllCo_maybe,
         splitForAllCo_ty_maybe, splitForAllCo_co_maybe,
+        splitUnivCo_maybe,
 
         nthRole, tyConRolesX, tyConRolesRepresentational, setNominalRole_maybe,
 
@@ -477,6 +478,10 @@ splitForAllCo_co_maybe :: Coercion -> Maybe (CoVar, Coercion, Coercion)
 splitForAllCo_co_maybe (ForAllCo cv k_co co)
   | isCoVar cv = Just (cv, k_co, co)
 splitForAllCo_co_maybe _ = Nothing
+
+splitUnivCo_maybe :: Coercion -> Maybe (UnivCoProvenance, Role, Pair Type)
+splitUnivCo_maybe (UnivCo prov r t1 t2) = Just (prov, r, Pair t1 t2)
+splitUnivCo_maybe _ = Nothing
 
 -------------------------------------------------------
 -- and some coercion kind stuff

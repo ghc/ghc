@@ -63,6 +63,7 @@ import Outputable
 import FastString
 import Maybes
 import Bag
+import Pair
 import Util
 import Data.List
 import Data.Ord
@@ -840,6 +841,14 @@ match_co renv subst co1 co2
       Just (arg2, res2)
         -> match_cos renv subst [arg1, res1] [arg2, res2]
       _ -> Nothing
+match_co renv subst co1 co2
+  | Just (prov1, r1, Pair ty1a ty1b) <- splitUnivCo_maybe co1
+  , Just (prov2, r2, Pair ty2a ty2b) <- splitUnivCo_maybe co2
+  = do { guard (r1 == r2)
+         -- TODO: Should we try to match provenance?
+       ; subst' <- match_ty renv subst ty1a ty2a
+       ; match_ty renv subst' ty1b ty2b
+       }
 match_co _ _ _co1 _co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
 #if defined(DEBUG)
