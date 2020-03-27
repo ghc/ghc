@@ -26,7 +26,7 @@ module GHC.Runtime.Heap.Layout (
         smallArrPtrsRep, arrWordsRep,
 
         -- ** Predicates
-        isStaticRep, isConRep, isThunkRep, isFunRep, isStaticNoCafCon,
+        isStaticRep, isConRep, isThunkRep, isUpdatableThunkRep, isFunRep, isStaticNoCafCon,
         isStackRep,
 
         -- ** Size-related things
@@ -187,8 +187,8 @@ type IsStatic = Bool
 data ClosureTypeInfo
   = Constr        ConTagZ ConstrDescription
   | Fun           FunArity ArgDescr
-  | Thunk
-  | ThunkSelector SelectorOffset
+  | Thunk         !Bool -- Single entry?
+  | ThunkSelector SelectorOffset !Bool -- Single entry?
   | BlackHole
   | IndStatic
 
@@ -276,11 +276,18 @@ isConRep (HeapRep _ _ _ Constr{}) = True
 isConRep _                        = False
 
 isThunkRep :: SMRep -> Bool
-isThunkRep (HeapRep _ _ _ Thunk)           = True
+isThunkRep (HeapRep _ _ _ (Thunk _se))     = True
 isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
 isThunkRep (HeapRep _ _ _ BlackHole)       = True
 isThunkRep (HeapRep _ _ _ IndStatic)       = True
 isThunkRep _                               = False
+
+isUpdatableThunkRep :: SMRep -> Bool
+isUpdatableThunkRep (HeapRep _ _ _ (Thunk se)) = not se
+isUpdatableThunkRep (HeapRep _ _ _ (ThunkSelector _ se)) = not se
+isUpdatableThunkRep (HeapRep _ _ _ BlackHole) = True
+isUpdatableThunkRep (HeapRep _ _ _ IndStatic) = True
+isUpdatableThunkRep _ = False
 
 isFunRep :: SMRep -> Bool
 isFunRep (HeapRep _ _ _ Fun{}) = True
@@ -387,7 +394,7 @@ heapClosureSizeW _ _ = panic "SMRep.heapClosureSize"
 
 closureTypeHdrSize :: DynFlags -> ClosureTypeInfo -> WordOff
 closureTypeHdrSize dflags ty = case ty of
-                  Thunk           -> thunkHdrSize dflags
+                  Thunk _se       -> thunkHdrSize dflags
                   ThunkSelector{} -> thunkHdrSize dflags
                   BlackHole       -> thunkHdrSize dflags
                   IndStatic       -> thunkHdrSize dflags
@@ -450,17 +457,17 @@ rtsClosureType rep
       HeapRep False 0 2 Fun{} -> FUN_0_2
       HeapRep False _ _ Fun{} -> FUN
 
-      HeapRep False 1 0 Thunk -> THUNK_1_0
-      HeapRep False 0 1 Thunk -> THUNK_0_1
-      HeapRep False 2 0 Thunk -> THUNK_2_0
-      HeapRep False 1 1 Thunk -> THUNK_1_1
-      HeapRep False 0 2 Thunk -> THUNK_0_2
-      HeapRep False _ _ Thunk -> THUNK
+      HeapRep False 1 0 Thunk{} -> THUNK_1_0
+      HeapRep False 0 1 Thunk{} -> THUNK_0_1
+      HeapRep False 2 0 Thunk{} -> THUNK_2_0
+      HeapRep False 1 1 Thunk{} -> THUNK_1_1
+      HeapRep False 0 2 Thunk{} -> THUNK_0_2
+      HeapRep False _ _ Thunk{} -> THUNK
 
       HeapRep False _ _ ThunkSelector{} ->  THUNK_SELECTOR
 
       HeapRep True _ _ Fun{}      -> FUN_STATIC
-      HeapRep True _ _ Thunk      -> THUNK_STATIC
+      HeapRep True _ _ Thunk{}    -> THUNK_STATIC
       HeapRep False _ _ BlackHole -> BLACKHOLE
       HeapRep False _ _ IndStatic -> IND_STATIC
 
@@ -560,9 +567,9 @@ pprTypeInfo (Fun arity args)
     braces (sep [ text "arity:" <+> ppr arity
                 , ptext (sLit ("fun_type:")) <+> ppr args ])
 
-pprTypeInfo (ThunkSelector offset)
-  = text "ThunkSel" <+> ppr offset
+pprTypeInfo (ThunkSelector offset se)
+  = text "ThunkSel" <+> ppr offset <+> parens (text "single_entry:" <+> ppr se)
 
-pprTypeInfo Thunk     = text "Thunk"
+pprTypeInfo (Thunk se) = text "Thunk" <+> parens (text "single entry:" <+> ppr se)
 pprTypeInfo BlackHole = text "BlackHole"
 pprTypeInfo IndStatic = text "IndStatic"
