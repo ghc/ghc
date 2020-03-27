@@ -1069,6 +1069,16 @@ mkNthCo r n co
                                                             , ppr r ]) )
                                              arg_cos `getNth` n
 
+    go r 0 co@(UnivCo prov _ ty1 ty2)
+      | isForAllTy ty1
+      = ASSERT(isForAllTy ty2)
+        UnivCo prov r (typeKind ty1) (typeKind ty2)
+    go r n co@(UnivCo prov _ ty1 ty2)
+      | (_, ts1) <- splitAppTys ty1
+      , (_, ts2) <- splitAppTys ty2
+      = ASSERT2(ts1 `lengthAtLeast` succ n && ts1 `lengthAtLeast` succ n, ppr n $$ ppr co)
+        UnivCo prov r (ts1 !! n) (ts2 !! n)
+
     go r n co =
       NthCo r n co
 
