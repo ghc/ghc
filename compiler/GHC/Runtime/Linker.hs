@@ -1260,7 +1260,7 @@ linkPackages' hsc_env new_pks pls = do
 
         | Just pkg_cfg <- lookupInstalledPackage pkgstate new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs (depends pkg_cfg)
+               pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
              ; linkPackage hsc_env pkg_cfg
              ; return (new_pkg : pkgs') }
@@ -1275,12 +1275,12 @@ linkPackage hsc_env pkg
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic (hscInterp hsc_env)
-            dirs | is_dyn    = Packages.libraryDynDirs pkg
-                 | otherwise = Packages.libraryDirs pkg
+            dirs | is_dyn    = Packages.unitLibraryDynDirs pkg
+                 | otherwise = Packages.unitLibraryDirs pkg
 
-        let hs_libs   =  Packages.hsLibraries pkg
+        let hs_libs   =  Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as
-            -- compiler/ghci/Linker.hs + rts/Linker.c link the
+            -- GHC.Runtime.Linker + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
@@ -1294,10 +1294,10 @@ linkPackage hsc_env pkg
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
             extra_libs =
-                      (if null (Packages.extraGHCiLibraries pkg)
-                            then Packages.extraLibraries pkg
-                            else Packages.extraGHCiLibraries pkg)
-                      ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
+                      (if null (Packages.unitExtDepLibsGhc pkg)
+                            then Packages.unitExtDepLibsSys pkg
+                            else Packages.unitExtDepLibsGhc pkg)
+                      ++ [ lib | '-':'l':lib <- Packages.unitLinkerOptions pkg ]
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths dflags (platformOS platform)
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
@@ -1322,10 +1322,10 @@ linkPackage hsc_env pkg
         pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
         maybePutStr dflags
-            ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
+            ("Loading package " ++ unitPackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
-        when (packageName pkg `notElem` partOfGHCi) $ do
+        when (unitPackageName pkg `notElem` partOfGHCi) $ do
             loadFrameworks hsc_env platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
@@ -1352,7 +1352,7 @@ linkPackage hsc_env pkg
         if succeeded ok
            then maybePutStrLn dflags "done."
            else let errmsg = "unable to load package `"
-                             ++ sourcePackageIdString pkg ++ "'"
+                             ++ unitPackageIdString pkg ++ "'"
                  in throwGhcExceptionIO (InstallationError errmsg)
 
 {-
@@ -1426,8 +1426,8 @@ loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
 loadFrameworks hsc_env platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
-    fw_dirs    = Packages.frameworkDirs pkg
-    frameworks = Packages.frameworks pkg
+    fw_dirs    = Packages.unitExtDepFrameworkDirs pkg
+    frameworks = Packages.unitExtDepFrameworks pkg
 
     load fw = do  r <- loadFramework hsc_env fw_dirs fw
                   case r of
