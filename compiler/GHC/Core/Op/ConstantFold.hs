@@ -1486,19 +1486,20 @@ match_eq_string _ id_unf _
 match_eq_string _ _ _ _ = Nothing
 
 -----------------------------------------------------------------------
--- Explanation of this rule: If C function strlen() and is applied to
--- an Addr# literal, we can perform constant folding. There are two
--- cases to consider: either the literal has a NUL byte or it doesn't.
--- If the literal has a NUL byte, Data.ByteString.elemIndex calculates
--- the result of strlen(). If the literal does not have an embedded NUL byte,
--- the result of strlen() is still well defined since all Addr# literals
--- are suffixed by NUL when compiling cmm-to-asm in GHC.CmmToAsm.Ppr.pprBytes.
--- In that case, strlen() is just the length of the literal.
+-- Illustration of this rule:
+--
+-- cstringLength# "foobar"# --> 6
+-- cstringLength# "fizz\NULzz"# --> 4
+--
+-- Nota bene: Addr# literals are suffixed by a NUL byte when they are
+-- compiled to read-only data sections. That's why cstringLength# is
+-- well defined on Addr# literals that do not explicitly have an embedded
+-- NUL byte.
 match_cstring_length :: RuleFun
-match_cstring_length _ id_unf _ [lit1]
+match_cstring_length env id_unf _ [lit1]
   | Just (LitString str) <- exprIsLiteral_maybe id_unf lit1
   = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
-     in Just (Lit (LitNumber LitNumInt (fromIntegral len) intPrimTy))
+     in Just (Lit (mkLitInt (roPlatform env) (fromIntegral len)))
 match_cstring_length _ _ _ _ = Nothing
 
 ---------------------------------------------------

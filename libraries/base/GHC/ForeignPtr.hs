@@ -86,16 +86,32 @@ data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
         -- object, because that ensures that whatever the finalizer is
         -- attached to is kept alive.
 
+-- | Functions called when a 'ForeignPtr' is finalized. Note that
+-- C finalizers and Haskell finalizers cannot be mixed.
 data Finalizers
-  = NoFinalizers
+  = NoFinalizer
+    -- ^ No finalizer. If there is no intent to add a finalizer at
+    -- any point in the future, consider 'FinalPtr' or 'PlainPtr' instead
+    -- since these perform fewer allocations.
   | CFinalizers (Weak# ())
+    -- ^ Finalizers are all C functions.
   | HaskellFinalizers [IO ()]
+    -- ^ Finalizers are all Haskell functions.
 
+-- | Finalizers for a 'ForeignPtr' and\/or references to GC-managed
+-- memory that backs a 'ForeignPtr'. Visually:
+--
+-- >                  Managed    Unmanaged
+-- >               +-----------+-----------------+
+-- > Finalizers    | MallocPtr | PlainForeignPtr |
+-- >               +-----------+-----------------+
+-- > No finalizers | PlainPtr  | FinalPtr        |
+-- >               +-----------+-----------------+
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
     -- ^ The pointer refers to memory that was allocated by a foreign
     -- function (typically using @malloc@). The finalizer frequently
-    -- call the C function @free@ or some variant of it.
+    -- calls the C function @free@ or some variant of it.
   | FinalPtr
     -- ^ The pointer must be an @Addr#@ literal. These are never
     -- garbage collected and consequently cannot be finalized.
@@ -118,7 +134,9 @@ data ForeignPtrContents
 -- FinalPtr exists as an optimization for foreign pointers created
 -- from Addr# literals. Most commonly, this happens in the bytestring
 -- library, where the combination of OverloadedStrings and a rewrite
--- rule overloads String literals as ByteString literals. Prior to the
+-- rule overloads String literals as ByteString literals. See the
+-- rule "ByteString packChars/packAddress" in
+-- bytestring:Data.ByteString.Internal. Prior to the
 -- introduction of FinalPtr, bytestring used PlainForeignPtr (in
 -- Data.ByteString.Internal.unsafePackAddress) to handle such literals.
 -- With O2 optimization, the resulting Core from a GHC patched with a
@@ -339,7 +357,7 @@ addForeignPtrFinalizerEnv ::
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
   MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a final pointer"
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
