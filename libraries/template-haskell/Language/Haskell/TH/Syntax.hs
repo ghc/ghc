@@ -1851,6 +1851,7 @@ data Lit = CharL Char
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type 'Addr#'
          | BytesPrimL Bytes     -- ^ Some raw bytes, type 'Addr#':
+         | ByteArrayPrimL Bytes -- ^ Some raw bytes, type 'ByteArray#':
          | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Generic )
 

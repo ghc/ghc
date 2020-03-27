@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -62,6 +63,7 @@ import GHC.Platform.Regs
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils hiding (mkDataLits, mkRODataLits, mkByteStringCLit)
 import GHC.Cmm.Switch
+import GHC.Cmm.Switch.ByteArray
 import GHC.StgToCmm.CgUtils
 
 import ForeignCall
@@ -496,7 +498,8 @@ mk_discrete_switch _ _tag_expr [(_tag,lbl)] Nothing _
 -- SOMETHING MORE COMPLICATED: defer to GHC.Cmm.Switch.Implement
 -- See Note [Cmm Switches, the general plan] in GHC.Cmm.Switch
 mk_discrete_switch signed tag_expr branches mb_deflt range
-  = mkSwitch tag_expr $ mkSwitchTargets signed range mb_deflt (M.fromList branches)
+  = mkIntegralSwitch tag_expr $
+      mkSwitchTargets signed range mb_deflt (M.fromList branches)
 
 divideBranches :: Ord a => [(a,b)] -> ([(a,b)], a, [(a,b)])
 divideBranches branches = (lo_branches, mid, hi_branches)
@@ -513,8 +516,8 @@ emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
                -> [(Literal, CmmAGraphScoped)] -- Tagged branches
                -> CmmAGraphScoped              -- Default branch (always)
                -> FCode ()                     -- Emit the code
-emitCmmLitSwitch _scrut []       deflt = emit $ fst deflt
-emitCmmLitSwitch scrut  branches deflt = do
+emitCmmLitSwitch _scrut [] deflt = emit $ fst deflt
+emitCmmLitSwitch scrut  branches@((lit0,_) : _) deflt = do
     scrut' <- assignTemp' scrut
     join_lbl <- newBlockId
     deflt_lbl <- label_code join_lbl deflt
@@ -525,21 +528,36 @@ emitCmmLitSwitch scrut  branches deflt = do
         rep = typeWidth cmm_ty
 
     -- We find the necessary type information in the literals in the branches
-    let signed = case head branches of
-                    (LitNumber nt _ _, _) -> litNumIsSigned nt
+    let signed = case lit0 of
+                    LitNumber nt _ _ -> litNumIsSigned nt
+                    _ -> False
+
+    -- We find the necessary type information in the literals in the branches
+    let isByteArraySwitch = case lit0 of
+                    LitByteArray{} -> True
                     _ -> False
 
     let range | signed    = (platformMinInt platform, platformMaxInt platform)
               | otherwise = (0, platformMaxWord platform)
 
-    if isFloatType cmm_ty
-    then emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
-    else emit $ mk_discrete_switch
-        signed
-        scrut'
-        [(litValue lit,l) | (lit,l) <- branches_lbls]
-        (Just deflt_lbl)
-        range
+    if | isFloatType cmm_ty ->
+           emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
+       | isByteArraySwitch -> emit $ mkByteArraySwitch
+           scrut' 
+           (ByteArraySwitchTargets
+             deflt_lbl
+             (M.fromList [(litByteArray lit,l) | (lit,l) <- branches_lbls])
+           )
+           -- TODO: We should probably be a little more intelligent
+           -- when handling byte arrays. Notice that in mk_discrete_switch,
+           -- there's a section named SINGLETON BRANCH, NO DEFAULT. Does it
+           -- make sense to do anything like that for byte arrays? Not sure.
+       | otherwise -> emit $ mk_discrete_switch
+           signed
+           scrut'
+           [(litValue lit,l) | (lit,l) <- branches_lbls]
+           (Just deflt_lbl)
+           range
     emitLabel join_lbl
 
 -- | lower bound (inclusive), upper bound (exclusive)

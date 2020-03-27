@@ -15,7 +15,7 @@ literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -829,15 +829,20 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by GHC.Core.Unfold.sizeExpr
-litSize (LitNumber LitNumInteger _ _) = 100   -- Note [Size of literal integers]
-litSize (LitNumber LitNumNatural _ _) = 100
-litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
-        -- If size could be 0 then @f "x"@ might be too small
-        -- [Sept03: make literal strings a bit bigger to avoid fruitless
-        --  duplication of little strings]
-litSize _other = 0    -- Must match size of nullary constructors
-                      -- Key point: if  x |-> 4, then x must inline unconditionally
-                      --            (eg via case binding)
+litSize = \case
+  LitNumber LitNumInteger _ _ -> 100   -- Note [Size of literal integers]
+  LitNumber LitNumNatural _ _ -> 100
+  LitString str -> strSize str
+  LitByteArray str -> strSize str
+  _ -> 0
+  -- Must match size of nullary constructors
+  -- Key point: if  x |-> 4, then x must inline unconditionally
+  --                         (eg via case binding)
+  where
+  strSize str = 10 + 10 * ((BS.length str + 3) `div` 4)
+  -- If size could be 0 then @f "x"@ might be too small
+  -- [Sept03: make literal strings a bit bigger to avoid fruitless
+  --  duplication of little strings]
 
 classOpSize :: DynFlags -> [Id] -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]

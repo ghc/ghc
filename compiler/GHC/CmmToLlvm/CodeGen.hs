@@ -1114,8 +1114,10 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 
 
 -- | Switch branch
-genSwitch :: CmmExpr -> SwitchTargets -> LlvmM StmtData
-genSwitch cond ids = do
+genSwitch :: CmmExpr -> CmmSwitchTargets -> LlvmM StmtData
+genSwitch cond (CmmByteArraySwitchTargets{}) =
+  panic "GHC.CmmToLlvm.CodeGen.genSwitch: write bytearray switch"
+genSwitch cond (CmmIntegralSwitchTargets ids) = do
     (vc, stmts, top) <- exprToVar cond
     let ty = getVarType vc
 

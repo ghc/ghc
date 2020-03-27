@@ -635,6 +635,7 @@ type family XHsChar x
 type family XHsCharPrim x
 type family XHsString x
 type family XHsStringPrim x
+type family XHsByteArrayPrim x
 type family XHsInt x
 type family XHsIntPrim x
 type family XHsWordPrim x

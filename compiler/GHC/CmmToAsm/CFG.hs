@@ -636,7 +636,7 @@ getCfg weights graph =
                 NoInfo cond
 
         (CmmSwitch _e ids) ->
-          let switchTargets = switchTargetsToList ids
+          let switchTargets = cmmSwitchTargetsToList ids
               --Compiler performance hack - for very wide switches don't
               --consider targets for layout.
               adjustedWeight =

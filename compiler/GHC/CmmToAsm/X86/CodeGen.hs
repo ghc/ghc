@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, GADTs, NondecreasingIndentation #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -3248,9 +3249,13 @@ outOfLineCmmOp bid mop res args
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
+genSwitch :: CmmExpr -> CmmSwitchTargets -> NatM InstrBlock
+genSwitch expr = \case
+  CmmIntegralSwitchTargets ts -> genIntegralSwitch expr ts
+  CmmByteArraySwitchTargets{} -> panic "PPC.genSwitch: TODO switch bytearray"
 
-genSwitch expr targets = do
+genIntegralSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
+genIntegralSwitch expr targets = do
   config <- getConfig
   dflags <- getDynFlags
   let platform = ncgPlatform config

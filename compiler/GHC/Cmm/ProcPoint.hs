@@ -309,7 +309,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                     case lastNode block of
                       CmmBranch id          -> add_if_pp id rst
                       CmmCondBranch _ ti fi _ -> add_if_pp ti (add_if_pp fi rst)
-                      CmmSwitch _ ids       -> foldr add_if_pp rst $ switchTargetsToList ids
+                      CmmSwitch _ ids       -> foldr add_if_pp rst $ cmmSwitchTargetsToList ids
                       _                     -> rst
 
                   -- when jumping to a PP that has an info table, if
@@ -399,7 +399,7 @@ replaceBranches env cmmg
     last :: CmmNode O C -> CmmNode O C
     last (CmmBranch id)          = CmmBranch (lookup id)
     last (CmmCondBranch e ti fi l) = CmmCondBranch e (lookup ti) (lookup fi) l
-    last (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets lookup ids)
+    last (CmmSwitch e ids)       = CmmSwitch e (mapCmmSwitchTargets lookup ids)
     last l@(CmmCall {})          = l { cml_cont = Nothing }
             -- NB. remove the continuation of a CmmCall, since this
             -- label will now be in a different CmmProc.  Not only

@@ -452,6 +452,7 @@ assembleI platform i = case i of
     literal (LitDouble r)     = double (fromRational r)
     literal (LitChar c)       = int (ord c)
     literal (LitString bs)    = lit [BCONPtrStr bs]
+    literal (LitByteArray _) = panic "GHC.ByteCode.Asm.literal: TODO LitByteArray, write me"
        -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i _) = case nt of
       LitNumInt     -> int (fromIntegral i)

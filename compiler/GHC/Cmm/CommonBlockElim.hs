@@ -12,6 +12,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch (eqSwitchTargetWith)
+import GHC.Cmm.Switch.ByteArray (eqByteArraySwitchTargetWith)
 import GHC.Cmm.ContFlowOpt
 
 import GHC.Cmm.Dataflow.Block
@@ -262,8 +263,13 @@ eqLastWith eqBid (CmmCondBranch c1 t1 f1 l1) (CmmCondBranch c2 t2 f2 l2) =
   c1 == c2 && l1 == l2 && eqBid t1 t2 && eqBid f1 f2
 eqLastWith eqBid (CmmCall t1 c1 g1 a1 r1 u1) (CmmCall t2 c2 g2 a2 r2 u2) =
   t1 == t2 && eqMaybeWith eqBid c1 c2 && a1 == a2 && r1 == r2 && u1 == u2 && g1 == g2
-eqLastWith eqBid (CmmSwitch e1 ids1) (CmmSwitch e2 ids2) =
-  e1 == e2 && eqSwitchTargetWith eqBid ids1 ids2
+eqLastWith eqBid (CmmSwitch e1 ids1) (CmmSwitch e2 ids2)
+  | CmmIntegralSwitchTargets ts1 <- ids1
+  , CmmIntegralSwitchTargets ts2 <- ids2
+    = e1 == e2 && eqSwitchTargetWith eqBid ts1 ts2
+  | CmmByteArraySwitchTargets ts1 <- ids1
+  , CmmByteArraySwitchTargets ts2 <- ids2
+    = e1 == e2 && eqByteArraySwitchTargetWith eqBid ts1 ts2
 eqLastWith _ _ _ = False
 
 eqMaybeWith :: (a -> b -> Bool) -> Maybe a -> Maybe b -> Bool

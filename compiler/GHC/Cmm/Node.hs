@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -18,6 +19,9 @@ module GHC.Cmm.Node (
      CmmNode(..), CmmFormal, CmmActual, CmmTickish,
      UpdFrameOffset, Convention(..),
      ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
+     CmmSwitchTargets(..),
+     cmmSwitchTargetsToList,
+     mapCmmSwitchTargets,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
@@ -31,6 +35,7 @@ import GhcPrelude hiding (succ)
 import GHC.Platform.Regs
 import GHC.Cmm.Expr
 import GHC.Cmm.Switch
+import GHC.Cmm.Switch.ByteArray
 import GHC.Driver.Session
 import FastString
 import ForeignCall
@@ -106,8 +111,8 @@ data CmmNode e x where
   } -> CmmNode O C
 
   CmmSwitch
-    :: CmmExpr       -- Scrutinee, of some integral type
-    -> SwitchTargets -- Cases. See [Note SwitchTargets]
+    :: CmmExpr       -- Scrutinee, of type that agrees with CmmSwitchType
+    -> CmmSwitchTargets -- Cases. See [Note SwitchTargets]
     -> CmmNode O C
 
   CmmCall :: {                -- A native call or tail call
@@ -164,6 +169,11 @@ data CmmNode e x where
       ret_off :: ByteOff,       -- same as cml_ret_off
       intrbl:: Bool             -- whether or not the call is interruptible
   } -> CmmNode O C
+
+data CmmSwitchTargets
+  = CmmIntegralSwitchTargets SwitchTargets
+  | CmmByteArraySwitchTargets ByteArraySwitchTargets
+  deriving (Eq)
 
 {- Note [Foreign calls]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,7 +253,7 @@ instance NonLocal CmmNode where
 
   successors (CmmBranch l) = [l]
   successors (CmmCondBranch {cml_true=t, cml_false=f}) = [f, t] -- meets layout constraint
-  successors (CmmSwitch _ ids) = switchTargetsToList ids
+  successors (CmmSwitch _ ids) = cmmSwitchTargetsToList ids
   successors (CmmCall {cml_cont=l}) = maybeToList l
   successors (CmmForeignCall {succ=l}) = [l]
 
@@ -475,7 +485,7 @@ mapExp f   (CmmStore addr e)                     = CmmStore (f addr) (f e)
 mapExp f   (CmmUnsafeForeignCall tgt fs as)      = CmmUnsafeForeignCall (mapForeignTarget f tgt) fs (map f as)
 mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi l)             = CmmCondBranch (f e) ti fi l
-mapExp f   (CmmSwitch e ids)                     = CmmSwitch (f e) ids
+mapExp f   (CmmSwitch e ids)                  = CmmSwitch (f e) ids
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
 mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
 
@@ -505,7 +515,7 @@ mapExpM f (CmmAssign r e)           = CmmAssign r `fmap` f e
 mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap` mapListM f [addr, e]
 mapExpM _ (CmmBranch _)             = Nothing
 mapExpM f (CmmCondBranch e ti fi l) = (\x -> CmmCondBranch x ti fi l) `fmap` f e
-mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
+mapExpM f (CmmSwitch e tbl)      = (\x -> CmmSwitch x tbl)      `fmap` f e
 mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
@@ -571,7 +581,7 @@ foldExpDeep f = foldExp (wrapRecExpf f)
 mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
 mapSuccessors f (CmmBranch bid)         = CmmBranch (f bid)
 mapSuccessors f (CmmCondBranch p y n l) = CmmCondBranch p (f y) (f n) l
-mapSuccessors f (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets f ids)
+mapSuccessors f (CmmSwitch e ids)       = CmmSwitch e (mapCmmSwitchTargets f ids)
 mapSuccessors _ n = n
 
 mapCollectSuccessors :: forall a. (Label -> (Label,a)) -> CmmNode O C
@@ -583,10 +593,10 @@ mapCollectSuccessors f (CmmCondBranch p y n l)
         (bidf, accf) = f n
     in  (CmmCondBranch p bidt bidf l, [accf, acct])
 mapCollectSuccessors f (CmmSwitch e ids)
-  = let lbls = switchTargetsToList ids :: [Label]
+  = let lbls = cmmSwitchTargetsToList ids :: [Label]
         lblMap = mapFromList $ zip lbls (map f lbls) :: LabelMap (Label, a)
     in ( CmmSwitch e
-          (mapSwitchTargets
+          (mapCmmSwitchTargets
             (\l -> fst $ mapFindWithDefault (error "impossible") l lblMap) ids)
           , map snd (mapElems lblMap)
         )
@@ -724,3 +734,18 @@ combineTickScopes s1 s2
   | s1 `isTickSubScope` s2 = s1
   | s2 `isTickSubScope` s1 = s2
   | otherwise              = CombinedScope s1 s2
+
+cmmSwitchTargetsToList :: CmmSwitchTargets -> [Label]
+cmmSwitchTargetsToList = \case
+  CmmIntegralSwitchTargets ts -> switchTargetsToList ts
+  CmmByteArraySwitchTargets ts -> byteArraySwitchTargetsToList ts
+
+mapCmmSwitchTargets ::
+     (Label -> Label)
+  -> CmmSwitchTargets
+  -> CmmSwitchTargets
+mapCmmSwitchTargets f = \case
+  CmmIntegralSwitchTargets ts ->
+    CmmIntegralSwitchTargets (mapSwitchTargets f ts)
+  CmmByteArraySwitchTargets ts ->
+    CmmByteArraySwitchTargets (mapByteArraySwitchTargets f ts)

@@ -4,6 +4,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -86,6 +87,7 @@ data PmLitValue
   -- We won't actually see PmLitString in the oracle since we desugar strings to
   -- lists
   | PmLitString FastString
+  | PmLitByteArray FastString
   | PmLitOverInt Int {- How often Negated? -} Integer
   | PmLitOverRat Int {- How often Negated? -} Rational
   | PmLitOverString FastString
@@ -119,6 +121,7 @@ eqPmLit (PmLit t1 v1) (PmLit t2 v2)
     go (PmLitRat r1)        (PmLitRat r2)        = decEquality (r1 == r2)
     go (PmLitChar c1)       (PmLitChar c2)       = decEquality (c1 == c2)
     go (PmLitString s1)     (PmLitString s2)     = decEquality (s1 == s2)
+    go (PmLitByteArray s1)  (PmLitByteArray s2)  = decEquality (s1 == s2)
     go (PmLitOverInt n1 i1) (PmLitOverInt n2 i2)
       | n1 == n2 && i1 == i2                     = Equal
     go (PmLitOverRat n1 r1) (PmLitOverRat n2 r2)
@@ -288,6 +291,7 @@ literalToPmLit ty l = PmLit ty <$> go l
     go (LitFloat r)      = Just (PmLitRat r)
     go (LitDouble r)     = Just (PmLitRat r)
     go (LitString s)     = Just (PmLitString (mkFastStringByteString s))
+    go (LitByteArray s)  = Just (PmLitByteArray (mkFastStringByteString s))
     go (LitNumber _ i _) = Just (PmLitInt i)
     go _                 = Nothing
 
@@ -328,7 +332,10 @@ coreExprAsPmLit e = case collectArgs e of
     , dataConName dc == ratioDataConName
     -- HACK: just assume we have a literal double. This case only occurs for
     --       overloaded lits anyway, so we immediately override type information
-    -> literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
+    -> if | Just ni <- isLitValue_maybe n
+          , Just di <- isLitValue_maybe d
+            -> literalToPmLit (exprType e) (mkLitDouble (ni % di))
+          | otherwise -> panic "coreExprAsPmLit: expected integral vals"
   (Var x, args)
     -- Take care of -XRebindableSyntax. The last argument should be the (only)
     -- integer literal, otherwise we can't really do much about it.
@@ -370,6 +377,7 @@ instance Outputable PmLitValue where
   ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
   ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
+  ppr (PmLitByteArray s)  = pprHsString s -- TODO: probably wrong
   ppr (PmLitOverInt n i)  = minuses n (ppr i)
   ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
   ppr (PmLitOverString s) = pprHsString s

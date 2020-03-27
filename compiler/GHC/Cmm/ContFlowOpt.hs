@@ -299,7 +299,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
             -- If all jump destinations of a switch go to the
             -- same target eliminate the switch.
             | CmmSwitch _expr targets <- shortcut_last
-            , (t:ts) <- switchTargetsToList targets
+            , (t:ts) <- cmmSwitchTargetsToList targets
             , all (== t) ts
             = CmmBranch t
 
@@ -403,7 +403,7 @@ replaceLabels env g
      txnode (CmmCondBranch p t f l) =
        mkCmmCondBranch (exp p) (lookup t) (lookup f) l
      txnode (CmmSwitch e ids) =
-       CmmSwitch (exp e) (mapSwitchTargets lookup ids)
+       CmmSwitch (exp e) (mapCmmSwitchTargets lookup ids)
      txnode (CmmCall t k rg a res r) =
        CmmCall (exp t) (liftM lookup k) rg a res r
      txnode fc@CmmForeignCall{} =
