@@ -1027,6 +1027,7 @@ data Coercion
 
   -- These ones mirror the shape of types
   = -- Refl :: _ -> N
+    -- Refl a :: a ~_N a
     Refl Type  -- See Note [Refl invariant]
           -- Invariant: applications of (Refl T) to a bunch of identity coercions
           --            always show up as Refl.
@@ -1041,6 +1042,7 @@ data Coercion
           -- Use (GRefl Representational ty MRefl), not (SubCo (Refl ty))
 
   -- GRefl :: "e" -> _ -> Maybe N -> e
+  -- GRefl r a (Just r') :: a ~_r' a
   -- See Note [Generalized reflexive coercion]
   | GRefl Role Type MCoercionN  -- See Note [Refl invariant]
           -- Use (Refl ty), not (GRefl Nominal ty MRefl)
@@ -1050,6 +1052,8 @@ data Coercion
   -- Type constructors into Coercions
 
   -- TyConAppCo :: "e" -> _ -> ?? -> e
+  -- TyConAppCo r tc [co1 :: a1 ~_r b1, ..., coN :: aN ~_r bN]
+  --   :: (tc a1 ... aN ~_r tc b1 ... bN)
   -- See Note [TyConAppCo roles]
   | TyConAppCo Role TyCon [Coercion]    -- lift TyConApp
                -- The TyCon is never a synonym;
@@ -1059,13 +1063,20 @@ data Coercion
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
+          -- AppCo (co1 :: a1 ~_r b1) (co2 :: a2 ~_N b2)
+          --   :: (a1 a2) ~_r (b1 b2)
 
   -- See Note [Forall coercions]
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
+         -- ForAllCo v (kco :: k1 ~_N m1) (co :: a ~_r b)
+         --   :: (forall (v :: k1). a) ~_r (forall (v :: m1). b)
 
   | FunCo Role Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
+         -- FunCo r (co1 :: a1 ~_r b1) (co2 :: a2 ~_r b2)
+         --   :: (a1 -> a2) ~_r (b1 -> b2)
+         --
          -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
          -- Because the AnonArgFlag has no impact on Core; it is only
          -- there to guide implicit instantiation of Haskell source
@@ -1073,8 +1084,11 @@ data Coercion
          -- Core-only.
 
   -- These are special
-  | CoVarCo CoVar      -- :: _ -> (N or R)
-                       -- result role depends on the tycon of the variable's type
+  | CoVarCo CoVar
+         -- CoVarCo :: _ -> (N or R)
+         -- CoVarCo (v :: a ~_r b)
+         --   :: a ~_r b
+         -- result role depends on the tycon of the variable's type
 
     -- AxiomInstCo :: e -> _ -> ?? -> e
   | AxiomInstCo (CoAxiom Branched) BranchIndex [Coercion]
@@ -1094,11 +1108,20 @@ data Coercion
   | UnivCo UnivCoProvenance Role Type Type
       -- :: _ -> "e" -> _ -> _ -> e
 
-  | SymCo Coercion             -- :: e -> e
-  | TransCo Coercion Coercion  -- :: e -> e -> e
+  | SymCo Coercion
+         -- SymCo :: e -> e
+         -- SymCo (co :: a ~_r b)
+         --   :: b ~_r a
+
+  | TransCo Coercion Coercion
+         -- TransCo :: e -> e -> e
+         -- TransCo (co1 :: a ~_r b) (co2 :: b ~_r c)
+         --   :: a ~_r c
 
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
     -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
+    -- NthCo r i (co :: (T t_0 ... t_n) ~_r (U u_1 ... u_n)
+    --   :: t_i ~_r u_i
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
     --
@@ -1108,17 +1131,26 @@ data Coercion
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
+    -- LRCo Left (co :: (a1 b1 ~_r a2 b2))
+    --   :: a1 ~_r a2
   | InstCo Coercion CoercionN
     -- :: e -> N -> e
+    -- InstCo (co1 :: forall (a1::k). b1 ~_r forall (a2::k). b2))
+    --        (co2 :: k ~_N k')
+    --   :: b1 (a |-> 1) ~_r b2 (a2 |-> s2)
     -- See Note [InstCo roles]
 
   -- Extract a kind coercion from a (heterogeneous) type coercion
   -- NB: all kind coercions are Nominal
   | KindCo Coercion
      -- :: e -> N
+     -- KindCo (co :: ((a1 :: k1) ~_r (a2 :: k2)))
+     --   :: k1 ~_N k2
 
   | SubCo CoercionN                  -- Turns a ~N into a ~R
     -- :: N -> R
+    -- SubCo (co :: (a ~_N b))
+    --   :: a ~_R b
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
