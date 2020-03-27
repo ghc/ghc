@@ -520,9 +520,9 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisInstalledUnitId   :: InstalledUnitId,
-  thisComponentId_      :: Maybe ComponentId,
-  thisUnitIdInsts_      :: Maybe [(ModuleName, Module)],
+  thisInstalledUnitId   :: InstalledUnitId,              -- ^ Target unit-id
+  thisComponentId_      :: Maybe ComponentId,            -- ^ Unit-id to instantiate
+  thisUnitIdInsts_      :: Maybe [(ModuleName, Module)], -- ^ How to instantiate the unit-id above
 
   -- ways
   ways                  :: Set Way,     -- ^ Way flags from the command line
