@@ -140,7 +140,7 @@ extraObjects context
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.
 libraryObjects :: Context -> Action [FilePath]
-libraryObjects context@Context{..} = do
+libraryObjects context = do
     hsObjs   <- hsObjects    context
     noHsObjs <- nonHsObjects context
     need $ noHsObjs ++ hsObjs
