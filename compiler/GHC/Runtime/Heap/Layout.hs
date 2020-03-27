@@ -19,7 +19,7 @@ module GHC.Runtime.Heap.Layout (
         -- * Closure representation
         SMRep(..), -- CmmInfo sees the rep; no one else does
         IsStatic,
-        ClosureTypeInfo(..), ArgDescr(..), Liveness,
+        ClosureTypeInfo(..), ThunkDetails(..), ArgDescr(..), Liveness,
         ConstrDescription,
 
         -- ** Construction
@@ -27,7 +27,7 @@ module GHC.Runtime.Heap.Layout (
         smallArrPtrsRep, arrWordsRep,
 
         -- ** Predicates
-        isStaticRep, isConRep, isThunkRep, isFunRep, isStaticNoCafCon,
+        isStaticRep, isConRep, isThunkRep, isUpdatableThunkRep, isFunRep, isStaticNoCafCon,
         isStackRep,
 
         -- ** Size-related things
@@ -185,11 +185,16 @@ type IsStatic = Bool
 -- rts/include/rts/storage/ClosureTypes.h. Described by the function
 -- rtsClosureType below.
 
+data ThunkDetails
+  = ThunkSingleEntry
+  | ThunkUpdatable
+  | ThunkSelector !SelectorOffset -- ^ always updatable
+  deriving Eq
+
 data ClosureTypeInfo
   = Constr        ConTagZ ConstrDescription
   | Fun           FunArity ArgDescr
-  | Thunk
-  | ThunkSelector SelectorOffset
+  | Thunk         !ThunkDetails
   | BlackHole
   | IndStatic
   deriving Eq
@@ -255,11 +260,20 @@ isConRep (HeapRep _ _ _ Constr{}) = True
 isConRep _                        = False
 
 isThunkRep :: SMRep -> Bool
-isThunkRep (HeapRep _ _ _ Thunk)           = True
-isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
-isThunkRep (HeapRep _ _ _ BlackHole)       = True
-isThunkRep (HeapRep _ _ _ IndStatic)       = True
-isThunkRep _                               = False
+isThunkRep (HeapRep _ _ _ (Thunk ThunkSingleEntry)) = True
+isThunkRep (HeapRep _ _ _ (Thunk ThunkUpdatable))   = True
+isThunkRep (HeapRep _ _ _ (Thunk ThunkSelector{}))  = True
+isThunkRep (HeapRep _ _ _ BlackHole)                = True
+isThunkRep (HeapRep _ _ _ IndStatic)                = True
+isThunkRep _                                        = False
+
+isUpdatableThunkRep :: SMRep -> Bool
+isUpdatableThunkRep (HeapRep _ _ _ (Thunk ThunkSingleEntry)) = False
+isUpdatableThunkRep (HeapRep _ _ _ (Thunk ThunkUpdatable)) = True
+isUpdatableThunkRep (HeapRep _ _ _ (Thunk (ThunkSelector _))) = True 
+isUpdatableThunkRep (HeapRep _ _ _ BlackHole) = True
+isUpdatableThunkRep (HeapRep _ _ _ IndStatic) = True
+isUpdatableThunkRep _ = False
 
 isFunRep :: SMRep -> Bool
 isFunRep (HeapRep _ _ _ Fun{}) = True
@@ -371,11 +385,12 @@ heapClosureSizeW profile rep = case rep of
 
 closureTypeHdrSize :: Profile -> ClosureTypeInfo -> WordOff
 closureTypeHdrSize profile ty = case ty of
-                  Thunk           -> thunkHdrSize profile
-                  ThunkSelector{} -> thunkHdrSize profile
-                  BlackHole       -> thunkHdrSize profile
-                  IndStatic       -> thunkHdrSize profile
-                  _               -> fixedHdrSizeW profile
+                  Thunk ThunkSingleEntry -> thunkHdrSize profile
+                  Thunk ThunkUpdatable   -> thunkHdrSize profile
+                  Thunk ThunkSelector{}  -> thunkHdrSize profile
+                  BlackHole              -> thunkHdrSize profile
+                  IndStatic              -> thunkHdrSize profile
+                  _                      -> fixedHdrSizeW profile
         -- All thunks use thunkHdrSize, even if they are non-updatable.
         -- this is because we don't have separate closure types for
         -- updatable vs. non-updatable thunks, so the GC can't tell the
@@ -433,17 +448,16 @@ rtsClosureType rep
       HeapRep False 0 2 Fun{} -> FUN_0_2
       HeapRep False _ _ Fun{} -> FUN
 
-      HeapRep False 1 0 Thunk -> THUNK_1_0
-      HeapRep False 0 1 Thunk -> THUNK_0_1
-      HeapRep False 2 0 Thunk -> THUNK_2_0
-      HeapRep False 1 1 Thunk -> THUNK_1_1
-      HeapRep False 0 2 Thunk -> THUNK_0_2
-      HeapRep False _ _ Thunk -> THUNK
-
-      HeapRep False _ _ ThunkSelector{} ->  THUNK_SELECTOR
+      HeapRep False _ _ (Thunk (ThunkSelector _)) ->  THUNK_SELECTOR
+      HeapRep False 1 0 (Thunk _) -> THUNK_1_0
+      HeapRep False 0 1 (Thunk _) -> THUNK_0_1
+      HeapRep False 2 0 (Thunk _) -> THUNK_2_0
+      HeapRep False 1 1 (Thunk _) -> THUNK_1_1
+      HeapRep False 0 2 (Thunk _) -> THUNK_0_2
+      HeapRep False _ _ (Thunk _) -> THUNK
 
       HeapRep True _ _ Fun{}      -> FUN_STATIC
-      HeapRep True _ _ Thunk      -> THUNK_STATIC
+      HeapRep True _ _ Thunk{}    -> THUNK_STATIC
       HeapRep False _ _ BlackHole -> BLACKHOLE
       HeapRep False _ _ IndStatic -> IND_STATIC
 
@@ -541,9 +555,10 @@ pprTypeInfo (Fun arity args)
     braces (sep [ text "arity:"    <+> ppr arity
                 , text "fun_type:" <+> ppr args ])
 
-pprTypeInfo (ThunkSelector offset)
+pprTypeInfo (Thunk (ThunkSelector offset))
   = text "ThunkSel" <+> ppr offset
 
-pprTypeInfo Thunk     = text "Thunk"
+pprTypeInfo (Thunk ThunkSingleEntry) = text "SEThunk"
+pprTypeInfo (Thunk ThunkUpdatable) = text "UpdThunk"
 pprTypeInfo BlackHole = text "BlackHole"
 pprTypeInfo IndStatic = text "IndStatic"

@@ -229,10 +229,13 @@ mkInfoTableContents profile
                                    (halfWordWidth platform))
                     , Nothing, [descr_lit], [decl]) }
 
-    mk_pieces Thunk srt_label
+    mk_pieces (Thunk ThunkSingleEntry) srt_label
       = return (Nothing, Nothing, srt_label, [])
 
-    mk_pieces (ThunkSelector offset) _no_srt
+    mk_pieces (Thunk ThunkUpdatable) srt_label
+      = return (Nothing, Nothing, srt_label, [])
+
+    mk_pieces (Thunk (ThunkSelector offset)) _no_srt
       = return (Just (CmmInt 0 (halfWordWidth platform)),
                 Just (mkWordCLit platform (fromIntegral offset)), [], [])
          -- Layout known (one free var); we use the layout field for offset

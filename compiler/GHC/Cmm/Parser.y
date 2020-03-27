@@ -487,7 +487,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                         let prof = profilingInfo profile $11 $13
                             rep  = mkRTSRep (fromIntegral $9) $
                                      mkHeapRep profile False (fromIntegral $5)
-                                                     (fromIntegral $7) Thunk
+                                                     (fromIntegral $7)  (Thunk ThunkUpdatable)
                                 -- not really Thunk, but that makes the info table
                                 -- we want.
                         return (mkCmmEntryLabel home_unit_id $3,
@@ -544,7 +544,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       liftP $ pure $ do
                         profile <- getProfile
                         let prof = profilingInfo profile $9 $11
-                            ty  = ThunkSelector (fromIntegral $5)
+                            ty   = Thunk (ThunkSelector (fromIntegral $5))
                             rep = mkRTSRep (fromIntegral $7) $
                                      mkHeapRep profile False 0 0 ty
                         return (mkCmmEntryLabel home_unit_id $3,

@@ -256,9 +256,9 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con = LFCon con
 
 -------------
-mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
-mkSelectorLFInfo id offset updatable
-  = LFThunk NotTopLevel False updatable (SelectorThunk offset)
+mkSelectorLFInfo :: Id -> Int -> UpdateFlag -> LambdaFormInfo
+mkSelectorLFInfo id offset upd_flag
+  = LFThunk NotTopLevel False (isUpdatable upd_flag) (SelectorThunk offset)
         (might_be_a_function (idType id))
 
 -------------
@@ -366,12 +366,14 @@ lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
 lfClosureType (LFReEntrant _ arity _ argd) = Fun arity argd
 lfClosureType (LFCon con)                  = Constr (dataConTagZ con)
                                                     (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType (LFThunk _ _ upd is_sel _)   = thunkClosureType upd is_sel
 lfClosureType _                            = panic "lfClosureType"
 
-thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
-thunkClosureType (SelectorThunk off) = ThunkSelector off
-thunkClosureType _                   = Thunk
+thunkClosureType :: Bool -> StandardFormInfo -> ClosureTypeInfo
+thunkClosureType _     (SelectorThunk off) = Thunk (ThunkSelector off)
+thunkClosureType False NonStandardThunk    = Thunk ThunkSingleEntry
+thunkClosureType True  NonStandardThunk    = Thunk ThunkUpdatable
+thunkClosureType _     (ApThunk _)         = Thunk ThunkUpdatable
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
