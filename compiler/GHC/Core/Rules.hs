@@ -842,8 +842,8 @@ match_co renv subst co1 co2
         -> match_cos renv subst [arg1, res1] [arg2, res2]
       _ -> Nothing
 match_co renv subst co1 co2
-  | Just (prov1, r1, Pair ty1a ty1b) <- splitUnivCo_maybe co1
-  , Just (prov2, r2, Pair ty2a ty2b) <- splitUnivCo_maybe co2
+  | Just (_prov1, r1, Pair ty1a ty1b) <- splitUnivCo_maybe co1
+  , Just (_prov2, r2, Pair ty2a ty2b) <- splitUnivCo_maybe co2
   = do { guard (r1 == r2)
          -- TODO: Should we try to match provenance?
        ; subst' <- match_ty renv subst ty1a ty2a
