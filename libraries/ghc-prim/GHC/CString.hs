@@ -95,7 +95,8 @@ unpackCString# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCString# #-}
 unpackCString# addr
     | isTrue# (ch `eqChar#` '\0'#) = []
-    | True                         = C# ch : unpackCString# (addr `plusAddr#` 1#)
+    | True = let !rest = unpackCString# (addr `plusAddr#` 1#)
+              in C# ch : rest
       where
         -- See Note [unpackCString# iterating over addr]
         !ch = indexCharOffAddr# addr 0#
