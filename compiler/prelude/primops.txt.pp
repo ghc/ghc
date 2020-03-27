@@ -2598,6 +2598,7 @@ primop  RaiseOp "raise#" GenPrimOp
    can_fail = True
      -- In contrast to 'raiseIO#', which throws a *precise* exception,
      -- exceptions thrown by 'raise#' are considered *imprecise*.
+     -- See Note [Precise vs imprecise exceptions] in Demand.hs.
      -- Hence 'raise#' is marked as "can_fail" (which 'raiseIO#' is not), but
      -- not as "has_side_effects" (which 'raiseIO#' is).
      -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
