@@ -94,7 +94,7 @@ data HsLocalBindsLR idL idR
       -- ^ Empty Local Bindings
 
   | XHsLocalBindsLR
-        (XXHsLocalBindsLR idL idR)
+        !(XXHsLocalBindsLR idL idR)
 
 type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExtField
@@ -126,7 +126,7 @@ data HsValBindsLR idL idR
     -- After renaming RHS; idR can be Name or Id Dependency analysed,
     -- later bindings in the list may depend on earlier ones.
   | XValBindsLR
-      (XXValBindsLR idL idR)
+      !(XXValBindsLR idL idR)
 
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
@@ -312,7 +312,7 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | XHsBindsLR (XXHsBindsLR idL idR)
+  | XHsBindsLR !(XXHsBindsLR idL idR)
 
 data NPatBindTc = NPatBindTc {
      pat_fvs :: NameSet, -- ^ Free variables
@@ -354,7 +354,7 @@ data ABExport p
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
         }
-   | XABExport (XXABExport p)
+   | XABExport !(XXABExport p)
 
 type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
@@ -377,7 +377,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
      }
-   | XPatSynBind (XXPatSynBind idL idR)
+   | XPatSynBind !(XXPatSynBind idL idR)
 
 type instance XPSB         (GhcPass idL) GhcPs = NoExtField
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
@@ -623,7 +623,6 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
   ppr (HsValBinds _ bs)   = ppr bs
   ppr (HsIPBinds _ bs)    = ppr bs
   ppr (EmptyLocalBinds _) = empty
-  ppr (XHsLocalBindsLR x) = ppr x
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
         => Outputable (HsValBindsLR (GhcPass pl) (GhcPass pr)) where
@@ -750,14 +749,12 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                , text "Binds:" <+> pprLHsBinds val_binds
                , pprIfTc @idR (text "Evidence:" <+> ppr ev_binds)
                ]
-ppr_monobind (XHsBindsLR x) = ppr x
 
 instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
-  ppr (XABExport x) = ppr x
 
 instance (OutputableBndrId l, OutputableBndrId r,
          Outputable (XXPatSynBind (GhcPass l) (GhcPass r)))
@@ -780,7 +777,6 @@ instance (OutputableBndrId l, OutputableBndrId r,
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
                                       (nest 2 $ pprFunBind mg)
-  ppr (XPatSynBind x) = ppr x
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
@@ -807,7 +803,7 @@ data HsIPBinds id
         [LIPBind id]
         -- TcEvBinds       -- Only in typechecker output; binds
         --                 -- uses of the implicit parameters
-  | XHsIPBinds (XXHsIPBinds id)
+  | XHsIPBinds !(XXHsIPBinds id)
 
 type instance XIPBinds       GhcPs = NoExtField
 type instance XIPBinds       GhcRn = NoExtField
@@ -819,11 +815,9 @@ type instance XXHsIPBinds    (GhcPass p) = NoExtCon
 
 isEmptyIPBindsPR :: HsIPBinds (GhcPass p) -> Bool
 isEmptyIPBindsPR (IPBinds _ is) = null is
-isEmptyIPBindsPR (XHsIPBinds _) = True
 
 isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
-isEmptyIPBindsTc (XHsIPBinds _) = True
 
 -- | Located Implicit Parameter Binding
 type LIPBind id = Located (IPBind id)
@@ -847,7 +841,7 @@ data IPBind id
         (XCIPBind id)
         (Either (Located HsIPName) (IdP id))
         (LHsExpr id)
-  | XIPBind (XXIPBind id)
+  | XIPBind !(XXIPBind id)
 
 type instance XCIPBind    (GhcPass p) = NoExtField
 type instance XXIPBind    (GhcPass p) = NoExtCon
@@ -856,14 +850,12 @@ instance OutputableBndrId p
        => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (pprIfTc @p $ ppr ds)
-  ppr (XHsIPBinds x) = ppr x
 
 instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
   ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
                    Right     id  -> pprBndr LetBind id
-  ppr (XIPBind x) = ppr x
 
 {-
 ************************************************************************
@@ -1030,7 +1022,7 @@ data Sig pass
                      SourceText
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
-  | XSig (XXSig pass)
+  | XSig !(XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
 type instance XPatSynSig        (GhcPass p) = NoExtField
@@ -1050,7 +1042,7 @@ type LFixitySig pass = Located (FixitySig pass)
 
 -- | Fixity Signature
 data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
-                    | XFixitySig (XXFixitySig pass)
+                    | XFixitySig !(XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
@@ -1190,14 +1182,12 @@ ppr_sig (CompleteMatchSig _ src cs mty)
         <+> opt_sig)
   where
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
-ppr_sig (XSig x) = ppr x
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where
   ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
-  ppr (XFixitySig x) = ppr x
 
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = text "{-#" <+> doc <+> text "#-}"

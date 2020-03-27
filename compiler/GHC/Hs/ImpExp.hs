@@ -91,7 +91,7 @@ data ImportDecl pass
       ideclHiding    :: Maybe (Bool, Located [LIE pass])
                                        -- ^ (True => hiding, names)
     }
-  | XImportDecl (XXImportDecl pass)
+  | XImportDecl !(XXImportDecl pass)
      -- ^
      --  'ApiAnnotation.AnnKeywordId's
      --
@@ -167,7 +167,6 @@ instance OutputableBndrId p
 
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
-    ppr (XImportDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -253,7 +252,7 @@ data IE pass
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
   | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
-  | XIE (XXIE pass)
+  | XIE !(XXIE pass)
 
 type instance XIEVar             (GhcPass _) = NoExtField
 type instance XIEThingAbs        (GhcPass _) = NoExtField
@@ -302,7 +301,6 @@ ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
-ieNames (XIE nec) = noExtCon nec
 
 ieWrappedName :: IEWrappedName name -> name
 ieWrappedName (IEName    (L _ n)) = n
@@ -344,7 +342,6 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
-    ppr (XIE x) = ppr x
 
 instance (HasOccName name) => HasOccName (IEWrappedName name) where
   occName w = occName (ieWrappedName w)

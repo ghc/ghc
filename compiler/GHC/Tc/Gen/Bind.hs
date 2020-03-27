@@ -358,15 +358,11 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
-    tc_ip_bind _ (XIPBind nec) = noExtCon nec
 
     -- Coerces a `t` into a dictionary for `IP "x" t`.
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
-
-tcLocalBinds (HsIPBinds _ (XHsIPBinds nec)) _ = noExtCon nec
-tcLocalBinds (XHsLocalBindsLR nec)          _ = noExtCon nec
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

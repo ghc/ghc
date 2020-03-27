@@ -510,7 +510,6 @@ exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
-exprCtOrigin (XExpr nec)        = noExtCon nec
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -521,17 +520,14 @@ matchesCtOrigin (MG { mg_alts = alts })
 
   | otherwise
   = Shouldn'tHappenOrigin "multi-way match"
-matchesCtOrigin (XMatchGroup nec) = noExtCon nec
 
 -- | Extract a suitable CtOrigin from guarded RHSs
 grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin
 grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
-grhssCtOrigin (XGRHSs nec) = noExtCon nec
 
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
 lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
 lGRHSCtOrigin [L _ (GRHS _ _ (L _ e))] = exprCtOrigin e
-lGRHSCtOrigin [L _ (XGRHS nec)] = noExtCon nec
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtOrigin :: CtOrigin -> SDoc

@@ -258,8 +258,6 @@ isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 isCompleteHsSig (HsWC { hswc_ext  = wcs
                       , hswc_body = HsIB { hsib_body = hs_ty } })
    = null wcs && no_anon_wc hs_ty
-isCompleteHsSig (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
-isCompleteHsSig (XHsWildCardBndrs nec) = noExtCon nec
 
 no_anon_wc :: LHsType GhcRn -> Bool
 no_anon_wc lty = go lty
@@ -300,7 +298,6 @@ no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
   where
     go (UserTyVar _ _)      = True
     go (KindedTyVar _ _ ki) = no_anon_wc ki
-    go (XTyVarBndr nec)     = noExtCon nec
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,7 +462,6 @@ tcPatSynSig name sig_ty
         mkSpecForAllTys ex $
         mkPhiTy prov $
         body
-tcPatSynSig _ (XHsImplicitBndrs nec) = noExtCon nec
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)

@@ -638,8 +638,6 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                                           sel (L ll lbl)))
                              , hsRecFieldArg = arg'
                              , hsRecPun      = pun })) }
-    rn_fld _ _ (L _ (HsRecField (L _ (XFieldOcc _)) _ _))
-      = panic "rnHsRecFields"
 
 
     rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in GHC.Hs.Pat

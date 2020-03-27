@@ -467,8 +467,6 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
        ; return (insts, fam_insts, deriv_infos) }
 
-tcLocalInstDecl (L _ (XInstDecl nec)) = noExtCon nec
-
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
 -- The returned DerivInfos are for any associated data families
@@ -543,8 +541,6 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                         . hsib_body
                                         . dfid_eqn
                                         . unLoc) adts)
-
-tcClsInstDecl (L _ (XClsInstDecl nec)) = noExtCon nec
 
 {-
 ************************************************************************
@@ -787,8 +783,6 @@ tcDataFamInstDecl mb_clsinfo
       , not (tv `elemVarSet` fvs_to_the_left)
       = go pats (Bndr tv tcb_vis : etad_tvs)
     go pats etad_tvs = (reverse (map fstOf3 pats), etad_tvs)
-
-tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
 -----------------------
 tcDataFamInstHeader

@@ -87,7 +87,6 @@ testOneFile libdir fileName = do
      doPragE (HsPragCore _ src ss) = [("co",[conv (noLoc ss)])]
      doPragE (HsPragSCC  _ src ss) = [("sc",[conv (noLoc ss)])]
      doPragE (HsPragTick _ src (ss,_,_) _ss2) = [("tp",[conv (noLoc ss)])]
-     doPragE (XHsPragE x) = noExtCon x
 
      conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)
 

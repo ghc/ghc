@@ -495,7 +495,6 @@ has_args (L _ (Match { m_pats = args }) : _) = not (null args)
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
         -- than pattern bindings (tests/rename/should_fail/rnfail002).
-has_args (L _ (XMatch nec) : _) = noExtCon nec
 
 {- **********************************************************************
 
@@ -2540,8 +2539,6 @@ mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
 mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
   = HsRecField (L loc (Unambiguous noExtField rdr)) arg pun
-mk_rec_upd_field (HsRecField (L _ (XFieldOcc nec)) _ _)
-  = noExtCon nec
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma

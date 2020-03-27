@@ -304,10 +304,6 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
         addPathEntry name $
         addTickMatchGroup False (fun_matches funBind)
 
-  case mg of
-    MG {} -> return ()
-    _     -> panic "addTickLHsBind"
-
   blackListed <- isBlackListed pos
   exported_names <- liftM exports getEnv
 
@@ -378,7 +374,6 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
-addTickLHsBind bind@(L _ (XHsBindsLR {})) = return bind
 
 bindTick
   :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe (Tickish Id))
@@ -647,7 +642,6 @@ addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
 addTickTupArg (L l (Present x e))  = do { e' <- addTickLHsExpr e
                                         ; return (L l (Present x e')) }
 addTickTupArg (L l (Missing ty)) = return (L l (Missing ty))
-addTickTupArg (L _ (XTupArg nec)) = noExtCon nec
 
 
 addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
@@ -656,7 +650,6 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = L l matches' }
-addTickMatchGroup _ (XMatchGroup nec) = noExtCon nec
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
@@ -665,7 +658,6 @@ addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
-addTickMatch _ _ (XMatch nec) = noExtCon nec
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -676,7 +668,6 @@ addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (L l local_binds)) = do
     return $ GRHSs x guarded' (L l local_binds')
   where
     binders = collectLocalBinders local_binds
-addTickGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
@@ -684,7 +675,6 @@ addTickGRHS isOneOfMany isLambda (GRHS x stmts expr) = do
   (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
                         (addTickGRHSBody isOneOfMany isLambda expr)
   return $ GRHS x stmts' expr'
-addTickGRHS _ _ (XGRHS nec) = noExtCon nec
 
 addTickGRHSBody :: Bool -> Bool -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTickGRHSBody isOneOfMany isLambda expr@(L pos e0) = do
@@ -763,8 +753,6 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
-addTickStmt _ (XStmtLR nec) = noExtCon nec
-
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprRHS e
@@ -786,7 +774,6 @@ addTickApplicativeArg isGuard (op, arg) =
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (L hpcSrcSpan ret))
       <*> addTickLPat pat
-  addTickArg (XApplicativeArg nec) = noExtCon nec
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
@@ -795,7 +782,6 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
         (addTickLStmts isGuard stmts)
         (return ids)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
-addTickStmtAndBinders _ (XParStmtBlock nec) = noExtCon nec
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
 addTickHsLocalBinds (HsValBinds x binds) =
@@ -805,7 +791,6 @@ addTickHsLocalBinds (HsIPBinds x binds)  =
         liftM (HsIPBinds x)
                 (addTickHsIPBinds binds)
 addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
-addTickHsLocalBinds (XHsLocalBindsLR x)  = return (XHsLocalBindsLR x)
 
 addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))
@@ -825,14 +810,12 @@ addTickHsIPBinds (IPBinds dictbinds ipbinds) =
         liftM2 IPBinds
                 (return dictbinds)
                 (mapM (liftL (addTickIPBind)) ipbinds)
-addTickHsIPBinds (XHsIPBinds x) = return (XHsIPBinds x)
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
 addTickIPBind (IPBind x nm e) =
         liftM2 (IPBind x)
                 (return nm)
                 (addTickLHsExpr e)
-addTickIPBind (XIPBind x) = return (XIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)
@@ -850,7 +833,6 @@ addTickHsCmdTop (HsCmdTop x cmd) =
         liftM2 HsCmdTop
                 (return x)
                 (addTickLHsCmd cmd)
-addTickHsCmdTop (XCmdTop nec) = noExtCon nec
 
 addTickLHsCmd ::  LHsCmd GhcTc -> TM (LHsCmd GhcTc)
 addTickLHsCmd (L pos c0) = do
@@ -915,14 +897,12 @@ addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
 addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
   return $ mg { mg_alts = L l matches' }
-addTickCmdMatchGroup (XMatchGroup nec) = noExtCon nec
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
-addTickCmdMatch (XMatch nec) = noExtCon nec
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) = do
@@ -932,7 +912,6 @@ addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) = do
     return $ GRHSs x guarded' (L l local_binds')
   where
     binders = collectLocalBinders local_binds
-addTickCmdGRHSs (XGRHSs nec) = noExtCon nec
 
 addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
@@ -941,7 +920,6 @@ addTickCmdGRHS (GRHS x stmts cmd)
   = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox)
                                    stmts (addTickLHsCmd cmd)
        ; return $ GRHS x stmts' expr' }
-addTickCmdGRHS (XGRHS nec) = noExtCon nec
 
 addTickLCmdStmts :: [LStmt GhcTc (LHsCmd GhcTc)]
                  -> TM [LStmt GhcTc (LHsCmd GhcTc)]
@@ -988,8 +966,6 @@ addTickCmdStmt stmt@(RecStmt {})
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 addTickCmdStmt ApplicativeStmt{} =
   panic "ToDo: addTickCmdStmt ApplicativeLastStmt"
-addTickCmdStmt (XStmtLR nec) =
-  noExtCon nec
 
 -- Others should never happen in a command context.
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)
@@ -1296,11 +1272,9 @@ hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 matchesOneOfMany :: [LMatch GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
+        matchCount :: LMatch GhcTc body -> Int
         matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))
           = length grhss
-        matchCount (L _ (Match { m_grhss = XGRHSs nec }))
-          = noExtCon nec
-        matchCount (L _ (XMatch nec)) = noExtCon nec
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 

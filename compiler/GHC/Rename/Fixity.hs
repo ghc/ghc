@@ -216,4 +216,3 @@ lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unLoc lrdr)
 
     format_ambig (elt, fix) = hang (ppr fix)
                                  2 (pprNameProvenance elt)
-lookupFieldFixityRn (XAmbiguousFieldOcc nec) = noExtCon nec

@@ -109,8 +109,6 @@ recoverPSB (PSB { psb_id = L _ name
          matcher_id = mkLocalId matcher_name $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
-recoverPSB (XPatSynBind nec) = noExtCon nec
-
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If type inference for a pattern synonym fails, we can't continue with
@@ -194,7 +192,6 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
-tcInferPatSynDecl (XPatSynBind nec) = noExtCon nec
 
 mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
@@ -441,7 +438,6 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
-tcCheckPatSynDecl (XPatSynBind nec) _ = noExtCon nec
 
 {- [Pattern synonyms and higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -888,7 +884,6 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
       = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
-tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
@@ -992,11 +987,9 @@ tcPatToExpr name args pat = go pat
     go1 p@(AsPat {})                         = notInvertible p
     go1 p@(ViewPat {})                       = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
-    go1   (XPat nec)                         = noExtCon nec
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
-    go1   (SplicePat _ (XSplice nec))        = noExtCon nec
 
     notInvertible p = Left (not_invertible_msg p)
 

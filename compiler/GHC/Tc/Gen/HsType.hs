@@ -218,7 +218,6 @@ kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
 
        ; emitResidualTvConstraint skol_info Nothing spec_tkvs
                                   tc_lvl wanted }
-kcClassSigType _ _ (XHsImplicitBndrs nec) = noExtCon nec
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
@@ -271,7 +270,6 @@ tcStandaloneKindSig (L _ kisig) = case kisig of
     do { kind <- tcTopLHsType kindLevelMode ksig (expectedKindInCtxt ctxt)
        ; checkValidType ctxt kind
        ; return (name, kind) }
-  XStandaloneKindSig nec -> noExtCon nec
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Bool, TcType)
@@ -309,8 +307,6 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
 
        ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type _ (XHsImplicitBndrs nec) _ = noExtCon nec
-
 tcTopLHsType :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
 --   we want to fully solve /all/ equalities, and report errors
@@ -333,8 +329,6 @@ tcTopLHsType mode hs_sig_type ctxt_kind
        ; final_ty <- zonkTcTypeToType (mkInvForAllTys kvs ty1)
        ; traceTc "End tcTopLHsType }" (vcat [ppr hs_ty, ppr final_ty])
        ; return final_ty}
-
-tcTopLHsType _ (XHsImplicitBndrs nec) _ = noExtCon nec
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
@@ -421,7 +415,6 @@ tcHsTypeApp wc_ty kind
        ; ty <- zonkTcType ty
        ; checkValidType TypeAppCtxt ty
        ; return ty }
-tcHsTypeApp (XHsWildCardBndrs nec) _ = noExtCon nec
 
 {- Note [Wildcards in visible type application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1947,7 +1940,6 @@ kcCheckDeclHeader_cusk name flav
   where
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
-kcCheckDeclHeader_cusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 -- | Kind-check a 'LHsQTyVars'. Used in 'inferInitialKind' (for tycon kinds and
 -- other kinds).
@@ -2003,8 +1995,6 @@ kcInferDeclHeader name flav
   where
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
-
-kcInferDeclHeader _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 -- | Kind-check a declaration header against a standalone kind signature.
 -- See Note [Arity inference in kcCheckDeclHeader_sig]
@@ -2201,7 +2191,6 @@ kcCheckDeclHeader_sig kisig name flav
             unifyKind (Just (HsTyVar noExtField NotPromoted v))
                       (tyBinderType tb)
                       v_ki
-        XTyVarBndr nec -> noExtCon nec
 
     -- Split the invisible binders that should become a part of 'tyConBinders'
     -- rather than 'tyConResKind'.
@@ -2216,8 +2205,6 @@ kcCheckDeclHeader_sig kisig name flav
           n_sig_invis_bndrs = invisibleTyBndrCount sig_ki
           n_inst = n_sig_invis_bndrs - n_res_invis_bndrs
       in splitPiTysInvisibleN n_inst sig_ki
-
-kcCheckDeclHeader_sig _ _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
 data ZippedBinder =
@@ -2709,7 +2696,6 @@ tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
 tcHsTyVarBndr new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; new_tv tv_nm kind }
-tcHsTyVarBndr _ (XTyVarBndr nec) = noExtCon nec
 
 -----------------
 tcHsQTyVarBndr :: ContextKind
@@ -2741,8 +2727,6 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
   where
     hs_tv = HsTyVar noExtField NotPromoted (noLoc tv_nm)
             -- Used for error messages only
-
-tcHsQTyVarBndr _ _ (XTyVarBndr nec) = noExtCon nec
 
 --------------------------------------
 -- Binding type/class variables in the
@@ -3200,9 +3184,6 @@ tcHsPartialSigType ctxt sig_ty
        ; traceTc "tcHsPartialSigType" (ppr tv_prs)
        ; return (wcs, wcx, tv_prs, theta, tau) }
 
-tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
-tcHsPartialSigType _ (XHsWildCardBndrs nec) = noExtCon nec
-
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
@@ -3341,9 +3322,6 @@ tcHsPatSigType ctxt sig_ty
                        -- See Note [Pattern signature binders]
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
            ; return (name, tv) }
-
-tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
-tcHsPatSigType _ (XHsWildCardBndrs nec)          = noExtCon nec
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn

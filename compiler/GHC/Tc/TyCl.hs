@@ -201,9 +201,6 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; return (gbl_env', inst_info, deriv_info) }
 
-
-tcTyClGroup (XTyClGroup nec) = noExtCon nec
-
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
 
@@ -1357,10 +1354,6 @@ getInitialKind strategy
                  Nothing -> return AnyKind
        ; return [tc] }
 
-getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-getInitialKind _ (FamDecl {tcdFam = XFamilyDecl nec}) = noExtCon nec
-getInitialKind _ (XTyClDecl nec) = noExtCon nec
-
 get_fam_decl_initial_kind
   :: Maybe TcTyCon -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyDecl GhcRn
@@ -1382,7 +1375,6 @@ get_fam_decl_initial_kind mb_parent_tycon
   where
     flav = getFamFlav mb_parent_tycon info
     ctxt = TyFamResKindCtxt name
-get_fam_decl_initial_kind _ (XFamilyDecl nec) = noExtCon nec
 
 -- See Note [Standalone kind signatures for associated types]
 check_initial_kind_assoc_fam
@@ -1402,7 +1394,6 @@ check_initial_kind_assoc_fam cls
   where
     ctxt = TyFamResKindCtxt name
     flav = getFamFlav (Just cls) info
-check_initial_kind_assoc_fam _ (XFamilyDecl nec) = noExtCon nec
 
 {- Note [Standalone kind signatures for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1562,9 +1553,6 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
   = case fd_info of
       ClosedTypeFamily (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
       _ -> return ()
-kcTyClDecl (FamDecl _ (XFamilyDecl nec))        _ = noExtCon nec
-kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) _ = noExtCon nec
-kcTyClDecl (XTyClDecl nec)                      _ = noExtCon nec
 
 -------------------
 
@@ -1633,8 +1621,6 @@ kcConDecl new_or_data res_kind (ConDeclGADT
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
-kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _) = noExtCon nec
-kcConDecl _ _ (XConDecl nec) = noExtCon nec
 
 {- Note [kcConDecls result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2028,8 +2014,6 @@ tcTyClDecl1 _parent roles_info
                               meths fundeps sigs ats at_defs
        ; return (noDerivInfos (classTyCon clas)) }
 
-tcTyClDecl1 _ _ (XTyClDecl nec) = noExtCon nec
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2251,9 +2235,6 @@ tcDefaultAssocDecl fam_tc
     suggestion :: SDoc
     suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
              <+> text "must all be distinct type variables"
-
-tcDefaultAssocDecl _ [L _ (TyFamInstDecl (HsIB _ (XFamEqn x)))] = noExtCon x
-tcDefaultAssocDecl _ [L _ (TyFamInstDecl (XHsImplicitBndrs x))] = noExtCon x
 
 
 {- Note [Type-checking default assoc decls]
@@ -2588,7 +2569,6 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
 #if __GLASGOW_HASKELL__ <= 810
   | otherwise = panic "tcFamInst1"  -- Silence pattern-exhaustiveness checker
 #endif
-tcFamDecl1 _ (XFamilyDecl nec) = noExtCon nec
 
 -- | Maybe return a list of Bools that say whether a type family was declared
 -- injective in the corresponding type arguments. Length of the list is equal to
@@ -2737,7 +2717,6 @@ tcDataDefn err_ctxt roles_info tc_name
           DataType -> return (mkDataTyConRhs data_cons)
           NewType  -> ASSERT( not (null data_cons) )
                       mkNewTyConRhs tc_name tycon (head data_cons)
-tcDataDefn _ _ _ (XHsDataDefn nec) = noExtCon nec
 
 
 -------------------------
@@ -2774,9 +2753,6 @@ kcTyFamInstEqn tc_fam_tc
     }
   where
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
-
-kcTyFamInstEqn _ (L _ (XHsImplicitBndrs nec)) = noExtCon nec
-kcTyFamInstEqn _ (L _ (HsIB _ (XFamEqn nec))) = noExtCon nec
 
 
 --------------------------
@@ -2815,8 +2791,6 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; return (mkCoAxBranch qtvs [] [] fam_tc pats rhs_ty
                               (map (const Nominal) qtvs)
                               loc) }
-
-tcTyFamInstEqn _ _ _ = panic "tcTyFamInstEqn"
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -3296,9 +3270,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
-tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _)
-  = noExtCon nec
-tcConDecl _ _ _ _ _ _ (XConDecl nec) = noExtCon nec
 
 -- | Produce an "expected kind" for the arguments of a data/newtype.
 -- If the declaration is indeed for a newtype,
@@ -4687,8 +4658,6 @@ tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn =
                             HsIB { hsib_body = eqn }})
   = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
                     (unLoc (feqn_tycon eqn))
-tcMkDataFamInstCtxt (DataFamInstDecl (XHsImplicitBndrs nec))
-  = noExtCon nec
 
 tcAddDataFamInstCtxt :: DataFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl
@@ -4880,7 +4849,6 @@ wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ _ annots))
           text "Expected" <+> (ppr $ length tyvars) <> comma <+>
           text "got" <+> (ppr $ length annots) <> colon)
        2 (ppr d)
-wrongNumberOfRoles _ (L _ (XRoleAnnotDecl nec)) = noExtCon nec
 
 
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
@@ -4889,7 +4857,6 @@ illegalRoleAnnotDecl (L loc (RoleAnnotDecl _ tycon _))
     setSrcSpan loc $
     addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
               text "they are allowed only for datatypes and classes.")
-illegalRoleAnnotDecl (L _ (XRoleAnnotDecl nec)) = noExtCon nec
 
 needXRoleAnnotations :: TyCon -> SDoc
 needXRoleAnnotations tc

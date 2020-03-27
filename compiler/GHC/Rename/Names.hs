@@ -388,7 +388,6 @@ rnImportDecl this_mod
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
-rnImportDecl _ (L _ (XImportDecl nec)) = noExtCon nec
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -765,7 +764,6 @@ getLocalNonValBinders fixity_env
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
-        find_con_decl_fld (L _ (XFieldOcc nec)) = noExtCon nec
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -801,8 +799,6 @@ getLocalNonValBinders fixity_env
                (avails, fldss)
                  <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
                pure (avails, concat fldss)
-    new_assoc _ (L _ (ClsInstD _ (XClsInstDecl nec))) = noExtCon nec
-    new_assoc _ (L _ (XInstDecl nec))                 = noExtCon nec
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
@@ -816,16 +812,13 @@ getLocalNonValBinders fixity_env
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
-    new_di _ _ (DataFamInstDecl (XHsImplicitBndrs nec)) = noExtCon nec
 
     new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
-getLocalNonValBinders _ (XHsGroup nec) = noExtCon nec
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector _ _ (L _ (XFieldOcc nec)) = noExtCon nec
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
@@ -1438,7 +1431,6 @@ findImportUsage imports used_gres
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
-    unused_decl (L _ (XImportDecl nec)) = noExtCon nec
 
 
 {- Note [The ImportMap]

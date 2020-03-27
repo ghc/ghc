@@ -181,32 +181,27 @@ following:
   type instance XXHsDecl (GhcPass _) = NoExtCon
   data HsDecl p
     = ...
-    | XHsDecl (XXHsDecl p)
+    | XHsDecl !(XXHsDecl p)
 
-This means that any function that wishes to consume an HsDecl will need to
-have a case for XHsDecl. This might look like this:
+The field of type `XXHsDecl p` is strict for a good reason: it allows the
+pattern-match coverage checker to conclude that any matches against XHsDecl
+are unreachable whenever `p ~ GhcPass _`. To see why this is the case, consider
+the following function which consumes an HsDecl:
 
   ex :: HsDecl GhcPs -> HsDecl GhcRn
   ...
   ex (XHsDecl nec) = noExtCon nec
 
-Ideally, we wouldn't need a case for XHsDecl at all (it /is/ supposed to be
-an unused extension constructor, after all). There is a way to achieve this
-on GHC 8.8 or later: make the field of XHsDecl strict:
+Because `p` equals GhcPs (i.e., GhcPass 'Parsed), XHsDecl's field has the type
+NoExtCon. But since (1) the field is strict and (2) NoExtCon is an empty data
+type, there is no possible way to reach the right-hand side of the XHsDecl
+case. As a result, the coverage checker concludes that the XHsDecl case is
+inaccessible, so it can be removed.
+(See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle for
+more on how this works.)
 
-  data HsDecl p
-    = ...
-    | XHsDecl !(XXHsDecl p)
-
-If this is done, GHC's pattern-match coverage checker is clever enough to
-figure out that the XHsDecl case of `ex` is unreachable, so it can simply be
-omitted. (See Note [Extensions to GADTs Meet Their Match] in Check for more on
-how this works.)
-
-When GHC drops support for bootstrapping with GHC 8.6 and earlier, we can make
-the strict field changes described above and delete gobs of code involving
-`noExtCon`. Until then, it is necessary to use, so be aware of it when writing
-code that consumes unused extension constructors.
+Bottom line: if you add a TTG extension constructor that uses NoExtCon, make
+sure that any uses of it as a field are strict.
 -}
 
 -- | Used as a data type index for the hsSyn AST; also serves

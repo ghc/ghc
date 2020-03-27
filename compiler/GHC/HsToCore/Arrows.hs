@@ -333,7 +333,6 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
-dsProcExpr _ _ = panic "dsProcExpr"
 
 {-
 Translation of a command judgement of the form
@@ -721,7 +720,6 @@ dsTrimCmdArg local_vars env_ids
         arg_code = if env_ids' == env_ids then core_cmd else
                 do_premap meth_ids in_ty in_ty' cmd_ty trim_code core_cmd
     return (mkLets meth_binds arg_code, free_vars)
-dsTrimCmdArg _ _ _ = panic "dsTrimCmdArg"
 
 -- Given D; xs |-a c : stk --> t, builds c with xs fed back.
 -- Typically needs to be prefixed with arr (\(p, stk) -> ((xs),stk))
@@ -1151,7 +1149,6 @@ leavesMatch (L _ (Match { m_pats = pats
       mkVarSet (collectLStmtsBinders stmts)
         `unionVarSet` defined_vars)
     | L _ (GRHS _ stmts body) <- grhss]
-leavesMatch _ = panic "leavesMatch"
 
 -- Replace the leaf commands in a match
 
@@ -1168,7 +1165,6 @@ replaceLeavesMatch _res_ty leaves
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
     (leaves', L loc (match { m_ext = noExtField, m_grhss = GRHSs x grhss' binds }))
-replaceLeavesMatch _ _ _ = panic "replaceLeavesMatch"
 
 replaceLeavesGRHS
         :: [Located (body' GhcTc)]  -- replacement leaf expressions of that type
@@ -1178,7 +1174,6 @@ replaceLeavesGRHS
 replaceLeavesGRHS (leaf:leaves) (L loc (GRHS x stmts _))
   = (leaves, L loc (GRHS x stmts leaf))
 replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
-replaceLeavesGRHS _ _ = panic "replaceLeavesGRHS"
 
 -- Balanced fold of a non-empty list.
 
@@ -1248,7 +1243,6 @@ collectl (L _ pat) bndrs
     go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
     go (ViewPat _ _ pat)          = collectl pat bndrs
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
-    go (XPat nec)                 = noExtCon nec
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs

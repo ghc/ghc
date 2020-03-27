@@ -100,6 +100,7 @@ dsForeigns' fos = do
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
 
+   do_decl :: ForeignDecl GhcTc -> DsM (SDoc, SDoc, [Id], [Binding])
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
       let id' = unLoc id
@@ -113,7 +114,6 @@ dsForeigns' fos = do
                               (L _ (CExportStatic _ ext_nm cconv)) _ }) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
-   do_decl (XForeignDecl nec) = noExtCon nec
 
 {-
 ************************************************************************
