@@ -219,19 +219,15 @@ rnLocalBindsAndThen (HsIPBinds x binds) thing_inside = do
     (thing, fvs_thing) <- thing_inside (HsIPBinds x binds') fv_binds
     return (thing, fvs_thing `plusFV` fv_binds)
 
-rnLocalBindsAndThen (XHsLocalBindsLR nec) _ = noExtCon nec
-
 rnIPBinds :: HsIPBinds GhcPs -> RnM (HsIPBinds GhcRn, FreeVars)
 rnIPBinds (IPBinds _ ip_binds ) = do
     (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
     return (IPBinds noExtField ip_binds', plusFVs fvs_s)
-rnIPBinds (XHsIPBinds nec) = noExtCon nec
 
 rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeVars)
 rnIPBind (IPBind _ ~(Left n) expr) = do
     (expr',fvExpr) <- rnLExpr expr
     return (IPBind noExtField (Left n) expr', fvExpr)
-rnIPBind (XIPBind nec) = noExtCon nec
 
 {-
 ************************************************************************
@@ -630,10 +626,10 @@ makeMiniFixityEnv :: [LFixitySig GhcPs] -> RnM MiniFixityEnv
 
 makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
+   add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
      foldlM add_one env [ (loc,name_loc,name,fixity)
                         | L name_loc name <- names ]
-   add_one_sig _ (L _ (XFixitySig nec)) = noExtCon nec
 
    add_one env (loc, name_loc, name,fixity) = do
      { -- this fixity decl is a duplicate iff
@@ -743,8 +739,6 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
     patternSynonymErr
       = hang (text "Illegal pattern synonym declaration")
            2 (text "Use -XPatternSynonyms to enable this extension")
-
-rnPatSynBind _ (XPatSynBind nec) = noExtCon nec
 
 {-
 Note [Renaming pattern synonym variables]
@@ -1047,8 +1041,6 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
 
-renameSig _ (XSig nec) = noExtCon nec
-
 {-
 Note [Orphan COMPLETE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1115,8 +1107,6 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False
 
-     (XSig nec, _) -> noExtCon nec
-
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (Located RdrName, Sig GhcPs)]
 -- Check for duplicates on RdrName version,
@@ -1171,7 +1161,6 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
-rnMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
 rnMatch :: Outputable (body GhcPs) => HsMatchContext GhcRn
         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
@@ -1193,7 +1182,6 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
                       _                     -> ctxt
         ; return (Match { m_ext = noExtField, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }}
-rnMatch' _ _ (XMatch nec) = noExtCon nec
 
 emptyCaseErr :: HsMatchContext GhcRn -> SDoc
 emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
@@ -1220,7 +1208,6 @@ rnGRHSs ctxt rnBody (GRHSs _ grhss (L l binds))
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
     return (GRHSs noExtField grhss' (L l binds'), fvGRHSs)
-rnGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
 rnGRHS :: HsMatchContext GhcRn
        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
@@ -1248,7 +1235,6 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
     is_standard_guard []                  = True
     is_standard_guard [L _ (BodyStmt {})] = True
     is_standard_guard _                   = False
-rnGRHS' _ _ (XGRHS nec) = noExtCon nec
 
 {-
 *********************************************************
@@ -1272,7 +1258,6 @@ rnSrcFixityDecl sig_ctxt = rn_decl
     rn_decl (FixitySig _ fnames fixity)
       = do names <- concatMapM lookup_one fnames
            return (FixitySig noExtField names fixity)
-    rn_decl (XFixitySig nec) = noExtCon nec
 
     lookup_one :: Located RdrName -> RnM [Located Name]
     lookup_one (L name_loc rdr_name)

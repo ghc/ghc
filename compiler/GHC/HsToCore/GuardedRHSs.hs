@@ -71,13 +71,11 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
-dsGRHSs _ (XGRHSs nec) _ _ = noExtCon nec
 
 dsGRHS :: HsMatchContext GhcRn -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
   = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
-dsGRHS _ _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 {-
 ************************************************************************
@@ -140,8 +138,6 @@ matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
 matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
 matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
-matchGuards (XStmtLR nec : _) _ _ _ =
-  noExtCon nec
 
 {-
 Should {\em fail} if @e@ returns @D@

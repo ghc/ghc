@@ -286,7 +286,6 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
                         , m_pats = []
                         , m_grhss = guards }
     checkMatches dsMatchContext [] [match]
-checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a list of syntactic /match/es (part of case, functions, etc.), each
 -- with a /pat/ and one or more /grhss/:
@@ -547,7 +546,6 @@ translatePat fam_insts x pat = case pat of
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
-  XPat      n  -> noExtCon n
 
 -- | 'translatePat', but also select and return a new match var.
 translatePatV :: FamInstEnvs -> Pat GhcTc -> DsM (Id, GrdVec)
@@ -642,7 +640,6 @@ translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grh
   grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
   -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
   return (mkGrdTreeMany pats' grhss')
-translateMatch _ _ (L _ (XMatch nec)) = noExtCon nec
 
 -- -----------------------------------------------------------------------
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
@@ -657,7 +654,6 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
         | null gs   = L match_loc (sep (map ppr pats))
         | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
-translateLGRHS _ _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 -- | Translate a guard statement to a 'GrdVec'
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec
@@ -670,7 +666,6 @@ translateGuard fam_insts guard = case guard of
   TransStmt       {} -> panic "translateGuard TransStmt"
   RecStmt         {} -> panic "translateGuard RecStmt"
   ApplicativeStmt {} -> panic "translateGuard ApplicativeLastStmt"
-  XStmtLR nec        -> noExtCon nec
 
 -- | Translate let-bindings
 translateLet :: HsLocalBinds GhcTc -> DsM GrdVec
