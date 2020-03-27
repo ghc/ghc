@@ -1131,11 +1131,11 @@ data DmdType = DmdType
                   DmdEnv        -- Demand on explicitly-mentioned
                                 --      free variables
                   [Demand]      -- Demand on arguments
-                  Divergence     -- See [Nature of result demand]
+                  Divergence     -- See [Demand type Divergence]
 
 {-
-Note [Nature of result demand]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Demand type Divergence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A Divergence contains information about termination.
 
 The semantics of this depends on whether we are looking at a DmdType, i.e. the
@@ -1230,7 +1230,7 @@ toBothDmdArg (DmdType fv _ r) = (fv, r)
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
-    -- See Note [Asymmetry of 'both']
+    -- See Note [Asymmetry of 'both*']
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
   = DmdType (plusVarEnv_CD bothDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
@@ -1303,7 +1303,7 @@ etaExpandDmdType n d
         --    when entering the additional lambda.
         inc_fv  = fv
         inc_ds  = take n (ds ++ repeat (defaultArgDmd div))
-        inc_div = case div of -- See [Nature of result demand]
+        inc_div = case div of -- See [Demand type Divergence]
           ConOrDiv -> Dunno
           _        -> div
 
@@ -1468,7 +1468,6 @@ peelManyCalls n (JD { sd = str, ud = abs })
 {-
 Note [Demands from unsaturated function calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Consider a demand transformer d1 -> d2 -> r for f.
 If a sufficiently detailed demand is fed into this transformer,
 e.g <C(C(S)), C1(C1(S))> arising from "f x1 x2" in a strict, use-once context,
@@ -1646,7 +1645,7 @@ transfomer, namely
 
 This DmdType gives the demands unleashed by the Id when it is applied
 to as many arguments as are given in by the arg demands in the DmdType.
-Also see Note [Nature of result demand] for the meaning of a Divergence in a
+Also see Note [Demand type Divergence] for the meaning of a Divergence in a
 strictness signature.
 
 If an Id is applied to less arguments than its arity, it means that
