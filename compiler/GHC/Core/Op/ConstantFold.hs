@@ -1490,7 +1490,7 @@ match_eq_string _ _ _ _ = Nothing
 -- an Addr# literal, we can perform constant folding. There are two
 -- cases to consider: either the literal has a NUL byte or it doesn't.
 -- If the literal has a NUL byte, Data.ByteString.elemIndex calculates
--- the result of strlen(). If the literal does not have a NUL byte,
+-- the result of strlen(). If the literal does not have an embedded NUL byte,
 -- the result of strlen() is still well defined since all Addr# literals
 -- are suffixed by NUL when compiling cmm-to-asm in GHC.CmmToAsm.Ppr.pprBytes.
 -- In that case, strlen() is just the length of the literal.
