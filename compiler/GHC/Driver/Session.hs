@@ -1191,7 +1191,7 @@ data RtsOptsEnabled
 -- See Note [Zapping coercions] for details.
 shouldBuildCoercions :: DynFlags -> Bool
 shouldBuildCoercions dflags =
-    gopt Opt_DoCoreLinting dflags && not (gopt Opt_DropCoercions dflags)
+    not (gopt Opt_DropCoercions dflags) -- && gopt Opt_DoCoreLinting dflags
     -- TODO: Add flag to explicitly enable coercion generation without linting?
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?

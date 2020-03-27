@@ -1875,7 +1875,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
       where f v acc
               | isTyVar v = tyvar env v `mappend` acc
               | isCoVar v = covar env v `mappend` acc
-              | otherwise = error "unknown thingy"
+              | otherwise = pprPanic "unknown thingy" (ppr v)
 
 {- *********************************************************************
 *                                                                      *

@@ -43,7 +43,10 @@ module GHC.Core.Coercion (
         mkKindCo, castCoercionKind, castCoercionKindI,
         --
         -- ** Zapping coercions
-        mkZappedCoercion, zapCoercion,
+
+        mkZappedCo, mkTcZappedCo,
+        mkZappedProv, mkTcZappedProv,
+        perhapsZapCoercion, zapCoercion,
 
         mkHeteroCoercionType,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
@@ -985,12 +988,12 @@ mkTransCo co1 co2 | isReflCo co1 = co2
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCo (UnivCo (ZappedProv fvs1) r t1a _t1b) (UnivCo (ZappedProv fvs2) _ _t2a t2b)
-  = UnivCo (ZappedProv (fvs1 `unionDVarSet` fvs2)) r t1a t2b
+  = UnivCo (mkZappedProv (fvs1 `unionDVarSet` fvs2)) r t1a t2b
 mkTransCo (UnivCo (ZappedProv fvs) r t1a _t1b) co2
-  = UnivCo (ZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co2)) r t1a t2b
+  = UnivCo (mkZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co2)) r t1a t2b
   where Pair _t2a t2b = coercionKind co2
 mkTransCo co1 (UnivCo (ZappedProv fvs) r _t2a t2b)
-  = UnivCo (ZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co1)) r t1a t2b
+  = UnivCo (mkZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co1)) r t1a t2b
   where Pair t1a _t1b = coercionKind co1
 mkTransCo co1 co2                 = TransCo co1 co2
 
@@ -1742,23 +1745,59 @@ keyword):
 
 -}
 
+mkZappedProv :: HasDebugCallStack
+             => DTyCoVarSet
+             -> UnivCoProvenance
+mkZappedProv fvs
+  -- | debugIsOn && anyDVarSet isCoercionHole fvs = pprPanic "mkZappedProv(unexpected cohole)" (ppr fvs)
+  | otherwise =
+    ZappedProv $ filterDVarSet (not . isCoercionHole) fvs
+
+mkTcZappedProv :: HasDebugCallStack
+             => DTyCoVarSet
+             -> [CoercionHole]
+             -> UnivCoProvenance
+mkTcZappedProv fvs coholes
+  | debugIsOn && anyDVarSet isCoercionHole fvs =
+    pprPanic "mkTcZappedProv(unexpected cohole)" (ppr fvs)
+  | otherwise =
+    TcZappedProv (filterDVarSet (not . isCoercionHole) fvs) coholes
+
+-- | Smart constructor for 'TcZappedProv' 'UnivCo's.
+mkTcZappedCo :: HasDebugCallStack
+             => Pair Type
+             -> Role
+             -> DTyCoVarSet
+             -> [CoercionHole]
+             -> Coercion
+mkTcZappedCo (Pair ty1 ty2) role fvs coholes
+  = mkUnivCo (mkTcZappedProv fvs coholes) role ty1 ty2
+
+-- | Smart constructor for 'ZappedProv' 'UnivCo's.
+mkZappedCo :: HasDebugCallStack
+           => Pair Type
+           -> Role
+           -> DTyCoVarSet
+           -> Coercion
+mkZappedCo (Pair ty1 ty2) role fvs =
+    mkUnivCo (mkZappedProv fvs) role ty1 ty2
+
 -- | Make a zapped coercion if building of coercions is disabled, otherwise
 -- return the given un-zapped coercion.
-mkZappedCoercion :: HasDebugCallStack
-                 => DynFlags
-                 -> Coercion  -- ^ the un-zapped coercion
-                 -> Pair Type -- ^ the kind of the coercion
-                 -> Role      -- ^ the role of the coercion
-                 -> DTyCoVarSet -- ^ the free variables of the coercion
-                 -> Coercion
-mkZappedCoercion dflags co (Pair ty1 ty2) role fvs
+perhapsZapCoercion :: HasDebugCallStack
+                   => DynFlags
+                   -> Coercion  -- ^ the un-zapped coercion
+                   -> Pair Type -- ^ the kind of the coercion
+                   -> Role      -- ^ the role of the coercion
+                   -> DTyCoVarSet -- ^ the free variables of the coercion
+                   -> Coercion
+perhapsZapCoercion dflags co pair@(Pair ty1 ty2) role fvs
   | debugIsOn && real_role /= role =
-    pprPanic "mkZappedCoercion(roles mismatch)" panic_doc
+    pprPanic "perhapsZapCoercion(roles mismatch)" panic_doc
   | debugIsOn && not co_kind_ok =
-    pprPanic "mkZappedCoercion(kind mismatch)" panic_doc
+    pprPanic "perhapsZapCoercion(kind mismatch)" panic_doc
   | shouldBuildCoercions dflags = co
-  | otherwise =
-    mkUnivCo (ZappedProv fvs) role ty1 ty2
+  | otherwise = mkZappedCo pair role fvs
   where
     (Pair real_ty1 real_ty2, real_role) = coercionKindRole co
     real_fvs = tyCoVarsOfCoDSet co
@@ -1786,7 +1825,7 @@ zapCoercion :: DynFlags -> Coercion -> Coercion
 zapCoercion _ co@(UnivCo (ZappedProv _) _ _ _) = co  -- already zapped
 zapCoercion _ co@(Refl _) = co  -- Refl is smaller than zapped coercions
 zapCoercion dflags co =
-    mkZappedCoercion dflags co (Pair t1 t2) role fvs
+    perhapsZapCoercion dflags co (Pair t1 t2) role fvs
   where
     (Pair t1 t2, role) = coercionKindRole co
     fvs = filterDVarSet (not . isCoercionHole) $ tyCoVarsOfCoDSet co

@@ -254,6 +254,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
+   , mkZappedProv, mkTcZappedProv
    , decomposePiCos, coercionKind, coercionLKind
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo )
@@ -475,9 +476,9 @@ expandTypeSynonyms ty
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
     go_prov subst (ZappedProv fvs)
-      = ZappedProv $ substFreeDVarSet subst fvs
+      = mkZappedProv $ substFreeDVarSet subst fvs
     go_prov subst (TcZappedProv fvs coholes)
-      = TcZappedProv (substFreeDVarSet subst fvs) coholes
+      = mkTcZappedProv (substFreeDVarSet subst fvs) coholes
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -721,21 +722,18 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov _   p@(PluginProv _)    = return p
     go_prov env (ZappedProv fvs)
-      = let bndrFVs v
-              | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
-              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
-              | otherwise = pprPanic "mapCoercion(ZappedProv): Bad free variable" (ppr v)
-        in do fvs' <- unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
-              return $ ZappedProv fvs'
+      = do { fvs' <- unionDVarSets <$> mapM (bndr_fvs env) (dVarSetElems fvs)
+           ; return $ mkZappedProv fvs' }
     go_prov env (TcZappedProv fvs coholes)
-      = let bndrFVs v
-              | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
-              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
-              | otherwise = pprPanic "mapCoercion(TcZappedProv): Bad free variable" (ppr v)
-        in do fvs' <- unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
-              coholes' <- mapM (cohole env) coholes
-              let fvs'' = mapUnionDVarSet tyCoVarsOfCoDSet coholes'
-              return $ ZappedProv $ fvs' `unionDVarSet` fvs''
+      = do { fvs' <- unionDVarSets <$> mapM (bndr_fvs env) (dVarSetElems fvs)
+           ; coholes' <- mapM (cohole env) coholes
+           ; let fvs'' = mapUnionDVarSet tyCoVarsOfCoDSet coholes'
+           ; return $ mkZappedProv $ fvs' `unionDVarSet` fvs'' }
+
+    bndr_fvs env v
+      | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
+      | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
+      | otherwise = pprPanic "mapCoercion(ZappedProv): Bad free variable" (ppr v)
 
 {-
 ************************************************************************

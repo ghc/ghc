@@ -21,6 +21,7 @@ module GHC.Core.TyCo.Tidy
 import GhcPrelude
 
 import GHC.Core.TyCo.Rep
+import {-# SOURCE #-} GHC.Core.Coercion ( mkZappedProv, mkTcZappedProv )
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
 import Name hiding (varName)
@@ -230,10 +231,10 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
-    go_prov (ZappedProv fvs)    = ZappedProv $ mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs)
+    go_prov (ZappedProv fvs)    = mkZappedProv $ mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs)
     go_prov (TcZappedProv fvs coholes)
-                                = TcZappedProv (mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs))
-                                               coholes -- Tidying needed?
+                                = mkTcZappedProv (mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs))
+                                                 coholes -- Tidying needed?
 
     substCoVar cv = fromMaybe cv $ lookupVarEnv subst cv
 

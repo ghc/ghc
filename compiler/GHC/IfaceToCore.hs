@@ -1260,7 +1260,7 @@ tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
 tcIfaceUnivCoProv (IfaceZappedProv tvs cvs _)
                                             = do cvs' <- mapM tcIfaceLclId cvs
                                                  tvs' <- mapM tcIfaceTyVar tvs
-                                                 return $ ZappedProv $ mkDVarSet $ cvs' ++ tvs'
+                                                 return $ mkZappedProv $ mkDVarSet $ cvs' ++ tvs'
 
 {-
 ************************************************************************

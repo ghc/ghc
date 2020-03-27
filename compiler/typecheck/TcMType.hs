@@ -113,6 +113,7 @@ import TcRnMonad        -- TcType, amongst others
 import Constraint
 import TcEvidence
 import Id
+import IdInfo (IdDetails(CoercionHoleId))
 import Name
 import VarSet
 import TysWiredIn
@@ -328,7 +329,7 @@ newCoercionHole :: BlockSubstFlag  -- should the presence of this hole block sub
                                    -- Note [Equalities with incompatible kinds]
                 -> TcPredType -> TcM CoercionHole
 newCoercionHole blocker pred_ty
-  = do { co_var <- newEvVar pred_ty
+  = do { co_var <- fmap (`setIdDetails` CoercionHoleId) (newEvVar pred_ty)
        ; traceTc "New coercion hole:" (ppr co_var <+> ppr blocker)
        ; ref <- newMutVar Nothing
        ; return $ CoercionHole { ch_co_var = co_var, ch_blocker = blocker

@@ -9,7 +9,9 @@ import {-# SOURCE #-} GHC.Core.TyCon
 
 import BasicTypes ( LeftOrRight )
 import GHC.Core.Coercion.Axiom
+import GHC.Core.TyCo.Rep (CoercionHole)
 import Var
+import VarSet
 import Pair
 import Util
 
@@ -40,6 +42,9 @@ isReflexiveCo :: Coercion -> Bool
 decomposePiCos :: HasDebugCallStack => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
 coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind, Kind, Type, Type, Role)
 coVarRole :: CoVar -> Role
+
+mkZappedProv :: HasDebugCallStack => DTyCoVarSet -> UnivCoProvenance
+mkTcZappedProv :: HasDebugCallStack => DTyCoVarSet -> [CoercionHole] -> UnivCoProvenance
 
 mkCoercionType :: Role -> Type -> Type -> Type
 

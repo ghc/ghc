@@ -64,7 +64,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkFunCo, mkForAllCo, mkUnivCo
    , mkAxiomInstCo, mkAppCo, mkGReflCo
    , mkInstCo, mkLRCo, mkTyConAppCo
-   , mkCoercionType
+   , mkCoercionType, mkZappedProv, mkTcZappedProv
    , coercionKind, coercionLKind, coVarKindsTypesRole )
 
 import GHC.Core.TyCo.Rep
@@ -825,9 +825,9 @@ subst_co subst co
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
-    go_prov (ZappedProv fvs)     = ZappedProv (substFreeDVarSet subst fvs)
+    go_prov (ZappedProv fvs)     = mkZappedProv (substFreeDVarSet subst fvs)
     go_prov (TcZappedProv fvs coholes)
-                                 = TcZappedProv (substFreeDVarSet subst fvs) coholes
+                                 = mkTcZappedProv (substFreeDVarSet subst fvs) coholes
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
