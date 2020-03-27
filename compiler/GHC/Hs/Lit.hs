@@ -55,6 +55,8 @@ data HsLit x
       -- ^ String
   | HsStringPrim (XHsStringPrim x) {- SourceText -} ByteString
       -- ^ Packed bytes
+  | HsByteArrayPrim (XHsByteArrayPrim x) {- SourceText -} ByteString
+      -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
       -- @GHC.Tc.Deriv.Generate@, and from TRANSLATION
@@ -85,6 +87,7 @@ type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
 type instance XHsString     (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
+type instance XHsByteArrayPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
 type instance XHsWordPrim   (GhcPass _) = SourceText
@@ -157,6 +160,7 @@ convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
 convertLit (HsString a x)     = HsString a x
 convertLit (HsStringPrim a x) = HsStringPrim a x
+convertLit (HsByteArrayPrim a x) = HsByteArrayPrim a x
 convertLit (HsInt a x)        = HsInt a x
 convertLit (HsIntPrim a x)    = HsIntPrim a x
 convertLit (HsWordPrim a x)   = HsWordPrim a x
@@ -232,6 +236,7 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsCharPrim st c)   = pp_st_suffix st primCharSuffix (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
+    ppr (HsByteArrayPrim st s) = pprWithSourceText st (pprHsBytes s) -- TODO: probably not right
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
     ppr (HsInteger st i _)  = pprWithSourceText st (integer i)
@@ -269,6 +274,7 @@ pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
 pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
+pmPprHsLit (HsByteArrayPrim _ s) = pprHsBytes s -- TODO: probably not right
 pmPprHsLit (HsInt _ i)        = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i
 pmPprHsLit (HsWordPrim _ w)   = integer w
@@ -288,6 +294,7 @@ hsLitNeedsParens p = go
     go (HsCharPrim {})    = False
     go (HsString {})      = False
     go (HsStringPrim {})  = False
+    go (HsByteArrayPrim {}) = False
     go (HsInt _ x)        = p > topPrec && il_neg x
     go (HsIntPrim _ x)    = p > topPrec && x < 0
     go (HsWordPrim {})    = False

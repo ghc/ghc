@@ -43,17 +43,18 @@ cmmImplementSwitchPlans dflags g
 visitSwitches :: Platform -> CmmBlock -> UniqSM [CmmBlock]
 visitSwitches platform block
   | (entry@(CmmEntry _ scope), middle, CmmSwitch vanillaExpr ids) <- blockSplit block
-  = do
-    let plan = createSwitchPlan ids
-    -- See Note [Floating switch expressions]
-    (assignSimple, simpleExpr) <- floatSwitchExpr platform vanillaExpr
+  = case ids of
+      CmmByteArraySwitchTargets{} -> error "visitSwitches: handle CmmByteArraySwitchTargets"
+      CmmIntegralSwitchTargets ts -> do
+        let plan = createSwitchPlan ts
+        -- See Note [Floating switch expressions]
+        (assignSimple, simpleExpr) <- floatSwitchExpr platform vanillaExpr
 
-    (newTail, newBlocks) <- implementSwitchPlan platform scope simpleExpr plan
+        (newTail, newBlocks) <- implementSwitchPlan platform scope simpleExpr plan
 
-    let block' = entry `blockJoinHead` middle `blockAppend` assignSimple `blockAppend` newTail
+        let block' = entry `blockJoinHead` middle `blockAppend` assignSimple `blockAppend` newTail
 
-    return $ block' : newBlocks
-
+        return $ block' : newBlocks
   | otherwise
   = return [block]
 
@@ -86,7 +87,8 @@ implementSwitchPlan platform scope expr = go
     go (Unconditionally l)
       = return (emptyBlock `blockJoinTail` CmmBranch l, [])
     go (JumpTable ids)
-      = return (emptyBlock `blockJoinTail` CmmSwitch expr ids, [])
+      = let intIds = CmmIntegralSwitchTargets ids in
+        return (emptyBlock `blockJoinTail` CmmSwitch expr intIds, [])
     go (IfLT signed i ids1 ids2)
       = do
         (bid1, newBlocks1) <- go' ids1

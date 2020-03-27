@@ -1236,6 +1236,11 @@ cvtLit (BytesPrimL (Bytes fptr off sz)) = do
              BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
   force bs
   return $ HsStringPrim NoSourceText bs
+cvtLit (ByteArrayPrimL (Bytes fptr off sz)) = do
+  let bs = unsafePerformIO $ withForeignPtr fptr $ \ptr ->
+             BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
+  force bs
+  return $ HsByteArrayPrim NoSourceText bs
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in

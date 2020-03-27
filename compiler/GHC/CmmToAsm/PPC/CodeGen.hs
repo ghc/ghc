@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, GADTs, LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -2047,8 +2047,13 @@ genCCall' config gcp target dest_regs args
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
-genSwitch config expr targets
+genSwitch :: NCGConfig -> CmmExpr -> CmmSwitchTargets -> NatM InstrBlock
+genSwitch config expr = \case
+  CmmIntegralSwitchTargets ts -> genIntegralSwitch config expr ts
+  CmmByteArraySwitchTargets{} -> panic "PPC.genSwitch: TODO switch bytearray"
+
+genIntegralSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
+genIntegralSwitch config expr targets
   | OSAIX <- platformOS platform
   = do
         (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)

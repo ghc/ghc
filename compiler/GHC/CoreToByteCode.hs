@@ -1625,6 +1625,7 @@ pushAtom _ _ (AnnLit lit) = do
         LitChar _        -> code N
         LitNullAddr      -> code N
         LitString _      -> code N
+        LitByteArray _   -> panic "pushAtom: TODO LitByteArray"
         LitRubbish       -> code N
         LitNumber nt _ _ -> case nt of
           LitNumInt     -> code N

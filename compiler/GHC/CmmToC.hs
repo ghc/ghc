@@ -285,8 +285,10 @@ pprStmt dflags stmt =
     CmmBranch ident               -> pprBranch ident
     CmmCondBranch expr yes no _   -> pprCondBranch dflags expr yes no
     CmmCall { cml_target = expr } -> mkJMP_ (pprExpr dflags expr) <> semi
-    CmmSwitch arg ids             -> pprSwitch dflags arg ids
-
+    CmmSwitch arg ids             -> case ids of
+      CmmIntegralSwitchTargets ts -> pprSwitch dflags arg ts
+      CmmByteArraySwitchTargets{} ->
+        panic "CmmToC.pprStmt, switch on strings not allowed in C" (ppr stmt)
     _other -> pprPanic "PprC.pprStmt" (ppr stmt)
 
 type Hinted a = (a, ForeignHint)

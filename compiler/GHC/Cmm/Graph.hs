@@ -12,7 +12,7 @@ module GHC.Cmm.Graph
   , mkJumpReturnsTo
   , mkJump, mkJumpExtra
   , mkRawJump
-  , mkCbranch, mkSwitch
+  , mkCbranch, mkIntegralSwitch, mkByteArraySwitch
   , mkReturn, mkComment, mkCallEntry, mkBranch
   , mkUnwind
   , copyInOflow, copyOutOflow
@@ -27,6 +27,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.CallConv
 import GHC.Cmm.Switch (SwitchTargets)
+import GHC.Cmm.Switch.ByteArray (ByteArraySwitchTargets)
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
@@ -224,8 +225,11 @@ mkCbranch       :: CmmExpr -> BlockId -> BlockId -> Maybe Bool -> CmmAGraph
 mkCbranch pred ifso ifnot likely =
   mkLast (CmmCondBranch pred ifso ifnot likely)
 
-mkSwitch        :: CmmExpr -> SwitchTargets -> CmmAGraph
-mkSwitch e tbl   = mkLast $ CmmSwitch e tbl
+mkIntegralSwitch :: CmmExpr -> SwitchTargets -> CmmAGraph
+mkIntegralSwitch e tbl = mkLast $ CmmSwitch e (CmmIntegralSwitchTargets tbl)
+
+mkByteArraySwitch :: CmmExpr -> ByteArraySwitchTargets -> CmmAGraph
+mkByteArraySwitch e tbl = mkLast $ CmmSwitch e (CmmByteArraySwitchTargets tbl)
 
 mkReturn        :: DynFlags -> CmmExpr -> [CmmExpr] -> UpdFrameOffset
                 -> CmmAGraph

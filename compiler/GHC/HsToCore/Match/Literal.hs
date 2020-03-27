@@ -92,6 +92,7 @@ dsLit l = do
   let platform = targetPlatform dflags
   case l of
     HsStringPrim _ s -> return (Lit (LitString s))
+    HsByteArrayPrim _ s -> return (Lit (LitByteArray s))
     HsCharPrim   _ c -> return (Lit (LitChar c))
     HsIntPrim    _ i -> return (Lit (mkLitIntWrap platform i))
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
@@ -463,6 +464,7 @@ hsLitKey _        (HsCharPrim   _ c) = mkLitChar            c
 hsLitKey _        (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
 hsLitKey _        (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
 hsLitKey _        (HsString _ s)     = LitString (bytesFS s)
+hsLitKey _        (HsByteArrayPrim _ s) = LitByteArray s
 hsLitKey _        l                  = pprPanic "hsLitKey" (ppr l)
 
 {-

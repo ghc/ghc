@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -308,8 +308,13 @@ genCondJump bid bool = do
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
-genSwitch config expr targets
+genSwitch :: NCGConfig -> CmmExpr -> CmmSwitchTargets -> NatM InstrBlock
+genSwitch config expr = \case
+  CmmIntegralSwitchTargets ts -> genIntegralSwitch config expr ts
+  CmmByteArraySwitchTargets{} -> panic "SPARC.genSwitch: TODO switch bytearray"
+
+genIntegralSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
+genIntegralSwitch config expr targets
         | ncgPIC config
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 

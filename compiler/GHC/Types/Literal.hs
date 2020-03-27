@@ -37,6 +37,7 @@ module GHC.Types.Literal
         , isZeroLit
         , litFitsInChar
         , litValue, isLitValue, isLitValue_maybe, mapLitValue
+        , litByteArray
 
         -- ** Coercions
         , word2IntLit, int2WordLit
@@ -118,6 +119,9 @@ data Literal
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'
+
+  | LitByteArray ByteString     -- ^ A bytearray-literal. This does not include
+                                -- a terminator. Create with 'mkLitByteArray'.
 
   | LitNullAddr                 -- ^ The @NULL@ pointer, the only pointer value
                                 -- that can be represented as a Literal. Create
@@ -215,19 +219,20 @@ instance Binary LitNumType where
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
-    put_ bh (LitNullAddr)    = do putByte bh 2
-    put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
-    put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
+    put_ bh (LitByteArray ab) = do putByte bh 2; put_ bh ab
+    put_ bh (LitNullAddr)    = do putByte bh 3
+    put_ bh (LitFloat ah)    = do putByte bh 4; put_ bh ah
+    put_ bh (LitDouble ai)   = do putByte bh 5; put_ bh ai
     put_ bh (LitLabel aj mb fod)
-        = do putByte bh 5
+        = do putByte bh 6
              put_ bh aj
              put_ bh mb
              put_ bh fod
     put_ bh (LitNumber nt i _)
-        = do putByte bh 6
+        = do putByte bh 7
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish)     = do putByte bh 7
+    put_ bh (LitRubbish)     = do putByte bh 8
     get bh = do
             h <- getByte bh
             case h of
@@ -238,19 +243,22 @@ instance Binary Literal where
                     ab <- get bh
                     return (LitString ab)
               2 -> do
-                    return (LitNullAddr)
+                    ab <- get bh
+                    return (LitByteArray ab)
               3 -> do
+                    return (LitNullAddr)
+              4 -> do
                     ah <- get bh
                     return (LitFloat ah)
-              4 -> do
+              5 -> do
                     ai <- get bh
                     return (LitDouble ai)
-              5 -> do
+              6 -> do
                     aj <- get bh
                     mb <- get bh
                     fod <- get bh
                     return (LitLabel aj mb fod)
-              6 -> do
+              7 -> do
                     nt <- get bh
                     i  <- get bh
                     -- Note [Types of LitNumbers]
@@ -456,6 +464,12 @@ isZeroLit (LitFloat  0)     = True
 isZeroLit (LitDouble 0)     = True
 isZeroLit _                 = False
 
+-- | Returns the 'ByteString' contained in the 'Literal' if the literal
+-- is a byte array. Panics otherwise.
+litByteArray  :: Literal -> ByteString
+litByteArray (LitByteArray b) = b
+litByteArray _ = panic "litByteArray"
+
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
 litValue  :: Literal -> Integer
@@ -593,9 +607,13 @@ rubbishLit = LitRubbish
 -- Ultimately the solution here is to make primitive strings a bit more
 -- structured, ensuring that the compiler can't inline in ways that will break
 -- user code. One approach to this is described in #8472.
+--
+-- Unlike LitString, LitByteArray is considered trivial. TODO: elaborate
+-- on why this is so.
 litIsTrivial :: Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsTrivial
 litIsTrivial (LitString _)      = False
+litIsTrivial (LitByteArray _)   = False
 litIsTrivial (LitNumber nt _ _) = case nt of
   LitNumInteger -> False
   LitNumNatural -> False
@@ -617,6 +635,7 @@ litIsDupable platform x = case x of
       LitNumWord    -> True
       LitNumWord64  -> True
    (LitString _) -> False
+   (LitByteArray _) -> False -- TODO: explain this choice
    _             -> True
 
 litFitsInChar :: Literal -> Bool
@@ -663,7 +682,8 @@ simply reads the field.
 literalType :: Literal -> Type
 literalType LitNullAddr       = addrPrimTy
 literalType (LitChar _)       = charPrimTy
-literalType (LitString  _)    = addrPrimTy
+literalType (LitString _)     = addrPrimTy
+literalType (LitByteArray _)  = byteArrayPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
@@ -699,6 +719,7 @@ absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
 cmpLit :: Literal -> Literal -> Ordering
 cmpLit (LitChar      a)     (LitChar       b)     = a `compare` b
 cmpLit (LitString    a)     (LitString     b)     = a `compare` b
+cmpLit (LitByteArray a)     (LitByteArray  b)     = a `compare` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
@@ -714,12 +735,13 @@ cmpLit lit1 lit2
 litTag :: Literal -> Int
 litTag (LitChar      _)   = 1
 litTag (LitString    _)   = 2
-litTag (LitNullAddr)      = 3
-litTag (LitFloat     _)   = 4
-litTag (LitDouble    _)   = 5
-litTag (LitLabel _ _ _)   = 6
-litTag (LitNumber  {})    = 7
-litTag (LitRubbish)       = 8
+litTag (LitByteArray _)   = 3
+litTag (LitNullAddr)      = 4
+litTag (LitFloat     _)   = 5
+litTag (LitDouble    _)   = 6
+litTag (LitLabel _ _ _)   = 7
+litTag (LitNumber  {})    = 8
+litTag (LitRubbish)       = 9
 
 {-
         Printing
@@ -730,6 +752,7 @@ litTag (LitRubbish)       = 8
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 pprLiteral _       (LitChar c)     = pprPrimChar c
 pprLiteral _       (LitString s)   = pprHsBytes s
+pprLiteral _       (LitByteArray s) = pprHsBytes s -- TODO: fix this
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
@@ -779,6 +802,7 @@ Literal         Output             Output if context requires
 -------         -------            ----------------------
 LitChar         'a'#
 LitString       "aaa"#
+LitByteArray    "aaa"##
 LitNullAddr     "__NULL"
 LitInt          -1#
 LitInt64        -1L#

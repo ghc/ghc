@@ -42,16 +42,20 @@ where
 
 import GHC.Prelude hiding (succ)
 
+import Data.Bifunctor (first)
 import GHC.Platform
 import GHC.Driver.Session (targetPlatform)
 import GHC.Cmm.CLabel
 import GHC.Cmm
+import GHC.Cmm.Node
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Cmm.Switch.ByteArray
 import GHC.Cmm.Ppr.Decl
 import GHC.Cmm.Ppr.Expr
+import GHC.Data.FastString
 import GHC.Utils.Misc
 
 import GHC.Types.Basic
@@ -248,10 +252,17 @@ pprNode platform node = pp_node <+> pp_debug
                      ])
              4 (vcat (map ppCase cases) $$ def) $$ rbrace
           where
-            (cases, mbdef) = switchTargetsFallThrough ids
+            (cases, mbdef) = case ids of
+              CmmByteArraySwitchTargets ts ->
+                -- TODO: pprHsBytes might not be right. Not sure.
+                let (arms,def) = byteArraySwitchTargetsFallThrough ts
+                 in ((fmap.first.fmap) pprHsBytes arms,Just def)
+              CmmIntegralSwitchTargets ts ->
+                let (arms,mbdef) = switchTargetsFallThrough ts
+                 in ((fmap.first.fmap) integer arms,mbdef)
             ppCase (is,l) = hsep
                             [ text "case"
-                            , commafy $ map integer is
+                            , commafy is
                             , text ": goto"
                             , ppr l <> semi
                             ]
@@ -261,8 +272,11 @@ pprNode platform node = pp_node <+> pp_debug
                             ]
                 | otherwise = empty
 
-            range = brackets $ hsep [integer lo, text "..", integer hi]
-              where (lo,hi) = switchTargetsRange ids
+            range = case ids of
+              CmmByteArraySwitchTargets _ -> empty
+              CmmIntegralSwitchTargets ts ->
+                let (lo,hi) = switchTargetsRange ts in
+                brackets $ hsep [integer lo, text "..", integer hi]
 
       CmmCall tgt k regs out res updfr_off ->
           hcat [ text "call", space

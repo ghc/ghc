@@ -175,12 +175,18 @@ lintCmmLast labels node = case node of
 
   CmmSwitch e ids -> do
             platform <- getPlatform
-            mapM_ checkTarget $ switchTargetsToList ids
+            mapM_ checkTarget $ cmmSwitchTargetsToList ids
             erep <- lintCmmExpr e
-            if (erep `cmmEqType_ignoring_ptrhood` bWord platform)
+            let expectedType = case ids of
+                  CmmIntegralSwitchTargets{} -> bWord platform
+                  CmmByteArraySwitchTargets{} -> gcWord platform
+                typeName = case ids of
+                  CmmIntegralSwitchTargets{} -> text "word: "
+                  CmmByteArraySwitchTargets{} -> text "pointer: "
+            if (erep `cmmEqType_ignoring_ptrhood` expectedType)
               then return ()
-              else cmmLintErr (text "switch scrutinee is not a word: " <>
-                               ppr e <> text " :: " <> ppr erep)
+              else cmmLintErr (text "switch scrutinee is not a " <>
+                                 typeName <> ppr e <> text " :: " <> ppr erep)
 
   CmmCall { cml_target = target, cml_cont = cont } -> do
           _ <- lintCmmExpr target

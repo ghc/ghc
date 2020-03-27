@@ -250,6 +250,7 @@ Library
         GHC.Cmm.MachOp
         GHC.Cmm.Monad
         GHC.Cmm.Switch
+        GHC.Cmm.Switch.ByteArray
         GHC.Cmm.Node
         GHC.Cmm.Opt
         GHC.Cmm.Parser

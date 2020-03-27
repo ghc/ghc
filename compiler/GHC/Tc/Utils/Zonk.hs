@@ -131,6 +131,7 @@ hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
 hsLitType (HsStringPrim _ _) = addrPrimTy
+hsLitType (HsByteArrayPrim _ _) = byteArrayPrimTy
 hsLitType (HsInt _ _)        = intTy
 hsLitType (HsIntPrim _ _)    = intPrimTy
 hsLitType (HsWordPrim _ _)   = wordPrimTy
