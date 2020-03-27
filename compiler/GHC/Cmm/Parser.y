@@ -467,7 +467,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
                                    mkHeapRep dflags False (fromIntegral $5)
-                                                   (fromIntegral $7) Thunk
+                                                   (fromIntegral $7) (Thunk False {- assume not single entry -})
                               -- not really Thunk, but that makes the info table
                               -- we want.
                       return (mkCmmEntryLabel pkg $3,
@@ -518,7 +518,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                 {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
+                          ty  = ThunkSelector (fromIntegral $5) False {- assume not single entry -}
                           rep = mkRTSRep (fromIntegral $7) $
                                    mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
