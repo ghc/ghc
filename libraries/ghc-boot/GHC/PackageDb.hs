@@ -46,23 +46,27 @@
 -- is kept in the file but here we treat it as an opaque blob of data. That way
 -- this library avoids depending on Cabal.
 --
-module GHC.PackageDb (
-       InstalledPackageInfo(..),
-       DbModule(..),
-       DbUnitId(..),
-       BinaryStringRep(..),
-       DbUnitIdModuleRep(..),
-       emptyInstalledPackageInfo,
-       PackageDbLock,
-       lockPackageDb,
-       unlockPackageDb,
-       DbMode(..),
-       DbOpenMode(..),
-       isDbOpenReadMode,
-       readPackageDbForGhc,
-       readPackageDbForGhcPkg,
-       writePackageDb
-  ) where
+module GHC.PackageDb
+   ( GenericUnitInfo(..)
+   , emptyGenericUnitInfo
+   -- * Read and write
+   , DbMode(..)
+   , DbOpenMode(..)
+   , isDbOpenReadMode
+   , readPackageDbForGhc
+   , readPackageDbForGhcPkg
+   , writePackageDb
+   -- * Locking
+   , PackageDbLock
+   , lockPackageDb
+   , unlockPackageDb
+   -- * Misc
+   , DbModule(..)
+   , DbUnitId(..)
+   , BinaryStringRep(..)
+   , DbUnitIdModuleRep(..)
+   )
+where
 
 import Prelude -- See note [Why do we import Prelude here?]
 import Data.Version (Version(..))
@@ -85,49 +89,155 @@ import GHC.IO.Handle.Lock
 import System.Directory
 
 
--- | This is a subset of Cabal's 'InstalledPackageInfo', with just the bits
--- that GHC is interested in.  See Cabal's documentation for a more detailed
--- description of all of the fields.
+-- | Information about an unit (a unit is an installed module library).
 --
-data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulename mod
-   = InstalledPackageInfo {
-       unitId             :: instunitid,
-       componentId        :: compid,
-       instantiatedWith   :: [(modulename, mod)],
-       sourcePackageId    :: srcpkgid,
-       packageName        :: srcpkgname,
-       packageVersion     :: Version,
-       sourceLibName      :: Maybe srcpkgname,
-       abiHash            :: String,
-       depends            :: [instunitid],
-       -- | Like 'depends', but each dependency is annotated with the
-       -- ABI hash we expect the dependency to respect.
-       abiDepends         :: [(instunitid, String)],
-       importDirs         :: [FilePath],
-       hsLibraries        :: [String],
-       extraLibraries     :: [String],
-       extraGHCiLibraries :: [String],
-       libraryDirs        :: [FilePath],
-       libraryDynDirs     :: [FilePath],
-       frameworks         :: [String],
-       frameworkDirs      :: [FilePath],
-       ldOptions          :: [String],
-       ccOptions          :: [String],
-       includes           :: [String],
-       includeDirs        :: [FilePath],
-       haddockInterfaces  :: [FilePath],
-       haddockHTMLs       :: [FilePath],
-       exposedModules     :: [(modulename, Maybe mod)],
-       hiddenModules      :: [modulename],
-       indefinite         :: Bool,
-       exposed            :: Bool,
-       trusted            :: Bool
-     }
-  deriving (Eq, Show)
+-- This is a subset of Cabal's 'InstalledPackageInfo', with just the bits
+-- that GHC is interested in.
+--
+-- Some types are left as parameters to be instantiated differently in ghc-pkg
+-- and in ghc itself.
+--
+data GenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod = GenericUnitInfo
+   { unitId             :: instunitid
+      -- ^ Unique unit identifier that is used during compilation (e.g. to
+      -- generate symbols).
+
+   , unitInstanceOf     :: compid
+      -- ^ Identifier of an indefinite unit (i.e. with module holes) that this
+      -- unit is an instance of.
+
+   , unitInstantiations :: [(modulename, mod)]
+      -- ^ How this unit instantiates some of its module holes. Map hole module
+      -- names to actual module
+
+   , unitPackageId      :: srcpkgid
+      -- ^ Source package identifier.
+      --
+      -- Cabal instantiates this with Distribution.Types.PackageId.PackageId
+      -- type which only contains the source package name and version. Notice
+      -- that it doesn't contain the Hackage revision, nor any kind of hash.
+
+   , unitPackageName    :: srcpkgname
+      -- ^ Source package name
+
+   , unitPackageVersion :: Version
+      -- ^ Source package version
+
+   , unitComponentName  :: Maybe srcpkgname
+      -- ^ Name of the component.
+      --
+      -- Cabal supports more than one components (libraries, executables,
+      -- testsuites) in the same package. Each component has a name except the
+      -- default one (that can only be a library component) for which we use
+      -- "Nothing".
+      --
+      -- GHC only deals with "library" components as they are the only kind of
+      -- components that can be registered in a database and used by other
+      -- modules.
+
+   , unitAbiHash        :: String
+      -- ^ ABI hash used to avoid mixing up units compiled with different
+      -- dependencies, compiler, options, etc.
+
+   , unitDepends        :: [instunitid]
+      -- ^ Identifiers of the units this one depends on
+
+   , unitAbiDepends     :: [(instunitid, String)]
+     -- ^ Like 'unitDepends', but each dependency is annotated with the ABI hash
+     -- we expect the dependency to respect.
+
+   , unitImportDirs     :: [FilePath]
+      -- ^ Directories containing module interfaces
+
+   , unitLibraries      :: [String]
+      -- ^ Names of the Haskell libraries provided by this unit
+
+   , unitExtDepLibsSys  :: [String]
+      -- ^ Names of the external system libraries that this unit depends on. See
+      -- also `unitExtDepLibsGhc` field.
+
+   , unitExtDepLibsGhc  :: [String]
+      -- ^ Because of slight differences between the GHC dynamic linker (in
+      -- GHC.Runtime.Linker) and the
+      -- native system linker, some packages have to link with a different list
+      -- of libraries when using GHC's. Examples include: libs that are actually
+      -- gnu ld scripts, and the possibility that the .a libs do not exactly
+      -- match the .so/.dll equivalents.
+      --
+      -- If this field is set, then we use that instead of the
+      -- `unitExtDepLibsSys` field.
+
+   , unitLibraryDirs    :: [FilePath]
+      -- ^ Directories containing libraries provided by this unit. See also
+      -- `unitLibraryDynDirs`.
+      --
+      -- It seems to be used to store paths to external library dependencies
+      -- too.
+
+   , unitLibraryDynDirs :: [FilePath]
+      -- ^ Directories containing the dynamic libraries provided by this unit.
+      -- See also `unitLibraryDirs`.
+      --
+      -- It seems to be used to store paths to external dynamic library
+      -- dependencies too.
+
+   , unitExtDepFrameworks :: [String]
+      -- ^ Names of the external MacOS frameworks that this unit depends on.
+
+   , unitExtDepFrameworkDirs :: [FilePath]
+      -- ^ Directories containing MacOS frameworks that this unit depends
+      -- on.
+
+   , unitLinkerOptions  :: [String]
+      -- ^ Linker (e.g. ld) command line options
+
+   , unitCcOptions      :: [String]
+      -- ^ C compiler options that needs to be passed to the C compiler when we
+      -- compile some C code against this unit.
+
+   , unitIncludes       :: [String]
+      -- ^ C header files that are required by this unit (provided by this unit
+      -- or external)
+
+   , unitIncludeDirs    :: [FilePath]
+      -- ^ Directories containing C header files that this unit depends
+      -- on.
+
+   , unitHaddockInterfaces :: [FilePath]
+      -- ^ Paths to Haddock interface files for this unit
+
+   , unitHaddockHTMLs   :: [FilePath]
+      -- ^ Paths to Haddock directories containing HTML files
+
+   , unitExposedModules :: [(modulename, Maybe mod)]
+      -- ^ Modules exposed by the unit.
+      --
+      -- A module can be re-exported from another package. In this case, we
+      -- indicate the module origin in the second parameter.
+
+   , unitHiddenModules  :: [modulename]
+      -- ^ Hidden modules.
+      --
+      -- These are useful for error reporting (e.g. if a hidden module is
+      -- imported)
+
+   , unitIsIndefinite   :: Bool
+      -- ^ True if this unit has some module holes that need to be instantiated
+      -- with real modules to make the unit usable (a.k.a. Backpack).
+
+   , unitIsExposed      :: Bool
+      -- ^ True if the unit is exposed. A unit could be installed in a database
+      -- by "disabled" by not being exposed.
+
+   , unitIsTrusted      :: Bool
+      -- ^ True if the unit is trusted (cf Safe Haskell)
+
+   }
+   deriving (Eq, Show)
 
 -- | A convenience constraint synonym for common constraints over parameters
--- to 'InstalledPackageInfo'.
-type RepInstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulename mod =
+-- to 'GenericUnitInfo'.
+type RepGenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod =
     (BinaryStringRep srcpkgid, BinaryStringRep srcpkgname,
      BinaryStringRep modulename, BinaryStringRep compid,
      BinaryStringRep instunitid,
@@ -172,39 +282,39 @@ class BinaryStringRep a where
   fromStringRep :: BS.ByteString -> a
   toStringRep   :: a -> BS.ByteString
 
-emptyInstalledPackageInfo :: RepInstalledPackageInfo a b c d e f g
-                          => InstalledPackageInfo a b c d e f g
-emptyInstalledPackageInfo =
-  InstalledPackageInfo {
-       unitId             = fromStringRep BS.empty,
-       componentId        = fromStringRep BS.empty,
-       instantiatedWith   = [],
-       sourcePackageId    = fromStringRep BS.empty,
-       packageName        = fromStringRep BS.empty,
-       packageVersion     = Version [] [],
-       sourceLibName      = Nothing,
-       abiHash            = "",
-       depends            = [],
-       abiDepends         = [],
-       importDirs         = [],
-       hsLibraries        = [],
-       extraLibraries     = [],
-       extraGHCiLibraries = [],
-       libraryDirs        = [],
-       libraryDynDirs     = [],
-       frameworks         = [],
-       frameworkDirs      = [],
-       ldOptions          = [],
-       ccOptions          = [],
-       includes           = [],
-       includeDirs        = [],
-       haddockInterfaces  = [],
-       haddockHTMLs       = [],
-       exposedModules     = [],
-       hiddenModules      = [],
-       indefinite         = False,
-       exposed            = False,
-       trusted            = False
+emptyGenericUnitInfo :: RepGenericUnitInfo a b c d e f g
+                          => GenericUnitInfo a b c d e f g
+emptyGenericUnitInfo =
+  GenericUnitInfo {
+       unitId                  = fromStringRep BS.empty,
+       unitInstanceOf          = fromStringRep BS.empty,
+       unitInstantiations      = [],
+       unitPackageId           = fromStringRep BS.empty,
+       unitPackageName         = fromStringRep BS.empty,
+       unitPackageVersion      = Version [] [],
+       unitComponentName       = Nothing,
+       unitAbiHash             = "",
+       unitDepends             = [],
+       unitAbiDepends          = [],
+       unitImportDirs          = [],
+       unitLibraries           = [],
+       unitExtDepLibsSys       = [],
+       unitExtDepLibsGhc       = [],
+       unitLibraryDirs         = [],
+       unitLibraryDynDirs      = [],
+       unitExtDepFrameworks    = [],
+       unitExtDepFrameworkDirs = [],
+       unitLinkerOptions       = [],
+       unitCcOptions           = [],
+       unitIncludes            = [],
+       unitIncludeDirs         = [],
+       unitHaddockInterfaces   = [],
+       unitHaddockHTMLs        = [],
+       unitExposedModules      = [],
+       unitHiddenModules       = [],
+       unitIsIndefinite        = False,
+       unitIsExposed           = False,
+       unitIsTrusted           = False
   }
 
 -- | Represents a lock of a package db.
@@ -284,8 +394,8 @@ isDbOpenReadMode = \case
 
 -- | Read the part of the package DB that GHC is interested in.
 --
-readPackageDbForGhc :: RepInstalledPackageInfo a b c d e f g =>
-                       FilePath -> IO [InstalledPackageInfo a b c d e f g]
+readPackageDbForGhc :: RepGenericUnitInfo a b c d e f g =>
+                       FilePath -> IO [GenericUnitInfo a b c d e f g]
 readPackageDbForGhc file =
   decodeFromFile file DbOpenReadOnly getDbForGhc >>= \case
     (pkgs, DbOpenReadOnly) -> return pkgs
@@ -323,8 +433,8 @@ readPackageDbForGhcPkg file mode =
 
 -- | Write the whole of the package DB, both parts.
 --
-writePackageDb :: (Binary pkgs, RepInstalledPackageInfo a b c d e f g) =>
-                  FilePath -> [InstalledPackageInfo a b c d e f g] ->
+writePackageDb :: (Binary pkgs, RepGenericUnitInfo a b c d e f g) =>
+                  FilePath -> [GenericUnitInfo a b c d e f g] ->
                   pkgs -> IO ()
 writePackageDb file ghcPkgs ghcPkgPart =
   writeFileAtomic file (runPut putDbForGhcPkg)
@@ -430,106 +540,107 @@ writeFileAtomic targetPath content = do
         hClose handle
         renameFile tmpPath targetPath)
 
-instance (RepInstalledPackageInfo a b c d e f g) =>
-         Binary (InstalledPackageInfo a b c d e f g) where
-  put (InstalledPackageInfo
-         unitId componentId instantiatedWith sourcePackageId
-         packageName packageVersion
-         sourceLibName
-         abiHash depends abiDepends importDirs
-         hsLibraries extraLibraries extraGHCiLibraries
-         libraryDirs libraryDynDirs
-         frameworks frameworkDirs
-         ldOptions ccOptions
-         includes includeDirs
-         haddockInterfaces haddockHTMLs
-         exposedModules hiddenModules
-         indefinite exposed trusted) = do
-    put (toStringRep sourcePackageId)
-    put (toStringRep packageName)
-    put packageVersion
-    put (fmap toStringRep sourceLibName)
+instance (RepGenericUnitInfo a b c d e f g) =>
+         Binary (GenericUnitInfo a b c d e f g) where
+  put (GenericUnitInfo
+         unitId unitInstanceOf unitInstantiations
+         unitPackageId
+         unitPackageName unitPackageVersion
+         unitComponentName
+         unitAbiHash unitDepends unitAbiDepends unitImportDirs
+         unitLibraries unitExtDepLibsSys unitExtDepLibsGhc
+         unitLibraryDirs unitLibraryDynDirs
+         unitExtDepFrameworks unitExtDepFrameworkDirs
+         unitLinkerOptions unitCcOptions
+         unitIncludes unitIncludeDirs
+         unitHaddockInterfaces unitHaddockHTMLs
+         unitExposedModules unitHiddenModules
+         unitIsIndefinite unitIsExposed unitIsTrusted) = do
+    put (toStringRep unitPackageId)
+    put (toStringRep unitPackageName)
+    put unitPackageVersion
+    put (fmap toStringRep unitComponentName)
     put (toStringRep unitId)
-    put (toStringRep componentId)
+    put (toStringRep unitInstanceOf)
     put (map (\(mod_name, mod) -> (toStringRep mod_name, toDbModule mod))
-             instantiatedWith)
-    put abiHash
-    put (map toStringRep depends)
-    put (map (\(k,v) -> (toStringRep k, v)) abiDepends)
-    put importDirs
-    put hsLibraries
-    put extraLibraries
-    put extraGHCiLibraries
-    put libraryDirs
-    put libraryDynDirs
-    put frameworks
-    put frameworkDirs
-    put ldOptions
-    put ccOptions
-    put includes
-    put includeDirs
-    put haddockInterfaces
-    put haddockHTMLs
+             unitInstantiations)
+    put unitAbiHash
+    put (map toStringRep unitDepends)
+    put (map (\(k,v) -> (toStringRep k, v)) unitAbiDepends)
+    put unitImportDirs
+    put unitLibraries
+    put unitExtDepLibsSys
+    put unitExtDepLibsGhc
+    put unitLibraryDirs
+    put unitLibraryDynDirs
+    put unitExtDepFrameworks
+    put unitExtDepFrameworkDirs
+    put unitLinkerOptions
+    put unitCcOptions
+    put unitIncludes
+    put unitIncludeDirs
+    put unitHaddockInterfaces
+    put unitHaddockHTMLs
     put (map (\(mod_name, mb_mod) -> (toStringRep mod_name, fmap toDbModule mb_mod))
-             exposedModules)
-    put (map toStringRep hiddenModules)
-    put indefinite
-    put exposed
-    put trusted
+             unitExposedModules)
+    put (map toStringRep unitHiddenModules)
+    put unitIsIndefinite
+    put unitIsExposed
+    put unitIsTrusted
 
   get = do
-    sourcePackageId    <- get
-    packageName        <- get
-    packageVersion     <- get
-    sourceLibName      <- get
+    unitPackageId      <- get
+    unitPackageName    <- get
+    unitPackageVersion <- get
+    unitComponentName  <- get
     unitId             <- get
-    componentId        <- get
-    instantiatedWith   <- get
-    abiHash            <- get
-    depends            <- get
-    abiDepends         <- get
-    importDirs         <- get
-    hsLibraries        <- get
-    extraLibraries     <- get
-    extraGHCiLibraries <- get
+    unitInstanceOf     <- get
+    unitInstantiations <- get
+    unitAbiHash        <- get
+    unitDepends        <- get
+    unitAbiDepends     <- get
+    unitImportDirs     <- get
+    unitLibraries      <- get
+    unitExtDepLibsSys  <- get
+    unitExtDepLibsGhc  <- get
     libraryDirs        <- get
     libraryDynDirs     <- get
     frameworks         <- get
     frameworkDirs      <- get
-    ldOptions          <- get
-    ccOptions          <- get
-    includes           <- get
-    includeDirs        <- get
-    haddockInterfaces  <- get
-    haddockHTMLs       <- get
-    exposedModules     <- get
-    hiddenModules      <- get
-    indefinite         <- get
-    exposed            <- get
-    trusted            <- get
-    return (InstalledPackageInfo
+    unitLinkerOptions  <- get
+    unitCcOptions      <- get
+    unitIncludes       <- get
+    unitIncludeDirs    <- get
+    unitHaddockInterfaces <- get
+    unitHaddockHTMLs   <- get
+    unitExposedModules <- get
+    unitHiddenModules  <- get
+    unitIsIndefinite   <- get
+    unitIsExposed      <- get
+    unitIsTrusted      <- get
+    return (GenericUnitInfo
               (fromStringRep unitId)
-              (fromStringRep componentId)
+              (fromStringRep unitInstanceOf)
               (map (\(mod_name, mod) -> (fromStringRep mod_name, fromDbModule mod))
-                instantiatedWith)
-              (fromStringRep sourcePackageId)
-              (fromStringRep packageName) packageVersion
-              (fmap fromStringRep sourceLibName)
-              abiHash
-              (map fromStringRep depends)
-              (map (\(k,v) -> (fromStringRep k, v)) abiDepends)
-              importDirs
-              hsLibraries extraLibraries extraGHCiLibraries
+                unitInstantiations)
+              (fromStringRep unitPackageId)
+              (fromStringRep unitPackageName) unitPackageVersion
+              (fmap fromStringRep unitComponentName)
+              unitAbiHash
+              (map fromStringRep unitDepends)
+              (map (\(k,v) -> (fromStringRep k, v)) unitAbiDepends)
+              unitImportDirs
+              unitLibraries unitExtDepLibsSys unitExtDepLibsGhc
               libraryDirs libraryDynDirs
               frameworks frameworkDirs
-              ldOptions ccOptions
-              includes includeDirs
-              haddockInterfaces haddockHTMLs
+              unitLinkerOptions unitCcOptions
+              unitIncludes unitIncludeDirs
+              unitHaddockInterfaces unitHaddockHTMLs
               (map (\(mod_name, mb_mod) ->
                         (fromStringRep mod_name, fmap fromDbModule mb_mod))
-                   exposedModules)
-              (map fromStringRep hiddenModules)
-              indefinite exposed trusted)
+                   unitExposedModules)
+              (map fromStringRep unitHiddenModules)
+              unitIsIndefinite unitIsExposed unitIsTrusted)
 
 instance (BinaryStringRep modulename, BinaryStringRep compid,
           BinaryStringRep instunitid,
