@@ -63,10 +63,14 @@ library
 
   hs-source-dirs: src
 
-  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs -O2
-  ghc-options: -Wall
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wnoncanonical-monad-instances
+  ghc-options: -funbox-strict-fields -O2
+               -Wall
+               -Wcompat
+               -Widentities
+               -Wredundant-constraints
+               -Wnoncanonical-monad-instances
+               -Wmissing-home-modules
+
 
   exposed-modules:
     Documentation.Haddock

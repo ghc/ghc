@@ -44,7 +44,7 @@ common lib-defaults
     , text         ^>= 1.2.3.0
     , parsec       ^>= 3.1.13.0
 
-  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs
+  ghc-options: -funbox-strict-fields -Wall
   if impl(ghc >= 8.0)
     ghc-options: -Wcompat -Wnoncanonical-monad-instances
 
