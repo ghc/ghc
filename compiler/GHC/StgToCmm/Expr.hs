@@ -341,6 +341,16 @@ exist, perhaps because the occurrence information preserved by
 job we deleted the hacks.
 -}
 
+cgCase (StgOpApp (StgPrimOp PushCatchFrameOp) args _) _ _ alts
+  | [(_, _, rhs)] <- alts
+  = do { arg_exprs <- getNonVoidArgAmodes args
+       ; case arg_exprs of
+           [handler_expr] -> do
+             emitCatchFrame handler_expr (cgExpr rhs)
+           _ ->
+             panic "Unexpected"
+       }
+
 cgCase (StgApp v []) _ (PrimAlt _) alts
   | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
   , [(DEFAULT, _, rhs)] <- alts

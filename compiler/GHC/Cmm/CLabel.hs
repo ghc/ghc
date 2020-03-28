@@ -45,6 +45,7 @@ module GHC.Cmm.CLabel (
         mkUpdInfoLabel,
         mkBHUpdInfoLabel,
         mkIndStaticInfoLabel,
+        mkCatchInfoLabel,
         mkMainCapabilityLabel,
         mkMAP_FROZEN_CLEAN_infoLabel,
         mkMAP_FROZEN_DIRTY_infoLabel,
@@ -493,7 +494,7 @@ mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label,
     mkNonmovingWriteBarrierEnabledLabel,
-    mkUpdInfoLabel,
+    mkUpdInfoLabel, mkCatchInfoLabel,
     mkBHUpdInfoLabel, mkIndStaticInfoLabel, mkMainCapabilityLabel,
     mkMAP_FROZEN_CLEAN_infoLabel, mkMAP_FROZEN_DIRTY_infoLabel,
     mkMAP_DIRTY_infoLabel,
@@ -508,6 +509,7 @@ mkNonmovingWriteBarrierEnabledLabel
 mkUpdInfoLabel                  = CmmLabel rtsUnitId (fsLit "stg_upd_frame")         CmmInfo
 mkBHUpdInfoLabel                = CmmLabel rtsUnitId (fsLit "stg_bh_upd_frame" )     CmmInfo
 mkIndStaticInfoLabel            = CmmLabel rtsUnitId (fsLit "stg_IND_STATIC")        CmmInfo
+mkCatchInfoLabel                = CmmLabel rtsUnitId (fsLit "stg_catch_frame")       CmmInfo
 mkMainCapabilityLabel           = CmmLabel rtsUnitId (fsLit "MainCapability")        CmmData
 mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
 mkMAP_FROZEN_DIRTY_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo

@@ -2589,6 +2589,14 @@ primop  CatchOp "catch#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop PushCatchFrameOp "pushCatchFrame#" GenPrimOp
+       (a -> State# RealWorld -> (# State# RealWorld, b #))
+    -> State# RealWorld
+    -> State# RealWorld
+  with
+    out_of_line = True
+    has_side_effects = True
+
 primop  RaiseOp "raise#" GenPrimOp
    b -> o
       -- NB: the type variable "o" is "a", but with OpenKind
