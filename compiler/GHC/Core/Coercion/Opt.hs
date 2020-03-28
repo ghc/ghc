@@ -559,8 +559,9 @@ opt_univ env sym prov role oty1 oty2
       PluginProv _       -> prov
 
 -------------
-opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
-opt_transList is = zipWith (opt_trans is)
+opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
+opt_transList is = zipWithEqual "opt_transList" (opt_trans is)
+  -- The input lists must have identical length.
 
 opt_trans :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
 opt_trans is co1 co2
@@ -659,14 +660,12 @@ opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
-  = ASSERT( cos1 `equalLength` cos2 )
-    fireTransRule "EtaCompL" co1 co2 $
+  = fireTransRule "EtaCompL" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
 opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
   | Just cos1 <- etaTyConAppCo_maybe tc co1
-  = ASSERT( cos1 `equalLength` cos2 )
-    fireTransRule "EtaCompR" co1 co2 $
+  = fireTransRule "EtaCompR" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
 opt_trans_rule is co1@(AppCo co1a co1b) co2
