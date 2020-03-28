@@ -492,7 +492,7 @@ ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, t
       +++ shortSubDecls False
           (
             [ ppAssocType summary links doc at [] splice unicode pkg qual | at <- ats
-              , let doc = lookupAnySubdoc (unL $ fdLName $ unL at) subdocs ]  ++
+              , let doc = lookupAnySubdoc (unLoc $ fdLName $ unLoc at) subdocs ]  ++
 
                 -- ToDo: add associated type defaults
 
@@ -544,7 +544,7 @@ ppClassDecl summary links instances fixities loc d subdocs
           <+>
         subDefaults (maybeToList defTys)
       | at <- ats
-      , let name = unL . fdLName $ unL at
+      , let name = unLoc . fdLName $ unLoc at
             doc = lookupAnySubdoc name subdocs
             subfixs = filter ((== name) . fst) fixities
             defTys = (declElem . ppDefaultAssocTy name) <$> lookupDAT name

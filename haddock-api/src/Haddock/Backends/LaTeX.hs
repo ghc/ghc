@@ -624,7 +624,7 @@ ppClassDecl instances doc subdocs
       text "\\haddockpremethods{}" <> emph (text "Associated Types") $$
       vcat  [ ppFamDecl True (fst doc) [] (FamDecl noExtField decl) True
             | L _ decl <- ats
-            , let name = unL . fdLName $ decl
+            , let name = unLoc . fdLName $ decl
                   doc = lookupAnySubdoc name subdocs
             ]
 

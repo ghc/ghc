@@ -319,8 +319,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
       case con_args d of
         PrefixCon _ -> Just d
         RecCon fields
-          | all field_avail (unL fields) -> Just d
-          | otherwise -> Just (d { con_args = PrefixCon (field_types (map unL (unL fields))) })
+          | all field_avail (unLoc fields) -> Just d
+          | otherwise -> Just (d { con_args = PrefixCon (field_types (map unLoc (unLoc fields))) })
           -- if we have *all* the field names available, then
           -- keep the record declaration.  Otherwise degrade to
           -- a constructor declaration.  This isn't quite right, but
@@ -340,7 +340,7 @@ restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 
 
 restrictATs :: [Name] -> [LFamilyDecl GhcRn] -> [LFamilyDecl GhcRn]
-restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
+restrictATs names ats = [ at | at <- ats , unLoc (fdLName (unLoc at)) `elem` names ]
 
 
 -------------------------------------------------------------------------------
@@ -444,18 +444,6 @@ reparenConDeclField c@XConDeclField{} = c
 
 
 -------------------------------------------------------------------------------
--- * Located
--------------------------------------------------------------------------------
-
-
-unL :: Located a -> a
-unL (L _ x) = x
-
-
-reL :: a -> Located a
-reL = L undefined
-
--------------------------------------------------------------------------------
 -- * NamedThing instances
 -------------------------------------------------------------------------------
 
@@ -475,17 +463,17 @@ class Parent a where
 instance Parent (ConDecl GhcRn) where
   children con =
     case con_args con of
-      RecCon fields -> map (extFieldOcc . unL) $
-                         concatMap (cd_fld_names . unL) (unL fields)
+      RecCon fields -> map (extFieldOcc . unLoc) $
+                         concatMap (cd_fld_names . unLoc) (unLoc fields)
       _             -> []
 
 instance Parent (TyClDecl GhcRn) where
   children d
-    | isDataDecl  d = map unL $ concatMap (getConNames . unL)
+    | isDataDecl  d = map unLoc $ concatMap (getConNames . unLoc)
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
-        map (unL . fdLName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns ]
+        map (unLoc . fdLName . unLoc) (tcdATs d) ++
+        [ unLoc n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 
@@ -495,13 +483,13 @@ family = getName &&& children
 
 
 familyConDecl :: ConDecl GHC.GhcRn -> [(Name, [Name])]
-familyConDecl d = zip (map unL (getConNames d)) (repeat $ children d)
+familyConDecl d = zip (map unLoc (getConNames d)) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.
 families :: TyClDecl GhcRn -> [(Name, [Name])]
 families d
-  | isDataDecl  d = family d : concatMap (familyConDecl . unL) (dd_cons (tcdDataDefn d))
+  | isDataDecl  d = family d : concatMap (familyConDecl . unLoc) (dd_cons (tcdDataDefn d))
   | isClassDecl d = [family d]
   | otherwise     = []
 
@@ -546,17 +534,16 @@ minimalDef n = do
 -- * DynFlags
 -------------------------------------------------------------------------------
 
-
-setObjectDir, setHiDir, setHieDir, setStubDir, setOutputDir :: String -> DynFlags -> DynFlags
-setObjectDir  f d = d{ objectDir  = Just f}
-setHiDir      f d = d{ hiDir      = Just f}
-setHieDir     f d = d{ hieDir     = Just f}
-setStubDir    f d = d{ stubDir    = Just f
-                     , includePaths = addGlobalInclude (includePaths d) [f] }
-  -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
-  -- \#included from the .hc file when compiling with -fvia-C.
-setOutputDir  f = setObjectDir f . setHiDir f . setHieDir f . setStubDir f
-
+-- TODO: use `setOutputDir` from GHC
+setOutputDir :: FilePath -> DynFlags -> DynFlags
+setOutputDir dir dynFlags =
+  dynFlags { objectDir    = Just dir
+           , hiDir        = Just dir
+           , hieDir       = Just dir
+           , stubDir      = Just dir
+           , includePaths = addGlobalInclude (includePaths dynFlags) [dir]
+           , dumpDir      = Just dir
+           }
 
 -------------------------------------------------------------------------------
 -- * 'StringBuffer' and 'ByteString'

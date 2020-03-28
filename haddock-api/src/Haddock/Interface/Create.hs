@@ -461,14 +461,14 @@ subordinates instMap decl = case decl of
     dataSubs :: HsDataDefn GhcRn -> [(Name, [HsDocString], Map Int HsDocString)]
     dataSubs dd = constrs ++ fields ++ derivs
       where
-        cons = map unL $ (dd_cons dd)
-        constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, conArgDocs c)
+        cons = map unLoc $ (dd_cons dd)
+        constrs = [ (unLoc cname, maybeToList $ fmap unLoc $ con_doc c, conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
-        fields  = [ (extFieldOcc n, maybeToList $ fmap unL doc, M.empty)
+        fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, M.empty)
                   | RecCon flds <- map getConArgs cons
                   , L _ (ConDeclField _ ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
-        derivs  = [ (instName, [unL doc], M.empty)
+        derivs  = [ (instName, [unLoc doc], M.empty)
                   | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
                                 concatMap (unLoc . deriv_clause_tys . unLoc) $
                                 unLoc $ dd_derivs dd
@@ -585,13 +585,13 @@ sortByLoc = sortBy (comparing getLoc)
 
 -- | Filter out declarations that we don't handle in Haddock
 filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterDecls = filter (isHandled . unL . fst)
+filterDecls = filter (isHandled . unLoc . fst)
   where
     isHandled (ForD _ (ForeignImport {})) = True
     isHandled (TyClD {})  = True
     isHandled (InstD {})  = True
     isHandled (DerivD {}) = True
-    isHandled (SigD _ d)  = isUserLSig (reL d)
+    isHandled (SigD _ d)  = isUserLSig (noLoc d)
     isHandled (ValD {})   = True
     -- we keep doc declarations to be able to get at named docs
     isHandled (DocD {})   = True
@@ -677,7 +677,7 @@ mkExportItems
       return [ExportDoc doc]
 
     lookupExport (IEDocNamed _ str, _)      = liftErrMsg $
-      findNamedDoc str [ unL d | d <- decls ] >>= \case
+      findNamedDoc str [ unLoc d | d <- decls ] >>= \case
         Nothing -> return  []
         Just docStr -> do
           doc <- processDocStringParas dflags pkgName gre docStr
@@ -725,13 +725,13 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           export <- hiValExportItem dflags t l doc (l `elem` splices) $ M.lookup t fixMap
           return [export]
         (ds, docs_) | decl : _ <- filter (not . isValD . unLoc) ds ->
-          let declNames = getMainDeclBinder (unL decl)
+          let declNames = getMainDeclBinder (unLoc decl)
           in case () of
             _
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
               | t `notElem` declNames,
-                Just p <- find isExported (parents t $ unL decl) ->
+                Just p <- find isExported (parents t $ unLoc decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++
                      pretty dflags (nameOccName t) ++ " is exported separately but " ++

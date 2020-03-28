@@ -82,7 +82,7 @@ dropHsDocTy = f
         f (HsOpTy x a b c) = HsOpTy x (g a) b (g c)
         f (HsParTy x a) = HsParTy x (g a)
         f (HsKindSig x a b) = HsKindSig x (g a) b
-        f (HsDocTy _ a _) = f $ unL a
+        f (HsDocTy _ a _) = f $ unLoc a
         f x = x
 
 outHsType :: (OutputableBndrId p)
@@ -215,7 +215,7 @@ ppSynonym dflags x = [out dflags x]
 ppData :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
     = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=noLoc [] }} :
-      concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
+      concatMap (ppCtor dflags decl subdocs . unLoc) (dd_cons defn)
     where
 
         -- GHC gives out "data Bar =", we want to delete the equals.
@@ -244,22 +244,22 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
                            [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy noExtField x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
+        funs = foldr1 (\x y -> noLoc $ HsFunTy noExtField x y)
+        apps = foldl1 (\x y -> noLoc $ HsAppTy noExtField x y)
 
-        typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
+        typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unLoc $ funs flds)
 
         -- We print the constructors as comma-separated list. See GHC
         -- docs for con_names on why it is a list to begin with.
-        name = commaSeparate dflags . map unL $ getConNames con
+        name = commaSeparate dflags . map unLoc $ getConNames con
 
-        resType = let c  = HsTyVar noExtField NotPromoted (reL (tcdName dat))
+        resType = let c  = HsTyVar noExtField NotPromoted (noLoc (tcdName dat))
                       as = map (tyVarBndr2Type . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
-                  in apps (map reL (c : as))
+                  in apps (map noLoc (c : as))
 
         tyVarBndr2Type :: HsTyVarBndr GhcRn -> HsType GhcRn
         tyVarBndr2Type (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
-        tyVarBndr2Type (KindedTyVar _ n k) = HsKindSig noExtField (reL (HsTyVar noExtField NotPromoted n)) k
+        tyVarBndr2Type (KindedTyVar _ n k) = HsKindSig noExtField (noLoc (HsTyVar noExtField NotPromoted n)) k
         tyVarBndr2Type (XTyVarBndr nec) = noExtCon nec
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
@@ -267,8 +267,8 @@ ppCtor dflags _dat subdocs con@(ConDeclGADT { })
     where
         f = [typeSig name (getGADTConTypeG con)]
 
-        typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
-        name = out dflags $ map unL $ getConNames con
+        typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unLoc ty)
+        name = out dflags $ map unLoc $ getConNames con
 ppCtor _ _ _ (XConDecl nec) = noExtCon nec
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
@@ -298,7 +298,7 @@ docWith dflags header d
 mkSubdoc :: DynFlags -> Located Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
 mkSubdoc dflags n subdocs s = concatMap (ppDocumentation dflags) getDoc ++ s
  where
-   getDoc = maybe [] (return . fst) (lookup (unL n) subdocs)
+   getDoc = maybe [] (return . fst) (lookup (unLoc n) subdocs)
 
 data Tag = TagL Char [Tags] | TagP Tags | TagPre Tags | TagInline String Tags | Str String
            deriving Show
