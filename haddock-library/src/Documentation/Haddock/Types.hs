@@ -79,7 +79,7 @@ data Picture = Picture
   } deriving (Eq, Show)
 
 data Header id = Header
-  { headerLevel :: Int
+  { headerLevel :: Int  -- ^ between 1 and 6 inclusive
   , headerTitle :: id
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 

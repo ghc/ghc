@@ -512,11 +512,11 @@ since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince 
 header :: Parser (DocH mod Identifier)
 header = do
   let psers = map (string . flip T.replicate "=") [6, 5 .. 1]
-      pser = choice' psers
-  delim <- T.unpack <$> pser
-  line <- skipHorizontalSpace *> nonEmptyLine >>= return . parseText
+      pser = Parsec.choice psers
+  depth <- T.length <$> pser
+  line <- parseText <$> (skipHorizontalSpace *> nonEmptyLine)
   rest <- try paragraph <|> return DocEmpty
-  return $ DocHeader (Header (length delim) line) `docAppend` rest
+  return $ DocHeader (Header depth line) `docAppend` rest
 
 textParagraph :: Parser (DocH mod Identifier)
 textParagraph = parseText . T.intercalate "\n" <$> some nonEmptyLine
