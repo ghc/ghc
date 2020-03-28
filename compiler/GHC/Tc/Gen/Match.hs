@@ -707,7 +707,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
              -- See Note [GroupStmt binder map] in GHC.Hs.Expr
-             n_bndr_ids = zipWith mk_n_bndr n_bndr_names bndr_ids
+             n_bndr_ids = zipWithEqual "tcMcStmt" mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
        -- Type check the thing in the environment with

@@ -1183,7 +1183,7 @@ gen_Show_binds get_fixity loc tycon
                  where
                    nm       = wrapOpParens (unpackFS l)
 
-             show_args               = zipWith show_arg bs_needed arg_tys
+             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed arg_tys
              (show_arg1:show_arg2:_) = show_args
              show_prefix_args        = intersperse (nlHsVar showSpace_RDR) show_args
 

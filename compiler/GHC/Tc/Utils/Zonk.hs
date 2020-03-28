@@ -1226,7 +1226,8 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
     zonk_args env args
       = do { (env1, new_args_rev) <- zonk_args_rev env (reverse args)
            ; (env2, new_pats)     <- zonkPats env1 (map get_pat args)
-           ; return (env2, zipWith replace_pat new_pats (reverse new_args_rev)) }
+           ; return (env2, zipWithEqual "zonkStmt" replace_pat
+                                        new_pats (reverse new_args_rev)) }
 
      -- these need to go backward, because if any operators are higher-rank,
      -- later operators may introduce skolems that are in scope for earlier

@@ -653,8 +653,7 @@ nop_fn body = body
 addDataConStrictness :: DataCon -> [Demand] -> [Demand]
 -- See Note [Add demands for strict constructors]
 addDataConStrictness con ds
-  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
-    zipWith add ds strs
+  = zipWithEqual "addDataConStrictness" add ds strs
   where
     strs = dataConRepStrictness con
     add dmd str | isMarkedStrict str = strictifyDmd dmd

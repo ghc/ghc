@@ -2053,11 +2053,14 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
         (t1, t2)
 
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      | tc1 == tc2 =
+      | tc1 == tc2
+      , tys1 `equalLength` tys2 =
         -- Type constructors are same. They may be synonyms, but we don't
-        -- expand further.
+        -- expand further. The lengths of tys1 and tys2 must be equal;
+        -- for example, with type S a = a, we don't want
+        -- to zip (S Monad Int) and (S Bool).
         let (tys1', tys2') =
-              unzip (zipWith (\ty1 ty2 -> go ty1 ty2) tys1 tys2)
+              unzip (zipWithEqual "expandSynonymsToMatch" go tys1 tys2)
          in (TyConApp tc1 tys1', TyConApp tc2 tys2')
 
     go (AppTy t1_1 t1_2) (AppTy t2_1 t2_2) =

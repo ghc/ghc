@@ -788,7 +788,7 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
   = do { fun            <- dsExpr expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
        ; core_res_wrap  <- dsHsWrapper res_wrap
-       ; let wrapped_args = zipWith ($) core_arg_wraps arg_exprs
+       ; let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
        ; dsWhenNoErrs (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_doc n | n <- [1..] ])
                       (\_ -> core_res_wrap (mkApps fun wrapped_args)) }
   where
