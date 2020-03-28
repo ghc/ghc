@@ -92,8 +92,8 @@ module GHC.StgToCmm.Ticky (
   tickyEnterViaNode,
 
   tickyEnterFun,
-  tickyEnterThunk, tickyEnterStdThunk,        -- dynamic non-value
-                                              -- thunks only
+  tickyEnterThunk,        -- dynamic non-value
+                          -- thunks only
   tickyEnterLNE,
 
   tickyUpdateBhCaf,
@@ -298,9 +298,6 @@ tickyEnterThunk cl_info
                                    else fsLit "ENT_STATIC_THK_MANY_ctr"
         | otherwise = if updatable then fsLit "ENT_DYN_THK_SINGLE_ctr"
                                    else fsLit "ENT_DYN_THK_MANY_ctr"
-
-tickyEnterStdThunk :: ClosureInfo -> FCode ()
-tickyEnterStdThunk = tickyEnterThunk
 
 tickyBlackHole :: Bool{-updatable-} -> FCode ()
 tickyBlackHole updatable
