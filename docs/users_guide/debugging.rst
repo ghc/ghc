@@ -818,6 +818,12 @@ Checking for consistency
    single: consistency checks
    single: lint
 
+.. ghc-flag:: -ddrop-coercions
+    :shortdesc: TODO
+    :type: dynamic
+
+    TODO
+
 .. ghc-flag:: -dcore-lint
     :shortdesc: Turn on internal sanity checking
     :type: dynamic
