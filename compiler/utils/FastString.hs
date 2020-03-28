@@ -128,7 +128,7 @@ import Foreign
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-import GHC.Base ( unpackCString#, unpackNBytes# )
+import GHC.Base ( unpackNBytes# )
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
