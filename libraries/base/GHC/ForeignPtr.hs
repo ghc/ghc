@@ -111,13 +111,13 @@ data Finalizers
 -- >                          +------------+-----------------+
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
-    -- ^ The pointer refers to memory that was allocated by a foreign
-    -- function (typically using @malloc@). The finalizer frequently
-    -- calls the C function @free@ or some variant of it.
+    -- ^ The pointer refers to unmanaged memory that was allocated by
+    -- a foreign function (typically using @malloc@). The finalizer
+    -- frequently calls the C function @free@ or some variant of it.
   | FinalPtr
-    -- ^ The pointer must be an @Addr#@ literal. These are never
-    -- garbage collected and consequently cannot be finalized.
-    -- See Note [Why FinalPtr].
+    -- ^ The pointer refers to unmanaged memory that should not be freed when
+    -- the 'ForeignPtr' becomes unreachable. Most commonly, this is used
+    -- with @Addr#@ literals. See Note [Why FinalPtr].
     --
     -- @since 4.15
   | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
