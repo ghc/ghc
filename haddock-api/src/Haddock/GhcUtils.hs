@@ -165,18 +165,17 @@ nubByName f ns = go emptyNameSet ns
       where
         y = f x
 
+
 -- ---------------------------------------------------------------------
 
 -- These functions are duplicated from the GHC API, as they must be
 -- instantiated at DocNameI instead of (GhcPass _).
 
-hsTyVarNameI :: HsTyVarBndr DocNameI -> DocName
-hsTyVarNameI (UserTyVar _ (L _ n))     = n
-hsTyVarNameI (KindedTyVar _ (L _ n) _) = n
-hsTyVarNameI (XTyVarBndr nec) = noExtCon nec
-
-hsLTyVarNameI :: LHsTyVarBndr DocNameI -> DocName
-hsLTyVarNameI = hsTyVarNameI . unLoc
+-- | Like 'hsTyVarName' from GHC API, but not instantiated at (GhcPass _)
+hsTyVarBndrName :: (XXTyVarBndr n ~ NoExtCon) => HsTyVarBndr n -> IdP n
+hsTyVarBndrName (UserTyVar _ name) = unLoc name
+hsTyVarBndrName (KindedTyVar _ (L _ name) _) = name
+hsTyVarBndrName (XTyVarBndr nec) = noExtCon nec
 
 getConNamesI :: ConDecl DocNameI -> [Located DocName]
 getConNamesI ConDeclH98  {con_name  = name}  = [name]
@@ -311,7 +310,7 @@ restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
       []    -> defn { dd_ND = DataType, dd_cons = [] }
       [con] -> defn { dd_cons = [con] }
       _ -> error "Should not happen"
-restrictDataDefn _ (XHsDataDefn _) = error "restrictDataDefn"
+restrictDataDefn _ (XHsDataDefn nec) = noExtCon nec
 
 restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]

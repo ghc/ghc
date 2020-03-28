@@ -313,7 +313,7 @@ renameLTyVarBndr (L loc (KindedTyVar x (L lv n) kind))
   = do { n' <- rename n
        ; kind' <- renameLKind kind
        ; return (L loc (KindedTyVar x (L lv n') kind')) }
-renameLTyVarBndr (L _ (XTyVarBndr _ )) = error "haddock:renameLTyVarBndr"
+renameLTyVarBndr (L _ (XTyVarBndr nec)) = noExtCon nec
 
 renameLContext :: Located [LHsType GhcRn] -> RnM (Located [LHsType DocNameI])
 renameLContext (L loc context) = do
@@ -512,7 +512,7 @@ renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
 renameLFieldOcc (L l (FieldOcc sel lbl)) = do
   sel' <- rename sel
   return $ L l (FieldOcc sel' lbl)
-renameLFieldOcc (L _ (XFieldOcc _)) = error "haddock:renameLFieldOcc"
+renameLFieldOcc (L _ (XFieldOcc nec)) = noExtCon nec
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of

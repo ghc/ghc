@@ -9,6 +9,7 @@ module Haddock.Interface.Specialize
     ) where
 
 
+import Haddock.GhcUtils ( hsTyVarBndrName )
 import Haddock.Syb
 import Haddock.Types
 
@@ -56,13 +57,9 @@ specialize specs = go spec_map0
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: LHsQTyVars GhcRn -> [HsType GhcRn] -> HsType GhcRn -> HsType GhcRn
-specializeTyVarBndrs bndrs typs =
-    specialize $ zip bndrs' typs
+specializeTyVarBndrs bndrs typs = specialize $ zip bndrs' typs
   where
-    bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
-    bname (UserTyVar _ (L _ name)) = name
-    bname (KindedTyVar _ (L _ name) _) = name
-    bname (XTyVarBndr _) = error "haddock:specializeTyVarBndrs"
+    bndrs' = map (hsTyVarBndrName . unLoc) . hsq_explicit $ bndrs
 
 
 
@@ -212,7 +209,7 @@ freeVariables =
             | getName name `Set.member` ctx -> (Set.empty, ctx)
             | otherwise -> (Set.singleton $ getName name, ctx)
         _ -> (Set.empty, ctx)
-    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
+    bndrsNames = Set.fromList . map (getName . hsTyVarBndrName . unLoc)
 
 
 -- | Make given type visually unambiguous.
@@ -295,7 +292,7 @@ renameBinder :: HsTyVarBndr GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr GhcRn)
 renameBinder (UserTyVar x lname) = UserTyVar x <$> located renameName lname
 renameBinder (KindedTyVar x lname lkind) =
   KindedTyVar x <$> located renameName lname <*> located renameType lkind
-renameBinder (XTyVarBndr _) = error "haddock:renameBinder"
+renameBinder (XTyVarBndr nec) = noExtCon nec
 
 -- | Core renaming logic.
 renameName :: (Eq name, SetName name) => name -> Rename name name
@@ -349,7 +346,3 @@ located :: Functor f => (a -> f b) -> Located a -> f (Located b)
 located f (L loc e) = L loc <$> f e
 
 
-tyVarName :: HsTyVarBndr name -> IdP name
-tyVarName (UserTyVar _ name) = unLoc name
-tyVarName (KindedTyVar _ (L _ name) _) = name
-tyVarName (XTyVarBndr _ ) = error "haddock:tyVarName"

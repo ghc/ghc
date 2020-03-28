@@ -35,6 +35,7 @@ import Control.Monad.IO.Class (MonadIO(..))
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
+import Data.Void (Void)
 import Documentation.Haddock.Types
 import BasicTypes (Fixity(..), PromotionFlag(..))
 
@@ -713,7 +714,7 @@ type instance XOpTy            DocNameI = NoExtField
 type instance XParTy           DocNameI = NoExtField
 type instance XIParamTy        DocNameI = NoExtField
 type instance XKindSig         DocNameI = NoExtField
-type instance XSpliceTy        DocNameI = NoExtField
+type instance XSpliceTy        DocNameI = Void       -- see `renameHsSpliceTy`
 type instance XDocTy           DocNameI = NoExtField
 type instance XBangTy          DocNameI = NoExtField
 type instance XRecTy           DocNameI = NoExtField
