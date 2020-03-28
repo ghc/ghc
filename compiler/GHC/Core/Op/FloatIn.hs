@@ -169,7 +169,9 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
   = wrapFloats drop_here $ wrapFloats extra_drop $
     mkTicks ticks $
     mkApps (fiExpr platform fun_drop ann_fun)
-           (zipWith (fiExpr platform) arg_drops ann_args)
+           (zipWithEqual "fiExpr" (fiExpr platform) arg_drops ann_args)
+           -- use zipWithEqual, we should have
+           -- length ann_args = length arg_fvs = length arg_drops
   where
     (ann_fun, ann_args, ticks) = collectAnnArgsTicks tickishFloatable ann_expr
     fun_ty  = exprType (deAnnotate ann_fun)
@@ -466,7 +468,8 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
   = wrapFloats drop_here1 $
     wrapFloats drop_here2 $
     Case (fiExpr platform scrut_drops scrut) case_bndr ty
-         (zipWith fi_alt alts_drops_s alts)
+         (zipWithEqual "fiExpr" fi_alt alts_drops_s alts)
+         -- use zipWithEqual, we should have length alts_drops_s = length alts
   where
         -- Float into the scrut and alts-considered-together just like App
     [drop_here1, scrut_drops, alts_drops]
