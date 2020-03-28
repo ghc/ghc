@@ -30,7 +30,8 @@ module Control.Monad.IO.Class (
 
 class (Monad m) => MonadIO m where
     -- | Lift a computation from the 'IO' monad.
-    -- Rarely used in a vacuum, this function is particularly useful in the context of a monad stack
+    -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
+    -- (i.e. IO is the base monad for the stack).
     -- $liftIOexample
     liftIO :: IO a -> m a
 
