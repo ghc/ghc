@@ -780,8 +780,8 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
-  = do { let (_, bndr') -- see Note [Zap occ info in rule binders]
-               = substBndr env (zapIdOccInfo bndr)
+  = do { -- see Note [Zap occ info in rule binders]
+         let bndr' = substIdType env (zapIdOccInfo bndr)
        ; (env', dx_bind, spec_dict) <- bindAuxiliaryDict env bndr' d
        ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
@@ -805,8 +805,8 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
 specHeader env (bndr : bndrs) (UnspecArg : args)
-  = do { let (env', bndr') -- see Note [Zap occ info in rule binders]
-               = substBndr env (zapIdOccInfo bndr)
+  = do { -- see Note [Zap occ info in rule binders]
+         let (env', bndr') = substBndr env (zapIdOccInfo bndr)
        ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
        ; pure ( env''
@@ -2712,6 +2712,9 @@ substTy env ty = Core.substTy (se_subst env) ty
 
 substCo :: SpecEnv -> Coercion -> Coercion
 substCo env co = Core.substCo (se_subst env) co
+
+substIdType :: SpecEnv -> Id -> Id
+substIdType env id = Core.substIdType (se_subst env) id
 
 substBndr :: SpecEnv -> CoreBndr -> (SpecEnv, CoreBndr)
 substBndr env bs = case Core.substBndr (se_subst env) bs of
