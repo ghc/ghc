@@ -1759,9 +1759,7 @@ mkZappedProv :: HasDebugCallStack
              => DTyCoVarSet
              -> UnivCoProvenance
 mkZappedProv fvs
-  -- | debugIsOn && anyDVarSet isCoercionHole fvs = pprPanic "mkZappedProv(unexpected cohole)" (ppr fvs)
-  | otherwise =
-    ZappedProv $ filterDVarSet (not . isCoercionHole) fvs
+  = ZappedProv $ filterDVarSet (not . isCoercionHole) fvs
 
 mkTcZappedProv :: HasDebugCallStack
              => DTyCoVarSet
