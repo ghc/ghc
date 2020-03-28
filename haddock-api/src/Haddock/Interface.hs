@@ -43,6 +43,7 @@ import Haddock.Types
 import Haddock.Utils
 
 import Control.Monad
+import Control.Monad.IO.Class ( liftIO )
 import Control.Exception (evaluate)
 import Data.List (foldl', isPrefixOf, nub)
 import qualified Data.Map as Map

@@ -294,6 +294,10 @@ ppHtmlContents dflags odir doctitle _maybe_package
           ]
   createDirectoryIfMissing True odir
   writeUtf8File (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
+  where
+    -- Extract a module's short description.
+    toInstalledDescription :: InstalledInterface -> Maybe (MDoc Name)
+    toInstalledDescription = fmap mkMeta . hmi_description . instInfo
 
 
 ppPrologue :: Maybe Package -> Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html

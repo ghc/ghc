@@ -42,6 +42,7 @@ import Haddock.Utils
 import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
 
 import Control.Monad hiding (forM_)
+import Control.Monad.IO.Class (MonadIO(..))
 import Data.Bifunctor (second)
 import Data.Foldable (forM_, foldl')
 import Data.Traversable (for)

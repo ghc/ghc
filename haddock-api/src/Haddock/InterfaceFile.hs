@@ -21,9 +21,9 @@ module Haddock.InterfaceFile (
 
 
 import Haddock.Types
-import Haddock.Utils hiding (out)
 
 import Control.Monad
+import Control.Monad.IO.Class ( MonadIO(..) )
 import Data.Array
 import Data.IORef
 import Data.List (mapAccumR)

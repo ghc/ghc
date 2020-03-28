@@ -20,9 +20,11 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char ( isSpace )
+import Data.Maybe ( mapMaybe )
 
 import Haddock.Types( DocName, DocNameI )
 
+import BasicTypes ( PromotionFlag(..) )
 import Exception
 import FV
 import Outputable ( Outputable, panic, showPpr )
@@ -251,6 +253,95 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
 getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
   -- Should only be called on ConDeclGADT
 getGADTConTypeG (XConDecl nec) = noExtCon nec
+
+
+mkEmptySigWcType :: LHsType GhcRn -> LHsSigWcType GhcRn
+-- Dubious, because the implicit binders are empty even
+-- though the type might have free varaiables
+mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
+
+
+addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
+-- Add the class context to a class-op signature
+addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
+  = L pos (TypeSig noExtField lname (mkEmptySigWcType (go (hsSigType ltype))))
+          -- The mkEmptySigWcType is suspicious
+  where
+    go (L loc (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty }))
+       = L loc (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
+                           , hst_bndrs = tvs, hst_body = go ty })
+    go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
+       = L loc (HsQualTy { hst_xqual = noExtField
+                         , hst_ctxt = add_ctxt ctxt, hst_body = ty })
+    go (L loc ty)
+       = L loc (HsQualTy { hst_xqual = noExtField
+                         , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
+
+    extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
+    add_ctxt (L loc preds) = L loc (extra_pred : preds)
+
+addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
+
+lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
+lHsQTyVarsToTypes tvs
+  = [ noLoc (HsTyVar noExtField NotPromoted (noLoc (hsLTyVarName tv)))
+    | tv <- hsQTvExplicit tvs ]
+
+
+--------------------------------------------------------------------------------
+-- * Making abstract declarations
+--------------------------------------------------------------------------------
+
+
+restrictTo :: [Name] -> LHsDecl GhcRn -> LHsDecl GhcRn
+restrictTo names (L loc decl) = L loc $ case decl of
+  TyClD x d | isDataDecl d  ->
+    TyClD x (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
+  TyClD x d | isClassDecl d ->
+    TyClD x (d { tcdSigs = restrictDecls names (tcdSigs d),
+               tcdATs = restrictATs names (tcdATs d) })
+  _ -> decl
+
+restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
+restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
+  | DataType <- new_or_data
+  = defn { dd_cons = restrictCons names cons }
+  | otherwise    -- Newtype
+  = case restrictCons names cons of
+      []    -> defn { dd_ND = DataType, dd_cons = [] }
+      [con] -> defn { dd_cons = [con] }
+      _ -> error "Should not happen"
+restrictDataDefn _ (XHsDataDefn _) = error "restrictDataDefn"
+
+restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
+restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
+  where
+    keep d | any (\n -> n `elem` names) (map unLoc $ getConNames d) =
+      case con_args d of
+        PrefixCon _ -> Just d
+        RecCon fields
+          | all field_avail (unL fields) -> Just d
+          | otherwise -> Just (d { con_args = PrefixCon (field_types (map unL (unL fields))) })
+          -- if we have *all* the field names available, then
+          -- keep the record declaration.  Otherwise degrade to
+          -- a constructor declaration.  This isn't quite right, but
+          -- it's the best we can do.
+        InfixCon _ _ -> Just d
+      where
+        field_avail :: LConDeclField GhcRn -> Bool
+        field_avail (L _ (ConDeclField _ fs _ _))
+            = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
+        field_avail (L _ (XConDeclField nec)) = noExtCon nec
+        field_types flds = [ t | ConDeclField _ _ t _ <- flds ]
+
+    keep _ = Nothing
+
+restrictDecls :: [Name] -> [LSig GhcRn] -> [LSig GhcRn]
+restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
+
+
+restrictATs :: [Name] -> [LFamilyDecl GhcRn] -> [LFamilyDecl GhcRn]
+restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
 
 -------------------------------------------------------------------------------
