@@ -89,7 +89,7 @@ data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
 -- | Functions called when a 'ForeignPtr' is finalized. Note that
 -- C finalizers and Haskell finalizers cannot be mixed.
 data Finalizers
-  = NoFinalizer
+  = NoFinalizers
     -- ^ No finalizer. If there is no intent to add a finalizer at
     -- any point in the future, consider 'FinalPtr' or 'PlainPtr' instead
     -- since these perform fewer allocations.
@@ -98,15 +98,17 @@ data Finalizers
   | HaskellFinalizers [IO ()]
     -- ^ Finalizers are all Haskell functions.
 
--- | Finalizers for a 'ForeignPtr' and\/or references to GC-managed
--- memory that backs a 'ForeignPtr'. Visually:
+-- | Controls finalization of a 'ForeignPtr', that is, what should happen
+-- if the 'ForeignPtr' becomes unreachable. Visually, these data constructors
+-- are appropriate in these scenarios:
 --
--- >                  Managed    Unmanaged
--- >               +-----------+-----------------+
--- > Finalizers    | MallocPtr | PlainForeignPtr |
--- >               +-----------+-----------------+
--- > No finalizers | PlainPtr  | FinalPtr        |
--- >               +-----------+-----------------+
+-- >                           Memory backing pointer is
+-- >                            GC-Managed   Unmanaged
+-- > Finalizer functions are: +------------+-----------------+
+-- >                 Allowed  | MallocPtr  | PlainForeignPtr |
+-- >                          +------------+-----------------+
+-- >              Prohibited  | PlainPtr   | FinalPtr        |
+-- >                          +------------+-----------------+
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
     -- ^ The pointer refers to memory that was allocated by a foreign
@@ -119,15 +121,26 @@ data ForeignPtrContents
     --
     -- @since 4.15
   | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
-    -- ^ The pointer refers to a byte array. Finalization is supported.
-    -- However, unlike with @PlainForeignPtr@, the finalizer is not
-    -- responsible for freeing the memory since the GHC runtime tracks
-    -- the liveliness of byte arrays.
+    -- ^ The pointer refers to a byte array.
+    -- The 'MutableByteArray#' field means that the 'MutableByteArray#' is
+    -- reachable (by GC) whenever the 'ForeignPtr' is reachable. When the
+    -- 'ForeignPtr' becomes unreachable, the runtime\'s normal GC recovers
+    -- the memory backing it. Here, the finalizer function intended to be used
+    -- to @free()@ any ancilliary *unmanaged* memory pointed to be the
+    -- 'MutableByteArray#'. See the @zlib@ library for an example of this use.
+    --
+    -- * Invariant: The 'Addr#' in the parent 'ForeignPtr' is an interior
+    --   pointer into this 'MutableByteArray#'.
+    -- * Invariant: The 'MutableByteArray#' is pinned.
+    --
+    -- It is fine to reuse the same 'MutableByteArray#' in distinct
+    -- 'MallocPtr' constructor applications.
   | PlainPtr (MutableByteArray# RealWorld)
     -- ^ The pointer refers to a byte array. Finalization is not
     -- supported. This optimizates @MallocPtr@ by avoiding the allocation
     -- of a @MutVar#@ when it is known that no one will add finalizers to
-    -- the @ForeignPtr@.
+    -- the @ForeignPtr@. The invariants that apply 'MallocPtr' apply to
+    -- 'PlainPtr' as well.
 
 -- Note [Why FinalPtr]
 --
