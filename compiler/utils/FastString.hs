@@ -128,7 +128,7 @@ import Foreign
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-#if __GLASGOW_HASKELL__ <= 811
+#if __GLASGOW_HASKELL__ < 811
 import GHC.Base (unpackCString#,unpackNBytes#)
 #endif
 
