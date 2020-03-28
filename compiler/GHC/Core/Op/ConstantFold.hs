@@ -1495,9 +1495,17 @@ match_eq_string _ _ _ _ = Nothing
 -- compiled to read-only data sections. That's why cstringLength# is
 -- well defined on Addr# literals that do not explicitly have an embedded
 -- NUL byte.
+--
+-- See GHC issue #5218, MR 2165, and bytestring PR 191. This is particularly
+-- helpful when using OverloadingStrings to create a ByteString since the
+-- function computing the length of such ByteStrings can often be constant
+-- folded.
 match_cstring_length :: RuleFun
 match_cstring_length env id_unf _ [lit1]
   | Just (LitString str) <- exprIsLiteral_maybe id_unf lit1
+    -- If elemIndex returns Just, it has the index of the first embedded NUL
+    -- in the string. If no NUL bytes are present (the common case) then use
+    -- full length of the byte string.
   = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
      in Just (Lit (mkLitInt (roPlatform env) (fromIntegral len)))
 match_cstring_length _ _ _ _ = Nothing
