@@ -3,6 +3,7 @@
 
 module Documentation.Haddock.ParserSpec (main, spec) where
 
+import           Data.Char (isSpace)
 import           Data.String
 import qualified Documentation.Haddock.Parser as Parse
 import           Documentation.Haddock.Types
@@ -442,6 +443,10 @@ spec = do
       property $ \xs ->
         (length . show . parseParas) xs `shouldSatisfy` (> 0)
 
+    -- See <https://github.com/haskell/haddock/issues/1142>
+    it "doesn't crash on unicode whitespace" $ do
+      "\8197" `shouldParseTo` DocEmpty
+
     context "when parsing @since" $ do
       it "adds specified version to the result" $ do
         parseParas "@since 0.5.0" `shouldBe`
@@ -470,7 +475,8 @@ spec = do
 
 
     context "when parsing text paragraphs" $ do
-      let filterSpecial = filter (`notElem` (".(=#-[*`\v\f\n\t\r\\\"'_/@<> " :: String))
+      let isSpecial c = isSpace c || c `elem` (".(=#-[*`\\\"'_/@<>" :: String)
+          filterSpecial = filter (not . isSpecial)
 
       it "parses an empty paragraph" $ do
         "" `shouldParseTo` DocEmpty

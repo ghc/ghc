@@ -31,16 +31,16 @@ import           Prelude hiding (takeWhile)
 import           Data.Char (isSpace)
 
 -- | Characters that count as horizontal space
-horizontalSpace :: [Char]
-horizontalSpace = " \t\f\v\r"
+horizontalSpace :: Char -> Bool
+horizontalSpace c = isSpace c && c /= '\n'
 
 -- | Skip and ignore leading horizontal space
 skipHorizontalSpace :: Parser ()
-skipHorizontalSpace = Parsec.skipMany (Parsec.oneOf horizontalSpace)
+skipHorizontalSpace = Parsec.skipMany (Parsec.satisfy horizontalSpace)
 
 -- | Take leading horizontal space
-takeHorizontalSpace :: Parser Text 
-takeHorizontalSpace = takeWhile (`elem` horizontalSpace)
+takeHorizontalSpace :: Parser Text
+takeHorizontalSpace = takeWhile horizontalSpace
 
 makeLabeled :: (String -> Maybe String -> a) -> Text -> a
 makeLabeled f input = case T.break isSpace $ removeEscapes $ T.strip input of
@@ -60,10 +60,10 @@ removeEscapes = T.unfoldr go
 
 -- | Consume characters from the input up to and including the given pattern.
 -- Return everything consumed except for the end pattern itself.
-takeUntil :: Text -> Parser Text 
+takeUntil :: Text -> Parser Text
 takeUntil end_ = T.dropEnd (T.length end_) <$> requireEnd (scan p (False, end)) >>= gotSome
   where
-    end = T.unpack end_ 
+    end = T.unpack end_
 
     p :: (Bool, String) -> Char -> Maybe (Bool, String)
     p acc c = case acc of
