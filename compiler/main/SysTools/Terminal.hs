@@ -32,20 +32,13 @@ import qualified System.Win32 as Win32
 stderrSupportsAnsiColors :: IO Bool
 stderrSupportsAnsiColors = do
 #if defined(MIN_VERSION_terminfo)
-  queryTerminal stdError `andM` do
-    (termSupportsColors <$> setupTermFromEnv)
-      `catch` \ (_ :: SetupTermError) ->
-        pure False
-
+    stderr_available <- queryTerminal stdError
+    if stderr_available then
+      fmap termSupportsColors setupTermFromEnv
+        `catch` \ (_ :: SetupTermError) -> pure False
+    else
+      pure False
   where
-
-    andM :: Monad m => m Bool -> m Bool -> m Bool
-    andM mx my = do
-      x <- mx
-      if x
-        then my
-        else pure x
-
     termSupportsColors :: Terminal -> Bool
     termSupportsColors term = fromMaybe 0 (getCapability term termColors) > 0
 
