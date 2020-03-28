@@ -19,7 +19,10 @@
 
 module GHC.StgToCmm.Prim (
    cgOpApp,
-   shouldInlinePrimOp
+   shouldInlinePrimOp,
+
+   emitCatchFrame
+
  ) where
 
 #include "HsVersions.h"
@@ -54,7 +57,7 @@ import Outputable
 import Util
 import Data.Maybe
 
-import Data.Bits ((.&.), bit)
+import Data.Bits ((.&.), (.|.), bit)
 import Control.Monad (liftM, when, unless)
 
 ------------------------------------------------------------------------
@@ -1452,6 +1455,7 @@ emitPrimOp dflags = \case
   AtomicModifyMutVar_Op -> alwaysExternal
   CasMutVarOp -> alwaysExternal
   CatchOp -> alwaysExternal
+  PushCatchFrameOp -> alwaysExternal
   RaiseOp -> alwaysExternal
   RaiseDivZeroOp -> alwaysExternal
   RaiseUnderflowOp -> alwaysExternal
@@ -3022,6 +3026,41 @@ emitCtzCall res x width = do
         [ res ]
         (MO_Ctz width)
         [ x ]
+
+
+-----------------------------------------------------------------------------
+-- Setting up catch frames
+-----------------------------------------------------------------------------
+
+emitCatchFrame :: CmmExpr -> FCode a -> FCode a
+emitCatchFrame handler body
+  = do
+       updfr  <- getUpdFrameOff
+       dflags <- getDynFlags
+       platform <- getPlatform
+       let
+         hdr       = fixedHdrSize dflags
+         off_frame = updfr + hdr + sIZEOF_StgCatchFrame_NoHdr dflags
+         frame     = CmmStackSlot Old off_frame
+
+         off_handler     = hdr + oFFSET_StgCatchFrame_handler dflags
+         off_exc_blocked = hdr + oFFSET_StgCatchFrame_exceptions_blocked dflags
+
+         exc_blocked =
+           CmmMachOp
+             (mo_u_32ToWord platform)
+             [CmmMachOp (mo_wordAnd platform)
+               [ CmmLoad (CmmRegOff currentTSOReg (oFFSET_StgTSO_flags dflags)) b32
+               , CmmLit (CmmInt (fromIntegral
+                  (tSO_INTERRUPTIBLE dflags .|. tSO_BLOCKEX dflags)) W32)
+               ]
+             ]
+
+       emitStore frame (mkLblExpr mkCatchInfoLabel)
+       emitStore (cmmOffset platform frame off_exc_blocked) exc_blocked
+       emitStore (cmmOffset platform frame off_handler) handler
+
+       withUpdFrameOff off_frame body
 
 ---------------------------------------------------------------------------
 -- Pushing to the update remembered set

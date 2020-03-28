@@ -53,6 +53,8 @@ import OrdList
 import ErrUtils
 import GHC.Driver.Session
 import GHC.Driver.Ways
+import PrelInfo         ( primOpId )
+import PrimOp           ( PrimOp ( CatchOp, PushCatchFrameOp ) )
 import Util
 import Outputable
 import FastString
@@ -61,6 +63,7 @@ import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
 import Control.Monad
+import TysPrim          ( realWorldStatePrimTy )
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S
 
@@ -834,6 +837,15 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+
+    cpe_app env (Var f) [CpeApp ty@Type{}, CpeApp exc_ty@Type{}, CpeApp action, CpeApp handler, CpeApp s0] _depth
+        | Just CatchOp <- isPrimOpId_maybe f
+        = do { s1 <- newVar realWorldStatePrimTy
+             ; let push_frame = mkApps (Var (primOpId PushCatchFrameOp)) [exc_ty, ty, handler, s0]
+                   catch_expr = Case push_frame s1 (varType s1) [(DEFAULT, [], mkApps action [ty, Var s1])]
+             ; cpeBody env catch_expr
+             }
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
