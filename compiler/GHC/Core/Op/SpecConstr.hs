@@ -1311,7 +1311,7 @@ scExpr' env (Let (Rec prs) body)
                 -- See Note [Local recursive groups]
 
         ; let all_usg = spec_usg `combineUsage` body_usg  -- Note [spec_usg includes rhs_usg]
-              bind'   = Rec (concat (zipWith ruleInfoBinds rhs_infos specs))
+              bind'   = Rec (concat (zipWithEqual "scExpr'" ruleInfoBinds rhs_infos specs))
 
         ; return (all_usg { scu_calls = scu_calls all_usg `delVarEnvList` bndrs' },
                   Let bind' body') }

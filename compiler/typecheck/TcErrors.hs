@@ -2057,7 +2057,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
         -- Type constructors are same. They may be synonyms, but we don't
         -- expand further.
         let (tys1', tys2') =
-              unzip (zipWith (\ty1 ty2 -> go ty1 ty2) tys1 tys2)
+              unzip (zipWithEqual "expandSynonymsToMatch" (\ty1 ty2 -> go ty1 ty2) tys1 tys2)
          in (TyConApp tc1 tys1', TyConApp tc2 tys2')
 
     go (AppTy t1_1 t1_2) (AppTy t2_1 t2_2) =

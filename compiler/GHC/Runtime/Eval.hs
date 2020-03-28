@@ -606,7 +606,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    syncOccs mbVs ocs = unzip3 $ catMaybes $ joinOccs mbVs ocs
      where
        joinOccs :: [Maybe (a,b)] -> [c] -> [Maybe (a,b,c)]
-       joinOccs = zipWith joinOcc
+       joinOccs = zipWithEqual "bindLocalsAtBreakpoint" joinOcc
        joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
 rttiEnvironment :: HscEnv -> IO HscEnv
