@@ -1069,7 +1069,7 @@ mkNthCo r n co
                                                             , ppr r ]) )
                                              arg_cos `getNth` n
 
-    go r 0 co@(UnivCo prov _ ty1 ty2)
+    go r 0 (UnivCo prov _ ty1 ty2)
       | isForAllTy ty1
       = ASSERT(isForAllTy ty2)
         UnivCo prov r (typeKind ty1) (typeKind ty2)
