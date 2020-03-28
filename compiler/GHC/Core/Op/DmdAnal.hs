@@ -27,6 +27,7 @@ import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
 import Id
 import IdInfo
+import TysWiredIn
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -350,19 +351,24 @@ forcesRealWorld :: FamInstEnvs -> Type -> Bool
 forcesRealWorld fam_envs = go initRecTc
   where
     go :: RecTcChecker -> Type -> Bool
-    go rec_tc ty
-      -- Found it!
-      | ty `eqType`  realWorldStatePrimTy
-      = True
-      -- search depth-first
+    go _rec_tc ty
       | Just (dc, _, field_tys, _) <- deepSplitProductType_maybe fam_envs ty
-      -- don't check the same TyCon twice
-      , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
-      = any (strict_field_forces rec_tc') field_tys
+      , dc == tupleDataCon Unboxed 2
+      , ((first_ty,_):_) <- field_tys
+      , first_ty `eqType` realWorldStatePrimTy
+      = True
+      -- -- Found it!
+      -- | ty `eqType`  realWorldStatePrimTy
+      -- = True
+      -- -- search depth-first
+      -- | Just (dc, _, field_tys, _) <- deepSplitProductType_maybe fam_envs ty
+      -- -- don't check the same TyCon twice
+      -- , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
+      -- = any (strict_field_forces rec_tc') field_tys
       | otherwise
       = False
 
-    strict_field_forces rec_tc (field_ty, str_mark) =
+    _strict_field_forces rec_tc (field_ty, str_mark) =
       (isMarkedStrict str_mark || isLiftedType_maybe field_ty == Just False)
         && go rec_tc field_ty
 
