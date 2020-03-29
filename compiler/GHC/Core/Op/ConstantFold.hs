@@ -329,6 +329,54 @@ primOpRules nm = \case
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
 mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
 
+mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
+            -> [RuleM CoreExpr] -> Maybe CoreRule
+mkRelOpRule nm cmp extra
+  = mkPrimOpRule nm 2 $
+    binaryCmpLit cmp : equal_rule : extra
+  where
+        -- x `cmp` x does not depend on x, so
+        -- compute it for the arbitrary value 'True'
+        -- and use that result
+    equal_rule = do { equalArgs
+                    ; platform <- getPlatform
+                    ; return (if cmp True True
+                              then trueValInt  platform
+                              else falseValInt platform) }
+
+{- Note [Rules for indexing into unmanaged memory]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reading from unmanaged memory can be constant folded when both the index
+is an int literal and the unmanaged memory is a primitive string literal.
+It is important to do this not only for `indexWord8OffAddr#` but also for
+its sequenced variant `readWord8OffAddr#` since the bytestring library uses
+the latter. In conjunction with a rewrite rule in bytestring, this allows
+GHC to perform this transformation:
+
+  BC8.head (BC8.packChars "hello") ==> 'h'
+
+The steps this walks through after discovering that the right
+arguments are constants:
+
+* Are all bytes that comprise the element in bounds? If not, the runtime
+  behavior will be undefined, so we do not rewrite the expression. It would
+  be nice if we could warn the user that they are doing something bad, but
+  there is no way to do that here. Technically, users are actually allowed to
+  go one byte past the end since the bytes are suffixed with an extra NUL byte
+  during code gen. We do not bother attempting to constant fold in this case
+  since it is uncommon and would complicate the implementation.
+* Take a slice of the bytestring that only includes the bytes that comprise
+  the element.
+* Fold over the bytes in the slice, either left-to-right or right-to-left
+  depending on target platform endianness.
+
+Several additional opportunities are ignored because they have no known
+utility and would complicate the implementation. Only rules for treating
+the element as Word8, Word16, and Word32 have been implemented. Index
+functions with signed element types or native-sized element types do not
+have rewrite rules.
+-}
+
 mkIndexAddrRule :: Name -> Int -> Maybe CoreRule
 mkIndexAddrRule nm width = Just $ mkBasicRule nm 2 $ do
   [addr,Lit (LitNumber _ ix _)] <- getArgs
@@ -351,6 +399,8 @@ lookupAddrElement width addrArg ixArg = do
   bs <- case exprIsLiteral_maybe env addrArg of
     Just (LitString bs) -> pure bs
     _ -> mzero
+  -- This inequality check is kind of a hack to make sure that narrowing
+  -- the Integer to an Int does not change the number.
   ixElem <- if ixArg < 1000000000
     then pure (fromIntegral ixArg)
     else mzero
@@ -367,21 +417,6 @@ bigEndianFold = BS.foldl' (\acc w -> 256 * acc + fromIntegral w) 0
 
 littleEndianFold :: ByteString -> Word64
 littleEndianFold = BS.foldr' (\w acc -> 256 * acc + fromIntegral w) 0
-
-mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
-            -> [RuleM CoreExpr] -> Maybe CoreRule
-mkRelOpRule nm cmp extra
-  = mkPrimOpRule nm 2 $
-    binaryCmpLit cmp : equal_rule : extra
-  where
-        -- x `cmp` x does not depend on x, so
-        -- compute it for the arbitrary value 'True'
-        -- and use that result
-    equal_rule = do { equalArgs
-                    ; platform <- getPlatform
-                    ; return (if cmp True True
-                              then trueValInt  platform
-                              else falseValInt platform) }
 
 {- Note [Rules for floating-point comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
