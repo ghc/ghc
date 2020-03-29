@@ -33,6 +33,7 @@ import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
 import GHC.Core
 import GHC.Core.Make
 import Id
+import Data.ByteString (ByteString)
 import Literal
 import GHC.Core.SimpleOpt ( exprIsLiteral_maybe )
 import PrimOp             ( PrimOp(..), tagToEnumKey )
@@ -303,6 +304,14 @@ primOpRules nm = \case
 
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
+   IndexOffAddrOp_Word8 -> mkIndexAddrRule nm 1
+   IndexOffAddrOp_Word16 -> mkIndexAddrRule nm 2
+   IndexOffAddrOp_Word32 -> mkIndexAddrRule nm 4
+
+   ReadOffAddrOp_Word8 -> mkReadAddrRule nm 1
+   ReadOffAddrOp_Word16 -> mkReadAddrRule nm 2
+   ReadOffAddrOp_Word32 -> mkReadAddrRule nm 4
+
    SeqOp      -> mkPrimOpRule nm 4 [ seqRule ]
    SparkOp    -> mkPrimOpRule nm 4 [ sparkRule ]
 
@@ -319,6 +328,45 @@ primOpRules nm = \case
 -- useful shorthands
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
 mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
+
+mkIndexAddrRule :: Name -> Int -> Maybe CoreRule
+mkIndexAddrRule nm width = Just $ mkBasicRule nm 2 $ do
+  [addr,Lit (LitNumber _ ix _)] <- getArgs
+  w <- lookupAddrElement width addr ix
+  platform <- getPlatform
+  pure $! Lit $! mkLitNumberWrap platform LitNumWord (fromIntegral w) wordPrimTy
+
+mkReadAddrRule :: Name -> Int -> Maybe CoreRule
+mkReadAddrRule nm width = Just $ mkBasicRule nm 3 $ do
+  [addr,Lit (LitNumber _ ix _),s] <- getArgs
+  w <- lookupAddrElement width addr ix
+  platform <- getPlatform
+  let n = mkLitNumberWrap platform LitNumWord (fromIntegral w) wordPrimTy
+  return $ mkCoreUbxTup [exprType s, wordPrimTy] [s, Lit n]
+
+lookupAddrElement :: Int -> CoreExpr -> Integer -> RuleM Word64
+lookupAddrElement width addrArg ixArg = do
+  platform <- getPlatform
+  env <- getInScopeEnv
+  bs <- case exprIsLiteral_maybe env addrArg of
+    Just (LitString bs) -> pure bs
+    _ -> mzero
+  ixElem <- if ixArg < 1000000000
+    then pure (fromIntegral ixArg)
+    else mzero
+  let ixByte = ixElem * width
+  when (ixByte + width > BS.length bs || ixByte < 0) mzero
+  let slice = BS.take width (BS.drop ixByte bs)
+      n = case platformByteOrder platform of
+        LittleEndian -> littleEndianFold slice
+        BigEndian -> bigEndianFold slice
+  pure n
+
+bigEndianFold :: ByteString -> Word64
+bigEndianFold = BS.foldl' (\acc w -> 256 * acc + fromIntegral w) 0
+
+littleEndianFold :: ByteString -> Word64
+littleEndianFold = BS.foldr' (\w acc -> 256 * acc + fromIntegral w) 0
 
 mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
             -> [RuleM CoreExpr] -> Maybe CoreRule

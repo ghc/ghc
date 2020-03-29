@@ -30,6 +30,8 @@ test('T2486', normal, compile, [''])
 test('T2756', normal, compile_and_run, [''])
 test('T3437', extra_run_opts('+RTS -M10m'), compile_and_run, [''])
 
+test('IndexAddr', normal, compile_and_run, [''])
+
 test('SeqRule', only_ways(['optasm']), compile_and_run, [''])
 
 test('runST', normal, compile_and_run, [''])
