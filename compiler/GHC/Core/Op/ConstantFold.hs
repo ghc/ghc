@@ -337,12 +337,12 @@ mkIndexAddrRule nm width = Just $ mkBasicRule nm 2 $ do
   pure $! Lit $! mkLitNumberWrap platform LitNumWord (fromIntegral w) wordPrimTy
 
 mkReadAddrRule :: Name -> Int -> Maybe CoreRule
-mkReadAddrRule nm width = Just $ mkBasicRule nm 3 $ do
-  [addr,Lit (LitNumber _ ix _),s] <- getArgs
+mkReadAddrRule nm width = Just $ mkBasicRule nm 4 $ do
+  [Type ty_s,addr,Lit (LitNumber _ ix _),s] <- getArgs
   w <- lookupAddrElement width addr ix
   platform <- getPlatform
   let n = mkLitNumberWrap platform LitNumWord (fromIntegral w) wordPrimTy
-  return $ mkCoreUbxTup [exprType s, wordPrimTy] [s, Lit n]
+  return $ mkCoreUbxTup [ty_s, wordPrimTy] [s, Lit n]
 
 lookupAddrElement :: Int -> CoreExpr -> Integer -> RuleM Word64
 lookupAddrElement width addrArg ixArg = do
