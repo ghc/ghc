@@ -100,7 +100,7 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
+mkFullIface :: HscEnv -> PartialModIface -> Maybe NonCaffySet -> IO ModIface
 mkFullIface hsc_env partial_iface mb_non_cafs = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
@@ -117,9 +117,9 @@ mkFullIface hsc_env partial_iface mb_non_cafs = do
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
+updateDeclCafInfos :: [IfaceDecl] -> Maybe NonCaffySet -> [IfaceDecl]
 updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
+updateDeclCafInfos decls (Just (NonCaffySet non_cafs)) = map update_decl decls
   where
     update_decl decl
       | IfaceId nm ty details infos <- decl
