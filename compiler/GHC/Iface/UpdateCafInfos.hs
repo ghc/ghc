@@ -23,7 +23,7 @@ import GHC.Utils.Outputable
 -- | Update CafInfos of all occurences (in rules, unfoldings, class instances)
 updateModDetailsCafInfos
   :: DynFlags
-  -> NameSet -- ^ Non-CAFFY names in the module. Names not in this set are CAFFY.
+  -> NonCaffySet -- ^ Non-CAFFY names in the module. Names not in this set are CAFFY.
   -> ModDetails -- ^ ModDetails to update
   -> ModDetails
 
@@ -31,7 +31,7 @@ updateModDetailsCafInfos dflags _ mod_details
   | gopt Opt_OmitInterfacePragmas dflags
   = mod_details
 
-updateModDetailsCafInfos _ non_cafs mod_details =
+updateModDetailsCafInfos _ (NonCaffySet non_cafs) mod_details =
   {- pprTrace "updateModDetailsCafInfos" (text "non_cafs:" <+> ppr non_cafs) $ -}
   let
     ModDetails{ md_types = type_env -- for unfoldings
