@@ -818,8 +818,13 @@ doSRTs dflags moduleSRTInfo procs data_ = do
                       -- already updated by oneSRT
                       srtMap
                     CmmData _ (CmmStaticsRaw lbl _)
-                      | isIdLabel lbl ->
-                          -- not analysed by oneSRT, declare it non-CAFFY here
+                      | isIdLabel lbl && not (isTickyLabel lbl) ->
+                          -- Raw data are not analysed by oneSRT and they can't
+                          -- be CAFFY.
+                          -- Some ticky labels share the same Name with proc
+                          -- labels so we don't update the SRT map for ticky
+                          -- labels to avoid overriding CafInfos of procs.
+                          -- See #17947.
                           Map.insert (mkCAFLabel lbl) Nothing srtMap
                       | otherwise ->
                           -- Not an IdLabel, ignore

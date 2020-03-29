@@ -11,8 +11,8 @@
 
 module GHC.StgToCmm.Utils (
         cgLit, mkSimpleLit,
-        emitRawDataLits, mkRawDataLits,
-        emitRawRODataLits, mkRawRODataLits,
+        emitRawDataLits,
+        emitRawRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
         assignTemp, newTemp,
