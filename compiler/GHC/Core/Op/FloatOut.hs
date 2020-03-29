@@ -19,11 +19,11 @@ import GHC.Core.Arity    ( etaExpand )
 import GHC.Core.Op.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
-import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import Id               ( Id, idArity, idType, isBottomingId,
-                          isJoinId, isJoinId_maybe )
+import ErrUtils          ( dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Types.Id      ( Id, idArity, idType, isBottomingId,
+                           isJoinId, isJoinId_maybe )
 import GHC.Core.Op.SetLevels
-import UniqSupply       ( UniqSupply )
+import GHC.Types.Unique.Supply ( UniqSupply )
 import Bag
 import Util
 import Maybes

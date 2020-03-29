@@ -27,12 +27,12 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( moduleName, moduleNameFS
+import GHC.Types.Module ( moduleName, moduleNameFS
                         , moduleUnitId, unitIdFS, getModule )
 import GHC.Iface.Env    ( newGlobalBinder )
-import Name      hiding ( varName )
-import RdrName
-import BasicTypes
+import GHC.Types.Name hiding ( varName )
+import GHC.Types.Name.Reader
+import GHC.Types.Basic
 import TysPrim
 import TysWiredIn
 import PrelNames
@@ -40,10 +40,10 @@ import TcEnv
 import TcRnMonad
 import GHC.Driver.Types
 import ErrUtils( Validity(..), andValid )
-import SrcLoc
+import GHC.Types.SrcLoc
 import Bag
-import VarEnv
-import VarSet (elemVarSet)
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set (elemVarSet)
 import Outputable
 import FastString
 import Util

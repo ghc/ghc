@@ -52,15 +52,13 @@ import Numeric.Natural
 import Prelude
 import Foreign.ForeignPtr
 
-import qualified Control.Monad.Fail as Fail
-
 -----------------------------------------------------
 --
 --              The Quasi class
 --
 -----------------------------------------------------
 
-class (MonadIO m, Fail.MonadFail m) => Quasi m where
+class (MonadIO m, MonadFail m) => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -187,12 +185,9 @@ runQ (Q m) = m
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   (>>) = (*>)
-#if !MIN_VERSION_base(4,13,0)
-  fail       = Fail.fail
-#endif
 
-instance Fail.MonadFail Q where
-  fail s     = report True s >> Q (Fail.fail "Q monad failure")
+instance MonadFail Q where
+  fail s     = report True s >> Q (fail "Q monad failure")
 
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)

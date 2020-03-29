@@ -19,16 +19,15 @@ import GhcPrelude
 
 import Data.Data hiding (Fixity)
 import Bag
-import BasicTypes
+import GHC.Types.Basic
 import FastString
-import NameSet
-import Name
+import GHC.Types.Name.Set
+import GHC.Types.Name
 import GHC.Core.DataCon
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Hs
-import OccName hiding (occName)
-import Var
-import Module
+import GHC.Types.Var
+import GHC.Types.Module
 import Outputable
 
 import qualified Data.ByteString as B
@@ -110,7 +109,7 @@ showAstData b a0 = blankLine $$ showAstData' a0
 
             occName n  =  braces $
                           text "OccName: "
-                       <> text (OccName.occNameString n)
+                       <> text (occNameString n)
 
             moduleName :: ModuleName -> SDoc
             moduleName m = braces $ text "ModuleName: " <> ppr m

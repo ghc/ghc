@@ -63,10 +63,6 @@ packageArgs = do
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
-              flag TablesNextToCode ?
-              notM (flag GhcUnregisterised) ?
-              notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
-            , ghcWithInterpreter ?
               ghciWithDebugger <$> flavour ?
               notStage0 ? arg "--ghc-option=-DDEBUGGER"
             , ghcProfiled <$> flavour ?

@@ -6,8 +6,8 @@ where
 
 import GhcPrelude
 
-import  Outputable
-import  Unique
+import Outputable
+import GHC.Types.Unique
 
 
 -- | The class of a register.

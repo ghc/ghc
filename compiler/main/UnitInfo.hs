@@ -37,8 +37,8 @@ import Data.Version
 
 import FastString
 import Outputable
-import Module
-import Unique
+import GHC.Types.Module as Module
+import GHC.Types.Unique
 
 -- -----------------------------------------------------------------------------
 -- Our UnitInfo type is the InstalledPackageInfo from ghc-boot,
@@ -58,7 +58,10 @@ type UnitInfo = InstalledPackageInfo
 --       other compact string types, e.g. plain ByteString or Text.
 
 newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
-newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
+newtype PackageName = PackageName
+   { unPackageName :: FastString
+   }
+   deriving (Eq, Ord)
 
 instance BinaryStringRep SourcePackageId where
   fromStringRep = SourcePackageId . mkFastStringByteString

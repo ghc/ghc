@@ -15,30 +15,30 @@ module GHC.Core.Op.Specialise ( specProgram, specUnfolding ) where
 
 import GhcPrelude
 
-import Id
+import GHC.Types.Id
 import TcType hiding( substTy )
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
 import GHC.Core.Predicate
-import Module( Module, HasModule(..) )
+import GHC.Types.Module( Module, HasModule(..) )
 import GHC.Core.Coercion( Coercion )
 import GHC.Core.Op.Monad
 import qualified GHC.Core.Subst
 import GHC.Core.Unfold
-import Var              ( isLocalVar )
-import VarSet
-import VarEnv
+import GHC.Types.Var      ( isLocalVar )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.SimpleOpt ( collectBindersPushingCo )
 import GHC.Core.Utils     ( exprIsTrivial, mkCast, exprType )
 import GHC.Core.FVs
 import GHC.Core.Arity     ( etaExpandToJoinPointRule )
-import UniqSupply
-import Name
-import MkId             ( voidArgId, voidPrimId )
+import GHC.Types.Unique.Supply
+import GHC.Types.Name
+import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import Maybes           ( mapMaybe, isJust )
 import MonadUtils       ( foldlM )
-import BasicTypes
+import GHC.Types.Basic
 import GHC.Driver.Types
 import Bag
 import GHC.Driver.Session
@@ -46,11 +46,10 @@ import Util
 import Outputable
 import FastString
 import State
-import UniqDFM
+import GHC.Types.Unique.DFM
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 
 {-
 ************************************************************************
@@ -2129,7 +2128,7 @@ emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyDVarEnv }
 type CallDetails  = DIdEnv CallInfoSet
   -- The order of specialized binds and rules depends on how we linearize
   -- CallDetails, so to get determinism we must use a deterministic set here.
-  -- See Note [Deterministic UniqFM] in UniqDFM
+  -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM
 
 data CallInfoSet = CIS Id (Bag CallInfo)
   -- The list of types and dictionaries is guaranteed to
@@ -2551,11 +2550,8 @@ instance Monad SpecM where
                                case f y of
                                    SpecM z ->
                                        z
-#if !MIN_VERSION_base(4,13,0)
-    fail = MonadFail.fail
-#endif
 
-instance MonadFail.MonadFail SpecM where
+instance MonadFail SpecM where
    fail str = SpecM $ error str
 
 instance MonadUnique SpecM where

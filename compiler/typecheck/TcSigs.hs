@@ -42,15 +42,15 @@ import TcEvidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
 
 import GHC.Driver.Session
-import Var      ( TyVar, tyVarKind )
-import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Var ( TyVar, tyVarKind )
+import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
-import BasicTypes
-import Module( getModule )
-import Name
-import NameEnv
+import GHC.Types.Basic
+import GHC.Types.Module( getModule )
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util( singleton )
 import Maybes( orElse )
 import Data.Maybe( mapMaybe )
@@ -291,7 +291,7 @@ no_anon_wc lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
-      XHsType{} -> True      -- Core type, which does not have any wildcard
+      XHsType (NHsCoreTy{}) -> True      -- Core type, which does not have any wildcard
 
     gos = all go
 

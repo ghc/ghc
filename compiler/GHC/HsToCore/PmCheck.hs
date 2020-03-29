@@ -27,23 +27,23 @@ import GhcPrelude
 import GHC.HsToCore.PmCheck.Types
 import GHC.HsToCore.PmCheck.Oracle
 import GHC.HsToCore.PmCheck.Ppr
-import BasicTypes (Origin, isGenerated)
+import GHC.Types.Basic (Origin, isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
 import GHC.Hs
 import TcHsSyn   ( shortCutLit )
-import Id
+import GHC.Types.Id
 import GHC.Core.ConLike
-import Name
+import GHC.Types.Name
 import FamInst
 import TysWiredIn
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import Outputable
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import Var (EvVar)
+import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
 import TcEvidence ( HsWrapper(..), isIdHsWrapper )
 import TcType (evVarPred)
@@ -642,7 +642,7 @@ translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grh
   grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
   -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
   return (mkGrdTreeMany pats' grhss')
-translateMatch _ _ (L _ (XMatch _)) = panic "translateMatch"
+translateMatch _ _ (L _ (XMatch nec)) = noExtCon nec
 
 -- -----------------------------------------------------------------------
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
@@ -657,7 +657,7 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
         | null gs   = L match_loc (sep (map ppr pats))
         | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
-translateLGRHS _ _ _ (L _ (XGRHS _)) = panic "translateLGRHS"
+translateLGRHS _ _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 -- | Translate a guard statement to a 'GrdVec'
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec

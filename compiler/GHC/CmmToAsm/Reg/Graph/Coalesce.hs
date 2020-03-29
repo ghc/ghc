@@ -12,9 +12,9 @@ import GHC.Platform.Reg
 import GHC.Cmm
 import Bag
 import Digraph
-import UniqFM
-import UniqSet
-import UniqSupply
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.Supply
 
 
 -- | Do register coalescing on this top level thing

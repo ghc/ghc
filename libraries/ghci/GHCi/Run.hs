@@ -89,8 +89,8 @@ run m = case m of
   MallocStrings bss -> mapM mkString0 bss
   PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
-  MkConInfoTable ptrs nptrs tag ptrtag desc ->
-    toRemotePtr <$> mkConInfoTable ptrs nptrs tag ptrtag desc
+  MkConInfoTable tc ptrs nptrs tag ptrtag desc ->
+    toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   StartTH -> startTH
   GetClosure ref -> do
     clos <- getClosureData =<< localRef ref

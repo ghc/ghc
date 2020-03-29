@@ -28,13 +28,13 @@ import TcRnMonad
 import TcEnv
 import TcOrigin
 import TcEvidence
-import Id( mkLocalId )
+import GHC.Types.Id( mkLocalId )
 import Inst
 import TysWiredIn
-import VarSet
+import GHC.Types.Var.Set
 import TysPrim
-import BasicTypes( Arity )
-import SrcLoc
+import GHC.Types.Basic( Arity )
+import GHC.Types.SrcLoc
 import Outputable
 import Util
 

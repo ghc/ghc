@@ -28,7 +28,7 @@ import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
-import BasicTypes ( Origin(..) )
+import GHC.Types.Basic ( Origin(..) )
 import GHC.Driver.Session
 import GHC.Hs
 import TcHsSyn
@@ -36,14 +36,14 @@ import TcEvidence
 import TcRnMonad
 import GHC.HsToCore.PmCheck
 import GHC.Core
-import Literal
+import GHC.Types.Literal
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import Id
+import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -53,15 +53,15 @@ import GHC.Core.Type
 import GHC.Core.Coercion ( eqCoercion )
 import GHC.Core.TyCon    ( isNewTyCon )
 import TysWiredIn
-import SrcLoc
+import GHC.Types.SrcLoc
 import Maybes
 import Util
-import Name
+import GHC.Types.Name
 import Outputable
-import BasicTypes ( isGenerated, il_value, fl_value )
+import GHC.Types.Basic ( isGenerated, il_value, fl_value )
 import FastString
-import Unique
-import UniqDFM
+import GHC.Types.Unique
+import GHC.Types.Unique.DFM
 
 import Control.Monad( unless )
 import Data.List.NonEmpty (NonEmpty(..))

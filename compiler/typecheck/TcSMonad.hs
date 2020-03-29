@@ -154,37 +154,36 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
-import Name
-import Module ( HasModule, getModule )
-import RdrName ( GlobalRdrEnv, GlobalRdrElt )
+import GHC.Types.Name
+import GHC.Types.Module ( HasModule, getModule )
+import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM
-import Var
-import VarEnv
-import VarSet
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import Outputable
 import Bag
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
 import TcRnTypes
 import TcOrigin
 import Constraint
 import GHC.Core.Predicate
 
-import Unique
-import UniqFM
-import UniqDFM
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import Maybes
 
 import GHC.Core.Map
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Data.IORef
 import Data.List ( partition, mapAccumL )
 
 #if defined(DEBUG)
 import Digraph
-import UniqSet
+import GHC.Types.Unique.Set
 #endif
 
 {-
@@ -2699,12 +2698,9 @@ instance Applicative TcS where
   (<*>) = ap
 
 instance Monad TcS where
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 
-instance MonadFail.MonadFail TcS where
+instance MonadFail TcS where
   fail err  = TcS (\_ -> fail err)
 
 instance MonadUnique TcS where

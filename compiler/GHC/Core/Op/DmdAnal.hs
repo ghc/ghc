@@ -17,16 +17,16 @@ import GhcPrelude
 
 import GHC.Driver.Session
 import GHC.Core.Op.WorkWrap.Lib ( findTypeShape )
-import Demand   -- All of it
+import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
 import Outputable
-import VarEnv
-import BasicTypes
+import GHC.Types.Var.Env
+import GHC.Types.Basic
 import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -37,7 +37,7 @@ import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import UniqSet
+import GHC.Types.Unique.Set
 
 {-
 ************************************************************************
@@ -136,7 +136,7 @@ dmdAnalStar env dmd e
   , (dmd_ty, e')    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
-    -- See Note [Analysing with absent demand] in Demand.hs
+    -- See Note [Analysing with absent demand] in GHC.Types.Demand
     (postProcessDmdType dmd_shell dmd_ty, e')
 
 -- Main Demand Analsysis machinery
@@ -389,7 +389,7 @@ Note [Demand on the scrutinee of a product case]
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in Demand.hs.
+see Note [Demand on case-alternative binders] in GHC.Types.Demand.
 This is crucial. Example:
    f x = case x of y { (a,b) -> k y a }
 If we just take scrut_demand = U(L,A), then we won't pass x to the
@@ -617,16 +617,11 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
--- unleashing on the given function's @rhs@, by creating a call demand of
--- @rhs_arity@ with a body demand appropriate for possible product types.
--- See Note [Product demands for function body].
--- For example, a call of the form @mkRhsDmd _ 2 (\x y -> (x, y))@ returns a
--- clean usage demand of @C1(C1(U(U,U)))@.
+-- unleashing on the given function's @rhs@, by creating
+-- a call demand of @rhs_arity@
+-- See Historical Note [Product demands for function body]
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkRhsDmd env rhs_arity rhs =
-  case peelTsFuns rhs_arity (findTypeShape (ae_fam_envs env) (exprType rhs)) of
-    Just (TsProd tss) -> mkCallDmds rhs_arity (cleanEvalProdDmd (length tss))
-    _                 -> mkCallDmds rhs_arity cleanEvalDmd
+mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
 
 -- | If given the let-bound 'Id', 'useLetUp' determines whether we should
 -- process the binding up (body before rhs) or down (rhs before body).
@@ -730,7 +725,7 @@ trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
 Because idArity of a function varies independently of its cardinality properties
 (cf. Note [idArity varies independently of dmdTypeDepth]), we implicitly encode
 the arity for when a demand signature is sound to unleash in its 'dmdTypeDepth'
-(cf. Note [Understanding DmdType and StrictSig] in Demand). It is unsound to
+(cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand). It is unsound to
 unleash a demand signature when the incoming number of arguments is less than
 that. See Note [What are demand signatures?] for more details on soundness.
 
@@ -777,7 +772,7 @@ reset or decrease arity. That's an unnecessary dependency, because
   * idArity is analysis information itself, thus volatile
   * We already *have* dmdTypeDepth, wo why not just use it to encode the
     threshold for when to unleash the signature
-    (cf. Note [Understanding DmdType and StrictSig] in Demand)
+    (cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand)
 
 Consider the following expression, for example:
 
@@ -857,9 +852,9 @@ forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
 GHC.Core.Arity)! A small example is the test case NewtypeArity.
 
 
-Note [Product demands for function body]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This example comes from shootout/binary_trees:
+Historical Note [Product demands for function body]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In 2013 I spotted this example, in shootout/binary_trees:
 
     Main.check' = \ b z ds. case z of z' { I# ip ->
                                 case ds_d13s of
@@ -878,8 +873,12 @@ Here we *really* want to unbox z, even though it appears to be used boxed in
 the Nil case.  Partly the Nil case is not a hot path.  But more specifically,
 the whole function gets the CPR property if we do.
 
-So for the demand on the body of a RHS we use a product demand if it's
-a product type.
+That motivated using a demand of C(C(C(S(L,L)))) for the RHS, where
+(solely because the result was a product) we used a product demand
+(albeit with lazy components) for the body. But that gives very silly
+behaviour -- see #17932.   Happily it turns out now to be entirely
+unnecessary: we get good results with C(C(C(S))).   So I simply
+deleted the special case.
 
 ************************************************************************
 *                                                                      *
@@ -1167,7 +1166,7 @@ findBndrsDmds env dmd_ty bndrs
       | otherwise = go dmd_ty bs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in Demand.hs
+-- See Note [Trimming a demand to a type] in GHC.Types.Demand
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where

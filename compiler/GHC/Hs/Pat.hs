@@ -56,19 +56,19 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Types
 import TcEvidence
-import BasicTypes
+import GHC.Types.Basic
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import TysWiredIn
-import Var
-import RdrName ( RdrName )
+import GHC.Types.Var
+import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import Outputable
 import GHC.Core.Type
-import SrcLoc
+import GHC.Types.SrcLoc
 import Bag -- collect ev vars from pats
 import Maybes
 -- libraries:
@@ -737,7 +737,7 @@ isIrrefutableHsPat
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
 
-    go (XPat {})           = False
+    go (XPat nec)          = noExtCon nec
 
 -- | Is the pattern any of combination of:
 --

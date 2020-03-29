@@ -15,8 +15,8 @@ import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHC.Driver.Session
 import GHC.Driver.Types
-import Name             ( Name, getName )
-import NameEnv
+import GHC.Types.Name       ( Name, getName )
+import GHC.Types.Name.Env
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
 import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import GHC.Types.RepType
@@ -71,6 +71,8 @@ make_constr_itbls hsc_env cons =
 
          descr = dataConIdentity dcon
 
-     r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs_really
+         tables_next_to_code = tablesNextToCode dflags
+
+     r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
                               conNo (tagForCon dflags dcon) descr)
      return (getName dcon, ItblPtr r)

@@ -49,15 +49,15 @@ import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
 import Outputable
-import Module
+import GHC.Types.Module
 import ErrUtils
 import GHC.Driver.Session
 import Panic
 import Util
 import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
-import BasicTypes       ( SuccessFlag(..) )
+import GHC.Types.Basic  ( SuccessFlag(..) )
 import Maybes           ( expectJust )
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
@@ -69,7 +69,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import GHC.Iface.Make  ( mkFullIface )
+import GHC.Iface.Make   ( mkFullIface )
 import UpdateCafInfos   ( updateModDetailsCafInfos )
 
 import Exception
@@ -511,8 +511,9 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
+        let pkgstate = pkgState dflags
         let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
-                          | Just c <- map (lookupInstalledPackage dflags) pkg_deps,
+                          | Just c <- map (lookupInstalledPackage pkgstate) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs

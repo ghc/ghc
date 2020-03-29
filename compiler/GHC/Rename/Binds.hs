@@ -45,19 +45,19 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV )
 import GHC.Driver.Session
-import Module
-import Name
-import NameEnv
-import NameSet
-import RdrName          ( RdrName, rdrNameOcc )
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
+import GHC.Types.SrcLoc as SrcLoc
 import ListSetOps       ( findDupsEq )
-import BasicTypes       ( RecFlag(..), TypeOrKind(..) )
+import GHC.Types.Basic  ( RecFlag(..), TypeOrKind(..) )
 import Digraph          ( SCC(..) )
 import Bag
 import Util
 import Outputable
-import UniqSet
+import GHC.Types.Unique.Set
 import Maybes           ( orElse )
 import OrdList
 import qualified GHC.LanguageExtensions as LangExt
@@ -577,7 +577,7 @@ depAnalBinds binds_w_dus
     sccs = depAnal (\(_, defs, _) -> defs)
                    (\(_, _, uses) -> nonDetEltsUniqSet uses)
                    -- It's OK to use nonDetEltsUniqSet here as explained in
-                   -- Note [depAnal determinism] in NameEnv.
+                   -- Note [depAnal determinism] in GHC.Types.Name.Env.
                    (bagToList binds_w_dus)
 
     get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)

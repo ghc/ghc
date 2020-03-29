@@ -35,7 +35,7 @@ module GHC.Driver.Finder (
 
 import GhcPrelude
 
-import Module
+import GHC.Types.Module
 import GHC.Driver.Types
 import GHC.Driver.Packages
 import FastString
@@ -340,8 +340,9 @@ findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = installedModuleUnitId mod
+        pkgstate = pkgState dflags
   --
-  case lookupInstalledPackage dflags pkg_id of
+  case lookupInstalledPackage pkgstate pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
@@ -805,12 +806,13 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
             _ -> panic "cantFindInstalledErr"
 
     build_tag = buildTag dflags
+    pkgstate = pkgState dflags
 
     looks_like_srcpkgid :: InstalledUnitId -> SDoc
     looks_like_srcpkgid pk
      -- Unsafely coerce a unit id FastString into a source package ID
      -- FastString and see if it means anything.
-     | (pkg:pkgs) <- searchPackageId dflags (SourcePackageId (installedUnitIdFS pk))
+     | (pkg:pkgs) <- searchPackageId pkgstate (SourcePackageId (installedUnitIdFS pk))
      = parens (text "This unit ID looks like the source package ID;" $$
        text "the real unit ID is" <+> quotes (ftext (installedUnitIdFS (unitId pkg))) $$
        (if null pkgs then Outputable.empty

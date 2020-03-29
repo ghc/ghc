@@ -23,15 +23,15 @@ import Binary
 import GHC.Iface.Binary           ( getDictFastString )
 import FastMutInt
 import FastString                 ( FastString )
-import Module                     ( Module )
-import Name
-import NameCache
+import GHC.Types.Module           ( Module )
+import GHC.Types.Name
+import GHC.Types.Name.Cache
 import Outputable
 import PrelInfo
-import SrcLoc
-import UniqSupply                 ( takeUniqFromSupply )
-import Unique
-import UniqFM
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import Util
 
 import qualified Data.Array as A

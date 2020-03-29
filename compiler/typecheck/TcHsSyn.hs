@@ -51,8 +51,8 @@ module TcHsSyn (
 import GhcPrelude
 
 import GHC.Hs
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import TcRnMonad
 import PrelNames
@@ -70,18 +70,18 @@ import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Driver.Types
-import Name
-import NameEnv
-import Var
-import VarEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Var
+import GHC.Types.Var.Env
 import GHC.Platform
-import BasicTypes
+import GHC.Types.Basic
 import Maybes
-import SrcLoc
+import GHC.Types.SrcLoc
 import Bag
 import Outputable
 import Util
-import UniqFM
+import GHC.Types.Unique.FM
 import GHC.Core
 
 import {-# SOURCE #-} TcSplice (runTopSplice)
@@ -796,8 +796,7 @@ zonkExpr env (HsTcBracketOut x wrap body bs)
 zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
   runTopSplice s >>= zonkExpr env
 
-zonkExpr _ (HsSpliceE x s) = WARN( True, ppr s ) -- Should not happen
-                           return (HsSpliceE x s)
+zonkExpr _ e@(HsSpliceE _ _) = pprPanic "zonkExpr: HsSpliceE" (ppr e)
 
 zonkExpr env (OpApp fixity e1 op e2)
   = do new_e1 <- zonkLExpr env e1

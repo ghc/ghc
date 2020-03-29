@@ -28,10 +28,10 @@ module GHC.Core.Unify (
 
 import GhcPrelude
 
-import Var
-import VarEnv
-import VarSet
-import Name( Name )
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name( Name )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
@@ -42,11 +42,10 @@ import FV( FV, fvVarSet, fvVarList )
 import Util
 import Pair
 import Outputable
-import UniqFM
-import UniqSet
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 
 import Control.Monad
-import qualified Control.Monad.Fail as MonadFail
 import Control.Applicative hiding ( empty )
 import qualified Control.Applicative
 
@@ -1244,9 +1243,6 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
-#if !MIN_VERSION_base(4,13,0)
-  fail     = MonadFail.fail
-#endif
   m >>= k  = UM (\state ->
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })
@@ -1260,7 +1256,7 @@ instance Alternative UM where
 
 instance MonadPlus UM
 
-instance MonadFail.MonadFail UM where
+instance MonadFail UM where
     fail _   = UM (\_ -> SurelyApart) -- failed pattern match
 
 initUM :: TvSubstEnv  -- subst to extend

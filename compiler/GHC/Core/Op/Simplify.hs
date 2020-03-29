@@ -21,13 +21,13 @@ import GHC.Core.Op.Simplify.Env
 import GHC.Core.Op.Simplify.Utils
 import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.FamInstEnv ( FamInstEnv )
-import Literal          ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
-import Id
-import MkId             ( seqId )
-import GHC.Core.Make    ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
+import GHC.Types.Id
+import GHC.Types.Id.Make   ( seqId )
+import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
-import IdInfo
-import Name             ( mkSystemVarName, isExternalName, getOccFS )
+import GHC.Types.Id.Info
+import GHC.Types.Name           ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.FamInstEnv      ( topNormaliseType_maybe )
@@ -37,27 +37,27 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Op.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
-import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
+import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
-import Cpr              ( mkCprSig, botCpr )
+import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Utils
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
                           , joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.Rules   ( mkRuleInfo, lookupRule, getRules )
-import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
+import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
-import Var              ( isTyCoVar )
+import GHC.Types.Var    ( isTyCoVar )
 import Maybes           ( orElse )
 import Control.Monad
 import Outputable
 import FastString
 import Util
 import ErrUtils
-import Module          ( moduleName, pprModuleName )
-import PrimOp          ( PrimOp (SeqOp) )
+import GHC.Types.Module ( moduleName, pprModuleName )
+import PrimOp           ( PrimOp (SeqOp) )
 
 
 {-
@@ -474,7 +474,7 @@ prepareRhs mode top_lvl occ _ rhs0
         = return (is_exp, emptyLetFloats, Var fun)
         where
           is_exp = isExpandableApp fun n_val_args   -- The fun a constructor or PAP
-                        -- See Note [CONLIKE pragma] in BasicTypes
+                        -- See Note [CONLIKE pragma] in GHC.Types.Basic
                         -- The definition of is_exp should match that in
                         -- OccurAnal.occAnalApp
 
@@ -2139,7 +2139,7 @@ If you find a match, rewrite it, and apply to 'rhs'.
 Notice that we can simply drop casts on the fly here, which
 makes it more likely that a rule will match.
 
-See Note [User-defined RULES for seq] in MkId.
+See Note [User-defined RULES for seq] in GHC.Types.Id.Make.
 
 Note [Occurrence-analyse after rule firing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2533,7 +2533,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   -- 2c. Try the seq rules if
   --     a) it binds only the case binder
   --     b) a rule for seq applies
-  -- See Note [User-defined RULES for seq] in MkId
+  -- See Note [User-defined RULES for seq] in GHC.Types.Id.Make
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
@@ -2757,7 +2757,7 @@ a case pattern.  This is *important*.  Consider
 
 We really must record that b is already evaluated so that we don't
 go and re-evaluate it when constructing the result.
-See Note [Data-con worker strictness] in MkId.hs
+See Note [Data-con worker strictness] in GHC.Types.Id.Make
 
 NB: simplLamBndrs preserves this eval info
 

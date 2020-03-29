@@ -153,9 +153,9 @@ import TcOrigin
 
 import GHC.Hs hiding (LIE)
 import GHC.Driver.Types
-import Module
-import RdrName
-import Name
+import GHC.Types.Module
+import GHC.Types.Name.Reader
+import GHC.Types.Name
 import GHC.Core.Type
 
 import TcType
@@ -163,24 +163,24 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import PrelNames
 
-import Id
-import VarSet
-import VarEnv
+import GHC.Types.Id
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import ErrUtils
-import SrcLoc
-import NameEnv
-import NameSet
+import GHC.Types.SrcLoc
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
 import Bag
 import Outputable
-import UniqSupply
+import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import FastString
 import Panic
 import Util
-import Annotations
-import BasicTypes( TopLevelFlag, TypeOrKind(..) )
+import GHC.Types.Annotations
+import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
 import Maybes
-import CostCentreState
+import GHC.Types.CostCentre.State
 
 import qualified GHC.LanguageExtensions as LangExt
 

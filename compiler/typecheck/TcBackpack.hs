@@ -19,12 +19,12 @@ module TcBackpack (
 
 import GhcPrelude
 
-import BasicTypes (defaultFixity, TypeOrKind(..))
+import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
 import GHC.Driver.Packages
 import TcRnExports
 import GHC.Driver.Session
 import GHC.Hs
-import RdrName
+import GHC.Types.Name.Reader
 import TcRnMonad
 import TcTyDecls
 import GHC.Core.InstEnv
@@ -39,13 +39,13 @@ import TcOrigin
 import GHC.Iface.Load
 import GHC.Rename.Names
 import ErrUtils
-import Id
-import Module
-import Name
-import NameEnv
-import NameSet
-import Avail
-import SrcLoc
+import GHC.Types.Id
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.SrcLoc
 import GHC.Driver.Types
 import Outputable
 import GHC.Core.Type
@@ -53,13 +53,13 @@ import FastString
 import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
 import TcEnv
-import Var
+import GHC.Types.Var
 import GHC.Iface.Syntax
 import PrelNames
 import qualified Data.Map as Map
 
 import GHC.Driver.Finder
-import UniqDSet
+import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
 import TcErrors
 import TcUnify
@@ -230,9 +230,17 @@ check_inst sig_inst = do
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: DynFlags -> ModuleName -> [IndefModule]
-requirementMerges dflags mod_name =
-    fromMaybe [] (Map.lookup mod_name (requirementContext (pkgState dflags)))
+requirementMerges :: PackageState -> ModuleName -> [IndefModule]
+requirementMerges pkgstate mod_name =
+    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+    where
+      -- update ComponentId cached details as they may have changed since the
+      -- time the ComponentId was created
+      fixupModule (IndefModule iud name) = IndefModule iud' name
+         where
+            iud' = iud { indefUnitIdComponentId = cid' }
+            cid  = indefUnitIdComponentId iud
+            cid' = updateComponentId pkgstate cid
 
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
@@ -265,7 +273,8 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (IndefiniteUnitId iuid) mod_name)))
   where
-    reqs = requirementMerges (hsc_dflags hsc_env) modname
+    pkgstate = pkgState (hsc_dflags hsc_env)
+    reqs = requirementMerges pkgstate modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
 
@@ -528,10 +537,11 @@ mergeSignatures
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         mod_name = moduleName (tcg_mod tcg_env)
+        pkgstate = pkgState dflags
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
-    let reqs = requirementMerges dflags mod_name
+    let reqs = requirementMerges pkgstate mod_name
 
     addErrCtxt (merge_msg mod_name reqs) $ do
 
@@ -560,7 +570,7 @@ mergeSignatures
             let insts = indefUnitIdInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
-                        pkg = getInstalledPackageDetails dflags inst_uid
+                        pkg = getInstalledPackageDetails pkgstate inst_uid
                     in null (exposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
