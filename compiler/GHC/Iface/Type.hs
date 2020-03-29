@@ -68,10 +68,10 @@ import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
-import Var
+import GHC.Types.Var
 import PrelNames
-import Name
-import BasicTypes
+import GHC.Types.Name
+import GHC.Types.Basic
 import Binary
 import Outputable
 import FastString
@@ -119,7 +119,7 @@ ifaceBndrType (IfaceTvBndr (_, t)) = t
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
 data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
-  = IfaceNoOneShot   -- and Note [The oneShot function] in MkId
+  = IfaceNoOneShot   -- and Note [The oneShot function] in GHC.Types.Id.Make
   | IfaceOneShot
 
 

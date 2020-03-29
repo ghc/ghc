@@ -32,7 +32,7 @@ import Constraint       ( HoleSort(..) )
 import TcHsSyn
 import TcRnMonad
 import TcUnify
-import BasicTypes
+import GHC.Types.Basic
 import Inst
 import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
 import TcSigs           ( tcUserTypeSig, tcInstSig )
@@ -50,37 +50,37 @@ import TcPat
 import TcMType
 import TcOrigin
 import TcType
-import Id
-import IdInfo
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
-import Name
-import NameEnv
-import NameSet
-import RdrName
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.Type
 import TcEvidence
-import VarSet
+import GHC.Types.Var.Set
 import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import GHC.Driver.Session
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
-import VarEnv  ( emptyTidyEnv, mkInScopeSet )
+import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 import ListSetOps
 import Maybes
 import Outputable
 import FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)
-import UniqSet ( nonDetEltsUniqSet )
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function

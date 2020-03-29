@@ -19,12 +19,12 @@ where
 
 import GhcPrelude
 
-import RdrName
+import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import TcRnMonad
-import Name
-import Module
-import SrcLoc
+import GHC.Types.Name
+import GHC.Types.Module
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
 import PrelNames ( mkUnboundName, isUnboundName, getUnique)
 import Util
@@ -33,7 +33,7 @@ import GHC.Driver.Session
 import FastString
 import Data.List
 import Data.Function ( on )
-import UniqDFM (udfmToList)
+import GHC.Types.Unique.DFM (udfmToList)
 
 {-
 ************************************************************************

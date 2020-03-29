@@ -15,7 +15,7 @@ module TcTypeable(mkTypeableBinds, tyConIsTypeable) where
 import GhcPrelude
 import GHC.Platform
 
-import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
+import GHC.Types.Basic ( Boxity(..), neverInlinePragma, SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import TcEnv
@@ -28,16 +28,16 @@ import TysPrim ( primTyCons )
 import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
-import Name
-import Id
+import GHC.Types.Name
+import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import Module
+import GHC.Types.Module
 import GHC.Hs
 import GHC.Driver.Session
 import Bag
-import Var ( VarBndr(..) )
+import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map
 import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)

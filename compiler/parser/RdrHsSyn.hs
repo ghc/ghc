@@ -108,20 +108,20 @@ import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon )
 import GHC.Core.ConLike        ( ConLike(..) )
 import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
-import RdrName
-import Name
-import BasicTypes
+import GHC.Types.Name.Reader
+import GHC.Types.Name
+import GHC.Types.Basic
 import Lexer
-import Lexeme           ( isLexCon )
+import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Core.Type    ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
                           tupleTyConName, cTupleTyConNameArity_maybe )
-import ForeignCall
+import GHC.Types.ForeignCall
 import PrelNames        ( allNameStrings )
-import SrcLoc
-import Unique           ( hasKey )
+import GHC.Types.SrcLoc
+import GHC.Types.Unique ( hasKey )
 import OrdList          ( OrdList, fromOL )
 import Bag              ( emptyBag, consBag )
 import Outputable
@@ -2548,7 +2548,7 @@ mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- Note [Pragma source text] in BasicTypes
+  = InlinePragma { inl_src = src -- Note [Pragma source text] in GHC.Types.Basic
                  , inl_inline = inl
                  , inl_sat    = Nothing
                  , inl_act    = act

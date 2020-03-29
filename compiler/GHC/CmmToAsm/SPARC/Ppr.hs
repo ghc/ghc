@@ -45,7 +45,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 
-import Unique           ( pprUniqueAlways )
+import GHC.Types.Unique ( pprUniqueAlways )
 import Outputable
 import GHC.Platform
 import FastString
