@@ -409,6 +409,30 @@ Maybe, but could you prove that RET_FUN is the only way that
 resurrection can occur?
 
 So, no shortcutting.
+
+Note [Ticky labels in SRT analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Raw Cmm data (CmmStaticsRaw) can't contain pointers so they're considered
+non-CAFFY in SRT analysis and we update the SRTMap mapping them to `Nothing`
+(meaning they're not CAFFY).
+
+However when building with -ticky we generate ticky CLabels using the function's
+`Name`. For example, if we have a top-level function `sat_s1rQ`, in a ticky
+build we get two IdLabels using the name `sat_s1rQ`:
+
+- For the function itself: IdLabel sat_s1rQ ... Entry
+- For the ticky counter: IdLabel sat_s1rQ ... RednCounts
+
+In these cases we really want to use the function definition for the SRT
+analysis of this Name, because that's what we export for this Name -- ticky
+counters are not exported. So we ignore ticky counters in SRT analysis (which
+are never CAFFY and never exported).
+
+Not doing this caused #17947 where we analysed the function first mapped the
+name to CAFFY. We then saw the ticky constructor, and becuase it has the same
+Name as the function and is not CAFFY we overrode the CafInfo of the name as
+non-CAFFY.
 -}
 
 -- ---------------------------------------------------------------------
@@ -818,8 +842,11 @@ doSRTs dflags moduleSRTInfo procs data_ = do
                       -- already updated by oneSRT
                       srtMap
                     CmmData _ (CmmStaticsRaw lbl _)
-                      | isIdLabel lbl ->
-                          -- not analysed by oneSRT, declare it non-CAFFY here
+                      | isIdLabel lbl && not (isTickyLabel lbl) ->
+                          -- Raw data are not analysed by oneSRT and they can't
+                          -- be CAFFY.
+                          -- See Note [Ticky labels in SRT analysis] above for
+                          -- why we exclude ticky labels here.
                           Map.insert (mkCAFLabel lbl) Nothing srtMap
                       | otherwise ->
                           -- Not an IdLabel, ignore

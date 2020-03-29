@@ -108,7 +108,7 @@ module GHC.Cmm.CLabel (
         pprCLabel,
         isInfoTableLabel,
         isConInfoTableLabel,
-        isIdLabel
+        isIdLabel, isTickyLabel
     ) where
 
 #include "HsVersions.h"
@@ -267,6 +267,12 @@ data CLabel
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
 isIdLabel _ = False
+
+-- Used in SRT analysis. See Note [Ticky labels in SRT analysis] in
+-- GHC.Cmm.Info.Build.
+isTickyLabel :: CLabel -> Bool
+isTickyLabel (IdLabel _ _ RednCounts) = True
+isTickyLabel _ = False
 
 -- This is laborious, but necessary. We can't derive Ord because
 -- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
@@ -462,8 +468,7 @@ mkSRTLabel     :: Unique -> CLabel
 mkSRTLabel u = SRTLabel u
 
 mkRednCountsLabel :: Name -> CLabel
-mkRednCountsLabel       name    =
-  IdLabel name NoCafRefs RednCounts  -- Note [ticky for LNE]
+mkRednCountsLabel name = IdLabel name NoCafRefs RednCounts  -- Note [ticky for LNE]
 
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
