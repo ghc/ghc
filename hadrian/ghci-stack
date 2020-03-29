@@ -2,5 +2,6 @@
 
 set -e
 
-GHC_FLAGS="$GHC_FLAGS $(TERM=dumb CABFLAGS=-v0 "hadrian/build-stack" tool-args -q --build-root=.hadrian_ghci --flavour=ghc-in-ghci "$@")"
+TOOL_ARGS=$(TERM=dumb CABFLAGS=-v0 "hadrian/build-cabal" tool-args -q --build-root=.hadrian_ghci --flavour=ghc-in-ghci "$@" | dos2unix | paste -s -d ' ' - )
+GHC_FLAGS="$GHC_FLAGS $TOOL_ARGS"
 stack exec -- ghci $GHC_FLAGS "$@" -fno-code -fwrite-interface -hidir=.hadrian_ghci/interface -O0 ghc/Main.hs +RTS -A128m
