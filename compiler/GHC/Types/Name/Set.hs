@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Types.Name.Set (
         -- * Names set type
         NameSet,
@@ -28,7 +29,10 @@ module GHC.Types.Name.Set (
 
         -- ** Manipulating defs and uses
         emptyDUs, usesOnly, mkDUs, plusDU,
-        findUses, duDefs, duUses, allUses
+        findUses, duDefs, duUses, allUses,
+
+        -- * Non-CAFfy names
+        NonCaffySet(..)
     ) where
 
 #include "HsVersions.h"
@@ -213,3 +217,8 @@ findUses dus uses
         = rhs_uses `unionNameSet` uses
         | otherwise     -- No def is used
         = uses
+
+-- | 'Id's which have no CAF references. This is a result of analysis of C--.
+-- It is always safe to use an empty 'NonCaffySet'. TODO Refer to Note.
+newtype NonCaffySet = NonCaffySet NameSet
+  deriving (Semigroup, Monoid)
