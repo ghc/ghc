@@ -42,6 +42,9 @@ module GHC.Types.Var.Set (
         sizeDVarSet, seqDVarSet,
         partitionDVarSet,
         dVarSetToVarSet,
+
+        -- ** non-CAFfy sets
+        NonCaffySet(..)
     ) where
 
 #include "HsVersions.h"
@@ -352,3 +355,8 @@ transCloDVarSet fn seeds
        | otherwise            = go (acc `unionDVarSet` new_vs) new_vs
        where
          new_vs = fn candidates `minusDVarSet` acc
+
+-- | 'Id's which have no CAF references. This is a result of analysis of C--.
+-- It is always safe to use an empty 'NonCaffySet'. TODO Refer to Note.
+newtype NonCaffySet = NonCaffySet NameSet
+  deriving (Semigroup, Monoid)
