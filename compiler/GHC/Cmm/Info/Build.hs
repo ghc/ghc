@@ -459,7 +459,7 @@ type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
 
 mkCAFLabel :: CLabel -> CAFLabel
-mkCAFLabel lbl = CAFLabel $! toClosureLbl lbl
+mkCAFLabel lbl = CAFLabel (toClosureLbl lbl)
 
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
@@ -736,10 +736,11 @@ getStaticFuns decls =
 type SRTMap = Map CAFLabel (Maybe SRTEntry)
 
 
--- | Given SRTMap of a module returns the set of non-CAFFY names in the module.
--- Any Names not in the set are CAFFY.
-srtMapNonCAFs :: SRTMap -> NameSet
-srtMapNonCAFs srtMap = mkNameSet (mapMaybe get_name (Map.toList srtMap))
+-- | Given 'SRTMap' of a module, returns the set of non-CAFFY names in the
+-- module.  Any 'Name's not in the set are CAFFY.
+srtMapNonCAFs :: SRTMap -> NonCaffySet
+srtMapNonCAFs srtMap =
+    NonCaffySet $ mkNameSet (mapMaybe get_name (Map.toList srtMap))
   where
     get_name (CAFLabel l, Nothing) = hasHaskellName l
     get_name (_l, Just _srt_entry) = Nothing
