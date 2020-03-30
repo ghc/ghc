@@ -1319,10 +1319,11 @@ checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> DsM Bool
 checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
   let definitely_inhabited = definitelyInhabitedType (delta_ty_st amb_cs)
   tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
+  -- See Note [Fuel for the inhabitation test]
   let rec_max_bound | tys_to_check `lengthExceeds` 1
                     = 1
                     | otherwise
-                    = defaultRecTcMaxBound
+                    = 3
       rec_ts' = setRecTcMaxBound rec_max_bound rec_ts
   allM (nonVoid rec_ts' amb_cs) tys_to_check
 
@@ -1342,6 +1343,7 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
   mb_cands <- inhabitationCandidates amb_cs strict_arg_ty
   case mb_cands of
     Right (tc, _, cands)
+      -- See Note [Fuel for the inhabitation test]
       |  Just rec_ts' <- checkRecTc rec_ts tc
       -> anyM (cand_is_inhabitable rec_ts' amb_cs) cands
            -- A strict argument type is inhabitable by a terminating value if
@@ -1390,7 +1392,7 @@ definitelyInhabitedType ty_st ty = do
       null (dataConImplBangs con) -- (2)
 
 {- Note [Strict argument type constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the ConVar case of clause processing, each conlike K traditionally
 generates two different forms of constraints:
 
@@ -1420,6 +1422,7 @@ say, `K2 undefined` or `K2 (let x = x in x)`.)
 Since neither the term nor type constraints mentioned above take strict
 argument types into account, we make use of the `nonVoid` function to
 determine whether a strict type is inhabitable by a terminating value or not.
+We call this the "inhabitation test".
 
 `nonVoid ty` returns True when either:
 1. `ty` has at least one InhabitationCandidate for which both its term and type
@@ -1445,15 +1448,20 @@ determine whether a strict type is inhabitable by a terminating value or not.
   `nonVoid MyVoid` returns False. The InhabitationCandidate for the MkMyVoid
   constructor contains Void as a strict argument type, and since `nonVoid Void`
   returns False, that InhabitationCandidate is discarded, leaving no others.
+* Whether or not a type is inhabited is undecidable in general.
+  See Note [Fuel for the inhabitation test].
+* For some types, inhabitation is evident immediately and we don't need to
+  perform expensive tests. See Note [Types that are definitely inhabitable].
 
-* Performance considerations
+Note [Fuel for the inhabitation test]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whether or not a type is inhabited is undecidable in general. As a result, we
+can run into infinite loops in `nonVoid`. Therefore, we adopt a fuel-based
+approach to prevent that.
 
-We must be careful when recursively calling `nonVoid` on the strict argument
-types of an InhabitationCandidate, because doing so naïvely can cause GHC to
-fall into an infinite loop. Consider the following example:
+Consider the following example:
 
   data Abyss = MkAbyss !Abyss
-
   stareIntoTheAbyss :: Abyss -> a
   stareIntoTheAbyss x = case x of {}
 
@@ -1474,7 +1482,6 @@ stareIntoTheAbyss above. Then again, the same problem occurs with recursive
 newtypes, like in the following code:
 
   newtype Chasm = MkChasm Chasm
-
   gazeIntoTheChasm :: Chasm -> a
   gazeIntoTheChasm x = case x of {} -- Erroneously warned as non-exhaustive
 
@@ -1498,9 +1505,26 @@ maximum recursion depth to 1 to mitigate the problem. If the branching factor
 is exactly 1 (i.e., we have a linear chain instead of a tree), then it's okay
 to stick with a larger maximum recursion depth.
 
+In #17977 we saw that the defaultRecTcMaxBound (100 at the time of writing) was
+too large and had detrimental effect on performance of the coverage checker.
+Given that we only commit to a best effort anyway, we decided to substantially
+decrement the recursion depth to 3, at the cost of precision in some edge cases
+like
+
+  data Nat = Z | S Nat
+  data Down :: Nat -> Type where
+    Down :: !(Down n) -> Down (S n)
+  f :: Down (S (S (S (S (S Z))))) -> ()
+  f x = case x of {}
+
+Since the coverage won't bother to instantiate Down 4 levels deep to see that it
+is in fact uninhabited, it will emit a inexhaustivity warning for the case.
+
+Note [Types that are definitely inhabitable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Another microoptimization applies to data types like this one:
 
-  data S a = ![a] !T
+  data S a = S ![a] !T
 
 Even though there is a strict field of type [a], it's quite silly to call
 nonVoid on it, since it's "obvious" that it is inhabitable. To make this
