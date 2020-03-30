@@ -1400,8 +1400,8 @@ depAnalTyClDecls rdr_env kisig_fv_env ds_w_fvs
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns
-  = nonDetFoldUniqSet add emptyNameSet ns
-  -- It's OK to use nonDetFoldUFM because we immediately forget the
+  = nonDetStrictFoldUniqSet add emptyNameSet ns
+  -- It's OK to use a non-deterministic fold because we immediately forget the
   -- ordering by creating a set
   where
     add n s = extendNameSet s (getParent rdr_env n)

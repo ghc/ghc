@@ -441,7 +441,7 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- For each element of the input set,
 -- add the deep free variables of its kind
-closeOverKinds vs = nonDetFoldVarSet do_one vs vs
+closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
     do_one v acc = appEndo (deep_ty (varType v)) acc
 
