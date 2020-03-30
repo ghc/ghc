@@ -1581,7 +1581,7 @@ placeJoinCeiling le@(LE { le_ctxt_lvl = lvl })
 
 maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
 maxFvLevel max_me env var_set
-  = foldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+  = nonDetStrictFoldDVarSet (flip (maxIn max_me env)) tOP_LEVEL var_set
 
 maxFvLevel' :: (Var -> Bool) -> LevelEnv -> TyCoVarSet -> Level
 -- Same but for TyCoVarSet

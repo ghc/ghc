@@ -545,7 +545,7 @@ closureGrowth expander sizer group abs_ids = go
         -- we lift @f@
         newbies = abs_ids `minusDVarSet` clo_fvs'
         -- Lifting @f@ removes @f@ from the closure but adds all @newbies@
-        cost = foldDVarSet (\id size -> sizer id + size) 0 newbies - n_occs
+        cost = nonDetStrictFoldDVarSet (\size id -> sizer id + size) 0 newbies - n_occs
     go (RhsSk body_dmd body)
       -- The conservative assumption would be that
       --   1. Every RHS with positive growth would be called multiple times,

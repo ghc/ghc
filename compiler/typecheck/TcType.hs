@@ -703,9 +703,11 @@ tcTyVarLevel tv
 tcTypeLevel :: TcType -> TcLevel
 -- Max level of any free var of the type
 tcTypeLevel ty
-  = foldDVarSet add topTcLevel (tyCoVarsOfTypeDSet ty)
+  = nonDetStrictFoldDVarSet add topTcLevel (tyCoVarsOfTypeDSet ty)
+    -- It's safe to use a non-deterministic fold because `maxTcLevel` is
+    -- commutative.
   where
-    add v lvl
+    add lvl v
       | isTcTyVar v = lvl `maxTcLevel` tcTyVarLevel v
       | otherwise = lvl
 
