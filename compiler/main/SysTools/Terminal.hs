@@ -18,6 +18,8 @@ import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
 #endif
 
+import System.IO.Unsafe
+
 #if defined(mingw32_HOST_OS) && !defined(WINAPI)
 # if defined(i386_HOST_ARCH)
 #  define WINAPI stdcall
@@ -28,9 +30,15 @@ import qualified System.Win32 as Win32
 # endif
 #endif
 
+-- | Does the controlling terminal support ANSI color sequences?
+-- This memoized to avoid thread-safety issues in ncurses (see #17922).
+stderrSupportsAnsiColors :: Bool
+stderrSupportsAnsiColors = unsafePerformIO stderrSupportsAnsiColors'
+{-# NOINLINE stderrSupportsAnsiColors #-}
+
 -- | Check if ANSI escape sequences can be used to control color in stderr.
-stderrSupportsAnsiColors :: IO Bool
-stderrSupportsAnsiColors = do
+stderrSupportsAnsiColors' :: IO Bool
+stderrSupportsAnsiColors' = do
 #if defined(MIN_VERSION_terminfo)
     stderr_available <- queryTerminal stdError
     if stderr_available then
