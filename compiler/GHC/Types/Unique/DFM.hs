@@ -50,14 +50,14 @@ module GHC.Types.Unique.DFM (
         equalKeysUDFM,
         minusUDFM,
         listToUDFM,
-        udfmMinusUFM,
+        udfmMinusUFM, ufmMinusUDFM,
         partitionUDFM,
         anyUDFM, allUDFM,
         pprUniqDFM, pprUDFM,
 
         udfmToList,
         udfmToUfm,
-        nonDetFoldUDFM,
+        nonDetStrictFoldUDFM,
         alwaysUnsafeUfmToUdfm,
     ) where
 
@@ -72,7 +72,7 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
-import GHC.Types.Unique.FM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap)
+import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -272,12 +272,14 @@ elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
 foldUDFM k z m = foldr k z (eltsUDFM m)
 
--- | Performs a nondeterministic fold over the UniqDFM.
+-- | Performs a nondeterministic strict fold over the UniqDFM.
 -- It's O(n), same as the corresponding function on `UniqFM`.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
-nonDetFoldUDFM k z (UDFM m _i) = foldr k z $ map taggedFst $ M.elems m
+nonDetStrictFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
+nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
+  where
+    k' acc (TaggedVal v _) = k v acc
 
 eltsUDFM :: UniqDFM elt -> [elt]
 eltsUDFM (UDFM m _i) =
@@ -337,6 +339,9 @@ udfmMinusUFM (UDFM x i) y = UDFM (M.difference x (ufmToIntMap y)) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
   -- bound.
 
+ufmMinusUDFM :: UniqFM elt1 -> UniqDFM elt2 -> UniqFM elt1
+ufmMinusUDFM x (UDFM y _i) = unsafeIntMapToUFM (M.difference (ufmToIntMap x) y)
+
 -- | Partition UniqDFM into two UniqDFMs according to the predicate
 partitionUDFM :: (elt -> Bool) -> UniqDFM elt -> (UniqDFM elt, UniqDFM elt)
 partitionUDFM p (UDFM m i) =
@@ -349,8 +354,7 @@ delListFromUDFM = foldl' delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
-udfmToUfm (UDFM m _i) =
-  listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m]
+udfmToUfm (UDFM m _i) = unsafeIntMapToUFM (M.map taggedFst m)
 
 listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM elt
 listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM

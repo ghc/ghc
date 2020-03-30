@@ -15,8 +15,12 @@ module GHC.Tc.Types.Evidence (
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
-  lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
+  lookupEvBind, evBindMapBinds,
+  foldEvBindMap, nonDetStrictFoldEvBindMap,
+  filterEvBindMap,
   isEmptyEvBindMap,
+  evBindMapToVarSet,
+  varSetMinusEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
@@ -55,6 +59,8 @@ module GHC.Tc.Types.Evidence (
 
 import GHC.Prelude
 
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
@@ -496,9 +502,21 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
+nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
+
 filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
 filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
   = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
+
+evBindMapToVarSet :: EvBindMap -> VarSet
+evBindMapToVarSet (EvBindMap dve) = unsafeUFMToUniqSet (mapUFM evBindVar (udfmToUfm dve))
+
+varSetMinusEvBindMap :: VarSet -> EvBindMap -> VarSet
+varSetMinusEvBindMap vs (EvBindMap dve) = vs `uniqSetMinusUDFM` dve
 
 instance Outputable EvBindMap where
   ppr (EvBindMap m) = ppr m
@@ -851,8 +869,8 @@ findNeededEvVars ev_binds seeds
   = transCloVarSet also_needs seeds
   where
    also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
-     -- It's OK to use nonDetFoldUFM here because we immediately
+   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
+     -- It's OK to use a non-deterministic fold here because we immediately
      -- forget about the ordering by creating a set
 
    add :: Var -> VarSet -> VarSet
