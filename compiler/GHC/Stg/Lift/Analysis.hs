@@ -533,7 +533,7 @@ closureGrowth expander sizer group abs_ids = go
     go (ClosureSk _ clo_fvs rhs)
       -- If no binder of the @group@ occurs free in the closure, the lifting
       -- won't have any effect on it and we can omit the recursive call.
-      | n_occs == 0 = 0
+      | dVarSetDisjointVarSet clo_fvs' group = 0
       -- Otherwise, we account the cost of allocating the closure and add it to
       -- the closure growth of its RHS.
       | otherwise   = mkIntWithInf cost + go rhs
@@ -545,7 +545,7 @@ closureGrowth expander sizer group abs_ids = go
         -- we lift @f@
         newbies = abs_ids `minusDVarSet` clo_fvs'
         -- Lifting @f@ removes @f@ from the closure but adds all @newbies@
-        cost = foldDVarSet (\id size -> sizer id + size) 0 newbies - n_occs
+        cost = foldDVarSet (\id size -> sizer id + size) 0 newbies - n_occs -- TODO: Do we  really want a right fold here? Also: no need to do this in deterministic order!
     go (RhsSk body_dmd body)
       -- The conservative assumption would be that
       --   1. Every RHS with positive growth would be called multiple times,

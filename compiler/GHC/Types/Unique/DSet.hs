@@ -26,6 +26,7 @@ module GHC.Types.Unique.DSet (
         unionUniqDSets, unionManyUniqDSets,
         minusUniqDSet, uniqDSetMinusUniqSet,
         intersectUniqDSets, uniqDSetIntersectUniqSet,
+        uniqDSetDisjointUniqSet,
         foldUniqDSet,
         elementOfUniqDSet,
         filterUniqDSet,
@@ -97,6 +98,10 @@ intersectUniqDSets (UniqDSet s) (UniqDSet t) = UniqDSet (intersectUDFM s t)
 uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
 uniqDSetIntersectUniqSet xs ys
   = UniqDSet (udfmIntersectUFM (getUniqDSet xs) (getUniqSet ys))
+
+uniqDSetDisjointUniqSet :: UniqDSet a -> UniqSet b -> Bool
+uniqDSetDisjointUniqSet xs ys
+  = disjointUdfmUfm (getUniqDSet xs) (getUniqSet ys)
 
 foldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
 foldUniqDSet c n (UniqDSet s) = foldUDFM c n s
