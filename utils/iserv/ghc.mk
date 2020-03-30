@@ -30,8 +30,9 @@ endif
 # refer to the RTS.  This is harmless if you don't use it (adds a bit
 # of overhead to startup and increases the binary sizes) but if you
 # need it there's no alternative.
+# Don't do this on FreeBSD to work around #17962.
 ifeq "$(TargetElf)" "YES"
-ifneq "$(TargetOS_CPP)" "solaris2"
+ifeq "$(findstring $(TargetOS_CPP), solaris2 freebsd)" ""
 # The Solaris linker does not support --export-dynamic option. It also
 # does not need it since it exports all dynamic symbols by default
 utils/iserv_stage2_MORE_HC_OPTS += -optl-Wl,--export-dynamic
