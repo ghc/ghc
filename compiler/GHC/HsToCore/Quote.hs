@@ -284,7 +284,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; _        <- mapM no_splice splcds
                      ; tycl_ds  <- mapM repTyClD (tyClGroupTyClDecls tyclds)
                      ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
-                     ; kisig_ds <- mapM repKiSigD (concatMap group_kisigs tyclds)
+                     ; kisig_ds <- mapMaybeM repKiSigD (concatMap group_kisigs tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repLFixD fixds
@@ -493,11 +493,11 @@ repRoleD (L loc (RoleAnnotDecl _ tycon roles))
 repRoleD (L _ (XRoleAnnotDecl nec)) = noExtCon nec
 
 -------------------------
-repKiSigD :: LStandaloneKindSig GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
+repKiSigD :: LStandaloneKindSig GhcRn -> MetaM (Maybe (SrcSpan, Core (M TH.Dec)))
 repKiSigD (L loc kisig) =
   case kisig of
-    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName loc ki v
-    XStandaloneKindSig nec -> noExtCon nec
+    StandaloneKindSig _ v ki -> Just <$> rep_ty_sig kiSigDName loc ki v
+    XStandaloneKindSig _ -> pure Nothing
 
 -------------------------
 repDataDefn :: Core TH.Name

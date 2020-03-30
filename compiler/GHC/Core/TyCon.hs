@@ -8,6 +8,7 @@ The @TyCon@ datatype
 
 {-# LANGUAGE CPP, FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Core.TyCon(
         -- * Main TyCon data types
@@ -2586,7 +2587,7 @@ data TyConFlavour
   | TypeSynonymFlavour
   | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
   | PromotedDataConFlavour
-  deriving Eq
+  deriving (Eq, Data.Data)
 
 instance Outputable TyConFlavour where
   ppr = text . go

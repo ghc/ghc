@@ -25,6 +25,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Core.TyCon   ( TyConFlavour(..) )
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Rename.Types
@@ -59,7 +60,8 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import Util             ( debugIsOn, filterOut, lengthExceeds,
+                          partitionWith, (<&&>) )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -73,7 +75,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
 
@@ -1293,7 +1295,23 @@ rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
        ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
+             decl_headers_env = mkNameEnv (map mk_pair decl_headers_list)
+               where mk_pair hdr = (decl_header_name (unLoc hdr), hdr)
+                     decl_headers_list = map (mapLoc mkDeclHeaderRn . fst) tycls_w_fvs
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names decl_headers_env (tyClGroupKindSigs tycl_ds)
+
+       ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+                   -- See Note [CUSKs and PolyKinds] in TcTyClsDecls
+       ; let (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
+             cusks_env
+               | cusks_enabled =
+                   mapNameEnv (\hdr -> L (getLoc hdr) (XStandaloneKindSig hdr)) $
+                   filterNameEnv (decl_header_cusk . unLoc) decl_headers_env
+               | otherwise = emptyNameEnv
+             kisig_cusks_env =
+               plusNameEnv_C (\saks _cusk -> saks) -- See Note [Choose SAKSs over CUSKs]
+               kisig_env cusks_env
+
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
@@ -1301,7 +1319,6 @@ rnTyClDecls tycl_ds
        ; rdr_env <- getGlobalRdrEnv
        ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
-             (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
 
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
              (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
@@ -1315,7 +1332,7 @@ rnTyClDecls tycl_ds
                                         , group_instds = init_inst_ds }]
 
              (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
+                = mapAccumL (mk_group role_annot_env kisig_cusks_env) rest_inst_ds tycl_sccs
 
              all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
@@ -1348,6 +1365,89 @@ rnTyClDecls tycl_ds
                           , group_roles  = roles
                           , group_instds = inst_ds }
 
+{- Note [Choose SAKSs over CUSKs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some declarations have both a CUSK and a SAKS:
+
+type T :: Type -> Type
+data T (a :: Type) = MkT
+
+In this case, we will end up with two representations for its signature:
+
+  1. StandaloneKindSig (data T (a :: Type)) T (Type -> Type)   -- representing the SAKS
+  2. XStandaloneKindSig (data T (a :: Type))                   -- representing the CUSK
+
+In the resulting TyClGroups, we want only one. The CUSK node is generated from
+the header and contains no new information, so it is safe to discard it. The
+SAKS node contains the signature explicitly given by the user and should not be
+discarded.
+
+Therefore, the SAKS node takes precedence over the CUSK node.
+-}
+
+
+-- | Extract the declaration header from a type/class definition.
+mkDeclHeaderRn :: TyClDecl GhcRn -> DeclHeaderRn
+
+-- Class
+mkDeclHeaderRn
+  (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs })
+  = DeclHeaderRn
+    { decl_header_flav = ClassFlavour,
+      decl_header_name = name,
+      decl_header_cusk = hsTvbAllKinded ktvs,
+      decl_header_bndrs = ktvs,
+      decl_header_res_sig = Nothing }
+
+-- Data/Newtype
+mkDeclHeaderRn
+  (DataDecl { tcdLName = L _ name
+            , tcdTyVars = ktvs
+            , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                       , dd_ND = new_or_data }
+            , tcdDExt = DataDeclRn { tcdDataCusk = has_cusk }})
+  = DeclHeaderRn
+      { decl_header_flav = newOrDataToFlavour new_or_data,
+        decl_header_name = name,
+        decl_header_cusk = has_cusk,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = m_sig }
+
+-- Type/data family
+mkDeclHeaderRn
+  (FamDecl { tcdFam =
+     FamilyDecl { fdLName     = L _ name
+                , fdTyVars    = ktvs
+                , fdResultSig = L _ resultSig
+                , fdInfo      = info } })
+  = DeclHeaderRn
+      { decl_header_flav = getFamFlav Nothing info,
+        decl_header_name = name,
+        decl_header_cusk = has_cusk,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = famResultKindSignature resultSig }
+  where
+    has_cusk =
+      case info of
+        ClosedTypeFamily {} -> hsTvbAllKinded ktvs
+                            && isJust (famResultKindSignature resultSig)
+        _ -> True -- Un-associated open type/data families have CUSKs
+
+-- Type synonym
+mkDeclHeaderRn
+  (SynDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdRhs = rhs })
+  = DeclHeaderRn
+      { decl_header_flav = TypeSynonymFlavour,
+        decl_header_name = name,
+        decl_header_cusk = hsTvbAllKinded ktvs && isJust (hsTyKindSig rhs),
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = hsTyKindSig rhs }
+
+-- Impossible cases
+mkDeclHeaderRn (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+mkDeclHeaderRn (FamDecl {tcdFam = XFamilyDecl nec}) = noExtCon nec
+mkDeclHeaderRn (XTyClDecl nec) = noExtCon nec
+
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
 
@@ -1370,34 +1470,37 @@ getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
 getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
 
 rnStandaloneKindSignatures
-  :: NameSet  -- names of types and classes in the current TyClGroup
+  :: NameSet  -- names of types and classes in the current HsGroup
+  -> NameEnv LDeclHeaderRn  -- headers of types and classes in the current HsGroup
   -> [LStandaloneKindSig GhcPs]
   -> RnM [(LStandaloneKindSig GhcRn, FreeVars)]
-rnStandaloneKindSignatures tc_names kisigs
+rnStandaloneKindSignatures tc_names decl_headers kisigs
   = do { let (no_dups, dup_kisigs) = removeDups (compare `on` get_name) kisigs
              get_name = standaloneKindSigName . unLoc
        ; mapM_ dupKindSig_Err dup_kisigs
-       ; mapM (wrapLocFstM (rnStandaloneKindSignature tc_names)) no_dups
+       ; mapM (wrapLocFstM (rnStandaloneKindSignature tc_names decl_headers)) no_dups
        }
 
 rnStandaloneKindSignature
-  :: NameSet  -- names of types and classes in the current TyClGroup
+  :: NameSet  -- names of types and classes in the current HsGroup
+  -> NameEnv LDeclHeaderRn  -- headers of types and classes in the current HsGroup
   -> StandaloneKindSig GhcPs
   -> RnM (StandaloneKindSig GhcRn, FreeVars)
-rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
+rnStandaloneKindSignature tc_names decl_headers (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
         ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
-        ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
+        ; let hdr = lookupNameEnv decl_headers (unLoc new_v)
+        ; return (StandaloneKindSig hdr new_v new_ki, fvs)
         }
   where
     standaloneKiSigErr :: SDoc
     standaloneKiSigErr =
       hang (text "Illegal standalone kind signature")
          2 (text "Did you mean to enable StandaloneKindSignatures?")
-rnStandaloneKindSignature _ (XStandaloneKindSig nec) = noExtCon nec
+rnStandaloneKindSignature _ _ (XStandaloneKindSig nec) = noExtCon nec
 
 depAnalTyClDecls :: GlobalRdrEnv
                  -> KindSig_FV_Env

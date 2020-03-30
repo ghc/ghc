@@ -464,7 +464,7 @@ tcLookupTcTyCon name = do
     thing <- tcLookup name
     case thing of
         ATcTyCon tc -> return tc
-        _           -> pprPanic "tcLookupTcTyCon" (ppr name)
+        _           -> pprPanic "tcLookupTcTyCon" (ppr name <+> text ":" <+> ppr thing)
 
 getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv
