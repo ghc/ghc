@@ -90,7 +90,12 @@ module GHC.StgToCmm.Ticky (
   tickyEnterDynCon,
 
   tickyEnterFun,
+<<<<<<< HEAD
   tickyEnterThunk,
+=======
+  tickyEnterThunk,        -- dynamic non-value
+                          -- thunks only
+>>>>>>> 3194634d92... Delete more dead code
   tickyEnterLNE,
 
   tickyUpdateBhCaf,

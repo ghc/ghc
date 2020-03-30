@@ -10,18 +10,18 @@ module GHC.Types.Var.Env (
         -- ** Manipulating these environments
         emptyVarEnv, unitVarEnv, mkVarEnv, mkVarEnv_Directly,
         elemVarEnv, disjointVarEnv,
-        extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnv_Directly,
+        extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
-        delVarEnvList, delVarEnv, delVarEnv_Directly,
+        delVarEnvList, delVarEnv,
         minusVarEnv, intersectsVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
         isEmptyVarEnv,
-        elemVarEnvByKey, lookupVarEnv_Directly,
-        filterVarEnv, filterVarEnv_Directly, restrictVarEnv,
+        elemVarEnvByKey,
+        filterVarEnv, restrictVarEnv,
         partitionVarEnv,
 
         -- * Deterministic Var environments (maps)
@@ -463,14 +463,10 @@ alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
 extendVarEnv      :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
-extendVarEnv_Directly :: VarEnv a -> Unique -> a -> VarEnv a
 plusVarEnv        :: VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnvList    :: [VarEnv a] -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 
-lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
-filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
-delVarEnv_Directly    :: VarEnv a -> Unique -> VarEnv a
 partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
@@ -499,7 +495,6 @@ alterVarEnv      = alterUFM
 extendVarEnv     = addToUFM
 extendVarEnv_C   = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
-extendVarEnv_Directly = addToUFM_Directly
 extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
 plusVarEnv_CD    = plusUFM_CD
@@ -519,12 +514,9 @@ mkVarEnv_Directly= listToUFM_Directly
 emptyVarEnv      = emptyUFM
 unitVarEnv       = unitUFM
 isEmptyVarEnv    = isNullUFM
-lookupVarEnv_Directly = lookupUFM_Directly
-filterVarEnv_Directly = filterUFM_Directly
-delVarEnv_Directly    = delFromUFM_Directly
 partitionVarEnv       = partitionUFM
 
-restrictVarEnv env vs = filterVarEnv_Directly keep env
+restrictVarEnv env vs = filterUFM_Directly keep env
   where
     keep u _ = u `elemVarSetByKey` vs
 
