@@ -25,7 +25,7 @@ module GHC.Types.Unique.Set (
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
         unionUniqSets, unionManyUniqSets,
-        minusUniqSet, uniqSetMinusUFM,
+        minusUniqSet, uniqSetMinusUFM, uniqSetMinusUDFM,
         intersectUniqSets,
         restrictUniqSetToUFM,
         uniqSetAny, uniqSetAll,
@@ -42,12 +42,12 @@ module GHC.Types.Unique.Set (
         unsafeUFMToUniqSet,
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
-        nonDetFoldUniqSet,
-        nonDetFoldUniqSet_Directly
+        nonDetStrictFoldUniqSet,
     ) where
 
 import GHC.Prelude
 
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Data.Coerce
@@ -111,6 +111,9 @@ restrictUniqSetToUFM (UniqSet s) m = UniqSet (intersectUFM s m)
 uniqSetMinusUFM :: UniqSet a -> UniqFM b -> UniqSet a
 uniqSetMinusUFM (UniqSet s) t = UniqSet (minusUFM s t)
 
+uniqSetMinusUDFM :: UniqSet a -> UniqDFM b -> UniqSet a
+uniqSetMinusUDFM (UniqSet s) t = UniqSet (ufmMinusUDFM s t)
+
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet a (UniqSet s) = elemUFM a s
 
@@ -159,14 +162,8 @@ nonDetKeysUniqSet = nonDetKeysUFM . getUniqSet'
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
-nonDetFoldUniqSet c n (UniqSet s) = nonDetFoldUFM c n s
-
--- See Note [Deterministic UniqFM] to learn about nondeterminism.
--- If you use this please provide a justification why it doesn't introduce
--- nondeterminism.
-nonDetFoldUniqSet_Directly:: (Unique -> elt -> a -> a) -> a -> UniqSet elt -> a
-nonDetFoldUniqSet_Directly f n (UniqSet s) = nonDetFoldUFM_Directly f n s
+nonDetStrictFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
+nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
 
 -- See Note [UniqSet invariant]
 mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b

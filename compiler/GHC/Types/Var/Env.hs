@@ -33,7 +33,7 @@ module GHC.Types.Var.Env (
         extendDVarEnv, extendDVarEnv_C,
         extendDVarEnvList,
         lookupDVarEnv, elemDVarEnv,
-        isEmptyDVarEnv, foldDVarEnv,
+        isEmptyDVarEnv, foldDVarEnv, nonDetStrictFoldDVarEnv,
         mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
@@ -574,6 +574,12 @@ lookupDVarEnv = lookupUDFM
 
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
+nonDetStrictFoldDVarEnv = nonDetStrictFoldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
 mapDVarEnv = mapUDFM
