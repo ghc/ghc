@@ -56,7 +56,7 @@ module GHC.Types.Unique.FM (
         intersectUFM_C,
         disjointUFM,
         equalKeysUFM,
-        nonDetFoldUFM, foldUFM, nonDetFoldUFM_Directly,
+        nonDetStrictFoldUFM, foldUFM, nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
@@ -67,7 +67,7 @@ module GHC.Types.Unique.FM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
-        nonDetUFMToList, ufmToIntMap,
+        nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
@@ -318,14 +318,14 @@ nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
-nonDetFoldUFM k z (UFM m) = M.foldr k z m
+nonDetStrictFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
-nonDetFoldUFM_Directly k z (UFM m) = M.foldrWithKey (k . getUnique) z m
+nonDetStrictFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnique i) x z') z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
@@ -358,6 +358,9 @@ instance Traversable NonDetUniqFM where
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
+
+unsafeIntMapToUFM :: M.IntMap elt -> UniqFM elt
+unsafeIntMapToUFM = UFM
 
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM a -> UniqFM b -> Bool
