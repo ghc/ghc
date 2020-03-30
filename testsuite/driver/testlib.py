@@ -1407,6 +1407,10 @@ def check_stats(name: TestName,
                 stats_file: Path,
                 range_fields: Dict[MetricName, MetricOracles]
                 ) -> PassFail:
+    if getTestOpts().expect == ExpectedOutcome.BROKEN:
+        print('Skipping performance metrics test on broken test {}'.format(name))
+        return passed()
+
     head_commit = Perf.commit_hash(GitRef('HEAD')) if Perf.inside_git_repo() else None
     if head_commit is None:
         return passed()
