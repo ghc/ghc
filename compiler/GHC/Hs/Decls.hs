@@ -3,6 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -29,16 +30,18 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  LDeclHeaderRn, DeclHeaderRn(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
+  getFamFlav,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
-  hsDeclHasCusk, famResultKindSignature,
+  famResultKindSignature,
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
@@ -93,6 +96,8 @@ module GHC.Hs.Decls (
 
     ) where
 
+#include "HsVersions.h"
+
 -- friends:
 import GhcPrelude
 
@@ -108,6 +113,7 @@ import GHC.Types.Basic
 import GHC.Core.Coercion
 import GHC.Types.ForeignCall
 import GHC.Hs.Extension
+import GHC.Types.Name
 import GHC.Types.Name.Set
 
 -- others:
@@ -120,6 +126,7 @@ import GHC.Core.Type
 import Bag
 import Maybes
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Void
 
 {-
 ************************************************************************
@@ -741,24 +748,6 @@ countTyClDecls decls
    isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
    isNewTy _                                                      = False
 
--- | Does this declaration have a complete, user-supplied kind signature?
--- See Note [CUSKs: complete user-supplied kind signatures]
-hsDeclHasCusk :: TyClDecl GhcRn -> Bool
-hsDeclHasCusk (FamDecl { tcdFam =
-    FamilyDecl { fdInfo      = fam_info
-               , fdTyVars    = tyvars
-               , fdResultSig = L _ resultSig } }) =
-    case fam_info of
-      ClosedTypeFamily {} -> hsTvbAllKinded tyvars
-                          && isJust (famResultKindSignature resultSig)
-      _ -> True -- Un-associated open type/data families have CUSKs
-hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
-  = hsTvbAllKinded tyvars && isJust (hsTyKindSig rhs)
-hsDeclHasCusk (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
-hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk (FamDecl { tcdFam = XFamilyDecl nec }) = noExtCon nec
-hsDeclHasCusk (XTyClDecl nec) = noExtCon nec
-
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1145,6 +1134,27 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
+getFamFlav
+  :: Maybe TyCon    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour
+getFamFlav mb_parent_tycon info =
+  case info of
+    DataFamily         -> DataFamilyFlavour mb_parent_tycon
+    OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
+    ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon ) -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
+
+{- Note [Closed type family mb_parent_tycon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no way to write a closed type family inside a class declaration:
+
+  class C a where
+    type family F a where  -- error: parse error on input ‘where’
+
+In fact, it is not clear what the meaning of such a declaration would be.
+Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
+-}
 
 ------------- Functions over FamilyDecls -----------
 
@@ -1329,6 +1339,31 @@ instance OutputableBndrId p
             _                            -> (ppDerivStrategy dcs, empty)
   ppr (XHsDerivingClause x) = ppr x
 
+type LDeclHeaderRn = Located DeclHeaderRn
+
+-- | Renamed declaration header (left-hand side of a declaration):
+--
+-- 1. data T a b = MkT (a -> b)
+--    ^^^^^^^^^^
+--
+-- 2. class C a where
+--    ^^^^^^^^^
+--
+-- 3. type family F a b :: r where
+--    ^^^^^^^^^^^^^^^^^^^^^^
+--
+-- Supplies arity and flavor information not covered by a standalone kind
+-- signature.
+--
+data DeclHeaderRn
+  = DeclHeaderRn
+      { decl_header_flav :: TyConFlavour,
+        decl_header_name :: Name,
+        decl_header_cusk :: Bool,
+        decl_header_bndrs :: LHsQTyVars GhcRn,
+        decl_header_res_sig :: Maybe (LHsType GhcRn)
+      }
+
 -- | Located Standalone Kind Signature
 type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
 
@@ -1338,12 +1373,23 @@ data StandaloneKindSig pass
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig (XXStandaloneKindSig pass)
 
-type instance XStandaloneKindSig (GhcPass p) = NoExtField
-type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
+type instance XStandaloneKindSig GhcPs = NoExtField
+type instance XStandaloneKindSig GhcRn = Maybe LDeclHeaderRn
+                  -- Just hdr  for signatures with an accompanying binding.
+                  -- Nothing   for signatures without an accompanying binding (error).
+type instance XStandaloneKindSig GhcTc = Void
 
-standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
+type instance XXStandaloneKindSig GhcPs = NoExtCon
+type instance XXStandaloneKindSig GhcRn = LDeclHeaderRn  -- CUSK
+type instance XXStandaloneKindSig GhcTc = NoExtCon
+
+standaloneKindSigName :: forall p. IsPass p => StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
-standaloneKindSigName (XStandaloneKindSig nec) = noExtCon nec
+standaloneKindSigName (XStandaloneKindSig x) =
+  case ghcPass @p of
+    GhcPs -> noExtCon x
+    GhcRn -> decl_header_name (unLoc x)
+    GhcTc -> noExtCon x
 
 {- Note [Wildcards in standalone kind signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1535,11 +1581,16 @@ instance OutputableBndrId p
        => Outputable (HsDataDefn (GhcPass p)) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
-instance OutputableBndrId p
+instance (IsPass p, OutputableBndrId p)
        => Outputable (StandaloneKindSig (GhcPass p)) where
   ppr (StandaloneKindSig _ v ki)
     = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
-  ppr (XStandaloneKindSig nec) = noExtCon nec
+  ppr (XStandaloneKindSig x) =
+    case ghcPass @p of
+      GhcPs -> noExtCon x
+      GhcRn -> whenPprDebug $
+        text "CUSK:" <+> ppr (decl_header_name (unLoc x))
+      GhcTc -> noExtCon x
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"

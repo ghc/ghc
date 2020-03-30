@@ -263,15 +263,16 @@ tcHsSigType ctxt sig_ty
     skol_info = SigTypeSkol ctxt
 
 -- Does validity checking and zonking.
-tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
-tcStandaloneKindSig (L _ kisig) = case kisig of
+tcStandaloneKindSig :: StandaloneKindSig GhcRn -> TcM (Name, SAKS_or_CUSK)
+tcStandaloneKindSig kisig = case kisig of
   StandaloneKindSig _ (L _ name) ksig ->
     let ctxt = StandaloneKindSigCtxt name in
     addSigCtxt ctxt (hsSigType ksig) $
     do { kind <- tcTopLHsType kindLevelMode ksig (expectedKindInCtxt ctxt)
        ; checkValidType ctxt kind
-       ; return (name, kind) }
-  XStandaloneKindSig nec -> noExtCon nec
+       ; return (name, SAKS kind) }
+  XStandaloneKindSig hdr ->
+    return (decl_header_name (unLoc hdr), CUSK)
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Bool, TcType)

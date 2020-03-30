@@ -1487,7 +1487,7 @@ instance ToHie (StandaloneKindSig GhcRn) where
       [ toHie $ C TyDecl name
       , toHie $ TS (ResolvedScopes []) typ
       ]
-    XStandaloneKindSig nec -> noExtCon nec
+    XStandaloneKindSig _ -> []
 
 instance ToHie (SigContext (LSig GhcRn)) where
   toHie (SC (SI styp msp) (L sp sig)) = concatM $ makeNode sig sp : case sig of
