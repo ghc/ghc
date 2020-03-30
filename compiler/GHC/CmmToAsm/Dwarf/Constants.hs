@@ -12,6 +12,7 @@ import Outputable
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.X86.Regs
+import GHC.CmmToAsm.PPC.Regs (toRegNo)
 
 import Data.Word
 
@@ -215,6 +216,7 @@ dwarfRegNo p r = case platformArch p of
     | r == xmm13 -> 30
     | r == xmm14 -> 31
     | r == xmm15 -> 32
+  ArchPPC_64 _ -> fromIntegral $ toRegNo r
   _other -> error "dwarfRegNo: Unsupported platform or unknown register!"
 
 -- | Virtual register number to use for return address.
@@ -226,4 +228,5 @@ dwarfReturnRegNo p
   = case platformArch p of
     ArchX86    -> 8  -- eip
     ArchX86_64 -> 16 -- rip
+    ArchPPC_64 ELF_V2 -> 65 -- lr (link register)
     _other     -> error "dwarfReturnRegNo: Unsupported platform!"

@@ -59,14 +59,17 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             ArchPPC_64 ELF_V2 -> pprFunctionPrologue lbl
             _ -> pprLabel platform lbl) $$ -- blocks guaranteed not null,
                                            -- so label needed
-         vcat (map (pprBasicBlock platform top_info) blocks)
+         vcat (map (pprBasicBlock config top_info) blocks) $$
+         (if ncgDebugLevel config > 0
+          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+         pprSizeDecl platform lbl
 
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock platform top_info) blocks) $$
+      vcat (map (pprBasicBlock config top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -76,7 +79,15 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr info_lbl
             <+> char '-'
             <+> ppr (mkDeadStripPreventer info_lbl)
-       else empty)
+       else empty) $$
+      pprSizeDecl platform info_lbl
+
+-- | Output the ELF .size directive.
+pprSizeDecl :: Platform -> CLabel -> SDoc
+pprSizeDecl platform lbl
+ = if osElfTarget (platformOS platform)
+   then text "\t.size" <+> ppr lbl <> text ", .-" <> ppr lbl
+   else empty
 
 pprFunctionDescriptor :: CLabel -> SDoc
 pprFunctionDescriptor lab = pprGloblDecl lab
@@ -105,12 +116,19 @@ pprFunctionPrologue lab =  pprGloblDecl lab
                         $$ text "\t.localentry\t" <> ppr lab
                         <> text ",.-" <> ppr lab
 
-pprBasicBlock :: Platform -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
-pprBasicBlock platform info_env (BasicBlock blockid instrs)
+pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
+              -> SDoc
+pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
-    pprLabel platform (blockLbl blockid) $$
-    vcat (map (pprInstr platform) instrs)
+    pprLabel platform asmLbl $$
+    vcat (map (pprInstr platform) instrs) $$
+    (if  ncgDebugLevel config > 0
+      then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
+      else empty
+    )
   where
+    asmLbl = blockLbl blockid
+    platform = ncgPlatform config
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (CmmStaticsRaw info_lbl info) ->
@@ -337,6 +355,9 @@ pprInstr platform instr = case instr of
    --    -> if platformOS platform == OSLinux
    --          then text "# " <> ftext s
    --          else text "; " <> ftext s
+
+   LOCATION file line col _name
+      -> text "\t.loc" <+> ppr file <+> ppr line <+> ppr col
 
    DELTA d
       -> pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
