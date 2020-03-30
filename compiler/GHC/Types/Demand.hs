@@ -785,16 +785,23 @@ cleanUseDmd_maybe _                     = Nothing
 splitFVs :: Bool   -- Thunk
          -> DmdEnv -> (DmdEnv, DmdEnv)
 splitFVs is_thunk rhs_fvs
-  | is_thunk  = nonDetFoldUFM_Directly add (emptyVarEnv, emptyVarEnv) rhs_fvs
-                -- It's OK to use nonDetFoldUFM_Directly because we
+  | is_thunk  = strictPairToTuple $
+                nonDetStrictFoldUFM_Directly add (emptyVarEnv :*: emptyVarEnv) rhs_fvs
+                -- It's OK to use a non-deterministic fold because we
                 -- immediately forget the ordering by putting the elements
                 -- in the envs again
   | otherwise = partitionVarEnv isWeakDmd rhs_fvs
   where
-    add uniq dmd@(JD { sd = s, ud = u }) (lazy_fv, sig_fv)
-      | Lazy <- s = (addToUFM_Directly lazy_fv uniq dmd, sig_fv)
-      | otherwise = ( addToUFM_Directly lazy_fv uniq (JD { sd = Lazy, ud = u })
-                    , addToUFM_Directly sig_fv  uniq (JD { sd = s,    ud = Abs }) )
+    add uniq dmd@(JD { sd = s, ud = u }) (lazy_fv :*: sig_fv)
+      | Lazy <- s = addToUFM_Directly lazy_fv uniq dmd :*: sig_fv
+      | otherwise = addToUFM_Directly lazy_fv uniq (JD { sd = Lazy, ud = u })
+                    :*:
+                    addToUFM_Directly sig_fv  uniq (JD { sd = s,    ud = Abs })
+
+data StrictPair a b = !a :*: !b
+
+strictPairToTuple :: StrictPair a b -> (a, b)
+strictPairToTuple (x :*: y) = (x, y)
 
 data TypeShape = TsFun TypeShape
                | TsProd [TypeShape]
