@@ -25,19 +25,14 @@ test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
 test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, [''])
 
-test('debug',
-     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
-     makefile_test, [])
+test('debug', normal, makefile_test, [])
 test('T9964', normal, compile, ['-O'])
 test('T10518', [cmm_src], compile, [''])
-test('T10667', [ when((arch('powerpc64') or arch('powerpc64le')),
-                      expect_broken(11261))],
-     compile, ['-g'])
+test('T10667', normal, compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
 test('T14999',
-     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261)),
-      when(unregisterised(), skip),
+     [when(unregisterised(), skip),
       unless(opsys('linux') and arch('x86_64') and have_gdb() and
         have_readelf(), skip)],
      makefile_test, [])

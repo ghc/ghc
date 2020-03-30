@@ -385,10 +385,10 @@ test('keep-cafs-fail',
   [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
-    when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
     when(opsys('freebsd'), expect_broken(16035)),
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
+    req_rts_linker,
   ],
   makefile_test, ['KeepCafsFail'])
 
@@ -397,7 +397,6 @@ test('keep-cafs',
   [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
-    when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
     when(opsys('freebsd'), expect_broken(16035)),
     req_rts_linker
   ],

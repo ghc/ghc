@@ -30,10 +30,13 @@ import GHC.CmmToAsm.PPC.Instr
 import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.CPrim
+import GHC.Cmm.DebugBlock
+   ( DebugBlock(..) )
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat
    , getBlockIdNat, getPicBaseNat, getNewRegPairNat
    , getPicBaseMaybeNat, getPlatform, getConfig
+   , getDebugBlock, getFileId
    )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -53,6 +56,8 @@ import GHC.Cmm.Switch
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
+import GHC.Core              ( Tickish(..) )
+import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
 import OrdList
@@ -123,9 +128,17 @@ basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
       id = entryLabel block
       stmts = blockToList nodes
+  -- Generate location directive
+  dbg <- getDebugBlock (entryLabel block)
+  loc_instrs <- case dblSourceTick =<< dbg of
+    Just (SourceNote span name)
+      -> do fileid <- getFileId (srcSpanFile span)
+            let line = srcSpanStartLine span; col =srcSpanStartCol span
+            return $ unitOL $ LOCATION fileid line col name
+    _ -> return nilOL
   mid_instrs <- stmtsToInstrs stmts
   tail_instrs <- stmtToInstrs tail
-  let instrs = mid_instrs `appOL` tail_instrs
+  let instrs = loc_instrs `appOL` mid_instrs `appOL` tail_instrs
   -- code generation may introduce new basic block boundaries, which
   -- are indicated by the NEWBLOCK instruction.  We must split up the
   -- instruction stream into basic blocks again.  Also, we extract

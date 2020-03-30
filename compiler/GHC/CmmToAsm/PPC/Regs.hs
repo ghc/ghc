@@ -31,6 +31,7 @@ module GHC.CmmToAsm.PPC.Regs (
         allMachRegNos,
         classOfRealReg,
         showReg,
+        toRegNo,
 
         -- machine specific
         allFPArgRegs,
@@ -250,7 +251,9 @@ showReg n
     | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
     | otherwise           = "%unknown_powerpc_real_reg_" ++ show n
 
-
+toRegNo :: Reg -> RegNo
+toRegNo (RegReal (RealRegSingle n)) = n
+toRegNo _                           = panic "PPC.toRegNo: unsupported register"
 
 -- machine specific ------------------------------------------------------------
 
