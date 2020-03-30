@@ -233,8 +233,7 @@ test('T5949',
      ['-O'])
 
 test('T4267',
-     [expect_broken(4267),
-      collect_stats('bytes allocated',10),
+     [collect_stats('bytes allocated',10),
       only_ways(['normal'])],
       compile_and_run,
       ['-O'])
