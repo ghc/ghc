@@ -1,6 +1,5 @@
 module Settings.Builders.Cabal (cabalBuilderArgs) where
 
-import Hadrian.Builder (getBuilderPath, needBuilder)
 import Hadrian.Haskell.Cabal
 
 import Builder
