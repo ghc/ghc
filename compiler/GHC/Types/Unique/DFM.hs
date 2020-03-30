@@ -58,6 +58,7 @@ module GHC.Types.Unique.DFM (
         udfmToList,
         udfmToUfm,
         nonDetFoldUDFM,
+        nonDetStrictFoldUDFM,
         alwaysUnsafeUfmToUdfm,
     ) where
 
@@ -278,6 +279,11 @@ foldUDFM k z m = foldr k z (eltsUDFM m)
 -- nondeterminism.
 nonDetFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
 nonDetFoldUDFM k z (UDFM m _i) = foldr k z $ map taggedFst $ M.elems m
+
+nonDetStrictFoldUDFM :: (a -> elt -> a) -> a -> UniqDFM elt -> a
+nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
+  where
+    k' acc (TaggedVal v _) = k acc v
 
 eltsUDFM :: UniqDFM elt -> [elt]
 eltsUDFM (UDFM m _i) =
