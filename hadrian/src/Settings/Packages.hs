@@ -122,6 +122,14 @@ packageArgs = do
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
           , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
+        --------------------------------- iserv --------------------------------
+        -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
+        -- refer to the RTS.  This is harmless if you don't use it (adds a bit
+        -- of overhead to startup and increases the binary sizes) but if you
+        -- need it there's no alternative.
+        , package iserv ? mconcat
+          [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
+
         -------------------------------- haddock -------------------------------
         , package haddock ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
