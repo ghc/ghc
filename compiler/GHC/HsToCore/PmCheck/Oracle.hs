@@ -1322,7 +1322,7 @@ checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
   let rec_max_bound | tys_to_check `lengthExceeds` 1
                     = 1
                     | otherwise
-                    = defaultRecTcMaxBound
+                    = 3
       rec_ts' = setRecTcMaxBound rec_max_bound rec_ts
   allM (nonVoid rec_ts' amb_cs) tys_to_check
 
