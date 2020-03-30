@@ -61,6 +61,7 @@ stages:
 # * x86_64-linux: Any Docker-capable x86_64 Linux machine
 # * aarch64-linux: Any Docker-capable AArch64 Linux machine
 # * x86_64-windows: A x86_64 Windows machine
+# * x86_64-darwin: A x86_64 Darwin machine
 # * lint: Any Docker-capable x86_64 Linux machine; distinct from
 #         x86_64-linux to ensure low-latency availability.
 #
@@ -413,14 +414,18 @@ validate-x86_64-darwin:
       - toolchain
 
 # Disabled because of OS X CI capacity
-.validate-x86_64-darwin-hadrian:
+nightly-x86_64-darwin-hadrian:
   <<: *only-default
-  stage: full-build
+  stage: build # TEMPORARY! use the next line instead in final version.
+  # stage: full-build
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.6.3
+    GHC_VERSION: 8.6.5
+    CABAL_INSTALL_VERSION: 2.4.1.0
+    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
+    # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
@@ -442,6 +447,15 @@ validate-x86_64-darwin:
     paths:
       - ghc.tar.xz
       - junit.xml
+# Uncomment the following in final version.
+#  only:
+#    variables:
+#      - $NIGHTLY
+  cache:
+    key: "darwin-hadrian-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
 
 .validate-linux:
   extends: .validate
