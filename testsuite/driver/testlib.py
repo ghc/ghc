@@ -19,7 +19,8 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
-                        TestRun, TestResult, TestOptions, PerfMetric
+                        TestRun, TestResult, TestOptions, PerfMetric, \
+                        ExpectedOutcome
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, \
                      PassFail
@@ -114,7 +115,7 @@ def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
     # future.
-    opts.expect = 'fail';
+    opts.expect = ExpectedOutcome.FAIL
 
 def reqlib( lib ):
     return lambda name, opts, l=lib: _reqlib (name, opts, l )
@@ -174,28 +175,28 @@ def have_library(lib: str) -> bool:
 
 def _reqlib( name, opts, lib ):
     if not have_library(lib):
-        opts.expect = 'missing-lib'
+        opts.expect = ExpectedOutcome.MISSING_LIB
 
 def req_haddock( name, opts ):
     if not config.haddock:
-        opts.expect = 'missing-lib'
+        opts.expect = ExpectedOutcome.MISSING_LIB
 
 def req_profiling( name, opts ):
     '''Require the profiling libraries (add 'GhcLibWays += p' to mk/build.mk)'''
     if not config.have_profiling:
-        opts.expect = 'fail'
+        opts.expect = ExpectedOutcome.FAIL
 
 def req_shared_libs( name, opts ):
     if not config.have_shared_libs:
-        opts.expect = 'fail'
+        opts.expect = ExpectedOutcome.FAIL
 
 def req_interp( name, opts ):
     if not config.have_interp:
-        opts.expect = 'fail'
+        opts.expect = ExpectedOutcome.FAIL
 
 def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:
-        opts.expect = 'fail'
+        opts.expect = ExpectedOutcome.FAIL
 
 def req_th( name, opts ):
     """
@@ -210,7 +211,7 @@ def req_th( name, opts ):
 
 def req_smp( name, opts ):
     if not config.have_smp:
-        opts.expect = 'fail'
+        opts.expect = ExpectedOutcome.FAIL
 
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
@@ -269,7 +270,7 @@ def expect_broken( bug: IssueNumber ):
     """
     def helper( name: TestName, opts ):
         record_broken(name, opts, bug)
-        opts.expect = 'fail';
+        opts.expect = ExpectedOutcome.FAIL
 
     return helper
 
@@ -291,7 +292,7 @@ def record_broken(name: TestName, opts, bug: IssueNumber):
 def _expect_pass(way):
     # Helper function. Not intended for use in .T files.
     opts = getTestOpts()
-    return opts.expect == 'pass' and way not in opts.expect_fail_for
+    return opts.expect == ExpectedOutcome.PASS and way not in opts.expect_fail_for
 
 # -----
 
@@ -869,7 +870,7 @@ def test(name: TestName,
     executeSetups([thisdir_settings, setup], name, myTestOpts)
 
     if name in config.broken_tests:
-        myTestOpts.expect = 'fail'
+        myTestOpts.expect = ExpectedOutcome.BROKEN
 
     thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
     if myTestOpts.alone:
@@ -1081,14 +1082,14 @@ def do_test(name: TestName,
                            print_output = config.verbose >= 3)
 
         # If user used expect_broken then don't record failures of pre_cmd
-        if exit_code != 0 and opts.expect not in ['fail']:
+        if exit_code != 0 and opts.expect not in [ExpectedOutcome.FAIL]:
             framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
             if_verbose(1, '** pre_cmd was "{0}".'.format(override_options(opts.pre_cmd)))
 
     result = func(*[name,way] + args)
 
-    if opts.expect not in ['pass', 'fail', 'missing-lib']:
-        framework_fail(name, way, 'bad expected ' + opts.expect)
+    if opts.expect not in [ExpectedOutcome.PASS, ExpectedOutcome.FAIL, ExpectedOutcome.MISSING_LIB]:
+        framework_fail(name, way, 'bad expected ' + opts.expect.value)
 
     try:
         passFail = result.passFail
@@ -1126,7 +1127,7 @@ def do_test(name: TestName,
                                 stderr=result.stderr)
                 t.unexpected_failures.append(tr)
         else:
-            if opts.expect == 'missing-lib':
+            if opts.expect == ExpectedOutcome.MISSING_LIB:
                 t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
             else:
                 t.n_expected_failures += 1
@@ -1958,7 +1959,7 @@ def compare_outputs(way: WayName,
         elif diff_file: diff_file.open('ab').close() # Make sure the file exists still as
                                                      # we will try to read it later
 
-        if config.accept and (getTestOpts().expect == 'fail' or
+        if config.accept and (getTestOpts().expect == ExpectedOutcome.FAIL or
                               way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
             return False

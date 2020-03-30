@@ -6,6 +6,7 @@ from my_typing import *
 from pathlib import Path
 from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
 from datetime import datetime
+from enum import Enum
 
 # -----------------------------------------------------------------------------
 # Configuration info
@@ -261,6 +262,20 @@ t = TestRun()
 def getTestRun() -> TestRun:
     return t
 
+class ExpectedOutcome(Enum):
+    """
+    Whether we expect a test to pass or why it we expect it to fail.
+    """
+
+    # The test should pass
+    PASS = 'pass'
+    # The test should fail (e.g. when testing an error message)
+    FAIL = 'fail'
+    # The test should fail because it is currently broken
+    BROKEN = 'broken'
+    # The test should fail because we are lacking a library it requires
+    MISSING_LIB = 'missing-lib'
+
 # -----------------------------------------------------------------------------
 # Information about the current test
 
@@ -282,7 +297,7 @@ class TestOptions:
        self.extra_ways = [] # type: List[WayName]
 
        # the result we normally expect for this test
-       self.expect = 'pass'
+       self.expect = ExpectedOutcome.PASS # type: ExpectedOutcome
 
        # override the expected result for certain ways
        self.expect_fail_for = [] # type: List[WayName]
