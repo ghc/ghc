@@ -256,15 +256,6 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 }
 #endif
 
-INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
-    (P_ node)
-{
-    TICK_ENT_DYN_IND(); /* tick */
-    node = StgInd_indirectee(node);
-    TICK_ENT_VIA_NODE();
-    jump %ENTRY_CODE(Sp(0)) (node);
-}
-
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     /* explicit stack */
 {
