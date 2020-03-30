@@ -1,0 +1,4 @@
+
+T17977b.hs:21:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f'’: f' (Down r) = ...
