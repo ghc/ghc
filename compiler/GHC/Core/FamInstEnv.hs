@@ -380,8 +380,8 @@ famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
   -- See Note [FamInstEnv determinism]
 
 famInstEnvSize :: FamInstEnv -> Int
-famInstEnvSize = nonDetFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
-  -- It's OK to use nonDetFoldUDFM here since we're just computing the
+famInstEnvSize = nonDetStrictFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
+  -- It's OK to use nonDetStrictFoldUDFM here since we're just computing the
   -- size.
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
