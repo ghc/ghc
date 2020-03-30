@@ -90,7 +90,6 @@ RTS_RET(stg_ctoi_V);
 RTS_RET(stg_apply_interp);
 
 RTS_ENTRY(stg_IND);
-RTS_ENTRY(stg_IND_direct);
 RTS_ENTRY(stg_IND_STATIC);
 RTS_ENTRY(stg_BLACKHOLE);
 RTS_ENTRY(stg_CAF_BLACKHOLE);
