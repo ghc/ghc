@@ -567,17 +567,27 @@ mkLocalBlockLabel u = LocalBlockLabel u
 
 -- Constructing RtsLabels
 mkRtsPrimOpLabel :: PrimOp -> CLabel
-mkRtsPrimOpLabel primop         = RtsLabel (RtsPrimOp primop)
+mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
-mkSelectorInfoLabel  :: Bool -> Int -> CLabel
-mkSelectorEntryLabel :: Bool -> Int -> CLabel
-mkSelectorInfoLabel  upd off    = RtsLabel (RtsSelectorInfoTable upd off)
-mkSelectorEntryLabel upd off    = RtsLabel (RtsSelectorEntry     upd off)
+mkSelectorInfoLabel :: DynFlags -> Bool -> Int -> CLabel
+mkSelectorInfoLabel dflags upd offset =
+   ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+   RtsLabel (RtsSelectorInfoTable upd offset)
 
-mkApInfoTableLabel :: Bool -> Int -> CLabel
-mkApEntryLabel     :: Bool -> Int -> CLabel
-mkApInfoTableLabel   upd off    = RtsLabel (RtsApInfoTable       upd off)
-mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
+mkSelectorEntryLabel :: DynFlags -> Bool -> Int -> CLabel
+mkSelectorEntryLabel dflags upd offset =
+   ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+   RtsLabel (RtsSelectorEntry upd offset)
+
+mkApInfoTableLabel :: DynFlags -> Bool -> Int -> CLabel
+mkApInfoTableLabel dflags upd arity =
+   ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
+   RtsLabel (RtsApInfoTable upd arity)
+
+mkApEntryLabel :: DynFlags -> Bool -> Int -> CLabel
+mkApEntryLabel dflags upd arity =
+   ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
+   RtsLabel (RtsApEntry upd arity)
 
 
 -- A call to some primitive hand written Cmm code
@@ -1209,7 +1219,7 @@ pprCLabel dflags = \case
    lbl -> getPprStyle $ \sty ->
             if useNCG && asmStyle sty
             then maybe_underscore $ pprAsmCLbl lbl
-            else pprCLbl dflags lbl
+            else pprCLbl platform lbl
 
   where
     platform = targetPlatform dflags
@@ -1226,10 +1236,10 @@ pprCLabel dflags = \case
         -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
         -- (The C compiler does this itself).
         = ftext fs <> char '@' <> int sz
-    pprAsmCLbl lbl = pprCLbl dflags lbl
+    pprAsmCLbl lbl = pprCLbl platform lbl
 
-pprCLbl :: DynFlags -> CLabel -> SDoc
-pprCLbl dflags = \case
+pprCLbl :: Platform -> CLabel -> SDoc
+pprCLbl platform = \case
    (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
    (SRTLabel u)         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
    (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore platform
@@ -1247,7 +1257,6 @@ pprCLbl dflags = \case
    (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
    (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
-    ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd
                  then (sLit "_upd_info")
@@ -1255,7 +1264,6 @@ pprCLbl dflags = \case
         ]
 
    (RtsLabel (RtsSelectorEntry upd_reqd offset)) ->
-    ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
@@ -1263,7 +1271,6 @@ pprCLbl dflags = \case
         ]
 
    (RtsLabel (RtsApInfoTable upd_reqd arity)) ->
-    ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
     hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_info")
@@ -1271,7 +1278,6 @@ pprCLbl dflags = \case
         ]
 
    (RtsLabel (RtsApEntry upd_reqd arity)) ->
-    ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
     hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
@@ -1301,8 +1307,6 @@ pprCLbl dflags = \case
    (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
    (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
    (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
-  where
-   platform = targetPlatform dflags
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text
