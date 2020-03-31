@@ -1,6 +1,3 @@
-{-# Language DataKinds #-}
-{-# Language GADTs     #-}
-
 {-
 %
 (c) The University of Glasgow 2006
@@ -1400,11 +1397,6 @@ tcTupArgs args tys
                                            ; return (L l (Present x expr')) }
     go (L _ (XTupArg nec), _) = noExtCon nec
 
--- data N = O | S N
-
--- data Vec n a where
---  VecO :: Vec 'O a
---  VecS :: a -> Vec n a -> Vec ('S n) a
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
