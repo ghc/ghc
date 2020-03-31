@@ -235,7 +235,7 @@ data CoAxBranch
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
     , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- See Note [CoAxBranch type variables]
-                                    -- cab_tvs and cab_lhs may be eta-reduded; see
+                                    -- cab_tvs and cab_lhs may be eta-reduced; see
                                     -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]       -- Bound coercion variables
                                     -- Always empty, for now.
@@ -443,9 +443,13 @@ looked like
 (See #9692, #14179, and #15845 for examples of what can go wrong if
 we don't eta-expand when showing things to the user.)
 
-(See also Note [Newtype eta] in GHC.Core.TyCon.  This is notionally separate
-and deals with the axiom connecting a newtype with its representation
-type; but it too is eta-reduced.)
+See also:
+
+* Note [Newtype eta] in GHC.Core.TyCon.  This is notionally separate
+  and deals with the axiom connecting a newtype with its representation
+  type; but it too is eta-reduced.
+* Note [Implementing eta reduction for data families] in TcInstDcls. This
+  describes the implementation details of this eta reduction happen.
 -}
 
 instance Eq (CoAxiom br) where

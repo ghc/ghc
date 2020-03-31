@@ -667,7 +667,7 @@ tcDataFamInstDecl mb_clsinfo
                                     new_or_data
 
        -- Eta-reduce the axiom if possible
-       -- Quite tricky: see Note [Eta-reduction for data families]
+       -- Quite tricky: see Note [Implementing eta reduction for data families]
        ; let (eta_pats, eta_tcbs) = eta_reduce fam_tc pats
              eta_tvs       = map binderVar eta_tcbs
              post_eta_qtvs = filterOut (`elem` eta_tvs) qtvs
@@ -761,7 +761,7 @@ tcDataFamInstDecl mb_clsinfo
        ; return (fam_inst, m_deriv_info) }
   where
     eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
-    -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
+    -- See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
     -- Splits the incoming patterns into two: the [TyVar]
     -- are the patterns that can be eta-reduced away.
     -- e.g.     T [a] Int a d c   ==>  (T [a] Int a, [d,c])
@@ -887,8 +887,8 @@ we actually have a place to put the regeneralised variables.
 Thus: skolemise away. cf. Inst.deeplySkolemise and TcUnify.tcSkolemise
 Examples in indexed-types/should_compile/T12369
 
-Note [Eta-reduction for data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Implementing eta reduction for data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    data D :: * -> * -> * -> * -> *
 
