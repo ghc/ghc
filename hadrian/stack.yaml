@@ -1,8 +1,4 @@
-resolver: lts-14.7
-
-extra-deps:
-- happy-1.19.12
-- Cabal-3.0.0.0@sha256:1ba37b8d80e89213b17db7b8b9ea0108da55ca65f8c0cbb7433881a284c5cf67
+resolver: lts-15.5
 
 packages:
 - '.'
