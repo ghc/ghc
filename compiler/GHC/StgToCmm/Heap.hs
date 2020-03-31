@@ -333,16 +333,18 @@ entryHeapCheck :: ClosureInfo
                -> FCode ()
                -> FCode ()
 
-entryHeapCheck cl_info nodeSet arity args code
-  = entryHeapCheck' is_fastf node arity args code
-  where
+entryHeapCheck cl_info nodeSet arity args code = do
+  platform <- getPlatform
+  let
     node = case nodeSet of
               Just r  -> CmmReg (CmmLocal r)
-              Nothing -> CmmLit (CmmLabel $ staticClosureLabel cl_info)
+              Nothing -> CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
 
     is_fastf = case closureFunInfo cl_info of
                  Just (_, ArgGen _) -> False
                  _otherwise         -> True
+
+  entryHeapCheck' is_fastf node arity args code
 
 -- | lower-level version for "GHC.Cmm.Parser"
 entryHeapCheck' :: Bool           -- is a known function pattern
