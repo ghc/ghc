@@ -637,7 +637,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
     prof       = mkProfilingInfo dflags id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
-    info_lbl = mkClosureInfoTableLabel id lf_info
+    info_lbl = mkClosureInfoTableLabel dflags id lf_info
 
 --------------------------------------
 --   Other functions over ClosureInfo
@@ -786,14 +786,14 @@ closureLocalEntryLabel dflags
   | tablesNextToCode dflags = toInfoLbl  . closureInfoLabel
   | otherwise               = toEntryLbl . closureInfoLabel
 
-mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
-mkClosureInfoTableLabel id lf_info
+mkClosureInfoTableLabel :: DynFlags -> Id -> LambdaFormInfo -> CLabel
+mkClosureInfoTableLabel dflags id lf_info
   = case lf_info of
         LFThunk _ _ upd_flag (SelectorThunk offset) _
-                      -> mkSelectorInfoLabel upd_flag offset
+                      -> mkSelectorInfoLabel dflags upd_flag offset
 
         LFThunk _ _ upd_flag (ApThunk arity) _
-                      -> mkApInfoTableLabel upd_flag arity
+                      -> mkApInfoTableLabel dflags upd_flag arity
 
         LFThunk{}     -> std_mk_lbl name cafs
         LFReEntrant{} -> std_mk_lbl name cafs
@@ -825,13 +825,13 @@ thunkEntryLabel dflags thunk_id c _ _
 
 enterApLabel :: DynFlags -> Bool -> Arity -> CLabel
 enterApLabel dflags is_updatable arity
-  | tablesNextToCode dflags = mkApInfoTableLabel is_updatable arity
-  | otherwise               = mkApEntryLabel is_updatable arity
+  | tablesNextToCode dflags = mkApInfoTableLabel dflags is_updatable arity
+  | otherwise               = mkApEntryLabel     dflags is_updatable arity
 
 enterSelectorLabel :: DynFlags -> Bool -> WordOff -> CLabel
 enterSelectorLabel dflags upd_flag offset
-  | tablesNextToCode dflags = mkSelectorInfoLabel upd_flag offset
-  | otherwise               = mkSelectorEntryLabel upd_flag offset
+  | tablesNextToCode dflags = mkSelectorInfoLabel  dflags upd_flag offset
+  | otherwise               = mkSelectorEntryLabel dflags upd_flag offset
 
 enterIdLabel :: DynFlags -> Name -> CafInfo -> CLabel
 enterIdLabel dflags id c
