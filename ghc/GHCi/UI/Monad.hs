@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
+{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor, DerivingVia #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -62,6 +62,7 @@ import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
+import Control.Arrow (Kleisli(..))
 import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
@@ -258,20 +259,16 @@ recordBreak brkLoc = do
       return (False, oldCounter)
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
-    deriving (Functor)
+    deriving 
+        (Functor, Applicative, Monad)
+    via
+        Kleisli Ghc (IORef GHCiState)
 
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
 
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
-
-instance Applicative GHCi where
-    pure a = GHCi $ \_ -> pure a
-    (<*>) = ap
-
-instance Monad GHCi where
-  (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
 
 class GhcMonad m => GhciMonad m where
   getGHCiState    :: m GHCiState
