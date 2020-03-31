@@ -5,6 +5,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -75,6 +76,7 @@ import GHC.Types.SrcLoc
 
 import Foreign
 import Data.Array
+import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
@@ -131,11 +133,13 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
 -- Bin
 ---------------------------------------------------------------
 
+type role Bin phantom
+
 newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
 
 castBin :: Bin a -> Bin b
-castBin (BinPtr i) = BinPtr i
+castBin = coerce
 
 ---------------------------------------------------------------
 -- class Binary

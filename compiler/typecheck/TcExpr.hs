@@ -1,3 +1,6 @@
+{-# Language DataKinds #-}
+{-# Language GADTs     #-}
+
 {-
 %
 (c) The University of Glasgow 2006
@@ -1396,6 +1399,12 @@ tcTupArgs args tys
     go (L l (Present x expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
                                            ; return (L l (Present x expr')) }
     go (L _ (XTupArg nec), _) = noExtCon nec
+
+-- data N = O | S N
+
+-- data Vec n a where
+--  VecO :: Vec 'O a
+--  VecS :: a -> Vec n a -> Vec ('S n) a
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
