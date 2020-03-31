@@ -1,0 +1,3 @@
+data family T17305.Foo (a_0 :: *) :: *
+data instance T17305.Foo where
+    T17305.MkFoo :: forall (a_1 :: *) . T17305.Foo a_1
