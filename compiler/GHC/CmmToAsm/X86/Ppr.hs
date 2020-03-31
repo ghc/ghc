@@ -93,7 +93,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl platform lbl
 
-    Just (RawCmmStatics info_lbl _) ->
+    Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       pprProcAlignment config $$
       (if platformHasSubsectionsViaSymbols platform
@@ -132,7 +132,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
        Nothing -> c
-       Just (RawCmmStatics infoLbl info) ->
+       Just (CmmStaticsRaw infoLbl info) ->
            pprAlignForSection platform Text $$
            infoTableLoc $$
            vcat (map (pprData config) info) $$
@@ -151,7 +151,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
 pprDatas :: NCGConfig -> (Alignment, RawCmmStatics) -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas _config (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas _config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -161,7 +161,7 @@ pprDatas _config (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStatic
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 
-pprDatas config (align, (RawCmmStatics lbl dats))
+pprDatas config (align, (CmmStaticsRaw lbl dats))
  = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
    where
       platform = ncgPlatform config

@@ -20,7 +20,7 @@ module GHC.Cmm.Utils(
         -- CmmLit
         zeroCLit, mkIntCLit,
         mkWordCLit, packHalfWordsCLit,
-        mkByteStringCLit,
+        mkByteStringCLit, mkFileEmbedLit,
         mkDataLits, mkRODataLits,
         mkStgWordCLit,
 
@@ -197,20 +197,27 @@ mkWordCLit platform wd = CmmInt wd (wordWidth platform)
 
 -- | We make a top-level decl for the string, and return a label pointing to it
 mkByteStringCLit
-  :: CLabel -> ByteString -> (CmmLit, GenCmmDecl RawCmmStatics info stmt)
+  :: CLabel -> ByteString -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
 mkByteStringCLit lbl bytes
-  = (CmmLabel lbl, CmmData (Section sec lbl) $ RawCmmStatics lbl [CmmString bytes])
+  = (CmmLabel lbl, CmmData (Section sec lbl) $ CmmStaticsRaw lbl [CmmString bytes])
   where
     -- This can not happen for String literals (as there \NUL is replaced by
     -- C0 80). However, it can happen with Addr# literals.
     sec = if 0 `BS.elem` bytes then ReadOnlyData else CString
 
-mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl RawCmmStatics info stmt
--- Build a data-segment data block
-mkDataLits section lbl lits
-  = CmmData section (RawCmmStatics lbl $ map CmmStaticLit lits)
+-- | We make a top-level decl for the embedded binary file, and return a label pointing to it
+mkFileEmbedLit
+  :: CLabel -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+mkFileEmbedLit lbl path
+  = (CmmLabel lbl, CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl [CmmFileEmbed path]))
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl RawCmmStatics info stmt
+
+-- | Build a data-segment data block
+mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
+mkDataLits section lbl lits
+  = CmmData section (CmmStaticsRaw lbl $ map CmmStaticLit lits)
+
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
 -- Build a read-only data block
 mkRODataLits lbl lits
   = mkDataLits section lbl lits

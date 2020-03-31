@@ -11,8 +11,7 @@
 
 module GHC.StgToCmm.Utils (
         cgLit, mkSimpleLit,
-        emitRawDataLits, mkRawDataLits,
-        emitRawRODataLits, mkRawRODataLits,
+        emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
         assignTemp, newTemp,
@@ -38,7 +37,6 @@ module GHC.StgToCmm.Utils (
         cmmUntag, cmmIsTagged,
 
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
-        mkWordCLit, mkByteStringCLit, mkFileEmbedLit,
         newStringCLit, newByteStringCLit,
         blankWord,
 
@@ -60,7 +58,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Platform.Regs
 import GHC.Cmm.CLabel
-import GHC.Cmm.Utils hiding (mkDataLits, mkRODataLits, mkByteStringCLit)
+import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.StgToCmm.CgUtils
 
@@ -83,7 +81,6 @@ import GHC.Types.CostCentre
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Char
 import Data.List
@@ -276,45 +273,13 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 --
 -------------------------------------------------------------------------
 
-mkRawDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
--- Build a data-segment data block
-mkRawDataLits section lbl lits
-  = CmmData section (CmmStaticsRaw lbl (map CmmStaticLit lits))
+-- | Emit a data-segment data block
+emitDataLits :: CLabel -> [CmmLit] -> FCode ()
+emitDataLits lbl lits = emitDecl (mkDataLits (Section Data lbl) lbl lits)
 
-mkRawRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
--- Build a read-only data block
-mkRawRODataLits lbl lits
-  = mkRawDataLits section lbl lits
-  where
-    section | any needsRelocation lits = Section RelocatableReadOnlyData lbl
-            | otherwise                = Section ReadOnlyData lbl
-    needsRelocation (CmmLabel _)      = True
-    needsRelocation (CmmLabelOff _ _) = True
-    needsRelocation _                 = False
-
--- | We make a top-level decl for the string, and return a label pointing to it
-mkByteStringCLit
-  :: CLabel -> ByteString -> (CmmLit, GenCmmDecl CmmStatics info stmt)
-mkByteStringCLit lbl bytes
-  = (CmmLabel lbl, CmmData (Section sec lbl) (CmmStaticsRaw lbl [CmmString bytes]))
-  where
-    -- This can not happen for String literals (as there \NUL is replaced by
-    -- C0 80). However, it can happen with Addr# literals.
-    sec = if 0 `BS.elem` bytes then ReadOnlyData else CString
-
--- | We make a top-level decl for the embedded binary file, and return a label pointing to it
-mkFileEmbedLit
-  :: CLabel -> FilePath -> (CmmLit, GenCmmDecl CmmStatics info stmt)
-mkFileEmbedLit lbl path
-  = (CmmLabel lbl, CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl [CmmFileEmbed path]))
-
-emitRawDataLits :: CLabel -> [CmmLit] -> FCode ()
--- Emit a data-segment data block
-emitRawDataLits lbl lits = emitDecl (mkRawDataLits (Section Data lbl) lbl lits)
-
-emitRawRODataLits :: CLabel -> [CmmLit] -> FCode ()
--- Emit a read-only data block
-emitRawRODataLits lbl lits = emitDecl (mkRawRODataLits lbl lits)
+-- | Emit a read-only data block
+emitRODataLits :: CLabel -> [CmmLit] -> FCode ()
+emitRODataLits lbl lits = emitDecl (mkRODataLits lbl lits)
 
 emitDataCon :: CLabel -> CmmInfoTable -> CostCentreStack -> [CmmLit] -> FCode ()
 emitDataCon lbl itbl ccs payload = emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))

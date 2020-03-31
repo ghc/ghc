@@ -236,7 +236,7 @@ emitCostCentreDecl cc = do
               is_caf,         -- StgInt is_caf
               zero platform   -- struct _CostCentre *link
             ]
-  ; emitRawDataLits (mkCCLabel cc) lits
+  ; emitDataLits (mkCCLabel cc) lits
   }
 
 emitCostCentreStackDecl :: CostCentreStack -> FCode ()
@@ -253,7 +253,7 @@ emitCostCentreStackDecl ccs
                 -- layouts of structs containing long-longs, simply
                 -- pad out the struct with zero words until we hit the
                 -- size of the overall struct (which we get via DerivedConstants.h)
-           emitRawDataLits (mkCCSLabel ccs) (mk_lits cc)
+           emitDataLits (mkCCSLabel ccs) (mk_lits cc)
     Nothing -> pprPanic "emitCostCentreStackDecl" (ppr ccs)
 
 zero :: Platform -> CmmLit

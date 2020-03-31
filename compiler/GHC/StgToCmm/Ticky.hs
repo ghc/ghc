@@ -243,7 +243,7 @@ emitTickyCounter cloType name args
 
         ; fun_descr_lit <- newStringCLit $ showSDocDebug dflags ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
-        ; emitRawDataLits ctr_lbl
+        ; emitDataLits ctr_lbl
         -- Must match layout of includes/rts/Ticky.h's StgEntCounter
         --
         -- krc: note that all the fields are I32 now; some were I16
@@ -256,7 +256,7 @@ emitTickyCounter cloType name args
               arg_descr_lit,
               zeroCLit platform,          -- Entries into this thing
               zeroCLit platform,          -- Heap allocated by this thing
-              zeroCLit platform                   -- Link to next StgEntCounter
+              zeroCLit platform           -- Link to next StgEntCounter
             ]
         }
 

@@ -167,7 +167,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
         rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
      --
-     return (top_decls, (lbl, RawCmmStatics info_lbl $ map CmmStaticLit $
+     return (top_decls, (lbl, CmmStaticsRaw info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
 
 -----------------------------------------------------

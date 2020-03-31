@@ -61,7 +61,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                                            -- so label needed
          vcat (map (pprBasicBlock platform top_info) blocks)
 
-    Just (RawCmmStatics info_lbl _) ->
+    Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
@@ -113,7 +113,7 @@ pprBasicBlock platform info_env (BasicBlock blockid instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
-       Just (RawCmmStatics info_lbl info) ->
+       Just (CmmStaticsRaw info_lbl info) ->
            pprAlignForSection platform Text $$
            vcat (map (pprData platform) info) $$
            pprLabel platform info_lbl
@@ -122,7 +122,7 @@ pprBasicBlock platform info_env (BasicBlock blockid instrs)
 
 pprDatas :: Platform -> RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas _platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -131,7 +131,7 @@ pprDatas _platform (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas platform (RawCmmStatics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
+pprDatas platform (CmmStaticsRaw lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
 pprData :: Platform -> CmmStatic -> SDoc
 pprData platform d = case d of

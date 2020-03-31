@@ -44,7 +44,7 @@ linkage lbl = if externallyVisibleCLabel lbl
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, RawCmmStatics) -> LlvmM LlvmData
 -- See note [emit-time elimination of static indirections] in CLabel.
-genLlvmData (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -67,7 +67,7 @@ genLlvmData (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit i
 
     pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 
-genLlvmData (sec, RawCmmStatics lbl xs) = do
+genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
