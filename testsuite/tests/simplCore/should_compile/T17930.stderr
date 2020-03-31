@@ -1,0 +1,2 @@
+$sfoo :: (?b::Bool) => [Char] -> [Char]
+$sfoo
