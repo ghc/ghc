@@ -316,3 +316,10 @@ test('T17722', normal, multimod_compile, ['T17722B', '-dcore-lint -O2 -v0'])
 test('T17724', normal, compile, ['-dcore-lint -O2'])
 # N.B. output spuriously different in profiled and hpc ways.
 test('T17787',  [ only_ways(['optasm', 'normal']), grep_errmsg(r'foo') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques -dsuppress-idinfo'])
+test('spec004', [ grep_errmsg(r'\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques'])
+test('T17966',
+     normal,
+     makefile_test, ['T17966'])
+# NB: T17810: -fspecialise-aggressively
+test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
