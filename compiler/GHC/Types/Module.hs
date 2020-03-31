@@ -991,7 +991,7 @@ renameHoleUnitId' pkg_map env uid =
         IndefUnitId{ indefUnitIdComponentId = cid
                    , indefUnitIdInsts       = insts
                    , indefUnitIdFreeHoles   = fh })
-          -> if disjointUFM (udfmToUfm (getUniqDSet fh)) env
+          -> if disjointUdfmUfm (getUniqDSet fh) env
                 then uid
                 -- Functorially apply the substitution to the instantiation,
                 -- then check the 'UnitInfoMap' to see if there is
