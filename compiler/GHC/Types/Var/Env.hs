@@ -33,7 +33,7 @@ module GHC.Types.Var.Env (
         extendDVarEnv, extendDVarEnv_C,
         extendDVarEnvList,
         lookupDVarEnv, elemDVarEnv,
-        isEmptyDVarEnv, foldDVarEnv,
+        isEmptyDVarEnv, foldDVarEnv, nonDetStrictFoldDVarEnv,
         mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
@@ -582,6 +582,9 @@ lookupDVarEnv = lookupUDFM
 
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
+
+nonDetStrictFoldDVarEnv :: (b -> a -> b) -> b -> DVarEnv a -> b
+nonDetStrictFoldDVarEnv = nonDetStrictFoldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
 mapDVarEnv = mapUDFM

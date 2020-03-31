@@ -25,7 +25,7 @@ module GHC.Types.Unique.Set (
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
         unionUniqSets, unionManyUniqSets,
-        minusUniqSet, uniqSetMinusUFM,
+        minusUniqSet, uniqSetMinusUFM, uniqSetMinusUDFM,
         intersectUniqSets,
         restrictUniqSetToUFM,
         uniqSetAny, uniqSetAll,
@@ -48,6 +48,7 @@ module GHC.Types.Unique.Set (
 
 import GhcPrelude
 
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Data.Coerce
@@ -110,6 +111,9 @@ restrictUniqSetToUFM (UniqSet s) m = UniqSet (intersectUFM s m)
 
 uniqSetMinusUFM :: UniqSet a -> UniqFM b -> UniqSet a
 uniqSetMinusUFM (UniqSet s) t = UniqSet (minusUFM s t)
+
+uniqSetMinusUDFM :: UniqSet a -> UniqDFM b -> UniqSet a
+uniqSetMinusUDFM (UniqSet s) t = UniqSet (ufmMinusUDFM s t)
 
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet a (UniqSet s) = elemUFM a s

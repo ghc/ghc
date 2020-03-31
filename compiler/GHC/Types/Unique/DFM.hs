@@ -50,7 +50,7 @@ module GHC.Types.Unique.DFM (
         equalKeysUDFM,
         minusUDFM,
         listToUDFM,
-        udfmMinusUFM,
+        udfmMinusUFM, ufmMinusUDFM,
         partitionUDFM,
         anyUDFM, allUDFM,
         pprUniqDFM, pprUDFM,
@@ -73,7 +73,7 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
-import GHC.Types.Unique.FM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap)
+import GHC.Types.Unique.FM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap, intMapToUFM)
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -342,6 +342,9 @@ udfmMinusUFM :: UniqDFM elt1 -> UniqFM elt2 -> UniqDFM elt1
 udfmMinusUFM (UDFM x i) y = UDFM (M.difference x (ufmToIntMap y)) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
   -- bound.
+
+ufmMinusUDFM :: UniqFM elt1 -> UniqDFM elt2 -> UniqFM elt1
+ufmMinusUDFM x (UDFM y _i) = intMapToUFM (M.difference (ufmToIntMap x) y)
 
 -- | Partition UniqDFM into two UniqDFMs according to the predicate
 partitionUDFM :: (elt -> Bool) -> UniqDFM elt -> (UniqDFM elt, UniqDFM elt)

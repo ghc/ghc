@@ -15,7 +15,9 @@ module TcEvidence (
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
-  lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
+  lookupEvBind, evBindMapBinds,
+  foldEvBindMap, nonDetStrictFoldEvBindMap,
+  filterEvBindMap,
   isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
@@ -495,6 +497,9 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
+
+nonDetStrictFoldEvBindMap :: (a -> EvBind -> a) -> a -> EvBindMap -> a
+nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
 
 filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
 filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
