@@ -108,7 +108,7 @@ module GHC.Cmm.CLabel (
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
 
-        pprCLabel,
+        pprCLabel, pprCLabel_LLVM, pprCLabel_NCG,
         isInfoTableLabel,
         isConInfoTableLabel,
         isIdLabel, isTickyLabel
@@ -242,7 +242,7 @@ data CLabel
 
   -- | These labels are generated and used inside the NCG only.
   --    They are special variants of a label used for dynamic linking
-  --    see module PositionIndependentCode for details.
+  --    see module "GHC.CmmToAsm.PIC" for details.
   | DynamicLinkerLabel DynamicLinkerLabelInfo CLabel
 
   -- | This label is generated and used inside the NCG only.
@@ -398,23 +398,24 @@ data ForeignLabelSource
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
 --      The regular Outputable instance only shows the label name, and not its other info.
 --
-pprDebugCLabel :: CLabel -> SDoc
-pprDebugCLabel lbl
+pprDebugCLabel :: Platform -> CLabel -> SDoc
+pprDebugCLabel platform lbl
  = case lbl of
-        IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
-                                       <> whenPprDebug (text ":" <> text (show info)))
+        IdLabel _ _ info-> pprCLabel_other platform lbl
+                           <> (parens $ text "IdLabel"
+                           <> whenPprDebug (text ":" <> text (show info)))
         CmmLabel pkg _ext _name _info
-         -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
+         -> pprCLabel_other platform lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
-        RtsLabel{}      -> ppr lbl <> (parens $ text "RtsLabel")
+        RtsLabel{}      -> pprCLabel_other platform lbl <> (parens $ text "RtsLabel")
 
         ForeignLabel _name mSuffix src funOrData
-            -> ppr lbl <> (parens $ text "ForeignLabel"
-                                <+> ppr mSuffix
-                                <+> ppr src
-                                <+> ppr funOrData)
+            -> pprCLabel_other platform lbl <> (parens $ text "ForeignLabel"
+                                        <+> ppr mSuffix
+                                        <+> ppr src
+                                        <+> ppr funOrData)
 
-        _               -> ppr lbl <> (parens $ text "other CLabel")
+        _               -> pprCLabel_other platform lbl <> (parens $ text "other CLabel")
 
 
 data IdLabelInfo
@@ -753,34 +754,37 @@ mkAsmTempDieLabel l = mkAsmTempDerivedLabel l (fsLit "_die")
 -- -----------------------------------------------------------------------------
 -- Convert between different kinds of label
 
-toClosureLbl :: CLabel -> CLabel
-toClosureLbl (IdLabel n c _) = IdLabel n c Closure
-toClosureLbl (CmmLabel m ext str _) = CmmLabel m ext str CmmClosure
-toClosureLbl l = pprPanic "toClosureLbl" (ppr l)
+toClosureLbl :: Platform -> CLabel -> CLabel
+toClosureLbl platform lbl = case lbl of
+   IdLabel n c _        -> IdLabel n c Closure
+   CmmLabel m ext str _ -> CmmLabel m ext str CmmClosure
+   _                    -> pprPanic "toClosureLbl" (pprCLabel_other platform lbl)
 
-toSlowEntryLbl :: CLabel -> CLabel
-toSlowEntryLbl (IdLabel n _ BlockInfoTable)
-  = pprPanic "toSlowEntryLbl" (ppr n)
-toSlowEntryLbl (IdLabel n c _) = IdLabel n c Slow
-toSlowEntryLbl l = pprPanic "toSlowEntryLbl" (ppr l)
+toSlowEntryLbl :: Platform -> CLabel -> CLabel
+toSlowEntryLbl platform lbl = case lbl of
+   IdLabel n _ BlockInfoTable -> pprPanic "toSlowEntryLbl" (ppr n)
+   IdLabel n c _              -> IdLabel n c Slow
+   _                          -> pprPanic "toSlowEntryLbl" (pprCLabel_other platform lbl)
 
-toEntryLbl :: CLabel -> CLabel
-toEntryLbl (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
-toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
-toEntryLbl (IdLabel n _ BlockInfoTable)  = mkLocalBlockLabel (nameUnique n)
-                              -- See Note [Proc-point local block entry-point].
-toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
-toEntryLbl (CmmLabel m ext str CmmInfo)    = CmmLabel m ext str CmmEntry
-toEntryLbl (CmmLabel m ext str CmmRetInfo) = CmmLabel m ext str CmmRet
-toEntryLbl l = pprPanic "toEntryLbl" (ppr l)
+toEntryLbl :: Platform -> CLabel -> CLabel
+toEntryLbl platform lbl = case lbl of
+   IdLabel n c LocalInfoTable    -> IdLabel n c LocalEntry
+   IdLabel n c ConInfoTable      -> IdLabel n c ConEntry
+   IdLabel n _ BlockInfoTable    -> mkLocalBlockLabel (nameUnique n)
+                   -- See Note [Proc-point local block entry-point].
+   IdLabel n c _                 -> IdLabel n c Entry
+   CmmLabel m ext str CmmInfo    -> CmmLabel m ext str CmmEntry
+   CmmLabel m ext str CmmRetInfo -> CmmLabel m ext str CmmRet
+   _                             -> pprPanic "toEntryLbl" (pprCLabel_other platform lbl)
 
-toInfoLbl :: CLabel -> CLabel
-toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
-toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
-toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
-toInfoLbl (CmmLabel m ext str CmmEntry)= CmmLabel m ext str CmmInfo
-toInfoLbl (CmmLabel m ext str CmmRet)  = CmmLabel m ext str CmmRetInfo
-toInfoLbl l = pprPanic "CLabel.toInfoLbl" (ppr l)
+toInfoLbl :: Platform -> CLabel -> CLabel
+toInfoLbl platform lbl = case lbl of
+   IdLabel n c LocalEntry      -> IdLabel n c LocalInfoTable
+   IdLabel n c ConEntry        -> IdLabel n c ConInfoTable
+   IdLabel n c _               -> IdLabel n c InfoTable
+   CmmLabel m ext str CmmEntry -> CmmLabel m ext str CmmInfo
+   CmmLabel m ext str CmmRet   -> CmmLabel m ext str CmmRetInfo
+   _                           -> pprPanic "CLabel.toInfoLbl" (pprCLabel_other platform lbl)
 
 hasHaskellName :: CLabel -> Maybe Name
 hasHaskellName (IdLabel n _ _) = Just n
@@ -1208,34 +1212,50 @@ and are not externally visible.
 -}
 
 instance Outputable CLabel where
-  ppr c = sdocWithDynFlags $ \dynFlags -> pprCLabel dynFlags c
+  ppr lbl = sdocWithDynFlags (\dflags -> pprCLabel (backend dflags) (targetPlatform dflags) lbl)
 
-pprCLabel :: DynFlags -> CLabel -> SDoc
-pprCLabel dflags = \case
-   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
+pprCLabel :: Backend -> Platform -> CLabel -> SDoc
+pprCLabel bcknd platform lbl =
+   case bcknd of
+      NCG  -> pprCLabel_NCG   platform lbl
+      LLVM -> pprCLabel_LLVM  platform lbl
+      _    -> pprCLabel_other platform lbl
 
-   (AsmTempLabel u)
-      | not (platformUnregisterised platform)
+pprCLabel_LLVM :: Platform -> CLabel -> SDoc
+pprCLabel_LLVM = pprCLabel_NCG
+
+pprCLabel_NCG :: Platform -> CLabel -> SDoc
+pprCLabel_NCG platform lbl = getPprStyle $ \sty ->
+  let
+    -- some platform (e.g. Darwin) require a leading "_" for exported asm
+    -- symbols
+    maybe_underscore :: SDoc -> SDoc
+    maybe_underscore doc =
+      if platformLeadingUnderscore platform
+      then pp_cSEP <> doc
+      else doc
+
+  in case lbl of
+   LocalBlockLabel u
       -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
-   (AsmTempDerivedLabel l suf)
-      | useNCG
+   AsmTempLabel u
+      -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
+
+   AsmTempDerivedLabel l suf
       -> ptext (asmTempLabelPrefix platform)
          <> case l of AsmTempLabel u    -> pprUniqueAlways u
                       LocalBlockLabel u -> pprUniqueAlways u
-                      _other            -> pprCLabel dflags l
+                      _other            -> pprCLabel_NCG platform l
          <> ftext suf
 
-   (DynamicLinkerLabel info lbl)
-      | useNCG
+   DynamicLinkerLabel info lbl
       -> pprDynamicLinkerAsmLabel platform info lbl
 
    PicBaseLabel
-      | useNCG
       -> text "1b"
 
-   (DeadStripPreventer lbl)
-      | useNCG
+   DeadStripPreventer lbl
       ->
       {-
          `lbl` can be temp one but we need to ensure that dsp label will stay
@@ -1243,36 +1263,36 @@ pprCLabel dflags = \case
          optional `_` (underscore) because this is how you mark non-temp symbols
          on some platforms (Darwin)
       -}
-      maybe_underscore $ text "dsp_" <> pprCLabel dflags lbl <> text "_dsp"
+      maybe_underscore $ text "dsp_" <> pprCLabel_NCG platform lbl <> text "_dsp"
 
-   (StringLitLabel u)
-      | useNCG
+   StringLitLabel u
       -> pprUniqueAlways u <> ptext (sLit "_str")
 
-   lbl -> getPprStyle $ \sty ->
-            if useNCG && asmStyle sty
-            then maybe_underscore $ pprAsmCLbl lbl
-            else pprCLbl platform lbl
+   ForeignLabel fs (Just sz) _ _
+      | asmStyle sty
+      , OSMinGW32 <- platformOS platform
+      -> -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
+         -- (The C compiler does this itself).
+         maybe_underscore $ ftext fs <> char '@' <> int sz
 
-  where
-    platform = targetPlatform dflags
-    useNCG   = backend dflags == NCG
+   _  | asmStyle sty -> maybe_underscore $ pprCLabel_common platform lbl
+      | otherwise    -> pprCLabel_common platform lbl
 
-    maybe_underscore :: SDoc -> SDoc
-    maybe_underscore doc =
-      if platformLeadingUnderscore platform
-      then pp_cSEP <> doc
-      else doc
+pprCLabel_other :: Platform -> CLabel -> SDoc
+pprCLabel_other platform lbl =
+   case lbl of
+      LocalBlockLabel u
+         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
-    pprAsmCLbl (ForeignLabel fs (Just sz) _ _)
-     | platformOS platform == OSMinGW32
-        -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
-        -- (The C compiler does this itself).
-        = ftext fs <> char '@' <> int sz
-    pprAsmCLbl lbl = pprCLbl platform lbl
+      AsmTempLabel u
+         | not (platformUnregisterised platform)
+         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
-pprCLbl :: Platform -> CLabel -> SDoc
-pprCLbl platform = \case
+      lbl -> pprCLabel_common platform lbl
+
+
+pprCLabel_common :: Platform -> CLabel -> SDoc
+pprCLabel_common platform = \case
    (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
    (SRTLabel u)         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
    (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore platform
@@ -1335,11 +1355,11 @@ pprCLbl platform = \case
    (CCS_Label ccs)     -> ppr ccs
    (HpcTicksLabel mod) -> text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
 
-   (AsmTempLabel {})        -> panic "pprCLbl AsmTempLabel"
-   (AsmTempDerivedLabel {}) -> panic "pprCLbl AsmTempDerivedLabel"
-   (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
-   (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
-   (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
+   (AsmTempLabel {})        -> panic "pprCLabel_common AsmTempLabel"
+   (AsmTempDerivedLabel {}) -> panic "pprCLabel_common AsmTempDerivedLabel"
+   (DynamicLinkerLabel {})  -> panic "pprCLabel_common DynamicLinkerLabel"
+   (PicBaseLabel {})        -> panic "pprCLabel_common PicBaseLabel"
+   (DeadStripPreventer {})  -> panic "pprCLabel_common DeadStripPreventer"
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text
@@ -1402,60 +1422,60 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
       OSDarwin
         | platformArch platform == ArchX86_64 ->
           case dllInfo of
-            CodeStub        -> char 'L' <> ppr lbl <> text "$stub"
-            SymbolPtr       -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
-            GotSymbolPtr    -> ppr lbl <> text "@GOTPCREL"
-            GotSymbolOffset -> ppr lbl
+            CodeStub        -> char 'L' <> ppLbl <> text "$stub"
+            SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
+            GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
+            GotSymbolOffset -> ppLbl
         | otherwise ->
           case dllInfo of
-            CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
-            SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+            CodeStub  -> char 'L' <> ppLbl <> text "$stub"
+            SymbolPtr -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       OSAIX ->
           case dllInfo of
-            SymbolPtr -> text "LC.." <> ppr lbl -- GCC's naming convention
+            SymbolPtr -> text "LC.." <> ppLbl -- GCC's naming convention
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       _ | osElfTarget (platformOS platform) -> elfLabel
 
       OSMinGW32 ->
           case dllInfo of
-            SymbolPtr -> text "__imp_" <> ppr lbl
+            SymbolPtr -> text "__imp_" <> ppLbl
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       _ -> panic "pprDynamicLinkerAsmLabel"
   where
+    ppLbl = pprCLabel_NCG platform lbl
     elfLabel
       | platformArch platform == ArchPPC
       = case dllInfo of
           CodeStub  -> -- See Note [.LCTOC1 in PPC PIC code]
-                       ppr lbl <> text "+32768@plt"
-          SymbolPtr -> text ".LC_" <> ppr lbl
+                       ppLbl <> text "+32768@plt"
+          SymbolPtr -> text ".LC_" <> ppLbl
           _         -> panic "pprDynamicLinkerAsmLabel"
 
       | platformArch platform == ArchX86_64
       = case dllInfo of
-          CodeStub        -> ppr lbl <> text "@plt"
-          GotSymbolPtr    -> ppr lbl <> text "@gotpcrel"
-          GotSymbolOffset -> ppr lbl
-          SymbolPtr       -> text ".LC_" <> ppr lbl
+          CodeStub        -> ppLbl <> text "@plt"
+          GotSymbolPtr    -> ppLbl <> text "@gotpcrel"
+          GotSymbolOffset -> ppLbl
+          SymbolPtr       -> text ".LC_" <> ppLbl
 
       | platformArch platform == ArchPPC_64 ELF_V1
         || platformArch platform == ArchPPC_64 ELF_V2
       = case dllInfo of
-          GotSymbolPtr    -> text ".LC_"  <> ppr lbl
-                                  <> text "@toc"
-          GotSymbolOffset -> ppr lbl
-          SymbolPtr       -> text ".LC_" <> ppr lbl
+          GotSymbolPtr    -> text ".LC_"  <> ppLbl <> text "@toc"
+          GotSymbolOffset -> ppLbl
+          SymbolPtr       -> text ".LC_" <> ppLbl
           _               -> panic "pprDynamicLinkerAsmLabel"
 
       | otherwise
       = case dllInfo of
-          CodeStub        -> ppr lbl <> text "@plt"
-          SymbolPtr       -> text ".LC_" <> ppr lbl
-          GotSymbolPtr    -> ppr lbl <> text "@got"
-          GotSymbolOffset -> ppr lbl <> text "@gotoff"
+          CodeStub        -> ppLbl <> text "@plt"
+          SymbolPtr       -> text ".LC_" <> ppLbl
+          GotSymbolPtr    -> ppLbl <> text "@got"
+          GotSymbolOffset -> ppLbl <> text "@gotoff"
 
 -- Figure out whether `symbol` may serve as an alias
 -- to `target` within one compilation unit.

@@ -496,7 +496,8 @@ ghcInternalFunctions = do
 strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
     dflags <- getDynFlags
-    let sdoc = pprCLabel dflags lbl
+    platform <- getPlatform
+    let sdoc = pprCLabel_LLVM platform lbl
         str = Outp.renderWithStyle
                   (initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle))
                   sdoc
