@@ -2190,7 +2190,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           where
             L loc (ModuleNameWithIsBoot mod is_boot) = s
             wanted_mod = L loc mod
-            key = ModuleNameWithIsBoot 
+            key = ModuleNameWithIsBoot
                     { mnwib_moduleName = unLoc wanted_mod
                     , mnwib_isBoot = is_boot
                     }
