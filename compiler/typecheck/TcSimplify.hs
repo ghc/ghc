@@ -1862,7 +1862,7 @@ neededEvVars implic@(Implic { ic_given = givens
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
 
       ; let seeds1        = foldr add_implic_seeds old_needs implics
-            seeds2        = foldEvBindMap add_wanted seeds1 ev_binds -- TODO
+            seeds2        = nonDetStrictFoldEvBindMap (flip add_wanted) seeds1 ev_binds
             seeds3        = seeds2 `unionVarSet` tcvs
             need_inner    = findNeededEvVars ev_binds seeds3
             live_ev_binds = filterEvBindMap (needed_ev_bind need_inner) ev_binds
