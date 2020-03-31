@@ -30,6 +30,7 @@ import Type   ( Type )
 import Util
 import SrcLoc
 import Outputable
+import Multiplicity
 import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )
 
@@ -126,7 +127,10 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
 
 matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
-    match_var <- selectMatchVar upat
+    match_var <- selectMatchVar Many upat
+       -- We only allow unrestricted patterns in guard, hence the `Many`
+       -- above. It isn't clear what linear patterns would mean, maybe we will
+       -- figure it out in the future.
 
     match_result <- matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs

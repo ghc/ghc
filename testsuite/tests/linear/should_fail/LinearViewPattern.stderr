@@ -1,0 +1,6 @@
+
+LinearViewPattern.hs:11:4: error:
+    • Couldn't match type ‘'Many’ with ‘'One’
+        arising from a non-linear pattern
+    • In the pattern: not -> True
+      In an equation for ‘f’: f (not -> True) = True
