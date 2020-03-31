@@ -2381,7 +2381,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
              seed_skols = mkVarSet skols     `unionVarSet`
                           mkVarSet given_ids `unionVarSet`
                           foldr add_non_flt_ct emptyVarSet no_float_cts `unionVarSet`
-                          foldEvBindMap add_one_bind emptyVarSet binds -- TODO
+                          evBindMapToVarSet binds
              -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
              -- Include the EvIds of any non-floating constraints
 
@@ -2406,9 +2406,6 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
        ; return ( flt_eqs, wanteds { wc_simple = remaining_simples } ) }
 
   where
-    add_one_bind :: EvBind -> VarSet -> VarSet
-    add_one_bind bind acc = extendVarSet acc (evBindVar bind)
-
     add_non_flt_ct :: Ct -> VarSet -> VarSet
     add_non_flt_ct ct acc | isDerivedCt ct = acc
                           | otherwise      = extendVarSet acc (ctEvId ct)

@@ -359,7 +359,7 @@ delListFromUDFM = foldl' delFromUDFM
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
 udfmToUfm (UDFM m _i) =
-  listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m]
+  listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m] -- TODO
 
 listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM elt
 listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM
