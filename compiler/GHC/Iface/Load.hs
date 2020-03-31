@@ -483,7 +483,7 @@ loadInterface doc_str mod from
                               }
                }
 
-        ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
+        ; let bad_boot = mi_boot iface == IsBoot && fmap fst (if_rec_types gbl_env) == Just mod
                             -- Warn warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
@@ -688,7 +688,7 @@ moduleFreeHolesPrecise doc_str mod
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
-        mb_iface <- findAndReadIface (text "moduleFreeHolesPrecise" <+> doc_str) imod mod False
+        mb_iface <- findAndReadIface (text "moduleFreeHolesPrecise" <+> doc_str) imod mod NotBoot
         case mb_iface of
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
@@ -704,23 +704,23 @@ wantHiBootFile :: DynFlags -> ExternalPackageState -> Module -> WhereFrom
 wantHiBootFile dflags eps mod from
   = case from of
        ImportByUser usr_boot
-          | usr_boot && not this_package
+          | usr_boot == IsBoot && not this_package
           -> Failed (badSourceImport mod)
           | otherwise -> Succeeded usr_boot
 
        ImportByPlugin
-          -> Succeeded False
+          -> Succeeded NotBoot
 
        ImportBySystem
           | not this_package   -- If the module to be imported is not from this package
-          -> Succeeded False   -- don't look it up in eps_is_boot, because that is keyed
+          -> Succeeded NotBoot -- don't look it up in eps_is_boot, because that is keyed
                                -- on the ModuleName of *home-package* modules only.
                                -- We never import boot modules from other packages!
 
           | otherwise
           -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
                 Just (ModuleNameWithIsBoot _ is_boot) -> Succeeded is_boot
-                Nothing           -> Succeeded False
+                Nothing           -> Succeeded NotBoot
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
   where
@@ -897,7 +897,7 @@ findAndReadIface :: SDoc
         -- sometimes it's ok to fail... see notes with loadInterface
 findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
   = do traceIf (sep [hsep [text "Reading",
-                           if hi_boot_file
+                           if hi_boot_file == IsBoot
                              then text "[boot]"
                              else Outputable.empty,
                            text "interface for",
@@ -1219,8 +1219,8 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
     ppr_mod (ModuleNameWithIsBoot mod_name boot) = ppr mod_name <+> ppr_boot boot
     ppr_pkg (pkg,trust_req)  = ppr pkg <>
                                (if trust_req then text "*" else Outputable.empty)
-    ppr_boot True  = text "[boot]"
-    ppr_boot False = Outputable.empty
+    ppr_boot IsBoot  = text "[boot]"
+    ppr_boot NotBoot = Outputable.empty
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty

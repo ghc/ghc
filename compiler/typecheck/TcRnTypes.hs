@@ -261,7 +261,7 @@ data IfLclEnv
         -- Whether or not the IfaceDecl came from a boot
         -- file or not; we'll use this to choose between
         -- NoUnfolding and BootUnfolding
-        if_boot :: Bool,
+        if_boot :: IsBootInterface,
 
         -- The field is used only for error reporting
         -- if (say) there's a Lint error in it
@@ -1421,8 +1421,8 @@ plusImportAvails
                    imp_finsts        = finsts1 `unionLists` finsts2 }
   where
     plus_mod_dep r1@(ModuleNameWithIsBoot m1 boot1) r2@(ModuleNameWithIsBoot m2 boot2)
-      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
-        boot1 = r2
+      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr (boot1 == IsBoot) <+> ppr (boot2 == IsBoot)))
+        boot1 == IsBoot = r2
       | otherwise = r1
       -- If either side can "see" a non-hi-boot interface, use that
       -- Reusing existing tuples saves 10% of allocations on test
@@ -1445,8 +1445,8 @@ data WhereFrom
                                         -- See Note [Care with plugin imports] in GHC.Iface.Load
 
 instance Outputable WhereFrom where
-  ppr (ImportByUser is_boot) | is_boot     = text "{- SOURCE -}"
-                             | otherwise   = empty
+  ppr (ImportByUser IsBoot)                = text "{- SOURCE -}"
+  ppr (ImportByUser NotBoot)               = empty
   ppr ImportBySystem                       = text "{- SYSTEM -}"
   ppr ImportByPlugin                       = text "{- PLUGIN -}"
 

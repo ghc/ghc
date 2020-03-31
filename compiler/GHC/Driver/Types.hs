@@ -114,7 +114,7 @@ module GHC.Driver.Types (
         MonadThings(..),
 
         -- * Information on imports and exports
-        WhetherHasOrphans, IsBootInterface, Usage(..),
+        WhetherHasOrphans, IsBootInterface(..), Usage(..),
         Dependencies(..), noDependencies,
         updNameCache,
         IfaceExport,
@@ -759,7 +759,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     [ thing
     |   -- Find each non-hi-boot module below me
       ModuleNameWithIsBoot mod is_boot_mod <- deps
-    , include_hi_boot || not is_boot_mod
+    , include_hi_boot || (is_boot_mod == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
         -- sometimes try to look up RULES etc for GHC.Prim. GHC.Prim won't
@@ -1096,8 +1096,10 @@ data ModIface_ (phase :: ModIfacePhase)
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
-mi_boot :: ModIface -> Bool
-mi_boot iface = mi_hsc_src iface == HsBootFile
+mi_boot :: ModIface -> IsBootInterface
+mi_boot iface = if mi_hsc_src iface == HsBootFile
+    then IsBoot
+    else NotBoot
 
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.
@@ -2844,19 +2846,19 @@ isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
   (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
     || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
-  not (isBootSummary ms)
+  (isBootSummary ms == NotBoot)
 
 -- | Add a ModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
 extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} ms = ModuleGraph
   { mg_mss = ms:mg_mss
-  , mg_non_boot = if isBootSummary ms
-      then mg_non_boot
-      else extendModuleEnv mg_non_boot (ms_mod ms) ms
-  , mg_boot = if isBootSummary ms
-      then extendModuleSet mg_boot (ms_mod ms)
-      else mg_boot
+  , mg_non_boot = case isBootSummary ms of
+      NotBoot -> mg_non_boot
+      IsBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
+  , mg_boot = case isBootSummary ms of
+      NotBoot -> mg_boot
+      IsBoot -> extendModuleSet mg_boot (ms_mod ms)
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
 
@@ -2957,8 +2959,8 @@ msDynObjFilePath :: ModSummary -> DynFlags -> FilePath
 msDynObjFilePath ms dflags = dynamicOutputFile dflags (msObjFilePath ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
-isBootSummary :: ModSummary -> Bool
-isBootSummary ms = ms_hsc_src ms == HsBootFile
+isBootSummary :: ModSummary -> IsBootInterface
+isBootSummary ms = if ms_hsc_src ms == HsBootFile then IsBoot else NotBoot
 
 instance Outputable ModSummary where
    ppr ms
