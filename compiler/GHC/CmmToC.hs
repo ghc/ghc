@@ -88,7 +88,7 @@ pprTop dflags = \case
   (CmmProc infos clbl _in_live_regs graph) ->
     (case mapLookup (g_entry graph) infos of
        Nothing -> empty
-       Just (RawCmmStatics info_clbl info_dat) ->
+       Just (CmmStaticsRaw info_clbl info_dat) ->
            pprDataExterns platform info_dat $$
            pprWordArray dflags info_is_in_rodata info_clbl info_dat) $$
     (vcat [
@@ -111,21 +111,21 @@ pprTop dflags = \case
 
   -- We only handle (a) arrays of word-sized things and (b) strings.
 
-  (CmmData section (RawCmmStatics lbl [CmmString str])) ->
+  (CmmData section (CmmStaticsRaw lbl [CmmString str])) ->
     pprExternDecl platform lbl $$
     hcat [
       pprLocalness lbl, pprConstness (isSecConstant section), text "char ", ppr lbl,
       text "[] = ", pprStringInCStyle str, semi
     ]
 
-  (CmmData section (RawCmmStatics lbl [CmmUninitialised size])) ->
+  (CmmData section (CmmStaticsRaw lbl [CmmUninitialised size])) ->
     pprExternDecl platform lbl $$
     hcat [
       pprLocalness lbl, pprConstness (isSecConstant section), text "char ", ppr lbl,
       brackets (int size), semi
     ]
 
-  (CmmData section (RawCmmStatics lbl lits)) ->
+  (CmmData section (CmmStaticsRaw lbl lits)) ->
     pprDataExterns platform lits $$
     pprWordArray dflags (isSecConstant section) lbl lits
   where
