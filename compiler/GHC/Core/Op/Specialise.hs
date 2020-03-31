@@ -37,6 +37,7 @@ import GHC.Core.Arity     ( etaExpandToJoinPointRule )
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
+import TysPrim            ( voidPrimTy )
 import Maybes           ( mapMaybe, maybeToList, isJust )
 import MonadUtils       ( foldlM )
 import GHC.Types.Basic
@@ -658,27 +659,15 @@ instance Outputable SpecArg where
   ppr (SpecDict d) = text "SpecDict" <+> ppr d
   ppr UnspecArg    = text "UnspecArg"
 
-getSpecDicts :: [SpecArg] -> [DictExpr]
-getSpecDicts = mapMaybe go
-  where
-    go (SpecDict d) = Just d
-    go _            = Nothing
+specArgFreeVars :: SpecArg -> VarSet
+specArgFreeVars (SpecType ty) = tyCoVarsOfType ty
+specArgFreeVars (SpecDict dx) = exprFreeVars dx
+specArgFreeVars UnspecType    = emptyVarSet
+specArgFreeVars UnspecArg     = emptyVarSet
 
-getSpecTypes :: [SpecArg] -> [Type]
-getSpecTypes = mapMaybe go
-  where
-    go (SpecType t) = Just t
-    go _            = Nothing
-
-isUnspecArg :: SpecArg -> Bool
-isUnspecArg UnspecArg  = True
-isUnspecArg UnspecType = True
-isUnspecArg _          = False
-
-isValueArg :: SpecArg -> Bool
-isValueArg UnspecArg    = True
-isValueArg (SpecDict _) = True
-isValueArg _            = False
+isSpecDict :: SpecArg -> Bool
+isSpecDict (SpecDict {}) = True
+isSpecDict _             = False
 
 -- | Given binders from an original function 'f', and the 'SpecArg's
 -- corresponding to its usage, compute everything necessary to build
@@ -725,21 +714,24 @@ isValueArg _            = False
 --    )
 specHeader
      :: SpecEnv
-     -> [CoreBndr]  -- The binders from the original function 'f'
+     -> [InBndr]    -- The binders from the original function 'f'
      -> [SpecArg]   -- From the CallInfo
-     -> SpecM ( -- Returned arguments
-                SpecEnv      -- Substitution to apply to the body of 'f'
-              , [CoreBndr]   -- Leftover binders from the original function 'f'
+     -> SpecM ( Int  -- Number of dictionaries specialised
+                     --   0 <=> Nothing useful happened
+
+                -- Returned arguments
+              , SpecEnv      -- Substitution to apply to the body of 'f'
+              , [OutBndr]    -- Leftover binders from the original function 'f'
                              --   that don’t have a corresponding SpecArg
 
                 -- RULE helpers
-              , [CoreBndr]   -- Binders for the RULE
+              , [OutBndr]    -- Binders for the RULE
               , [CoreArg]    -- Args for the LHS of the rule
 
                 -- Specialised function helpers
-              , [CoreBndr]   -- Binders for $sf
+              , [OutBndr]    -- Binders for $sf
               , [DictBind]   -- Auxiliary dictionary bindings
-              , [CoreExpr]   -- Specialised arguments for unfolding
+              , [OutExpr]    -- Specialised arguments for unfolding
               )
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
@@ -747,9 +739,10 @@ specHeader
 -- details.
 specHeader env (bndr : bndrs) (SpecType t : args)
   = do { let env' = extendTvSubstList env [(bndr, t)]
-       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (n_spec, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
-       ; pure ( env''
+       ; pure ( n_spec
+              , env''
               , leftover_bndrs
               , rule_bs
               , Type t : rule_es
@@ -765,9 +758,10 @@ specHeader env (bndr : bndrs) (SpecType t : args)
 -- /and/ a binder for the specialised body.
 specHeader env (bndr : bndrs) (UnspecType : args)
   = do { let (env', bndr') = substBndr env bndr
-       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (n_spec, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
             <- specHeader env' bndrs args
-       ; pure ( env''
+       ; pure ( n_spec
+              , env''
               , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
@@ -783,9 +777,10 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 specHeader env (bndr : bndrs) (SpecDict d : args)
   = do { bndr' <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
        ; let (env', dx_bind, spec_dict) = bindAuxiliaryDict env bndr bndr' d
-       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (n_spec, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
-       ; pure ( env''
+       ; pure ( n_spec + 1  -- Ha!  A useful specialisation!
+              , env''
               , leftover_bndrs
               -- See Note [Evidence foralls]
               , exprFreeIdsList (varToCoreExpr bndr') ++ rule_bs
@@ -807,9 +802,10 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 specHeader env (bndr : bndrs) (UnspecArg : args)
   = do { -- see Note [Zap occ info in rule binders]
          let (env', bndr') = substBndr env (zapIdOccInfo bndr)
-       ; (env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+       ; (n_spec, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
-       ; pure ( env''
+       ; pure ( n_spec
+              , env''
               , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
@@ -817,17 +813,21 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
                   then bs' -- see Note [Drop dead args from specialisations]
                   else bndr' : bs'
               , dx
-              , if isDeadBinder bndr
-                  then spec_args -- see Note [Drop dead args from specialisations]
-                  else varToCoreExpr bndr' : spec_args
+              , varToCoreExpr bndr' : spec_args
               )
        }
+
+-- If we run out of binders, stop immediately
+-- See Note [Specialisation Must Preserve Sharing]
+specHeader env [] _ = pure (0, env, [], [], [], [], [], [])
 
 -- Return all remaining binders from the original function. These have the
 -- invariant that they should all correspond to unspecialised arguments, so
 -- it's safe to stop processing at this point.
-specHeader env bndrs [] = pure (env, bndrs, [], [], [], [], [])
-specHeader env [] _     = pure (env, [], [], [], [], [], [])
+specHeader env bndrs []
+  = pure (0, env', bndrs', [], [], [], [], [])
+  where
+    (env', bndrs') = substBndrs env bndrs
 
 
 -- | Specialise a set of calls to imported bindings
@@ -1096,12 +1096,10 @@ specExpr env expr@(App {})
     go other         _    = specExpr env other
 
 ---------------- Lambda/case require dumping of usage details --------------------
-specExpr env e@(Lam _ _) = do
-    (body', uds) <- specExpr env' body
-    let (free_uds, dumped_dbs) = dumpUDs bndrs' uds
-    return (mkLams bndrs' (wrapDictBindsE dumped_dbs body'), free_uds)
+specExpr env e@(Lam {})
+  = specLam env' bndrs' body
   where
-    (bndrs, body) = collectBinders e
+    (bndrs, body)  = collectBinders e
     (env', bndrs') = substBndrs env bndrs
         -- More efficient to collect a group of binders together all at once
         -- and we don't want to split a lambda group with dumped bindings
@@ -1127,6 +1125,18 @@ specExpr env (Let bind body)
         -- All done
       ; return (foldr Let body' binds', uds) }
 
+--------------
+specLam :: SpecEnv -> [OutBndr] -> InExpr -> SpecM (OutExpr, UsageDetails)
+-- The binders have been substituted, but the body has not
+specLam env bndrs body
+  | null bndrs
+  = specExpr env body
+  | otherwise
+  = do { (body', uds) <- specExpr env body
+       ; let (free_uds, dumped_dbs) = dumpUDs bndrs uds
+       ; return (mkLams bndrs (wrapDictBindsE dumped_dbs body'), free_uds) }
+
+--------------
 specTickish :: SpecEnv -> Tickish Id -> Tickish Id
 specTickish env (Breakpoint ix ids)
   = Breakpoint ix [ id' | id <- ids, Var id' <- [specVar env id]]
@@ -1134,6 +1144,7 @@ specTickish env (Breakpoint ix ids)
   -- should never happen, but it's harmless to drop them anyway.
 specTickish _ other_tickish = other_tickish
 
+--------------
 specCase :: SpecEnv
          -> CoreExpr            -- Scrutinee, already done
          -> Id -> [CoreAlt]
@@ -1256,7 +1267,13 @@ specBind :: SpecEnv                     -- Use this for RHSs
 --    No calls for binders of this bind
 specBind rhs_env (NonRec fn rhs) body_uds
   = do { (rhs', rhs_uds) <- specExpr rhs_env rhs
-       ; (fn', spec_defns, body_uds1) <- specDefn rhs_env body_uds fn rhs
+
+        ; let zapped_fn = zapIdDemandInfo fn
+              -- We zap the demand info because the binding may float,
+              -- which would invaidate the demand info (see #17810 for example).
+              -- Destroying demand info is not terrible; specialisation is
+              -- always followed soon by demand analysis.
+      ; (fn', spec_defns, body_uds1) <- specDefn rhs_env body_uds zapped_fn rhs
 
        ; let pairs = spec_defns ++ [(fn', rhs')]
                         -- fn' mentions the spec_defns in its rules,
@@ -1376,8 +1393,7 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
-  |  callSpecArity pis <= fn_arity      -- See Note [Specialisation Must Preserve Sharing]
-  && notNull calls_for_me               -- And there are some calls to specialise
+  |  notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
         -- See Note [Auto-specialisation and RULES]
@@ -1397,25 +1413,20 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
   where
-    _trace_doc = sep [ ppr rhs_tyvars, ppr rhs_bndrs
-                     , ppr (idInlineActivation fn) ]
+    _trace_doc = sep [ ppr rhs_bndrs, ppr (idInlineActivation fn) ]
 
-    fn_type                 = idType fn
-    fn_arity                = idArity fn
-    fn_unf                  = realIdUnfolding fn  -- Ignore loop-breaker-ness here
-    pis                     = fst $ splitPiTys fn_type
-    theta                   = getTheta pis
-    n_dicts                 = length theta
-    inl_prag                = idInlinePragma fn
-    inl_act                 = inlinePragmaActivation inl_prag
-    is_local                = isLocalId fn
+    fn_type   = idType fn
+    fn_arity  = idArity fn
+    fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
+    inl_prag  = idInlinePragma fn
+    inl_act   = inlinePragmaActivation inl_prag
+    is_local  = isLocalId fn
 
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
-    (rhs_bndrs, rhs_body)      = collectBindersPushingCo rhs
-                                 -- See Note [Account for casts in binding]
-    rhs_tyvars = filter isTyVar rhs_bndrs
+    (rhs_bndrs, rhs_body) = collectBindersPushingCo rhs
+                            -- See Note [Account for casts in binding]
 
     in_scope = Core.substInScope (se_subst env)
 
@@ -1432,38 +1443,43 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     spec_call :: SpecInfo                         -- Accumulating parameter
               -> CallInfo                         -- Call instance
               -> SpecM SpecInfo
-    spec_call spec_acc@(rules_acc, pairs_acc, uds_acc)
-              (CI { ci_key = call_args, ci_arity = call_arity })
-      = ASSERT(call_arity <= fn_arity)
+    spec_call spec_acc@(rules_acc, pairs_acc, uds_acc) (CI { ci_key = call_args })
+      = -- See Note [Specialising Calls]
+        do { ( n_spec_dicts, rhs_env2, leftover_bndrs
+             , rule_bndrs, rule_lhs_args
+             , spec_bndrs, dx_binds, spec_args) <- specHeader env rhs_bndrs call_args
 
-        -- See Note [Specialising Calls]
-        do { (rhs_env2, leftover_bndrs, rule_bndrs, rule_args, unspec_bndrs, dx_binds, spec_args)
-               <- specHeader env rhs_bndrs $ dropWhileEndLE isUnspecArg call_args
-           ; let rhs_body' = mkLams leftover_bndrs rhs_body
            ; dflags <- getDynFlags
-           ; if already_covered dflags rules_acc rule_args
+           ; if n_spec_dicts == 0  -- No useful specialisation
+                || already_covered dflags rules_acc rule_lhs_args
              then return spec_acc
              else -- pprTrace "spec_call" (vcat [ ppr _call_info, ppr fn, ppr rhs_dict_ids
                   --                           , text "rhs_env2" <+> ppr (se_subst rhs_env2)
                   --                           , ppr dx_binds ]) $
-                  do
-           {    -- Figure out the type of the specialised function
-             let body = mkLams unspec_bndrs rhs_body'
-                 body_ty = substTy rhs_env2 $ exprType body
-                 (lam_extra_args, app_args)     -- See Note [Specialisations Must Be Lifted]
-                   | isUnliftedType body_ty     -- C.f. GHC.Core.Op.WorkWrap.Lib.mkWorkerArgs
-                   , not (isJoinId fn)
-                   = ([voidArgId], voidPrimId : unspec_bndrs)
-                   | otherwise = ([], unspec_bndrs)
-                 join_arity_change = length app_args - length rule_args
+        do { -- Run the specialiser on the specialised RHS
+             -- The "1" suffix is before we maybe add the void arg
+           ; (spec_rhs1, rhs_uds) <- specLam rhs_env2 (spec_bndrs ++ leftover_bndrs) rhs_body
+           ; let spec_fn_ty1 = exprType spec_rhs1
+
+                 -- Maybe add a void arg to the specialised function,
+                 -- to avoid unlifted bindings
+                 -- See Note [Specialisations Must Be Lifted]
+                 -- C.f. GHC.Core.Op.WorkWrap.Lib.mkWorkerArgs
+                 add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
+                 (spec_rhs, spec_fn_ty, rule_rhs_args)
+                   | add_void_arg = ( Lam        voidArgId  spec_rhs1
+                                    , mkVisFunTy voidPrimTy spec_fn_ty1
+                                    , voidPrimId : spec_bndrs)
+                   | otherwise   = (spec_rhs1, spec_fn_ty1, spec_bndrs)
+
+                 arity_decr      = count isValArg rule_lhs_args - count isId rule_rhs_args
+                 join_arity_decr = length rule_lhs_args - length rule_rhs_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
-                                 = Just (orig_join_arity + join_arity_change)
+                                 = Just (orig_join_arity - join_arity_decr)
                                  | otherwise
                                  = Nothing
 
-           ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_extra_args body)
-           ; let spec_id_ty = exprType spec_rhs
-           ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
+           ; spec_fn <- newSpecIdSM fn spec_fn_ty spec_join_arity
            ; this_mod <- getModule
            ; let
                 -- The rule to put in the function's specialisation is:
@@ -1491,13 +1507,12 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
                                   rule_bndrs
-                                  rule_args
-                                  (mkVarApps (Var spec_f) app_args)
+                                  rule_lhs_args
+                                  (mkVarApps (Var spec_fn) rule_rhs_args)
 
                 spec_rule
                   = case isJoinId_maybe fn of
-                      Just join_arity -> etaExpandToJoinPointRule join_arity
-                                                                  rule_wout_eta
+                      Just join_arity -> etaExpandToJoinPointRule join_arity rule_wout_eta
                       Nothing -> rule_wout_eta
 
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
@@ -1516,7 +1531,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags unspec_bndrs spec_app n_dicts fn_unf)
+                  = (inl_prag, specUnfolding dflags fn spec_bndrs spec_app arity_decr fn_unf)
 
                 spec_app e = e `mkApps` spec_args
 
@@ -1524,14 +1539,14 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 -- Adding arity information just propagates it a bit faster
                 --      See Note [Arity decrease] in GHC.Core.Op.Simplify
                 -- Copy InlinePragma information from the parent Id.
-                -- So if f has INLINE[1] so does spec_f
-                arity_decrease = length rhs_bndrs - (length unspec_bndrs + length leftover_bndrs)
-                spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - arity_decrease)
-                                        `setInlinePragma` spec_inl_prag
-                                        `setIdUnfolding`  spec_unf
-                                        `asJoinId_maybe`  spec_join_arity
+                -- So if f has INLINE[1] so does spec_fn
+                spec_f_w_arity = spec_fn `setIdArity`      max 0 (fn_arity - arity_decr)
+                                         `setInlinePragma` spec_inl_prag
+                                         `setIdUnfolding`  spec_unf
+                                         `asJoinId_maybe`  spec_join_arity
 
-                _rule_trace_doc = vcat [ ppr spec_f, ppr fn_type, ppr spec_id_ty
+                _rule_trace_doc = vcat [ ppr fn <+> dcolon <+> ppr fn_type
+                                       , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty
                                        , ppr rhs_bndrs, ppr call_args
                                        , ppr spec_rule
                                        ]
@@ -2247,8 +2262,6 @@ data CallInfoSet = CIS Id (Bag CallInfo)
 
 data CallInfo
   = CI { ci_key  :: [SpecArg]   -- All arguments
-       , ci_arity :: Int        -- The number of variables necessary to bind
-                                -- all of the specialised arguments
        , ci_fvs  :: VarSet      -- Free vars of the ci_key
                                 -- call (including tyvars)
                                 -- [*not* include the main id itself, of course]
@@ -2294,12 +2307,6 @@ callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) =
   foldr (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
-computeArity :: [SpecArg] -> Int
-computeArity = length . filter isValueArg . dropWhileEndLE isUnspecArg
-
-callSpecArity :: [TyCoBinder] -> Int
-callSpecArity = length . filter (not . isNamedBinder) . dropWhileEndLE isVisibleBinder
-
 getTheta :: [TyCoBinder] -> [PredType]
 getTheta = fmap tyBinderType . filter isInvisibleBinder . filter (not . isNamedBinder)
 
@@ -2310,13 +2317,9 @@ singleCall id args
   = MkUD {ud_binds = emptyBag,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args -- used to be tys
-                                 , ci_arity = computeArity args
                                  , ci_fvs  = call_fvs }) }
   where
-    tys      = getSpecTypes args
-    dicts    = getSpecDicts args
-    call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
-    tys_fvs  = tyCoVarsOfTypes tys
+    call_fvs = foldr (unionVarSet . specArgFreeVars) emptyVarSet args
         -- The type args (tys) are guaranteed to be part of the dictionary
         -- types, because they are just the constrained types,
         -- and the dictionary is therefore sure to be bound
@@ -2335,10 +2338,9 @@ mkCallUDs env f args
     res = mkCallUDs' env f args
 
 mkCallUDs' env f args
-  |  not (want_calls_for f)      -- Imported from elsewhere
-  || null (getSpecDicts ci_key)  -- Not overloaded, or no specialisation wanted
-  || not (computeArity ci_key <= idArity f)
-  -- See also Note [Specialisations already covered]
+  |  not (want_calls_for f)  -- Imported from elsewhere
+  || null ci_key             -- No useful specialisation
+   -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
     emptyUDs
 
@@ -2351,22 +2353,28 @@ mkCallUDs' env f args
     constrained_tyvars = tyCoVarsOfTypes $ getTheta pis
 
     ci_key :: [SpecArg]
-    ci_key = fmap (\(t, a) ->
-      case t of
-        Named (binderVar -> tyVar)
-          |  tyVar `elemVarSet` constrained_tyvars
-          -> case a of
-              Type ty -> SpecType ty
-              _ -> pprPanic "ci_key" $ ppr a
-          |  otherwise
-          -> UnspecType
-        Anon InvisArg pred
-          | type_determines_value pred
-          , interestingDict env a -- Note [Interesting dictionary arguments]
-          -> SpecDict a
-          | otherwise -> UnspecArg
-        Anon VisArg _ -> UnspecArg
-                ) $ zip pis args
+    ci_key = dropWhileEndLE (not . isSpecDict) $
+             zipWith mk_spec_arg args pis
+             -- Drop trailing args until we get to a SpecDict
+             -- In this way the RULE hasas few args as possible,
+             -- which broadens its applicability
+
+    mk_spec_arg :: CoreExpr -> TyCoBinder -> SpecArg
+    mk_spec_arg arg (Named bndr)
+      |  binderVar bndr `elemVarSet` constrained_tyvars
+      = case arg of
+          Type ty -> SpecType ty
+          _       -> pprPanic "ci_key" $ ppr arg
+      |  otherwise = UnspecType
+
+    mk_spec_arg arg (Anon InvisArg pred)
+      | type_determines_value pred
+      , interestingDict env arg -- Note [Interesting dictionary arguments]
+      = SpecDict arg
+      | otherwise = UnspecArg
+
+    mk_spec_arg _ (Anon VisArg _)
+      = UnspecArg
 
     want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
          -- For imported things, we gather call instances if
