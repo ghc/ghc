@@ -187,6 +187,8 @@ Compiler
   has been removed. From this point forth GHC will only support floating point
   via SSE2.
 
+- New :ghc-flag:`-Wunused-packages` warning reports unused packages.
+
 - Add new flags :ghc-flag:`-Wunused-record-wildcards` and
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
