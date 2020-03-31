@@ -2046,7 +2046,7 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
       DataFamilyInst rep_tc ->
         do { let -- eta-expand lhs types, because sometimes data/newtype
                  -- instances are eta-reduced; See #9692
-                 -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
+                 -- See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
                  (ee_tvs, ee_lhs, _) = etaExpandCoAxBranch branch
                  fam'     = reifyName fam
                  dataCons = tyConDataCons rep_tc
