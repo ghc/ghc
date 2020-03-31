@@ -251,7 +251,7 @@ mkInfoTableContents dflags
                            ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
-        slow_entry = CmmLabel (toSlowEntryLbl info_lbl)
+        slow_entry = CmmLabel (toSlowEntryLbl platform info_lbl)
         srt_lit = case srt_label of
                     []          -> mkIntCLit platform 0
                     (lit:_rest) -> ASSERT( null _rest ) lit

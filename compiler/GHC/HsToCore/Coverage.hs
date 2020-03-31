@@ -1312,9 +1312,9 @@ static void hpc_init_Main(void)
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
 -}
 
-hpcInitCode :: Module -> HpcInfo -> SDoc
-hpcInitCode _ (NoHpcInfo {}) = Outputable.empty
-hpcInitCode this_mod (HpcInfo tickCount hashNo)
+hpcInitCode :: DynFlags -> Module -> HpcInfo -> SDoc
+hpcInitCode _ _ (NoHpcInfo {}) = Outputable.empty
+hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
  = vcat
     [ text "static void hpc_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
@@ -1332,7 +1332,7 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
        ])
     ]
   where
-    tickboxes = ppr (mkHpcTicksLabel $ this_mod)
+    tickboxes = pprCLabel dflags (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (moduleNameFS (moduleName this_mod)))
