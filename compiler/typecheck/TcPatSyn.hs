@@ -20,6 +20,7 @@ import GhcPrelude
 
 import GHC.Hs
 import TcPat
+import Multiplicity
 import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
@@ -102,7 +103,7 @@ recoverPSB (PSB { psb_id = L _ name
        where
          -- The matcher_id is used only by the desugarer, so actually
          -- and error-thunk would probably do just as well here.
-         matcher_id = mkLocalId matcher_name $
+         matcher_id = mkLocalId matcher_name Many $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
 recoverPSB (XPatSynBind nec) = noExtCon nec
@@ -145,8 +146,8 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints  $
-               tcInferNoInst                   $ \ exp_ty ->
-               tcPat PatSyn lpat exp_ty        $
+               tcInferNoInst                           $ \ exp_ty ->
+               tcPat PatSyn lpat (unrestricted exp_ty) $
                mapM tcLookupId arg_names
 
        ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
@@ -385,9 +386,9 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; req_dicts <- newEvVars req_theta
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
-           pushLevelAndCaptureConstraints            $
-           tcExtendTyVarEnv univ_tvs                 $
-           tcPat PatSyn lpat (mkCheckExpType pat_ty) $
+           pushLevelAndCaptureConstraints               $
+           tcExtendTyVarEnv univ_tvs $
+           tcPat PatSyn lpat (unrestricted (mkCheckExpType pat_ty)) $
            do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs
@@ -402,7 +403,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                   -- substitution.
                   -- See also Note [The substitution invariant] in TyCoSubst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
-              ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
+              ; args'      <- zipWithM (tc_arg subst) arg_names (map scaledThing arg_tys)
               ; return (ex_tvs', prov_dicts, args') }
 
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
@@ -423,7 +424,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_bndrs, req_theta, ev_binds, req_dicts)
                           (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', arg_tys)
+                          (args', (map scaledThing arg_tys))
                           pat_ty rec_fields }
   where
     tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTcId)
@@ -702,16 +703,16 @@ tcPatSynMatcher (L loc name) lpat
                | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
                | otherwise   = (args,                 arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
-                       mkVisFunTys cont_arg_tys res_ty
+                       mkVisFunTysMany cont_arg_tys res_ty
 
-             fail_ty  = mkVisFunTy voidPrimTy res_ty
+             fail_ty  = mkVisFunTyMany voidPrimTy res_ty
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
 
-       ; let matcher_tau   = mkVisFunTys [pat_ty, cont_ty, fail_ty] res_ty
+       ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
@@ -731,14 +732,14 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [pat_ty] res_ty
+                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam noExtField $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
+                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
@@ -800,7 +801,7 @@ mkPatSynBuilderId dir (L _ name)
                               mkForAllTys univ_bndrs $
                               mkForAllTys ex_bndrs $
                               mkPhiTy theta $
-                              mkVisFunTys arg_tys $
+                              mkVisFunTysMany arg_tys $
                               pat_ty
              builder_id     = mkExportedVanillaId builder_name builder_sigma
               -- See Note [Exported LocalIds] in Id
@@ -907,7 +908,7 @@ tcPatSynBuilderOcc ps
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
-  | need_dummy_arg = mkVisFunTy voidPrimTy ty
+  | need_dummy_arg = mkVisFunTyMany voidPrimTy ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn

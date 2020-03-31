@@ -41,6 +41,7 @@ import PrelNames
 import FastString
 import Outputable
 import Util
+import Multiplicity ( scaledThing )
 
 import Control.Monad ( guard )
 
@@ -70,7 +71,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     _ | (tvs, rho) <- splitForAllTys ev_ty
       , (theta, pred) <- splitFunTys rho
       , not (null tvs && null theta)
-      -> ForAllPred tvs theta pred
+      -> ForAllPred tvs (map scaledThing theta) pred
 
       | otherwise
       -> IrredPred ev_ty
