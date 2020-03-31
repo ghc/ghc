@@ -43,6 +43,7 @@ module GHC.Types.Unique.Set (
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
         nonDetFoldUniqSet,
+        nonDetStrictFoldUniqSet,
         nonDetFoldUniqSet_Directly
     ) where
 
@@ -165,6 +166,9 @@ nonDetKeysUniqSet = nonDetKeysUFM . getUniqSet'
 -- nondeterminism.
 nonDetFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
 nonDetFoldUniqSet c n (UniqSet s) = nonDetFoldUFM c n s
+
+nonDetStrictFoldUniqSet :: (a -> elt -> a) -> a -> UniqSet elt -> a
+nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

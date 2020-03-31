@@ -862,12 +862,12 @@ findNeededEvVars ev_binds seeds
   = transCloVarSet also_needs seeds
   where
    also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
-     -- It's OK to use nonDetFoldUFM here because we immediately
+   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
+     -- It's OK to use nonDetStrictFoldUFM here because we immediately
      -- forget about the ordering by creating a set
 
-   add :: Var -> VarSet -> VarSet
-   add v needs
+   add :: VarSet -> Var -> VarSet
+   add needs v
      | Just ev_bind <- lookupEvBind ev_binds v
      , EvBind { eb_is_given = is_given, eb_rhs = rhs } <- ev_bind
      , is_given

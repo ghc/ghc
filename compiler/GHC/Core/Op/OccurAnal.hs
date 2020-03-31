@@ -2204,8 +2204,8 @@ extendFvs env s
   = (s `unionVarSet` extras, extras `subVarSet` s)
   where
     extras :: VarSet    -- env(s)
-    extras = nonDetFoldUFM unionVarSet emptyVarSet $
-      -- It's OK to use nonDetFoldUFM here because unionVarSet commutes
+    extras = nonDetStrictFoldUFM unionVarSet emptyVarSet $
+      -- It's OK to use nonDetStrictFoldUFM here because unionVarSet commutes
              intersectUFM_C (\x _ -> x) env (getUniqSet s)
 
 {-
@@ -2502,8 +2502,8 @@ addOneOcc ud id info
     plus_zapped old new = doZapping ud id old `addOccInfo` new
 
 addManyOccsSet :: UsageDetails -> VarSet -> UsageDetails
-addManyOccsSet usage id_set = nonDetFoldUniqSet addManyOccs usage id_set
-  -- It's OK to use nonDetFoldUFM here because addManyOccs commutes
+addManyOccsSet usage id_set = nonDetStrictFoldUniqSet (flip addManyOccs) usage id_set
+  -- It's OK to use nonDetStrictFoldUFM here because addManyOccs commutes
 
 -- Add several occurrences, assumed not to be tail calls
 addManyOccs :: Var -> UsageDetails -> UsageDetails
