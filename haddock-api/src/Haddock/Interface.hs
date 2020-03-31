@@ -56,7 +56,7 @@ import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
 import GHC.Driver.Types
 import FastString (unpackFS)
-import TcRnTypes (tcg_rdr_env)
+import GHC.Tc.Utils (tcg_rdr_env)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, gre_name, globalRdrEnvElts)

@@ -52,7 +52,7 @@ import GHC.Types.Name.Env
 import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
 import GHC.Types.Name.Reader
-import TcRnTypes
+import GHC.Tc.Utils
 import FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified Outputable as O
