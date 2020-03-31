@@ -338,9 +338,9 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
 -- precise exception guarantees are off the table.
 -- See Note [Precise exceptions and strictness analysis] in Demand.hs
 mayThrowPreciseException :: FamInstEnvs -> Type -> DmdType -> Bool
-mayThrowPreciseException _        _  (DmdType _ _ ConOrDiv) = False
-mayThrowPreciseException _        _  (DmdType _ _ Diverges) = False
-mayThrowPreciseException fam_envs ty _                      = forcesRealWorld fam_envs ty
+mayThrowPreciseException fam_envs ty dmd_ty
+  | not (mayThrowPreciseDmdType dmd_ty) = False
+  | otherwise                           = pprTrace "mayThrow" (ppr ty) $ forcesRealWorld fam_envs ty
 
 -- | Whether a 'seqDmd' on an expression of the given type may force
 -- @State# RealWorld@, incurring a side-effect (ignoring unsafe shenigans like
@@ -374,6 +374,8 @@ forcesRealWorld fam_envs = go initRecTc
 -- precise excpetions.
 tryClearPreciseException :: FamInstEnvs -> Type -> StrictSig -> StrictSig
 tryClearPreciseException fam_envs ty sig@(StrictSig dmd_ty@(DmdType fvs args div))
+  | not (mayThrowPreciseDmdType dmd_ty) -- Why bother clearing if there is nothing to clear?
+  = sig
   | (arg_tys, res_ty) <- splitPiTys ty
   , args `equalLength` filter (not . isNamedBinder) arg_tys
   , mayThrowPreciseException fam_envs res_ty dmd_ty

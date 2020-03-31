@@ -24,6 +24,7 @@ module GHC.Types.Demand (
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
         emptyDmdType, botDmdType, mkDmdType, addDemand,
+        mayThrowPreciseDmdType,
 
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
@@ -1276,6 +1277,11 @@ isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env [] Dunno)
   | isEmptyVarEnv env = True
 isTopDmdType _                        = False
+
+mayThrowPreciseDmdType :: DmdType -> Bool
+mayThrowPreciseDmdType (DmdType _ _ Dunno)    = True
+mayThrowPreciseDmdType (DmdType _ _ ExnOrDiv) = True
+mayThrowPreciseDmdType _                      = False
 
 mkDmdType :: DmdEnv -> [Demand] -> Divergence -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
