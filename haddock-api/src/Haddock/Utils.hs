@@ -181,7 +181,6 @@ restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
       []    -> defn { dd_ND = DataType, dd_cons = [] }
       [con] -> defn { dd_cons = [con] }
       _ -> error "Should not happen"
-restrictDataDefn _ (XHsDataDefn _) = error "restrictDataDefn"
 
 restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
@@ -201,7 +200,6 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
             = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
-        field_avail (L _ (XConDeclField nec)) = noExtCon nec
         field_types flds = [ t | ConDeclField _ _ t _ <- flds ]
 
     keep _ = Nothing

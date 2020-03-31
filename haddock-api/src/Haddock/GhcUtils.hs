@@ -78,12 +78,6 @@ getInstLoc (TyFamInstD _ (TyFamInstDecl
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
   { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}})) = l
-getInstLoc (ClsInstD _ (XClsInstDecl nec)) = noExtCon nec
-getInstLoc (DataFamInstD _ (DataFamInstDecl (HsIB _ (XFamEqn nec)))) = noExtCon nec
-getInstLoc (TyFamInstD _ (TyFamInstDecl (HsIB _ (XFamEqn nec)))) = noExtCon nec
-getInstLoc (XInstDecl nec) = noExtCon nec
-getInstLoc (DataFamInstD _ (DataFamInstDecl (XHsImplicitBndrs nec))) = noExtCon nec
-getInstLoc (TyFamInstD _ (TyFamInstDecl (XHsImplicitBndrs nec))) = noExtCon nec
 
 
 
@@ -170,7 +164,6 @@ nubByName f ns = go emptyNameSet ns
 hsTyVarNameI :: HsTyVarBndr DocNameI -> DocName
 hsTyVarNameI (UserTyVar _ (L _ n))     = n
 hsTyVarNameI (KindedTyVar _ (L _ n) _) = n
-hsTyVarNameI (XTyVarBndr nec) = noExtCon nec
 
 hsLTyVarNameI :: LHsTyVarBndr DocNameI -> DocName
 hsLTyVarNameI = hsTyVarNameI . unLoc
@@ -178,11 +171,9 @@ hsLTyVarNameI = hsTyVarNameI . unLoc
 getConNamesI :: ConDecl DocNameI -> [Located DocName]
 getConNamesI ConDeclH98  {con_name  = name}  = [name]
 getConNamesI ConDeclGADT {con_names = names} = names
-getConNamesI (XConDecl nec) = noExtCon nec
 
 hsImplicitBodyI :: HsImplicitBndrs DocNameI thing -> thing
 hsImplicitBodyI (HsIB { hsib_body = body }) = body
-hsImplicitBodyI (XHsImplicitBndrs nec) = noExtCon nec
 
 hsSigTypeI :: LHsSigType DocNameI -> LHsType DocNameI
 hsSigTypeI = hsImplicitBodyI
@@ -216,7 +207,6 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
-getGADTConType (XConDecl nec) = noExtCon nec
 
 getMainDeclBinderI :: HsDecl DocNameI -> [IdP DocNameI]
 getMainDeclBinderI (TyClD _ d) = [tcdNameI d]
@@ -231,14 +221,12 @@ getMainDeclBinderI _ = []
 
 familyDeclLNameI :: FamilyDecl DocNameI -> Located DocName
 familyDeclLNameI (FamilyDecl { fdLName = n }) = n
-familyDeclLNameI (XFamilyDecl nec) = noExtCon nec
 
 tyClDeclLNameI :: TyClDecl DocNameI -> Located DocName
 tyClDeclLNameI (FamDecl { tcdFam = fd })     = familyDeclLNameI fd
 tyClDeclLNameI (SynDecl { tcdLName = ln })   = ln
 tyClDeclLNameI (DataDecl { tcdLName = ln })  = ln
 tyClDeclLNameI (ClassDecl { tcdLName = ln }) = ln
-tyClDeclLNameI (XTyClDecl nec) = noExtCon nec
 
 tcdNameI :: TyClDecl DocNameI -> DocName
 tcdNameI = unLoc . tyClDeclLNameI
@@ -274,7 +262,6 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
 
 getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
   -- Should only be called on ConDeclGADT
-getGADTConTypeG (XConDecl nec) = noExtCon nec
 
 
 -------------------------------------------------------------------------------

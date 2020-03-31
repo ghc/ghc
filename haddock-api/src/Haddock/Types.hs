@@ -378,13 +378,12 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     , pfdKindSig = fdResultSig
     }
   where
+    mkType :: HsTyVarBndr (GhcPass p) -> HsType (GhcPass p)
     mkType (KindedTyVar _ (L loc name) lkind) =
         HsKindSig noExtField tvar lkind
       where
         tvar = L loc (HsTyVar noExtField NotPromoted (L loc name))
     mkType (UserTyVar _ name) = HsTyVar noExtField NotPromoted name
-    mkType (XTyVarBndr nec) = noExtCon nec
-mkPseudoFamilyDecl (XFamilyDecl nec) = noExtCon nec
 
 
 -- | An instance head that may have documentation and a source location.

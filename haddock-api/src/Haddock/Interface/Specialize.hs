@@ -295,7 +295,6 @@ renameBinder :: HsTyVarBndr GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr GhcRn)
 renameBinder (UserTyVar x lname) = UserTyVar x <$> located renameName lname
 renameBinder (KindedTyVar x lname lkind) =
   KindedTyVar x <$> located renameName lname <*> located renameType lkind
-renameBinder (XTyVarBndr _) = error "haddock:renameBinder"
 
 -- | Core renaming logic.
 renameName :: (Eq name, SetName name) => name -> Rename name name
