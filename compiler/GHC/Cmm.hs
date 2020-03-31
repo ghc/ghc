@@ -1,5 +1,8 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
@@ -7,7 +10,8 @@ module GHC.Cmm (
      CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
      CmmBlock, RawCmmDecl,
-     Section(..), SectionType(..), CmmStatics(..), RawCmmStatics(..), CmmStatic(..),
+     Section(..), SectionType(..),
+     GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
      isSecConstant,
 
      -- ** Blocks containing lists
@@ -206,21 +210,22 @@ data CmmStatic
         -- ^ an embedded binary file
 
 -- Static data before SRT generation
-data CmmStatics
-  = CmmStatics
-      CLabel       -- Label of statics
-      CmmInfoTable
-      CostCentreStack
-      [CmmLit]     -- Payload
-  | CmmStaticsRaw
-      CLabel       -- Label of statics
-      [CmmStatic]  -- The static data itself
+data GenCmmStatics (rawOnly :: Bool) where
+    CmmStatics
+      :: CLabel       -- Label of statics
+      -> CmmInfoTable
+      -> CostCentreStack
+      -> [CmmLit]     -- Payload
+      -> GenCmmStatics 'False
 
--- Static data, after SRTs are generated
-data RawCmmStatics
-   = RawCmmStatics
-       CLabel      -- Label of statics
-       [CmmStatic] -- The static data itself
+    -- | Static data, after SRTs are generated
+    CmmStaticsRaw
+      :: CLabel       -- Label of statics
+      -> [CmmStatic]  -- The static data itself
+      -> GenCmmStatics a
+
+type CmmStatics    = GenCmmStatics 'False
+type RawCmmStatics = GenCmmStatics 'True
 
 -- -----------------------------------------------------------------------------
 -- Basic blocks consisting of lists

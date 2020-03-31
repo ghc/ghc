@@ -121,9 +121,9 @@ llvmGroupLlvmGens cmm = do
         let split (CmmData s d' )     = return $ Just (s, d')
             split (CmmProc h l live g) = do
               -- Set function type
-              let l' = case mapLookup (g_entry g) h of
+              let l' = case mapLookup (g_entry g) h :: Maybe RawCmmStatics of
                          Nothing                   -> l
-                         Just (RawCmmStatics info_lbl _) -> info_lbl
+                         Just (CmmStaticsRaw info_lbl _) -> info_lbl
               lml <- strCLabel_llvm l'
               funInsert lml =<< llvmFunTy live
               return Nothing
