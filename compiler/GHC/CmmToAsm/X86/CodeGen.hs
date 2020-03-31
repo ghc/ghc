@@ -1485,7 +1485,7 @@ memConstant align lit = do
                                return (addr, addr_code)
                        else return (ripRel (ImmCLbl lbl), nilOL)
   let code =
-        LDATA rosection (align, RawCmmStatics lbl [CmmStaticLit lit])
+        LDATA rosection (align, CmmStaticsRaw lbl [CmmStaticLit lit])
         `consOL` addr_code
   return (Amode addr code)
 
@@ -3329,7 +3329,7 @@ createJumpTable config ids section lbl
                           where blockLabel = blockLbl blockid
                   in map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry config) ids
-      in CmmData section (mkAlignment 1, RawCmmStatics lbl jumpTable)
+      in CmmData section (mkAlignment 1, CmmStaticsRaw lbl jumpTable)
 
 extractUnwindPoints :: [Instr] -> [UnwindPoint]
 extractUnwindPoints instrs =
