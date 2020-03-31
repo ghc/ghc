@@ -131,7 +131,8 @@ data ForeignPtrContents
     --
     -- * Invariant: The 'Addr#' in the parent 'ForeignPtr' is an interior
     --   pointer into this 'MutableByteArray#'.
-    -- * Invariant: The 'MutableByteArray#' is pinned.
+    -- * Invariant: The 'MutableByteArray#' is pinned, so the 'Addr#' does not
+    --   get invalidated by the GC moving the byte array.
     --
     -- It is fine to reuse the same 'MutableByteArray#' in distinct
     -- 'MallocPtr' constructor applications.

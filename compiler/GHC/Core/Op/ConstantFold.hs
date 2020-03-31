@@ -1497,7 +1497,7 @@ match_eq_string _ _ _ _ = Nothing
 -- NUL byte.
 --
 -- See GHC issue #5218, MR 2165, and bytestring PR 191. This is particularly
--- helpful when using OverloadingStrings to create a ByteString since the
+-- helpful when using OverloadedStrings to create a ByteString since the
 -- function computing the length of such ByteStrings can often be constant
 -- folded.
 match_cstring_length :: RuleFun
