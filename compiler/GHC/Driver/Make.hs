@@ -2161,7 +2161,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
 
-        loop :: [(Located ModuleName, IsBootInterface)]
+        loop :: [Located ModuleNameWithIsBoot]
                         -- Work list: process these modules
              -> NodeMap [Either ErrorMessages ModSummary]
                         -- Visited set; the range is a list because
@@ -2170,7 +2170,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              -> IO (NodeMap [Either ErrorMessages ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
-        loop ((wanted_mod, is_boot) : ss) done
+        loop (s : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
@@ -2188,7 +2188,12 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                        loop (calcDeps s) (Map.insert key [Right s] done)
                      loop ss new_map
           where
-            key = ModuleNameWithIsBoot (unLoc wanted_mod) is_boot
+            L loc (ModuleNameWithIsBoot mod is_boot) = s
+            wanted_mod = L loc mod
+            key = ModuleNameWithIsBoot
+                    { mnwib_moduleName = unLoc wanted_mod
+                    , mnwib_isBoot = is_boot
+                    }
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs template haskell. We enable codegen to
@@ -2299,7 +2304,7 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
                   -- If a module imports a boot module, msDeps helpfully adds a
                   -- dependency to that non-boot module in it's result. This
                   -- means we don't have to think about boot modules here.
-                  | (L _ mn, NotBoot) <- msDeps ms
+                  | L _ (ModuleNameWithIsBoot mn NotBoot) <- msDeps ms
                   , dep_ms <-
                       toList (Map.lookup (ModuleNameWithIsBoot mn NotBoot) nodemap) >>= toList >>=
                       toList
@@ -2320,10 +2325,11 @@ mkRootMap summaries = Map.insertListWith (flip (++))
 -- modules always contains B.hs if it contains B.hs-boot.
 -- Remember, this pass isn't doing the topological sort.  It's
 -- just gathering the list of all relevant ModSummaries
-msDeps :: ModSummary -> [(Located ModuleName, IsBootInterface)]
+msDeps :: ModSummary -> [Located ModuleNameWithIsBoot]
 msDeps s =
-    concat [ [(m, IsBoot), (m, NotBoot)] | m <- ms_home_srcimps s ]
-        ++ [ (m, NotBoot) | m <- ms_home_imps s ]
+    concat [ [ L loc (ModuleNameWithIsBoot m IsBoot), L loc (ModuleNameWithIsBoot m NotBoot) ]
+           | L loc m <- ms_home_srcimps s ]
+        ++ [ L loc (ModuleNameWithIsBoot m NotBoot) | L loc m <- ms_home_imps s ]
 
 -----------------------------------------------------------------------------
 -- Summarising modules
