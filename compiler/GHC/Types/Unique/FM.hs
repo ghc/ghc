@@ -67,7 +67,7 @@ module GHC.Types.Unique.FM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
-        nonDetUFMToList, ufmToIntMap,
+        nonDetUFMToList, ufmToIntMap, intMapToUFM,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
@@ -358,6 +358,9 @@ instance Traversable NonDetUniqFM where
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
+
+intMapToUFM :: M.IntMap elt -> UniqFM elt
+intMapToUFM = UFM
 
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM a -> UniqFM b -> Bool

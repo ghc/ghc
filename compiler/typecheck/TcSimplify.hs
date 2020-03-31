@@ -1862,11 +1862,11 @@ neededEvVars implic@(Implic { ic_given = givens
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
 
       ; let seeds1        = foldr add_implic_seeds old_needs implics
-            seeds2        = foldEvBindMap add_wanted seeds1 ev_binds
+            seeds2        = foldEvBindMap add_wanted seeds1 ev_binds -- TODO
             seeds3        = seeds2 `unionVarSet` tcvs
             need_inner    = findNeededEvVars ev_binds seeds3
             live_ev_binds = filterEvBindMap (needed_ev_bind need_inner) ev_binds
-            need_outer    = foldEvBindMap del_ev_bndr need_inner live_ev_binds
+            need_outer    = varSetMinusEvBindMap need_inner live_ev_binds
                             `delVarSetList` givens
 
       ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
@@ -1890,8 +1890,8 @@ neededEvVars implic@(Implic { ic_given = givens
      | is_given  = ev_var `elemVarSet` needed
      | otherwise = True   -- Keep all wanted bindings
 
-   del_ev_bndr :: EvBind -> VarSet -> VarSet
-   del_ev_bndr (EvBind { eb_lhs = v }) needs = delVarSet needs v
+   varSetMinusEvBindMap :: VarSet -> EvBindMap -> VarSet
+   varSetMinusEvBindMap vs ebm = uniqSetMinusUDFM vs (ev_bind_varenv ebm)
 
    add_wanted :: EvBind -> VarSet -> VarSet
    add_wanted (EvBind { eb_is_given = is_given, eb_rhs = rhs }) needs
@@ -2381,7 +2381,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
              seed_skols = mkVarSet skols     `unionVarSet`
                           mkVarSet given_ids `unionVarSet`
                           foldr add_non_flt_ct emptyVarSet no_float_cts `unionVarSet`
-                          foldEvBindMap add_one_bind emptyVarSet binds
+                          foldEvBindMap add_one_bind emptyVarSet binds -- TODO
              -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
              -- Include the EvIds of any non-floating constraints
 
