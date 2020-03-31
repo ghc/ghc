@@ -1769,7 +1769,7 @@ reifyDataCon isGadtDataCon tys dc
                 -- constructors can be declared infix.
                 -- See Note [Infix GADT constructors] in TcTyClsDecls.
               | dataConIsInfix dc && not isGadtDataCon ->
-                  ASSERT( arg_tys `lengthIs` 2 ) do
+                  ASSERT( r_arg_tys `lengthIs` 2 ) do
                   { let [r_a1, r_a2] = r_arg_tys
                         [s1,   s2]   = dcdBangs
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
@@ -1788,7 +1788,7 @@ reifyDataCon isGadtDataCon tys dc
                          { cxt <- reifyCxt theta'
                          ; ex_tvs'' <- reifyTyVars ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
-       ; ASSERT( arg_tys `equalLength` dcdBangs )
+       ; ASSERT( r_arg_tys `equalLength` dcdBangs )
          ret_con }
 
 {-
