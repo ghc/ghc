@@ -240,7 +240,7 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
         DataFamInstTyCon T [Int] ax_ti
 
 * The axiom ax_ti may be eta-reduced; see
-  Note [Eta reduction for data families] in GHC.Core.FamInstEnv
+  Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
 
 * Data family instances may have a different arity than the data family.
   See Note [Arity of data families] in GHC.Core.FamInstEnv
@@ -1100,8 +1100,9 @@ data AlgTyConFlav
                -- and R:T is the representation TyCon (ie this one)
                -- and a,b,c are the tyConTyVars of this TyCon
                --
-               -- BUT may be eta-reduced; see FamInstEnv
-               --     Note [Eta reduction for data families]
+               -- BUT may be eta-reduced; see
+               --     Note [Eta reduction for data families] in
+               --     GHC.Core.Coercion.Axiom
 
           -- Cached fields of the CoAxiom, but adjusted to
           -- use the tyConTyVars of this TyCon

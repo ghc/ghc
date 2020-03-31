@@ -118,6 +118,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
 
             , fi_tys    :: [Type]       --   The LHS type patterns
             -- May be eta-reduced; see Note [Eta reduction for data families]
+            -- in GHC.Core.Coercion.Axiom
 
             , fi_rhs :: Type         --   the RHS, with its freshened vars
             }
@@ -132,7 +133,8 @@ Note [Arity of data families]
 Data family instances might legitimately be over- or under-saturated.
 
 Under-saturation has two potential causes:
- U1) Eta reduction. See Note [Eta reduction for data families].
+ U1) Eta reduction. See Note [Eta reduction for data families] in
+     GHC.Core.Coercion.Axiom.
  U2) When the user has specified a return kind instead of written out patterns.
      Example:
 
@@ -160,8 +162,8 @@ Over-saturation is also possible:
 
       However, we require that any over-saturation is eta-reducible. That is,
       we require that any extra patterns be bare unrepeated type variables;
-      see Note [Eta reduction for data families]. Accordingly, the FamInst
-      is never over-saturated.
+      see Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom.
+      Accordingly, the FamInst is never over-saturated.
 
 Why can we allow such flexibility for data families but not for type families?
 Because data families can be decomposed -- that is, they are generative and
@@ -335,7 +337,7 @@ Then we get a data type for each instance, and an axiom:
    axiom ax8 a :: T Bool [a] ~ TBoolList a
 
 These two axioms for T, one with one pattern, one with two;
-see Note [Eta reduction for data families]
+see Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
 
 Note [FamInstEnv determinism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -479,7 +481,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 Note [Compatibility of eta-reduced axioms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In newtype instances of data families we eta-reduce the axioms,
-See Note [Eta reduction for data families] in GHC.Core.FamInstEnv. This means that
+See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom. This means that
 we sometimes need to test compatibility of two axioms that were eta-reduced to
 different degrees, e.g.:
 
@@ -1057,7 +1059,7 @@ We handle data families and type families separately here:
  * For data family instances, though, we need to re-split for each
    instance, because the breakdown might be different for each
    instance.  Why?  Because of eta reduction; see
-   Note [Eta reduction for data families].
+   Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom.
 -}
 
 -- checks if one LHS is dominated by a list of other branches
