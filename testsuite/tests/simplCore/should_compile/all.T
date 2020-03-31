@@ -319,3 +319,10 @@ test('T17787',  [ grep_errmsg(r'foo') ], compile, ['-ddump-simpl -dsuppress-uniq
 test('T17901',
      normal,
      makefile_test, ['T17901'])
+test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques -dsuppress-idinfo'])
+test('spec004', [ grep_errmsg(r'\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques'])
+test('T17966',
+     normal,
+     makefile_test, ['T17966'])
+# NB: T17810: -fspecialise-aggressively
+test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
