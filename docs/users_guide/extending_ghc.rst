@@ -749,6 +749,19 @@ NOT be invoked with your own modules.
 In the ``ModIface`` datatype you can find lots of useful information, including
 the exported definitions and type class instances.
 
+The ``ModIface`` datatype also contains facilities for extending it with extra
+data, stored in a ``Map`` of serialised fields, indexed by field names and using
+GHC's internal ``Binary`` class. The interface to work with these fields is:
+
+::
+
+    readIfaceField :: Binary a => FieldName -> ModIface -> IO (Maybe a)
+    writeIfaceField :: Binary a => FieldName -> a -> ModIface -> IO ModIface
+    deleteIfaceField :: FieldName -> ModIface -> ModIface
+
+These fields are currently serialized at the end of the `.hi` file, with their
+own sub-header within the file. A pointer to the sub-header exists after the
+way descriptor.
 
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
