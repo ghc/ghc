@@ -139,7 +139,7 @@ module GHC.Types.Module
         unitModuleSet,
 
         -- * hs-boot
-        IsBootInterface,
+        IsBootInterface(..),
         ModuleNameWithIsBoot(..),
         ModuleWithIsBoot(..),
     ) where
@@ -304,9 +304,9 @@ addBootSuffix path = path ++ "-boot"
 
 addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
 -- ^ Add the @-boot@ suffix if the @Bool@ argument is @True@
-addBootSuffix_maybe is_boot path
- | is_boot   = addBootSuffix path
- | otherwise = path
+addBootSuffix_maybe is_boot path = case is_boot of
+ IsBoot -> addBootSuffix path
+ NotBoot -> path
 
 addBootSuffixLocn :: ModLocation -> ModLocation
 -- ^ Add the @-boot@ suffix to all file paths associated with the module
@@ -1347,13 +1347,29 @@ type DModuleNameEnv elt = UniqDFM elt
 -- so they don't matter here.
 --
 -- When dealing with the modules themselves, however, one should use not
--- 'IsBootInterface' or conflate signatures and modules in opposition to boot
+-- 'IsBoot' or conflate signatures and modules in opposition to boot
 -- interfaces. Instead, one should use 'DriverPhases.HscSource'. See Note
 -- [HscSource types].
 
 -- | Indicates whether a module name is referring to a boot interface (hs-boot
 -- file) or regular module (hs file).
-type IsBootInterface = Bool
+-- We need to treat boot modules specially when building compilation graphs,
+-- since they break cycles.  Regular source files and signature files are treated
+-- equivalently.
+
+data IsBootInterface = NotBoot | IsBoot
+  deriving (Eq, Ord, Show, Data)
+
+instance Binary IsBootInterface where
+  put_ bh ib = put_ bh $
+    case ib of
+      NotBoot -> False
+      IsBoot -> True
+  get bh = do
+    b <- get bh
+    return $ case b of
+      False -> NotBoot
+      True -> IsBoot
 
 data ModuleNameWithIsBoot = ModuleNameWithIsBoot
   { mnwib_moduleName :: ModuleName
@@ -1368,8 +1384,8 @@ instance Binary ModuleNameWithIsBoot where
 
 instance Outputable ModuleNameWithIsBoot where
   ppr (ModuleNameWithIsBoot m b) = hsep $ ppr m : case b of
-    True -> []
-    False -> [text "{-# SOURCE #-}"]
+    IsBoot -> []
+    NotBoot -> [text "{-# SOURCE #-}"]
 
 data ModuleWithIsBoot = ModuleWithIsBoot
   { mwib_module :: Module
@@ -1384,5 +1400,5 @@ instance Binary ModuleWithIsBoot where
 
 instance Outputable ModuleWithIsBoot where
   ppr (ModuleWithIsBoot m b) = hsep $ ppr m : case b of
-    True -> []
-    False -> [text "{-# SOURCE #-}"]
+    IsBoot -> []
+    NotBoot -> [text "{-# SOURCE #-}"]

@@ -474,7 +474,7 @@ checkDependencies hsc_env summary iface
            where pkg = moduleUnitId mod
         _otherwise  -> return (RecompBecause reason)
 
-   projectNonBootNames = map mnwib_moduleName . filter (not . mnwib_isBoot)
+   projectNonBootNames = map mnwib_moduleName . filter ((== NotBoot) . mnwib_isBoot)
    old_deps = Set.fromList
      $ projectNonBootNames prev_dep_mods
    isOldHomeDeps = flip Set.member old_deps
@@ -491,7 +491,7 @@ checkDependencies hsc_env summary iface
        then return (UpToDate, [])
        else do
          mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
-           let mnames = mname:(map mnwib_moduleName $ filter (not . mnwib_isBoot) $
+           let mnames = mname:(map mnwib_moduleName $ filter ((== NotBoot) . mnwib_isBoot) $
                  dep_mods $ mi_deps imported_iface)
            case find (not . isOldHomeDeps) mnames of
              Nothing -> return (UpToDate, mnames)

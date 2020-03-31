@@ -1974,7 +1974,7 @@ runTcInteractive hsc_env thing_inside
        ; let getOrphans m mb_pkg = fmap (\iface -> mi_module iface
                                           : dep_orphs (mi_deps iface))
                                  (loadSrcInterface (text "runTcInteractive") m
-                                                   False mb_pkg)
+                                                   NotBoot mb_pkg)
 
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
