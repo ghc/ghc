@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 -- |
 -- Types for referring to remote objects in Remote GHCi.  For more
@@ -36,6 +37,7 @@ import GHC.ForeignPtr
 -- between machines of different word size. For example, when connecting to
 -- an iserv instance on a different architecture with different word size via
 -- -fexternal-interpreter.
+type role RemotePtr phantom
 newtype RemotePtr a = RemotePtr Word64
 
 toRemotePtr :: Ptr a -> RemotePtr a
@@ -45,7 +47,7 @@ fromRemotePtr :: RemotePtr a -> Ptr a
 fromRemotePtr (RemotePtr p) = wordPtrToPtr (fromIntegral p)
 
 castRemotePtr :: RemotePtr a -> RemotePtr b
-castRemotePtr (RemotePtr a) = RemotePtr a
+castRemotePtr = coerce
 
 deriving instance Show (RemotePtr a)
 deriving instance Binary (RemotePtr a)
