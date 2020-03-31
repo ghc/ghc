@@ -551,7 +551,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
   = do dflags <- getDynFlags
        platform <- getPlatform
        let node = idToReg platform (NonVoid bndr)
-           slow_lbl = closureSlowEntryLabel  cl_info
+           slow_lbl = closureSlowEntryLabel  platform cl_info
            fast_lbl = closureLocalEntryLabel platform cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump dflags NativeNodeCall

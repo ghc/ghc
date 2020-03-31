@@ -776,16 +776,16 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 --   Label generation
 --------------------------------------
 
-staticClosureLabel :: ClosureInfo -> CLabel
-staticClosureLabel = toClosureLbl .  closureInfoLabel
+staticClosureLabel :: Platform -> ClosureInfo -> CLabel
+staticClosureLabel platform = toClosureLbl platform .  closureInfoLabel
 
-closureSlowEntryLabel :: ClosureInfo -> CLabel
-closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
+closureSlowEntryLabel :: Platform -> ClosureInfo -> CLabel
+closureSlowEntryLabel platform = toSlowEntryLbl platform . closureInfoLabel
 
 closureLocalEntryLabel :: Platform -> ClosureInfo -> CLabel
 closureLocalEntryLabel platform
-  | platformTablesNextToCode platform = toInfoLbl  . closureInfoLabel
-  | otherwise                         = toEntryLbl . closureInfoLabel
+  | platformTablesNextToCode platform = toInfoLbl  platform . closureInfoLabel
+  | otherwise                         = toEntryLbl platform . closureInfoLabel
 
 mkClosureInfoTableLabel :: DynFlags -> Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel dflags id lf_info
