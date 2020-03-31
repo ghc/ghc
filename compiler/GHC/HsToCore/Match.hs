@@ -51,13 +51,14 @@ import GHC.HsToCore.Match.Literal
 import Type
 import Coercion ( eqCoercion )
 import TyCon( isNewTyCon )
+import Multiplicity
 import TysWiredIn
 import SrcLoc
 import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( isGenerated, il_value, fl_value )
+import BasicTypes ( isGenerated, il_value, fl_value, Boxity(..) )
 import FastString
 import Unique
 import UniqDFM
@@ -170,10 +171,15 @@ See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 
 type MatchId = Id   -- See Note [Match Ids]
 
-match :: [MatchId] -- ^ Variables rep\'ing the exprs we\'re matching with. See Note [Match Ids]
-      -> Type -- ^ Type of the case expression
-      -> [EquationInfo] -- ^ Info about patterns, etc. (type synonym below)
-      -> DsM MatchResult -- ^ Desugared result!
+match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
+                          -- ^ See Note [Match Ids]
+                          --
+                          -- ^ Note that the Match Ids carry not only a name, but
+                          -- ^ also the multiplicity at which each column has been
+                          -- ^ type checked.
+      -> Type             -- ^ Type of the case expression
+      -> [EquationInfo]   -- ^ Info about patterns, etc. (type synonym below)
+      -> DsM MatchResult  -- ^ Desugared result!
 
 match [] ty eqns
   = ASSERT2( not (null eqns), ppr ty )
@@ -248,7 +254,7 @@ matchEmpty :: MatchId -> Type -> DsM (NonEmpty MatchResult)
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
   where
-    mk_seq fail = return $ mkWildCase (Var var) (idType var) res_ty
+    mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
                                       [(DEFAULT, [], fail)]
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
@@ -267,7 +273,7 @@ matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchR
 matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { let CoPat _ co pat _ = firstPat eqn1
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var pat_ty'
+        ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; core_wrap <- dsHsWrapper co
@@ -283,7 +289,7 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
          let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var pat_ty'
+        ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
@@ -297,7 +303,7 @@ matchOverloadedList (var :| vars) ty (eqns@(eqn1 :| _))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView
   = do { let ListPat (ListPatTc elt_ty (Just (_,e))) _ = firstPat eqn1
-       ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
+       ; var' <- newUniqueId var (idMult var) (mkListTy elt_ty)  -- we construct the overall type by hand
        ; match_result <- match (var':vars) ty $ NEL.toList $
            decomposeFirstPat getOLPat <$> eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
        ; e' <- dsSyntaxExpr e [Var var]
@@ -466,12 +472,17 @@ tidy1 _ _ (TuplePat tys pats boxity)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
-    tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys
+    tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys'
+    tys' = case boxity of
+             Unboxed -> map getRuntimeRep tys ++ tys
+             Boxed   -> tys
+           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 tidy1 _ _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
-    sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] tys
+    sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] (map getRuntimeRep tys ++ tys)
+                 -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ o (LitPat _ lit)
@@ -526,7 +537,7 @@ tidy_bang_pat v o l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
   -- Newtypes: push bang inwards (#9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v o (p { pat_args = push_bang_into_newtype_arg l ty args })
+      then tidy1 v o (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
       else tidy1 v o p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
@@ -739,8 +750,12 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM newSysLocalDsNoLP arg_tys
-                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
+                           []    -> newSysLocalsDsNoLP arg_tys
+                           (m:_) ->
+                            selectMatchVars (zipWithEqual "matchWrapper"
+                                              (\a b -> (scaledMult a, unLoc b))
+                                                arg_tys
+                                                (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
@@ -800,7 +815,8 @@ matchEquations ctxt vars eqns_info rhs_ty
         ; match_result <- match vars rhs_ty eqns_info
 
         ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
-        ; extractMatchResult match_result fail_expr }
+        ; let fail_expr' = mkWildCase fail_expr (unrestricted rhs_ty) rhs_ty []
+        ; extractMatchResult match_result fail_expr' }
 
 {-
 ************************************************************************
@@ -843,7 +859,12 @@ matchSinglePat (Var var) ctx pat ty match_result
   = matchSinglePatVar var ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL pat
+  = do { var           <- selectSimpleMatchVarL Many pat
+                            -- matchSinglePat is only used in matchSimply, which
+                            -- is used in list comprehension, arrow notation,
+                            -- and to create field selectors. All of which only
+                            -- bind unrestricted variables, hence the 'Many'
+                            -- above.
        ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 

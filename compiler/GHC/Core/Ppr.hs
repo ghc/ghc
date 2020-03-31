@@ -404,7 +404,9 @@ pprTypedLamBinder bind_site debug_on var
       | isTyVar var  -> parens (pprKindedTyVarBndr var)
 
       | otherwise    -> parens (hang (pprIdBndr var)
-                                   2 (vcat [ dcolon <+> pprType (idType var)
+                                   2 (vcat [ dcolon
+                                                -- <> brackets (ppr (idMult var))
+                                                <+> pprType (idType var)
                                            , pp_unf]))
   where
     unf_info = unfoldingInfo (idInfo var)

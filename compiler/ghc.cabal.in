@@ -526,6 +526,8 @@ Library
         FamInstEnv
         FunDeps
         InstEnv
+        Multiplicity
+        UsageEnv
         TyCon
         CoAxiom
         Type
