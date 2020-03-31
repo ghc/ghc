@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -72,6 +73,7 @@ import GHC.HsToCore.Binds
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
+import Data.Coerce (coerce)
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -2153,9 +2155,10 @@ occNameLit name = coreStringLit (occNameString name)
 -- PHANTOM TYPES for consistency. In order to make sure we do this correct
 -- we invent a new datatype which uses phantom types.
 
+type role Core phantom
 newtype Core a = MkC CoreExpr
 unC :: Core a -> CoreExpr
-unC (MkC x) = x
+unC = coerce
 
 type family NotM a where
   NotM (M _) = TypeError ('Text ("rep2_nw must not produce something of overloaded type"))
