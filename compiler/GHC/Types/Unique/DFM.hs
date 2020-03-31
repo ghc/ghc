@@ -73,7 +73,7 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
-import GHC.Types.Unique.FM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap, intMapToUFM)
+import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, intMapToUFM)
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -358,8 +358,7 @@ delListFromUDFM = foldl' delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
-udfmToUfm (UDFM m _i) =
-  listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m] -- TODO
+udfmToUfm (UDFM m _i) = intMapToUFM (M.map taggedFst m)
 
 listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM elt
 listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM
