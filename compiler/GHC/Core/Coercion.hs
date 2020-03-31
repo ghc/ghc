@@ -245,7 +245,7 @@ ppr_co_ax_branch ppr_rhs fam_tc branch
 
     -- Eta-expand LHS and RHS types, because sometimes data family
     -- instances are eta-reduced.
-    -- See Note [Eta reduction for data families] in GHC.Core.FamInstEnv.
+    -- See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom.
     (ee_tvs, ee_lhs, ee_rhs) = etaExpandCoAxBranch branch
 
     pp_lhs = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc)

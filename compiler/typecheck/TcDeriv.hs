@@ -1312,7 +1312,7 @@ write it out
       return x = MkT [x]
       ... etc ...
 
-See Note [Eta reduction for data families] in GHC.Core.FamInstEnv
+See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
 
 %************************************************************************
 %*                                                                      *
