@@ -173,15 +173,16 @@ mkInlinableUnfolding dflags expr
   where
     expr' = simpleOptExpr dflags expr
 
-specUnfolding :: DynFlags -> [Var] -> (CoreExpr -> CoreExpr) -> Arity
+specUnfolding :: DynFlags -> Id -> [Var] -> (CoreExpr -> CoreExpr) -> Arity
               -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
 -- specUnfolding spec_bndrs spec_app arity_decrease unf
 --   = \spec_bndrs. spec_app( unf )
 --
-specUnfolding dflags spec_bndrs spec_app arity_decrease
+specUnfolding dflags fn spec_bndrs spec_app arity_decrease
               df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
-  = ASSERT2( arity_decrease == count isId old_bndrs - count isId spec_bndrs, ppr df )
+  = ASSERT2( arity_decrease == count isId old_bndrs - count isId spec_bndrs
+           , ppr df $$ ppr spec_bndrs $$ ppr (spec_app (Var fn)) $$ ppr arity_decrease )
     mkDFunUnfolding spec_bndrs con (map spec_arg args)
       -- There is a hard-to-check assumption here that the spec_app has
       -- enough applications to exactly saturate the old_bndrs
@@ -195,7 +196,7 @@ specUnfolding dflags spec_bndrs spec_app arity_decrease
                    -- The beta-redexes created by spec_app will be
                    -- simplified away by simplOptExpr
 
-specUnfolding dflags spec_bndrs spec_app arity_decrease
+specUnfolding dflags _ spec_bndrs spec_app arity_decrease
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                              , uf_is_top = top_lvl
                              , uf_guidance = old_guidance })
@@ -212,7 +213,7 @@ specUnfolding dflags spec_bndrs spec_app arity_decrease
 
    in mkCoreUnfolding src top_lvl new_tmpl guidance
 
-specUnfolding _ _ _ _ _ = noUnfolding
+specUnfolding _ _ _ _ _ _ = noUnfolding
 
 {- Note [Specialising unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
