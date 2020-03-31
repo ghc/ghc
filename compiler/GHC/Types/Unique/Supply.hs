@@ -3,10 +3,11 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE BangPatterns #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -42,6 +43,8 @@ import GHC.IO
 
 import MonadUtils
 import Control.Monad
+import Control.Monad.Trans.Reader ( ReaderT(..) )
+import Control.Arrow ( Kleisli(..) )
 import Data.Bits
 import Data.Char
 
@@ -213,6 +216,14 @@ instance MonadUnique UniqSM where
     getUniqueSupplyM = getUs
     getUniqueM  = getUniqueUs
     getUniquesM = getUniquesUs
+
+instance MonadUnique m => MonadUnique (ReaderT a m) where
+    getUniqueSupplyM :: ReaderT a m UniqSupply
+    getUniqueSupplyM = ReaderT (\_ -> getUniqueSupplyM)
+
+instance MonadUnique m => MonadUnique (Kleisli m a) where
+    getUniqueSupplyM :: Kleisli m a UniqSupply
+    getUniqueSupplyM = Kleisli (\_ -> getUniqueSupplyM)
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us0 -> case takeUniqFromSupply us0 of

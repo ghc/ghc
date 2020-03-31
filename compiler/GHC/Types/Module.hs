@@ -9,8 +9,9 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module GHC.Types.Module
     (
@@ -491,6 +492,14 @@ class ContainsModule t where
 
 class HasModule m where
     getModule :: m Module
+
+instance HasModule m => HasModule (ReaderT a m) where
+    getModule :: ReaderT a m Module
+    getModule = ReaderT (\_ -> getModule)
+
+instance HasModule m => HasModule (Kleisli m a) where
+    getModule :: Kleisli m a Module
+    getModule = Kleisli (\_ -> getModule)
 
 instance DbUnitIdModuleRep InstalledUnitId ComponentId UnitId ModuleName Module where
   fromDbModule (DbModule uid mod_name)  = mkModule uid mod_name
