@@ -297,6 +297,8 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
               return (mapInsert pp bid env, b : bs)
 
+         platform = targetPlatform dflags
+
          add_jumps
              :: LabelMap CmmGraph
              -> (Label, LabelMap CmmBlock)
@@ -317,7 +319,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- label instead.
                   jump_label (Just info_lbl) _
                              | tablesNextToCode dflags = info_lbl
-                             | otherwise               = toEntryLbl info_lbl
+                             | otherwise               = toEntryLbl platform info_lbl
                   jump_label Nothing         block_lbl = block_lbl
 
                   add_if_pp id rst = case mapLookup id procLabels of
