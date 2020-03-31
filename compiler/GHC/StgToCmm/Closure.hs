@@ -65,6 +65,7 @@ module GHC.StgToCmm.Closure (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Stg.Syntax
 import GHC.Runtime.Heap.Layout
@@ -775,16 +776,18 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 --   Label generation
 --------------------------------------
 
-staticClosureLabel :: ClosureInfo -> CLabel
-staticClosureLabel = toClosureLbl .  closureInfoLabel
+staticClosureLabel :: Platform -> ClosureInfo -> CLabel
+staticClosureLabel platform = toClosureLbl platform .  closureInfoLabel
 
-closureSlowEntryLabel :: ClosureInfo -> CLabel
-closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
+closureSlowEntryLabel :: Platform -> ClosureInfo -> CLabel
+closureSlowEntryLabel platform = toSlowEntryLbl platform . closureInfoLabel
 
 closureLocalEntryLabel :: DynFlags -> ClosureInfo -> CLabel
 closureLocalEntryLabel dflags
-  | tablesNextToCode dflags = toInfoLbl  . closureInfoLabel
-  | otherwise               = toEntryLbl . closureInfoLabel
+  | tablesNextToCode dflags = toInfoLbl  platform . closureInfoLabel
+  | otherwise               = toEntryLbl platform . closureInfoLabel
+  where
+    platform = targetPlatform dflags
 
 mkClosureInfoTableLabel :: DynFlags -> Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel dflags id lf_info
