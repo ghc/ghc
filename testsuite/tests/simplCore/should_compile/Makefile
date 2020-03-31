@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T17966:
+	$(RM) -f T17966.o T17966.hi
+	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-spec T17966.hs 2> /dev/null | grep 'SPEC'
+        # Expecting a SPEC rule for $cm
+
 T17409:
 	$(RM) -f T17409.o T17409.hi
 	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -dverbose-core2core -dsuppress-uniques T17409.hs 2> /dev/null | grep '\<id\>'
