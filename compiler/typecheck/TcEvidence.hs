@@ -19,6 +19,7 @@ module TcEvidence (
   foldEvBindMap, nonDetStrictFoldEvBindMap,
   filterEvBindMap,
   isEmptyEvBindMap,
+  evBindMapToVarSet,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
@@ -57,6 +58,8 @@ module TcEvidence (
 
 import GhcPrelude
 
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
@@ -504,6 +507,9 @@ nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv b
 filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
 filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
   = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
+
+evBindMapToVarSet :: EvBindMap -> VarSet
+evBindMapToVarSet (EvBindMap dve) = unsafeUFMToUniqSet (mapUFM evBindVar (udfmToUfm dve))
 
 instance Outputable EvBindMap where
   ppr (EvBindMap m) = ppr m
