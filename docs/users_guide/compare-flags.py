@@ -78,13 +78,6 @@ def main() -> None:
         error('')
         failed = True
 
-    now_documented = EXPECTED_UNDOCUMENTED.intersection(doc_flags)
-    if len(now_documented) > 0:
-        error('Found flags that are documented yet listed in {}:'.format(EXPECTED_UNDOCUMENTED_PATH))
-        error('\n'.join('  {}'.format(flag) for flag in sorted(now_documented)))
-        error('')
-        failed = True
-
     if failed:
         sys.exit(1)
 

@@ -45,6 +45,7 @@ import TcType
 import TcEvidence
 import TcRnMonad
 import Type
+import Multiplicity
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -69,6 +70,7 @@ import Outputable
 import PatSyn
 
 import Control.Monad
+import TysPrim
 import Data.List.NonEmpty ( nonEmpty )
 
 {-
@@ -223,7 +225,9 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar upat
+       ; var    <- selectMatchVar Many upat
+                    -- `var` will end up in a let binder, so the multiplicity
+                    -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 
@@ -380,27 +384,31 @@ dsExpr e@(SectionR _ op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
+    dsWhenNoErrs (newSysLocalsDsNoLP [x_ty, y_ty])
                  (\[x_id, y_id] -> bindNonRec y_id y_core $
                                    Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
                                                           core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (L _ (Missing ty))
+  = do { let go (lam_vars, args, usedmults, mult:mults) (L _ (Missing ty))
                     -- For every missing expression, we need
-                    -- another lambda in the desugaring.
-               = do { lam_var <- newSysLocalDsNoLP ty
-                    ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (L _ (Present _ expr))
+                    -- another lambda in the desugaring. This lambda is linear
+                    -- since tuples are linear
+               = do { lam_var <- newSysLocalDsNoLP (mkTyVarTy mult) ty
+                    ; return (lam_var : lam_vars, Var lam_var : args, mult:usedmults, mults) }
+             go (lam_vars, args, missing, mults) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; return (lam_vars, core_expr : args) }
+                    ; return (lam_vars, core_expr : args, missing, mults) }
              go _ _ = panic "dsExpr"
 
-       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
+       ; let multiplicityVars = mkTemplateTyVars (repeat multiplicityTy)
+       ; dsWhenNoErrs (foldM go ([], [], [], multiplicityVars) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
-                      (\(lam_vars, args) -> mkCoreLams lam_vars $
+                      (\(lam_vars, args, usedmults, _) ->
+                      mkCoreLams usedmults $
+                        mkCoreLams lam_vars $
                                             mkCoreTupBoxity boxity args) }
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
@@ -544,8 +552,8 @@ dsExpr (RecordCon { rcon_flds = rbinds
              labels = conLikeFieldLabels con_like
 
        ; con_args <- if null labels
-                     then mapM unlabelled_bottom arg_tys
-                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels)
+                     then mapM unlabelled_bottom (map scaledThing arg_tys)
+                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map scaledThing arg_tys) labels)
 
        ; return (mkCoreApps con_expr' con_args) }
 
@@ -609,8 +617,9 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
                                       (MG { mg_alts = noLoc alts
-                                          , mg_ext = MatchGroupTc [in_ty] out_ty
-                                          , mg_origin = FromSource })
+                                          , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
+                                          , mg_origin = FromSource
+                                          })
                                      -- FromSource is not strictly right, but we
                                      -- want incomplete pattern-match warnings
 
@@ -625,7 +634,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     ds_field (L _ rec_field)
       = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
            ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
-           ; lcl_id <- newSysLocalDs (idType fld_id)
+           ; lcl_id <- newSysLocalDs (idMult fld_id) (idType fld_id)
            ; return (idName fld_id, lcl_id, rhs) }
 
     add_field_binds [] expr = expr
@@ -644,6 +653,9 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
+                 arg_tys' = map (scaleScaled Many) arg_tys
+                   -- Record updates consume the source record with multiplicity
+                   -- Many. Therefore all the fields need to be scaled thus.
                  user_tvs =
                    case con of
                      RealDataCon data_con -> dataConUserTyVars data_con
@@ -655,7 +667,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta in_subst (eqSpecPreds eq_spec))
            ; theta_vars <- mapM newPredVarDs (substTheta in_subst prov_theta)
-           ; arg_ids    <- newSysLocalsDs (substTysUnchecked in_subst arg_tys)
+           ; arg_ids    <- newSysLocalsDs (substScaledTysUnchecked in_subst arg_tys')
            ; let field_labels = conLikeFieldLabels con
                  val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
                                          field_labels arg_ids
@@ -940,10 +952,10 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt res1_ty pat rhs bind_op fail_op) stmts
+    go _ (BindStmt (pat_mult, res1_ty) pat rhs bind_op fail_op) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
-            ; var   <- selectSimpleMatchVarL pat
+            ; var   <- selectSimpleMatchVarL pat_mult pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure pat match fail_op
@@ -965,7 +977,7 @@ dsDo stmts
            ; body' <- dsLExpr $ noLoc $ HsDo body_ty DoExpr (noLoc stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
-                   = do { var   <- selectSimpleMatchVarL pat
+                   = do { var   <- selectSimpleMatchVarL Many pat
                         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure pat match fail_op
@@ -989,7 +1001,7 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
+        new_bind_stmt = L loc $ BindStmt (Many, bind_ty) (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
@@ -1003,7 +1015,7 @@ dsDo stmts
                            (MG { mg_alts = noLoc [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [tup_ty] body_ty
+                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
