@@ -35,15 +35,15 @@ mkTickBox platform mod n
                         (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
                         n
 
+-- | Emit top-level tables for HPC and return code to initialise
 initHpc :: Module -> HpcInfo -> FCode ()
--- Emit top-level tables for HPC and return code to initialise
 initHpc _ (NoHpcInfo {})
   = return ()
 initHpc this_mod (HpcInfo tickCount _hashNo)
   = do dflags <- getDynFlags
        when (gopt Opt_Hpc dflags) $
-           emitRawDataLits (mkHpcTicksLabel this_mod)
-                           [ (CmmInt 0 W64)
-                           | _ <- take tickCount [0 :: Int ..]
-                           ]
+           emitDataLits (mkHpcTicksLabel this_mod)
+                        [ (CmmInt 0 W64)
+                        | _ <- take tickCount [0 :: Int ..]
+                        ]
 
