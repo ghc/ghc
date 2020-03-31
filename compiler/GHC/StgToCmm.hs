@@ -27,6 +27,7 @@ import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 
 import GHC.Cmm
+import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
