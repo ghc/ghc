@@ -1021,8 +1021,8 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
 
 -- Here because it knows about JumpDest
 shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, RawCmmStatics) -> (Alignment, RawCmmStatics)
-shortcutStatics fn (align, RawCmmStatics lbl statics)
-  = (align, RawCmmStatics lbl $ map (shortcutStatic fn) statics)
+shortcutStatics fn (align, CmmStaticsRaw lbl statics)
+  = (align, CmmStaticsRaw lbl $ map (shortcutStatic fn) statics)
   -- we need to get the jump tables, so apply the mapping to the entries
   -- of a CmmData too.
 

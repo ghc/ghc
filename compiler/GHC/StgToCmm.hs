@@ -27,6 +27,7 @@ import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 
 import GHC.Cmm
+import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
@@ -192,7 +193,7 @@ mkModuleInit cost_centre_info this_mod hpc_info
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
   = do dflags <- getDynFlags
-       emitRawRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
+       emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
                            (tagForCon dflags con)
              | con <- tyConDataCons tycon]
