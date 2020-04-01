@@ -241,6 +241,9 @@ RTS_THUNK(stg_ap_5_upd);
 RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
+// Standard entry for `unpackCString# str` thunks
+RTS_ENTRY(stg_MK_STRING);
+
 /* standard application routines (see also utils/genapply,
  * and GHC.StgToCmm.ArgRep).
  */
