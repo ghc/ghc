@@ -51,6 +51,8 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Driver.Session
 
+import GHC.Builtin.Names (unpackCStringName)
+
 import Control.Monad
 
 ------------------------------------------------------------------------
@@ -76,6 +78,9 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
       lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
   in (cg_id_info, gen_code dflags lf_info closure_label)
   where
+
+  gen_code :: DynFlags -> LambdaFormInfo -> CLabel -> FCode ()
+
   -- special case for a indirection (f = g).  We create an IND_STATIC
   -- closure pointing directly to the indirectee.  This is exactly
   -- what the CAF will eventually evaluate to anyway, we're just
@@ -90,10 +95,33 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- concurrent/should_run/4030 fails, for instance.
   --
   gen_code _ _ closure_label
-    | StgApp f [] <- body, null args, isNonRec rec
+    | StgApp f [] <- body
+    , null args
+    , isNonRec rec
     = do
          cg_info <- getCgIdInfo f
          emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+
+  gen_code _ _ closure_label
+    | StgApp f [arg] <- stripStgTicksTopE (not . tickishIsCode) body
+    , idName f == unpackCStringName
+    = do -- TODO: What to do with ticks?
+         pprTrace "unpackCString#" (ppr body) (return ())
+         arg' <- getArgAmode (NonVoid arg)
+         case arg' of
+           CmmLit lit -> do
+             let payload = [lit]
+             let info = CmmInfoTable
+                   { cit_lbl = mkRtsMkStringLabel
+                   , cit_rep = HeapRep True 0 1 Thunk
+                   , cit_prof = NoProfilingInfo
+                   , cit_srt = Nothing
+                   , cit_clo = Nothing
+                   }
+             emitDecl (CmmData (Section Data closure_label) (CmmStatics closure_label info ccs payload))
+
+           _ -> panic "cgTopRhsClosure.gen_code"
+
 
   gen_code dflags lf_info _closure_label
    = do { let name = idName id
@@ -221,6 +249,34 @@ mkRhsClosure :: DynFlags -> Id -> CostCentreStack
              -> [Id]                            -- Args
              -> CgStgExpr
              -> FCode (CgIdInfo, FCode CmmAGraph)
+
+{-
+    TODO: Consider handling this too. Not sure if it's going to save us much to
+          so this needs benchmarking.
+
+---------- unpackCString# --------------------
+mkRhsClosure    dflags bndr _cc
+                []         -- No free variables, because this is top-level
+                Updatable  -- Updatable thunk
+                []         -- A thunk
+                expr
+
+  | let expr_no_ticks = stripStgTicksTopE (not . tickishIsCode) expr
+  , StgApp fn [arg] <- expr
+  , idName fn == unpackCStringName
+  = -- TODO: What to do with ticks?
+    -- A non-top-level unpackCString# closure. Most unpackCString# closures are
+    -- floted to the top-level, but sometimes we see simplifier-generated thunks
+    -- like:
+    --
+    --     sat_sK0 [Occ=Once] :: [GHC.Types.Char]
+    --     [LclId] =
+    --         {} \u []
+    --             GHC.CString.unpackCString#
+    --                 "Oops! The program has entered an `absent' argument!\n"#;
+    --
+    pprPanic "mkRhsClosure" (text "unpackCString# closure:" <+> ppr expr)
+-}
 
 {- mkRhsClosure looks for two special forms of the right-hand side:
         a) selector thunks
@@ -375,7 +431,8 @@ mkRhsClosure dflags bndr cc fvs upd_flag args body
 
 -------------------------
 cgRhsStdThunk
-        :: Id
+        :: HasCallStack
+        => Id
         -> LambdaFormInfo
         -> [StgArg]             -- payload
         -> FCode (CgIdInfo, FCode CmmAGraph)
@@ -432,7 +489,8 @@ mkClosureLFInfo platform bndr top fvs upd_flag args
 --              The code for closures
 ------------------------------------------------------------------------
 
-closureCodeBody :: Bool            -- whether this is a top-level binding
+closureCodeBody :: HasCallStack
+                => Bool            -- whether this is a top-level binding
                 -> Id              -- the closure's name
                 -> ClosureInfo     -- Lots of information about this closure
                 -> CostCentreStack -- Optional cost centre attached to closure

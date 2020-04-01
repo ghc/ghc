@@ -913,6 +913,7 @@
       SymI_HasProto(stg_sel_13_noupd_info)                              \
       SymI_HasProto(stg_sel_14_noupd_info)                              \
       SymI_HasProto(stg_sel_15_noupd_info)                              \
+      SymI_HasProto(stg_MK_STRING_info)                                 \
       SymI_HasProto(stg_upd_frame_info)                                 \
       SymI_HasProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \

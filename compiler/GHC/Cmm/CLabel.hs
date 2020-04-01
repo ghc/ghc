@@ -23,6 +23,7 @@ module GHC.Cmm.CLabel (
         mkConInfoTableLabel,
         mkApEntryLabel,
         mkApInfoTableLabel,
+        mkMkStringInfoTableLabel,
         mkClosureTableLabel,
         mkBytesLabel,
 
@@ -61,6 +62,7 @@ module GHC.Cmm.CLabel (
         mkCAFBlackHoleInfoTableLabel,
         mkRtsPrimOpLabel,
         mkRtsSlowFastTickyCtrLabel,
+        mkRtsMkStringLabel,
 
         mkSelectorInfoLabel,
         mkSelectorEntryLabel,
@@ -427,6 +429,8 @@ data RtsLabelInfo
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
 
+  | RtsMkStringInfoTable
+
   | RtsPrimOp PrimOp
   | RtsApFast     FastString    -- ^ _fast versions of generic apply
   | RtsSlowFastTickyCtr String
@@ -570,16 +574,16 @@ mkLocalBlockLabel u = LocalBlockLabel u
 mkRtsPrimOpLabel :: PrimOp -> CLabel
 mkRtsPrimOpLabel primop         = RtsLabel (RtsPrimOp primop)
 
-mkSelectorInfoLabel  :: Bool -> Int -> CLabel
-mkSelectorEntryLabel :: Bool -> Int -> CLabel
+mkSelectorInfoLabel, mkSelectorEntryLabel  :: Bool -> Int -> CLabel
 mkSelectorInfoLabel  upd off    = RtsLabel (RtsSelectorInfoTable upd off)
 mkSelectorEntryLabel upd off    = RtsLabel (RtsSelectorEntry     upd off)
 
-mkApInfoTableLabel :: Bool -> Int -> CLabel
-mkApEntryLabel     :: Bool -> Int -> CLabel
+mkApInfoTableLabel, mkApEntryLabel :: Bool -> Int -> CLabel
 mkApInfoTableLabel   upd off    = RtsLabel (RtsApInfoTable       upd off)
 mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
 
+mkMkStringInfoTableLabel :: CLabel
+mkMkStringInfoTableLabel = RtsLabel RtsMkStringInfoTable
 
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
@@ -672,6 +676,8 @@ mkRtsApFastLabel str = RtsLabel (RtsApFast str)
 mkRtsSlowFastTickyCtrLabel :: String -> CLabel
 mkRtsSlowFastTickyCtrLabel pat = RtsLabel (RtsSlowFastTickyCtr pat)
 
+mkRtsMkStringLabel :: CLabel
+mkRtsMkStringLabel = RtsLabel RtsMkStringInfoTable
 
 -- Constructing Code Coverage Labels
 mkHpcTicksLabel :: Module -> CLabel
@@ -1279,11 +1285,8 @@ pprCLbl dflags = \case
                         else (sLit "_noupd_entry"))
         ]
 
-   (CmmLabel _ fs CmmInfo)    -> ftext fs <> text "_info"
-   (CmmLabel _ fs CmmEntry)   -> ftext fs <> text "_entry"
-   (CmmLabel _ fs CmmRetInfo) -> ftext fs <> text "_info"
-   (CmmLabel _ fs CmmRet)     -> ftext fs <> text "_ret"
-   (CmmLabel _ fs CmmClosure) -> ftext fs <> text "_closure"
+   (RtsLabel RtsMkStringInfoTable) ->
+    text "stg_MK_STRING_info"
 
    (RtsLabel (RtsPrimOp primop)) -> text "stg_" <> ppr primop
    (RtsLabel (RtsSlowFastTickyCtr pat)) ->
