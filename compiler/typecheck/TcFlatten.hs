@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, ViewPatterns, BangPatterns #-}
+{-# LANGUAGE CPP, DeriveFunctor, DerivingVia, ViewPatterns, BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -34,6 +34,7 @@ import GHC.Types.Basic( SwapFlag(..) )
 import Util
 import Bag
 import Control.Monad
+import Control.Monad.Trans.Reader ( ReaderT(..) )
 import MonadUtils    ( zipWith3M )
 import Data.Foldable ( foldrM )
 
@@ -490,16 +491,17 @@ eqFlattenMode _  _ = False
 -- See Note [The flattening work list].
 newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
-  deriving (Functor)
+  deriving (Functor, Applicative, Monad)
+  via ReaderT FlattenEnv TcS
 
-instance Monad FlatM where
-  m >>= k  = FlatM $ \env ->
-             do { a  <- runFlatM m env
-                ; runFlatM (k a) env }
+-- instance Monad FlatM where
+--   m >>= k  = FlatM $ \env ->
+--              do { a  <- runFlatM m env
+--                 ; runFlatM (k a) env }
 
-instance Applicative FlatM where
-  pure x = FlatM $ const (pure x)
-  (<*>) = ap
+-- instance Applicative FlatM where
+--   pure x = FlatM $ const (pure x)
+--   (<*>) = ap
 
 liftTcS :: TcS a -> FlatM a
 liftTcS thing_inside
