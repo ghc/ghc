@@ -257,7 +257,6 @@ data StandardFormInfo
         -- in the RTS to save space.
         RepArity                -- Arity, n
 
-
 ------------------------------------------------------
 --                Building LambdaFormInfo
 ------------------------------------------------------
@@ -664,7 +663,7 @@ data ClosureInfo
     }
 
 -- | Convert from 'ClosureInfo' to 'CmmInfoTable'.
-mkCmmInfo :: ClosureInfo -> Id -> CostCentreStack -> CmmInfoTable
+mkCmmInfo :: HasCallStack => ClosureInfo -> Id -> CostCentreStack -> CmmInfoTable
 mkCmmInfo ClosureInfo {..} id ccs
   = CmmInfoTable { cit_lbl  = closureInfoLabel
                  , cit_rep  = closureSMRep
