@@ -9,6 +9,7 @@
 #include "ghcplatform.h"
 #include "Rts.h"
 #include "RtsSymbols.h"
+
 #include "TopHandler.h"
 #include "HsFFI.h"
 #include "CloneStack.h"
@@ -713,7 +714,7 @@ extern char **environ;
       SymI_HasProto(defaultRtsConfig)                                   \
       SymI_HasProto(initLinker)                                         \
       SymI_HasProto(initLinker_)                                        \
-      SymI_HasDataProto(stg_unpackClosurezh)                                \
+      SymI_HasDataProto(stg_unpackClosurezh)                            \
       SymI_HasDataProto(stg_closureSizzezh)                                 \
       SymI_HasDataProto(stg_whereFromzh)                                 \
       SymI_HasDataProto(stg_getApStackValzh)                                \
@@ -976,6 +977,8 @@ extern char **environ;
       SymI_HasDataProto(stg_sel_13_noupd_info)                              \
       SymI_HasDataProto(stg_sel_14_noupd_info)                              \
       SymI_HasDataProto(stg_sel_15_noupd_info)                              \
+      SymI_HasDataProto(stg_unpack_cstring_info)                            \
+      SymI_HasDataProto(stg_unpack_cstring_utf8_info)                       \
       SymI_HasDataProto(stg_upd_frame_info)                                 \
       SymI_HasDataProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \

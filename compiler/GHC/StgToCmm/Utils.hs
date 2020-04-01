@@ -266,7 +266,7 @@ emitRODataLits lbl lits = emitDecl (mkRODataLits lbl lits)
 
 emitDataCon :: CLabel -> CmmInfoTable -> CostCentreStack -> [CmmLit] -> FCode ()
 emitDataCon lbl itbl ccs payload =
-  emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
+  emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload []))
 
 -------------------------------------------------------------------------
 --

@@ -301,6 +301,9 @@ data GenCmmStatics (rawOnly :: Bool) where
       -> CmmInfoTable
       -> CostCentreStack
       -> [CmmLit]     -- Payload
+      -> [CmmLit]     -- Non-pointers that go to the end of the closure
+                      -- This is used by stg_unpack_cstring closures.
+                      -- See Note [unpack_cstring closures] in StgStdThunks.cmm.
       -> GenCmmStatics 'False
 
     -- | Static data, after SRTs are generated
@@ -432,8 +435,8 @@ pprInfoTable platform (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
 --
 
 pprStatics :: Platform -> GenCmmStatics a -> SDoc
-pprStatics platform (CmmStatics lbl itbl ccs payload) =
-  pdoc platform lbl <> colon <+> pdoc platform itbl <+> ppr ccs <+> pdoc platform payload
+pprStatics platform (CmmStatics lbl itbl ccs payload extras) =
+  pdoc platform lbl <> colon <+> pdoc platform itbl <+> ppr ccs <+> pdoc platform payload <+> ppr extras
 pprStatics platform (CmmStaticsRaw lbl ds) = vcat ((pdoc platform lbl <> colon) : map (pprStatic platform) ds)
 
 pprStatic :: Platform -> CmmStatic -> SDoc
