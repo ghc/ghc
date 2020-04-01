@@ -108,7 +108,7 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     alts bounds = unionVarSets . map (alt bounds)
 
     alt :: BVs -> StgAlt -> FVs
-    alt bounds (_, bndrs, e) =
+    alt bounds (GenStgAlt _ bndrs e _) =
       expr (extendVarSetList bounds bndrs) e
 
 --------------------------------------------------------------------------------
