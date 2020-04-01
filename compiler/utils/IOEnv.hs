@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia   #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -43,40 +44,24 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
+import Control.Monad.Trans.Reader ( ReaderT(..) )
 import MonadUtils
-import Control.Applicative (Alternative(..))
+import Control.Applicative ( Alternative(..) )
 
 ----------------------------------------------------------------------
 -- Defining the monad type
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a) deriving (Functor)
+newtype IOEnv env a = IOEnv (env -> IO a)
+    deriving (Functor, Applicative, Monad, Alternative, MonadPlus, MonadIO)
+    via ReaderT env IO
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
 
-instance Monad (IOEnv m) where
-    (>>=)  = thenM
-    (>>)   = (*>)
-
 instance MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string
-
-instance Applicative (IOEnv m) where
-    pure = returnM
-    IOEnv f <*> IOEnv x = IOEnv (\ env -> f env <*> x env )
-    (*>) = thenM_
-
-returnM :: a -> IOEnv env a
-returnM a = IOEnv (\ _ -> return a)
-
-thenM :: IOEnv env a -> (a -> IOEnv env b) -> IOEnv env b
-thenM (IOEnv m) f = IOEnv (\ env -> do { r <- m env ;
-                                         unIOEnv (f r) env })
-
-thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
-thenM_ (IOEnv m) f = IOEnv (\ env -> do { _ <- m env ; unIOEnv f env })
 
 failM :: IOEnv env a
 failM = IOEnv (\ _ -> throwIO IOEnvFailure)
@@ -163,21 +148,8 @@ uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
 uninterruptibleMaskM_ (IOEnv m) = IOEnv (\ env -> uninterruptibleMask_ (m env))
 
 ----------------------------------------------------------------------
--- Alternative/MonadPlus
-----------------------------------------------------------------------
-
-instance Alternative (IOEnv env) where
-    empty   = IOEnv (const empty)
-    m <|> n = IOEnv (\env -> unIOEnv m env <|> unIOEnv n env)
-
-instance MonadPlus (IOEnv env)
-
-----------------------------------------------------------------------
 -- Accessing input/output
 ----------------------------------------------------------------------
-
-instance MonadIO (IOEnv env) where
-    liftIO io = IOEnv (\ _ -> io)
 
 newMutVar :: a -> IOEnv env (IORef a)
 newMutVar val = liftIO (newIORef val)

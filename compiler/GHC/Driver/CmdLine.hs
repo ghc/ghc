@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia   #-}
 
 -------------------------------------------------------------------------------
 --
@@ -39,6 +40,8 @@ import Data.Function
 import Data.List
 
 import Control.Monad (liftM, ap)
+import qualified Control.Monad.Trans.State.Strict as Strict
+import Data.Functor.Identity
 
 --------------------------------------------------------
 --         The Flag and OptKind types
@@ -167,17 +170,8 @@ liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
 -- (CmdLineP s) typically instantiates the 'm' in (EwM m) and (OptKind m)
 newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
-    deriving (Functor)
-
-instance Applicative (CmdLineP s) where
-    pure a = CmdLineP $ \s -> (a, s)
-    (<*>) = ap
-
-instance Monad (CmdLineP s) where
-    m >>= k = CmdLineP $ \s ->
-                  let (a, s') = runCmdLine m s
-                  in runCmdLine (k a) s'
-
+    deriving (Functor, Applicative, Monad)
+    via Strict.State s
 
 getCmdLineState :: CmdLineP s s
 getCmdLineState   = CmdLineP $ \s -> (s,s)
