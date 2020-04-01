@@ -346,8 +346,8 @@ rhsDmdShell bndr
     (ds, cd) = toCleanDmd (idDemandInfo bndr)
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
-tagSkeletonAlt (con, bndrs, rhs)
-  = (alt_skel, arg_occs, (con, map BoringBinder bndrs, rhs'))
+tagSkeletonAlt (GenStgAlt con bndrs rhs alloc)
+  = (alt_skel, arg_occs, GenStgAlt con (map BoringBinder bndrs) rhs' alloc)
   where
     (alt_skel, alt_arg_occs, rhs') = tagSkeletonExpr rhs
     arg_occs = alt_arg_occs `delVarSetList` bndrs
