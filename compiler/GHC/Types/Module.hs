@@ -9,8 +9,9 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module GHC.Types.Module
     (
@@ -161,6 +162,7 @@ import qualified Text.ParserCombinators.ReadP as Parse
 import Text.ParserCombinators.ReadP (ReadP, (<++))
 import Data.Char (isAlphaNum)
 import Control.DeepSeq
+import Control.Monad.Trans.Reader
 import Data.Coerce
 import Data.Data
 import Data.Function
@@ -491,6 +493,10 @@ class ContainsModule t where
 
 class HasModule m where
     getModule :: m Module
+
+instance HasModule m => HasModule (ReaderT a m) where
+    getModule :: ReaderT a m Module
+    getModule = ReaderT (\_ -> getModule)
 
 instance DbUnitIdModuleRep InstalledUnitId ComponentId UnitId ModuleName Module where
   fromDbModule (DbModule uid mod_name)  = mkModule uid mod_name
