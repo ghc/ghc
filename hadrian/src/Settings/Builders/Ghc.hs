@@ -29,9 +29,12 @@ toolArgs = do
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     ways <- getLibraryWays
+    useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
     mconcat [ arg "-Wall"
+            , not useColor ? builder (Ghc CompileHs) ?
+              arg "-fdiagnostics-color=never"
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
               platformSupportsSharedLibs ? way vanilla ?
               arg "-dynamic-too"
