@@ -267,7 +267,7 @@ mkRhsClosure    dflags bndr _cc
   , StgCase (StgApp scrutinee [{-no args-}])
          _   -- ignore bndr
          (AlgAlt _)
-         [(DataAlt _, params, sel_expr)] <- strip expr
+         [GenStgAlt (DataAlt _) params sel_expr _] <- strip expr
   , StgApp selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 

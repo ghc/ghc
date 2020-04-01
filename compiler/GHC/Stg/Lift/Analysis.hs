@@ -346,11 +346,16 @@ rhsDmdShell bndr
     (ds, cd) = toCleanDmd (idDemandInfo bndr)
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
-tagSkeletonAlt (con, bndrs, rhs)
-  = (alt_skel, arg_occs, (con, map BoringBinder bndrs, rhs'))
+tagSkeletonAlt alt
+  = (alt_skel, arg_occs, alt')
   where
-    (alt_skel, alt_arg_occs, rhs') = tagSkeletonExpr rhs
-    arg_occs = alt_arg_occs `delVarSetList` bndrs
+    (alt_skel, alt_arg_occs, rhs') = tagSkeletonExpr (altRhs alt)
+    arg_occs = alt_arg_occs `delVarSetList` (altBndrs alt)
+    alt' = GenStgAlt { altCon       = altCon alt
+                     , altBndrs     = map BoringBinder (altBndrs alt)
+                     , altRhs       = rhs'
+                     , altAllocates = altAllocates alt
+                     }
 
 -- | Combines several heuristics to decide whether to lambda-lift a given
 -- @let@-binding to top-level. See "GHC.Stg.Lift.Analysis#when" for details.

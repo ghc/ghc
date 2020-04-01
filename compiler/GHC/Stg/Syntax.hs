@@ -24,7 +24,7 @@ module GHC.Stg.Syntax (
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
-        GenStgAlt, AltType(..),
+        GenStgAlt(..), AltType(..),
 
         StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
         NoExtFieldSilent, noExtFieldSilent,
@@ -470,6 +470,21 @@ type family XLetNoEscape (pass :: StgPass)
 type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
 type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
 
+-- Note [Case alternative allocation strategy]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The case alternative is extended with a boolean flag to carry
+-- information about whether it does any heap allocation.
+--  * False - alternative does _not_ allocate
+--  * True  - alternative does allocate
+-- We compute this information in @annTopBindindingsFreeVars@ and
+-- then the code generator could consult that flag to decide the
+-- GCPlan. The flag is set to False by default (assuming the
+-- alternative does _not_ allocate).
+type family AltAllocates (pass :: StgPass)
+type instance AltAllocates 'Vanilla  = Bool
+type instance AltAllocates 'LiftLams = Bool
+type instance AltAllocates 'CodeGen  = Bool
+
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
@@ -494,10 +509,14 @@ the TyCon from the constructors or literals (which are guaranteed to have the
 Real McCoy) rather than from the scrutinee type.
 -}
 
-type GenStgAlt pass
-  = (AltCon,          -- alts: data constructor,
-     [BinderP pass],  -- constructor's parameters,
-     GenStgExpr pass) -- ...right-hand side.
+data GenStgAlt pass
+  = GenStgAlt
+  { altCon       :: AltCon            -- alts: data constructor
+  , altBndrs     :: [BinderP pass]    -- constructor's parameters
+  , altRhs       :: GenStgExpr pass   -- ...right-hand side
+  , altAllocates :: AltAllocates pass -- does this expression allocate?
+                                      -- See Note [Case alternative allocation strategy]
+  }
 
 data AltType
   = PolyAlt             -- Polymorphic (a lifted type variable)
@@ -639,6 +658,7 @@ type OutputablePass pass =
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
   , OutputableBndr (BinderP pass)
+  , Outputable (AltAllocates pass)
   )
 
 pprGenStgTopBinding
@@ -690,6 +710,9 @@ instance OutputablePass pass => Outputable (GenStgExpr pass) where
 
 instance OutputablePass pass => Outputable (GenStgRhs pass) where
     ppr rhs = pprStgRhs rhs
+
+instance OutputablePass pass => Outputable (GenStgAlt pass) where
+    ppr alt = pprStgAlt False alt
 
 pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
@@ -781,11 +804,11 @@ pprStgExpr (StgCase expr bndr alt_type alts)
 
 
 pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc
-pprStgAlt indent (con, params, expr)
+pprStgAlt indent (GenStgAlt con params expr alloc)
   | indent    = hang altPattern 4 (ppr expr <> semi)
   | otherwise = sep [altPattern, ppr expr <> semi]
     where
-      altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
+      altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), ppr alloc, text "->"])
 
 
 pprStgOp :: StgOp -> SDoc
