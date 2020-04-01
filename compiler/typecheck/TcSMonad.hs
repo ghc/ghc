@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
+{-# LANGUAGE CPP, DeriveFunctor, DerivingVia, TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -155,7 +155,7 @@ import GHC.Core.TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
 import GHC.Types.Name
-import GHC.Types.Module ( HasModule, getModule )
+import GHC.Types.Module ( HasModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
@@ -177,6 +177,7 @@ import Maybes
 
 import GHC.Core.Map
 import Control.Monad
+import Control.Monad.Trans.Reader
 import MonadUtils
 import Data.IORef
 import Data.List ( partition, mapAccumL )
@@ -2691,26 +2692,13 @@ data TcSEnv
     }
 
 ---------------
-newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
-
-instance Applicative TcS where
-  pure x = TcS (\_ -> return x)
-  (<*>) = ap
-
-instance Monad TcS where
-  m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
+newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
+    deriving ( Functor, Applicative, Monad
+             , HasModule, MonadUnique, MonadThings )
+    via ReaderT TcSEnv TcM
 
 instance MonadFail TcS where
   fail err  = TcS (\_ -> fail err)
-
-instance MonadUnique TcS where
-   getUniqueSupplyM = wrapTcS getUniqueSupplyM
-
-instance HasModule TcS where
-   getModule = wrapTcS getModule
-
-instance MonadThings TcS where
-   lookupThing n = wrapTcS (lookupThing n)
 
 -- Basic functionality
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

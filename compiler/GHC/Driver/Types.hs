@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
 
 -- | Types for the per-module compiler
 module GHC.Driver.Types (
@@ -215,7 +216,7 @@ import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
-import Control.Monad    ( guard, liftM, ap )
+import Control.Monad    ( guard, liftM )
 import Data.IORef
 import Data.Time
 import Exception
@@ -223,6 +224,7 @@ import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.State (StateT(..))
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -265,19 +267,8 @@ data HscStatus
 -- The Hsc monad: Passing an environment and warning state
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-    deriving (Functor)
-
-instance Applicative Hsc where
-    pure a = Hsc $ \_ w -> return (a, w)
-    (<*>) = ap
-
-instance Monad Hsc where
-    Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
-                                   case k a of
-                                       Hsc k' -> k' e w1
-
-instance MonadIO Hsc where
-    liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
+    deriving (Functor, Applicative, Monad, MonadIO)
+    via ReaderT HscEnv (StateT WarningMessages IO)
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
