@@ -33,7 +33,7 @@ basic properties listed above.
 -}
 
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
-  DeriveFunctor #-}
+  DeriveFunctor, NamedFieldPuns #-}
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 
@@ -210,19 +210,17 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
 
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 
-lintAlt
-    :: (OutputablePass a, BinderP a ~ Id)
-    => (AltCon, [Id], GenStgExpr a) -> LintM ()
+lintAlt :: (OutputablePass a, BinderP a ~ Id) => GenStgAlt a -> LintM ()
 
-lintAlt (DEFAULT, _, rhs) =
-    lintStgExpr rhs
+lintAlt GenStgAlt{altCon=DEFAULT, altRhs} =
+    lintStgExpr altRhs
 
-lintAlt (LitAlt _, _, rhs) =
-    lintStgExpr rhs
+lintAlt GenStgAlt{altCon=LitAlt _, altRhs} =
+    lintStgExpr altRhs
 
-lintAlt (DataAlt _, bndrs, rhs) = do
-    mapM_ checkPostUnariseBndr bndrs
-    addInScopeVars bndrs (lintStgExpr rhs)
+lintAlt GenStgAlt{altCon=DataAlt _, altBndrs, altRhs} = do
+    mapM_ checkPostUnariseBndr altBndrs
+    addInScopeVars altBndrs (lintStgExpr altRhs)
 
 {-
 ************************************************************************

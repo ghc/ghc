@@ -437,7 +437,7 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     case scrut2 of
       StgApp id [] | idName id == unsafeEqualityProofName ->
         case alts2 of
-          [(_, [_co], rhs)] ->
+          [GenStgAlt _ [_co] rhs _] ->
             return rhs
           _ ->
             pprPanic "coreToStgExpr" $
@@ -445,7 +445,11 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
               text "STG:" $$ ppr stg
       _ -> return stg
   where
-    vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
+    -- Does this alt allocate? Set to False by default.
+    -- We then compute this value right before codegen.
+    -- See Note [Case alternative allocation strategy]
+    alloc = False
+    vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM StgAlt
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
@@ -453,14 +457,14 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { rhs2 <- coreToStgExpr rhs
-           ; return (DEFAULT, [], rhs2)  }
+           ; return (GenStgAlt DEFAULT [] rhs2 alloc)  }
       | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
         extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
         rhs2 <- coreToStgExpr rhs
-        return (con, binders', rhs2)
+        return (GenStgAlt con binders' rhs2 alloc)
 
 coreToStgExpr (Let bind body) = do
     coreToStgLet bind body

@@ -343,7 +343,7 @@ stgCseExpr env (StgLetNoEscape ext binds body)
 -- Case alternatives
 -- Extend the CSE environment
 stgCseAlt :: CseEnv -> AltType -> OutId -> InStgAlt -> OutStgAlt
-stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
+stgCseAlt env ty case_bndr (GenStgAlt (DataAlt dataCon) args rhs alloc)
     = let (env1, args') = substBndrs env args
           env2
             -- To avoid dealing with unboxed sums StgCse runs after unarise and
@@ -358,11 +358,11 @@ stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
             = env1
             -- see note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
-      in (DataAlt dataCon, args', rhs')
-stgCseAlt env _ _ (altCon, args, rhs)
+      in GenStgAlt (DataAlt dataCon) args' rhs' alloc
+stgCseAlt env _ _ (GenStgAlt altCon args rhs alloc)
     = let (env1, args') = substBndrs env args
           rhs' = stgCseExpr env1 rhs
-      in (altCon, args', rhs')
+      in GenStgAlt altCon args' rhs' alloc
 
 -- Bindings
 stgCseBind :: CseEnv -> InStgBinding -> (Maybe OutStgBinding, CseEnv)
@@ -412,8 +412,8 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
 
   where
     -- see Note [All alternatives are the binder]
-    isBndr (_, _, StgApp f []) = f == bndr
-    isBndr _                   = False
+    isBndr alt | StgApp f [] <- altRhs alt = f == bndr
+    isBndr _                               = False
 
 
 -- Utilities
