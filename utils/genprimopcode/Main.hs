@@ -514,20 +514,25 @@ gen_latex_doc (Info defaults entries)
 
            mk_options o =
              "\\primoptions{"
-              ++ mk_has_side_effects o ++ "}{"
+              ++ mk_effect o ++ "}{"
               ++ mk_out_of_line o ++ "}{"
               ++ mk_commutable o ++ "}{"
               ++ mk_needs_wrapper o ++ "}{"
-              ++ mk_can_fail o ++ "}{"
               ++ mk_fixity o ++ "}{"
               ++ latex_encode (mk_strictness o) ++ "}{"
               ++ "}"
 
-           mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
+           mk_effect o = case lookup_attrib "effect" o of
+             Just (OptionString _ "NoEffect")        -> ""
+             Just (OptionString _ "ThrowsImprecise") -> "May throw an imprecise exception."
+             Just (OptionString _ "WriteEffect")     -> "May throw an imprecise exception or perform a write effect."
+             Just (OptionString _ "ThrowsPrecise")   -> "May throw a precise exception (or any other effect)."
+             Just v                                  -> error "Wrong value for effect: '" ++ show v ++ "'"
+             Nothing                                 -> ""
+
            mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
            mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
            mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
-           mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
 
            mk_bool_opt o opt_name if_true if_false =
              case lookup_attrib opt_name o of

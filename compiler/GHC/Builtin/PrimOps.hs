@@ -312,158 +312,183 @@ perform a heap check or they block.
 primOpOutOfLine :: PrimOp -> Bool
 #include "primop-out-of-line.hs-incl"
 
+
 {-
 ************************************************************************
 *                                                                      *
             Failure and side effects
 *                                                                      *
 ************************************************************************
+-}
 
-Note [Checking versus non-checking primops]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | A classification of primops by triggered side effects.
+-- See Note [Classification by PrimOpEffect].
+-- The total 'Ord' instance is significant (and hence the order of constructors
+-- is). A "stronger" effect means less transformations are sound to apply to
+-- them.
+data PrimOpEffect
+  = NoEffect
+  | ThrowsImprecise
+  | WriteEffect
+  | ThrowsPrecise
+  deriving (Eq, Ord)
 
-  In GHC primops break down into two classes:
+-- | Can we discard a call to the primop, i.e. @case a `op` b of _ -> rhs@?
+-- This is a question that i.e. the Simplifier asks before dropping the @case@.
+-- See Note [Transformations affected by can_fail and has_side_effects].
+isDiscardablePrimOpEffect :: PrimOpEffect -> Bool
+isDiscardablePrimOpEffect eff = eff <= ThrowsImprecise
 
-   a. Checking primops behave, for instance, like division. In this
-      case the primop may throw an exception (e.g. division-by-zero)
-      and is consequently is marked with the can_fail flag described below.
-      The ability to fail comes at the expense of precluding some optimizations.
+-- | Can we duplicate a call to the primop?
+-- This is a question that i.e. the Simplifier asks when inlining definitions
+-- involving primops with multiple syntactic occurrences.
+-- See Note [Transformations affected by can_fail and has_side_effects].
+isDupablePrimOpEffect :: PrimOpEffect -> Bool
+-- isDupablePrimOpEffect eff = True -- #3207, see the Note
+isDupablePrimOpEffect eff = eff <= ThrowsImprecise
 
-   b. Non-checking primops behavior, for instance, like addition. While
-      addition can overflow it does not produce an exception. So can_fail is
-      set to False, and we get more optimisation opportunities.  But we must
-      never throw an exception, so we cannot rewrite to a call to error.
+-- | Can we perform other actions first before entering the primop?
+-- This is the question that i.e. @FloatIn@ asks.
+-- See Note [Transformations affected by can_fail and has_side_effects].
+isDeferrablePrimOpEffect :: PrimOpEffect -> Bool
+isDeferrablePrimOpEffect eff = eff <= WriteEffect
 
-  It is important that a non-checking primop never be transformed in a way that
-  would cause it to bottom. Doing so would violate Core's let/app invariant
-  (see Note [Core let/app invariant] in GHC.Core) which is critical to
-  the simplifier's ability to float without fear of changing program meaning.
+-- | Can we speculatively execute this primop, before performing other actions
+-- that should come first according to evaluation strategy?
+-- This is the question that i.e. @FloatOut@ (of a @case@) asks.
+-- See Note [Transformations affected by can_fail and has_side_effects].
+isSpeculatablePrimOpEffect :: PrimOpEffect -> Bool
+isSpeculatablePrimOpEffect eff = eff <= NoEffect
 
+{- Note [Classification by PrimOpEffect]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some primops have effects that are not captured entirely by their result value.
+We distinguish these cases:
 
-Note [PrimOp can_fail and has_side_effects]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Both can_fail and has_side_effects mean that the primop has
-some effect that is not captured entirely by its result value.
+  * NoEffect: Pure primop, like `plusInt#`.
+  * ThrowsImprecise: Possibly throws an *imprecise* exception, like
+    division-by-zero or a segfault arising from an out of bounds array access.
+    An imprecise exception is an outright error and transformations may play
+    fast and loose by turning one imprecise exception into another, or bottom.
+    See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
+  * WriteEffect: A write side-effect, either writing to the RealWorld (IO) or
+    to a mutable variable (`writeMutVar#`).
+  * ThrowsPrecise: Possibly throws a *precise* exception. `raiseIO#` is the
+    only primop that does that.
+    See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
 
-----------  has_side_effects ---------------------
-A primop "has_side_effects" if it has some *write* effect, visible
-elsewhere
-    - writing to the world (I/O)
-    - writing to a mutable data structure (writeIORef)
-    - throwing a synchronous Haskell exception
+Why is this classification necessary? Because the kind of effect a primop
+performs influences the transformations we are allowed to apply to it.
+For example let binding a division-by-zero (which `ThrowsImprecise`) might
+violate Core's let/app invariant (see Note [Core let/app invariant] in
+GHC.Core) which is critical to the simplifier's ability to float without fear
+of changing program meaning.
 
-Often such primops have a type like
-   State -> input -> (State, output)
-so the state token guarantees ordering.  In general we rely *only* on
-data dependencies of the state token to enforce write-effect ordering
+See Note [Transformations affected by PrimOpEffect].
 
- * NB1: if you inline unsafePerformIO, you may end up with
-   side-effecting ops whose 'state' output is discarded.
-   And programmers may do that by hand; see #9390.
-   That is why we (conservatively) do not discard write-effecting
-   primops even if both their state and result is discarded.
+Note [Transformations affected by PrimOpEffect]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The PrimOpEffect of a primop affects applicability of program transformations
+in the following way.
+Summary table is followed by details.
 
- * NB2: We consider primops, such as raiseIO#, that can raise a
-   (Haskell) synchronous exception to "have_side_effects" but not
-   "can_fail".  We must be careful about not discarding such things;
-   see the paper "A semantics for imprecise exceptions".
+Tranform. | Example  | NoEffect | ThrowsImprecise | WriteEffect | ThrowsPrecise
+----------+----------+----------+-----------------+-------------+--------------
+Defer     | FloatIn  | YES      | YES             | YES         | NO
+Discard   | DeadCode | YES      | YES             | NO          | NO
+Dupe      | Inlining | YES      | YES             | NO          | NO
+Speculate | FloatOut | YES      | NO              | NO          | NO
 
- * NB3: *Read* effects (like reading an IORef) don't count here,
-   because it doesn't matter if we don't do them, or do them more than
-   once.  *Sequencing* is maintained by the data dependency of the state
-   token.
-
-----------  can_fail ----------------------------
-A primop "can_fail" if it can fail with an *unchecked* exception on
-some elements of its input domain. Main examples:
-   division (fails on zero denominator)
-   array indexing (fails if the index is out of bounds)
-
-An "unchecked exception" is one that is an outright error, (not
-turned into a Haskell exception,) such as seg-fault or
-divide-by-zero error.  Such can_fail primops are ALWAYS surrounded
-with a test that checks for the bad cases, but we need to be
-very careful about code motion that might move it out of
-the scope of the test.
-
-Note [Transformations affected by can_fail and has_side_effects]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The can_fail and has_side_effects properties have the following effect
-on program transformations.  Summary table is followed by details.
-
-            can_fail     has_side_effects
-Discard        YES           NO
-Float in       YES           YES
-Float out      NO            NO
-Duplicate      YES           NO
+Note how there is a total order on effects in terms of which program
+tranformations they inhibit. A "stronger" effect means less transformations
+are sound to apply to it. NoEffect means any tranformation is sound;
+ThrowsPrecise means none of the following is.
+Whether or not a primop is cheap to evaluate is an orthogonal concern.
 
 * Discarding.   case (a `op` b) of _ -> rhs  ===>   rhs
-  You should not discard a has_side_effects primop; e.g.
-     case (writeIntArray# a i v s of (# _, _ #) -> True
-  Arguably you should be able to discard this, since the
-  returned stat token is not used, but that relies on NEVER
-  inlining unsafePerformIO, and programmers sometimes write
-  this kind of stuff by hand (#9390).  So we (conservatively)
-  never discard a has_side_effects primop.
-
-  However, it's fine to discard a can_fail primop.  For example
-     case (indexIntArray# a i) of _ -> True
-  We can discard indexIntArray#; it has can_fail, but not
-  has_side_effects; see #5658 which was all about this.
-  Notice that indexIntArray# is (in a more general handling of
-  effects) read effect, but we don't care about that here, and
-  treat read effects as *not* has_side_effects.
-
-  Similarly (a `/#` b) can be discarded.  It can seg-fault or
-  cause a hardware exception, but not a synchronous Haskell
+  You should not discard a WriteEffect primop; e.g.
+    case (writeIntArray# a i v s of (# _, _ #) -> True
+  Arguably you should be able to discard this, since the returned state token
+  is not used, but that relies on NEVER inlining unsafePerformIO, and
+  programmers sometimes write this kind of stuff by hand (#9390).  So we
+  (conservatively) never discard such a primop.
+  The situation with (stronger) ThrowsPrecise primops such as raiseIO# is even
+  more restrictive: We may never discard a side effect throwing a precise
   exception.
 
+  However, it's fine to discard a ThrowsImprecise primop.  For example
+    case (indexIntArray# a i) of _ -> True
+  We can discard indexIntArray#; it might throw an imprecise segmentation
+  fault, but no precise exception, so we are OK with not observing it.
+  See #5658 which was all about this.
+  Similarly (a `/#` b) can be discarded.  It can seg-fault or cause a hardware
+  exception, but not a precise Haskell exception.
+  It's obviously fine to discard a NoEffect if its result aren't used.
 
-
-  Synchronous Haskell exceptions, e.g. from raiseIO#, are treated
-  as has_side_effects and hence are not discarded.
-
-* Float in.  You can float a can_fail or has_side_effects primop
-  *inwards*, but not inside a lambda (see Duplication below).
-
-* Float out.  You must not float a can_fail primop *outwards* lest
-  you escape the dynamic scope of the test.  Example:
-      case d ># 0# of
-        True  -> case x /# d of r -> r +# 1
-        False -> 0
-  Here we must not float the case outwards to give
-      case x/# d of r ->
-      case d ># 0# of
-        True  -> r +# 1
-        False -> 0
-
-  Nor can you float out a has_side_effects primop.  For example:
-       if blah then case writeMutVar# v True s0 of (# s1 #) -> s1
-               else s0
-  Notice that s0 is mentioned in both branches of the 'if', but
-  only one of these two will actually be consumed.  But if we
-  float out to
-      case writeMutVar# v True s0 of (# s1 #) ->
-      if blah then s1 else s0
-  the writeMutVar will be performed in both branches, which is
-  utterly wrong.
-
-* Duplication.  You cannot duplicate a has_side_effect primop.  You
-  might wonder how this can occur given the state token threading, but
-  just look at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get
-  something like this
-        p = case readMutVar# s v of
-              (# s', r #) -> (S# s', r)
-        s' = case p of (s', r) -> s'
-        r  = case p of (s', r) -> r
-
+* Duplication.  Example: The Simplifier inlines a (multi occ) binding.
+  You cannot duplicate any effectful primop participating in state token
+  threading. Not even what is actually a read-only effect like `readMutVar#`,
+  see #3207.
+  You might wonder how that can be problematic, but just look at
+  Control.Monad.ST.Lazy.Imp.strictToLazy!  We get something like this
+    p = case readMutVar# s v of
+          (# s', r #) -> (S# s', r)
+    s' = case p of (s', r) -> s'
+    r  = case p of (s', r) -> r
   (All these bindings are boxed.)  If we inline p at its two call
   sites, we get a catastrophe: because the read is performed once when
   s' is demanded, and once when 'r' is demanded, which may be much
-  later.  Utterly wrong.  #3207 is real example of this happening.
+  later.  Utterly wrong.  #3207 is a real example of this happening.
 
-  However, it's fine to duplicate a can_fail primop.  That is really
-  the only difference between can_fail and has_side_effects.
+  If it wasn't for working around state token threading
+  (see https://gitlab.haskell.org/ghc/ghc/issues/3207#note_257470 for other
+  approaches), then duplication wouldn't be an issue at all, soundness-wise.
+  But for the time being, we mark primops that participate in state token
+  threading such as `readMutVar#` (which has NoEffect at heart) and
+  `readArray#` (ThrowsImprecise) as WriteEffect and say that we may not
+  duplicate WriteEffect.
+
+* Deferring (Float In).  Example, here inside a single-alt case:
+    case (a `op` b) of (# s, x #) -> case e of p -> rhs
+    ==>
+    case e of p -> case (a `op` b) of (# s, x #) -> rhs
+  Note that e might diverge (or throw an imprecise exception) and thus the
+  side-effect we would observe by evaluating op might not happen if we defer it
+  after e.
+
+  That is a problem if op ThrowsPrecise: If e diverges, the user can catch
+  the precise exception /before/ FloatIn, but not afterwards. Hence we may not
+  float in a ThrowsPrecise primop like raiseIO#.
+
+  But since e can never throw an imprecise exception, there is no
+  non-imprecise-exceptional control flow in which it is possible to observe
+  that a WriteEffect (and anything "weaker") didn't happen. So it's OK to
+  defer (every weaker than or equal to) write effects. So you can float a
+  WriteEffect *inwards*, but not inside a lambda (see Duplication below [SG: It
+  isn't obvious to me how that explains why we shouldn't float inside a lambda
+  at all]).
+
+* Speculating (Float out).
+  You must not float a ThrowsImprecise primop *outwards* lest you escape the
+  dynamic scope of the test.  Example:
+    case d ># 0# of
+      True  -> case x /# d of r -> r +# 1
+      False -> 0
+  Here we must not float the division outwards to give
+    case x/# d of r ->
+    case d ># 0# of
+      True  -> r +# 1
+      False -> 0
+  Now the potential division by zero will be performed in both branches.
+
+  Similarly you can't float out a (stronger) WriteEffect primop.  For example:
+    if blah then case writeMutVar# v True s0 of (# s1 #) -> s1
+            else s0
+  Notice that s0 is mentioned in both branches of the 'if', but only one of
+  these two will actually be consumed.  But if we float out to
+    case writeMutVar# v True s0 of (# s1 #) ->
+      if blah then s1 else s0
+  the writeMutVar will be performed in both branches, which is utterly wrong.
 
 Note [Implementation: how can_fail/has_side_effects affect transformations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
