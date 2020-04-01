@@ -72,6 +72,8 @@ module GHC.Cmm.CLabel (
         mkCAFBlackHoleInfoTableLabel,
         mkRtsPrimOpLabel,
         mkRtsSlowFastTickyCtrLabel,
+        mkRtsUnpackCStringLabel,
+        mkRtsUnpackCStringUtf8Label,
 
         mkSelectorInfoLabel,
         mkSelectorEntryLabel,
@@ -562,6 +564,8 @@ data RtsLabelInfo
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
 
+  | RtsUnpackCStringInfoTable
+  | RtsUnpackCStringUtf8InfoTable
   | RtsPrimOp            PrimOp
   | RtsApFast            NonDetFastString    -- ^ _fast versions of generic apply
   | RtsSlowFastTickyCtr String
@@ -734,7 +738,6 @@ mkApEntryLabel platform upd arity =
    assert (arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform)) $
    RtsLabel (RtsApEntry upd arity)
 
-
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
@@ -852,6 +855,11 @@ mkRtsApFastLabel str = RtsLabel (RtsApFast (NonDetFastString str))
 mkRtsSlowFastTickyCtrLabel :: String -> CLabel
 mkRtsSlowFastTickyCtrLabel pat = RtsLabel (RtsSlowFastTickyCtr pat)
 
+-- | A standard string unpacking thunk. See Note [unpack_cstring closures] in
+-- StgStdThunks.cmm.
+mkRtsUnpackCStringLabel, mkRtsUnpackCStringUtf8Label :: CLabel
+mkRtsUnpackCStringLabel = RtsLabel RtsUnpackCStringInfoTable
+mkRtsUnpackCStringUtf8Label = RtsLabel RtsUnpackCStringUtf8InfoTable
 
 -- Constructing Code Coverage Labels
 mkHpcTicksLabel :: Module -> CLabel
@@ -958,6 +966,9 @@ hasIdLabelInfo _ = Nothing
 hasCAF :: CLabel -> Bool
 hasCAF (IdLabel _ _ (IdTickyInfo TickyRednCounts)) = False -- See Note [ticky for LNE]
 hasCAF (IdLabel _ MayHaveCafRefs _) = True
+hasCAF (RtsLabel RtsUnpackCStringInfoTable) = True
+hasCAF (RtsLabel RtsUnpackCStringUtf8InfoTable) = True
+  -- The info table stg_MK_STRING_info is for thunks
 hasCAF _                            = False
 
 -- Note [ticky for LNE]
@@ -1195,6 +1206,9 @@ labelType (CmmLabel _ _ _ CmmRet)               = CodeLabel
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
 labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
+labelType (RtsLabel RtsUnpackCStringInfoTable)  = CodeLabel
+labelType (RtsLabel RtsUnpackCStringUtf8InfoTable)
+                                                = CodeLabel
 labelType (RtsLabel _)                          = DataLabel
 labelType (LocalBlockLabel _)                   = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
@@ -1524,6 +1538,11 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    RtsLabel (RtsSlowFastTickyCtr pat)
       -> maybe_underscore $ text "SLOW_CALL_fast_" <> text pat <> text "_ctr"
+
+   RtsLabel RtsUnpackCStringInfoTable
+      -> maybe_underscore $ text "stg_unpack_cstring_info"
+   RtsLabel RtsUnpackCStringUtf8InfoTable
+      -> maybe_underscore $ text "stg_unpack_cstring_utf8_info"
 
    LargeBitmapLabel u
       -> maybe_underscore $ tempLabelPrefixOrUnderscore

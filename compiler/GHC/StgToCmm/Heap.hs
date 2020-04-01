@@ -161,19 +161,20 @@ hpStore base vals = do
 --              Layout of static closures
 -----------------------------------------------------------
 
--- Make a static closure, adding on any extra padding needed for CAFs,
--- and adding a static link field if necessary.
-
+-- | Make a static closure, adding on any extra padding needed for CAFs, and
+-- adding a static link field if necessary.
 mkStaticClosureFields
         :: Profile
         -> CmmInfoTable
         -> CostCentreStack
         -> CafInfo
-        -> [CmmLit]             -- Payload
+        -> [CmmLit]             -- ^ Payload
+        -> [CmmLit]             -- ^ Extra non-pointers that go to the end of the closure.
+                                -- See Note [unpack_cstring closures] in StgStdThunks.cmm.
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields profile info_tbl ccs caf_refs payload
+mkStaticClosureFields profile info_tbl ccs caf_refs payload extras
   = mkStaticClosure profile info_lbl ccs payload padding
-        static_link_field saved_info_field
+        static_link_field saved_info_field extras
   where
     platform = profilePlatform profile
     info_lbl = cit_lbl info_tbl
@@ -218,14 +219,15 @@ mkStaticClosureFields profile info_tbl ccs caf_refs payload
                                       -- in rts/sm/Storage.h
 
 mkStaticClosure :: Profile -> CLabel -> CostCentreStack -> [CmmLit]
-  -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure profile info_lbl ccs payload padding static_link_field saved_info_field
+  -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
+mkStaticClosure profile info_lbl ccs payload padding static_link_field saved_info_field extras
   =  [CmmLabel info_lbl]
   ++ staticProfHdr profile ccs
   ++ payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
+  ++ extras
 
 -----------------------------------------------------------
 --              Heap overflow checking

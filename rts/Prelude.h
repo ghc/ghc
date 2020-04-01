@@ -33,6 +33,7 @@ PRELUDE_CLOSURE(ghczmprim_GHCziTupleziPrim_Z0T_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_True_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_False_closure);
 PRELUDE_CLOSURE(base_GHCziPack_unpackCString_closure);
+PRELUDE_CLOSURE(base_GHCziPack_unpackCStringUtf8_closure);
 PRELUDE_CLOSURE(base_GHCziWeak_runFinalizzerBatch_closure);
 PRELUDE_CLOSURE(base_GHCziWeakziFinalizze_runFinalizzerBatch_closure);
 
@@ -70,6 +71,7 @@ PRELUDE_CLOSURE(base_GHCziEventziWindows_processRemoteCompletion_closure);
 PRELUDE_CLOSURE(base_GHCziTopHandler_flushStdHandles_closure);
 PRELUDE_CLOSURE(base_GHCziTopHandler_runMainIO_closure);
 
+PRELUDE_INFO(ghczmprim_GHCziCString_unpackCStringzh_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_con_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_con_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_con_info);

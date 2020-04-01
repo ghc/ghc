@@ -25,6 +25,8 @@ import GHC.Stg.Syntax
 import GHC.Platform
 import GHC.Platform.Profile
 
+import GHC.Builtin.Names (unpackCStringName, unpackCStringUtf8Name)
+
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
@@ -87,6 +89,9 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
       lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
   in (cg_id_info, gen_code lf_info closure_label)
   where
+
+  gen_code :: LambdaFormInfo -> CLabel -> FCode ()
+
   -- special case for a indirection (f = g).  We create an IND_STATIC
   -- closure pointing directly to the indirectee.  This is exactly
   -- what the CAF will eventually evaluate to anyway, we're just
@@ -101,10 +106,43 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   -- concurrent/should_run/4030 fails, for instance.
   --
   gen_code _ closure_label
-    | StgApp f [] <- body, null args, isNonRec rec
+    | StgApp f [] <- body
+    , null args
+    , isNonRec rec
     = do
          cg_info <- getCgIdInfo f
          emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+
+  -- Emit standard stg_unpack_cstring closures for top-level unpackCString# thunks.
+  --
+  -- Note that we do not do this for thunks enclosured in code ticks (e.g. hpc
+  -- ticks) since we want to ensure that these ticks are not lost (e.g.
+  -- resulting in Strings being reported by hpc as uncovered). However, we
+  -- don't worry about standard profiling ticks since unpackCString tends not
+  -- be terribly interesting in profiles. See Note [unpack_cstring closures] in
+  -- StgStdThunks.cmm.
+  gen_code _ closure_label
+    | null args
+    , StgApp f [arg] <- stripStgTicksTopE (not . tickishIsCode) body
+    , Just unpack <- is_string_unpack_op f
+    = do arg' <- getArgAmode (NonVoid arg)
+         case arg' of
+           CmmLit lit -> do
+             let info = CmmInfoTable
+                   { cit_lbl = unpack
+                   , cit_rep = HeapRep True 0 1 Thunk
+                   , cit_prof = NoProfilingInfo
+                   , cit_srt = Nothing
+                   , cit_clo = Nothing
+                   }
+             emitDecl $ CmmData (Section Data closure_label) $
+                 CmmStatics closure_label info ccs [] [lit]
+           _ -> panic "cgTopRhsClosure.gen_code"
+    where
+      is_string_unpack_op f
+        | idName f == unpackCStringName     = Just mkRtsUnpackCStringLabel
+        | idName f == unpackCStringUtf8Name = Just mkRtsUnpackCStringUtf8Label
+        | otherwise                         = Nothing
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
