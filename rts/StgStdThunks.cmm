@@ -13,6 +13,8 @@
 #include "Cmm.h"
 #include "Updates.h"
 
+import CLOSURE ghczmprim_GHCziCString_unpackCStringzh_closure;
+
 /* -----------------------------------------------------------------------------
    The code for a thunk that simply extracts a field from a
    single-constructor datatype depends only on the offset of the field
@@ -282,5 +284,39 @@ INFO_TABLE(stg_ap_7_upd,7,0,THUNK,"stg_ap_7_upd_info","stg_ap_7_upd_info")
            StgThunk_payload(node,4),
            StgThunk_payload(node,5),
            StgThunk_payload(node,6));
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Making strings
+   -------------------------------------------------------------------------- */
+
+// FIXME HACK: We use CONSTR_NOCAF with 4 nptrs as we don't support having
+// payload in top-level thunks. Fields are:
+// - Padding for indirectee -- this is part of the thunk header! So below we use
+//                             index 2 for the payload
+// - Static link
+// - Saved info
+// - The actual payload!
+INFO_TABLE(stg_MK_STRING, 0, 0, THUNK_STATIC, "stg_MK_STRING", "stg_MK_STRING")
+    (P_ node)
+{
+    W_ newCAF_ret;
+
+    // TODO (osa): Not sure why we do stack check before `newCAF`, but this is
+    // how `unpackCString# str` thunks are today.
+    STK_CHK_ENTER(WDS(2), node);
+
+    (newCAF_ret) = ccall newCAF(BaseReg "ptr", node "ptr");
+
+    if (newCAF_ret == 0) {
+        jump node();
+    } else {
+        // Stack check done above
+        Sp_adj(-2);
+        Sp(1) = newCAF_ret;
+        Sp(0) = stg_bh_upd_frame_info;
+        // TODO: Make this a direct call
+        jump stg_ap_n_fast(ghczmprim_GHCziCString_unpackCStringzh_closure, StgThunk_payload(node, 2));
     }
 }
