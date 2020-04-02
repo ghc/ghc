@@ -568,10 +568,10 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
 --                            q   ::   a
 --
 
-tcMcStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
+tcMcStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
   = do  { ((rhs', pat', thing, new_res_ty), bind_op')
-            <- tcSyntaxOp MCompOrigin bind_op
+            <- tcSyntaxOp MCompOrigin (xbsrn_bindOp xbsrn)
                           [SynRho, SynFun SynAny SynRho] res_ty $
                \ [rhs_ty, pat_ty, new_res_ty] ->
                do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
@@ -581,11 +581,15 @@ tcMcStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
                   ; return (rhs', pat', thing, new_res_ty) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- fmap join . forM fail_op $ \fail ->
+        ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
             tcMonadFailOp (MCompPatOrigin pat) pat' fail new_res_ty
 
-
-        ; return (BindStmt (bind_op', new_res_ty, fail_op') pat' rhs', thing) }
+        ; let xbstc = XBindStmtTc
+                { xbstc_bindOp = bind_op'
+                , xbstc_boundResultType = new_res_ty
+                , xbstc_failOp = fail_op'
+                }
+        ; return (BindStmt xbstc pat' rhs', thing) }
 
 -- Boolean expressions.
 --
@@ -827,14 +831,14 @@ tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
-tcDoStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
+tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
                 --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
                 -- This level of generality is needed for using do-notation
                 -- in full generality; see #1537
 
           ((rhs', pat', new_res_ty, thing), bind_op')
-            <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
+            <- tcSyntaxOp DoOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] ->
                 do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                    ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
@@ -843,10 +847,14 @@ tcDoStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
                    ; return (rhs', pat', new_res_ty, thing) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- fmap join . forM fail_op $ \fail ->
+        ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
             tcMonadFailOp (DoPatOrigin pat) pat' fail new_res_ty
-
-        ; return (BindStmt (bind_op', new_res_ty, fail_op') pat' rhs', thing) }
+        ; let xbstc = XBindStmtTc
+                { xbstc_bindOp = bind_op'
+                , xbstc_boundResultType = new_res_ty
+                , xbstc_failOp = fail_op'
+                }
+        ; return (BindStmt xbstc pat' rhs', thing) }
 
 tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
@@ -940,7 +948,7 @@ tcMonadFailOp :: CtOrigin
               -> LPat GhcTcId
               -> SyntaxExpr GhcRn    -- The fail op
               -> TcType              -- Type of the whole do-expression
-              -> TcRn (Maybe (SyntaxExpr GhcTcId))  -- Typechecked fail op
+              -> TcRn (FailOperator GhcTcId)  -- Typechecked fail op
 -- Get a 'fail' operator expression, to use if the pattern match fails.
 -- This won't be used in cases where we've already determined the pattern
 -- match can't fail (so the fail op is Nothing), however, it seems that the

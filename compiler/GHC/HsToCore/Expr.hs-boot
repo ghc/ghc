@@ -1,6 +1,5 @@
 module GHC.HsToCore.Expr where
-import GhcPrelude         ( Maybe )
-import GHC.Hs             ( HsExpr, LHsExpr, LHsLocalBinds, LPat, SyntaxExpr )
+import GHC.Hs             ( HsExpr, LHsExpr, LHsLocalBinds, LPat, SyntaxExpr, FailOperator )
 import GHC.HsToCore.Monad ( DsM, MatchResult )
 import GHC.Core           ( CoreExpr )
 import GHC.Hs.Extension   ( GhcTc)
@@ -10,4 +9,4 @@ dsLExpr, dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
 
-dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
+dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> FailOperator GhcTc -> DsM CoreExpr

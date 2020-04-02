@@ -762,7 +762,8 @@ exhaustive list). How we deal with pattern match failure is context-dependent.
 
  * In the case of list comprehensions and pattern guards we don't need any
    'fail' function; the desugarer ignores the fail function of 'BindStmt'
-   entirely. That said, it ought to be 'Nothing' for clarity.
+   entirely. So, for list comprehensions, the fail function is set to 'Nothing'
+   for clarity.
 
  * In the case of monadic contexts (e.g. monad comprehensions, do, and mdo
    expressions) we want pattern match failure to be desugared to the appropriate
@@ -823,8 +824,8 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body)) thing_inside
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
-        ; return (( [( L loc (BindStmt (bind_op, fail_op) pat' body')
-                     , fv_expr )]
+        ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
+        ; return (( [( L loc (BindStmt xbsrn pat' body'), fv_expr )]
                   , thing),
                   fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
@@ -1154,8 +1155,9 @@ rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body), fv_pat)
 
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
+       ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-                  L loc (BindStmt (bind_op, fail_op) pat' body'))] }
+                  L loc (BindStmt xbsrn pat' body'))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (text "an mdo expression") binds)
@@ -1647,12 +1649,12 @@ stmtTreeToStmts
 -- In the spec, but we do it here rather than in the desugarer,
 -- because we need the typechecker to typecheck the <$> form rather than
 -- the bind form, which would give rise to a Monad constraint.
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt (_, fail_op) pat rhs), _))
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt xbs pat rhs), _))
                 tail _tail_fvs
   | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail
   -- See Note [ApplicativeDo and strict patterns]
   = mkApplicativeStmt ctxt [ApplicativeArgOne
-                            { xarg_app_arg_one = fail_op
+                            { xarg_app_arg_one = xbsrn_failOp xbs
                             , app_arg_pattern  = pat
                             , arg_expr         = rhs
                             , is_body_stmt     = False
@@ -1690,9 +1692,9 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
    return (stmts, unionNameSets (fvs:fvss))
  where
-   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt (_, fail_op) pat exp), _))
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt xbs pat exp), _))
      = return (ApplicativeArgOne
-               { xarg_app_arg_one = fail_op
+               { xarg_app_arg_one = xbsrn_failOp xbs
                , app_arg_pattern  = pat
                , arg_expr         = exp
                , is_body_stmt     = False
@@ -1880,9 +1882,9 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- strict patterns though; splitSegments expects that if we return Just
   -- then we have actually done some splitting. Otherwise it will go into
   -- an infinite loop (#14163).
-  go lets indep bndrs ((L loc (BindStmt (bind_op, fail_op) pat body), fvs): rest)
+  go lets indep bndrs ((L loc (BindStmt xbs pat body), fvs): rest)
     | isEmptyNameSet (bndrs `intersectNameSet` fvs) && not (isStrictPattern pat)
-    = go lets ((L loc (BindStmt (bind_op, fail_op) pat body), fvs) : indep)
+    = go lets ((L loc (BindStmt xbs pat body), fvs) : indep)
          bndrs' rest
     where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders pat)
   -- If we encounter a LetStmt that doesn't depend on a BindStmt in this
@@ -2127,7 +2129,7 @@ badIpBinds what binds
 
 monadFailOp :: LPat GhcPs
             -> HsStmtContext GhcRn
-            -> RnM (Maybe (SyntaxExpr GhcRn), FreeVars)
+            -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt
   -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
   -- we should not need to fail.
@@ -2164,7 +2166,7 @@ So, in this case, we synthesize the function
 (rather than plain 'fail') for the 'fail' operation. This is done in
 'getMonadFailOp'.
 -}
-getMonadFailOp :: RnM (Maybe (SyntaxExpr GhcRn), FreeVars) -- Syntax expr fail op
+getMonadFailOp :: RnM (FailOperator GhcRn, FreeVars) -- Syntax expr fail op
 getMonadFailOp
  = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags

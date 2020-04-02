@@ -495,9 +495,9 @@ dsMcStmt (LetStmt _ binds) stmts
        ; dsLocalBinds binds rest }
 
 --   [ .. | a <- m, stmts ]
-dsMcStmt (BindStmt (bind_op, bind_ty, fail_op) pat rhs) stmts
+dsMcStmt (BindStmt xbs pat rhs) stmts
   = do { rhs' <- dsLExpr rhs
-       ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
+       ; dsMcBindStmt pat rhs' (xbstc_bindOp xbs) (xbstc_failOp xbs) (xbstc_boundResultType xbs) stmts }
 
 -- Apply `guard` to the `exp` expression
 --

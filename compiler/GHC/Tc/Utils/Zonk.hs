@@ -1190,16 +1190,21 @@ zonkStmt env _ (LetStmt x (L l binds))
   = do (env1, new_binds) <- zonkLocalBinds env binds
        return (env1, LetStmt x (L l new_binds))
 
-zonkStmt env zBody (BindStmt (bind_op, bind_ty, fail_op) pat body)
-  = do  { (env1, new_bind) <- zonkSyntaxExpr env bind_op
-        ; new_bind_ty <- zonkTcTypeToTypeX env1 bind_ty
+zonkStmt env zBody (BindStmt xbs pat body)
+  = do  { (env1, new_bind) <- zonkSyntaxExpr env (xbstc_bindOp xbs)
+        ; new_bind_ty <- zonkTcTypeToTypeX env1 (xbstc_boundResultType xbs)
         ; new_body <- zBody env1 body
         ; (env2, new_pat) <- zonkPat env1 pat
-        ; new_fail <- case fail_op of
+        ; new_fail <- case xbstc_failOp xbs of
             Nothing -> return Nothing
             Just f -> fmap (Just . snd) (zonkSyntaxExpr env1 f)
         ; return ( env2
-                 , BindStmt (new_bind, new_bind_ty, new_fail) new_pat new_body) }
+                 , BindStmt (XBindStmtTc
+                              { xbstc_bindOp = new_bind
+                              , xbstc_boundResultType = new_bind_ty
+                              , xbstc_failOp = new_fail
+                              })
+                            new_pat new_body) }
 
 -- Scopes: join > ops (in reverse order) > pats (in forward order)
 --              > rest of stmts

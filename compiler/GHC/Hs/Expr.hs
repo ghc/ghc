@@ -1948,8 +1948,19 @@ data RecStmtTc =
 type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
 type instance XBindStmt        (GhcPass _) GhcPs b = NoExtField
-type instance XBindStmt        (GhcPass _) GhcRn b = (SyntaxExpr GhcRn, FailOperator GhcRn)
-type instance XBindStmt        (GhcPass _) GhcTc b = (SyntaxExpr GhcTc, Type, FailOperator GhcTc)
+type instance XBindStmt        (GhcPass _) GhcRn b = XBindStmtRn
+type instance XBindStmt        (GhcPass _) GhcTc b = XBindStmtTc
+
+data XBindStmtRn = XBindStmtRn
+  { xbsrn_bindOp :: SyntaxExpr GhcRn
+  , xbsrn_failOp :: FailOperator GhcRn
+  }
+
+data XBindStmtTc = XBindStmtTc
+  { xbstc_bindOp :: SyntaxExpr GhcTc
+  , xbstc_boundResultType :: Type -- If (>>=) :: Q -> (R -> S) -> T, this is S
+  , xbstc_failOp :: FailOperator GhcTc
+  }
 
 type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExtField
 type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExtField
@@ -2011,7 +2022,7 @@ type FailOperator id = Maybe (SyntaxExpr id)
 -- | Applicative Argument
 data ApplicativeArg idL
   = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
-    { xarg_app_arg_one  :: (XApplicativeArgOne idL)
+    { xarg_app_arg_one  :: XApplicativeArgOne idL
       -- ^ The fail operator, after renaming
       --
       -- The fail operator is needed if this is a BindStmt
@@ -2022,17 +2033,18 @@ data ApplicativeArg idL
       -- It is also used for guards in MonadComprehensions.
       -- The fail operator is Nothing
       -- if the pattern match can't fail
-    , app_arg_pattern   :: (LPat idL) -- WildPat if it was a BodyStmt (see below)
-    , arg_expr          :: (LHsExpr idL)
-    , is_body_stmt      :: Bool -- True <=> was a BodyStmt
-                              -- False <=> was a BindStmt
-                              -- See Note [Applicative BodyStmt]
+    , app_arg_pattern   :: LPat idL -- WildPat if it was a BodyStmt (see below)
+    , arg_expr          :: LHsExpr idL
+    , is_body_stmt      :: Bool
+      -- ^ True <=> was a BodyStmt,
+      -- False <=> was a BindStmt.
+      -- See Note [Applicative BodyStmt]
     }
   | ApplicativeArgMany     -- do { stmts; return vars }
-    { xarg_app_arg_many :: (XApplicativeArgMany idL)
+    { xarg_app_arg_many :: XApplicativeArgMany idL
     , app_stmts         :: [ExprLStmt idL] -- stmts
-    , final_expr        :: (HsExpr idL)    -- return (v1,..,vn), or just (v1,..,vn)
-    , bv_pattern        :: (LPat idL)      -- (v1,...,vn)
+    , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
+    , bv_pattern        :: LPat idL      -- (v1,...,vn)
     }
   | XApplicativeArg !(XXApplicativeArg idL)
 
