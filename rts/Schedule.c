@@ -941,7 +941,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          */
         if (recent_activity != ACTIVITY_INACTIVE) return;
 #endif
-        if (task->incall->tso->why_blocked == BlockedOnIOCompletion) return;
+        if (task->incall->tso && task->incall->tso->why_blocked == BlockedOnIOCompletion) return;
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
 
