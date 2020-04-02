@@ -150,7 +150,6 @@ import GHC.Utils.Misc
 import Data.List (sortBy, sort)
 import Data.Ord
 import Data.Version
-import GHC.PackageDb
 import GHC.Utils.Fingerprint
 
 import qualified Data.ByteString as BS
@@ -344,10 +343,6 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
-instance BinaryStringRep ModuleName where
-  fromStringRep = mkModuleNameFS . mkFastStringByteString
-  toStringRep   = bytesFS . moduleNameFS
-
 instance Data ModuleName where
   -- don't traverse?
   toConstr _   = abstractConstr "ModuleName"
@@ -492,15 +487,6 @@ class ContainsModule t where
 class HasModule m where
     getModule :: m Module
 
-instance DbUnitIdModuleRep InstalledUnitId ComponentId UnitId ModuleName Module where
-  fromDbModule (DbModule uid mod_name)  = mkModule uid mod_name
-  fromDbModule (DbModuleVar mod_name)   = mkHoleModule mod_name
-  fromDbUnitId (DbUnitId cid insts)     = newUnitId cid insts
-  fromDbUnitId (DbInstalledUnitId iuid) = DefiniteUnitId (DefUnitId iuid)
-  -- GHC never writes to the database, so it's not needed
-  toDbModule = error "toDbModule: not implemented"
-  toDbUnitId = error "toDbUnitId: not implemented"
-
 {-
 ************************************************************************
 *                                                                      *
@@ -534,10 +520,6 @@ data ComponentDetails = ComponentDetails
    , componentName           :: Maybe String
    , componentSourcePkdId    :: String
    }
-
-instance BinaryStringRep ComponentId where
-  fromStringRep bs = ComponentId (mkFastStringByteString bs) Nothing
-  toStringRep (ComponentId s _) = bytesFS s
 
 instance Uniquable ComponentId where
   getUnique (ComponentId n _) = getUnique n
@@ -700,11 +682,6 @@ instance Binary InstalledUnitId where
   put_ bh (InstalledUnitId fs) = put_ bh fs
   get bh = do fs <- get bh; return (InstalledUnitId fs)
 
-instance BinaryStringRep InstalledUnitId where
-  fromStringRep bs = InstalledUnitId (mkFastStringByteString bs)
-  -- GHC doesn't write to database
-  toStringRep   = error "BinaryStringRep InstalledUnitId: not implemented"
-
 instance Eq InstalledUnitId where
     uid1 == uid2 = installedUnitIdKey uid1 == installedUnitIdKey uid2
 
@@ -858,7 +835,7 @@ unitIdIsDefinite = isEmptyUniqDSet . unitIdFreeHoles
 hashUnitId :: ComponentId -> [(ModuleName, Module)] -> FastString
 hashUnitId cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (toStringRep cid)
+  . fingerprintUnitId (bytesFS (componentIdRaw cid))
   $ rawHashUnitId sorted_holes
 
 -- | Generate a hash for a sorted module substitution.
@@ -867,9 +844,9 @@ rawHashUnitId sorted_holes =
     fingerprintByteString
   . BS.concat $ do
         (m, b) <- sorted_holes
-        [ toStringRep m,                BS.Char8.singleton ' ',
+        [ bytesFS (moduleNameFS m),                BS.Char8.singleton ' ',
           bytesFS (unitIdFS (moduleUnitId b)), BS.Char8.singleton ':',
-          toStringRep (moduleName b),   BS.Char8.singleton '\n']
+          bytesFS (moduleNameFS (moduleName b)),   BS.Char8.singleton '\n']
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString
 fingerprintUnitId prefix (Fingerprint a b)
