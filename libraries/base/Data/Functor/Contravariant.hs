@@ -1,5 +1,8 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
@@ -53,11 +56,11 @@ import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Functor.Compose
 
-import Data.Monoid (Alt(..))
+import Data.Monoid (Alt(..), All(..))
 import Data.Proxy
 import GHC.Generics
 
-import Prelude hiding ((.),id)
+import Prelude hiding ((.), id)
 
 -- | The class of contravariant functors.
 --
@@ -76,6 +79,7 @@ import Prelude hiding ((.),id)
 -- newtype Predicate a = Predicate { getPredicate :: a -> Bool }
 --
 -- instance Contravariant Predicate where
+--   contramap :: (a' -> a) -> (Predicate a -> Predicate a')
 --   contramap f (Predicate p) = Predicate (p . f)
 --                                          |   `- First, map the input...
 --                                          `----- then apply the predicate.
@@ -86,7 +90,7 @@ import Prelude hiding ((.),id)
 --
 -- Any instance should be subject to the following laws:
 --
--- [Identity]    @'contramap' 'id' = 'id'@
+-- [Identity]    @'contramap' 'id'      = 'id'@
 -- [Composition] @'contramap' (g . f) = 'contramap' f . 'contramap' g@
 --
 -- Note, that the second law follows from the free theorem of the type of
@@ -94,7 +98,7 @@ import Prelude hiding ((.),id)
 -- condition holds.
 
 class Contravariant f where
-  contramap :: (a -> b) -> f b -> f a
+  contramap :: (a' -> a) -> (f a -> f a')
 
   -- | Replace all locations in the output with the same value.
   -- The default definition is @'contramap' . 'const'@, but this may be
@@ -110,7 +114,7 @@ class Contravariant f where
 -- lawful we have the following laws:
 --
 -- @
--- 'fmap' f ≡ 'phantom'
+-- 'fmap'      f ≡ 'phantom'
 -- 'contramap' f ≡ 'phantom'
 -- @
 phantom :: (Functor f, Contravariant f) => f a -> f b
@@ -123,79 +127,134 @@ infixl 4 >$, $<, >$<, >$$<
 ($<) = flip (>$)
 
 -- | This is an infix alias for 'contramap'.
-(>$<) :: Contravariant f => (a -> b) -> f b -> f a
+(>$<) :: Contravariant f => (a -> b) -> (f b -> f a)
 (>$<) = contramap
 
 -- | This is an infix version of 'contramap' with the arguments flipped.
 (>$$<) :: Contravariant f => f b -> (a -> b) -> f a
 (>$$<) = flip contramap
 
-deriving instance Contravariant f => Contravariant (Alt f)
-deriving instance Contravariant f => Contravariant (Rec1 f)
-deriving instance Contravariant f => Contravariant (M1 i c f)
+deriving newtype instance Contravariant f => Contravariant (Alt f)
+deriving newtype instance Contravariant f => Contravariant (Rec1 f)
+deriving newtype instance Contravariant f => Contravariant (M1 i c f)
 
 instance Contravariant V1 where
+  contramap :: (a' -> a) -> (V1 a -> V1 a')
   contramap _ x = case x of
 
 instance Contravariant U1 where
+  contramap :: (a' -> a) -> (U1 a -> U1 a')
   contramap _ _ = U1
 
 instance Contravariant (K1 i c) where
+  contramap :: (a' -> a) -> (K1 i c a -> K1 i c a')
   contramap _ (K1 c) = K1 c
 
 instance (Contravariant f, Contravariant g) => Contravariant (f :*: g) where
+  contramap :: (a' -> a) -> ((f :*: g) a -> (f :*: g) a')
   contramap f (xs :*: ys) = contramap f xs :*: contramap f ys
 
 instance (Functor f, Contravariant g) => Contravariant (f :.: g) where
+  contramap :: (a' -> a) -> ((f :.: g) a -> (f :.: g) a')
   contramap f (Comp1 fg) = Comp1 (fmap (contramap f) fg)
 
 instance (Contravariant f, Contravariant g) => Contravariant (f :+: g) where
+  contramap :: (a' -> a) -> ((f :+: g) a -> (f :+: g) a')
   contramap f (L1 xs) = L1 (contramap f xs)
   contramap f (R1 ys) = R1 (contramap f ys)
 
 instance (Contravariant f, Contravariant g) => Contravariant (Sum f g) where
+  contramap :: (a' -> a) -> (Sum f g a -> Sum f g a')
   contramap f (InL xs) = InL (contramap f xs)
   contramap f (InR ys) = InR (contramap f ys)
 
 instance (Contravariant f, Contravariant g)
-  => Contravariant (Product f g) where
-    contramap f (Pair a b) = Pair (contramap f a) (contramap f b)
+      => Contravariant (Product f g) where
+  contramap :: (a' -> a) -> (Product f g a -> Product f g a')
+  contramap f (Pair a b) = Pair (contramap f a) (contramap f b)
 
 instance Contravariant (Const a) where
+  contramap :: (b' -> b) -> (Const a b -> Const a b')
   contramap _ (Const a) = Const a
 
 instance (Functor f, Contravariant g) => Contravariant (Compose f g) where
+  contramap :: (a' -> a) -> (Compose f g a -> Compose f g a')
   contramap f (Compose fga) = Compose (fmap (contramap f) fga)
 
 instance Contravariant Proxy where
+  contramap :: (a' -> a) -> (Proxy a -> Proxy a')
   contramap _ _ = Proxy
 
 newtype Predicate a = Predicate { getPredicate :: a -> Bool }
+  deriving
+    ( -- | @('<>')@ on predicates uses logical conjunction @('&&')@ on
+      -- the results. Without newtypes this equals @'liftA2' (&&)@.
+      --
+      -- @
+      -- (<>) :: Predicate a -> Predicate a -> Predicate a
+      -- Predicate pred <> Predicate pred' = Predicate \a ->
+      --   pred a && pred' a
+      -- @
+      Semigroup
+    , -- | @'mempty'@ on predicates always returns @True@. Without
+      -- newtypes this equals @'pure' True@.
+      --
+      -- @
+      -- mempty :: Predicate a
+      -- mempty = \_ -> True
+      -- @
+      Monoid
+    )
+  via a -> All
 
--- | A 'Predicate' is a 'Contravariant' 'Functor', because 'contramap' can
--- apply its function argument to the input of the predicate.
-instance Contravariant Predicate where
-  contramap f g = Predicate $ getPredicate g . f
-
-instance Semigroup (Predicate a) where
-  Predicate p <> Predicate q = Predicate $ \a -> p a && q a
-
-instance Monoid (Predicate a) where
-  mempty = Predicate $ const True
+  deriving
+    ( -- | A 'Predicate' is a 'Contravariant' 'Functor', because
+      -- 'contramap' can apply its function argument to the input of
+      -- the predicate.
+      --
+      -- Without newtypes @'contramap' f@ equals precomposing with @f@
+      -- (= @(. f)@).
+      --
+      -- @
+      -- contramap :: (a' -> a) -> (Predicate a -> Predicate a')
+      -- contramap f (Predicate g) = Predicate (g . f)
+      -- @
+      Contravariant
+    )
+  via Op Bool
 
 -- | Defines a total ordering on a type as per 'compare'.
 --
 -- This condition is not checked by the types. You must ensure that the
 -- supplied values are valid total orderings yourself.
 newtype Comparison a = Comparison { getComparison :: a -> a -> Ordering }
-
-deriving instance Semigroup (Comparison a)
-deriving instance Monoid (Comparison a)
+  deriving
+  newtype
+    ( -- | @('<>')@ on comparisons combines results with @('<>')
+      -- \@Ordering@. Without newtypes this equals @'liftA2' ('liftA2'
+      -- ('<>'))@.
+      --
+      -- @
+      -- (<>) :: Comparison a -> Comparison a -> Comparison a
+      -- Comparison cmp <> Comparison cmp' = Comparison \a a' ->
+      --   cmp a a' <> cmp a a'
+      -- @
+      Semigroup
+    , -- | @'mempty'@ on comparisons always returns @EQ@. Without
+      -- newtypes this equals @'pure' ('pure' EQ)@.
+      --
+      -- @
+      -- mempty :: Comparison a
+      -- mempty = Comparison \_ _ -> EQ
+      -- @
+      Monoid
+    )
 
 -- | A 'Comparison' is a 'Contravariant' 'Functor', because 'contramap' can
 -- apply its function argument to each input of the comparison function.
 instance Contravariant Comparison where
-  contramap f g = Comparison $ on (getComparison g) f
+  contramap :: (a' -> a) -> (Comparison a -> Comparison a')
+  contramap f (Comparison g) = Comparison (on g f)
 
 -- | Compare using 'compare'.
 defaultComparison :: Ord a => Comparison a
@@ -214,18 +273,34 @@ defaultComparison = Comparison compare
 -- The types alone do not enforce these laws, so you'll have to check them
 -- yourself.
 newtype Equivalence a = Equivalence { getEquivalence :: a -> a -> Bool }
+  deriving
+    ( -- | @('<>')@ on equivalences uses logical conjunction @('&&')@
+      -- on the results. Without newtypes this equals @'liftA2'
+      -- ('liftA2' (&&))@.
+      --
+      -- @
+      -- (<>) :: Equivalence a -> Equivalence a -> Equivalence a
+      -- Equivalence equiv <> Equivalence equiv' = Equivalence \a b ->
+      --   equiv a b && equiv a b
+      -- @
+      Semigroup
+    , -- | @'mempty'@ on equivalences always returns @True@. Without
+      -- newtypes this equals @'pure' ('pure' True)@.
+      --
+      -- @
+      -- mempty :: Equivalence a
+      -- mempty = Equivalence \_ _ -> True
+      -- @
+      Monoid
+    )
+  via a -> a -> All
 
 -- | Equivalence relations are 'Contravariant', because you can
 -- apply the contramapped function to each input to the equivalence
 -- relation.
 instance Contravariant Equivalence where
-  contramap f g = Equivalence $ on (getEquivalence g) f
-
-instance Semigroup (Equivalence a) where
-  Equivalence p <> Equivalence q = Equivalence $ \a b -> p a b && q a b
-
-instance Monoid (Equivalence a) where
-  mempty = Equivalence (\_ _ -> True)
+  contramap :: (a' -> a) -> (Equivalence a -> Equivalence a')
+  contramap f (Equivalence g) = Equivalence (on g f)
 
 -- | Check for equivalence with '=='.
 --
@@ -238,15 +313,36 @@ comparisonEquivalence (Comparison p) = Equivalence $ \a b -> p a b == EQ
 
 -- | Dual function arrows.
 newtype Op a b = Op { getOp :: b -> a }
-
-deriving instance Semigroup a => Semigroup (Op a b)
-deriving instance Monoid a => Monoid (Op a b)
+  deriving
+  newtype
+    ( -- | @('<>') \@(Op a b)@ without newtypes is @('<>') \@(b->a)@ =
+      -- @liftA2 ('<>')@. This lifts the 'Semigroup' operation
+      -- @('<>')@ over the output of @a@.
+      --
+      -- @
+      -- (<>) :: Op a b -> Op a b -> Op a b
+      -- Op f <> Op g = Op \a -> f a <> g a
+      -- @
+      Semigroup
+    , -- | @'mempty' \@(Op a b)@ without newtypes is @mempty \@(b->a)@
+      -- = @\_ -> mempty@.
+      --
+      -- @
+      -- mempty :: Op a b
+      -- mempty = Op \_ -> mempty
+      -- @
+      Monoid
+    )
 
 instance Category Op where
+  id :: Op a a
   id = Op id
+
+  (.) :: Op b c -> Op a b -> Op a c
   Op f . Op g = Op (g . f)
 
 instance Contravariant (Op a) where
+  contramap :: (b' -> b) -> (Op a b -> Op a b')
   contramap f g = Op (getOp g . f)
 
 instance Num a => Num (Op a b) where
