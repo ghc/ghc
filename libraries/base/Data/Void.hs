@@ -79,15 +79,13 @@ absurd a = case a of {}
 -- | If 'Void' is uninhabited then any 'Functor' that holds only
 -- values of type 'Void' is holding no values.
 --
--- Using @ApplicativeDo@: \'@'vacuous' theVoid@\' can be understood as the
+-- Assuming that @f@ is also a 'Monad', @('vacuous' theVoid)@ can be understood as the
 -- @do@ expression
 --
 -- @
 -- do void <- theVoid
 --    pure (absurd void)
 -- @
---
--- with an inferred @Functor@ constraint.
 --
 -- @since 4.8.0.0
 vacuous :: Functor f => f Void -> f a
