@@ -29,7 +29,8 @@ module Control.Monad.IO.Class (
 -- * @'liftIO' (m >>= f) = 'liftIO' m >>= ('liftIO' . f)@
 
 class (Monad m) => MonadIO m where
-    -- | Lift a computation from the 'IO' monad.
+    -- | * Description
+    -- Lift a computation from the 'IO' monad.
     -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
     -- (i.e. IO is the base monad for the stack).
     -- $liftIOexample
