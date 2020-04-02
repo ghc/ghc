@@ -2194,7 +2194,10 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
 
               -- [it <- e]
               bind_stmt = L loc $ BindStmt
-                                       (mkRnSyntaxExpr bindIOName, Nothing)
+                                       (XBindStmtRn
+                                          { xbsrn_bindOp = mkRnSyntaxExpr bindIOName
+                                          , xbsrn_failOp = Nothing
+                                          })
                                        (L loc (VarPat noExtField (L loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
 

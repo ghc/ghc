@@ -709,10 +709,14 @@ addTickStmt _isGuard (LastStmt x e noret ret) = do
                 (addTickLHsExpr e)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickStmt _isGuard (BindStmt (bind, ty, fail) pat e) = do
-        liftM4 (\b f -> BindStmt (b, ty, f))
-                (addTickSyntaxExpr hpcSrcSpan bind)
-                (mapM (addTickSyntaxExpr hpcSrcSpan) fail)
+addTickStmt _isGuard (BindStmt xbs pat e) = do
+        liftM4 (\b f -> BindStmt $ XBindStmtTc
+                    { xbstc_bindOp = b
+                    , xbstc_boundResultType = xbstc_boundResultType xbs
+                    , xbstc_failOp = f
+                    })
+                (addTickSyntaxExpr hpcSrcSpan (xbstc_bindOp xbs))
+                (mapM (addTickSyntaxExpr hpcSrcSpan) (xbstc_failOp xbs))
                 (addTickLPat pat)
                 (addTickLHsExprRHS e)
 addTickStmt isGuard (BodyStmt x e bind' guard') = do
