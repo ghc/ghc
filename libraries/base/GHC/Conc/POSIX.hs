@@ -175,7 +175,9 @@ interruptIOManager = return ()
 startIOManagerThread :: IO ()
 startIOManagerThread = do
   modifyMVar_ ioManagerThread $ \old -> do
-    let create = do t <- forkIO ioManager; return (Just t)
+    let create = do t <- forkIO ioManager;
+                    labelThread t "IOManagerThread";
+                    return (Just t)
     case old of
       Nothing -> create
       Just t  -> do
