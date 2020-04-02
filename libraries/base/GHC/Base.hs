@@ -483,30 +483,41 @@ the first law, so you need only check that the former condition holds.
 -}
 
 class  Functor f  where
-    -- | Using @ApplicativeDo@: \'@'fmap' f as@\' can be understood as
-    -- the @do@ expression
+    -- 'fmap' is used to apply a function of type '(a -> b)' on a functor 'f a', to produce a functor 'f b'.
+    -- ==== __Examples__
     --
-    -- @
-    -- do a <- as
-    --    pure (f a)
-    -- @
+    -- Convert from a @'Data.Maybe.Maybe' 'Data.Int.Int'@ to a @'Data.Maybe.Maybe'
+    -- 'Data.String.String'@ using 'Prelude.show':
     --
-    -- with an inferred @Functor@ constraint.
+    -- >>> fmap show Nothing
+    -- Nothing
+    -- >>> fmap show (Just 3)
+    -- Just "3"
+    --
+    -- Convert from an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@ to an
+    -- @'Data.Either.Either' 'Data.Int.Int'@ 'Data.String.String' using 'Prelude.show':
+    --
+    -- >>> fmap show (Left 17)
+    -- Left 17
+    -- >>> fmap show (Right 17)
+    -- Right "17"
+    --
+    -- Double each element of a list:
+    --
+    -- >>> fmap (*2) [1,2,3]
+    -- [2,4,6]
+    --
+    -- Apply 'Prelude.even' to the second element of a pair:
+    --
+    -- >>> fmap even (2,2)
+    -- (2,True)
+    --
     fmap        :: (a -> b) -> f a -> f b
 
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
     --
-    -- Using @ApplicativeDo@: \'@a '<$' bs@\' can be understood as the
-    -- @do@ expression
-    --
-    -- @
-    -- do bs
-    --    pure a
-    -- @
-    --
-    -- with an inferred @Functor@ constraint.
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
@@ -584,14 +595,17 @@ class Functor f => Applicative f where
     -- A few functors support an implementation of '<*>' that is more
     -- efficient than the default one.
     --
-    -- Using @ApplicativeDo@: \'@fs '<*>' as@\' can be understood as
-    -- the @do@ expression
+    -- ==== __Example__
+    -- Used in combination with '(<$>)', '(<*>)' can be used to build a record.
     --
-    -- @
-    -- do f <- fs
-    --    a <- as
-    --    pure (f a)
-    -- @
+    -- >>> data MyState = MyState {arg1 :: Foo, arg2 :: Bar, arg3 :: Baz}
+    --
+    -- >>> produceFoo :: Applicative f => f Foo
+    -- >>> produceBar :: Applicative f => f Bar
+    -- >>> produceBaz :: Applicative f => f Baz
+    --
+    -- >>> mkState :: Applicative f => f MyState
+    -- >>> mkState = MyState <$> produceFoo <*> produceBar <*> produceBaz
     (<*>) :: f (a -> b) -> f a -> f b
     (<*>) = liftA2 id
 
@@ -605,38 +619,39 @@ class Functor f => Applicative f where
     -- This became a typeclass method in 4.10.0.0. Prior to that, it was
     -- a function defined in terms of '<*>' and 'fmap'.
     --
-    -- Using @ApplicativeDo@: \'@'liftA2' f as bs@\' can be understood
-    -- as the @do@ expression
-    --
-    -- @
-    -- do a <- as
-    --    b <- bs
-    --    pure (f a b)
-    -- @
+    -- ==== __Example__
+    -- >>> liftA2 (,) (Just 3) (Just 5)
+    -- Just (3,5)
 
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
     -- | Sequence actions, discarding the value of the first argument.
     --
-    -- \'@as '*>' bs@\' can be understood as the @do@ expression
+    -- ==== __Example__
+    -- If used in conjunction with the Applicative instance for @'Maybe' a@,
+    -- you can chain Maybe computations, with a possible "early return"
+    -- in case of 'Nothing'.
     --
-    -- @
-    -- do as
-    --    bs
-    -- @
+    -- >>> Just 2 *> Just 3
+    -- Just 3
     --
-    -- This is a tad complicated for our @ApplicativeDo@ extension
-    -- which will give it a @Monad@ constraint. For an @Applicative@
-    -- constraint we write it of the form
+    -- >>> Nothing *> Just 3
+    -- Nothing
     --
-    -- @
-    -- do _ <- as
-    --    b <- bs
-    --    pure b
-    -- @
+    -- Of course a more interesting use case would be to have effectful
+    -- computations instead of just returning pure values. 
+    --
+    -- >>> putStrLn "hello" *> putStrLn "World" *> getChar
+    -- hello -- stdout;
+    -- World -- stdout;
+    -- l     -- stdin;
+    -- 'l'   -- returned value. The previous results have been discarded.
+    -- it :: Char
+    --
     (*>) :: f a -> f b -> f b
     a1 *> a2 = (id <$ a1) <*> a2
+
     -- This is essentially the same as liftA2 (flip const), but if the
     -- Functor instance has an optimized (<$), it may be better to use
     -- that instead. Before liftA2 became a method, this definition
@@ -648,27 +663,11 @@ class Functor f => Applicative f where
 
     -- | Sequence actions, discarding the value of the second argument.
     --
-    -- Using @ApplicativeDo@: \'@as '<*' bs@\' can be understood as
-    -- the @do@ expression
-    --
-    -- @
-    -- do a <- as
-    --    bs
-    --    pure a
-    -- @
     (<*) :: f a -> f b -> f a
     (<*) = liftA2 const
 
 -- | A variant of '<*>' with the arguments reversed.
 --
--- Using @ApplicativeDo@: \'@as '<**>' fs@\' can be understood as the
--- @do@ expression
---
--- @
--- do a <- as
---    f <- fs
---    pure (f a)
--- @
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
 -- Don't use $ here, see the note at the top of the page
@@ -676,16 +675,6 @@ class Functor f => Applicative f where
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 --
--- Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
--- @do@ expression
---
---
--- @
--- do a <- as
---    pure (f a)
--- @
---
--- with an inferred @Functor@ constraint, weaker than @Applicative@.
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
@@ -693,15 +682,6 @@ liftA f a = pure f <*> a
 
 -- | Lift a ternary function to actions.
 --
--- Using @ApplicativeDo@: \'@'liftA3' f as bs cs@\' can be understood
--- as the @do@ expression
---
--- @
--- do a <- as
---    b <- bs
---    c <- cs
---    pure (f a b c)
--- @
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = liftA2 f a b <*> c
 
