@@ -31,7 +31,7 @@
 module Main (main) where
 
 import qualified GHC.PackageDb as GhcPkg
-import GHC.PackageDb (BinaryStringRep(..))
+import GHC.PackageDb
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings.Platform (getTargetPlatform)
@@ -50,11 +50,12 @@ import Distribution.Package hiding (installedUnitId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
+import Distribution.Pretty (Pretty (..))
 import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
-import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File, readUTF8File)
+import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
@@ -67,6 +68,7 @@ import Prelude
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
+import Data.Bifunctor
 
 import Data.Char ( toLower )
 import Control.Monad
@@ -1297,7 +1299,8 @@ updateDBCache verbosity db db_stack = do
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
 
-  GhcPkg.writePackageDb filename (map fst pkgsGhcCacheFormat) pkgsCabalFormat
+  let d = fmap (fromPackageCacheFormat . fst) pkgsGhcCacheFormat
+  GhcPkg.writePackageDb filename d pkgsCabalFormat
     `catchIO` \e ->
       if isPermissionError e
       then die $ filename ++ ": you don't have permission to modify this file"
@@ -1311,7 +1314,6 @@ type PackageCacheFormat = GhcPkg.GenericUnitInfo
                             PackageIdentifier
                             PackageName
                             UnitId
-                            OpenUnitId
                             ModuleName
                             OpenModule
 
@@ -1363,6 +1365,28 @@ recomputeValidAbiDeps db pkg =
     abiDepsUpdated =
       GhcPkg.unitAbiDepends pkg /= newAbiDeps
 
+
+-- | Convert from PackageCacheFormat to DbUnitInfo (the format used in
+-- Ghc.PackageDb to store into the database)
+fromPackageCacheFormat :: PackageCacheFormat -> GhcPkg.DbUnitInfo
+fromPackageCacheFormat = GhcPkg.mapGenericUnitInfo
+     mkUnitId' mkComponentId' mkPackageIdentifier' mkPackageName' mkModuleName' mkModule'
+   where
+     displayBS :: Pretty a => a -> BS.ByteString
+     displayBS            = toUTF8BS . display
+     mkPackageIdentifier' = displayBS
+     mkPackageName'       = displayBS
+     mkComponentId'       = displayBS
+     mkUnitId'            = displayBS
+     mkModuleName'        = displayBS
+     mkInstUnitId' i      = case i of
+       IndefFullUnitId cid insts -> DbInstUnitId (mkComponentId' cid)
+                                                 (fmap (bimap mkModuleName' mkModule') (Map.toList insts))
+       DefiniteUnitId uid        -> DbUnitId (mkUnitId' (unDefUnitId uid))
+     mkModule' m = case m of
+       OpenModule uid n -> DbModule (mkInstUnitId' uid) (mkModuleName' n)
+       OpenModuleVar n  -> DbModuleVar  (mkModuleName' n)
+
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.GenericUnitInfo {
@@ -1399,43 +1423,6 @@ convertPackageInfoToCacheFormat pkg =
     }
   where
     convertExposed (ExposedModule n reexport) = (n, reexport)
-
-instance GhcPkg.BinaryStringRep ComponentId where
-  fromStringRep = mkComponentId . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep PackageName where
-  fromStringRep = mkPackageName . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep PackageIdentifier where
-  fromStringRep = fromMaybe (error "BinaryStringRep PackageIdentifier")
-                . simpleParse . fromStringRep
-  toStringRep = toStringRep . display
-
-instance GhcPkg.BinaryStringRep ModuleName where
-  fromStringRep = ModuleName.fromString . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep String where
-  fromStringRep = fromUTF8BS
-  toStringRep   = toUTF8BS
-
-instance GhcPkg.BinaryStringRep UnitId where
-  fromStringRep = mkUnitId . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.DbUnitIdModuleRep UnitId ComponentId OpenUnitId ModuleName OpenModule where
-  fromDbModule (GhcPkg.DbModule uid mod_name) = OpenModule uid mod_name
-  fromDbModule (GhcPkg.DbModuleVar mod_name) = OpenModuleVar mod_name
-  toDbModule (OpenModule uid mod_name) = GhcPkg.DbModule uid mod_name
-  toDbModule (OpenModuleVar mod_name) = GhcPkg.DbModuleVar mod_name
-  fromDbUnitId (GhcPkg.DbUnitId cid insts) = IndefFullUnitId cid (Map.fromList insts)
-  fromDbUnitId (GhcPkg.DbInstalledUnitId uid)
-    = DefiniteUnitId (unsafeMkDefUnitId uid)
-  toDbUnitId (IndefFullUnitId cid insts) = GhcPkg.DbUnitId cid (Map.toList insts)
-  toDbUnitId (DefiniteUnitId def_uid)
-    = GhcPkg.DbInstalledUnitId (unDefUnitId def_uid)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar

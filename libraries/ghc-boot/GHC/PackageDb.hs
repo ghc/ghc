@@ -1,17 +1,18 @@
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE RecordWildCards #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.PackageDb
@@ -48,6 +49,10 @@
 --
 module GHC.PackageDb
    ( GenericUnitInfo(..)
+   , type DbUnitInfo
+   , DbModule (..)
+   , DbInstUnitId (..)
+   , mapGenericUnitInfo
    -- * Read and write
    , DbMode(..)
    , DbOpenMode(..)
@@ -59,11 +64,6 @@ module GHC.PackageDb
    , PackageDbLock
    , lockPackageDb
    , unlockPackageDb
-   -- * Misc
-   , DbModule(..)
-   , DbUnitId(..)
-   , BinaryStringRep(..)
-   , DbUnitIdModuleRep(..)
    )
 where
 
@@ -75,6 +75,7 @@ import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Lazy.Internal as BS.Lazy (defaultChunkSize)
 import qualified Data.Foldable as F
 import qualified Data.Traversable as F
+import Data.Bifunctor
 import Data.Binary as Bin
 import Data.Binary.Put as Bin
 import Data.Binary.Get as Bin
@@ -87,6 +88,8 @@ import GHC.IO.Exception (IOErrorType(InappropriateType))
 import GHC.IO.Handle.Lock
 import System.Directory
 
+-- | @ghc-boot@'s UnitInfo, serialized to the database.
+type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
 
 -- | Information about an unit (a unit is an installed module library).
 --
@@ -96,8 +99,8 @@ import System.Directory
 -- Some types are left as parameters to be instantiated differently in ghc-pkg
 -- and in ghc itself.
 --
-data GenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod = GenericUnitInfo
-   { unitId             :: instunitid
+data GenericUnitInfo compid srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
+   { unitId             :: uid
       -- ^ Unique unit identifier that is used during compilation (e.g. to
       -- generate symbols).
 
@@ -138,10 +141,10 @@ data GenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod
       -- ^ ABI hash used to avoid mixing up units compiled with different
       -- dependencies, compiler, options, etc.
 
-   , unitDepends        :: [instunitid]
+   , unitDepends        :: [uid]
       -- ^ Identifiers of the units this one depends on
 
-   , unitAbiDepends     :: [(instunitid, String)]
+   , unitAbiDepends     :: [(uid, String)]
      -- ^ Like 'unitDepends', but each dependency is annotated with the ABI hash
      -- we expect the dependency to respect.
 
@@ -234,52 +237,52 @@ data GenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod
    }
    deriving (Eq, Show)
 
--- | A convenience constraint synonym for common constraints over parameters
--- to 'GenericUnitInfo'.
-type RepGenericUnitInfo compid srcpkgid srcpkgname instunitid unitid modulename mod =
-    (BinaryStringRep srcpkgid, BinaryStringRep srcpkgname,
-     BinaryStringRep modulename, BinaryStringRep compid,
-     BinaryStringRep instunitid,
-     DbUnitIdModuleRep instunitid compid unitid modulename mod)
-
--- | A type-class for the types which can be converted into 'DbModule'/'DbUnitId'.
--- There is only one type class because these types are mutually recursive.
--- NB: The functional dependency helps out type inference in cases
--- where types would be ambiguous.
-class DbUnitIdModuleRep instunitid compid unitid modulename mod
-    | mod -> unitid, unitid -> mod, mod -> modulename, unitid -> compid, unitid -> instunitid
-    where
-  fromDbModule :: DbModule instunitid compid unitid modulename mod -> mod
-  toDbModule :: mod -> DbModule instunitid compid unitid modulename mod
-  fromDbUnitId :: DbUnitId instunitid compid unitid modulename mod -> unitid
-  toDbUnitId :: unitid -> DbUnitId instunitid compid unitid modulename mod
-
--- | @ghc-boot@'s copy of 'Module', i.e. what is serialized to the database.
--- Use 'DbUnitIdModuleRep' to convert it into an actual 'Module'.
--- It has phantom type parameters as this is the most convenient way
--- to avoid undecidable instances.
-data DbModule instunitid compid unitid modulename mod
-   = DbModule {
-       dbModuleUnitId :: unitid,
-       dbModuleName :: modulename
+-- | Convert between GenericUnitInfo instances
+mapGenericUnitInfo
+   :: (uid1 -> uid2)
+   -> (cid1 -> cid2)
+   -> (srcpkg1 -> srcpkg2)
+   -> (srcpkgname1 -> srcpkgname2)
+   -> (modname1 -> modname2)
+   -> (mod1 -> mod2)
+   -> (GenericUnitInfo cid1 srcpkg1 srcpkgname1 uid1 modname1 mod1
+       -> GenericUnitInfo cid2 srcpkg2 srcpkgname2 uid2 modname2 mod2)
+mapGenericUnitInfo fuid fcid fsrcpkg fsrcpkgname fmodname fmod g@(GenericUnitInfo {..}) =
+   g { unitId              = fuid unitId
+     , unitInstanceOf      = fcid unitInstanceOf
+     , unitInstantiations  = fmap (bimap fmodname fmod) unitInstantiations
+     , unitPackageId       = fsrcpkg unitPackageId
+     , unitPackageName     = fsrcpkgname unitPackageName
+     , unitComponentName   = fmap fsrcpkgname unitComponentName
+     , unitDepends         = fmap fuid unitDepends
+     , unitAbiDepends      = fmap (first fuid) unitAbiDepends
+     , unitExposedModules  = fmap (bimap fmodname (fmap fmod)) unitExposedModules
+     , unitHiddenModules   = fmap fmodname unitHiddenModules
      }
-   | DbModuleVar {
-       dbModuleVarName :: modulename
-     }
-  deriving (Eq, Show)
 
--- | @ghc-boot@'s copy of 'UnitId', i.e. what is serialized to the database.
--- Use 'DbUnitIdModuleRep' to convert it into an actual 'UnitId'.
--- It has phantom type parameters as this is the most convenient way
--- to avoid undecidable instances.
-data DbUnitId instunitid compid unitid modulename mod
-   = DbUnitId compid [(modulename, mod)]
-   | DbInstalledUnitId instunitid
-  deriving (Eq, Show)
+-- | @ghc-boot@'s 'Module', serialized to the database.
+data DbModule
+   = DbModule
+      { dbModuleUnitId  :: DbInstUnitId
+      , dbModuleName    :: BS.ByteString
+      }
+   | DbModuleVar
+      { dbModuleVarName :: BS.ByteString
+      }
+   deriving (Eq, Show)
 
-class BinaryStringRep a where
-  fromStringRep :: BS.ByteString -> a
-  toStringRep   :: a -> BS.ByteString
+-- | @ghc-boot@'s instantiated unit id, serialized to the database.
+data DbInstUnitId
+
+   -- | Instantiated unit
+   = DbInstUnitId
+      BS.ByteString               -- component id
+      [(BS.ByteString, DbModule)] -- instantiations: [(modulename,module)]
+
+   -- | Uninstantiated unit
+   | DbUnitId
+      BS.ByteString               -- unit id
+  deriving (Eq, Show)
 
 -- | Represents a lock of a package db.
 newtype PackageDbLock = PackageDbLock Handle
@@ -358,8 +361,7 @@ isDbOpenReadMode = \case
 
 -- | Read the part of the package DB that GHC is interested in.
 --
-readPackageDbForGhc :: RepGenericUnitInfo a b c d e f g =>
-                       FilePath -> IO [GenericUnitInfo a b c d e f g]
+readPackageDbForGhc :: FilePath -> IO [DbUnitInfo]
 readPackageDbForGhc file =
   decodeFromFile file DbOpenReadOnly getDbForGhc >>= \case
     (pkgs, DbOpenReadOnly) -> return pkgs
@@ -397,9 +399,7 @@ readPackageDbForGhcPkg file mode =
 
 -- | Write the whole of the package DB, both parts.
 --
-writePackageDb :: (Binary pkgs, RepGenericUnitInfo a b c d e f g) =>
-                  FilePath -> [GenericUnitInfo a b c d e f g] ->
-                  pkgs -> IO ()
+writePackageDb :: Binary pkgs => FilePath -> [DbUnitInfo] -> pkgs -> IO ()
 writePackageDb file ghcPkgs ghcPkgPart =
   writeFileAtomic file (runPut putDbForGhcPkg)
   where
@@ -504,8 +504,7 @@ writeFileAtomic targetPath content = do
         hClose handle
         renameFile tmpPath targetPath)
 
-instance (RepGenericUnitInfo a b c d e f g) =>
-         Binary (GenericUnitInfo a b c d e f g) where
+instance Binary DbUnitInfo where
   put (GenericUnitInfo
          unitId unitInstanceOf unitInstantiations
          unitPackageId
@@ -520,17 +519,16 @@ instance (RepGenericUnitInfo a b c d e f g) =>
          unitHaddockInterfaces unitHaddockHTMLs
          unitExposedModules unitHiddenModules
          unitIsIndefinite unitIsExposed unitIsTrusted) = do
-    put (toStringRep unitPackageId)
-    put (toStringRep unitPackageName)
+    put unitPackageId
+    put unitPackageName
     put unitPackageVersion
-    put (fmap toStringRep unitComponentName)
-    put (toStringRep unitId)
-    put (toStringRep unitInstanceOf)
-    put (map (\(mod_name, mod) -> (toStringRep mod_name, toDbModule mod))
-             unitInstantiations)
+    put unitComponentName
+    put unitId
+    put unitInstanceOf
+    put unitInstantiations
     put unitAbiHash
-    put (map toStringRep unitDepends)
-    put (map (\(k,v) -> (toStringRep k, v)) unitAbiDepends)
+    put unitDepends
+    put unitAbiDepends
     put unitImportDirs
     put unitLibraries
     put unitExtDepLibsSys
@@ -545,9 +543,8 @@ instance (RepGenericUnitInfo a b c d e f g) =>
     put unitIncludeDirs
     put unitHaddockInterfaces
     put unitHaddockHTMLs
-    put (map (\(mod_name, mb_mod) -> (toStringRep mod_name, fmap toDbModule mb_mod))
-             unitExposedModules)
-    put (map toStringRep unitHiddenModules)
+    put unitExposedModules
+    put unitHiddenModules
     put unitIsIndefinite
     put unitIsExposed
     put unitIsTrusted
@@ -583,16 +580,16 @@ instance (RepGenericUnitInfo a b c d e f g) =>
     unitIsExposed      <- get
     unitIsTrusted      <- get
     return (GenericUnitInfo
-              (fromStringRep unitId)
-              (fromStringRep unitInstanceOf)
-              (map (\(mod_name, mod) -> (fromStringRep mod_name, fromDbModule mod))
-                unitInstantiations)
-              (fromStringRep unitPackageId)
-              (fromStringRep unitPackageName) unitPackageVersion
-              (fmap fromStringRep unitComponentName)
+              unitId
+              unitInstanceOf
+              unitInstantiations
+              unitPackageId
+              unitPackageName
+              unitPackageVersion
+              unitComponentName
               unitAbiHash
-              (map fromStringRep unitDepends)
-              (map (\(k,v) -> (fromStringRep k, v)) unitAbiDepends)
+              unitDepends
+              unitAbiDepends
               unitImportDirs
               unitLibraries unitExtDepLibsSys unitExtDepLibsGhc
               libraryDirs libraryDynDirs
@@ -600,55 +597,35 @@ instance (RepGenericUnitInfo a b c d e f g) =>
               unitLinkerOptions unitCcOptions
               unitIncludes unitIncludeDirs
               unitHaddockInterfaces unitHaddockHTMLs
-              (map (\(mod_name, mb_mod) ->
-                        (fromStringRep mod_name, fmap fromDbModule mb_mod))
-                   unitExposedModules)
-              (map fromStringRep unitHiddenModules)
+              unitExposedModules
+              unitHiddenModules
               unitIsIndefinite unitIsExposed unitIsTrusted)
 
-instance (BinaryStringRep modulename, BinaryStringRep compid,
-          BinaryStringRep instunitid,
-          DbUnitIdModuleRep instunitid compid unitid modulename mod) =>
-         Binary (DbModule instunitid compid unitid modulename mod) where
+instance Binary DbModule where
   put (DbModule dbModuleUnitId dbModuleName) = do
     putWord8 0
-    put (toDbUnitId dbModuleUnitId)
-    put (toStringRep dbModuleName)
+    put dbModuleUnitId
+    put dbModuleName
   put (DbModuleVar dbModuleVarName) = do
     putWord8 1
-    put (toStringRep dbModuleVarName)
+    put dbModuleVarName
   get = do
     b <- getWord8
     case b of
-      0 -> do dbModuleUnitId <- get
-              dbModuleName <- get
-              return (DbModule (fromDbUnitId dbModuleUnitId)
-                               (fromStringRep dbModuleName))
-      _ -> do dbModuleVarName <- get
-              return (DbModuleVar (fromStringRep dbModuleVarName))
+      0 -> DbModule <$> get <*> get
+      _ -> DbModuleVar <$> get
 
-instance (BinaryStringRep modulename, BinaryStringRep compid,
-          BinaryStringRep instunitid,
-          DbUnitIdModuleRep instunitid compid unitid modulename mod) =>
-         Binary (DbUnitId instunitid compid unitid modulename mod) where
-  put (DbInstalledUnitId instunitid) = do
+instance Binary DbInstUnitId where
+  put (DbUnitId uid) = do
     putWord8 0
-    put (toStringRep instunitid)
-  put (DbUnitId dbUnitIdComponentId dbUnitIdInsts) = do
+    put uid
+  put (DbInstUnitId dbUnitIdComponentId dbUnitIdInsts) = do
     putWord8 1
-    put (toStringRep dbUnitIdComponentId)
-    put (map (\(mod_name, mod) -> (toStringRep mod_name, toDbModule mod)) dbUnitIdInsts)
+    put dbUnitIdComponentId
+    put dbUnitIdInsts
+
   get = do
     b <- getWord8
     case b of
-      0 -> do
-        instunitid <- get
-        return (DbInstalledUnitId (fromStringRep instunitid))
-      _ -> do
-        dbUnitIdComponentId <- get
-        dbUnitIdInsts <- get
-        return (DbUnitId
-            (fromStringRep dbUnitIdComponentId)
-            (map (\(mod_name, mod) -> ( fromStringRep mod_name
-                                      , fromDbModule mod))
-                 dbUnitIdInsts))
+      0 -> DbUnitId <$> get
+      _ -> DbInstUnitId <$> get <*> get
