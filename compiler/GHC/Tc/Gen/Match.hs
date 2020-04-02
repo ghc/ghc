@@ -581,7 +581,9 @@ tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
                   ; return (rhs', pat', thing, new_res_ty) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- tcMonadFailOp (MCompPatOrigin pat) pat' fail_op new_res_ty
+        ; fail_op' <- fmap join . forM fail_op $ \fail ->
+            tcMonadFailOp (MCompPatOrigin pat) pat' fail new_res_ty
+
 
         ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
 
@@ -841,7 +843,8 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
                    ; return (rhs', pat', new_res_ty, thing) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op new_res_ty
+        ; fail_op' <- fmap join . forM fail_op $ \fail ->
+            tcMonadFailOp (DoPatOrigin pat) pat' fail new_res_ty
 
         ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
 
@@ -937,16 +940,17 @@ tcMonadFailOp :: CtOrigin
               -> LPat GhcTcId
               -> SyntaxExpr GhcRn    -- The fail op
               -> TcType              -- Type of the whole do-expression
-              -> TcRn (SyntaxExpr GhcTcId)  -- Typechecked fail op
--- Get a 'fail' operator expression, to use if the pattern
--- match fails. If the pattern is irrefutatable, just return
--- noSyntaxExpr; it won't be used
+              -> TcRn (Maybe (SyntaxExpr GhcTcId))  -- Typechecked fail op
+-- Get a 'fail' operator expression, to use if the pattern match fails.
+-- This won't be used in cases where we've already determined the pattern
+-- match can't fail (so the fail op is Nothing), however, it seems that the
+-- isIrrefutableHsPat test is still required here for some reason I haven't
+-- yet determined.
 tcMonadFailOp orig pat fail_op res_ty
   | isIrrefutableHsPat pat
-  = return noSyntaxExpr
-
+  = return Nothing
   | otherwise
-  = snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
+  = Just . snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
                              (mkCheckExpType res_ty) $ \_ -> return ())
 
 {-
@@ -1035,7 +1039,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                           return ()
-           ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op body_ty
+           ; fail_op' <- fmap join . forM fail_op $ \fail ->
+               tcMonadFailOp (DoPatOrigin pat) pat' fail body_ty
 
            ; return (ApplicativeArgOne
                       { app_arg_pattern = pat'

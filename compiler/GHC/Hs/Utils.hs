@@ -321,8 +321,8 @@ mkLastStmt body = LastStmt noExtField body Nothing noSyntaxExpr
 mkBodyStmt body
   = BodyStmt noExtField body noSyntaxExpr noSyntaxExpr
 mkBindStmt pat body
-  = BindStmt noExtField pat body noSyntaxExpr noSyntaxExpr
-mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr noSyntaxExpr
+  = BindStmt noExtField pat body noSyntaxExpr Nothing
+mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr Nothing
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body. IsPass idR

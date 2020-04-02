@@ -2197,7 +2197,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                                        (L loc (VarPat noExtField (L loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
-                                       noSyntaxExpr
+                                       Nothing
 
               -- [; print it]
               print_it  = L loc $ BodyStmt noExtField

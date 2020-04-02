@@ -950,7 +950,7 @@ dsDo stmts
                do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat) =
-                 ((pat, noSyntaxExpr), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+                 ((pat, Nothing), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
 
            ; rhss' <- sequence rhss
 
@@ -983,7 +983,7 @@ dsDo stmts
       where
         new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
-                                         noSyntaxExpr  -- Tuple cannot fail
+                                         Nothing  -- Tuple cannot fail
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
@@ -1009,17 +1009,26 @@ dsDo stmts
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
 
-dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-dsHandleMonadicFailure pat match fail_op
-  | matchCanFail match
-  = do { dflags <- getDynFlags
-       ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-       ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
-       ; extractMatchResult match fail_expr }
-  | otherwise
-  = extractMatchResult match (error "It can't fail")
+dsHandleMonadicFailure pat match m_fail_op
+  | matchCanFail match = do
+    fail_op <- case m_fail_op of
+      -- Note that (non-monadic) list comprehension, pattern guards, etc could
+      -- have fallible bindings without an explicit failure op, but this is
+      -- handled elsewhere. See Note [Failing pattern matches in Stmts] the
+      -- breakdown of regular and special binds.
+      Nothing -> pprPanic "missing fail op" $
+        text "Pattern match:" <+> ppr pat <+>
+        text "is failable, and fail_expr was left unset"
+      Just fail_op -> pure fail_op
+    dflags <- getDynFlags
+    fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
+    fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+    extractMatchResult match fail_expr
+  | otherwise =
+    extractMatchResult match (error "It can't fail")
 
 mk_fail_msg :: DynFlags -> Located e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
