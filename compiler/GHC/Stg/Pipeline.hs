@@ -48,7 +48,7 @@ runStgM mask (StgM m) = evalStateT m mask
 stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
-        -> IO [StgTopBinding]        -- output program
+        -> IO [CgStgTopBinding]        -- output program
 
 stg2stg dflags this_mod binds
   = do  { dump_when Opt_D_dump_stg "STG:" binds

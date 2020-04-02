@@ -126,7 +126,6 @@ import GHC.Iface.Tidy
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 import GHC.Stg.Syntax
-import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.Types.CostCentre
@@ -1546,7 +1545,7 @@ This reduces residency towards the end of the CodeGen phase significantly
 
 doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
-            -> [StgTopBinding]
+            -> [CgStgTopBinding]
             -> HpcInfo
             -> IO (Stream IO CmmGroupSRTs NameSet)
          -- Note we produce a 'Stream' of CmmGroups, so that the
@@ -1556,7 +1555,7 @@ doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    let stg_binds_w_fvs = stg_binds
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings stg_binds_w_fvs)
 
@@ -1592,7 +1591,7 @@ doCodeGen hsc_env this_mod data_tycons
     return (Stream.mapM dump2 pipeline_stream)
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
-            -> IO ( [StgTopBinding] -- output program
+            -> IO ( [CgStgTopBinding] -- output program
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
 myCoreToStg dflags this_mod prepd_binds = do
     let (stg_binds, cost_centre_info)

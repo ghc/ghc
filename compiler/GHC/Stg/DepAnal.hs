@@ -4,6 +4,7 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 
 import GhcPrelude
 
+import GHC.Stg.FVs
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
@@ -35,15 +36,15 @@ type FVs = VarSet
 -- variables (FVs) back. We ignore imported FVs as they do not change the
 -- ordering but it improves performance.
 --
-annTopBindingsDeps :: Module -> [StgTopBinding] -> [(StgTopBinding, FVs)]
-annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
+annTopBindingsDeps :: Module -> [StgTopBinding] -> [(CgStgTopBinding, FVs)]
+annTopBindingsDeps this_mod bs = map top_bind bs
   where
-    top_bind :: StgTopBinding -> FVs
-    top_bind StgTopStringLit{} =
-      emptyVarSet
+    top_bind :: StgTopBinding -> (CgStgTopBinding, FVs)
+    top_bind (StgTopStringLit id bs) =
+      (StgTopStringLit id bs, emptyVarSet)
 
     top_bind (StgTopLifted bs) =
-      binding emptyVarSet bs
+      (StgTopLifted (annBindingFreeVars bs), binding emptyVarSet bs)
 
     binding :: BVs -> StgBinding -> FVs
     binding bounds (StgNonRec _ r) =
@@ -115,17 +116,17 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
 -- * Dependency sorting
 
 -- | Dependency sort a STG program so that dependencies come before uses.
-depSortStgPgm :: Module -> [StgTopBinding] -> [StgTopBinding]
+depSortStgPgm :: Module -> [StgTopBinding] -> [CgStgTopBinding]
 depSortStgPgm this_mod =
     {-# SCC "STG.depSort" #-}
     map fst . depSort . annTopBindingsDeps this_mod
 
 -- | Sort free-variable-annotated STG bindings so that dependencies come before
 -- uses.
-depSort :: [(StgTopBinding, FVs)] -> [(StgTopBinding, FVs)]
+depSort :: [(CgStgTopBinding, FVs)] -> [(CgStgTopBinding, FVs)]
 depSort = concatMap get_binds . depAnal defs uses
   where
-    uses, defs :: (StgTopBinding, FVs) -> [Name]
+    uses, defs :: (CgStgTopBinding, FVs) -> [Name]
 
     -- TODO (osa): I'm unhappy about two things in this code:
     --
