@@ -57,7 +57,7 @@ import GHC.Generics (K1(..))
 
 -- | 'Bifoldable' identifies foldable structures with two different varieties
 -- of elements (as opposed to 'Foldable', which has one variety of element).
--- Common examples are 'Either' and '(,)':
+-- Common examples are 'Either' and @(,)@:
 --
 -- > instance Bifoldable Either where
 -- >   bifoldMap f _ (Left  a) = f a
