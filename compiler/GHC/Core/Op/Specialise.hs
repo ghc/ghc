@@ -2177,7 +2177,7 @@ unionCallInfoSet (CIS f calls1) (CIS _ calls2) =
 
 callDetailsFVs :: CallDetails -> VarSet
 callDetailsFVs calls =
-  nonDetStrictFoldUDFM (flip (unionVarSet . callInfoFVs)) emptyVarSet calls
+  nonDetStrictFoldUDFM (unionVarSet . callInfoFVs) emptyVarSet calls
   -- It's OK to use nonDetStrictFoldUDFM here because we forget the ordering
   -- immediately by converting to a nondeterministic set.
 

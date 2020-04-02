@@ -295,7 +295,7 @@ dVarSetMinusVarSet = uniqDSetMinusUniqSet
 foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
 foldDVarSet = foldUniqDSet
 
-nonDetStrictFoldDVarSet :: (a -> Var -> a) -> a -> DVarSet -> a
+nonDetStrictFoldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
 nonDetStrictFoldDVarSet = nonDetStrictFoldUniqDSet
 
 anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool

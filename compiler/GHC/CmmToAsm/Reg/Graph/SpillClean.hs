@@ -554,7 +554,7 @@ delAssoc :: (Uniquable a)
 delAssoc a m
         | Just aSet     <- lookupUFM  m a
         , m1            <- delFromUFM m a
-        = nonDetStrictFoldUniqSet (\m x -> delAssoc1 x a m) m1 aSet
+        = nonDetStrictFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
           -- It's OK to use nonDetStrictFoldUFM here because deletion is commutative
 
         | otherwise     = m

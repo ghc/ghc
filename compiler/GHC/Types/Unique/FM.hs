@@ -321,8 +321,8 @@ nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 nonDetFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
 nonDetFoldUFM k z (UFM m) = M.foldr k z m
 
-nonDetStrictFoldUFM :: (a -> elt -> a) -> a -> UniqFM elt -> a
-nonDetStrictFoldUFM k z (UFM m) = M.foldl' k z m
+nonDetStrictFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

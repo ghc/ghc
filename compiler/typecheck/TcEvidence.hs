@@ -501,7 +501,7 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
-nonDetStrictFoldEvBindMap :: (a -> EvBind -> a) -> a -> EvBindMap -> a
+nonDetStrictFoldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
 
 filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
@@ -866,8 +866,8 @@ findNeededEvVars ev_binds seeds
      -- It's OK to use nonDetStrictFoldUFM here because we immediately
      -- forget about the ordering by creating a set
 
-   add :: VarSet -> Var -> VarSet
-   add needs v
+   add :: Var -> VarSet -> VarSet
+   add v needs
      | Just ev_bind <- lookupEvBind ev_binds v
      , EvBind { eb_is_given = is_given, eb_rhs = rhs } <- ev_bind
      , is_given

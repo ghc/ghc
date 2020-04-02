@@ -2502,7 +2502,7 @@ addOneOcc ud id info
     plus_zapped old new = doZapping ud id old `addOccInfo` new
 
 addManyOccsSet :: UsageDetails -> VarSet -> UsageDetails
-addManyOccsSet usage id_set = nonDetStrictFoldUniqSet (flip addManyOccs) usage id_set
+addManyOccsSet usage id_set = nonDetStrictFoldUniqSet addManyOccs usage id_set
   -- It's OK to use nonDetStrictFoldUFM here because addManyOccs commutes
 
 -- Add several occurrences, assumed not to be tail calls

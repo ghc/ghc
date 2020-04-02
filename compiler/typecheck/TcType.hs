@@ -707,7 +707,7 @@ tcTypeLevel ty
     -- It's safe to use a non-deterministic fold because `maxTcLevel` is
     -- commutative.
   where
-    add lvl v
+    add v lvl
       | isTcTyVar v = lvl `maxTcLevel` tcTyVarLevel v
       | otherwise = lvl
 

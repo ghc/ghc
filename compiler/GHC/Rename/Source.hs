@@ -1426,7 +1426,7 @@ toParents rdr_env ns
   -- It's OK to use nonDetStrictFoldUFM because we immediately forget the
   -- ordering by creating a set
   where
-    add s n = extendNameSet s (getParent rdr_env n)
+    add n s = extendNameSet s (getParent rdr_env n)
 
 getParent :: GlobalRdrEnv -> Name -> Name
 getParent rdr_env n

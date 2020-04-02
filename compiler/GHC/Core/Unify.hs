@@ -658,7 +658,7 @@ niSubstTvSet :: TvSubstEnv -> TyCoVarSet -> TyCoVarSet
 -- remembering that the substitution isn't necessarily idempotent
 -- This is used in the occurs check, before extending the substitution
 niSubstTvSet tsubst tvs
-  = nonDetStrictFoldUniqSet (flip (unionVarSet . get)) emptyVarSet tvs
+  = nonDetStrictFoldUniqSet (unionVarSet . get) emptyVarSet tvs
   -- It's OK to nonDetStrictFoldUFM here because we immediately forget the
   -- ordering by creating a set.
   where

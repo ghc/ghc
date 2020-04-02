@@ -583,7 +583,7 @@ lookupDVarEnv = lookupUDFM
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
 
-nonDetStrictFoldDVarEnv :: (b -> a -> b) -> b -> DVarEnv a -> b
+nonDetStrictFoldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 nonDetStrictFoldDVarEnv = nonDetStrictFoldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b

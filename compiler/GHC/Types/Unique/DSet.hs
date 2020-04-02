@@ -101,7 +101,7 @@ uniqDSetIntersectUniqSet xs ys
 foldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
 foldUniqDSet c n (UniqDSet s) = foldUDFM c n s
 
-nonDetStrictFoldUniqDSet :: (b -> a -> b) -> b -> UniqDSet a -> b
+nonDetStrictFoldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
 nonDetStrictFoldUniqDSet f acc (UniqDSet s) = nonDetStrictFoldUDFM f acc s
 
 elementOfUniqDSet :: Uniquable a => a -> UniqDSet a -> Bool

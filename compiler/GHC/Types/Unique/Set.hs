@@ -167,7 +167,7 @@ nonDetKeysUniqSet = nonDetKeysUFM . getUniqSet'
 nonDetFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
 nonDetFoldUniqSet c n (UniqSet s) = nonDetFoldUFM c n s
 
-nonDetStrictFoldUniqSet :: (a -> elt -> a) -> a -> UniqSet elt -> a
+nonDetStrictFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
 nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.

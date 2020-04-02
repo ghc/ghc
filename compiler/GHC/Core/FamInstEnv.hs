@@ -378,7 +378,7 @@ famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
   -- See Note [FamInstEnv determinism]
 
 famInstEnvSize :: FamInstEnv -> Int
-famInstEnvSize = nonDetStrictFoldUDFM (\sum (FamIE elt) -> sum + length elt) 0
+famInstEnvSize = nonDetStrictFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
   -- It's OK to use nonDetStrictFoldUDFM here since we're just computing the
   -- size.
 
