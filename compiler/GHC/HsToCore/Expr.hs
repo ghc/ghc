@@ -942,14 +942,14 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt (bind_op, res1_ty, fail_op) pat rhs) stmts
+    go _ (BindStmt xbs pat rhs) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
-                                      res1_ty (cantFailMatchResult body)
-            ; match_code <- dsHandleMonadicFailure pat match fail_op
-            ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
+                         (xbstc_boundResultType xbs) (cantFailMatchResult body)
+            ; match_code <- dsHandleMonadicFailure pat match (xbstc_failOp xbs)
+            ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt body_ty args mb_join) stmts
       = do {
@@ -992,10 +992,11 @@ dsDo stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
         new_bind_stmt = L loc $ BindStmt
-          ( bind_op
-          , bind_ty
-          , Nothing -- Tuple cannot fail
-          )
+          XBindStmtTc
+            { xbstc_bindOp = bind_op
+            , xbstc_boundResultType = bind_ty
+            , xbstc_failOp = Nothing -- Tuple cannot fail
+            }
           (mkBigLHsPatTupId later_pats)
           mfix_app
 
@@ -1024,7 +1025,7 @@ dsDo stmts
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
     go _ (XStmtLR nec)  _ = noExtCon nec
 
-dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
+dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
 dsHandleMonadicFailure pat match m_fail_op
