@@ -114,7 +114,7 @@ import Text.Show
 #if 1
 import Foreign.C
 import System.Posix.Internals (c_write)
-import GHC.Conc.Sync (myThreadId)
+import GHC.Conc.Sync (myThreadId, labelThread)
 #endif
 
 import qualified GHC.Windows as Win32
@@ -394,6 +394,7 @@ startIOManagerThread loop = do
                             then forkOS loop
                             else forkIO loop
                     debugIO $ "created io-manager threads."
+                    labelThread t "IOManagerThread"
                     return (Just t)
     debugIO $ "startIOManagerThread old=" ++ show old
     case old of
