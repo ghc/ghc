@@ -542,7 +542,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == mappendName, isAliasMG mg /= Just sappendName
-                      -> addWarnNonCanonicalMethod2NoDefault
+                      -> addWarnNonCanonicalMethod2
                             Opt_WarnNonCanonicalMonoidInstances "mappend" "(<>)"
 
                   _ -> return ()
