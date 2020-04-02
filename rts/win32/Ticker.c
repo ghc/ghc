@@ -30,6 +30,12 @@ static VOID CALLBACK tick_callback(
 // be very useful for profiling with a max usable resolution of
 // 15ms. Unfortunately we don't have anything better.
 
+// Update as of 2020-04-02:
+// It seems we can get somewhat reliable resolution even for intervals
+// at 1ms which had an average error of <5%.
+// This seems to be the case starting at some point during the
+// Windows 7 lifetime and any newer versions of windows.
+
 void
 initTicker (Time interval, TickProc handle_tick)
 {
@@ -53,7 +59,7 @@ startTicker(void)
                               tick_callback,
                               0,
                               0,
-                              TimeToUS(tick_interval) / 1000, // ms
+                              TimeToMS(tick_interval), // ms
                               WT_EXECUTEINTIMERTHREAD);
     if (r == 0) {
         sysErrorBelch("CreateTimerQueueTimer");
