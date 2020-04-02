@@ -17,6 +17,7 @@ module GHC.Unit.Info (
 
         -- * The UnitInfo type: information about a unit
         UnitInfo,
+        toUnitInfo,
         GenericUnitInfo(..),
         ComponentId(..),
         PackageId(..),
@@ -33,6 +34,7 @@ import GHC.Prelude
 
 import GHC.PackageDb
 import Data.Version
+import Data.Bifunctor
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -48,9 +50,31 @@ type UnitInfo = GenericUnitInfo
                        PackageId
                        PackageName
                        Module.InstalledUnitId
-                       Module.UnitId
                        Module.ModuleName
                        Module.Module
+
+-- | Convert a DbUnitInfo (read from a package database) into `UnitInfo`
+toUnitInfo :: DbUnitInfo -> UnitInfo
+toUnitInfo = mapGenericUnitInfo
+   mkUnitId'
+   mkComponentId'
+   mkPackageIdentifier'
+   mkPackageName'
+   mkModuleName'
+   mkModule'
+   where
+     mkPackageIdentifier' = PackageId       . mkFastStringByteString
+     mkPackageName'       = PackageName     . mkFastStringByteString
+     mkUnitId'            = InstalledUnitId . mkFastStringByteString
+     mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
+     mkComponentId' cid   = ComponentId (mkFastStringByteString cid) Nothing
+     mkInstUnitId' i = case i of
+      DbInstUnitId cid insts -> newUnitId (mkComponentId' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbUnitId uid           -> DefiniteUnitId (DefUnitId (mkUnitId' uid))
+     mkModule' m = case m of
+       DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
+       DbModuleVar  n -> mkHoleModule (mkModuleName' n)
+
 
 -- TODO: there's no need for these to be FastString, as we don't need the uniq
 --       feature, but ghc doesn't currently have convenient support for any
@@ -61,14 +85,6 @@ newtype PackageName = PackageName
    { unPackageName :: FastString
    }
    deriving (Eq, Ord)
-
-instance BinaryStringRep PackageId where
-  fromStringRep = PackageId . mkFastStringByteString
-  toStringRep (PackageId s) = bytesFS s
-
-instance BinaryStringRep PackageName where
-  fromStringRep = PackageName . mkFastStringByteString
-  toStringRep (PackageName s) = bytesFS s
 
 instance Uniquable PackageId where
   getUnique (PackageId n) = getUnique n
