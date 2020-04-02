@@ -512,7 +512,7 @@ class Foldable t where
 
     -- | The least element of a non-empty structure.
     --
-    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty
+    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
     --
     -- ==== __Examples__
     --
