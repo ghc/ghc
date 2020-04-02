@@ -48,7 +48,7 @@ import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              GetDocsFailure(..),
-             getModuleGraph, handleSourceError )
+             getModuleGraph, handleSourceError, ms_mod )
 import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
@@ -100,8 +100,8 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( find, group, intercalate, intersperse, isPrefixOf,
-                   isSuffixOf, nub, partition, sort, sortBy, (\\) )
+import Data.List ( elemIndices, find, group, intercalate, intersperse,
+                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
@@ -173,7 +173,7 @@ ghciCommands = map mkCmd [
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
   ("abandon",   keepGoing abandonCmd,           noCompletion),
-  ("break",     keepGoing breakCmd,             completeIdentifier),
+  ("break",     keepGoing breakCmd,             completeBreakpoint),
   ("back",      keepGoing backCmd,              noCompletion),
   ("browse",    keepGoing' (browseCmd False),   completeModule),
   ("browse!",   keepGoing' (browseCmd True),    completeModule),
@@ -3300,7 +3300,7 @@ completeCmd argLine0 = case parseLine argLine0 of
 completeGhciCommand, completeMacro, completeIdentifier, completeModule,
     completeSetModule, completeSeti, completeShowiOptions,
     completeHomeModule, completeSetOptions, completeShowOptions,
-    completeHomeModuleOrFile, completeExpression
+    completeHomeModuleOrFile, completeExpression, completeBreakpoint
     :: GhciMonad m => CompletionFunc m
 
 -- | Provide completions for last word in a given string.
@@ -3355,6 +3355,68 @@ completeIdentifier line@(left, _) =
       rdrs <- GHC.getRdrNamesInScope
       dflags <- GHC.getSessionDynFlags
       return (filter (w `isPrefixOf`) (map (showPpr dflags) rdrs))
+
+
+completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #17989
+    -- See Note [Tab-completion for :break]
+    -- Pif ~ Pair with Identifier name and File name
+    pifsBreaks <- pifsFromModBreaks
+    pifsInscope <- pifsInscopeByPrefix w
+    pure $ [n | (n,f) <- pifsInscope, (unQual n, f) `elem` pifsBreaks]
+  where
+    -- Extract from the ModBreaks data all the names of top-level
+    -- functions eligible to set breakpoints, and put them
+    -- into a pair together with the filename where they are defined.
+    pifsFromModBreaks :: GhciMonad m => m [(String, FastString)]
+    pifsFromModBreaks = do
+        graph <- GHC.getModuleGraph
+        imods <- filterM GHC.moduleIsInterpreted $
+                    ms_mod <$> GHC.mgModSummaries graph
+        topDecls <- mapM pifsFromModBreaksByModule imods
+        pure $ concat topDecls
+
+    -- Return all possible top-level pifs from the ModBreaks
+    -- for one module.
+    -- Identifiers of ModBreaks pifs are never qualified.
+    pifsFromModBreaksByModule :: GhciMonad m => Module -> m [(String, FastString)]
+    pifsFromModBreaksByModule mod = do
+        (_, locs, decls) <- getModBreak mod
+        let mbFile  = safeHead $ mapMaybe srcSpanFileName_maybe $ elems locs
+        -- The first element in `decls` is the name of the top-level function.
+        let topLvlDecls = nub $ mapMaybe safeHead $ elems decls
+        pure $ case mbFile of
+          Nothing  -> []
+          (Just file) -> zip  topLvlDecls $ repeat file
+      where
+        safeHead []      = Nothing
+        safeHead (h : _) = Just h
+
+    -- Return the pifs of all identifieres (RdrNames) in scope, where
+    -- the identifier has the given prefix.
+    -- Identifiers of inscope pifs maybe qualified.
+    pifsInscopeByPrefix :: GhciMonad m => String -> m [(String, FastString)]
+    pifsInscopeByPrefix pref = do
+        dflags <- GHC.getSessionDynFlags
+        rdrs <- GHC.getRdrNamesInScope
+        let strnams = (filter (pref `isPrefixOf`) (map (showPpr dflags) rdrs))
+        nams_fil <- mapM createInscopePif strnams
+        pure $ concat nams_fil
+
+    -- Return a list of pifs for a single in scope identifier
+    createInscopePif :: GhciMonad m => String -> m [(String, FastString)]
+    createInscopePif str_rdr = do
+        names <- GHC.parseName str_rdr
+        let files = mapMaybe srcSpanFileName_maybe $ map nameSrcSpan names
+        pure $ zip (repeat str_rdr) files
+
+    -- unQual "ModLev.Module.func"   ->   "func"
+    unQual :: String -> String
+    unQual qual_unqual =
+      let ixs = elemIndices '.' qual_unqual
+      in  case ixs of
+          [] -> qual_unqual
+          _  -> drop (1 + last ixs) qual_unqual
+
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags
@@ -3437,6 +3499,41 @@ allVisibleModules dflags = listVisibleModuleNames dflags
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
 
+{-
+Note [Tab-completion for :break]
+--------------------------------
+In tab-completion for the `:break` command, only those
+identifiers should be shown, that are accepted in the
+`:break` command. Hence these identifiers must be
+
+- defined in an interpreted module
+- top-level
+- currently in scope
+- listed in a `ModBreaks` value as a possible breakpoint.
+
+The identifiers may be qualified or unqualified.
+
+To get all possible top-level breakpoints for tab-completeion
+with the correct qualification do:
+
+1. Build the  list called `pifsBreaks` of all pairs of
+(Identifier, module-filename) from the `ModBreaks` values.
+Here all identifiers are unqualified.
+
+2. Build the list called `pifInscope` of all pairs of
+(Identifiers, module-filename) with identifiers from
+the `GlobalRdrEnv`. Take only those identifiers that are
+in scope and have the  correct prefix.
+Here the identifiers may be qualified.
+
+3. From the `pifInscope` list seclect all pairs that can be
+found in the `pifsBreaks` list, by comparing only the
+unqualified part of the identifier.
+The remaining identifiers can be used for tab-completion.
+
+This ensures, that we show only identifiers, that can be used
+in a `:break` command.
+-}
 
 -- -----------------------------------------------------------------------------
 -- commands for debugger
@@ -3703,7 +3800,7 @@ findBreakAndSet :: GhciMonad m
                 => Module -> (TickArray -> [(Int, RealSrcSpan)]) -> m ()
 findBreakAndSet md lookupTickTree = do
    tickArray <- getTickArray md
-   (breakArray, _) <- getModBreak md
+   (breakArray, _, _) <- getModBreak md
    case lookupTickTree tickArray of
       []  -> liftIO $ putStrLn $ "No breakpoints found at that location."
       some -> mapM_ (breakAt breakArray) some
@@ -3962,7 +4059,7 @@ getTickArray modl = do
    case lookupModuleEnv arrmap modl of
       Just arr -> return arr
       Nothing  -> do
-        (_breakArray, ticks) <- getModBreak modl
+        (_breakArray, ticks, _) <- getModBreak modl
         let arr = mkTickArray (assocs ticks)
         setGHCiState st{tickarrays = extendModuleEnv arrmap modl arr}
         return arr
@@ -4001,19 +4098,20 @@ turnBreakOnOff :: GHC.GhcMonad m => Bool -> BreakLocation -> m BreakLocation
 turnBreakOnOff onOff loc
   | onOff == breakEnabled loc = return loc
   | otherwise = do
-      (arr, _) <- getModBreak (breakModule loc)
+      (arr, _, _) <- getModBreak (breakModule loc)
       hsc_env <- GHC.getSession
       liftIO $ enableBreakpoint hsc_env arr (breakTick loc) onOff
       return loc { breakEnabled = onOff }
 
 getModBreak :: GHC.GhcMonad m
-            => Module -> m (ForeignRef BreakArray, Array Int SrcSpan)
+            => Module -> m (ForeignRef BreakArray, Array Int SrcSpan, Array Int [String])
 getModBreak m = do
    mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
    let modBreaks  = GHC.modInfoModBreaks mod_info
    let arr        = GHC.modBreaks_flags modBreaks
    let ticks      = GHC.modBreaks_locs  modBreaks
-   return (arr, ticks)
+   let decls      = GHC.modBreaks_decls modBreaks
+   return (arr, ticks, decls)
 
 setBreakFlag :: GHC.GhcMonad m => Bool -> ForeignRef BreakArray -> Int -> m ()
 setBreakFlag toggle arr i = do
