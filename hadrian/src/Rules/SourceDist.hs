@@ -23,12 +23,14 @@ sourceDistRules = do
     root -/- "source-dist" -/- "ghc-*-src.tar.xz" %> \fname -> do
         let tarName   = takeFileName fname
             dropTarXz = dropExtension . dropExtension
-            treePath  = root -/- "source-dist" -/- dropTarXz tarName
+            treeDir   = dropTarXz tarName
+            treePath  = root -/- "source-dist" -/- treeDir
         prepareTree treePath
-        runBuilder
+        runBuilderWithCmdOptions
+            [Cwd $ root -/- "source-dist"]
             (Tar Create)
-            ["cJf", fname,  treePath]
-            ["cJf", fname] [treePath]
+            ["cJf", tarName,  treeDir]
+            ["cJf", tarName] [treeDir]
     "GIT_COMMIT_ID" %> \fname ->
         writeFileChanged fname =<< setting ProjectGitCommitId
     "VERSION" %> \fname ->
