@@ -589,19 +589,11 @@ specProgram guts@(ModGuts { mg_module = this_mod
              -- Specialise the bindings of this module
        ; (binds', uds) <- runSpecM dflags this_mod (go binds)
 
-             -- Specialise imported functions
-       ; hpt_rules <- getRuleBase
-       ; let rule_base = extendRuleBaseList hpt_rules local_rules
-       ; (new_rules, spec_binds) <- specImports dflags this_mod top_env emptyVarSet
-                                                [] rule_base uds
+       ; (spec_rules, spec_binds) <- specImports dflags this_mod top_env
+                                                 local_rules uds
 
-       ; let final_binds
-               | null spec_binds = binds'
-               | otherwise       = Rec (flattenBinds spec_binds) : binds'
-                   -- Note [Glom the bindings if imported functions are specialised]
-
-       ; return (guts { mg_binds = final_binds
-                      , mg_rules = new_rules ++ local_rules }) }
+       ; return (guts { mg_binds = spec_binds ++ binds'
+                      , mg_rules = spec_rules ++ local_rules }) }
   where
         -- We need to start with a Subst that knows all the things
         -- that are in scope, so that the substitution engine doesn't
@@ -645,72 +637,93 @@ See #10491
 *                                                                      *
 ********************************************************************* -}
 
--- | Specialise a set of calls to imported bindings
-specImports :: DynFlags
-            -> Module
-            -> SpecEnv          -- Passed in so that all top-level Ids are in scope
-            -> VarSet           -- Don't specialise these ones
-                                -- See Note [Avoiding recursive specialisation]
-            -> [Id]             -- Stack of imported functions being specialised
-            -> RuleBase         -- Rules from this module and the home package
-                                -- (but not external packages, which can change)
-            -> UsageDetails     -- Calls for imported things, and floating bindings
-            -> CoreM ( [CoreRule]   -- New rules
-                     , [CoreBind] ) -- Specialised bindings
-                                    -- See Note [Wrapping bindings returned by specImports]
-specImports dflags this_mod top_env done callers rule_base
+specImports :: DynFlags -> Module -> SpecEnv
+            -> [CoreRule]
+            -> UsageDetails
+            -> CoreM ([CoreRule], [CoreBind])
+specImports dflags this_mod top_env local_rules
             (MkUD { ud_binds = dict_binds, ud_calls = calls })
-  -- See Note [Disabling cross-module specialisation]
   | not $ gopt Opt_CrossModuleSpecialise dflags
-  = return ([], [])
+    -- See Note [Disabling cross-module specialisation]
+  = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { let import_calls = dVarEnvElts calls
-       ; (rules, spec_binds) <- go rule_base import_calls
+  = do { hpt_rules <- getRuleBase
+       ; let rule_base = extendRuleBaseList hpt_rules local_rules
+
+       ; (spec_rules, spec_binds) <- spec_imports dflags this_mod top_env
+                                                  [] rule_base
+                                                  dict_binds calls
 
              -- Don't forget to wrap the specialized bindings with
              -- bindings for the needed dictionaries.
              -- See Note [Wrap bindings returned by specImports]
-       ; let spec_binds' = wrapDictBinds dict_binds spec_binds
+             -- and Note [Glom the bindings if imported functions are specialised]
+       ; let final_binds
+               | null spec_binds = wrapDictBinds dict_binds []
+               | otherwise       = [Rec $ flattenBinds $
+                                    wrapDictBinds dict_binds spec_binds]
 
-       ; return (rules, spec_binds') }
+       ; return (spec_rules, final_binds)
+    }
+
+-- | Specialise a set of calls to imported bindings
+spec_imports :: DynFlags
+             -> Module
+             -> SpecEnv          -- Passed in so that all top-level Ids are in scope
+             -> [Id]             -- Stack of imported functions being specialised
+                                 -- See Note [specImport call stack]
+             -> RuleBase         -- Rules from this module and the home package
+                                 -- (but not external packages, which can change)
+             -> Bag DictBind     -- Dict bindings, used /only/ for filterCalls
+                                 -- See Note [Avoiding loops in specImports]
+             -> CallDetails      -- Calls for imported things
+             -> CoreM ( [CoreRule]   -- New rules
+                      , [CoreBind] ) -- Specialised bindings
+spec_imports dflags this_mod top_env
+             callers rule_base dict_binds calls
+  = do { let import_calls = dVarEnvElts calls
+       -- ; debugTraceMsg (text "specImports {" <+>
+       --                  vcat [ text "calls:" <+> ppr import_calls
+       --                       , text "dict_binds:" <+> ppr dict_binds ])
+       ; (rules, spec_binds) <- go rule_base import_calls
+       -- ; debugTraceMsg (text "End specImports }" <+> ppr import_calls)
+
+       ; return (rules, spec_binds) }
   where
     go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
     go _ [] = return ([], [])
-    go rb (cis@(CIS fn _) : other_calls)
-      = do { let ok_calls = filterCalls cis dict_binds
-                     -- Drop calls that (directly or indirectly) refer to fn
-                     -- See Note [Avoiding loops]
---           ; debugTraceMsg (text "specImport" <+> vcat [ ppr fn
---                                                       , text "calls" <+> ppr cis
---                                                       , text "ud_binds =" <+> ppr dict_binds
---                                                       , text "dump set =" <+> ppr dump_set
---                                                       , text "filtered calls =" <+> ppr ok_calls ])
-           ; (rules1, spec_binds1) <- specImport dflags this_mod top_env
-                                                 done callers rb fn ok_calls
+    go rb (cis : other_calls)
+      = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
+           ; (rules1, spec_binds1) <- spec_import dflags this_mod top_env
+                                                  callers rb dict_binds cis
+           -- ; debugTraceMsg (text "specImport }" <+> ppr cis)
 
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
-specImport :: DynFlags
-           -> Module
-           -> SpecEnv               -- Passed in so that all top-level Ids are in scope
-           -> VarSet                -- Don't specialise these
-                                    -- See Note [Avoiding recursive specialisation]
-           -> [Id]                  -- Stack of imported functions being specialised
-           -> RuleBase              -- Rules from this module
-           -> Id -> [CallInfo]      -- Imported function and calls for it
-           -> CoreM ( [CoreRule]    -- New rules
-                    , [CoreBind] )  -- Specialised bindings
-specImport dflags this_mod top_env done callers rb fn calls_for_fn
-  | fn `elemVarSet` done
+spec_import :: DynFlags
+            -> Module
+            -> SpecEnv               -- Passed in so that all top-level Ids are in scope
+            -> [Id]                  -- Stack of imported functions being specialised
+                                     -- See Note [specImport call stack]
+            -> RuleBase              -- Rules from this module
+            -> Bag DictBind          -- Dict bindings, used /only/ for filterCalls
+                                     -- See Note [Avoiding loops in specImports]
+            -> CallInfoSet           -- Imported function and calls for it
+            -> CoreM ( [CoreRule]    -- New rules
+                     , [CoreBind] )  -- Specialised bindings
+spec_import dflags this_mod top_env callers
+            rb dict_binds cis@(CIS fn _)
+  | isIn "specImport" fn callers
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, because
                         -- the RHS of the specialised function contains a recursive
                         -- call to the original function
 
-  | null calls_for_fn   -- We filtered out all the calls in deleteCallsMentioning
-  = return ([], [])
+  | null good_calls
+  = do { -- debugTraceMsg (text "specImport:no valid calls")
+       ; return ([], []) }
 
   | wantSpecImport dflags unfolding
   , Just rhs <- maybeUnfoldingTemplate unfolding
@@ -723,32 +736,37 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
        ; let full_rb = unionRuleBase rb (eps_rule_base eps)
              rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
-       ; (rules1, spec_pairs, uds)
-             <- -- pprTrace "specImport1" (vcat [ppr fn, ppr calls_for_fn, ppr rhs]) $
-                runSpecM dflags this_mod $
-                specCalls (Just this_mod) top_env rules_for_fn calls_for_fn fn rhs
+       ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
+             <- do { -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
+                   ; runSpecM dflags this_mod $
+                     specCalls (Just this_mod) top_env rules_for_fn good_calls fn rhs }
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
              -- we rely on a global GlomBinds to sort that out later
              -- See Note [Glom the bindings if imported functions are specialised]
 
               -- Now specialise any cascaded calls
-       ; (rules2, spec_binds2) <- -- pprTrace "specImport 2" (ppr fn $$ ppr rules1 $$ ppr spec_binds1) $
-                                  specImports dflags this_mod top_env
-                                              (extendVarSet done fn)
-                                              (fn:callers)
-                                              (extendRuleBaseList rb rules1)
-                                              uds
+       -- ; debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
+       ; (rules2, spec_binds2) <- spec_imports dflags this_mod top_env
+                                               (fn:callers)
+                                               (extendRuleBaseList rb rules1)
+                                               (dict_binds `unionBags` dict_binds1)
+                                               new_calls
 
-       ; let final_binds = spec_binds2 ++ spec_binds1
+       ; let final_binds = wrapDictBinds dict_binds1 $
+                           spec_binds2 ++ spec_binds1
 
        ; return (rules2 ++ rules1, final_binds) }
 
-  | otherwise = do { tryWarnMissingSpecs dflags callers fn calls_for_fn
-                   ; return ([], [])}
+  | otherwise
+  = do { tryWarnMissingSpecs dflags callers fn good_calls
+       ; return ([], [])}
 
   where
     unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
+    good_calls = filterCalls cis dict_binds
+       -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
+       -- See Note [Avoiding loops in specImports]
 
 -- | Returns whether or not to show a missed-spec warning.
 -- If -Wall-missed-specializations is on, show the warning.
@@ -790,8 +808,114 @@ wantSpecImport dflags unf
                -- inside it that we want to specialise
        | otherwise -> False    -- Stable, not INLINE, hence INLINABLE
 
-{- Note [Warning about missed specialisations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Avoiding loops in specImports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must take great care when specialising instance declarations
+(functions like $fOrdList) lest we accidentally build a recursive
+dictionary. See Note [Avoiding loops].
+
+The basic strategy of Note [Avoiding loops] is to use filterCalls
+to discard loopy specialisations.  But to do that we must ensure
+that the in-scope dict-binds (passed to filterCalls) contains
+all the needed dictionary bindings.  In particular, in the recursive
+call to spec_imorpts in spec_import, we must include the dict-binds
+from the parent.  Lacking this caused #17151, a really nasty bug.
+
+Here is what happened.
+* Class struture:
+    Source is a superclass of Mut
+    Index is a superclass of Source
+
+* We started with these dict binds
+    dSource = $fSourcePix @Int $fIndexInt
+    dIndex  = sc_sel dSource
+    dMut    = $fMutPix @Int dIndex
+  and these calls to specialise
+    $fMutPix @Int dIndex
+    $fSourcePix @Int $fIndexInt
+
+* We specialised the call ($fMutPix @Int dIndex)
+  ==> new call ($fSourcePix @Int dIndex)
+      (because Source is a superclass of Mut)
+
+* We specialised ($fSourcePix @Int dIndex)
+  ==> produces specialised dict $s$fSourcePix,
+      a record with dIndex as a field
+      plus RULE forall d. ($fSourcePix @Int d) = $s$fSourcePix
+  *** This is the bogus step ***
+
+* Now we decide not to specialise the call
+    $fSourcePix @Int $fIndexInt
+  because we alredy have a RULE that matches it
+
+* Finally the simplifer rewrites
+    dSource = $fSourcePix @Int $fIndexInt
+    ==>  dSource = $s$fSourcePix
+
+Disaster. Now we have
+
+Rewrite dSource's RHS to $s$fSourcePix   Disaster
+    dSource = $s$fSourcePix
+    dIndex  = sc_sel dSource
+    $s$fSourcePix = MkSource dIndex ...
+
+Solution: filterCalls should have stopped the bogus step,
+by seeing that dIndex transitively uses $fSourcePix. But
+it can only do that if it sees all the dict_binds.  Wow.
+
+--------------
+Here's another example (#13429).  Suppose we have
+  class Monoid v => C v a where ...
+
+We start with a call
+   f @ [Integer] @ Integer $fC[]Integer
+
+Specialising call to 'f' gives dict bindings
+   $dMonoid_1 :: Monoid [Integer]
+   $dMonoid_1 = M.$p1C @ [Integer] $fC[]Integer
+
+   $dC_1 :: C [Integer] (Node [Integer] Integer)
+   $dC_1 = M.$fCvNode @ [Integer] $dMonoid_1
+
+...plus a recursive call to
+   f @ [Integer] @ (Node [Integer] Integer) $dC_1
+
+Specialising that call gives
+   $dMonoid_2  :: Monoid [Integer]
+   $dMonoid_2  = M.$p1C @ [Integer] $dC_1
+
+   $dC_2 :: C [Integer] (Node [Integer] Integer)
+   $dC_2 = M.$fCvNode @ [Integer] $dMonoid_2
+
+Now we have two calls to the imported function
+  M.$fCvNode :: Monoid v => C v a
+  M.$fCvNode @v @a m = C m some_fun
+
+But we must /not/ use the call (M.$fCvNode @ [Integer] $dMonoid_2)
+for specialisation, else we get:
+
+  $dC_1 = M.$fCvNode @ [Integer] $dMonoid_1
+  $dMonoid_2 = M.$p1C @ [Integer] $dC_1
+  $s$fCvNode = C $dMonoid_2 ...
+    RULE M.$fCvNode [Integer] _ _ = $s$fCvNode
+
+Now use the rule to rewrite the call in the RHS of $dC_1
+and we get a loop!
+
+
+Note [specImport call stack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When specialising an imports function 'f', we may get new calls
+of an imported fuction 'g', which we want to specialise in turn,
+and similarly specialising 'g' might expose a new call to 'h'.
+
+We track the stack of enclosing functions. So when specialising 'h' we
+haev a specImport call stack of [g,f]. We do this for two reasons:
+* Note [Warning about missed specialisations]
+* Note [Avoiding recursive specialisation]
+
+Note [Warning about missed specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose
  * In module Lib, you carefully mark a function 'foo' INLINABLE
  * Import Lib(foo) into another module M
@@ -806,6 +930,16 @@ for /every/ overloaded imported function, but sometimes useful. That
 is what Opt_WarnAllMissedSpecs does.
 
 ToDo: warn about missed opportunities for local functions.
+
+Note [Avoiding recursive specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise 'f' we may find new overloaded calls to 'g', 'h' in
+'f's RHS.  So we want to specialise g,h.  But we don't want to
+specialise f any more!  It's possible that f's RHS might have a
+recursive yet-more-specialised call, so we'd diverge in that case.
+And if the call is to the same type, one specialisation is enough.
+Avoiding this recursive specialisation loop is one reason for the
+'callers' stack passed to specImports and specImport.
 
 Note [Specialise imported INLINABLE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -842,15 +976,6 @@ make sure that f_spec is recursive.  Easiest thing is to make all
 the specialisations for imported bindings recursive.
 
 
-Note [Avoiding recursive specialisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we specialise 'f' we may find new overloaded calls to 'g', 'h' in
-'f's RHS.  So we want to specialise g,h.  But we don't want to
-specialise f any more!  It's possible that f's RHS might have a
-recursive yet-more-specialised call, so we'd diverge in that case.
-And if the call is to the same type, one specialisation is enough.
-Avoiding this recursive specialisation loop is the reason for the
-'done' VarSet passed to specImports and specImport.
 
 ************************************************************************
 *                                                                      *
@@ -1637,13 +1762,11 @@ This translates to
 
 None of these definitions is recursive. What happened was that we
 generated a specialisation:
-
      RULE forall d. dfun T d = dT  :: C [T]
      dT = (MkD a d (meth d)) [T/a, d1/d]
         = MkD T d1 (meth d1)
 
 But now we use the RULE on the RHS of d2, to get
-
     d2 = dT = MkD d1 (meth d1)
     d1 = $p1 d2
 
@@ -1659,46 +1782,6 @@ Solution:
   Discard all calls that mention dictionaries that depend
   (directly or indirectly) on the dfun we are specialising.
   This is done by 'filterCalls'
-
---------------
-Here's another example, this time for an imported dfun, so the call
-to filterCalls is in specImports (#13429). Suppose we have
-  class Monoid v => C v a where ...
-
-We start with a call
-   f @ [Integer] @ Integer $fC[]Integer
-
-Specialising call to 'f' gives dict bindings
-   $dMonoid_1 :: Monoid [Integer]
-   $dMonoid_1 = M.$p1C @ [Integer] $fC[]Integer
-
-   $dC_1 :: C [Integer] (Node [Integer] Integer)
-   $dC_1 = M.$fCvNode @ [Integer] $dMonoid_1
-
-...plus a recursive call to
-   f @ [Integer] @ (Node [Integer] Integer) $dC_1
-
-Specialising that call gives
-   $dMonoid_2  :: Monoid [Integer]
-   $dMonoid_2  = M.$p1C @ [Integer] $dC_1
-
-   $dC_2 :: C [Integer] (Node [Integer] Integer)
-   $dC_2 = M.$fCvNode @ [Integer] $dMonoid_2
-
-Now we have two calls to the imported function
-  M.$fCvNode :: Monoid v => C v a
-  M.$fCvNode @v @a m = C m some_fun
-
-But we must /not/ use the call (M.$fCvNode @ [Integer] $dMonoid_2)
-for specialisation, else we get:
-
-  $dC_1 = M.$fCvNode @ [Integer] $dMonoid_1
-  $dMonoid_2 = M.$p1C @ [Integer] $dC_1
-  $s$fCvNode = C $dMonoid_2 ...
-    RULE M.$fCvNode [Integer] _ _ = $s$fCvNode
-
-Now use the rule to rewrite the call in the RHS of $dC_1
-and we get a loop!
 
 --------------
 Here's yet another example
