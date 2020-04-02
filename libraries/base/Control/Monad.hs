@@ -167,17 +167,6 @@ f >=> g     = \x -> f x >>= g
 
 -- | Repeat an action indefinitely.
 --
--- Using @ApplicativeDo@: \'@'forever' as@\' can be understood as the
--- pseudo-@do@ expression
---
--- @
--- do as
---    as
---    ..
--- @
---
--- with @as@ repeating.
---
 -- ==== __Examples__
 --
 -- A common use of 'forever' is to process input from network sockets,
@@ -200,6 +189,10 @@ f >=> g     = \x -> f x >>= g
 --     echo client = 'forever' $
 --       hGetLine client >>= hPutStrLn client
 -- @
+--
+-- Note that "forever" isn't necessarily non-terminating.
+-- If the action is in a @'MonadPlus'@ and short-circuits after some number of iterations.
+-- then @'forever'@ actually returns `mzero`, effectively short-circuiting its caller.
 forever     :: (Applicative f) => f a -> f b
 {-# INLINE forever #-}
 forever a   = let a' = a *> a' in a'
@@ -287,22 +280,14 @@ For further information, see this issue comment, which includes side-by-side
 Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
--- | @'replicateM' n act@ performs the action @n@ times,
--- gathering the results.
+-- | @'replicateM' n act@ performs the action @act@ @n@ times,
+-- and then returns the list of results:
 --
--- Using @ApplicativeDo@: \'@'replicateM' 5 as@\' can be understood as
--- the @do@ expression
---
--- @
--- do a1 <- as
---    a2 <- as
---    a3 <- as
---    a4 <- as
---    a5 <- as
---    pure [a1,a2,a3,a4,a5]
--- @
---
--- Note the @Applicative@ constraint.
+-- ==== __Examples__
+-- >>> replicateM 3 (putStrLn "a")
+-- a
+-- a
+-- a
 replicateM        :: (Applicative m) => Int -> m a -> m [a]
 {-# INLINABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
