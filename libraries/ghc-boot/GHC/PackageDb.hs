@@ -48,7 +48,6 @@
 --
 module GHC.PackageDb
    ( GenericUnitInfo(..)
-   , emptyGenericUnitInfo
    -- * Read and write
    , DbMode(..)
    , DbOpenMode(..)
@@ -281,41 +280,6 @@ data DbUnitId instunitid compid unitid modulename mod
 class BinaryStringRep a where
   fromStringRep :: BS.ByteString -> a
   toStringRep   :: a -> BS.ByteString
-
-emptyGenericUnitInfo :: RepGenericUnitInfo a b c d e f g
-                          => GenericUnitInfo a b c d e f g
-emptyGenericUnitInfo =
-  GenericUnitInfo {
-       unitId                  = fromStringRep BS.empty,
-       unitInstanceOf          = fromStringRep BS.empty,
-       unitInstantiations      = [],
-       unitPackageId           = fromStringRep BS.empty,
-       unitPackageName         = fromStringRep BS.empty,
-       unitPackageVersion      = Version [] [],
-       unitComponentName       = Nothing,
-       unitAbiHash             = "",
-       unitDepends             = [],
-       unitAbiDepends          = [],
-       unitImportDirs          = [],
-       unitLibraries           = [],
-       unitExtDepLibsSys       = [],
-       unitExtDepLibsGhc       = [],
-       unitLibraryDirs         = [],
-       unitLibraryDynDirs      = [],
-       unitExtDepFrameworks    = [],
-       unitExtDepFrameworkDirs = [],
-       unitLinkerOptions       = [],
-       unitCcOptions           = [],
-       unitIncludes            = [],
-       unitIncludeDirs         = [],
-       unitHaddockInterfaces   = [],
-       unitHaddockHTMLs        = [],
-       unitExposedModules      = [],
-       unitHiddenModules       = [],
-       unitIsIndefinite        = False,
-       unitIsExposed           = False,
-       unitIsTrusted           = False
-  }
 
 -- | Represents a lock of a package db.
 newtype PackageDbLock = PackageDbLock Handle

@@ -22,7 +22,6 @@ module GHC.Unit.Info (
         PackageId(..),
         PackageName(..),
         Version(..),
-        defaultUnitInfo,
         unitPackageNameString,
         unitPackageIdString,
         pprUnitInfo,
@@ -82,9 +81,6 @@ instance Outputable PackageId where
 
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
-
-defaultUnitInfo :: UnitInfo
-defaultUnitInfo = emptyGenericUnitInfo
 
 unitPackageIdString :: UnitInfo -> String
 unitPackageIdString pkg = unpackFS str
