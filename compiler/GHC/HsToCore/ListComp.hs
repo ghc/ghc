@@ -585,7 +585,7 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
                                   mkBoxedTupleTy [t1,t2]))
                                exps_w_tys
 
-       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr bind_ty stmts_rest }
+       ; dsMcBindStmt pat rhs bind_op Nothing bind_ty stmts_rest }
   where
     ds_inner :: ParStmtBlock GhcTc GhcTc -> DsM (CoreExpr, Type)
     ds_inner (ParStmtBlock _ stmts bndrs return_op)
@@ -609,7 +609,7 @@ matchTuple ids body
 dsMcBindStmt :: LPat GhcTc
              -> CoreExpr        -- ^ the desugared rhs of the bind statement
              -> SyntaxExpr GhcTc
-             -> SyntaxExpr GhcTc
+             -> Maybe (SyntaxExpr GhcTc)
              -> Type            -- ^ S in (>>=) :: Q -> (R -> S) -> T
              -> [ExprLStmt GhcTc]
              -> DsM CoreExpr

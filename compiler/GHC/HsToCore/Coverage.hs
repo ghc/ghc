@@ -714,7 +714,7 @@ addTickStmt _isGuard (BindStmt x pat e bind fail) = do
                 (addTickLPat pat)
                 (addTickLHsExprRHS e)
                 (addTickSyntaxExpr hpcSrcSpan bind)
-                (addTickSyntaxExpr hpcSrcSpan fail)
+                (mapM (addTickSyntaxExpr hpcSrcSpan) fail)
 addTickStmt isGuard (BodyStmt x e bind' guard') = do
         liftM3 (BodyStmt x)
                 (addTick isGuard e)
@@ -768,7 +768,7 @@ addTickApplicativeArg isGuard (op, arg) =
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
-      <*> addTickSyntaxExpr hpcSrcSpan fail
+      <*> mapM (addTickSyntaxExpr hpcSrcSpan) fail
   addTickArg (ApplicativeArgMany x stmts ret pat) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts

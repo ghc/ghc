@@ -1834,8 +1834,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (LPat idL)
              body
              (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind in Stmts]
-             (SyntaxExpr idR) -- The fail operator
-             -- The fail operator is noSyntaxExpr
+             (Maybe (SyntaxExpr idR)) -- The fail operator
+             -- The fail operator is Nothing
              -- if the pattern match can't fail
              -- See Note [NoSyntaxExpr] (2)
 
@@ -2003,13 +2003,14 @@ data ApplicativeArg idL
     , is_body_stmt      :: Bool -- True <=> was a BodyStmt
                               -- False <=> was a BindStmt
                               -- See Note [Applicative BodyStmt]
-    , fail_operator     :: (SyntaxExpr idL) -- The fail operator
+    , fail_operator     :: Maybe (SyntaxExpr idL) -- The fail operator
                          -- The fail operator is needed if this is a BindStmt
                          -- where the pattern can fail. E.g.:
                          -- (Just a) <- stmt
                          -- The fail operator will be invoked if the pattern
                          -- match fails.
-                         -- The fail operator is noSyntaxExpr
+                         -- It is also used for guards in MonadComprehensions.
+                         -- The fail operator is Nothing
                          -- if the pattern match can't fail
                          -- See Note [NoSyntaxExpr] (2)
     }
@@ -2252,7 +2253,7 @@ pprStmt (ApplicativeStmt _ args mb_join)
      [ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
              :: ExprStmt (GhcPass idL))]
      | otherwise =
-     [ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr noSyntaxExpr
+     [ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr Nothing
              :: ExprStmt (GhcPass idL))]
    flattenArg (_, ApplicativeArgMany _ stmts _ _) =
      concatMap flattenStmt stmts
@@ -2278,7 +2279,7 @@ pprArg (ApplicativeArgOne _ pat expr isBody _)
     ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
             :: ExprStmt (GhcPass idL))
   | otherwise =
-    ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr noSyntaxExpr
+    ppr (BindStmt (panic "pprStmt") pat expr noSyntaxExpr Nothing
             :: ExprStmt (GhcPass idL))
 pprArg (ApplicativeArgMany _ stmts return pat) =
      ppr pat <+>

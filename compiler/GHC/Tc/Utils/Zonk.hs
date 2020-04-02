@@ -1195,7 +1195,9 @@ zonkStmt env zBody (BindStmt bind_ty pat body bind_op fail_op)
         ; new_bind_ty <- zonkTcTypeToTypeX env1 bind_ty
         ; new_body <- zBody env1 body
         ; (env2, new_pat) <- zonkPat env1 pat
-        ; (_, new_fail) <- zonkSyntaxExpr env1 fail_op
+        ; new_fail <- case fail_op of
+            Nothing -> return Nothing
+            Just f -> fmap (Just . snd) (zonkSyntaxExpr env1 f)
         ; return ( env2
                  , BindStmt new_bind_ty new_pat new_body new_bind new_fail) }
 
@@ -1241,7 +1243,10 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
 
     zonk_arg env (ApplicativeArgOne x pat expr isBody fail_op)
       = do { new_expr <- zonkLExpr env expr
-           ; (_, new_fail) <- zonkSyntaxExpr env fail_op
+           ; new_fail <- forM fail_op $ \old_fail ->
+              do { (_, fail') <- zonkSyntaxExpr env old_fail
+                 ; return fail'
+                 }
            ; return (ApplicativeArgOne x pat new_expr isBody new_fail) }
     zonk_arg env (ApplicativeArgMany x stmts ret pat)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
