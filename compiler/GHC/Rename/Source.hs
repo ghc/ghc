@@ -459,10 +459,12 @@ rnSrcInstDecl (XInstDecl nec) = noExtCon nec
 checkCanonicalInstances :: Name -> LHsSigType GhcRn -> LHsBinds GhcRn -> RnM ()
 checkCanonicalInstances cls poly_ty mbinds = do
     whenWOptM Opt_WarnNonCanonicalMonadInstances
-        checkCanonicalMonadInstances
+        $ checkCanonicalMonadInstances
+        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
     whenWOptM Opt_WarnNonCanonicalMonoidInstances
-        checkCanonicalMonoidInstances
+        $ checkCanonicalMonoidInstances
+        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
 
   where
     -- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
@@ -478,18 +480,18 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
     --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
     --
-    checkCanonicalMonadInstances
+    checkCanonicalMonadInstances refURL
       | cls == applicativeClassName  = do
           forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == pureAName, isAliasMG mg == Just returnMName
-                      -> addWarnNonCanonicalMethod1
+                      -> addWarnNonCanonicalMethod1 refURL
                             Opt_WarnNonCanonicalMonadInstances "pure" "return"
 
                       | name == thenAName, isAliasMG mg == Just thenMName
-                      -> addWarnNonCanonicalMethod1
+                      -> addWarnNonCanonicalMethod1 refURL
                             Opt_WarnNonCanonicalMonadInstances "(*>)" "(>>)"
 
                   _ -> return ()
@@ -500,11 +502,11 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == returnMName, isAliasMG mg /= Just pureAName
-                      -> addWarnNonCanonicalMethod2
+                      -> addWarnNonCanonicalMethod2 refURL
                             Opt_WarnNonCanonicalMonadInstances "return" "pure"
 
                       | name == thenMName, isAliasMG mg /= Just thenAName
-                      -> addWarnNonCanonicalMethod2
+                      -> addWarnNonCanonicalMethod2 refURL
                             Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
 
                   _ -> return ()
@@ -524,14 +526,14 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --
     --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
     --
-    checkCanonicalMonoidInstances
+    checkCanonicalMonoidInstances refURL
       | cls == semigroupClassName  = do
           forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
               case mbind of
                   FunBind { fun_id      = L _ name
                           , fun_matches = mg }
                       | name == sappendName, isAliasMG mg == Just mappendName
-                      -> addWarnNonCanonicalMethod1
+                      -> addWarnNonCanonicalMethod1 refURL
                             Opt_WarnNonCanonicalMonoidInstances "(<>)" "mappend"
 
                   _ -> return ()
@@ -542,8 +544,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == mappendName, isAliasMG mg /= Just sappendName
-                      -> addWarnNonCanonicalMethod2
-                            Opt_WarnNonCanonicalMonoidInstances "mappend" "(<>)"
+                      -> addWarnNonCanonicalMethod2 refURL
+                            Opt_WarnNonCanonicalMonoidInstances
+                            "mappend" "(<>)"
 
                   _ -> return ()
 
@@ -560,7 +563,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 flag lhs rhs = do
+    addWarnNonCanonicalMethod1 refURL flag lhs rhs = do
         addWarn (Reason flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text (lhs ++ " = " ++ rhs)) <+>
@@ -569,29 +572,26 @@ checkCanonicalInstances cls poly_ty mbinds = do
                        , text "Move definition from" <+>
                          quotes (text rhs) <+>
                          text "to" <+> quotes (text lhs)
+                       , text "See also:" <+>
+                         text refURL
                        ]
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 flag lhs rhs = do
+    addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
         addWarn (Reason flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text lhs) <+>
                          text "definition detected"
                        , instDeclCtxt1 poly_ty
+                       , quotes (text lhs) <+>
+                         text "will eventually be removed in favour of" <+>
+                         quotes (text rhs)
                        , text "Either remove definition for" <+>
-                         quotes (text lhs) <+> text "or define as" <+>
+                         quotes (text lhs) <+> text "(recommended)" <+>
+                         text "or define as" <+>
                          quotes (text (lhs ++ " = " ++ rhs))
-                       ]
-
-    -- like above, but method has no default impl
-    addWarnNonCanonicalMethod2NoDefault flag lhs rhs = do
-        addWarn (Reason flag) $ vcat
-                       [ text "Noncanonical" <+>
-                         quotes (text lhs) <+>
-                         text "definition detected"
-                       , instDeclCtxt1 poly_ty
-                       , text "Define as" <+>
-                         quotes (text (lhs ++ " = " ++ rhs))
+                       , text "See also:" <+>
+                         text refURL
                        ]
 
     -- stolen from TcInstDcls
