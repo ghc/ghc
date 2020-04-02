@@ -342,7 +342,7 @@ generateJumpTableForInstr :: Platform -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr platform (JMP_TBL _ ids label) =
   let jumpTable = map (jumpTableEntry platform) ids
-  in Just (CmmData (Section ReadOnlyData label) (RawCmmStatics label jumpTable))
+  in Just (CmmData (Section ReadOnlyData label) (CmmStaticsRaw label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 

@@ -45,10 +45,10 @@ import qualified Control.Monad.ST.Unsafe as ST
 import qualified GHC.ST as GHC.ST
 import GHC.Base
 
--- | The lazy @'ST' monad.
--- The ST monad allows for destructive updates, but is escapable (unlike IO).
+-- | The lazy @'ST'@ monad.
+-- The ST monad allows for destructive updates, but is escapable (unlike @IO@).
 -- A computation of type @'ST' s a@ returns a value of type @a@, and
--- execute in "thread" @s@. The @s@ parameter is either
+-- executes in "thread" @s@. The @s@ parameter is either
 --
 -- * an uninstantiated type variable (inside invocations of 'runST'), or
 --

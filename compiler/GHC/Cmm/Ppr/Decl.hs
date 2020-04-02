@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -70,11 +72,8 @@ instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
     ppr t = pprTop t
 
-instance Outputable CmmStatics where
+instance Outputable (GenCmmStatics a) where
     ppr = pprStatics
-
-instance Outputable RawCmmStatics where
-    ppr = pprRawStatics
 
 instance Outputable CmmStatic where
     ppr e = sdocWithDynFlags $ \dflags ->
@@ -142,19 +141,17 @@ instance Outputable ForeignHint where
 --      following C--
 --
 
-pprStatics :: CmmStatics -> SDoc
+pprStatics :: GenCmmStatics a -> SDoc
 pprStatics (CmmStatics lbl itbl ccs payload) =
   ppr lbl <> colon <+> ppr itbl <+> ppr ccs <+> ppr payload
-pprStatics (CmmStaticsRaw lbl ds) = pprRawStatics (RawCmmStatics lbl ds)
-
-pprRawStatics :: RawCmmStatics -> SDoc
-pprRawStatics (RawCmmStatics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
+pprStatics (CmmStaticsRaw lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: Platform -> CmmStatic -> SDoc
 pprStatic platform s = case s of
     CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit platform lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
+    CmmFileEmbed path  -> nest 4 $ text "incbin " <+> text (show path)
 
 -- --------------------------------------------------------------------------
 -- data sections

@@ -1107,10 +1107,10 @@ updInfoSRTs
   -> [CmmDeclSRTs]
 
 updInfoSRTs _ _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
-  = [CmmData s (RawCmmStatics lbl statics)]
+  = [CmmData s (CmmStaticsRaw lbl statics)]
 
 updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
-  = [CmmData s (RawCmmStatics lbl (map CmmStaticLit field_lits))]
+  = [CmmData s (CmmStaticsRaw lbl (map CmmStaticLit field_lits))]
   where
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
     field_lits = mkStaticClosureFields dflags itbl ccs caf_info payload
