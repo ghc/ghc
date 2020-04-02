@@ -17,7 +17,7 @@ module GHC.Core.Subst (
         deShadowBinds, substSpec, substRulesForImportedIds,
         substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-        lookupIdSubst, lookupTCvSubst, substIdOcc,
+        lookupIdSubst, lookupTCvSubst, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
 
         -- ** Operations on substitutions
@@ -756,4 +756,3 @@ analyser, so it's possible that the worker is not even in scope any more.
 In all all these cases we simply drop the special case, returning to
 InlVanilla.  The WARN is just so I can see if it happens a lot.
 -}
-
