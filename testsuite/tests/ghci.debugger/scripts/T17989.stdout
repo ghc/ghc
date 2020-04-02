@@ -1,0 +1,20 @@
+7 7 ":break "
+"B.bar"
+"B.foo"
+"T17989A.bar"
+"T17989A.foo"
+"T17989C.foo"
+"foo"
+"main"
+Breakpoint 0 activated at T17989B.hs:10:9-25
+Breakpoint 1 activated at T17989B.hs:7:6-11
+Breakpoint 2 activated at T17989A.hs:10:7-13
+Breakpoint 3 activated at T17989A.hs:4:9-14
+Breakpoint 4 activated at T17989C.hs:4:9-26
+Breakpoint 4 was already set at T17989C.hs:4:9-26
+Breakpoint 5 activated at T17989M.hs:6:8-51
+2 2 ":break "
+"B.bar"
+"B.foo"
+1 1 ":break "
+"foo"
