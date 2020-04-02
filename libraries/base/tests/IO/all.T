@@ -16,8 +16,8 @@ test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
-test('hGetBuffering001', 
-	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')], 
+test('hGetBuffering001',
+	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')],
 	compile_and_run, [''])
 
 test('hGetChar001', normal, compile_and_run, [''])
@@ -46,7 +46,7 @@ test('hSeek004', [], compile_and_run, ['-cpp'])
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
 test('hSetBuffering003',
-    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')], 
+    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')],
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
@@ -67,6 +67,7 @@ test('openFile005', [], compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', [], compile_and_run, [''])
 test('openFile008', cmd_prefix('ulimit -n 2048; '), compile_and_run, [''])
+test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001', [], compile_and_run, [''])
