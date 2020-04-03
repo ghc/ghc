@@ -646,7 +646,7 @@ computeInterface doc_str hi_boot_file mod0 = do
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
                     r <- liftIO $
-                        rnModIface hsc_env (indefUnitIdInsts (indefModuleUnitId indef))
+                        rnModIface hsc_env (instUnitInsts (indefModuleUnitId indef))
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
@@ -672,7 +672,7 @@ moduleFreeHolesPrecise doc_str mod
  | otherwise =
    case splitModuleInsts mod of
     (imod, Just indef) -> do
-        let insts = indefUnitIdInsts (indefModuleUnitId indef)
+        let insts = instUnitInsts (indefModuleUnitId indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt

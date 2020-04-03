@@ -403,7 +403,7 @@ lookupUnit' False (UnitInfoMap pkg_map _) uid = lookupUDFM pkg_map uid
 lookupUnit' True m@(UnitInfoMap pkg_map _) uid =
     case splitUnitIdInsts uid of
         (iuid, Just indef) ->
-            fmap (renamePackage m (indefUnitIdInsts indef))
+            fmap (renamePackage m (instUnitInsts indef))
                  (lookupUDFM pkg_map iuid)
         (_, Nothing) -> lookupUDFM pkg_map uid
 
@@ -782,10 +782,10 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                   let local = [ Map.singleton
                                   (moduleName mod)
                                   (Set.singleton $ IndefModule indef mod_name)
-                              | (mod_name, mod) <- indefUnitIdInsts indef
+                              | (mod_name, mod) <- instUnitInsts indef
                               , isHoleModule mod ]
                       recurse = [ collectHoles (moduleUnitId mod)
-                                | (_, mod) <- indefUnitIdInsts indef ]
+                                | (_, mod) <- instUnitInsts indef ]
                   in Map.unionsWith Set.union $ local ++ recurse
                 -- Other types of unit identities don't have holes
                 (_, Nothing) -> Map.empty
@@ -857,7 +857,7 @@ findPackages prec_map pkg_db arg pkgs unusable
         in if iuid == installedUnitInfoId p
               then Just (case mb_indef of
                             Nothing    -> p
-                            Just indef -> renamePackage pkg_db (indefUnitIdInsts indef) p)
+                            Just indef -> renamePackage pkg_db (instUnitInsts indef) p)
               else Nothing
 
 selectPackages :: PackagePrecedenceIndex -> PackageArg -> [UnitInfo]
@@ -1133,9 +1133,9 @@ upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
 upd_wired_in_uid wiredInMap (DefiniteUnitId def_uid) =
     DefiniteUnitId (upd_wired_in wiredInMap def_uid)
 upd_wired_in_uid wiredInMap (IndefiniteUnitId indef_uid) =
-    IndefiniteUnitId $ newIndefUnitId
-        (indefUnitIdComponentId indef_uid)
-        (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (indefUnitIdInsts indef_uid))
+    IndefiniteUnitId $ newInstantiatedUnit
+        (instUnitInstanceOf indef_uid)
+        (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 
 upd_wired_in :: WiredPackagesMap -> DefUnitId -> DefUnitId
 upd_wired_in wiredInMap key

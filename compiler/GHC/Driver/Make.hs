@@ -1524,7 +1524,7 @@ unitIdsToCheck dflags =
   goUnitId uid =
     case splitUnitIdInsts uid of
       (_, Just indef) ->
-        let insts = indefUnitIdInsts indef
+        let insts = instUnitInsts indef
         in uid : concatMap (goUnitId . moduleUnitId . snd) insts
       _ -> []
 
