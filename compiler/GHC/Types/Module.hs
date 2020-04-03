@@ -547,7 +547,7 @@ instance Outputable ComponentId where
 -- typechecking.
 --
 -- There are two possible forms for a 'UnitId'.  It can be a
--- 'DefiniteUnitId', in which case we just have a string that uniquely
+-- 'UnitId', in which case we just have a string that uniquely
 -- identifies some fully compiled, installed library we have on disk.
 -- However, when we are typechecking a library with missing holes,
 -- we may need to instantiate a library on the fly (in which case
@@ -556,15 +556,15 @@ instance Outputable ComponentId where
 -- instantiation, so that we can substitute over it.
 data UnitId
     = InstUnit {-# UNPACK #-} !InstantiatedUnit
-    |   DefiniteUnitId {-# UNPACK #-} !DefUnitId
+    | DefUnit  {-# UNPACK #-} !DefUnitId        -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
 
 unitIdFS :: UnitId -> FastString
 unitIdFS (InstUnit x) = instUnitIdFS x
-unitIdFS (DefiniteUnitId (DefUnitId x)) = installedUnitIdFS x
+unitIdFS (DefUnit (DefUnitId x)) = installedUnitIdFS x
 
 unitIdKey :: UnitId -> Unique
 unitIdKey (InstUnit x) = instUnitIdKey x
-unitIdKey (DefiniteUnitId (DefUnitId x)) = installedUnitIdKey x
+unitIdKey (DefUnit (DefUnitId x)) = installedUnitIdKey x
 
 -- | A dynamically instantiated unit.
 --
@@ -714,7 +714,7 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 
 -- | Lossy conversion to the on-disk 'InstalledUnitId' for a component.
 toInstalledUnitId :: UnitId -> InstalledUnitId
-toInstalledUnitId (DefiniteUnitId (DefUnitId iuid)) = iuid
+toInstalledUnitId (DefUnit (DefUnitId iuid)) = iuid
 toInstalledUnitId (InstUnit indef) =
     componentIdToInstalledUnitId (instUnitInstanceOf indef)
 
@@ -828,7 +828,7 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 unitIdFreeHoles :: UnitId -> UniqDSet ModuleName
 unitIdFreeHoles (InstUnit x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
-unitIdFreeHoles (DefiniteUnitId _) = emptyUniqDSet
+unitIdFreeHoles (DefUnit _) = emptyUniqDSet
 
 instance Show UnitId where
     show = unitIdString
@@ -872,7 +872,7 @@ newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug..
 newUnitId cid insts = InstUnit $ newInstantiatedUnit cid insts
 
 pprUnitId :: UnitId -> SDoc
-pprUnitId (DefiniteUnitId uid) = ppr uid
+pprUnitId (DefUnit uid) = ppr uid
 pprUnitId (InstUnit uid) = ppr uid
 
 instance Eq UnitId where
@@ -902,7 +902,7 @@ instance Outputable UnitId where
 
 -- Performance: would prefer to have a NameCache like thing
 instance Binary UnitId where
-  put_ bh (DefiniteUnitId def_uid) = do
+  put_ bh (DefUnit def_uid) = do
     putByte bh 0
     put_ bh def_uid
   put_ bh (InstUnit indef_uid) = do
@@ -910,7 +910,7 @@ instance Binary UnitId where
     put_ bh indef_uid
   get bh = do b <- getByte bh
               case b of
-                0 -> fmap DefiniteUnitId   (get bh)
+                0 -> fmap DefUnit  (get bh)
                 _ -> fmap InstUnit (get bh)
 
 instance Binary ComponentId where
@@ -924,7 +924,7 @@ newSimpleUnitId (ComponentId fs _) = fsToUnitId fs
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnitId :: FastString -> UnitId
-fsToUnitId = DefiniteUnitId . DefUnitId . InstalledUnitId
+fsToUnitId = DefUnit . DefUnitId . InstalledUnitId
 
 stringToUnitId :: String -> UnitId
 stringToUnitId = fsToUnitId . mkFastString
@@ -1003,7 +1003,7 @@ splitModuleInsts m =
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
 splitUnitIdInsts (InstUnit iuid) =
     (componentIdToInstalledUnitId (instUnitInstanceOf iuid), Just iuid)
-splitUnitIdInsts (DefiniteUnitId (DefUnitId uid)) = (uid, Nothing)
+splitUnitIdInsts (DefUnit (DefUnitId uid)) = (uid, Nothing)
 
 generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
 generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
@@ -1018,13 +1018,13 @@ parseModuleName = fmap mkModuleName
                 $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
 
 parseUnitId :: ReadP UnitId
-parseUnitId = parseFullUnitId <++ parseDefiniteUnitId <++ parseSimpleUnitId
+parseUnitId = parseFullUnitId <++ parseUnitId <++ parseSimpleUnitId
   where
     parseFullUnitId = do
         cid <- parseComponentId
         insts <- parseModSubst
         return (newUnitId cid insts)
-    parseDefiniteUnitId = do
+    parseUnitId = do
         s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
         return (stringToUnitId s)
     parseSimpleUnitId = do
