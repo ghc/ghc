@@ -1,5 +1,8 @@
-{-# LANGUAGE Trustworthy, BangPatterns #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
@@ -193,7 +196,8 @@ type CharBuffer = Buffer Char
 #endif
 
 data BufferState = ReadBuffer | WriteBuffer
-  deriving Eq -- ^ @since 4.2.0.0
+  deriving
+  stock Eq -- ^ @since 4.2.0.0
 
 withBuffer :: Buffer e -> (Ptr e -> IO a) -> IO a
 withBuffer Buffer{ bufRaw=raw } f = withForeignPtr (castForeignPtr raw) f

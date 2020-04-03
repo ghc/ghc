@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns
            , CPP
@@ -110,21 +111,24 @@ data FdData = FdData {
 data FdKey = FdKey {
       keyFd     :: {-# UNPACK #-} !Fd
     , keyUnique :: {-# UNPACK #-} !Unique
-    } deriving ( Eq   -- ^ @since 4.4.0.0
-               , Show -- ^ @since 4.4.0.0
-               )
+    } deriving
+      stock ( Eq   -- ^ @since 4.4.0.0
+            , Show -- ^ @since 4.4.0.0
+            )
 
 -- | Callback invoked on I/O events.
 type IOCallback = FdKey -> Event -> IO ()
 
-data State = Created
-           | Running
-           | Dying
-           | Releasing
-           | Finished
-             deriving ( Eq   -- ^ @since 4.4.0.0
-                      , Show -- ^ @since 4.4.0.0
-                      )
+data State
+    = Created
+    | Running
+    | Dying
+    | Releasing
+    | Finished
+    deriving
+    stock ( Eq   -- ^ @since 4.4.0.0
+          , Show -- ^ @since 4.4.0.0
+          )
 
 -- | The event manager state.
 data EventManager = EventManager

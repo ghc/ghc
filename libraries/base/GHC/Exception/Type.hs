@@ -1,10 +1,10 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , ExistentialQuantification
-           , MagicHash
-           , RecordWildCards
-           , PatternSynonyms
-  #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -51,9 +51,9 @@ instance of the @Exception@ class. The simplest case is a new exception
 type directly below the root:
 
 > data MyException = ThisException | ThatException
->     deriving Show
+>     deriving stock Show
 >
-> instance Exception MyException
+>     deriving anycass Exception
 
 The default method definitions in the @Exception@ class do what we need
 in this case. You can now throw and catch @ThisException@ and
@@ -109,7 +109,7 @@ of exceptions:
 > -- Make an exception type for a particular frontend compiler exception
 >
 > data MismatchedParentheses = MismatchedParentheses
->     deriving Show
+>     deriving stock Show
 >
 > instance Exception MismatchedParentheses where
 >     toException   = frontendExceptionToException
@@ -160,9 +160,10 @@ data ArithException
   | DivideByZero
   | Denormal
   | RatioZeroDenominator -- ^ @since 4.6.0.0
-  deriving ( Eq  -- ^ @since 3.0
-           , Ord -- ^ @since 3.0
-           )
+  deriving
+  stock ( Eq  -- ^ @since 3.0
+        , Ord -- ^ @since 3.0
+        )
 
 divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
 divZeroException        = toException DivideByZero
