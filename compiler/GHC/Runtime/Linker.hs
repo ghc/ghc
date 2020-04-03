@@ -141,9 +141,9 @@ emptyPLS = PersistentLinkerState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = map toInstalledUnitId [rtsUnitId]
+  where init_pkgs = map toUnitId [rtsUnitId]
 
-extendLoadedPkgs :: DynLinker -> [InstalledUnitId] -> IO ()
+extendLoadedPkgs :: DynLinker -> [UnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
   modifyPLS_ dl $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
@@ -625,7 +625,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
-            -> IO ([Linkable], [InstalledUnitId])     -- ... then link these first
+            -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hsc_env hpt pls replace_osuf span mods
@@ -663,8 +663,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
                 -> UniqDSet ModuleName         -- accum. module dependencies
-                -> UniqDSet InstalledUnitId          -- accum. package dependencies
-                -> IO ([ModuleName], [InstalledUnitId]) -- result
+                -> UniqDSet UnitId          -- accum. package dependencies
+                -> IO ([ModuleName], [UnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -678,7 +678,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = moduleUnitId mod
+            pkg = moduleUnit mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
@@ -691,7 +691,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
           --
           if pkg /= this_pkg
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toInstalledUnitId pkg))
+             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
              else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
@@ -1266,7 +1266,7 @@ linkPackages' hsc_env new_pks pls = do
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (installedUnitIdFS new_pkg)))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
 linkPackage :: HscEnv -> UnitInfo -> IO ()
