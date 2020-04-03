@@ -2011,10 +2011,10 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 -- is only one exposed package which exports this module, don't qualify.
 mkQualModule :: DynFlags -> QueryQualifyModule
 mkQualModule dflags mod
-     | moduleUnitId mod == thisPackage dflags = False
+     | moduleUnit mod == thisPackage dflags = False
 
      | [(_, pkgconfig)] <- lookup,
-       packageConfigId pkgconfig == moduleUnitId mod
+       packageConfigId pkgconfig == moduleUnit mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False

@@ -328,7 +328,7 @@ buildUnit session cid insts lunit = do
                         -- blank for now.
                         TcSession -> []
                         _ -> map (toInstalledUnitId . unwireUnitId dflags)
-                                $ deps ++ [ moduleUnitId mod
+                                $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
             unitAbiDepends = [],

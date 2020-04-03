@@ -309,7 +309,7 @@ implicitRequirements' hsc_env normal_imports
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
-            Found _ mod | thisPackage dflags /= moduleUnitId mod ->
+            Found _ mod | thisPackage dflags /= moduleUnit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where dflags = hsc_dflags hsc_env
@@ -329,7 +329,7 @@ checkUnitId uid = do
             -- NB: direct hole instantiations are well-typed by construction
             -- (because we FORCE things to be merged in), so don't check them
             when (not (isHoleModule mod)) $ do
-                checkUnitId (moduleUnitId mod)
+                checkUnitId (moduleUnit mod)
                 _ <- mod `checkImplements` InstantiatedModule indef mod_name
                 return ()
       _ -> return () -- if it's hashed, must be well-typed
@@ -1003,7 +1003,7 @@ instantiateSignature = do
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
-    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
+    MASSERT( moduleUnit outer_mod == thisPackage dflags )
     inner_mod `checkImplements`
         InstantiatedModule
             (newInstantiatedUnit (thisComponentId dflags)

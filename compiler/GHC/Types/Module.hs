@@ -11,6 +11,10 @@ the keys.
 
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.Module
     (
@@ -86,8 +90,8 @@ module GHC.Types.Module
         wiredInUnitIds,
 
         -- * The Module type
-        Module(Module),
-        moduleUnitId, moduleName,
+        GenModule(..),
+        type Module,
         pprModule,
         mkModule,
         mkHoleModule,
@@ -374,7 +378,7 @@ moduleNameString (ModuleName mod) = unpackFS mod
 -- eg. "$aeson_70dylHtv1FFGeai1IoxcQr$Data.Aeson.Types.Internal"
 moduleStableString :: Module -> String
 moduleStableString Module{..} =
-  "$" ++ unitIdString moduleUnitId ++ "$" ++ moduleNameString moduleName
+  "$" ++ unitIdString moduleUnit ++ "$" ++ moduleNameString moduleName
 
 mkModuleName :: String -> ModuleName
 mkModuleName s = ModuleName (mkFastString s)
@@ -402,18 +406,20 @@ moduleNameColons = dots_to_colons . moduleNameString
 ************************************************************************
 -}
 
+-- | A generic module is a pair of a unit identifier and a 'ModuleName'.
+data GenModule unit = Module
+   { moduleUnit :: !unit       -- ^ Unit the module belongs to
+   , moduleName :: !ModuleName -- ^ Module name (e.g. A.B.C)
+   }
+   deriving (Eq,Ord,Data)
+
 -- | A Module is a pair of a 'UnitId' and a 'ModuleName'.
 --
 -- Module variables (i.e. @<H>@) which can be instantiated to a
 -- specific module at some later point in time are represented
--- with 'moduleUnitId' set to 'holeUnitId' (this allows us to
--- avoid having to make 'moduleUnitId' a partial operation.)
---
-data Module = Module {
-   moduleUnitId :: !UnitId,  -- pkg-1.0
-   moduleName :: !ModuleName  -- A.B.C
-  }
-  deriving (Eq, Ord)
+-- with 'moduleUnit' set to 'holeUnitId' (this allows us to
+-- avoid having to make 'moduleUnit' a partial operation.)
+type Module = GenModule UnitId
 
 -- | Calculate the free holes of a 'Module'.  If this set is non-empty,
 -- this module was defined in an indefinite library that had required
@@ -424,7 +430,7 @@ data Module = Module {
 moduleFreeHoles :: Module -> UniqDSet ModuleName
 moduleFreeHoles m
     | isHoleModule m = unitUniqDSet (moduleName m)
-    | otherwise = unitIdFreeHoles (moduleUnitId m)
+    | otherwise = unitIdFreeHoles (moduleUnit m)
 
 -- | A 'Module' is definite if it has no free holes.
 moduleIsDefinite :: Module -> Bool
@@ -441,18 +447,12 @@ instance Uniquable Module where
 instance Outputable Module where
   ppr = pprModule
 
-instance Binary Module where
+instance Binary a => Binary (GenModule a) where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
 
-instance Data Module where
-  -- don't traverse?
-  toConstr _   = abstractConstr "Module"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "Module"
-
-instance NFData Module where
-  rnf x = x `seq` ()
+instance NFData (GenModule a) where
+  rnf (Module unit name) = unit `seq` name `seq` ()
 
 -- | This gives a stable ordering, as opposed to the Ord instance which
 -- gives an ordering based on the 'Unique's of the components, which may
@@ -477,7 +477,7 @@ pprModule mod@(Module p n)  = getPprStyle doc
     | qualModule sty mod =
         if isHoleModule mod
             then angleBrackets (pprModuleName n)
-            else ppr (moduleUnitId mod) <> char ':' <> pprModuleName n
+            else ppr (moduleUnit mod) <> char ':' <> pprModuleName n
     | otherwise =
         pprModuleName n
 
@@ -855,7 +855,7 @@ rawHashUnitId sorted_holes =
   . BS.concat $ do
         (m, b) <- sorted_holes
         [ bytesFS (moduleNameFS m),                BS.Char8.singleton ' ',
-          bytesFS (unitIdFS (moduleUnitId b)), BS.Char8.singleton ':',
+          bytesFS (unitIdFS (moduleUnit b)), BS.Char8.singleton ':',
           bytesFS (moduleNameFS (moduleName b)),   BS.Char8.singleton '\n']
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString
@@ -963,7 +963,7 @@ renameHoleUnitId dflags = renameHoleUnitId' (getUnitInfoMap dflags)
 renameHoleModule' :: UnitInfoMap -> ShHoleSubst -> Module -> Module
 renameHoleModule' pkg_map env m
   | not (isHoleModule m) =
-        let uid = renameHoleUnitId' pkg_map env (moduleUnitId m)
+        let uid = renameHoleUnitId' pkg_map env (moduleUnit m)
         in mkModule uid (moduleName m)
   | Just m' <- lookupUFM env (moduleName m) = m'
   -- NB m = <Blah>, that's what's in scope.
@@ -995,7 +995,7 @@ renameHoleUnitId' pkg_map env uid =
 -- instantiation is @Nothing@ no on-the-fly renaming is needed.
 splitModuleInsts :: Module -> (InstalledModule, Maybe InstantiatedModule)
 splitModuleInsts m =
-    let (uid, mb_iuid) = splitUnitIdInsts (moduleUnitId m)
+    let (uid, mb_iuid) = splitUnitIdInsts (moduleUnit m)
     in (InstalledModule uid (moduleName m),
         fmap (\iuid -> InstantiatedModule iuid (moduleName m)) mb_iuid)
 
@@ -1116,14 +1116,14 @@ holeUnitId :: UnitId
 holeUnitId      = fsToUnitId (fsLit "hole")
 
 isInteractiveModule :: Module -> Bool
-isInteractiveModule mod = moduleUnitId mod == interactiveUnitId
+isInteractiveModule mod = moduleUnit mod == interactiveUnitId
 
 -- Note [Representation of module/name variables]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In our ICFP'16, we use <A> to represent module holes, and {A.T} to represent
 -- name holes.  This could have been represented by adding some new cases
 -- to the core data types, but this would have made the existing 'nameModule'
--- and 'moduleUnitId' partial, which would have required a lot of modifications
+-- and 'moduleUnit' partial, which would have required a lot of modifications
 -- to existing code.
 --
 -- Instead, we adopted the following encoding scheme:
@@ -1139,7 +1139,7 @@ isInteractiveModule mod = moduleUnitId mod == interactiveUnitId
 -- 'Name'; 'NameShape' handles name substitutions exclusively.
 
 isHoleModule :: Module -> Bool
-isHoleModule mod = moduleUnitId mod == holeUnitId
+isHoleModule mod = moduleUnit mod == holeUnitId
 
 wiredInUnitIds :: [UnitId]
 wiredInUnitIds = [ primUnitId,
