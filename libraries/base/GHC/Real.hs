@@ -1,5 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -75,12 +82,14 @@ underflowError = raise# underflowException
 -- Note that `Ratio`'s instances inherit the deficiencies from the type
 -- parameter's. For example, @Ratio Natural@'s 'Num' instance has similar
 -- problems to `Numeric.Natural.Natural`'s.
-data  Ratio a = !a :% !a  deriving Eq -- ^ @since 2.01
+data Ratio a = !a :% !a
+    deriving
+    stock Eq -- ^ @since 2.01
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
 -- two 'Integer' values.  A rational number may be constructed using
 -- the '%' operator.
-type  Rational          =  Ratio Integer
+type Rational = Ratio Integer
 
 ratioPrec, ratioPrec1 :: Int
 ratioPrec  = 7  -- Precedence of ':%' constructor
@@ -95,40 +104,38 @@ notANumber = 0 :% 0
 
 -- | Forms the ratio of two integral numbers.
 {-# SPECIALISE (%) :: Integer -> Integer -> Rational #-}
-(%)                     :: (Integral a) => a -> a -> Ratio a
+(%) :: Integral a => a -> a -> Ratio a
+x % y = reduce (x * signum y) (abs y)
 
 -- | Extract the numerator of the ratio in reduced form:
 -- the numerator and denominator have no common factor and the denominator
 -- is positive.
-numerator       :: Ratio a -> a
+numerator :: Ratio a -> a
+numerator (x :% _) = x
 
 -- | Extract the denominator of the ratio in reduced form:
 -- the numerator and denominator have no common factor and the denominator
 -- is positive.
-denominator     :: Ratio a -> a
-
+denominator :: Ratio a -> a
+denominator (_ :% y) = y
 
 -- | 'reduce' is a subsidiary function used only in this module.
 -- It normalises a ratio by dividing both numerator and denominator by
 -- their greatest common divisor.
-reduce ::  (Integral a) => a -> a -> Ratio a
+reduce :: forall a. Integral a => a -> a -> Ratio a
 {-# SPECIALISE reduce :: Integer -> Integer -> Rational #-}
-reduce _ 0              =  ratioZeroDenominatorError
-reduce x y              =  (x `quot` d) :% (y `quot` d)
-                           where d = gcd x y
-
-x % y                   =  reduce (x * signum y) (abs y)
-
-numerator   (x :% _)    =  x
-denominator (_ :% y)    =  y
+reduce _ 0 = ratioZeroDenominatorError
+reduce x y = (x `quot` d) :% (y `quot` d) where
+    d :: a
+    d = gcd x y
 
 --------------------------------------------------------------
 -- Standard numeric classes
 --------------------------------------------------------------
 
-class  (Num a, Ord a) => Real a  where
+class (Num a, Ord a) => Real a where
     -- | the rational equivalent of its real argument with full precision
-    toRational          ::  a -> Rational
+    toRational :: a -> Rational
 
 -- | Integral numbers, supporting integer division.
 --
@@ -144,37 +151,37 @@ class  (Num a, Ord a) => Real a  where
 --
 -- An example of a suitable Euclidean function, for 'Integer'\'s instance, is
 -- 'abs'.
-class  (Real a, Enum a) => Integral a  where
+class (Real a, Enum a) => Integral a where
     -- | integer division truncated toward zero
-    quot                :: a -> a -> a
+    quot :: a -> a -> a
     -- | integer remainder, satisfying
     --
     -- > (x `quot` y)*y + (x `rem` y) == x
-    rem                 :: a -> a -> a
+    rem :: a -> a -> a
     -- | integer division truncated toward negative infinity
-    div                 :: a -> a -> a
+    div :: a -> a -> a
     -- | integer modulus, satisfying
     --
     -- > (x `div` y)*y + (x `mod` y) == x
-    mod                 :: a -> a -> a
+    mod :: a -> a -> a
     -- | simultaneous 'quot' and 'rem'
-    quotRem             :: a -> a -> (a,a)
+    quotRem :: a -> a -> (a,a)
     -- | simultaneous 'div' and 'mod'
-    divMod              :: a -> a -> (a,a)
+    divMod :: a -> a -> (a,a)
     -- | conversion to 'Integer'
-    toInteger           :: a -> Integer
+    toInteger :: a -> Integer
 
     {-# INLINE quot #-}
     {-# INLINE rem #-}
     {-# INLINE div #-}
     {-# INLINE mod #-}
-    n `quot` d          =  q  where (q,_) = quotRem n d
-    n `rem` d           =  r  where (_,r) = quotRem n d
-    n `div` d           =  q  where (q,_) = divMod n d
-    n `mod` d           =  r  where (_,r) = divMod n d
+    n `quot` d =  q  where (q,_) = quotRem n d
+    n `rem`  d =  r  where (_,r) = quotRem n d
+    n `div`  d =  q  where (q,_) = divMod n d
+    n `mod`  d =  r  where (_,r) = divMod n d
 
-    divMod n d          =  if signum r == negate (signum d) then (q-1, r+d) else qr
-                           where qr@(q,r) = quotRem n d
+    divMod n d = if signum r == negate (signum d) then (q-1, r+d) else qr
+                 where qr@(q,r) = quotRem n d
 
 -- | Fractional numbers, supporting real division.
 --
@@ -187,26 +194,26 @@ class  (Real a, Enum a) => Integral a  where
 --
 -- Note that it /isn't/ customarily expected that a type instance of
 -- 'Fractional' implement a field. However, all instances in @base@ do.
-class  (Num a) => Fractional a  where
+class Num a => Fractional a where
     {-# MINIMAL fromRational, (recip | (/)) #-}
 
     -- | Fractional division.
-    (/)                 :: a -> a -> a
+    (/) :: a -> a -> a
     -- | Reciprocal fraction.
-    recip               :: a -> a
+    recip :: a -> a
     -- | Conversion from a 'Rational' (that is @'Ratio' 'Integer'@).
     -- A floating literal stands for an application of 'fromRational'
     -- to a value of type 'Rational', so such literals have type
     -- @('Fractional' a) => a@.
-    fromRational        :: Rational -> a
+    fromRational :: Rational -> a
 
     {-# INLINE recip #-}
     {-# INLINE (/) #-}
-    recip x             =  1 / x
-    x / y               = x * recip y
+    recip x =  1 / x
+    x / y   = x * recip y
 
 -- | Extracting components of fractions.
-class  (Real a, Fractional a) => RealFrac a  where
+class (Real a, Fractional a) => RealFrac a where
     -- | The function 'properFraction' takes a real fractional number @x@
     -- and returns a pair @(n,f)@ such that @x = n+f@, and:
     --
@@ -217,55 +224,58 @@ class  (Real a, Fractional a) => RealFrac a  where
     --
     -- The default definitions of the 'ceiling', 'floor', 'truncate'
     -- and 'round' functions are in terms of 'properFraction'.
-    properFraction      :: (Integral b) => a -> (b,a)
+    properFraction :: forall b. Integral b => a -> (b, a)
     -- | @'truncate' x@ returns the integer nearest @x@ between zero and @x@
-    truncate            :: (Integral b) => a -> b
+    truncate :: forall b. Integral b => a -> b
     -- | @'round' x@ returns the nearest integer to @x@;
     --   the even integer if @x@ is equidistant between two integers
-    round               :: (Integral b) => a -> b
+    round :: forall b. Integral b => a -> b
     -- | @'ceiling' x@ returns the least integer not less than @x@
-    ceiling             :: (Integral b) => a -> b
+    ceiling :: forall b. Integral b => a -> b
     -- | @'floor' x@ returns the greatest integer not greater than @x@
-    floor               :: (Integral b) => a -> b
+    floor :: forall b. Integral b => a -> b
 
     {-# INLINE truncate #-}
-    truncate x          =  m  where (m,_) = properFraction x
+    truncate x = m where (m,_) = properFraction x
 
-    round x             =  let (n,r) = properFraction x
-                               m     = if r < 0 then n - 1 else n + 1
-                           in case signum (abs r - 0.5) of
-                                -1 -> n
-                                0  -> if even n then n else m
-                                1  -> m
-                                _  -> errorWithoutStackTrace "round default defn: Bad value"
+    round x =  let (n,r) = properFraction x
+                   m     = if r < 0 then n - 1 else n + 1
+               in case signum (abs r - 0.5) of
+                    -1 -> n
+                    0  -> if even n then n else m
+                    1  -> m
+                    _  -> errorWithoutStackTrace "round default defn: Bad value"
 
-    ceiling x           =  if r > 0 then n + 1 else n
-                           where (n,r) = properFraction x
+    ceiling x =  if r > 0 then n + 1 else n
+                 where (n,r) = properFraction x
 
-    floor x             =  if r < 0 then n - 1 else n
-                           where (n,r) = properFraction x
+    floor x = if r < 0 then n - 1 else n
+              where (n,r) = properFraction x
 
 -- These 'numeric' enumerations come straight from the Report
 
-numericEnumFrom         :: (Fractional a) => a -> [a]
-numericEnumFrom n       = go 0
+numericEnumFrom :: forall a. Fractional a => a -> [a]
+numericEnumFrom n = go 0
   where
     -- See Note [Numeric Stability of Enumerating Floating Numbers]
+    go :: a -> [a]
     go !k = let !n' = n + k
              in n' : go (k + 1)
 
-numericEnumFromThen     :: (Fractional a) => a -> a -> [a]
+numericEnumFromThen :: forall a. Fractional a => a -> a -> [a]
 numericEnumFromThen n m = go 0
   where
+    step :: a
     step = m - n
     -- See Note [Numeric Stability of Enumerating Floating Numbers]
+    go :: a -> [a]
     go !k = let !n' = n + k * step
              in n' : go (k + 1)
 
-numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
-numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
+numericEnumFromTo :: (Ord a, Fractional a) => a -> a -> [a]
+numericEnumFromTo n m = takeWhile (<= m + 1/2) (numericEnumFrom n)
 
-numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
+numericEnumFromThenTo :: (Ord a, Fractional a) => a -> a -> a -> [a]
 numericEnumFromThenTo e1 e2 e3
     = takeWhile predicate (numericEnumFromThen e1 e2)
                                 where
@@ -321,11 +331,11 @@ See #15081 and Phab:D4650 for the related discussion about this problem.
 --------------------------------------------------------------
 
 -- | @since 2.0.1
-instance  Real Int  where
-    toRational x        =  toInteger x :% 1
+instance Real Int where
+    toRational x = toInteger x :% 1
 
 -- | @since 2.0.1
-instance  Integral Int  where
+instance Integral Int where
     toInteger (I# i) = smallInteger i
 
     a `quot` b
@@ -378,35 +388,46 @@ instance Real Word where
 
 -- | @since 2.01
 instance Integral Word where
-    quot    (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `quotWord#` y#)
-        | otherwise             = divZeroError
-    rem     (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `remWord#` y#)
-        | otherwise             = divZeroError
-    div     (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `quotWord#` y#)
-        | otherwise             = divZeroError
-    mod     (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `remWord#` y#)
-        | otherwise             = divZeroError
+    quot (W# x#) y@(W# y#)
+        | y /= 0
+        = W# (x# `quotWord#` y#)
+        | otherwise
+        = divZeroError
+    rem (W# x#) y@(W# y#)
+        | y /= 0
+        = W# (x# `remWord#` y#)
+        | otherwise
+        = divZeroError
+    div (W# x#) y@(W# y#)
+        | y /= 0
+        = W# (x# `quotWord#` y#)
+        | otherwise
+        = divZeroError
+    mod (W# x#) y@(W# y#)
+        | y /= 0
+        = W# (x# `remWord#` y#)
+        | otherwise
+        = divZeroError
     quotRem (W# x#) y@(W# y#)
-        | y /= 0                = case x# `quotRemWord#` y# of
-                                  (# q, r #) ->
-                                      (W# q, W# r)
-        | otherwise             = divZeroError
-    divMod  (W# x#) y@(W# y#)
-        | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
-        | otherwise             = divZeroError
-    toInteger (W# x#)           = wordToInteger x#
+        | y /= 0
+        = case x# `quotRemWord#` y# of
+              (# q, r #) -> (W# q, W# r)
+        | otherwise
+        = divZeroError
+    divMod (W# x#) y@(W# y#)
+        | y /= 0
+        = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
+        | otherwise
+        = divZeroError
+    toInteger (W# x#) = wordToInteger x#
 
 --------------------------------------------------------------
 -- Instances for Integer
 --------------------------------------------------------------
 
 -- | @since 2.0.1
-instance  Real Integer  where
-    toRational x        =  x :% 1
+instance Real Integer where
+    toRational x = x :% 1
 
 -- | @since 4.8.0.0
 instance Real Natural where
@@ -425,8 +446,8 @@ instance Real Natural where
 -- of integer-gmp or integer-simple.
 
 -- | @since 2.0.1
-instance  Integral Integer where
-    toInteger n      = n
+instance Integral Integer where
+    toInteger n = n
 
     {-# INLINE quot #-}
     _ `quot` 0 = divZeroError
@@ -471,40 +492,40 @@ instance Integral Natural where
 --------------------------------------------------------------
 
 -- | @since 2.0.1
-instance  (Integral a)  => Ord (Ratio a)  where
+instance Integral a => Ord (Ratio a) where
     {-# SPECIALIZE instance Ord Rational #-}
-    (x:%y) <= (x':%y')  =  x * y' <= x' * y
-    (x:%y) <  (x':%y')  =  x * y' <  x' * y
+    (x:%y) <= (x':%y') = x * y' <= x' * y
+    (x:%y) <  (x':%y') = x * y' <  x' * y
 
 -- | @since 2.0.1
-instance  (Integral a)  => Num (Ratio a)  where
+instance Integral a => Num (Ratio a) where
     {-# SPECIALIZE instance Num Rational #-}
-    (x:%y) + (x':%y')   =  reduce (x*y' + x'*y) (y*y')
-    (x:%y) - (x':%y')   =  reduce (x*y' - x'*y) (y*y')
-    (x:%y) * (x':%y')   =  reduce (x * x') (y * y')
-    negate (x:%y)       =  (-x) :% y
-    abs (x:%y)          =  abs x :% y
-    signum (x:%_)       =  signum x :% 1
-    fromInteger x       =  fromInteger x :% 1
+    (x:%y) + (x':%y') = reduce (x*y' + x'*y) (y*y')
+    (x:%y) - (x':%y') = reduce (x*y' - x'*y) (y*y')
+    (x:%y) * (x':%y') = reduce (x * x') (y * y')
+    negate (x:%y)     = (-x) :% y
+    abs (x:%y)        = abs x :% y
+    signum (x:%_)     = signum x :% 1
+    fromInteger x     = fromInteger x :% 1
 
 -- | @since 2.0.1
 {-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
-instance  (Integral a)  => Fractional (Ratio a)  where
+instance Integral a => Fractional (Ratio a) where
     {-# SPECIALIZE instance Fractional Rational #-}
-    (x:%y) / (x':%y')   =  (x*y') % (y*x')
+    (x:%y) / (x':%y')   = (x*y') % (y*x')
     recip (0:%_)        = ratioZeroDenominatorError
     recip (x:%y)
         | x < 0         = negate y :% negate x
         | otherwise     = y :% x
-    fromRational (x:%y) =  fromInteger x % fromInteger y
+    fromRational (x:%y) = fromInteger x % fromInteger y
 
 -- | @since 2.0.1
-instance  (Integral a)  => Real (Ratio a)  where
+instance Integral a => Real (Ratio a) where
     {-# SPECIALIZE instance Real Rational #-}
-    toRational (x:%y)   =  toInteger x :% toInteger y
+    toRational (x:%y) = toInteger x :% toInteger y
 
 -- | @since 2.0.1
-instance  (Integral a)  => RealFrac (Ratio a)  where
+instance Integral a => RealFrac (Ratio a) where
     {-# SPECIALIZE instance RealFrac Rational #-}
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
                           where (q,r) = quotRem x y
@@ -520,30 +541,30 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
           (GT, _) -> n + x
 
 -- | @since 2.0.1
-instance  (Show a)  => Show (Ratio a)  where
+instance Show a => Show (Ratio a) where
     {-# SPECIALIZE instance Show Rational #-}
-    showsPrec p (x:%y)  =  showParen (p > ratioPrec) $
-                           showsPrec ratioPrec1 x .
-                           showString " % " .
-                           -- H98 report has spaces round the %
-                           -- but we removed them [May 04]
-                           -- and added them again for consistency with
-                           -- Haskell 98 [Sep 08, #1920]
-                           showsPrec ratioPrec1 y
+    showsPrec p (x:%y) = showParen (p > ratioPrec) $
+                         showsPrec ratioPrec1 x .
+                         showString " % " .
+                         -- H98 report has spaces round the %
+                         -- but we removed them [May 04]
+                         -- and added them again for consistency with
+                         -- Haskell 98 [Sep 08, #1920]
+                         showsPrec ratioPrec1 y
 
 -- | @since 2.0.1
-instance  (Integral a)  => Enum (Ratio a)  where
+instance Integral a => Enum (Ratio a) where
     {-# SPECIALIZE instance Enum Rational #-}
-    succ x              =  x + 1
-    pred x              =  x - 1
+    succ x = x + 1
+    pred x = x - 1
 
-    toEnum n            =  fromIntegral n :% 1
-    fromEnum            =  fromInteger . truncate
+    toEnum n = fromIntegral n :% 1
+    fromEnum = fromInteger . truncate
 
-    enumFrom            =  numericEnumFrom
-    enumFromThen        =  numericEnumFromThen
-    enumFromTo          =  numericEnumFromTo
-    enumFromThenTo      =  numericEnumFromThenTo
+    enumFrom       = numericEnumFrom
+    enumFromThen   = numericEnumFromThen
+    enumFromTo     = numericEnumFromTo
+    enumFromThenTo = numericEnumFromThenTo
 
 --------------------------------------------------------------
 -- Coercions
@@ -607,23 +628,25 @@ odd             =  not . even
         Integer -> Int -> Integer,
         Int -> Int -> Int #-}
 {-# INLINABLE [1] (^) #-}    -- See Note [Inlining (^)]
-(^) :: (Num a, Integral b) => a -> b -> a
+(^) :: forall a b. (Num a, Integral b) => a -> b -> a
 x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
         | y0 == 0   = 1
         | otherwise = f x0 y0
     where -- f : x0 ^ y0 = x ^ y
+          f :: a -> b -> a
           f x y | even y    = f (x * x) (y `quot` 2)
                 | y == 1    = x
                 | otherwise = g (x * x) (y `quot` 2) x         -- See Note [Half of y - 1]
           -- g : x0 ^ y0 = (x ^ y) * z
+          g :: a -> b -> a -> a
           g x y z | even y = g (x * x) (y `quot` 2) z
                   | y == 1 = x * z
                   | otherwise = g (x * x) (y `quot` 2) (x * z) -- See Note [Half of y - 1]
 
 -- | raise a number to an integral power
-(^^)            :: (Fractional a, Integral b) => a -> b -> a
+(^^) :: (Fractional a, Integral b) => a -> b -> a
 {-# INLINABLE [1] (^^) #-}         -- See Note [Inlining (^)
-x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
+x ^^ n = if n >= 0 then x^n else recip (x^(negate n))
 
 {- Note [Half of y - 1]
    ~~~~~~~~~~~~~~~~~~~~~
@@ -719,7 +742,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
 -- Special version of (^) for Rational base
 {-# RULES "(^)/Rational"    (^) = (^%^) #-}
-(^%^)           :: Integral a => Rational -> a -> Rational
+(^%^) :: Integral a => Rational -> a -> Rational
 (n :% d) ^%^ e
     | e < 0     = errorWithoutStackTrace "Negative exponent"
     | e == 0    = 1 :% 1
@@ -727,7 +750,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
 -- Special version of (^^) for Rational base
 {-# RULES "(^^)/Rational"   (^^) = (^^%^^) #-}
-(^^%^^)         :: Integral a => Rational -> a -> Rational
+(^^%^^) :: Integral a => Rational -> a -> Rational
 (n :% d) ^^%^^ e
     | e > 0     = (n ^ e) :% (d ^ e)
     | e == 0    = 1 :% 1
@@ -747,20 +770,21 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 -- Note: Since for signed fixed-width integer types, @'abs' 'minBound' < 0@,
 -- the result may be negative if one of the arguments is @'minBound'@ (and
 -- necessarily is if the other is @0@ or @'minBound'@) for such types.
-gcd             :: (Integral a) => a -> a -> a
+gcd :: forall a. Integral a => a -> a -> a
 {-# NOINLINE [1] gcd #-}
-gcd x y         =  gcd' (abs x) (abs y)
-                   where gcd' a 0  =  a
-                         gcd' a b  =  gcd' b (a `rem` b)
+gcd x y =  gcd' (abs x) (abs y) where
+    gcd' :: a -> a -> a
+    gcd' a 0 = a
+    gcd' a b = gcd' b (a `rem` b)
 
 -- | @'lcm' x y@ is the smallest positive integer that both @x@ and @y@ divide.
-lcm             :: (Integral a) => a -> a -> a
+lcm :: Integral a => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
 {-# SPECIALISE lcm :: Word -> Word -> Word #-}
 {-# NOINLINE [1] lcm #-}
-lcm _ 0         =  0
-lcm 0 _         =  0
-lcm x y         =  abs ((x `quot` (gcd x y)) * y)
+lcm _ 0 = 0
+lcm 0 _ = 0
+lcm x y = abs ((x `quot` (gcd x y)) * y)
 
 {-# RULES
 "gcd/Integer->Integer->Integer" gcd = gcdInteger
