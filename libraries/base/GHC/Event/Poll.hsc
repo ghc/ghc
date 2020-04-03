@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving
+{-# LANGUAGE DerivingStrategies
+           , GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , BangPatterns
   #-}
@@ -150,16 +151,20 @@ data PollFd = PollFd {
       pfdFd      :: {-# UNPACK #-} !Fd
     , pfdEvents  :: {-# UNPACK #-} !Event
     , pfdRevents :: {-# UNPACK #-} !Event
-    } deriving Show -- ^ @since 4.4.0.0
+    } deriving
+      stock Show -- ^ @since 4.4.0.0
 
 newtype Event = Event CShort
-    deriving ( Eq         -- ^ @since 4.4.0.0
-             , Show       -- ^ @since 4.4.0.0
-             , Num        -- ^ @since 4.4.0.0
-             , Storable   -- ^ @since 4.4.0.0
-             , Bits       -- ^ @since 4.4.0.0
-             , FiniteBits -- ^ @since 4.7.0.0
-             )
+    deriving
+    stock Show       -- ^ @since 4.4.0.0
+
+    deriving
+    newtype ( Eq         -- ^ @since 4.4.0.0
+            , Num        -- ^ @since 4.4.0.0
+            , Storable   -- ^ @since 4.4.0.0
+            , Bits       -- ^ @since 4.4.0.0
+            , FiniteBits -- ^ @since 4.7.0.0
+            )
 
 #{enum Event, Event
  , pollIn    = POLLIN

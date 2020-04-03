@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DerivingStrategies        #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MagicHash                 #-}
 {-# LANGUAGE UnboxedTuples             #-}
@@ -114,7 +115,8 @@ data StaticPtrInfo = StaticPtrInfo
       -- @(Line, Column)@ pair.
     , spInfoSrcLoc     :: (Int, Int)
     }
-  deriving Show -- ^ @since 4.8.0.0
+  deriving
+  stock Show -- ^ @since 4.8.0.0
 
 -- | 'StaticPtrInfo' of the given 'StaticPtr'.
 staticPtrInfo :: StaticPtr a -> StaticPtrInfo

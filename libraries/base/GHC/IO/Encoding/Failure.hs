@@ -1,5 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -48,8 +49,9 @@ data CodingFailureMode
   | RoundtripFailure
        -- ^ Use the private-use escape mechanism to attempt to allow
        -- illegal sequences to be roundtripped.
-  deriving ( Show -- ^ @since 4.4.0.0
-           )
+  deriving
+  stock Show -- ^ @since 4.4.0.0
+
        -- This will only work properly for those encodings which are
        -- strict supersets of ASCII in the sense that valid ASCII data
        -- is also valid in that encoding. This is not true for
@@ -201,4 +203,3 @@ ioe_encodingError :: IO a
 ioe_encodingError = ioException
     (IOError Nothing InvalidArgument "recoverEncode"
         "invalid character" Nothing Nothing)
-
