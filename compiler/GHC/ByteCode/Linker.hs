@@ -164,7 +164,7 @@ nameToCLabel n suffix = mkFastString label
   where
     encodeZ = zString . zEncodeFS
     (Module pkgKey modName) = ASSERT( isExternalName n ) nameModule n
-    packagePart = encodeZ (unitIdFS pkgKey)
+    packagePart = encodeZ (unitFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ (occNameFS (nameOccName n))
 

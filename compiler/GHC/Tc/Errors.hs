@@ -2149,7 +2149,7 @@ sameOccExtra ty1 ty2
   , let n1 = tyConName tc1
         n2 = tyConName tc2
         same_occ = nameOccName n1                   == nameOccName n2
-        same_pkg = moduleUnitId (nameModule n1) == moduleUnitId (nameModule n2)
+        same_pkg = moduleUnit (nameModule n1) == moduleUnit (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
   = text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
@@ -2166,7 +2166,7 @@ sameOccExtra ty1 ty2
                   , ppUnless (same_pkg || pkg == mainUnitId) $
                     nest 4 $ text "in package" <+> quotes (ppr pkg) ])
        where
-         pkg = moduleUnitId mod
+         pkg = moduleUnit mod
          mod = nameModule nm
          loc = nameSrcSpan nm
 

@@ -174,7 +174,7 @@ deSugar hsc_env
         ; let used_names = mkUsedNames tcg_env
               pluginModules =
                 map lpModule (cachedPlugins (hsc_dflags hsc_env))
-        ; deps <- mkDependencies (thisInstalledUnitId (hsc_dflags hsc_env))
+        ; deps <- mkDependencies (thisUnitId (hsc_dflags hsc_env))
                                  (map mi_module pluginModules) tcg_env
 
         ; used_th <- readIORef tc_splice_used
