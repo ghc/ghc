@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CApiFFI
            , GeneralizedNewtypeDeriving
+           , DerivingStrategies
            , NoImplicitPrelude
            , RecordWildCards
            , BangPatterns
@@ -122,11 +123,12 @@ poll kq mtimeout f = do
 ------------------------------------------------------------------------
 -- FFI binding
 
-newtype KQueueFd = KQueueFd {
-      fromKQueueFd :: CInt
-    } deriving ( Eq   -- ^ @since 4.4.0.0
-               , Show -- ^ @since 4.4.0.0
-               )
+newtype KQueueFd = KQueueFd { fromKQueueFd :: CInt }
+    deriving
+    stock Show -- ^ @since 4.4.0.0
+
+    deriving
+    newtype Eq -- ^ @since 4.4.0.0
 
 data Event = KEvent {
       ident  :: {-# UNPACK #-} !CUIntPtr
@@ -139,7 +141,8 @@ data Event = KEvent {
     , data_  :: {-# UNPACK #-} !CIntPtr
 #endif
     , udata  :: {-# UNPACK #-} !(Ptr ())
-    } deriving Show -- ^ @since 4.4.0.0
+    } deriving
+      stock Show -- ^ @since 4.4.0.0
 
 toEvents :: Fd -> [Filter] -> Flag -> FFlag -> [Event]
 toEvents fd flts flag fflag = map (\filt -> KEvent (fromIntegral fd) filt flag fflag 0 nullPtr) flts
@@ -169,10 +172,11 @@ instance Storable Event where
         #{poke struct kevent, udata} ptr (udata ev)
 
 newtype FFlag = FFlag Word32
-    deriving ( Eq       -- ^ @since 4.4.0.0
-             , Show     -- ^ @since 4.4.0.0
-             , Storable -- ^ @since 4.4.0.0
-             )
+    deriving
+    newtype ( Eq       -- ^ @since 4.4.0.0
+            , Show     -- ^ @since 4.4.0.0
+            , Storable -- ^ @since 4.4.0.0
+            )
 
 #{enum FFlag, FFlag
  , noteEOF = NOTE_EOF
@@ -183,13 +187,16 @@ newtype Flag = Flag Word32
 #else
 newtype Flag = Flag Word16
 #endif
-    deriving ( Bits       -- ^ @since 4.7.0.0
-             , FiniteBits -- ^ @since 4.7.0.0
-             , Eq         -- ^ @since 4.4.0.0
-             , Num        -- ^ @since 4.7.0.0
-             , Show       -- ^ @since 4.4.0.0
-             , Storable   -- ^ @since 4.4.0.0
-             )
+    deriving
+    stock Show       -- ^ @Since 4.4.0.0
+
+    deriving
+    newtype ( Eq         -- ^ @since 4.4.0.0
+            , Num        -- ^ @since 4.7.0.0
+            , Storable   -- ^ @since 4.4.0.0
+            , Bits       -- ^ @since 4.7.0.0
+            , FiniteBits -- ^ @since 4.7.0.0
+            )
 
 #{enum Flag, Flag
  , flagAdd     = EV_ADD
@@ -202,11 +209,14 @@ newtype Filter = Filter Int32
 #else
 newtype Filter = Filter Int16
 #endif
-    deriving ( Eq       -- ^ @since 4.4.0.0
-             , Num      -- ^ @since 4.4.0.0
-             , Show     -- ^ @since 4.4.0.0
-             , Storable -- ^ @since 4.4.0.0
-             )
+    deriving
+    stock Show     -- ^ @since 4.4.0.0
+
+    deriving
+    newtype ( Eq       -- ^ @since 4.4.0.0
+            , Num      -- ^ @since 4.4.0.0
+            , Storable -- ^ @since 4.4.0.0
+            )
 
 filterRead :: Filter
 filterRead = Filter (#const EVFILT_READ)

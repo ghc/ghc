@@ -1,10 +1,11 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , ExistentialQuantification
-           , MagicHash
-           , RecordWildCards
-           , PatternSynonyms
-  #-}
+
 {-# LANGUAGE TypeInType #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -52,9 +53,10 @@ throw e = raise# (toException e)
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
 data ErrorCall = ErrorCallWithLocation String String
-    deriving ( Eq  -- ^ @since 4.7.0.0
-             , Ord -- ^ @since 4.7.0.0
-             )
+    deriving
+    stock ( Eq  -- ^ @since 4.7.0.0
+          , Ord -- ^ @since 4.7.0.0
+          )
 
 pattern ErrorCall :: String -> ErrorCall
 pattern ErrorCall err <- ErrorCallWithLocation err _ where

@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving
+{-# LANGUAGE DerivingStrategies
+           , GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , BangPatterns
   #-}
@@ -129,12 +130,14 @@ poll ep mtimeout f = do
 
 newtype EPollFd = EPollFd {
       fromEPollFd :: CInt
-    } deriving (Eq, Show)
+    } deriving
+      newtype (Eq, Show)
 
 data Event = Event {
       eventTypes :: EventType
     , eventFd    :: Fd
-    } deriving (Show)
+    } deriving
+      stock Show
 
 -- | @since 4.3.1.0
 instance Storable Event where
@@ -161,12 +164,14 @@ newtype ControlOp = ControlOp CInt
 
 newtype EventType = EventType {
       unEventType :: Word32
-    } deriving ( Show       -- ^ @since 4.4.0.0
-               , Eq         -- ^ @since 4.4.0.0
-               , Num        -- ^ @since 4.4.0.0
-               , Bits       -- ^ @since 4.4.0.0
-               , FiniteBits -- ^ @since 4.7.0.0
-               )
+    } deriving
+      stock Show       -- ^ @since 4.4.0.0
+      deriving
+      newtype ( Eq         -- ^ @since 4.4.0.0
+              , Num        -- ^ @since 4.4.0.0
+              , Bits       -- ^ @since 4.4.0.0
+              , FiniteBits -- ^ @since 4.7.0.0
+              )
 
 #{enum EventType, EventType
  , epollIn  = EPOLLIN
@@ -244,4 +249,3 @@ foreign import ccall safe "sys/epoll.h epoll_wait"
 foreign import ccall unsafe "sys/epoll.h epoll_wait"
     c_epoll_wait_unsafe :: CInt -> Ptr Event -> CInt -> CInt -> IO CInt
 #endif /* defined(HAVE_EPOLL) */
-
