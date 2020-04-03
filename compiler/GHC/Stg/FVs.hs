@@ -38,7 +38,6 @@ Top-level closure bindings never capture variables as all of their free
 variables are global.
 -}
 module GHC.Stg.FVs (
-    annTopBindingsFreeVars,
     annBindingFreeVars
   ) where
 
@@ -64,14 +63,6 @@ emptyEnv = Env emptyVarSet
 addLocals :: [Id] -> Env -> Env
 addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
-
--- | Annotates a top-level STG binding group with its free variables.
-annTopBindingsFreeVars :: [StgTopBinding] -> [CgStgTopBinding]
-annTopBindingsFreeVars = map go
-  where
-    go (StgTopStringLit id bs) = StgTopStringLit id bs
-    go (StgTopLifted bind)
-      = StgTopLifted (annBindingFreeVars bind)
 
 -- | Annotates an STG binding with its free variables.
 annBindingFreeVars :: StgBinding -> CgStgBinding
