@@ -6,6 +6,6 @@ newtype A = A Int
 newtype B = B A
 
 {-# NOINLINE a #-}
-a = trace "evaluating a" A 42000
+a = trace "evaluating a" A 42
 
 b = B a
