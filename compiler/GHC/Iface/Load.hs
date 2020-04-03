@@ -619,7 +619,7 @@ is_external_sig dflags iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    moduleUnitId (mi_module iface) /= thisPackage dflags
+    moduleUnit (mi_module iface) /= thisPackage dflags
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -641,14 +641,14 @@ computeInterface ::
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     dflags <- getDynFlags
-    case splitModuleInsts mod0 of
-        (imod, Just indef) | not (unitIdIsDefinite (thisPackage dflags)) -> do
+    case getModuleInstantiation mod0 of
+        (imod, Just indef) | not (unitIsDefinite (thisPackage dflags)) -> do
             r <- findAndReadIface doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
                     r <- liftIO $
-                        rnModIface hsc_env (indefUnitIdInsts (indefModuleUnitId indef))
+                        rnModIface hsc_env (instUnitInsts (moduleUnit indef))
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
@@ -672,9 +672,9 @@ moduleFreeHolesPrecise
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
-   case splitModuleInsts mod of
+   case getModuleInstantiation mod of
     (imod, Just indef) -> do
-        let insts = indefUnitIdInsts (indefModuleUnitId indef)
+        let insts = instUnitInsts (moduleUnit indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
@@ -726,13 +726,13 @@ wantHiBootFile dflags eps mod from
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
   where
-    this_package = thisPackage dflags == moduleUnitId mod
+    this_package = thisPackage dflags == moduleUnit mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (text "You cannot {-# SOURCE #-} import a module from another package")
        2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
-          <+> quotes (ppr (moduleUnitId mod)))
+          <+> quotes (ppr (moduleUnit mod)))
 
 -----------------------------------------------------
 --      Loading type/class/value decls
@@ -925,7 +925,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if installedModuleUnitId mod `installedUnitIdEq` thisPackage dflags &&
+                       if moduleUnit mod `unitIdEq` thisPackage dflags &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
@@ -935,7 +935,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                        traceIf (text "...not found")
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
-                                           (installedModuleName mod) err))
+                                           (moduleName mod) err))
     where read_file file_path = do
               traceIf (text "readIFace" <+> text file_path)
               -- Figure out what is recorded in mi_module.  If this is
@@ -943,11 +943,11 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
               -- if it's indefinite, the inside will be uninstantiated!
               dflags <- getDynFlags
               let wanted_mod =
-                    case splitModuleInsts wanted_mod_with_insts of
+                    case getModuleInstantiation wanted_mod_with_insts of
                         (_, Nothing) -> wanted_mod_with_insts
                         (_, Just indef_mod) ->
-                          indefModuleToModule dflags
-                            (generalizeIndefModule indef_mod)
+                          instModuleToModule (pkgState dflags)
+                            (uninstantiateInstantiatedModule indef_mod)
               read_result <- readIface wanted_mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
@@ -1272,7 +1272,7 @@ badIfaceFile file err
 
 hiModuleNameMismatchWarn :: DynFlags -> Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn dflags requested_mod read_mod
- | moduleUnitId requested_mod == moduleUnitId read_mod =
+ | moduleUnit requested_mod == moduleUnit read_mod =
     sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,
          text "but we were expecting module" <+> quotes (ppr requested_mod),
          sep [text "Probable cause: the source code which generated interface file",

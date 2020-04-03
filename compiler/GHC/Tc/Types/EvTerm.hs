@@ -41,7 +41,7 @@ evCallStack cs = do
   m             <- getModule
   srcLocDataCon <- lookupDataCon srcLocDataConName
   let mkSrcLoc l = mkCoreConApps srcLocDataCon <$>
-               sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
+               sequence [ mkStringExprFS (unitFS $ moduleUnit m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
                         , return $ mkIntExprInt platform (srcSpanStartLine l)
