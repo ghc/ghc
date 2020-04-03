@@ -486,4 +486,7 @@ typedef struct StgCompactNFData_ {
     StgClosure *result;
       // Used temporarily to store the result of compaction.  Doesn't need to be
       // a GC root.
+    struct StgCompactNFData_ *link;
+      // Used by compacting GC for linking CNFs with threaded hash tables. See
+      // Note [CNFs in compacting GC] in Compact.c for details.
 } StgCompactNFData;
