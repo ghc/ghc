@@ -13,6 +13,7 @@ import Haddock.Backends.Hyperlinker.Utils
 import qualified Data.ByteString as BS
 
 import GHC.Iface.Ext.Types
+import GHC.Iface.Ext.Utils ( isEvidenceContext , emptyNodeInfo )
 import GHC.Unit.Module ( ModuleName, moduleNameString )
 import GHC.Types.Name   ( getOccString, isInternalName, Name, nameModule, nameUnique )
 import GHC.Types.SrcLoc
@@ -105,6 +106,7 @@ renderWithAst srcs Node{..} toks = anchored $ case toks of
 
     _ -> go nodeChildren toks
   where
+    nodeInfo = maybe emptyNodeInfo id (Map.lookup SourceInfo $ getSourcedNodeInfo sourcedNodeInfo)
     go _ [] = mempty
     go [] xs = foldMap renderToken xs
     go (cur:rest) xs =
@@ -139,8 +141,9 @@ richToken srcs details Token{..}
 
     contexts = concatMap (Set.elems . identInfo) . Map.elems . nodeIdentifiers $ details
 
-    -- pick an arbitary identifier to hyperlink with
-    identDet = Map.lookupMin . nodeIdentifiers $ details
+    -- pick an arbitary non-evidence identifier to hyperlink with
+    identDet = Map.lookupMin $ Map.filter notEvidence $ nodeIdentifiers $ details
+    notEvidence = not . any isEvidenceContext . identInfo
 
     -- If we have name information, we can make links
     linked = case identDet of
@@ -163,7 +166,8 @@ annotate  ni content =
       | otherwise = mempty
     annotation = typ ++ identTyps
     typ = unlines (nodeType ni)
-    typedIdents = [ (n,t) | (n, identType -> Just t) <- Map.toList $ nodeIdentifiers ni ]
+    typedIdents = [ (n,t) | (n, c@(identType -> Just t)) <- Map.toList $ nodeIdentifiers ni
+                          , not (any isEvidenceContext $ identInfo c) ]
     identTyps
       | length typedIdents > 1 || null (nodeType ni)
           = concatMap (\(n,t) -> printName n ++ " :: " ++ t ++ "\n") typedIdents
@@ -176,17 +180,19 @@ richTokenStyle
   :: Bool         -- ^ are we lacking a type annotation?
   -> ContextInfo  -- ^ in what context did this token show up?
   -> [StyleClass]
-richTokenStyle True  Use           = ["hs-type"]
-richTokenStyle False Use           = ["hs-var"]
-richTokenStyle  _    RecField{}    = ["hs-var"]
-richTokenStyle  _    PatternBind{} = ["hs-var"]
-richTokenStyle  _    MatchBind{}   = ["hs-var"]
-richTokenStyle  _    TyVarBind{}   = ["hs-type"]
-richTokenStyle  _    ValBind{}     = ["hs-var"]
-richTokenStyle  _    TyDecl        = ["hs-type"]
-richTokenStyle  _    ClassTyDecl{} = ["hs-type"]
-richTokenStyle  _    Decl{}        = ["hs-var"]
-richTokenStyle  _    IEThing{}     = []  -- could be either a value or type
+richTokenStyle True  Use               = ["hs-type"]
+richTokenStyle False Use               = ["hs-var"]
+richTokenStyle  _    RecField{}        = ["hs-var"]
+richTokenStyle  _    PatternBind{}     = ["hs-var"]
+richTokenStyle  _    MatchBind{}       = ["hs-var"]
+richTokenStyle  _    TyVarBind{}       = ["hs-type"]
+richTokenStyle  _    ValBind{}         = ["hs-var"]
+richTokenStyle  _    TyDecl            = ["hs-type"]
+richTokenStyle  _    ClassTyDecl{}     = ["hs-type"]
+richTokenStyle  _    Decl{}            = ["hs-var"]
+richTokenStyle  _    IEThing{}         = []  -- could be either a value or type
+richTokenStyle  _    EvidenceVarBind{} = []
+richTokenStyle  _    EvidenceVarUse{}  = []
 
 tokenStyle :: TokenType -> [StyleClass]
 tokenStyle TkIdentifier = ["hs-identifier"]
