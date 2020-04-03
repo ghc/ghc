@@ -1,7 +1,9 @@
-{-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE Unsafe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -34,7 +36,8 @@ import GHC.IO
 
 -- |A mutable variable in the 'IO' monad
 newtype IORef a = IORef (STRef RealWorld a)
-  deriving Eq
+  deriving
+  stock Eq
   -- ^ Pointer equality.
   --
   -- @since 4.0.0.0

@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -136,13 +140,14 @@ data GeneralCategory
         | Surrogate             -- ^ Cs: Other, Surrogate
         | PrivateUse            -- ^ Co: Other, Private Use
         | NotAssigned           -- ^ Cn: Other, Not Assigned
-        deriving ( Show     -- ^ @since 2.01
-                 , Eq       -- ^ @since 2.01
-                 , Ord      -- ^ @since 2.01
-                 , Enum     -- ^ @since 2.01
-                 , Bounded  -- ^ @since 2.01
-                 , Ix       -- ^ @since 2.01
-                 )
+        deriving
+        stock ( Show     -- ^ @since 2.01
+              , Eq       -- ^ @since 2.01
+              , Ord      -- ^ @since 2.01
+              , Enum     -- ^ @since 2.01
+              , Bounded  -- ^ @since 2.01
+              , Ix       -- ^ @since 2.01
+              )
 
 -- | The Unicode general category of the character. This relies on the
 -- 'Enum' instance of 'GeneralCategory', which must remain in the
