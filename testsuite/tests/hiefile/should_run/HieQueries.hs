@@ -11,7 +11,7 @@ import GHC.Types.Name
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
-
+import Maybes
 import GHC.Driver.Session
 import SysTools
 import Outputable                 ( Outputable, renderWithStyle, ppr, defaultUserStyle, initSDocContext )
@@ -33,11 +33,13 @@ foo x = f [x]
 point :: (Int,Int)
 point = (31,9)
 
-bar :: String
-bar = show 1
+bar :: Show x => x -> String
+bar x = show [(1,x,A)]
 --      ^ this is the point'
 point' :: (Int,Int)
 point' = (37,9)
+
+data A = A deriving Show
 
 makeNc :: IO NameCache
 makeNc = do
@@ -48,26 +50,6 @@ dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
   return $ defaultDynFlags systemSettings (LlvmConfig [] [])
-
-selectPoint :: HieFile -> (Int,Int) -> HieAST Int
-selectPoint hf (sl,sc) = case M.toList (getAsts $ hie_asts hf) of
-    [(fs,ast)] ->
-      case selectSmallestContaining (sp fs) ast of
-        Nothing -> error "point not found"
-        Just ast' -> ast'
-    _ -> error "map should only contain a single AST"
- where
-   sloc fs = mkRealSrcLoc fs sl sc
-   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
-
-findEvidence :: NodeInfo a -> (Name, IdentifierDetails a)
-findEvidence ni =
-    case find go xs of
-      Just (Right n,x) -> (n,x)
-      _ -> error "couldn't find evidence var"
- where
-   xs = M.toList $ nodeIdentifiers ni
-   go (n,dets) = any isEvidenceContext (identInfo dets)
 
 main = do
   libdir:_ <- getArgs
@@ -84,39 +66,46 @@ type RefMap = M.Map Identifier [(Span, IdentifierDetails Int)]
 
 explainEv :: DynFlags -> HieFile -> RefMap -> (Int,Int) -> IO ()
 explainEv df hf refmap point = do
-  let (var,dets) = findEvidence $ nodeInfo $ selectPoint hf point
+  let (var,dets) = expectJust "couldn't find evidence var" $
+        findEvidence $ nodeInfo $
+          expectJust "point not found" $ selectPoint hf point
       Just typ = identType dets
-  putStr $ "At " ++ show point ++ ", found evidence of type: "
+  putStr $ "At " ++ pprint point ++ ", found evidence of type: "
   putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
-  putStrLn ""
   let describeEvidenceVar :: Name -> IO ()
-      describeEvidenceVar var =
+      describeEvidenceVar = describeEvidenceVar' 0
+      describeEvidenceVar' :: Int -> Name -> IO ()
+      describeEvidenceVar' lvl var =
         case M.lookup (Right var) refmap of
           Nothing -> error "evidence var not found in map"
           Just xs -> case find (any isEvidenceBind . identInfo . snd) xs of
             Nothing -> error "couldn't find evidence bind"
             Just (sp,dets) -> do
               let Just typ = identType dets
+              print [(replicate (69-(lvl*2)) '-')]
               forM_ (identInfo dets) $ \det -> case det of
-                EvidenceVarBind EvSigBind _ _ -> do
-                  putStr $ "Evidence from " ++ show sp ++ " of type: "
-                  putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
-                  putStrLn "Is bound by a signature\n"
+                EvidenceVarBind EvSigBind _ msrc -> do
+                  print [ "Evidence from", pprint sp, "of type:"
+                        , renderHieType df $ recoverFullType typ (hie_types hf)]
+                  print ["Bound by a signature for the value at:",pprint msrc]
                 EvidenceVarBind (EvLetBind deps) _ _ -> do
-                  putStr $ "Evidence from " ++ show sp ++ " of type: "
-                  putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
-                  putStrLn "Is bound by a let, depending on:\n"
-                  mapM_ describeEvidenceVar (getEvBindDeps deps)
+                  print [ "Evidence from", pprint sp, "of type:"
+                        , renderHieType df $ recoverFullType typ (hie_types hf)]
+                  print ["Bound by a let, depending on:"]
+                  mapM_ (describeEvidenceVar' $ lvl+1) (getEvBindDeps deps)
                 EvidenceVarBind EvExternalBind _ _ -> do
-                  putStr $ "Evidence of type: "
-                  putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
-                  putStrLn $ "bound by an instance at " ++ show (nameSrcSpan var)
-                  putStrLn $ "From " ++ pprint df (nameModule var)
-                  putStrLn ""
+                  print [ "Evidence of type:"
+                        , renderHieType df $ recoverFullType typ (hie_types hf)]
+                  print ["Bound by an instance at", pprint (nameSrcSpan var)]
+                  print ["From the module:", pprint (nameModule var)]
                 _ -> return ()
+        where
+          print xs = putStrLn $ concat (replicate lvl "  ") ++ ('|':unwords xs)
   describeEvidenceVar var
+  putStrLn $ replicate 70 '='
+  where
+    pprint :: Outputable a => a -> String
+    pprint = renderWithStyle (initSDocContext df sty) . ppr
+      where sty = defaultUserStyle df
 
-pprint :: Outputable a => DynFlags -> a -> String
-pprint df = renderWithStyle (initSDocContext df sty) . ppr
-  where sty = defaultUserStyle df
 

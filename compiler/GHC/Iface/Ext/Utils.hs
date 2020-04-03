@@ -29,6 +29,7 @@ import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
 import Data.Maybe                 ( maybeToList )
 import Data.Monoid
+import Data.List                  (find)
 import Data.Traversable           ( for )
 import Control.Monad.Trans.State.Strict hiding (get)
 
@@ -72,6 +73,25 @@ resolveVisibility kind ty_args
 
 foldType :: (HieType a -> a) -> HieTypeFix -> a
 foldType f (Roll t) = f $ fmap (foldType f) t
+
+selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
+selectPoint hf (sl,sc) = getFirst $
+  flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(fs,ast) -> First $
+      case selectSmallestContaining (sp fs) ast of
+        Nothing -> Nothing
+        Just ast' -> Just ast'
+ where
+   sloc fs = mkRealSrcLoc fs sl sc
+   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+
+findEvidence :: NodeInfo a -> Maybe (Name, IdentifierDetails a)
+findEvidence ni =
+    case find go xs of
+      Just (Right n,x) -> Just (n,x)
+      _ -> Nothing
+ where
+   xs = M.toList $ nodeIdentifiers ni
+   go (_,dets) = any isEvidenceContext (identInfo dets)
 
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go

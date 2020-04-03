@@ -1,21 +1,45 @@
-At (31,9), found evidence of type: C [a]
-
-Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C [a]
-Is bound by a let, depending on:
-
-Evidence of type: forall a. C a => C [a]
-bound by an instance at RealSrcSpan SrcSpanOneLine "HieQueries.hs" 27 10 22 (Just (BufSpan {bufSpanStart = BufPos {bufPos = 549}, bufSpanEnd = BufPos {bufPos = 561}}))
-From Main
-
-Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C a
-Is bound by a signature
-
-At (37,9), found evidence of type: Show Integer
-
-Evidence from SrcSpanMultiLine "HieQueries.hs" 4 1 121 34 of type: Show Integer
-Is bound by a let, depending on:
-
-Evidence of type: Show Integer
-bound by an instance at UnhelpfulSpan "<no location info>"
-From GHC.Show
-
+At (31, 9), found evidence of type: C [a]
+|---------------------------------------------------------------------
+|Evidence from HieQueries.hs:31:1-13 of type: C [a]
+|Bound by a let, depending on:
+  |-------------------------------------------------------------------
+  |Evidence of type: forall a. C a => C [a]
+  |Bound by an instance at HieQueries.hs:27:10-21
+  |From the module: Main
+  |-------------------------------------------------------------------
+  |Evidence from HieQueries.hs:31:1-13 of type: C a
+  |Bound by a signature for the value at: Just HieQueries.hs:31:1-13
+======================================================================
+At (37, 9), found evidence of type: Show [(Integer, x, A)]
+|---------------------------------------------------------------------
+|Evidence from HieQueries.hs:37:1-22 of type: Show [(Integer, x, A)]
+|Bound by a let, depending on:
+  |-------------------------------------------------------------------
+  |Evidence of type: forall a. Show a => Show [a]
+  |Bound by an instance at <no location info>
+  |From the module: GHC.Show
+  |-------------------------------------------------------------------
+  |Evidence from HieQueries.hs:37:1-22 of type: Show (Integer, x, A)
+  |Bound by a let, depending on:
+    |-----------------------------------------------------------------
+    |Evidence of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
+    |Bound by an instance at <no location info>
+    |From the module: GHC.Show
+    |-----------------------------------------------------------------
+    |Evidence from HieQueries.hs:37:1-22 of type: Show Integer
+    |Bound by a let, depending on:
+      |---------------------------------------------------------------
+      |Evidence of type: Show Integer
+      |Bound by an instance at <no location info>
+      |From the module: GHC.Show
+    |-----------------------------------------------------------------
+    |Evidence from HieQueries.hs:37:1-22 of type: Show x
+    |Bound by a signature for the value at: Just HieQueries.hs:37:1-22
+    |-----------------------------------------------------------------
+    |Evidence from HieQueries.hs:37:1-22 of type: Show A
+    |Bound by a let, depending on:
+      |---------------------------------------------------------------
+      |Evidence of type: Show A
+      |Bound by an instance at HieQueries.hs:42:21-24
+      |From the module: Main
+======================================================================
