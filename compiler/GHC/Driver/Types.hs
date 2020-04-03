@@ -1138,7 +1138,7 @@ mi_free_holes iface =
     (_, Just indef)
         -- A mini-hack: we rely on the fact that 'renameFreeHoles'
         -- drops things that aren't holes.
-        -> renameFreeHoles (mkUniqDSet cands) (indefUnitIdInsts (indefModuleUnitId indef))
+        -> renameFreeHoles (mkUniqDSet cands) (instUnitInsts (indefModuleUnitId indef))
     _   -> emptyUniqDSet
   where
     cands = map fst (dep_mods (mi_deps iface))
