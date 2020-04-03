@@ -72,7 +72,8 @@ explainEv df hf refmap point = do
       expandType = text . renderHieType df .
         flip recoverFullType (hie_types hf)
       pprint :: Outputable a => a -> String
-      pprint = renderWithStyle (initSDocContext df sty) . ppr
+      pprint = pretty . renderWithStyle (initSDocContext df sty) . ppr
+      pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
       sty = defaultUserStyle df
   putStrLn $ replicate 26 '='
   putStrLn $ "At point " ++ show point ++ ", we found:"
