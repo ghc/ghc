@@ -1,5 +1,7 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
@@ -7,7 +9,7 @@
 -- Module      :  GHC.IO.Encoding.Types
 -- Copyright   :  (c) The University of Glasgow, 2008-2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -49,7 +51,7 @@ data BufferCodec from to state = BufferCodec {
    -- The fact that as many elements as possible are translated is used by the IO
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
-  
+
   recover :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
    -- ^ The @recover@ function is used to continue decoding
    -- in the presence of invalid or unrepresentable sequences. This includes
@@ -68,7 +70,7 @@ data BufferCodec from to state = BufferCodec {
    -- In particular, this feature is used to implement transliteration.
    --
    -- @since 4.4.0.0
-  
+
   close  :: IO (),
    -- ^ Resources associated with the encoding may now be released.
    -- The @encode@ function may not be called again after calling
@@ -123,13 +125,14 @@ instance Show TextEncoding where
   show te = textEncodingName te
 
 -- | @since 4.4.0.0
-data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains insufficient available elements,
-                                      -- or all of the input sequence has been successfully translated.
-                    | OutputUnderflow -- ^ Stopped because the output contains insufficient free elements
-                    | InvalidSequence -- ^ Stopped because there are sufficient free elements in the output
-                                      -- to output at least one encoded ASCII character, but the input contains
-                                      -- an invalid or unrepresentable sequence
-                    deriving ( Eq   -- ^ @since 4.4.0.0
-                             , Show -- ^ @since 4.4.0.0
-                             )
-
+data CodingProgress
+  = InputUnderflow  -- ^ Stopped because the input contains insufficient available elements,
+                    -- or all of the input sequence has been successfully translated.
+  | OutputUnderflow -- ^ Stopped because the output contains insufficient free elements
+  | InvalidSequence -- ^ Stopped because there are sufficient free elements in the output
+                    -- to output at least one encoded ASCII character, but the input contains
+                    -- an invalid or unrepresentable sequence
+  deriving
+  stock ( Eq   -- ^ @since 4.4.0.0
+        , Show -- ^ @since 4.4.0.0
+        )

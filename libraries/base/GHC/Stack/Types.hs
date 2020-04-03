@@ -1,10 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE ImplicitParams    #-}
-{-# LANGUAGE KindSignatures    #-}
-{-# LANGUAGE PolyKinds         #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ImplicitParams     #-}
+{-# LANGUAGE KindSignatures     #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE PolyKinds          #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE Trustworthy        #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 -- we hide this module from haddock to enforce GHC.Stack as the main
@@ -216,4 +217,5 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq -- ^ @since 4.9.0.0
+  } deriving
+    stock Eq -- ^ @since 4.9.0.0
