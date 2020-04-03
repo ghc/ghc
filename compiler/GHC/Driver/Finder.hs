@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Driver.Finder (
     flushFinderCaches,
@@ -76,7 +77,7 @@ flushFinderCaches hsc_env =
  where
         this_pkg = thisPackage (hsc_dflags hsc_env)
         fc_ref = hsc_FC hsc_env
-        is_ext mod _ | not (installedModuleUnitId mod `installedUnitIdEq` this_pkg) = True
+        is_ext mod _ | not (moduleUnit mod `unitIdEq` this_pkg) = True
                      | otherwise = False
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
@@ -135,8 +136,8 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if installedModuleUnitId mod `installedUnitIdEq` thisPackage dflags
-       then findInstalledHomeModule hsc_env (installedModuleName mod)
+    in if moduleUnit mod `unitIdEq` thisPackage dflags
+       then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
 -- -----------------------------------------------------------------------------
@@ -194,7 +195,7 @@ findExposedPluginPackageModule hsc_env mod_name
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
      LookupFound m pkg_conf -> do
-       let im = fst (splitModuleInsts m)
+       let im = fst (getModuleInstantiation m)
        r' <- findPackageModule_ hsc_env im pkg_conf
        case r' of
         -- TODO: ghc -M is unlikely to do the right thing
@@ -202,8 +203,8 @@ findLookupResult hsc_env r = case r of
         -- instantiated; you probably also need all of the
         -- implicit locations from the instances
         InstalledFound loc   _ -> return (Found loc m)
-        InstalledNoPackage   _ -> return (NoPackage (moduleUnitId m))
-        InstalledNotFound fp _ -> return (NotFound{ fr_paths = fp, fr_pkg = Just (moduleUnitId m)
+        InstalledNoPackage   _ -> return (NoPackage (moduleUnit m))
+        InstalledNotFound fp _ -> return (NotFound{ fr_paths = fp, fr_pkg = Just (moduleUnit m)
                                          , fr_pkgs_hidden = []
                                          , fr_mods_hidden = []
                                          , fr_unusables = []
@@ -212,13 +213,13 @@ findLookupResult hsc_env r = case r of
        return (FoundMultiple rs)
      LookupHidden pkg_hiddens mod_hiddens ->
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
-                       , fr_pkgs_hidden = map (moduleUnitId.fst) pkg_hiddens
-                       , fr_mods_hidden = map (moduleUnitId.fst) mod_hiddens
+                       , fr_pkgs_hidden = map (moduleUnit.fst) pkg_hiddens
+                       , fr_mods_hidden = map (moduleUnit.fst) mod_hiddens
                        , fr_unusables = []
                        , fr_suggestions = [] })
      LookupUnusable unusable ->
        let unusables' = map get_unusable unusable
-           get_unusable (m, ModUnusable r) = (moduleUnitId m, r)
+           get_unusable (m, ModUnusable r) = (moduleUnit m, r)
            get_unusable (_, r)             =
              pprPanic "findLookupResult: unexpected origin" (ppr r)
        in return (NotFound{ fr_paths = [], fr_pkg = Nothing
@@ -245,8 +246,8 @@ modLocationCache hsc_env mod do_this = do
 
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
-  let iuid = thisInstalledUnitId dflags
-  in InstalledModule iuid mod_name
+  let iuid = thisUnitId dflags
+  in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
@@ -339,7 +340,7 @@ findPackageModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
-        pkg_id = installedModuleUnitId mod
+        pkg_id = moduleUnit mod
         pkgstate = pkgState dflags
   --
   case lookupInstalledPackage pkgstate pkg_id of
@@ -355,7 +356,7 @@ findPackageModule hsc_env mod = do
 -- for the appropriate config.
 findPackageModule_ :: HscEnv -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ hsc_env mod pkg_conf =
-  ASSERT2( installedModuleUnitId mod == installedUnitInfoId pkg_conf, ppr (installedModuleUnitId mod) <+> ppr (installedUnitInfoId pkg_conf) )
+  ASSERT2( moduleUnit mod == unitId pkg_conf, ppr (moduleUnit mod) <+> ppr (unitId pkg_conf) )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -381,7 +382,7 @@ findPackageModule_ hsc_env mod pkg_conf =
     [one] | MkDepend <- ghcMode dflags -> do
           -- there's only one place that this .hi file can be, so
           -- don't bother looking for it.
-          let basename = moduleNameSlashes (installedModuleName mod)
+          let basename = moduleNameSlashes (moduleName mod)
           loc <- mk_hi_loc one basename
           return (InstalledFound loc mod)
     _otherwise ->
@@ -413,7 +414,7 @@ searchPathExts paths mod exts
         return result
 
   where
-    basename = moduleNameSlashes (installedModuleName mod)
+    basename = moduleNameSlashes (moduleName mod)
 
     to_search :: [(FilePath, IO ModLocation)]
     to_search = [ (file, fn path basename)
@@ -424,7 +425,7 @@ searchPathExts paths mod exts
                       file = base <.> ext
                 ]
 
-    search [] = return (InstalledNotFound (map fst to_search) (Just (installedModuleUnitId mod)))
+    search [] = return (InstalledNotFound (map fst to_search) (Just (moduleUnit mod)))
 
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
@@ -649,7 +650,7 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
   where
     unambiguousPackages = foldl' unambiguousPackage (Just []) mods
     unambiguousPackage (Just xs) (m, ModOrigin (Just _) _ _ _)
-        = Just (moduleUnitId m : xs)
+        = Just (moduleUnit m : xs)
     unambiguousPackage _ _ = Nothing
 
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
@@ -658,10 +659,10 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
     pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
-          then [text "package" <+> ppr (moduleUnitId m)]
+          then [text "package" <+> ppr (moduleUnit m)]
           else [] ++
       map ((text "a reexport in package" <+>)
-                .ppr.packageConfigId) res ++
+                .ppr.mkUnit) res ++
       if f then [text "a package flag"] else []
       )
 
@@ -714,7 +715,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
          text "try running 'ghc-pkg check'." $$
          tried_these files dflags
 
-    pkg_hidden :: UnitId -> SDoc
+    pkg_hidden :: Unit -> SDoc
     pkg_hidden uid =
         text "It is a member of the hidden package"
         <+> quotes (ppr uid)
@@ -758,11 +759,11 @@ cantFindErr cannot_find _ dflags mod_name find_result
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
               | Just True <- e
-                 = parens (text "from" <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnit mod))
               | f && moduleName mod == m
-                 = parens (text "from" <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnit mod))
               | (pkg:_) <- res
-                 = parens (text "from" <+> ppr (packageConfigId pkg)
+                 = parens (text "from" <+> ppr (mkUnit pkg)
                     <> comma <+> text "reexporting" <+> ppr mod)
               | f
                  = parens (text "defined via package flags to be"
@@ -775,10 +776,10 @@ cantFindErr cannot_find _ dflags mod_name find_result
                                    fromHiddenReexport = rhs })
               | Just False <- e
                  = parens (text "needs flag -package-key"
-                    <+> ppr (moduleUnitId mod))
+                    <+> ppr (moduleUnit mod))
               | (pkg:_) <- rhs
                  = parens (text "needs flag -package-id"
-                    <+> ppr (packageConfigId pkg))
+                    <+> ppr (mkUnit pkg))
               | otherwise = Outputable.empty
 
 cantFindInstalledErr :: PtrString -> PtrString -> DynFlags -> ModuleName
@@ -794,7 +795,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (pkg `installedUnitIdEq` thisPackage dflags)
+                | Just pkg <- mb_pkg, not (pkg `unitIdEq` thisPackage dflags)
                 -> not_found_in_package pkg files
 
                 | null files
@@ -808,13 +809,13 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
     build_tag = buildTag dflags
     pkgstate = pkgState dflags
 
-    looks_like_srcpkgid :: InstalledUnitId -> SDoc
+    looks_like_srcpkgid :: UnitId -> SDoc
     looks_like_srcpkgid pk
      -- Unsafely coerce a unit id (i.e. an installed package component
      -- identifier) into a PackageId and see if it means anything.
-     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (installedUnitIdFS pk))
+     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (unitIdFS pk))
      = parens (text "This unit ID looks like the source package ID;" $$
-       text "the real unit ID is" <+> quotes (ftext (installedUnitIdFS (unitId pkg))) $$
+       text "the real unit ID is" <+> quotes (ftext (unitIdFS (unitId pkg))) $$
        (if null pkgs then Outputable.empty
         else text "and" <+> int (length pkgs) <+> text "other candidates"))
      -- Todo: also check if it looks like a package name!

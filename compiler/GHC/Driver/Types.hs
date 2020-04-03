@@ -872,8 +872,8 @@ type FinderCache = InstalledModuleEnv InstalledFindResult
 
 data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
-  | InstalledNoPackage InstalledUnitId
-  | InstalledNotFound [FilePath] (Maybe InstalledUnitId)
+  | InstalledNoPackage UnitId
+  | InstalledNotFound [FilePath] (Maybe UnitId)
 
 -- | The result of searching for an imported module.
 --
@@ -883,29 +883,29 @@ data InstalledFindResult
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
-  | NoPackage UnitId
-        -- ^ The requested package was not found
+  | NoPackage Unit
+        -- ^ The requested unit was not found
   | FoundMultiple [(Module, ModuleOrigin)]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
   | NotFound
-      { fr_paths       :: [FilePath]       -- Places where I looked
+      { fr_paths       :: [FilePath]       -- ^ Places where I looked
 
-      , fr_pkg         :: Maybe UnitId  -- Just p => module is in this package's
-                                           --           manifest, but couldn't find
-                                           --           the .hi file
+      , fr_pkg         :: Maybe Unit       -- ^ Just p => module is in this unit's
+                                           --   manifest, but couldn't find the
+                                           --   .hi file
 
-      , fr_mods_hidden :: [UnitId]      -- Module is in these packages,
+      , fr_mods_hidden :: [Unit]           -- ^ Module is in these units,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [UnitId]      -- Module is in these packages,
-                                           --   but the *package* is hidden
+      , fr_pkgs_hidden :: [Unit]           -- ^ Module is in these units,
+                                           --   but the *unit* is hidden
 
-        -- Modules are in these packages, but it is unusable
-      , fr_unusables   :: [(UnitId, UnusablePackageReason)]
+        -- | Module is in these units, but it is unusable
+      , fr_unusables   :: [(Unit, UnusablePackageReason)]
 
-      , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
+      , fr_suggestions :: [ModuleSuggestion] -- ^ Possible mis-spelled modules
       }
 
 {-
@@ -1134,11 +1134,11 @@ mi_semantic_module iface = case mi_sig_of iface of
 -- 'ModIface' depends on.
 mi_free_holes :: ModIface -> UniqDSet ModuleName
 mi_free_holes iface =
-  case splitModuleInsts (mi_module iface) of
+  case getModuleInstantiation (mi_module iface) of
     (_, Just indef)
         -- A mini-hack: we rely on the fact that 'renameFreeHoles'
         -- drops things that aren't holes.
-        -> renameFreeHoles (mkUniqDSet cands) (indefUnitIdInsts (indefModuleUnitId indef))
+        -> renameFreeHoles (mkUniqDSet cands) (instUnitInsts (moduleUnit indef))
     _   -> emptyUniqDSet
   where
     cands = map fst (dep_mods (mi_deps iface))
@@ -1517,7 +1517,7 @@ data CgGuts
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
         cg_foreign_files :: ![(ForeignSrcLang, FilePath)],
-        cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
+        cg_dep_pkgs  :: ![UnitId], -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
         cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
@@ -1850,7 +1850,7 @@ setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
    = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { thisInstalledUnitId = toInstalledUnitId interactiveUnitId } }
+                { thisUnitId = toUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -1944,8 +1944,8 @@ Note [Printing unit ids]
 In the old days, original names were tied to PackageIds, which directly
 corresponded to the entities that users wrote in Cabal files, and were perfectly
 suitable for printing when we need to disambiguate packages.  However, with
-UnitId, the situation can be different: if the key is instantiated with
-some holes, we should try to give the user some more useful information.
+instantiated units, the situation can be different: if the key is instantiated
+with some holes, we should try to give the user some more useful information.
 -}
 
 -- | Creates some functions that work out the best ways to format
@@ -2011,10 +2011,10 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 -- is only one exposed package which exports this module, don't qualify.
 mkQualModule :: DynFlags -> QueryQualifyModule
 mkQualModule dflags mod
-     | moduleUnitId mod == thisPackage dflags = False
+     | moduleUnit mod == thisPackage dflags = False
 
      | [(_, pkgconfig)] <- lookup,
-       packageConfigId pkgconfig == moduleUnitId mod
+       mkUnit pkgconfig == moduleUnit mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
@@ -2509,7 +2509,7 @@ data Dependencies
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(InstalledUnitId, Bool)]
+         , dep_pkgs   :: [(UnitId, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules
@@ -2932,7 +2932,7 @@ data ModSummary
      }
 
 ms_installed_mod :: ModSummary -> InstalledModule
-ms_installed_mod = fst . splitModuleInsts . ms_mod
+ms_installed_mod = fst . getModuleInstantiation . ms_mod
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod

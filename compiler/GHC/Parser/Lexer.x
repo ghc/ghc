@@ -2079,7 +2079,7 @@ warnopt f options = f `EnumSet.member` pWarningFlags options
 -- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
 data ParserFlags = ParserFlags {
     pWarningFlags   :: EnumSet WarningFlag
-  , pThisPackage    :: UnitId      -- ^ key of package currently being compiled
+  , pThisPackage    :: Unit        -- ^ key of package currently being compiled
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
@@ -2174,7 +2174,7 @@ failLocMsgP loc1 loc2 str =
 getPState :: P PState
 getPState = P $ \s -> POk s s
 
-withThisPackage :: (UnitId -> a) -> P a
+withThisPackage :: (Unit -> a) -> P a
 withThisPackage f = P $ \s@(PState{options = o}) -> POk s (f (pThisPackage o))
 
 getExts :: P ExtsBitmap
@@ -2492,7 +2492,7 @@ pragState dynflags buf loc = (mkPState dynflags buf loc) {
 mkParserFlags'
   :: EnumSet WarningFlag        -- ^ warnings flags enabled
   -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
-  -> UnitId                     -- ^ key of package currently being compiled
+  -> Unit                       -- ^ key of package currently being compiled
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
   -> Bool                       -- ^ keep regular comment tokens

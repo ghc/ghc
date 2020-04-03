@@ -282,12 +282,12 @@ nameIsHomePackage :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
 nameIsHomePackage this_mod
   = \nm -> case n_sort nm of
-              External nm_mod    -> moduleUnitId nm_mod == this_pkg
-              WiredIn nm_mod _ _ -> moduleUnitId nm_mod == this_pkg
+              External nm_mod    -> moduleUnit nm_mod == this_pkg
+              WiredIn nm_mod _ _ -> moduleUnit nm_mod == this_pkg
               Internal -> True
               System   -> False
   where
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 nameIsHomePackageImport :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
@@ -296,17 +296,17 @@ nameIsHomePackageImport this_mod
   = \nm -> case nameModule_maybe nm of
               Nothing -> False
               Just nm_mod -> nm_mod /= this_mod
-                          && moduleUnitId nm_mod == this_pkg
+                          && moduleUnit nm_mod == this_pkg
   where
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 -- | Returns True if the Name comes from some other package: neither this
 -- package nor the interactive package.
-nameIsFromExternalPackage :: UnitId -> Name -> Bool
-nameIsFromExternalPackage this_pkg name
+nameIsFromExternalPackage :: Unit -> Name -> Bool
+nameIsFromExternalPackage this_unit name
   | Just mod <- nameModule_maybe name
-  , moduleUnitId mod /= this_pkg    -- Not this package
-  , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  , moduleUnit mod /= this_unit   -- Not the current unit
+  , not (isInteractiveModule mod) -- Not the 'interactive' package
   = True
   | otherwise
   = False
@@ -592,7 +592,7 @@ pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
     case qualName sty mod occ of              -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
-      NameNotInScope2  -> ppr (moduleUnitId mod) <> colon     -- Module not in
+      NameNotInScope2  -> ppr (moduleUnit mod) <> colon     -- Module not in
                           <> ppr (moduleName mod) <> dot          -- scope either
       NameUnqual       -> empty                   -- In scope unqualified
 

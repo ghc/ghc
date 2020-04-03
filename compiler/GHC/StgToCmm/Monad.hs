@@ -474,7 +474,7 @@ instance HasDynFlags FCode where
 getPlatform :: FCode Platform
 getPlatform = targetPlatform <$> getDynFlags
 
-getThisPackage :: FCode UnitId
+getThisPackage :: FCode Unit
 getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a

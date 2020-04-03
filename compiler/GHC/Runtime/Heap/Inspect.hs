@@ -139,7 +139,7 @@ isThunk _             = False
 constrClosToName :: HscEnv -> GenClosure a -> IO (Either String Name)
 constrClosToName hsc_env ConstrClosure{pkg=pkg,modl=mod,name=occ} = do
    let occName = mkOccName OccName.dataName occ
-       modName = mkModule (stringToUnitId pkg) (mkModuleName mod)
+       modName = mkModule (stringToUnit pkg) (mkModuleName mod)
    Right `fmap` lookupOrigIO hsc_env modName occName
 constrClosToName _hsc_env clos =
    return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (fmap (const ()) clos)))

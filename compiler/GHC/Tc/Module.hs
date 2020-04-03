@@ -35,7 +35,7 @@ module GHC.Tc.Module (
         checkBootDecl, checkHiBootIface',
         findExtraSigImports,
         implicitRequirements,
-        checkUnitId,
+        checkUnit,
         mergeSignatures,
         tcRnMergeSignatures,
         instantiateSignature,

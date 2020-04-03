@@ -99,7 +99,7 @@ import {-# SOURCE #-}   GHC.Driver.Session
                            , pprUserLength
                            , unsafeGlobalDynFlags, initSDocContext
                            )
-import {-# SOURCE #-}   GHC.Types.Module( UnitId, Module, ModuleName, moduleName )
+import {-# SOURCE #-}   GHC.Types.Module( Unit, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle)
@@ -196,7 +196,7 @@ type QueryQualifyModule = Module -> Bool
 
 -- | For a given package, we need to know whether to print it with
 -- the component id to disambiguate it.
-type QueryQualifyPackage = UnitId -> Bool
+type QueryQualifyPackage = Unit -> Bool
 
 -- See Note [Printing original names] in GHC.Driver.Types
 data QualifyName   -- Given P:M.T

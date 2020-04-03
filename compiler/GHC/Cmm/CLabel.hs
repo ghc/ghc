@@ -187,7 +187,7 @@ data CLabel
 
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel
-        UnitId               -- what package the label belongs to.
+        Unit                    -- what package the label belongs to.
         FastString              -- identifier giving the prefix of the label
         CmmLabelInfo            -- encodes the suffix of the label
 
@@ -354,7 +354,7 @@ instance Ord CLabel where
 data ForeignLabelSource
 
    -- | Label is in a named package
-   = ForeignLabelInPackage      UnitId
+   = ForeignLabelInPackage Unit
 
    -- | Label is in some external, system package that doesn't also
    --   contain compiled Haskell code, and is not associated with any .hi files.
@@ -553,7 +553,7 @@ mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
   mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
-        :: UnitId -> FastString -> CLabel
+        :: Unit -> FastString -> CLabel
 
 mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
 mkCmmEntryLabel     pkg str     = CmmLabel pkg str CmmEntry
@@ -1082,7 +1082,7 @@ labelDynamic config this_mod lbl =
     externalDynamicRefs = ncgExternalDynamicRefs config
     platform = ncgPlatform config
     os = platformOS platform
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 
 -----------------------------------------------------------------------------

@@ -19,7 +19,7 @@ import GHC.Prelude             ( FilePath, String, show )
 import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
-import GHC.Types.Module        ( InstalledUnitId, Module )
+import GHC.Types.Module        ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
 import GHC.Utils.Outputable
 import GHC.Types.Var           ( Id )
@@ -62,7 +62,7 @@ data PersistentLinkerState
        temp_sos :: ![(FilePath, String)] }
 
 -- TODO: Make this type more precise
-type LinkerUnitId = InstalledUnitId
+type LinkerUnitId = UnitId
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {

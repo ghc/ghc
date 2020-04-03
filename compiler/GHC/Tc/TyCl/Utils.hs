@@ -181,11 +181,11 @@ checkNameIsAcyclic n m = SynCycleM $ \s ->
                 Left err -> Left err
 
 -- | Checks if any of the passed in 'TyCon's have cycles.
--- Takes the 'UnitId' of the home package (as we can avoid
+-- Takes the 'Unit' of the home package (as we can avoid
 -- checking those TyCons: cycles never go through foreign packages) and
 -- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
 -- can give better error messages.
-checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
+checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds = do
     case runSynCycleM (mapM_ (go emptyNameSet []) tcs) emptyNameSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
@@ -215,7 +215,7 @@ checkSynCycles this_uid tcs tyclds = do
         -- This won't hold once we get recursive packages with Backpack,
         -- but for now it's fine.
         | not (isHoleModule mod ||
-               moduleUnitId mod == this_uid ||
+               moduleUnit mod == this_uid ||
                isInteractiveModule mod)
             = return ()
         | Just ty <- synTyConRhs_maybe tc =

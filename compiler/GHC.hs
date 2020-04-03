@@ -159,11 +159,11 @@ module GHC (
 
         -- * Abstract syntax elements
 
-        -- ** Packages
-        UnitId,
+        -- ** Units
+        Unit,
 
         -- ** Modules
-        Module, mkModule, pprModule, moduleName, moduleUnitId,
+        Module, mkModule, pprModule, moduleName, moduleUnit,
         ModuleName, mkModuleName, moduleNameString,
 
         -- ** Names
@@ -594,7 +594,7 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags'' <- liftIO $ interpretPackageEnv dflags'
@@ -643,7 +643,7 @@ setSessionDynFlags dflags = do
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
 -- 'load' is called.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
 -- | Set the action taken when the compiler produces a message.  This
@@ -655,7 +655,7 @@ setLogAction action = do
   void $ setProgramDynFlags_ False $
     dflags' { log_action = action }
 
-setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [InstalledUnitId]
+setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [UnitId]
 setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
@@ -1357,7 +1357,7 @@ packageDbModules only_exposed = do
      [ mkModule pid modname
      | p <- pkgs
      , not only_exposed || exposed p
-     , let pid = packageConfigId p
+     , let pid = mkUnit p
      , modname <- exposedModules p
                ++ map exportName (reexportedModules p) ]
                -}
@@ -1489,7 +1489,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     this_pkg = thisPackage dflags
   --
   case maybe_pkg of
-    Just pkg | fsToUnitId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | fsToUnit pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
@@ -1501,7 +1501,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | moduleUnitId m /= this_pkg -> return m
+             Found loc m | moduleUnit m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
@@ -1545,7 +1545,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set InstalledUnitId)
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set UnitId)
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

@@ -31,7 +31,7 @@ import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import GHC.Tc.Instance.Family
 import GHC.Types.Module ( moduleName, moduleNameFS
-                        , moduleUnitId, unitIdFS, getModule )
+                        , moduleUnit, unitFS, getModule )
 import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
@@ -615,7 +615,7 @@ tc_mkRepTy gk_ tycon k =
         dtName  = mkStrLitTy . occNameFS . nameOccName $ tyConName_user
         mdName  = mkStrLitTy . moduleNameFS . moduleName
                 . nameModule . tyConName $ tycon
-        pkgName = mkStrLitTy . unitIdFS . moduleUnitId
+        pkgName = mkStrLitTy . unitFS . moduleUnit
                 . nameModule . tyConName $ tycon
         isNT    = mkTyConTy $ if isNewTyCon tycon
                               then promotedTrueDataCon

@@ -309,9 +309,9 @@ warnUnusedPackages = do
         pit = eps_PIT eps
 
     let loadedPackages
-          = map (getPackageDetails dflags)
+          = map (unsafeGetUnitInfo dflags)
           . nub . sort
-          . map moduleUnitId
+          . map moduleUnit
           . moduleEnvKeys
           $ pit
 
@@ -348,16 +348,16 @@ warnUnusedPackages = do
 
         matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
-        matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
+        matching dflags (UnitIdArg uid) p = uid == realUnit dflags p
 
         -- For wired-in packages, we have to unwire their id,
         -- otherwise they won't match package flags
-        realUnitId :: DynFlags -> UnitInfo -> UnitId
-        realUnitId dflags
-          = unwireUnitId dflags
-          . DefiniteUnitId
-          . DefUnitId
-          . installedUnitInfoId
+        realUnit :: DynFlags -> UnitInfo -> Unit
+        realUnit dflags
+          = unwireUnit dflags
+          . RealUnit
+          . Definite
+          . unitId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
@@ -965,7 +965,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
 
-    when (not (null (unitIdsToCheck dflags))) $
+    when (not (null (instantiatedUnitsToCheck dflags))) $
       throwGhcException (ProgramError "Backpack typechecking not supported with -j")
 
     -- The bits of shared state we'll be using:
@@ -1374,7 +1374,7 @@ upsweep
 upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
    dflags <- getSessionDynFlags
    (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
-                           (unitIdsToCheck dflags) done_holes
+                           (instantiatedUnitsToCheck dflags) done_holes
    return (res, reverse $ mgModSummaries done)
  where
   done_holes = emptyUniqSet
@@ -1405,13 +1405,13 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     -> [SCC ModSummary]
     -> Int
     -> Int
-    -> [UnitId]
+    -> [Unit]
     -> UniqSet ModuleName
     -> m (SuccessFlag, ModuleGraph)
   upsweep' _old_hpt done
      [] _ _ uids_to_check _
    = do hsc_env <- getSession
-        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnitId hsc_env) uids_to_check
+        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnit hsc_env) uids_to_check
         return (Succeeded, done)
 
   upsweep' _old_hpt done
@@ -1436,13 +1436,13 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         -- our imports when you run --make.
         let (ready_uids, uids_to_check')
                 = partition (\uid -> isEmptyUniqDSet
-                    (unitIdFreeHoles uid `uniqDSetMinusUniqSet` done_holes))
+                    (unitFreeModuleHoles uid `uniqDSetMinusUniqSet` done_holes))
                      uids_to_check
             done_holes'
                 | ms_hsc_src mod == HsigFile
                 = addOneToUniqSet done_holes (ms_mod_name mod)
                 | otherwise = done_holes
-        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnitId hsc_env) ready_uids
+        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnit hsc_env) ready_uids
 
         -- Remove unwanted tmp files between compilations
         liftIO (cleanup hsc_env)
@@ -1517,16 +1517,17 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
                 upsweep' old_hpt1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
 
-unitIdsToCheck :: DynFlags -> [UnitId]
-unitIdsToCheck dflags =
-  nubSort $ concatMap goUnitId (explicitPackages (pkgState dflags))
+-- | Return a list of instantiated units to type check from the PackageState.
+--
+-- Use explicit (instantiated) units as roots and also return their
+-- instantiations that are themselves instantiations and so on recursively.
+instantiatedUnitsToCheck :: DynFlags -> [Unit]
+instantiatedUnitsToCheck dflags =
+  nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
  where
-  goUnitId uid =
-    case splitUnitIdInsts uid of
-      (_, Just indef) ->
-        let insts = indefUnitIdInsts indef
-        in uid : concatMap (goUnitId . moduleUnitId . snd) insts
-      _ -> []
+  goUnit HoleUnit         = []
+  goUnit (RealUnit _)     = []
+  goUnit uid@(VirtUnit i) = uid : concatMap (goUnit . moduleUnit . snd) (instUnitInsts i)
 
 maybeGetIfaceDate :: DynFlags -> ModLocation -> IO (Maybe UTCTime)
 maybeGetIfaceDate dflags location

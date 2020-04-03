@@ -246,7 +246,7 @@ import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkComponentId)
+import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -520,8 +520,8 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisInstalledUnitId   :: InstalledUnitId,              -- ^ Target unit-id
-  thisComponentId_      :: Maybe ComponentId,            -- ^ Unit-id to instantiate
+  thisUnitId   :: UnitId,              -- ^ Target unit-id
+  thisComponentId_      :: Maybe IndefUnitId,            -- ^ Unit-id to instantiate
   thisUnitIdInsts_      :: Maybe [(ModuleName, Module)], -- ^ How to instantiate the unit-id above
 
   -- ways
@@ -626,7 +626,7 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [PackageDatabase],
+  pkgDatabase           :: Maybe [PackageDatabase UnitId],
         -- ^ Stack of package databases for the target platform.
         --
         -- A "package database" is a misleading name as it is really a Unit
@@ -1088,8 +1088,9 @@ isNoLink _      = False
 -- is used.
 data PackageArg =
       PackageArg String    -- ^ @-package@, by 'PackageName'
-    | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
+    | UnitIdArg Unit       -- ^ @-package-id@, by 'Unit'
   deriving (Eq, Show)
+
 instance Outputable PackageArg where
     ppr (PackageArg pn) = text "package" <+> text pn
     ppr (UnitIdArg uid) = text "unit" <+> ppr uid
@@ -1320,7 +1321,7 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        thisInstalledUnitId     = toInstalledUnitId mainUnitId,
+        thisUnitId     = toUnitId mainUnitId,
         thisUnitIdInsts_        = Nothing,
         thisComponentId_        = Nothing,
 
@@ -1952,16 +1953,16 @@ setOutputHi   f d = d { outputHi   = f}
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
 
-thisComponentId :: DynFlags -> ComponentId
+thisComponentId :: DynFlags -> IndefUnitId
 thisComponentId dflags =
   let pkgstate = pkgState dflags
   in case thisComponentId_ dflags of
-    Just (ComponentId raw _) -> mkComponentId pkgstate raw
+    Just uid -> updateIndefUnitId pkgstate uid
     Nothing  ->
       case thisUnitIdInsts_ dflags of
         Just _  ->
           throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-        Nothing -> mkComponentId pkgstate (unitIdFS (thisPackage dflags))
+        Nothing -> mkIndefUnitId pkgstate (unitFS (thisPackage dflags))
 
 thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
 thisUnitIdInsts dflags =
@@ -1969,36 +1970,36 @@ thisUnitIdInsts dflags =
         Just insts -> insts
         Nothing    -> []
 
-thisPackage :: DynFlags -> UnitId
+thisPackage :: DynFlags -> Unit
 thisPackage dflags =
     case thisUnitIdInsts_ dflags of
         Nothing -> default_uid
         Just insts
           | all (\(x,y) -> mkHoleModule x == y) insts
-          -> newUnitId (thisComponentId dflags) insts
+          -> mkVirtUnit (thisComponentId dflags) insts
           | otherwise
           -> default_uid
   where
-    default_uid = DefiniteUnitId (DefUnitId (thisInstalledUnitId dflags))
+    default_uid = RealUnit (Definite (thisUnitId dflags))
 
-parseUnitIdInsts :: String -> [(ModuleName, Module)]
-parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
+parseUnitInsts :: String -> Instantiations
+parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse -instantiated-with: " ++ str)
   where parse = sepBy parseEntry (R.char ',')
         parseEntry = do
             n <- parseModuleName
             _ <- R.char '='
-            m <- parseModuleId
+            m <- parseHoleyModule
             return (n, m)
 
 setUnitIdInsts :: String -> DynFlags -> DynFlags
 setUnitIdInsts s d =
-    d { thisUnitIdInsts_ = Just (parseUnitIdInsts s) }
+    d { thisUnitIdInsts_ = Just (parseUnitInsts s) }
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
-    d { thisComponentId_ = Just (ComponentId (fsLit s) Nothing) }
+    d { thisComponentId_ = Just (Indefinite (UnitId (fsLit s)) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -4554,13 +4555,13 @@ exposePackage, exposePackageId, hidePackage,
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags =
-    parsePackageFlag "-package-id" parseUnitIdArg p : packageFlags s })
+    parsePackageFlag "-package-id" parseUnitArg p : packageFlags s })
 exposePluginPackage p =
   upd (\s -> s{ pluginPackageFlags =
     parsePackageFlag "-plugin-package" parsePackageArg p : pluginPackageFlags s })
 exposePluginPackageId p =
   upd (\s -> s{ pluginPackageFlags =
-    parsePackageFlag "-plugin-package-id" parseUnitIdArg p : pluginPackageFlags s })
+    parsePackageFlag "-plugin-package-id" parseUnitArg p : pluginPackageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -4580,12 +4581,12 @@ parsePackageArg :: ReadP PackageArg
 parsePackageArg =
     fmap PackageArg (munch1 (\c -> isAlphaNum c || c `elem` ":-_."))
 
-parseUnitIdArg :: ReadP PackageArg
-parseUnitIdArg =
-    fmap UnitIdArg parseUnitId
+parseUnitArg :: ReadP PackageArg
+parseUnitArg =
+    fmap UnitIdArg parseUnit
 
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p d = d { thisInstalledUnitId = stringToInstalledUnitId p }
+setUnitId p d = d { thisUnitId = stringToUnitId p }
 
 -- | Given a 'ModuleName' of a signature in the home library, find
 -- out how it is instantiated.  E.g., the canonical form of
@@ -4598,7 +4599,7 @@ canonicalizeHomeModule dflags mod_name =
 
 canonicalizeModuleIfHome :: DynFlags -> Module -> Module
 canonicalizeModuleIfHome dflags mod
-    = if thisPackage dflags == moduleUnitId mod
+    = if thisPackage dflags == moduleUnit mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 

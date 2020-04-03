@@ -585,7 +585,7 @@ importName
 
         -- A label imported with an explicit packageId.
         | STRING NAME
-        { ($2, mkCmmCodeLabel (fsToUnitId (mkFastString $1)) $2) }
+        { ($2, mkCmmCodeLabel (fsToUnit (mkFastString $1)) $2) }
 
 
 names   :: { [FastString] }
@@ -1163,7 +1163,7 @@ profilingInfo dflags desc_str ty_str
     then NoProfilingInfo
     else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
 
-staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
+staticClosure :: Unit -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
        let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []

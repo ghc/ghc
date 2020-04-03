@@ -25,7 +25,7 @@ import GHC.Driver.Backpack.Syntax
 
 import GHC.Parser.Annotation
 import GHC hiding (Failed, Succeeded)
-import GHC.Driver.Packages
+import GHC.Driver.Packages hiding (packageNameMap)
 import GHC.Parser
 import GHC.Parser.Lexer
 import GHC.Driver.Monad
@@ -96,14 +96,14 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == ComponentId (fsLit "main") Nothing
+                            then if cid == Indefinite (UnitId (fsLit "main")) Nothing
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
 doBackpack _ =
     throwGhcException (CmdLineError "--backpack can only process a single file")
 
-computeUnitId :: LHsUnit HsComponentId -> (ComponentId, [(ModuleName, Module)])
+computeUnitId :: LHsUnit HsComponentId -> (IndefUnitId, [(ModuleName, Module)])
 computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
   where
     cid = hsComponentId (unLoc (hsunitName unit))
@@ -112,7 +112,7 @@ computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
     get_reqs (DeclD HsSrcFile _ _) = emptyUniqDSet
     get_reqs (DeclD HsBootFile _ _) = emptyUniqDSet
     get_reqs (IncludeD (IncludeDecl (L _ hsuid) _ _)) =
-        unitIdFreeHoles (convertHsUnitId hsuid)
+        unitFreeModuleHoles (convertHsComponentId hsuid)
 
 -- | Tiny enum for all types of Backpack operations we may do.
 data SessionType
@@ -129,17 +129,17 @@ data SessionType
 
 -- | Create a temporary Session to do some sort of type checking or
 -- compilation.
-withBkpSession :: ComponentId
+withBkpSession :: IndefUnitId
                -> [(ModuleName, Module)]
-               -> [(UnitId, ModRenaming)]
+               -> [(Unit, ModRenaming)]
                -> SessionType   -- what kind of session are we doing
                -> BkpM a        -- actual action to run
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let (ComponentId cid_fs _) = cid
+    let cid_fs = unitIdFS (indefUnit cid)
         is_primary = False
-        uid_str = unpackFS (hashUnitId cid insts)
+        uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
         -- There are multiple units in a single Backpack file, so we
         -- need to separate out the results in those cases.  Right now,
@@ -174,12 +174,12 @@ withBkpSession cid insts deps session_type do_this = do
                         _ -> hscTarget dflags,
         thisUnitIdInsts_ = Just insts,
         thisComponentId_ = Just cid,
-        thisInstalledUnitId =
+        thisUnitId =
             case session_type of
-                TcSession -> newInstalledUnitId cid Nothing
+                TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
-                _ | null insts -> newInstalledUnitId cid Nothing
-                  | otherwise  -> newInstalledUnitId cid (Just (hashUnitId cid insts)),
+                _ | null insts -> newUnitId cid Nothing
+                  | otherwise  -> newUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
         -- Setup all of the output directories according to our hierarchy
         objectDir   = Just (outdir objectDir),
         hiDir       = Just (outdir hiDir),
@@ -192,7 +192,7 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnitId dflags (improveUnitId (getUnitInfoMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
+          let uid = unwireUnit dflags (improveUnit (getUnitInfoMap dflags) $ renameHoleUnit dflags (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -204,41 +204,41 @@ withBkpSession cid insts deps session_type do_this = do
         _ <- setSessionDynFlags dflags
         do_this
 
-withBkpExeSession :: [(UnitId, ModRenaming)] -> BkpM a -> BkpM a
+withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (ComponentId (fsLit "main") Nothing) [] deps ExeSession do_this
+    withBkpSession (Indefinite (UnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
 
-getSource :: ComponentId -> BkpM (LHsUnit HsComponentId)
+getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
     bkp_env <- getBkpEnv
     case Map.lookup cid (bkp_table bkp_env) of
         Nothing -> pprPanic "missing needed dependency" (ppr cid)
         Just lunit -> return lunit
 
-typecheckUnit :: ComponentId -> [(ModuleName, Module)] -> BkpM ()
+typecheckUnit :: IndefUnitId -> [(ModuleName, Module)] -> BkpM ()
 typecheckUnit cid insts = do
     lunit <- getSource cid
     buildUnit TcSession cid insts lunit
 
-compileUnit :: ComponentId -> [(ModuleName, Module)] -> BkpM ()
+compileUnit :: IndefUnitId -> [(ModuleName, Module)] -> BkpM ()
 compileUnit cid insts = do
-    -- Let everyone know we're building this unit ID
-    msgUnitId (newUnitId cid insts)
+    -- Let everyone know we're building this unit
+    msgUnitId (mkVirtUnit cid insts)
     lunit <- getSource cid
     buildUnit CompSession cid insts lunit
 
 -- | Compute the dependencies with instantiations of a syntactic
 -- HsUnit; e.g., wherever you see @dependency p[A=<A>]@ in a
--- unit file, return the 'UnitId' corresponding to @p[A=<A>]@.
+-- unit file, return the 'Unit' corresponding to @p[A=<A>]@.
 -- The @include_sigs@ parameter controls whether or not we also
 -- include @dependency signature@ declarations in this calculation.
 --
--- Invariant: this NEVER returns InstalledUnitId.
-hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(UnitId, ModRenaming)]
+-- Invariant: this NEVER returns UnitId.
+hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(Unit, ModRenaming)]
 hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
   where
     get_dep (L _ (IncludeD (IncludeDecl (L _ hsuid) mb_lrn is_sig)))
-        | include_sigs || not is_sig = [(convertHsUnitId hsuid, go mb_lrn)]
+        | include_sigs || not is_sig = [(convertHsComponentId hsuid, go mb_lrn)]
         | otherwise = []
       where
         go Nothing = ModRenaming True []
@@ -248,7 +248,7 @@ hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
             convRn (L _ (Renaming (L _ from) (Just (L _ to)))) = (from, to)
     get_dep _ = []
 
-buildUnit :: SessionType -> ComponentId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()
+buildUnit :: SessionType -> IndefUnitId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()
 buildUnit session cid insts lunit = do
     -- NB: include signature dependencies ONLY when typechecking.
     -- If we're compiling, it's not necessary to recursively
@@ -260,7 +260,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnitId dflags hsubst) raw_deps
+        deps0 = map (renameHoleUnit dflags hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -273,7 +273,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnitId (getUnitInfoMap dflags)) deps0
+    let deps = map (improveUnit (getUnitInfoMap dflags)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -304,7 +304,7 @@ buildUnit session cid insts lunit = do
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
 
-        let compat_fs = (case cid of ComponentId fs _ -> fs)
+        let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
 
         return GenericUnitInfo {
@@ -312,8 +312,8 @@ buildUnit session cid insts lunit = do
             unitAbiHash = "",
             unitPackageId = PackageId compat_fs,
             unitPackageName = compat_pn,
-            unitPackageVersion = makeVersion [0],
-            unitId = toInstalledUnitId (thisPackage dflags),
+            unitPackageVersion = makeVersion [],
+            unitId = toUnitId (thisPackage dflags),
             unitComponentName = Nothing,
             unitInstanceOf = cid,
             unitInstantiations = insts,
@@ -327,8 +327,8 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toInstalledUnitId . unwireUnitId dflags)
-                                $ deps ++ [ moduleUnitId mod
+                        _ -> map (toUnitId . unwireUnit dflags)
+                                $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
             unitAbiDepends = [],
@@ -391,21 +391,18 @@ addPackage pkg = do
          _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
          return ()
 
--- Precondition: UnitId is NOT InstalledUnitId
-compileInclude :: Int -> (Int, UnitId) -> BkpM ()
+compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
     msgInclude (i, n) uid
     -- Check if we've compiled it already
-    case lookupUnit dflags uid of
-        Nothing -> do
-            case splitUnitIdInsts uid of
-                (_, Just indef) ->
-                    innerBkpM $ compileUnit (indefUnitIdComponentId indef)
-                                            (indefUnitIdInsts indef)
-                _ -> return ()
-        Just _ -> return ()
+    case uid of
+      HoleUnit   -> return ()
+      RealUnit _ -> return ()
+      VirtUnit i -> case lookupUnit dflags uid of
+        Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
+        Just _  -> return ()
 
 -- ----------------------------------------------------------------------------
 -- Backpack monad
@@ -423,7 +420,7 @@ data BkpEnv
         -- | The filename of the bkp file we're compiling
         bkp_filename :: FilePath,
         -- | Table of source units which we know how to compile
-        bkp_table :: Map ComponentId (LHsUnit HsComponentId),
+        bkp_table :: Map IndefUnitId (LHsUnit HsComponentId),
         -- | When a package we are compiling includes another package
         -- which has not been compiled, we bump the level and compile
         -- that.
@@ -535,7 +532,7 @@ msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
         $ showModuleIndex (i, n) ++ "Processing " ++ unpackFS fs_pn
 
 -- | Message when we instantiate a Backpack unit.
-msgUnitId :: UnitId -> BkpM ()
+msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
@@ -545,7 +542,7 @@ msgUnitId pk = do
                                 (ppr pk)
 
 -- | Message when we include a Backpack unit.
-msgInclude :: (Int,Int) -> UnitId -> BkpM ()
+msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     dflags <- getDynFlags
     level <- getBkpLevel
@@ -563,7 +560,7 @@ type PackageNameMap a = Map PackageName a
 -- to use this for anything
 unitDefines :: PackageState -> LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (mkComponentId pkgstate fs))
+    = (pn, HsComponentId pn (mkIndefUnitId pkgstate fs))
 
 packageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
 packageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
@@ -609,16 +606,16 @@ renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
     renameHsModuleId (HsModuleVar lm) = HsModuleVar lm
     renameHsModuleId (HsModuleId luid lm) = HsModuleId (fmap renameHsUnitId luid) lm
 
-convertHsUnitId :: HsUnitId HsComponentId -> UnitId
-convertHsUnitId (HsUnitId (L _ hscid) subst)
-    = newUnitId (hsComponentId hscid) (map (convertHsModuleSubst . unLoc) subst)
+convertHsComponentId :: HsUnitId HsComponentId -> Unit
+convertHsComponentId (HsUnitId (L _ hscid) subst)
+    = mkVirtUnit (hsComponentId hscid) (map (convertHsModuleSubst . unLoc) subst)
 
 convertHsModuleSubst :: HsModuleSubst HsComponentId -> (ModuleName, Module)
 convertHsModuleSubst (L _ modname, L _ m) = (modname, convertHsModuleId m)
 
 convertHsModuleId :: HsModuleId HsComponentId -> Module
 convertHsModuleId (HsModuleVar (L _ modname)) = mkHoleModule modname
-convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsUnitId hsuid) modname
+convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsComponentId hsuid) modname
 
 
 
@@ -824,8 +821,7 @@ hsModuleToModSummary pn hsc_src modname
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
-newInstalledUnitId :: ComponentId -> Maybe FastString -> InstalledUnitId
-newInstalledUnitId (ComponentId cid_fs _) (Just fs)
-    = InstalledUnitId (cid_fs `appendFS` mkFastString "+" `appendFS` fs)
-newInstalledUnitId (ComponentId cid_fs _) Nothing
-    = InstalledUnitId cid_fs
+newUnitId :: IndefUnitId -> Maybe FastString -> UnitId
+newUnitId uid mhash = case mhash of
+   Nothing   -> indefUnit uid
+   Just hash -> UnitId (unitIdFS (indefUnit uid) `appendFS` mkFastString "+" `appendFS` hash)

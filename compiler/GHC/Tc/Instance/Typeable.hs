@@ -205,7 +205,7 @@ mkModIdRHS mod
   = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
-                  `nlHsApp` trNameLit (unitIdFS (moduleUnitId mod))
+                  `nlHsApp` trNameLit (unitFS (moduleUnit mod))
                   `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
        }
 
@@ -265,7 +265,7 @@ todoForTyCons mod mod_id tycons = do
                        }
   where
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
-    pkg_fpr = fingerprintString $ unitIdString $ moduleUnitId mod
+    pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
 todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
 todoForExportedKindReps kinds = do

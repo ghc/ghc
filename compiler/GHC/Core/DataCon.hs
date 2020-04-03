@@ -1391,7 +1391,7 @@ dataConRepArgTys (MkData { dcRep = rep
 dataConIdentity :: DataCon -> ByteString
 -- We want this string to be UTF-8, so we get the bytes directly from the FastStrings.
 dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
-   [ BSB.byteString $ bytesFS (unitIdFS (moduleUnitId mod))
+   [ BSB.byteString $ bytesFS (unitFS (moduleUnit mod))
    , BSB.int8 $ fromIntegral (ord ':')
    , BSB.byteString $ bytesFS (moduleNameFS (moduleName mod))
    , BSB.int8 $ fromIntegral (ord '.')
