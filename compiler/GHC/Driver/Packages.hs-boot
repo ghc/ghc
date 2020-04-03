@@ -12,4 +12,5 @@ mkComponentId :: PackageState -> FastString -> ComponentId
 displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
 improveUnitId :: UnitInfoMap -> UnitId -> UnitId
 getUnitInfoMap :: DynFlags -> UnitInfoMap
+unitInfoMap :: PackageState -> UnitInfoMap
 getPackageState :: DynFlags -> PackageState

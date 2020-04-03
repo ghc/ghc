@@ -230,13 +230,13 @@ check_inst sig_inst = do
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: PackageState -> ModuleName -> [IndefModule]
+requirementMerges :: PackageState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
     fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
     where
       -- update ComponentId cached details as they may have changed since the
       -- time the ComponentId was created
-      fixupModule (IndefModule iud name) = IndefModule iud' name
+      fixupModule (InstantiatedModule iud name) = InstantiatedModule iud' name
          where
             iud' = iud { instUnitInstanceOf = cid' }
             cid  = instUnitInstanceOf iud
@@ -267,7 +267,7 @@ findExtraSigImports' :: HscEnv
                      -> ModuleName
                      -> IO (UniqDSet ModuleName)
 findExtraSigImports' hsc_env HsigFile modname =
-    fmap unionManyUniqDSets (forM reqs $ \(IndefModule iuid mod_name) ->
+    fmap unionManyUniqDSets (forM reqs $ \(InstantiatedModule iuid mod_name) ->
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
@@ -329,7 +329,7 @@ checkUnitId uid = do
             -- (because we FORCE things to be merged in), so don't check them
             when (not (isHoleModule mod)) $ do
                 checkUnitId (moduleUnitId mod)
-                _ <- mod `checkImplements` IndefModule indef mod_name
+                _ <- mod `checkImplements` InstantiatedModule indef mod_name
                 return ()
       _ -> return () -- if it's hashed, must be well-typed
 
@@ -485,7 +485,7 @@ inheritedSigPvpWarning =
 -- logically "implicit" entities are defined indirectly in an interface
 -- file.  #13151 gives a proposal to make these *truly* implicit.
 
-merge_msg :: ModuleName -> [IndefModule] -> SDoc
+merge_msg :: ModuleName -> [InstantiatedModule] -> SDoc
 merge_msg mod_name [] =
     text "while checking the local signature" <+> ppr mod_name <+>
     text "for consistency"
@@ -546,7 +546,7 @@ mergeSignatures
     addErrCtxt (merge_msg mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
-    ireq_ifaces0 <- forM reqs $ \(IndefModule iuid mod_name) ->
+    ireq_ifaces0 <- forM reqs $ \(InstantiatedModule iuid mod_name) ->
         let m = mkModule (IndefiniteUnitId iuid) mod_name
             im = fst (splitModuleInsts m)
         in fmap fst
@@ -566,7 +566,7 @@ mergeSignatures
         --  3. Thinning the interface according to an explicit export
         --  list.
         --
-        gen_subst (nsubst,oks,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
+        gen_subst (nsubst,oks,ifaces) (imod@(InstantiatedModule iuid _), ireq_iface) = do
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
@@ -731,7 +731,7 @@ mergeSignatures
     tcg_env <- getGblEnv
 
     -- STEP 4: Rename the interfaces
-    ext_ifaces <- forM thinned_ifaces $ \((IndefModule iuid _), ireq_iface) ->
+    ext_ifaces <- forM thinned_ifaces $ \((InstantiatedModule iuid _), ireq_iface) ->
         tcRnModIface (instUnitInsts iuid) (Just nsubst) ireq_iface
     lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
@@ -898,8 +898,8 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
 
-impl_msg :: Module -> IndefModule -> SDoc
-impl_msg impl_mod (IndefModule req_uid req_mod_name) =
+impl_msg :: Module -> InstantiatedModule -> SDoc
+impl_msg impl_mod (InstantiatedModule req_uid req_mod_name) =
   text "while checking that" <+> ppr impl_mod <+>
   text "implements signature" <+> ppr req_mod_name <+>
   text "in" <+> ppr req_uid
@@ -907,8 +907,8 @@ impl_msg impl_mod (IndefModule req_uid req_mod_name) =
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
-checkImplements :: Module -> IndefModule -> TcRn TcGblEnv
-checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
+checkImplements :: Module -> InstantiatedModule -> TcRn TcGblEnv
+checkImplements impl_mod req_mod@(InstantiatedModule uid mod_name) =
   addErrCtxt (impl_msg impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
@@ -1004,7 +1004,7 @@ instantiateSignature = do
     -- the local one just to get the information?  Hmm...
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     inner_mod `checkImplements`
-        IndefModule
+        InstantiatedModule
             (newInstantiatedUnit (thisComponentId dflags)
                                  (thisUnitIdInsts dflags))
             (moduleName outer_mod)
