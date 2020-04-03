@@ -153,6 +153,9 @@ main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
   logger <- getLogger
+  let args' = case postLoadMode of
+                DoRun -> takeWhile (\arg -> unLoc arg /= "--") args
+                _     -> args
 
   -- set the default GhcMode, backend and GhcLink.  The backend
   -- can be further adjusted on a module by module basis, using only
@@ -163,6 +166,7 @@ main' postLoadMode dflags0 args flagWarnings = do
          = case postLoadMode of
                DoInteractive   -> (CompManager, Interpreter,  LinkInMemory)
                DoEval _        -> (CompManager, Interpreter,  LinkInMemory)
+               DoRun           -> (CompManager, Interpreter,  LinkInMemory)
                DoMake          -> (CompManager, dflt_backend, LinkBinary)
                DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
@@ -174,6 +178,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                          ghcLink   = link,
                          verbosity = case postLoadMode of
                                          DoEval _ -> 0
+                                         DoRun    -> 0
                                          _other   -> 1
                         }
 
@@ -187,6 +192,7 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- a great story for the moment.
       dflags2  | DoInteractive <- postLoadMode = def_ghci_flags
                | DoEval _      <- postLoadMode = def_ghci_flags
+               | DoRun         <- postLoadMode = def_ghci_flags
                | otherwise                     = dflags1
         where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
                                        `gopt_set` Opt_IgnoreOptimChanges
@@ -195,7 +201,7 @@ main' postLoadMode dflags0 args flagWarnings = do
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
   (dflags3, fileish_args, dynamicFlagWarnings) <-
-      GHC.parseDynamicFlags logger dflags2 args
+      GHC.parseDynamicFlags logger dflags2 args'
 
   let dflags4 = case bcknd of
                 Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
@@ -250,12 +256,21 @@ main' postLoadMode dflags0 args flagWarnings = do
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
+       DoRun                  -> doRun srcs args
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showUnits hsc_env
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats logger dflags6
+
+doRun :: [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
+doRun srcs args = do
+    dflags <- getDynFlags
+    let mainFun = fromMaybe "main" (mainFunIs dflags)
+    ghciUI srcs (Just ["System.Environment.withArgs " ++ show args' ++ " (Control.Monad.void " ++ mainFun ++ ")"])
+  where
+    args' = drop 1 $ dropWhile (/= "--") $ map unLoc args
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
@@ -418,15 +433,18 @@ data PostLoadMode
   | DoBackpack              -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
+  | DoRun                   -- ghc --run
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
-doMkDependHSMode, doMakeMode, doInteractiveMode,
+
+doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
   doAbiHashMode, showUnitsMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
+doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showUnitsMode = mkPostLoadMode ShowPackages
 
@@ -487,11 +505,13 @@ needsInputsMode _               = False
 isLinkMode :: PostLoadMode -> Bool
 isLinkMode (StopBefore StopLn) = True
 isLinkMode DoMake              = True
+isLinkMode DoRun               = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
 isLinkMode _                   = False
 
 isCompManagerMode :: PostLoadMode -> Bool
+isCompManagerMode DoRun         = True
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
@@ -573,6 +593,7 @@ mode_flags =
   , defFlag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+  , defFlag "-run"         (PassFlag (setMode doRunMode))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
   , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))

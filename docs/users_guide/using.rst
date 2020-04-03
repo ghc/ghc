@@ -265,6 +265,20 @@ The available mode flags are:
     Interactive mode, which is also available as :program:`ghci`. Interactive
     mode is described in more detail in :ref:`ghci`.
 
+.. ghc-flag:: --run ⟨file⟩
+    :shortdesc: Run a Haskell program.
+    :type: mode
+    :category: modes
+
+    .. index::
+       single: run mode
+       single: GHCi
+
+    Run a script's ``main`` entry-point. Similar to ``runghc`` this will by
+    default use the bytecode interpreter. If the command-line contains a ``--``
+    argument then all arguments that follow will be passed to the script. All
+    arguments that precede ``--`` are interpreted as GHC arguments.
+
 .. ghc-flag:: --make
     :shortdesc: Build a multi-module Haskell program, automatically figuring out
         dependencies. Likely to be much easier, and faster, than using
