@@ -4,7 +4,7 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 
 import GhcPrelude
 
-import GHC.Stg.FVs
+import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
@@ -13,8 +13,13 @@ import Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.Var.Set
 import GHC.Types.Module (Module)
+import Util
+
+import Data.Maybe ( mapMaybe )
 
 import Data.Graph (SCC (..))
+
+
 
 --------------------------------------------------------------------------------
 -- * Dependency analysis
@@ -25,7 +30,27 @@ type BVs = VarSet
 -- | Set of free variables
 type FVs = VarSet
 
--- | Dependency analysis on STG terms.
+newtype Env
+  = Env
+  { locals :: IdSet
+  }
+
+emptyEnv :: Env
+emptyEnv = Env emptyVarSet
+
+addLocals :: [Id] -> Env -> Env
+addLocals bndrs env
+  = env { locals = extendVarSetList (locals env) bndrs }
+
+-- | This makes sure that only local, non-global free vars make it into the set.
+mkFreeVarSet :: Env -> [Id] -> DIdSet
+mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
+
+boundIds :: StgBinding -> [Id]
+boundIds (StgNonRec b _) = [b]
+boundIds (StgRec pairs)  = map fst pairs
+
+-- | Dependency analysis and free variable annotations on STG terms.
 --
 -- Dependencies of a binding are just free variables in the binding. This
 -- includes imported ids and ids in the current module. For recursive groups we
@@ -44,14 +69,95 @@ annTopBindingsDeps this_mod bs = map top_bind bs
       (StgTopStringLit id bs, emptyVarSet)
 
     top_bind (StgTopLifted bs) =
-      (StgTopLifted (annBindingFreeVars bs), binding emptyVarSet bs)
+       (StgTopLifted bs', fvs)
+      where
+       (bs', _dIdSet, fvs) = binding emptyEnv emptyDVarSet emptyVarSet bs
 
-    binding :: BVs -> StgBinding -> FVs
-    binding bounds (StgNonRec _ r) =
-      rhs bounds r
-    binding bounds (StgRec bndrs) =
-      unionVarSets $
-        map (bind_non_rec (extendVarSetList bounds (map fst bndrs))) bndrs
+    binding :: Env -> DIdSet -> BVs -> StgBinding -> (CgStgBinding, DIdSet, FVs)
+    binding = undefined rhs
+
+    rhs :: Env -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
+    rhs = undefined args expr
+
+    expr :: Env -> DIdSet -> BVs -> StgExpr -> (CgStgBinding, DIdSet, FVs)
+    expr = undefined alts var expr
+
+    alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
+    alts = undefined expr
+
+    args :: Env -> BVs -> [StgArg] -> (DIdSet, FVs)
+    args = undefined var
+
+    var :: Env -> BVs -> Var -> (DIdSet, FVs)
+    var = undefined this_mod
+
+{-
+    binding :: Env -> DIdSet -> BVs -> StgBinding -> (CgStgBinding, DIdSet, FVs)
+    binding env body_fv bounds (StgNonRec bndr r) =
+        (StgNonRec bndr r', fvs, rhs bounds r)
+      where
+        -- See Note [Tracking local binders]
+        (r', rhs_fvs) = rhsFV env r
+        fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
+
+    binding env body_fv bounds (StgRec pairs) =
+      ( StgRec pairs'
+      , fvs
+      , unionVarSets $
+          map (bind_non_rec (extendVarSetList bounds (map fst pairs))) pairs)
+      where
+        -- See Note [Tracking local binders]
+        bndrs = map fst pairs
+        (rhss, rhs_fvss) = mapAndUnzip (rhsFV env . snd) pairs
+        pairs' = zip bndrs rhss
+        fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
+
+    rhsFV :: Env -> StgRhs -> (CgStgRhs, DIdSet)
+    rhsFV env (StgRhsClosure _ ccs uf bndrs body)
+      = (StgRhsClosure fvs ccs uf bndrs body', fvs)
+      where
+        -- See Note [Tracking local binders]
+        (body', body_fvs) = exprFV (addLocals bndrs env) body
+        fvs = delDVarSetList body_fvs bndrs
+    rhsFV env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, argsFV env as)
+
+    exprFV :: Env -> StgExpr -> (CgStgExpr, DIdSet)
+    exprFV env = go
+      where
+        go (StgApp occ as)
+          = (StgApp occ as, unionDVarSet (argsFV env as) (mkFreeVarSet env [occ]))
+        go (StgLit lit) = (StgLit lit, emptyDVarSet)
+        go (StgConApp dc as tys) = (StgConApp dc as tys, argsFV env as)
+        go (StgOpApp op as ty) = (StgOpApp op as ty, argsFV env as)
+        go StgLam{} = pprPanic "StgFVs: StgLam" empty
+        go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
+          where
+            (scrut', scrut_fvs) = go scrut
+            -- See Note [Tracking local binders]
+            (alts', alt_fvss) = mapAndUnzip (altFV (addLocals [bndr] env)) alts
+            alt_fvs = unionDVarSets alt_fvss
+            fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
+        go (StgLet ext bind body) = go_bind (StgLet ext) bind body
+        go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
+        go (StgTick tick e) = (StgTick tick e', fvs')
+          where
+            (e', fvs) = go e
+            fvs' = unionDVarSet (tickish tick) fvs
+            tickish (Breakpoint _ ids) = mkDVarSet ids
+            tickish _                  = emptyDVarSet
+    
+        go_bind dc bind body = (dc bind' body', fvs)
+          where
+            -- See Note [Tracking local binders]
+            env' = addLocals (boundIds bind) env
+            (body', body_fvs) = exprFV env' body
+            (bind', fvs, _) = binding env' body_fvs bind
+
+    argsFV :: Env -> [StgArg] -> DIdSet
+    argsFV env = mkFreeVarSet env . mapMaybe f
+      where
+        f (StgVarArg occ) = Just occ
+        f _               = Nothing
 
     bind_non_rec :: BVs -> (Id, StgRhs) -> FVs
     bind_non_rec bounds (_, r) =
@@ -111,6 +217,14 @@ annTopBindingsDeps this_mod bs = map top_bind bs
     alt :: BVs -> StgAlt -> FVs
     alt bounds (_, bndrs, e) =
       expr (extendVarSetList bounds bndrs) e
+
+    altFV :: Env -> StgAlt -> (CgStgAlt, DIdSet)
+    altFV env (con, bndrs, e) = ((con, bndrs, e'), fvs)
+      where
+        -- See Note [Tracking local binders]
+        (e', rhs_fvs) = exprFV (addLocals bndrs env) e
+        fvs = delDVarSetList rhs_fvs bndrs
+-}
 
 --------------------------------------------------------------------------------
 -- * Dependency sorting
