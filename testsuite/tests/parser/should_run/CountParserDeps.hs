@@ -56,7 +56,7 @@ parserDeps libdir =
     loop _ modules [] = return modules
 
     mkModule :: ModuleName -> Module
-    mkModule = Module (stringToUnitId "ghc")
+    mkModule = Module (stringToUnit "ghc")
 
     modDeps :: ModIface -> [ModuleName]
     modDeps mi = map fst $ dep_mods (mi_deps mi)
