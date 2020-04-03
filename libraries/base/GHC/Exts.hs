@@ -1,6 +1,7 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, DeriveDataTypeable,
-             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
+             DerivingStrategies, MultiParamTypeClasses, FlexibleInstances,
+             NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -173,9 +174,10 @@ traceEvent = Debug.Trace.traceEventIO
 -- entire ghc package at runtime
 
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving ( Data -- ^ @since 4.3.0.0
-                         , Eq   -- ^ @since 4.3.0.0
-                         )
+    deriving
+    stock ( Data -- ^ @since 4.3.0.0
+          , Eq   -- ^ @since 4.3.0.0
+          )
 
 
 {- **********************************************************************
