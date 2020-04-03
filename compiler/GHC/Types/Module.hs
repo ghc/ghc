@@ -38,7 +38,6 @@ module GHC.Types.Module
         unitIdFS,
         unitIdKey,
         InstantiatedUnit(..),
-        InstantiatedModule(..),
         instUnitToUnitId,
         instModuleToModule,
         InstalledUnitId(..),
@@ -92,6 +91,8 @@ module GHC.Types.Module
         -- * The Module type
         GenModule(..),
         type Module,
+        type InstalledModule,
+        type InstantiatedModule,
         pprModule,
         mkModule,
         mkHoleModule,
@@ -100,7 +101,6 @@ module GHC.Types.Module
         ContainsModule(..),
 
         -- * Installed unit ids and modules
-        InstalledModule(..),
         InstalledModuleEnv,
         installedModuleEq,
         installedUnitIdEq,
@@ -421,6 +421,13 @@ data GenModule unit = Module
 -- avoid having to make 'moduleUnit' a partial operation.)
 type Module = GenModule UnitId
 
+-- | A 'InstalledModule' is a 'Module' whose unit is identified with an
+-- 'InstalledUnitId'.
+type InstalledModule = GenModule InstalledUnitId
+
+-- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
+type InstantiatedModule = GenModule InstantiatedUnit
+
 -- | Calculate the free holes of a 'Module'.  If this set is non-empty,
 -- this module was defined in an indefinite library that had required
 -- signatures.
@@ -446,6 +453,14 @@ instance Uniquable Module where
 
 instance Outputable Module where
   ppr = pprModule
+
+instance Outputable InstalledModule where
+  ppr (Module p n) =
+    ppr p <> char ':' <> pprModuleName n
+
+instance Outputable InstantiatedModule where
+  ppr (Module uid m) =
+    ppr uid <> char ':' <> ppr m
 
 instance Binary a => Binary (GenModule a) where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
@@ -655,20 +670,10 @@ instUnitToUnitId pkgstate iuid =
     improveUnitId (unitInfoMap pkgstate) $
         InstUnit iuid
 
--- | An `InstantiatedModule` is a module which comes from an `InstantiatedUnit`.
-data InstantiatedModule = InstantiatedModule {
-        instModuleUnitId :: InstantiatedUnit,
-        instModuleName   :: ModuleName
-    } deriving (Eq, Ord)
-
-instance Outputable InstantiatedModule where
-  ppr (InstantiatedModule uid m) =
-    ppr uid <> char ':' <> ppr m
-
 -- | Injects an 'InstantiatedModule' to 'Module' (see also
 -- 'instUnitToUnitId'.
 instModuleToModule :: PackageState -> InstantiatedModule -> Module
-instModuleToModule pkgstate (InstantiatedModule iuid mod_name) =
+instModuleToModule pkgstate (Module iuid mod_name) =
     mkModule (instUnitToUnitId pkgstate iuid) mod_name
 
 -- | An installed unit identifier identifies a library which has
@@ -735,17 +740,6 @@ instance Outputable InstantiatedUnit where
      where
       cid   = instUnitInstanceOf uid
       insts = instUnitInsts uid
-
--- | A 'InstalledModule' is a 'Module' which contains a 'InstalledUnitId'.
-data InstalledModule = InstalledModule {
-   installedModuleUnitId :: !InstalledUnitId,
-   installedModuleName :: !ModuleName
-  }
-  deriving (Eq, Ord)
-
-instance Outputable InstalledModule where
-  ppr (InstalledModule p n) =
-    ppr p <> char ':' <> pprModuleName n
 
 fsToInstalledUnitId :: FastString -> InstalledUnitId
 fsToInstalledUnitId fs = InstalledUnitId fs
@@ -996,8 +990,8 @@ renameHoleUnitId' pkg_map env uid =
 splitModuleInsts :: Module -> (InstalledModule, Maybe InstantiatedModule)
 splitModuleInsts m =
     let (uid, mb_iuid) = splitUnitIdInsts (moduleUnit m)
-    in (InstalledModule uid (moduleName m),
-        fmap (\iuid -> InstantiatedModule iuid (moduleName m)) mb_iuid)
+    in (Module uid (moduleName m),
+        fmap (\iuid -> Module iuid (moduleName m)) mb_iuid)
 
 -- | See 'splitModuleInsts'.
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
@@ -1011,7 +1005,7 @@ generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
     newInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
 
 generalizeInstantiatedModule :: InstantiatedModule -> InstantiatedModule
-generalizeInstantiatedModule (InstantiatedModule uid n) = InstantiatedModule (generalizeInstantiatedUnit uid) n
+generalizeInstantiatedModule (Module uid n) = Module (generalizeInstantiatedUnit uid) n
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName

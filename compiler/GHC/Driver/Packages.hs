@@ -781,7 +781,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                 (_, Just indef) ->
                   let local = [ Map.singleton
                                   (moduleName mod)
-                                  (Set.singleton $ InstantiatedModule indef mod_name)
+                                  (Set.singleton $ Module indef mod_name)
                               | (mod_name, mod) <- instUnitInsts indef
                               , isHoleModule mod ]
                       recurse = [ collectHoles (moduleUnit mod)

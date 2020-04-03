@@ -648,7 +648,7 @@ computeInterface doc_str hi_boot_file mod0 = do
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
                     r <- liftIO $
-                        rnModIface hsc_env (instUnitInsts (instModuleUnitId indef))
+                        rnModIface hsc_env (instUnitInsts (moduleUnit indef))
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
@@ -674,7 +674,7 @@ moduleFreeHolesPrecise doc_str mod
  | otherwise =
    case splitModuleInsts mod of
     (imod, Just indef) -> do
-        let insts = instUnitInsts (instModuleUnitId indef)
+        let insts = instUnitInsts (moduleUnit indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
@@ -925,7 +925,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if installedModuleUnitId mod `installedUnitIdEq` thisPackage dflags &&
+                       if moduleUnit mod `installedUnitIdEq` thisPackage dflags &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
@@ -935,7 +935,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                        traceIf (text "...not found")
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
-                                           (installedModuleName mod) err))
+                                           (moduleName mod) err))
     where read_file file_path = do
               traceIf (text "readIFace" <+> text file_path)
               -- Figure out what is recorded in mi_module.  If this is
