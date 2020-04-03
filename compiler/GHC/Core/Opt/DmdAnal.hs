@@ -210,7 +210,7 @@ dmdAnal' env dmd (Lam var body)
           -- body_dmd: a demand to analyze the body
 
         (body_ty, body') = dmdAnal env body_dmd body
-        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
+        (lam_ty, var')   = annotateLamIdBndr env body_ty var
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
@@ -221,7 +221,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
-        (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
+        (alt_ty2, case_bndr_dmd) = findBndrDmd env alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
         fam_envs                 = ae_fam_envs env
         alt_ty3
@@ -290,7 +290,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
-    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
+    (body_ty', id_dmd) = findBndrDmd env body_ty id
     id'                = setIdDemandInfo id id_dmd
 
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
@@ -1025,16 +1025,15 @@ annotateBndr env dmd_ty var
   | isId var  = (dmd_ty', setIdDemandInfo var dmd)
   | otherwise = (dmd_ty, var)
   where
-    (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
+    (dmd_ty', dmd) = findBndrDmd env dmd_ty var
 
 annotateLamIdBndr :: AnalEnv
-                  -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
                   -> Id         -- Lambda binder
                   -> (DmdType,  -- Demand type of lambda
                       Id)       -- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun dmd_ty id
+annotateLamIdBndr env dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
@@ -1049,7 +1048,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
                              (unf_ty, _) = dmdAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
-    (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
+    (dmd_ty', dmd) = findBndrDmd env dmd_ty id
 
 deleteFVs :: DmdType -> [Var] -> DmdType
 deleteFVs (DmdType fvs dmds res) bndrs
@@ -1166,11 +1165,6 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 ************************************************************************
 -}
 
-type DFunFlag = Bool  -- indicates if the lambda being considered is in the
-                      -- sequence of lambdas at the top of the RHS of a dfun
-notArgOfDfun :: DFunFlag
-notArgOfDfun = False
-
 data AnalEnv
   = AE { ae_dflags :: DynFlags
        , ae_sigs   :: SigEnv
@@ -1235,13 +1229,13 @@ findBndrsDmds env dmd_ty bndrs
     go dmd_ty []  = (dmd_ty, [])
     go dmd_ty (b:bs)
       | isId b    = let (dmd_ty1, dmds) = go dmd_ty bs
-                        (dmd_ty2, dmd)  = findBndrDmd env False dmd_ty1 b
+                        (dmd_ty2, dmd)  = findBndrDmd env dmd_ty1 b
                     in (dmd_ty2, dmd : dmds)
       | otherwise = go dmd_ty bs
 
-findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type]
-findBndrDmd env arg_of_dfun dmd_ty id
+findBndrDmd :: AnalEnv -> DmdType -> Id -> (DmdType, Demand)
+-- See Note [Trimming a demand to a type] in GHC.Types.Demand
+findBndrDmd env dmd_ty id
   = (dmd_ty', dmd')
   where
     dmd' = strictify $
@@ -1288,7 +1282,7 @@ See #17758 for more background and perf numbers.
 
 The implementation is extremly simple: just make the strictness
 analyser strictify the demand on a dictionary binder in
-'findBndrDmd`.
+'findBndrDmd'.
 
 Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
