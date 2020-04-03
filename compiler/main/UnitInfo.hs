@@ -19,7 +19,7 @@ module UnitInfo (
         UnitInfo,
         toUnitInfo,
         GenericUnitInfo(..),
-        ComponentId(..),
+        IndefUnitId(..),
         PackageId(..),
         PackageName(..),
         Version(..),
@@ -46,7 +46,7 @@ import GHC.Types.Unique
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
 type UnitInfo = GenericUnitInfo
-                       ComponentId
+                       IndefUnitId
                        PackageId
                        PackageName
                        Module.InstalledUnitId
@@ -57,7 +57,7 @@ type UnitInfo = GenericUnitInfo
 toUnitInfo :: DbUnitInfo -> UnitInfo
 toUnitInfo = mapGenericUnitInfo
    mkUnitId'
-   mkComponentId'
+   mkIndefUnitId'
    mkPackageIdentifier'
    mkPackageName'
    mkModuleName'
@@ -67,9 +67,9 @@ toUnitInfo = mapGenericUnitInfo
      mkPackageName'       = PackageName     . mkFastStringByteString
      mkUnitId'            = InstalledUnitId . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
-     mkComponentId' cid   = ComponentId (mkFastStringByteString cid) Nothing
+     mkIndefUnitId' cid   = IndefUnitId (InstalledUnitId (mkFastStringByteString cid)) Nothing
      mkInstUnitId' i = case i of
-      DbInstUnitId cid insts -> newUnitId (mkComponentId' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)
       DbUnitId uid           -> DefUnit (DefUnitId (mkUnitId' uid))
      mkModule' m = case m of
        DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
@@ -155,12 +155,12 @@ installedUnitInfoId = unitId
 packageConfigId :: UnitInfo -> UnitId
 packageConfigId p =
     if unitIsIndefinite p
-        then newUnitId (unitInstanceOf p) (unitInstantiations p)
+        then mkInstUnit (unitInstanceOf p) (unitInstantiations p)
         else DefUnit (DefUnitId (unitId p))
 
 expandedUnitInfoId :: UnitInfo -> UnitId
 expandedUnitInfoId p =
-    newUnitId (unitInstanceOf p) (unitInstantiations p)
+    mkInstUnit (unitInstanceOf p) (unitInstantiations p)
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
