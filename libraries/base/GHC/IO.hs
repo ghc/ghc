@@ -1,11 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude
-           , BangPatterns
-           , RankNTypes
-           , MagicHash
-           , ScopedTypeVariables
-           , UnboxedTuples
-  #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -278,9 +279,10 @@ data MaskingState
       -- ^ the state during 'mask': asynchronous exceptions are masked, but blocking operations may still be interrupted
   | MaskedUninterruptible
       -- ^ the state during 'uninterruptibleMask': asynchronous exceptions are masked, and blocking operations may not be interrupted
- deriving ( Eq   -- ^ @since 4.3.0.0
-          , Show -- ^ @since 4.3.0.0
-          )
+  deriving
+  stock ( Eq   -- ^ @since 4.3.0.0
+        , Show -- ^ @since 4.3.0.0
+        )
 
 -- | Returns the 'MaskingState' for the current thread.
 getMaskingState :: IO MaskingState
