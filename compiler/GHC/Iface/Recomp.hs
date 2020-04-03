@@ -209,10 +209,10 @@ checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
-       -- readIface will have verified that the InstalledUnitId matches,
+       -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; if moduleUnitId (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
+       ; if moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -332,7 +332,7 @@ checkHsig mod_summary iface = do
     dflags <- getDynFlags
     let outer_mod = ms_mod mod_summary
         inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
+    MASSERT( moduleUnit outer_mod == thisPackage dflags )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -405,7 +405,7 @@ checkMergedSignatures mod_summary iface = do
         new_merged = case Map.lookup (ms_mod_name mod_summary)
                                      (requirementContext (pkgState dflags)) of
                         Nothing -> []
-                        Just r -> sort $ map (indefModuleToModule dflags) r
+                        Just r -> sort $ map (instModuleToModule (pkgState dflags)) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")
@@ -463,7 +463,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if toInstalledUnitId pkg `notElem` (map fst prev_dep_pkgs)
+           -> if toUnitId pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
@@ -471,7 +471,7 @@ checkDependencies hsc_env summary iface
                          return (RecompBecause reason)
                  else
                          return UpToDate
-           where pkg = moduleUnitId mod
+           where pkg = moduleUnit mod
         _otherwise  -> return (RecompBecause reason)
 
    old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods
@@ -561,7 +561,7 @@ getFromModIface doc_msg mod getter
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: UnitId -> Usage -> IfG RecompileRequired
+checkModUsage :: Unit -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }

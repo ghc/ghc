@@ -55,7 +55,7 @@ mkExtraObj dflags extn xs
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
                     ++ map (FileOption "-I")
-                            (unitIncludeDirs $ getPackageDetails dflags rtsUnitId)
+                            (unitIncludeDirs $ unsafeGetUnitInfo dflags rtsUnitId)
 
       -- When compiling assembler code, we drop the usual C options, and if the
       -- compiler is Clang, we add an extra argument to tell Clang to ignore
@@ -139,7 +139,7 @@ mkExtraObjToLinkIntoBinary dflags = do
 -- this was included as inline assembly in the main.c file but this
 -- is pretty fragile. gas gets upset trying to calculate relative offsets
 -- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> [InstalledUnitId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary :: DynFlags -> [UnitId] -> IO [FilePath]
 mkNoteObjsToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
 
@@ -166,7 +166,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 -- | Return the "link info" string
 --
 -- See Note [LinkInfo section]
-getLinkInfo :: DynFlags -> [InstalledUnitId] -> IO String
+getLinkInfo :: DynFlags -> [UnitId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
    pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
@@ -200,7 +200,7 @@ ghcLinkInfoNoteName = "GHC link info"
 
 -- Returns 'False' if it was, and we can avoid linking, because the
 -- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> [InstalledUnitId] -> FilePath -> IO Bool
+checkLinkInfo :: DynFlags -> [UnitId] -> FilePath -> IO Bool
 checkLinkInfo dflags pkg_deps exe_file
  | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
  -- ToDo: Windows and OS X do not use the ELF binary format, so

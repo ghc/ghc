@@ -211,7 +211,7 @@ data ShIfEnv = ShIfEnv {
         -- The semantic module that we are renaming to
         sh_if_semantic_module :: Module,
         -- Cached hole substitution, e.g.
-        -- @sh_if_hole_subst == listToUFM . unitIdInsts . moduleUnitId . sh_if_module@
+        -- @sh_if_hole_subst == listToUFM . unitIdInsts . moduleUnit . sh_if_module@
         sh_if_hole_subst :: ShHoleSubst,
         -- An optional name substitution to be applied when renaming
         -- the names in the interface.  If this is 'Nothing', then
