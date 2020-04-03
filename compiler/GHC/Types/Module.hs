@@ -34,9 +34,9 @@ module GHC.Types.Module
         unitIdFS,
         unitIdKey,
         InstantiatedUnit(..),
-        IndefModule(..),
-        indefUnitIdToUnitId,
-        indefModuleToModule,
+        InstantiatedModule(..),
+        instUnitToUnitId,
+        instModuleToModule,
         InstalledUnitId(..),
         toInstalledUnitId,
         ShHoleSubst,
@@ -63,7 +63,7 @@ module GHC.Types.Module
         splitModuleInsts,
         splitUnitIdInsts,
         generalizeInstantiatedUnit,
-        generalizeIndefModule,
+        generalizeInstantiatedModule,
 
         -- * Parsers
         parseModuleName,
@@ -171,7 +171,7 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, componentIdString, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState)
+import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, componentIdString, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -637,34 +637,39 @@ newInstantiatedUnit cid insts =
      fs = hashUnitId cid sorted_insts
      sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
 
--- | Injects an 'InstantiatedUnit' (indefinite library which
--- was on-the-fly instantiated) to a 'UnitId' (either
--- an indefinite or definite library).
-indefUnitIdToUnitId :: DynFlags -> InstantiatedUnit -> UnitId
-indefUnitIdToUnitId dflags iuid =
+-- | Check the database to see if we already have an installed unit that
+-- corresponds to the given 'InstantiatedUnit'.
+--
+-- Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged or
+-- references a matching installed unit.
+--
+-- See Note [UnitId to InstalledUnitId improvement]
+instUnitToUnitId :: PackageState -> InstantiatedUnit -> UnitId
+instUnitToUnitId pkgstate iuid =
     -- NB: suppose that we want to compare the indefinite
     -- unit id p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
     -- IndefiniteUnitId, they won't compare equal; only
     -- after improvement will the equality hold.
-    improveUnitId (getUnitInfoMap dflags) $
+    improveUnitId (unitInfoMap pkgstate) $
         IndefiniteUnitId iuid
 
-data IndefModule = IndefModule {
-        indefModuleUnitId :: InstantiatedUnit,
-        indefModuleName   :: ModuleName
+-- | An `InstantiatedModule` is a module which comes from an `InstantiatedUnit`.
+data InstantiatedModule = InstantiatedModule {
+        instModuleUnitId :: InstantiatedUnit,
+        instModuleName   :: ModuleName
     } deriving (Eq, Ord)
 
-instance Outputable IndefModule where
-  ppr (IndefModule uid m) =
+instance Outputable InstantiatedModule where
+  ppr (InstantiatedModule uid m) =
     ppr uid <> char ':' <> ppr m
 
--- | Injects an 'IndefModule' to 'Module' (see also
--- 'indefUnitIdToUnitId'.
-indefModuleToModule :: DynFlags -> IndefModule -> Module
-indefModuleToModule dflags (IndefModule iuid mod_name) =
-    mkModule (indefUnitIdToUnitId dflags iuid) mod_name
+-- | Injects an 'InstantiatedModule' to 'Module' (see also
+-- 'instUnitToUnitId'.
+instModuleToModule :: PackageState -> InstantiatedModule -> Module
+instModuleToModule pkgstate (InstantiatedModule iuid mod_name) =
+    mkModule (instUnitToUnitId pkgstate iuid) mod_name
 
 -- | An installed unit identifier identifies a library which has
 -- been installed to the package database.  These strings are
@@ -988,11 +993,11 @@ renameHoleUnitId' pkg_map env uid =
 -- a 'Module' that we definitely can find on-disk, as well as an
 -- instantiation if we need to instantiate it on the fly.  If the
 -- instantiation is @Nothing@ no on-the-fly renaming is needed.
-splitModuleInsts :: Module -> (InstalledModule, Maybe IndefModule)
+splitModuleInsts :: Module -> (InstalledModule, Maybe InstantiatedModule)
 splitModuleInsts m =
     let (uid, mb_iuid) = splitUnitIdInsts (moduleUnitId m)
     in (InstalledModule uid (moduleName m),
-        fmap (\iuid -> IndefModule iuid (moduleName m)) mb_iuid)
+        fmap (\iuid -> InstantiatedModule iuid (moduleName m)) mb_iuid)
 
 -- | See 'splitModuleInsts'.
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
@@ -1005,8 +1010,8 @@ generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
                                            , instUnitInsts = insts } =
     newInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
 
-generalizeIndefModule :: IndefModule -> IndefModule
-generalizeIndefModule (IndefModule uid n) = IndefModule (generalizeInstantiatedUnit uid) n
+generalizeInstantiatedModule :: InstantiatedModule -> InstantiatedModule
+generalizeInstantiatedModule (InstantiatedModule uid n) = InstantiatedModule (generalizeInstantiatedUnit uid) n
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName

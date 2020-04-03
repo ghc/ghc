@@ -25,7 +25,7 @@ import GHC.Driver.Backpack.Syntax
 
 import ApiAnnotation
 import GHC hiding (Failed, Succeeded)
-import GHC.Driver.Packages
+import GHC.Driver.Packages hiding (packageNameMap)
 import Parser
 import Lexer
 import GHC.Driver.Monad
