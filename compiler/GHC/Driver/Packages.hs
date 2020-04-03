@@ -27,7 +27,6 @@ module GHC.Driver.Packages (
         searchPackageId,
         getPackageDetails,
         getInstalledPackageDetails,
-        componentIdString,
         displayInstalledUnitId,
         listVisibleModuleNames,
         lookupModuleInAllPackages,
@@ -106,7 +105,6 @@ import qualified Data.Semigroup as Semigroup
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
-import Data.Version
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -2109,15 +2107,6 @@ missingDependencyMsg (Just parent)
 
 -- -----------------------------------------------------------------------------
 
-componentIdString :: ComponentId -> String
-componentIdString (ComponentId  raw Nothing)        = unpackFS raw
-componentIdString (ComponentId _raw (Just details)) =
-   case componentName details of
-     Nothing    -> componentSourcePkdId details
-     Just cname -> componentPackageName details
-                     ++ "-" ++ showVersion (componentPackageVersion details)
-                     ++ ":" ++ cname
-
 -- Cabal packages may contain several components (programs, libraries, etc.).
 -- As far as GHC is concerned, installed package components ("units") are
 -- identified by an opaque ComponentId string provided by Cabal. As the string
@@ -2137,11 +2126,10 @@ mkComponentId :: PackageState -> FastString -> ComponentId
 mkComponentId pkgstate raw =
     case lookupInstalledPackage pkgstate (InstalledUnitId raw) of
       Nothing -> ComponentId raw Nothing -- we didn't find the unit at all
-      Just c  -> ComponentId raw $ Just $ ComponentDetails
+      Just c  -> ComponentId raw $ Just $ UnitPprInfo
                                              (unitPackageNameString c)
                                              (unitPackageVersion c)
                                              ((unpackFS . unPackageName) <$> unitComponentName c)
-                                             (unitPackageIdString c)
 
 -- | Update component ID details from the database
 updateComponentId :: PackageState -> ComponentId -> ComponentId
