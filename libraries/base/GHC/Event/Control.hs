@@ -1,9 +1,9 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , ScopedTypeVariables
-           , BangPatterns
-  #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Event.Control
     (
@@ -57,9 +57,10 @@ data ControlMessage = CMsgWakeup
                     | CMsgDie
                     | CMsgSignal {-# UNPACK #-} !(ForeignPtr Word8)
                                  {-# UNPACK #-} !Signal
-    deriving ( Eq   -- ^ @since 4.4.0.0
-             , Show -- ^ @since 4.4.0.0
-             )
+    deriving
+    stock ( Eq   -- ^ @since 4.4.0.0
+          , Show -- ^ @since 4.4.0.0
+          )
 
 -- | The structure used to tell the IO manager thread what to do.
 data Control = W {

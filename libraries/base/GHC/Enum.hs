@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -193,7 +194,7 @@ predError inst_ty =
 ------------------------------------------------------------------------
 
 -- | @since 2.01
-deriving instance Bounded ()
+deriving stock instance Bounded ()
 
 -- | @since 2.01
 instance Enum () where
@@ -211,58 +212,58 @@ instance Enum () where
 
 -- Report requires instances up to 15
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b)
+deriving stock instance (Bounded a, Bounded b)
         => Bounded (a,b)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c)
+deriving stock instance (Bounded a, Bounded b, Bounded c)
         => Bounded (a,b,c)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d)
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d)
         => Bounded (a,b,c,d)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e)
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e)
         => Bounded (a,b,c,d,e)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f)
         => Bounded (a,b,c,d,e,f)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g)
         => Bounded (a,b,c,d,e,f,g)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h)
         => Bounded (a,b,c,d,e,f,g,h)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i)
         => Bounded (a,b,c,d,e,f,g,h,i)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j)
         => Bounded (a,b,c,d,e,f,g,h,i,j)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j, Bounded k)
         => Bounded (a,b,c,d,e,f,g,h,i,j,k)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j, Bounded k,
           Bounded l)
         => Bounded (a,b,c,d,e,f,g,h,i,j,k,l)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j, Bounded k,
           Bounded l, Bounded m)
         => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j, Bounded k,
           Bounded l, Bounded m, Bounded n)
         => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
 -- | @since 2.01
-deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
+deriving stock instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
           Bounded f, Bounded g, Bounded h, Bounded i, Bounded j, Bounded k,
           Bounded l, Bounded m, Bounded n, Bounded o)
         => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
@@ -272,7 +273,7 @@ deriving instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e,
 ------------------------------------------------------------------------
 
 -- | @since 2.01
-deriving instance Bounded Bool
+deriving stock instance Bounded Bool
 
 -- | @since 2.01
 instance Enum Bool where
@@ -298,7 +299,7 @@ instance Enum Bool where
 ------------------------------------------------------------------------
 
 -- | @since 2.01
-deriving instance Bounded Ordering
+deriving stock instance Bounded Ordering
 -- | @since 2.01
 instance Enum Ordering where
   succ LT = EQ
@@ -967,11 +968,11 @@ enumNegDeltaToNatural x0 ndelta lim = go x0
 -- Instances from GHC.Types
 
 -- | @since 4.10.0.0
-deriving instance Bounded VecCount
+deriving stock instance Bounded VecCount
 -- | @since 4.10.0.0
-deriving instance Enum VecCount
+deriving stock instance Enum VecCount
 
 -- | @since 4.10.0.0
-deriving instance Bounded VecElem
+deriving stock instance Bounded VecElem
 -- | @since 4.10.0.0
-deriving instance Enum VecElem
+deriving stock instance Enum VecElem

@@ -1,6 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
-             MagicHash, UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 #include "MachDeps.h"
@@ -165,23 +171,23 @@ appPrec1 = I# 11#       -- appPrec + 1
 --------------------------------------------------------------
 
 -- | @since 2.01
-deriving instance Show ()
+deriving stock instance Show ()
 
 -- | @since 2.01
-instance Show a => Show [a]  where
+instance Show a => Show [a] where
   {-# SPECIALISE instance Show [String] #-}
   {-# SPECIALISE instance Show [Char] #-}
   {-# SPECIALISE instance Show [Int] #-}
   showsPrec _         = showList
 
 -- | @since 2.01
-deriving instance Show Bool
+deriving stock instance Show Bool
 
 -- | @since 2.01
-deriving instance Show Ordering
+deriving stock instance Show Ordering
 
 -- | @since 2.01
-instance  Show Char  where
+instance Show Char where
     showsPrec _ '\'' = showString "'\\''"
     showsPrec _ c    = showChar '\'' . showLitChar c . showChar '\''
 
@@ -203,10 +209,10 @@ showWord w# cs
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
 
 -- | @since 2.01
-deriving instance Show a => Show (Maybe a)
+deriving stock instance Show a => Show (Maybe a)
 
 -- | @since 4.11.0.0
-deriving instance Show a => Show (NonEmpty a)
+deriving stock instance Show a => Show (NonEmpty a)
 
 -- | @since 2.01
 instance Show TyCon where
@@ -226,7 +232,7 @@ instance Show CallStack where
   showsPrec _ = shows . getCallStack
 
 -- | @since 4.9.0.0
-deriving instance Show SrcLoc
+deriving stock instance Show SrcLoc
 
 --------------------------------------------------------------
 -- Show instances for the first few tuple
@@ -596,13 +602,13 @@ instance Show KindRep where
       . showsPrec 11 q
 
 -- | @since 4.11.0.0
-deriving instance Show RuntimeRep
+deriving stock instance Show RuntimeRep
 
 -- | @since 4.11.0.0
-deriving instance Show VecCount
+deriving stock instance Show VecCount
 
 -- | @since 4.11.0.0
-deriving instance Show VecElem
+deriving stock instance Show VecElem
 
 -- | @since 4.11.0.0
-deriving instance Show TypeLitSort
+deriving stock instance Show TypeLitSort
