@@ -13,7 +13,7 @@ import Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.Var.Set
 import GHC.Types.Module (Module)
---import Util
+import Util
 
 --import Data.Maybe ( mapMaybe )
 
@@ -82,15 +82,15 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         -- See Note [Tracking local binders]
         (r', rhs_fvs, da_fvs) = rhs env body_fv bounds r
         fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
-    binding env body_fv bounds (StgRec pairs) =
-        ( undefined
-        , undefined
-        , undefined
+    binding env body_fv bounds (StgRec bindings) =
+        ( StgRec (zip bndrs rhss')
+        , delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
+        , unionVarSets da_fvss
         )
       where
-
-    bind_non_rec :: BVs -> (Id, StgRhs) -> FVs
-    bind_non_rec = undefined
+        (bndrs, rhss) = unzip bindings
+        bounds' = extendVarSetList bounds bndrs
+        (rhss', rhs_fvss, da_fvss) = mapAndUnzip3 (rhs env body_fv bounds') rhss
 
     rhs :: Env -> DIdSet -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
     rhs = undefined args expr
