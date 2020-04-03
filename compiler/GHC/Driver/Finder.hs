@@ -77,7 +77,7 @@ flushFinderCaches hsc_env =
  where
         this_pkg = thisPackage (hsc_dflags hsc_env)
         fc_ref = hsc_FC hsc_env
-        is_ext mod _ | not (installedModuleUnitId mod `installedUnitIdEq` this_pkg) = True
+        is_ext mod _ | not (moduleUnit mod `installedUnitIdEq` this_pkg) = True
                      | otherwise = False
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
@@ -136,8 +136,8 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if installedModuleUnitId mod `installedUnitIdEq` thisPackage dflags
-       then findInstalledHomeModule hsc_env (installedModuleName mod)
+    in if moduleUnit mod `installedUnitIdEq` thisPackage dflags
+       then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
 -- -----------------------------------------------------------------------------
@@ -247,7 +247,7 @@ modLocationCache hsc_env mod do_this = do
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
   let iuid = thisInstalledUnitId dflags
-  in InstalledModule iuid mod_name
+  in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
@@ -340,7 +340,7 @@ findPackageModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
-        pkg_id = installedModuleUnitId mod
+        pkg_id = moduleUnit mod
         pkgstate = pkgState dflags
   --
   case lookupInstalledPackage pkgstate pkg_id of
@@ -356,7 +356,7 @@ findPackageModule hsc_env mod = do
 -- for the appropriate config.
 findPackageModule_ :: HscEnv -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ hsc_env mod pkg_conf =
-  ASSERT2( installedModuleUnitId mod == installedUnitInfoId pkg_conf, ppr (installedModuleUnitId mod) <+> ppr (installedUnitInfoId pkg_conf) )
+  ASSERT2( moduleUnit mod == installedUnitInfoId pkg_conf, ppr (moduleUnit mod) <+> ppr (installedUnitInfoId pkg_conf) )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -382,7 +382,7 @@ findPackageModule_ hsc_env mod pkg_conf =
     [one] | MkDepend <- ghcMode dflags -> do
           -- there's only one place that this .hi file can be, so
           -- don't bother looking for it.
-          let basename = moduleNameSlashes (installedModuleName mod)
+          let basename = moduleNameSlashes (moduleName mod)
           loc <- mk_hi_loc one basename
           return (InstalledFound loc mod)
     _otherwise ->
@@ -414,7 +414,7 @@ searchPathExts paths mod exts
         return result
 
   where
-    basename = moduleNameSlashes (installedModuleName mod)
+    basename = moduleNameSlashes (moduleName mod)
 
     to_search :: [(FilePath, IO ModLocation)]
     to_search = [ (file, fn path basename)
@@ -425,7 +425,7 @@ searchPathExts paths mod exts
                       file = base <.> ext
                 ]
 
-    search [] = return (InstalledNotFound (map fst to_search) (Just (installedModuleUnitId mod)))
+    search [] = return (InstalledNotFound (map fst to_search) (Just (moduleUnit mod)))
 
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
