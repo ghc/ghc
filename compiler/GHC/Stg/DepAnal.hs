@@ -4,18 +4,18 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 
 import GhcPrelude
 
-import GHC.Core    ( Tickish(Breakpoint) )
+--import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Stg.Syntax
 import GHC.Types.Id
-import GHC.Types.Name (Name, nameIsLocalOrFrom)
+import GHC.Types.Name (Name) --, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
 import Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.Var.Set
 import GHC.Types.Module (Module)
-import Util
+--import Util
 
-import Data.Maybe ( mapMaybe )
+--import Data.Maybe ( mapMaybe )
 
 import Data.Graph (SCC (..))
 
@@ -38,6 +38,7 @@ newtype Env
 emptyEnv :: Env
 emptyEnv = Env emptyVarSet
 
+{-
 addLocals :: [Id] -> Env -> Env
 addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
@@ -49,6 +50,7 @@ mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
 boundIds :: StgBinding -> [Id]
 boundIds (StgNonRec b _) = [b]
 boundIds (StgRec pairs)  = map fst pairs
+-}
 
 -- | Dependency analysis and free variable annotations on STG terms.
 --
@@ -74,13 +76,27 @@ annTopBindingsDeps this_mod bs = map top_bind bs
        (bs', _dIdSet, fvs) = binding emptyEnv emptyDVarSet emptyVarSet bs
 
     binding :: Env -> DIdSet -> BVs -> StgBinding -> (CgStgBinding, DIdSet, FVs)
-    binding = undefined rhs
+    binding env body_fv bounds (StgNonRec bndr r) =
+        (StgNonRec bndr r', fvs, da_fvs)
+      where
+        -- See Note [Tracking local binders]
+        (r', rhs_fvs, da_fvs) = rhs env body_fv bounds r
+        fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
+    binding env body_fv bounds (StgRec pairs) =
+        ( undefined
+        , undefined
+        , undefined
+        )
+      where
 
-    rhs :: Env -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
+    bind_non_rec :: BVs -> (Id, StgRhs) -> FVs
+    bind_non_rec = undefined
+
+    rhs :: Env -> DIdSet -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
     rhs = undefined args expr
 
-    expr :: Env -> DIdSet -> BVs -> StgExpr -> (CgStgBinding, DIdSet, FVs)
-    expr = undefined alts var expr
+    expr :: Env -> DIdSet -> BVs -> StgExpr -> (CgStgExpr, DIdSet, FVs)
+    expr = undefined alts var expr binding
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
     alts = undefined expr
@@ -92,14 +108,6 @@ annTopBindingsDeps this_mod bs = map top_bind bs
     var = undefined this_mod
 
 {-
-    binding :: Env -> DIdSet -> BVs -> StgBinding -> (CgStgBinding, DIdSet, FVs)
-    binding env body_fv bounds (StgNonRec bndr r) =
-        (StgNonRec bndr r', fvs, rhs bounds r)
-      where
-        -- See Note [Tracking local binders]
-        (r', rhs_fvs) = rhsFV env r
-        fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
-
     binding env body_fv bounds (StgRec pairs) =
       ( StgRec pairs'
       , fvs
