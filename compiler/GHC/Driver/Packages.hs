@@ -1132,8 +1132,8 @@ upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap
 upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
 upd_wired_in_uid wiredInMap (DefiniteUnitId def_uid) =
     DefiniteUnitId (upd_wired_in wiredInMap def_uid)
-upd_wired_in_uid wiredInMap (IndefiniteUnitId indef_uid) =
-    IndefiniteUnitId $ newInstantiatedUnit
+upd_wired_in_uid wiredInMap (InstUnit indef_uid) =
+    InstUnit $ newInstantiatedUnit
         (instUnitInstanceOf indef_uid)
         (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 

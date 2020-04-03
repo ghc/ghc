@@ -552,18 +552,18 @@ instance Outputable ComponentId where
 -- However, when we are typechecking a library with missing holes,
 -- we may need to instantiate a library on the fly (in which case
 -- we don't have any on-disk representation.)  In that case, you
--- have an 'IndefiniteUnitId', which explicitly records the
+-- have an 'InstUnit', which explicitly records the
 -- instantiation, so that we can substitute over it.
 data UnitId
-    = IndefiniteUnitId {-# UNPACK #-} !InstantiatedUnit
+    = InstUnit {-# UNPACK #-} !InstantiatedUnit
     |   DefiniteUnitId {-# UNPACK #-} !DefUnitId
 
 unitIdFS :: UnitId -> FastString
-unitIdFS (IndefiniteUnitId x) = instUnitIdFS x
+unitIdFS (InstUnit x) = instUnitIdFS x
 unitIdFS (DefiniteUnitId (DefUnitId x)) = installedUnitIdFS x
 
 unitIdKey :: UnitId -> Unique
-unitIdKey (IndefiniteUnitId x) = instUnitIdKey x
+unitIdKey (InstUnit x) = instUnitIdKey x
 unitIdKey (DefiniteUnitId (DefUnitId x)) = installedUnitIdKey x
 
 -- | A dynamically instantiated unit.
@@ -650,10 +650,10 @@ instUnitToUnitId pkgstate iuid =
     -- unit id p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
-    -- IndefiniteUnitId, they won't compare equal; only
+    -- InstUnit, they won't compare equal; only
     -- after improvement will the equality hold.
     improveUnitId (unitInfoMap pkgstate) $
-        IndefiniteUnitId iuid
+        InstUnit iuid
 
 -- | An `InstantiatedModule` is a module which comes from an `InstantiatedUnit`.
 data InstantiatedModule = InstantiatedModule {
@@ -715,7 +715,7 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 -- | Lossy conversion to the on-disk 'InstalledUnitId' for a component.
 toInstalledUnitId :: UnitId -> InstalledUnitId
 toInstalledUnitId (DefiniteUnitId (DefUnitId iuid)) = iuid
-toInstalledUnitId (IndefiniteUnitId indef) =
+toInstalledUnitId (InstUnit indef) =
     componentIdToInstalledUnitId (instUnitInstanceOf indef)
 
 installedUnitIdString :: InstalledUnitId -> String
@@ -826,7 +826,7 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 
 -- | Retrieve the set of free holes of a 'UnitId'.
 unitIdFreeHoles :: UnitId -> UniqDSet ModuleName
-unitIdFreeHoles (IndefiniteUnitId x) = instUnitHoles x
+unitIdFreeHoles (InstUnit x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
 unitIdFreeHoles (DefiniteUnitId _) = emptyUniqDSet
 
@@ -869,11 +869,11 @@ fingerprintUnitId prefix (Fingerprint a b)
 -- | Create a new, un-hashed unit identifier.
 newUnitId :: ComponentId -> [(ModuleName, Module)] -> UnitId
 newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug...
-newUnitId cid insts = IndefiniteUnitId $ newInstantiatedUnit cid insts
+newUnitId cid insts = InstUnit $ newInstantiatedUnit cid insts
 
 pprUnitId :: UnitId -> SDoc
 pprUnitId (DefiniteUnitId uid) = ppr uid
-pprUnitId (IndefiniteUnitId uid) = ppr uid
+pprUnitId (InstUnit uid) = ppr uid
 
 instance Eq UnitId where
   uid1 == uid2 = unitIdKey uid1 == unitIdKey uid2
@@ -905,13 +905,13 @@ instance Binary UnitId where
   put_ bh (DefiniteUnitId def_uid) = do
     putByte bh 0
     put_ bh def_uid
-  put_ bh (IndefiniteUnitId indef_uid) = do
+  put_ bh (InstUnit indef_uid) = do
     putByte bh 1
     put_ bh indef_uid
   get bh = do b <- getByte bh
               case b of
                 0 -> fmap DefiniteUnitId   (get bh)
-                _ -> fmap IndefiniteUnitId (get bh)
+                _ -> fmap InstUnit (get bh)
 
 instance Binary ComponentId where
   put_ bh (ComponentId fs _) = put_ bh fs
@@ -974,7 +974,7 @@ renameHoleModule' pkg_map env m
 renameHoleUnitId' :: UnitInfoMap -> ShHoleSubst -> UnitId -> UnitId
 renameHoleUnitId' pkg_map env uid =
     case uid of
-      (IndefiniteUnitId
+      (InstUnit
         InstantiatedUnit{ instUnitInstanceOf = cid
                         , instUnitInsts      = insts
                         , instUnitHoles      = fh })
@@ -1001,7 +1001,7 @@ splitModuleInsts m =
 
 -- | See 'splitModuleInsts'.
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
-splitUnitIdInsts (IndefiniteUnitId iuid) =
+splitUnitIdInsts (InstUnit iuid) =
     (componentIdToInstalledUnitId (instUnitInstanceOf iuid), Just iuid)
 splitUnitIdInsts (DefiniteUnitId (DefUnitId uid)) = (uid, Nothing)
 

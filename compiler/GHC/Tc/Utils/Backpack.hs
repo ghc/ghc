@@ -272,7 +272,7 @@ findExtraSigImports' hsc_env HsigFile modname =
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
-                (mkModule (IndefiniteUnitId iuid) mod_name)))
+                (mkModule (InstUnit iuid) mod_name)))
   where
     pkgstate = pkgState (hsc_dflags hsc_env)
     reqs = requirementMerges pkgstate modname
@@ -548,7 +548,7 @@ mergeSignatures
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(InstantiatedModule iuid mod_name) ->
-        let m = mkModule (IndefiniteUnitId iuid) mod_name
+        let m = mkModule (InstUnit iuid) mod_name
             im = fst (splitModuleInsts m)
         in fmap fst
          . withException
@@ -570,7 +570,7 @@ mergeSignatures
         gen_subst (nsubst,oks,ifaces) (imod@(InstantiatedModule iuid _), ireq_iface) = do
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
-                    let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
+                    let inst_uid = fst (splitUnitIdInsts (InstUnit iuid))
                         pkg = getInstalledPackageDetails pkgstate inst_uid
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
@@ -954,7 +954,7 @@ checkImplements impl_mod req_mod@(InstantiatedModule uid mod_name) =
     -- the ORIGINAL signature.  We are going to eventually rename it,
     -- but we must proceed slowly, because it is NOT known if the
     -- instantiation is correct.
-    let sig_mod = mkModule (IndefiniteUnitId uid) mod_name
+    let sig_mod = mkModule (InstUnit uid) mod_name
         isig_mod = fst (splitModuleInsts sig_mod)
     mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod False
     isig_iface <- case mb_isig_iface of
