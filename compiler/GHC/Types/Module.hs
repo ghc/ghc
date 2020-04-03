@@ -571,15 +571,15 @@ instance Outputable ComponentId where
 -- instantiation, so that we can substitute over it.
 data UnitId
     = InstUnit {-# UNPACK #-} !InstantiatedUnit
-    | UnitId   {-# UNPACK #-} !DefUnitId        -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
+    | DefUnit  {-# UNPACK #-} !DefUnitId        -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
 
 unitIdFS :: UnitId -> FastString
 unitIdFS (InstUnit x) = instUnitIdFS x
-unitIdFS (UnitId (DefUnitId x)) = installedUnitIdFS x
+unitIdFS (DefUnit (DefUnitId x)) = installedUnitIdFS x
 
 unitIdKey :: UnitId -> Unique
 unitIdKey (InstUnit x) = instUnitIdKey x
-unitIdKey (UnitId (DefUnitId x)) = installedUnitIdKey x
+unitIdKey (DefUnit (DefUnitId x)) = installedUnitIdKey x
 
 -- | A dynamically instantiated unit.
 --
@@ -719,7 +719,7 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 
 -- | Lossy conversion to the on-disk 'InstalledUnitId' for a component.
 toInstalledUnitId :: UnitId -> InstalledUnitId
-toInstalledUnitId (UnitId (DefUnitId iuid)) = iuid
+toInstalledUnitId (DefUnit (DefUnitId iuid)) = iuid
 toInstalledUnitId (InstUnit indef) =
     componentIdToInstalledUnitId (instUnitInstanceOf indef)
 
@@ -822,7 +822,7 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 unitIdFreeHoles :: UnitId -> UniqDSet ModuleName
 unitIdFreeHoles (InstUnit x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
-unitIdFreeHoles (UnitId _) = emptyUniqDSet
+unitIdFreeHoles (DefUnit _) = emptyUniqDSet
 
 instance Show UnitId where
     show = unitIdString
@@ -866,7 +866,7 @@ newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug..
 newUnitId cid insts = InstUnit $ newInstantiatedUnit cid insts
 
 pprUnitId :: UnitId -> SDoc
-pprUnitId (UnitId uid) = ppr uid
+pprUnitId (DefUnit uid) = ppr uid
 pprUnitId (InstUnit uid) = ppr uid
 
 instance Eq UnitId where
@@ -896,7 +896,7 @@ instance Outputable UnitId where
 
 -- Performance: would prefer to have a NameCache like thing
 instance Binary UnitId where
-  put_ bh (UnitId def_uid) = do
+  put_ bh (DefUnit def_uid) = do
     putByte bh 0
     put_ bh def_uid
   put_ bh (InstUnit indef_uid) = do
@@ -904,7 +904,7 @@ instance Binary UnitId where
     put_ bh indef_uid
   get bh = do b <- getByte bh
               case b of
-                0 -> fmap UnitId   (get bh)
+                0 -> fmap DefUnit  (get bh)
                 _ -> fmap InstUnit (get bh)
 
 instance Binary ComponentId where
@@ -918,7 +918,7 @@ newSimpleUnitId (ComponentId fs _) = fsToUnitId fs
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnitId :: FastString -> UnitId
-fsToUnitId = UnitId . DefUnitId . InstalledUnitId
+fsToUnitId = DefUnit . DefUnitId . InstalledUnitId
 
 stringToUnitId :: String -> UnitId
 stringToUnitId = fsToUnitId . mkFastString
@@ -997,7 +997,7 @@ splitModuleInsts m =
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
 splitUnitIdInsts (InstUnit iuid) =
     (componentIdToInstalledUnitId (instUnitInstanceOf iuid), Just iuid)
-splitUnitIdInsts (UnitId (DefUnitId uid)) = (uid, Nothing)
+splitUnitIdInsts (DefUnit (DefUnitId uid)) = (uid, Nothing)
 
 generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
 generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
