@@ -38,11 +38,11 @@ newtype Env
 emptyEnv :: Env
 emptyEnv = Env emptyVarSet
 
-{-
 addLocals :: [Id] -> Env -> Env
 addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
 
+{-
 -- | This makes sure that only local, non-global free vars make it into the set.
 mkFreeVarSet :: Env -> [Id] -> DIdSet
 mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
@@ -80,7 +80,7 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         (StgNonRec bndr r', fvs, da_fvs)
       where
         -- See Note [Tracking local binders]
-        (r', rhs_fvs, da_fvs) = rhs env body_fv bounds r
+        (r', rhs_fvs, da_fvs) = rhs env bounds r
         fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
     binding env body_fv bounds (StgRec bindings) =
         ( StgRec (zip bndrs rhss')
@@ -90,12 +90,26 @@ annTopBindingsDeps this_mod bs = map top_bind bs
       where
         (bndrs, rhss) = unzip bindings
         bounds' = extendVarSetList bounds bndrs
-        (rhss', rhs_fvss, da_fvss) = mapAndUnzip3 (rhs env body_fv bounds') rhss
+        (rhss', rhs_fvss, da_fvss) = mapAndUnzip3 (rhs env bounds') rhss
 
-    rhs :: Env -> DIdSet -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
-    rhs = undefined args expr
+    rhs :: Env -> BVs -> StgRhs -> (CgStgRhs, DIdSet, FVs)
+    rhs env bounds (StgRhsClosure _ ccs uf bndrs body) =
+        ( StgRhsClosure fvs ccs uf bndrs body'
+        , fvs
+        , da_fvs
+        )
+      where
+        (body', body_fvs, da_fvs) = expr (addLocals bndrs env) (extendVarSetList bounds bndrs) body
+        fvs = delDVarSetList body_fvs bndrs
+    rhs env bounds (StgRhsCon ccs dc as) =
+        ( StgRhsCon ccs dc as
+        , fvs
+        , da_fvs
+        )
+      where
+        (fvs, da_fvs) = args env bounds as
 
-    expr :: Env -> DIdSet -> BVs -> StgExpr -> (CgStgExpr, DIdSet, FVs)
+    expr :: Env -> BVs -> StgExpr -> (CgStgExpr, DIdSet, FVs)
     expr = undefined alts var expr binding
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
