@@ -355,7 +355,7 @@ warnUnusedPackages = do
         realUnitId :: DynFlags -> UnitInfo -> UnitId
         realUnitId dflags
           = unwireUnitId dflags
-          . DefiniteUnitId
+          . DefUnit
           . DefUnitId
           . installedUnitInfoId
 

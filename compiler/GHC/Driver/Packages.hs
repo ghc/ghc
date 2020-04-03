@@ -897,7 +897,7 @@ matchingId uid p = uid == installedUnitInfoId p
 
 matching :: PackageArg -> UnitInfo -> Bool
 matching (PackageArg str) = matchingStr str
-matching (UnitIdArg (DefiniteUnitId (DefUnitId uid)))  = matchingId uid
+matching (UnitIdArg (DefUnit (DefUnitId uid)))  = matchingId uid
 matching (UnitIdArg _)  = \_ -> False -- TODO: warn in this case
 
 -- | This sorts a list of packages, putting "preferred" packages first.
@@ -1130,8 +1130,8 @@ upd_wired_in_mod :: WiredPackagesMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
 
 upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
-upd_wired_in_uid wiredInMap (DefiniteUnitId def_uid) =
-    DefiniteUnitId (upd_wired_in wiredInMap def_uid)
+upd_wired_in_uid wiredInMap (DefUnit def_uid) =
+    DefUnit (upd_wired_in wiredInMap def_uid)
 upd_wired_in_uid wiredInMap (InstUnit indef_uid) =
     InstUnit $ newInstantiatedUnit
         (instUnitInstanceOf indef_uid)
@@ -1144,10 +1144,10 @@ upd_wired_in wiredInMap key
 
 updateVisibilityMap :: WiredPackagesMap -> VisibilityMap -> VisibilityMap
 updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
-  where f vm (from, to) = case Map.lookup (DefiniteUnitId from) vis_map of
+  where f vm (from, to) = case Map.lookup (DefUnit from) vis_map of
                     Nothing -> vm
-                    Just r -> Map.insert (DefiniteUnitId to) r
-                                (Map.delete (DefiniteUnitId from) vm)
+                    Just r -> Map.insert (DefUnit to) r
+                                (Map.delete (DefUnit from) vm)
 
 
 -- ----------------------------------------------------------------------------
@@ -1648,8 +1648,8 @@ mkPackageState dflags dbs preload0 = do
 -- | Given a wired-in 'UnitId', "unwire" it into the 'UnitId'
 -- that it was recorded as in the package database.
 unwireUnitId :: DynFlags -> UnitId -> UnitId
-unwireUnitId dflags uid@(DefiniteUnitId def_uid) =
-    maybe uid DefiniteUnitId (Map.lookup def_uid (unwireMap (pkgState dflags)))
+unwireUnitId dflags uid@(DefUnit def_uid) =
+    maybe uid DefUnit (Map.lookup def_uid (unwireMap (pkgState dflags)))
 unwireUnitId _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -2226,7 +2226,7 @@ fsPackageName info = fs
 -- | Given a fully instantiated 'UnitId', improve it into a
 -- 'InstalledUnitId' if we can find it in the package database.
 improveUnitId :: UnitInfoMap -> UnitId -> UnitId
-improveUnitId _ uid@(DefiniteUnitId _) = uid -- short circuit
+improveUnitId _ uid@(DefUnit _) = uid -- short circuit
 improveUnitId pkg_map uid =
     -- Do NOT lookup indefinite ones, they won't be useful!
     case lookupUnit' False pkg_map uid of
