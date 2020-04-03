@@ -33,7 +33,7 @@ module GHC.Types.Module
 
         -- * The UnitId type
         ComponentId(..),
-        ComponentDetails(..),
+        UnitPprInfo(..),
         UnitId(..),
         unitIdFS,
         unitIdKey,
@@ -175,7 +175,7 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, componentIdString, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState, PackageState, unitInfoMap)
+import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -519,8 +519,8 @@ class HasModule m where
 -- within a package.  When a package only has one component, the 'ComponentId'
 -- coincides with the 'InstalledPackageId'
 data ComponentId = ComponentId
-   { componentIdRaw     :: FastString             -- ^ Raw
-   , componentIdDetails :: Maybe ComponentDetails -- ^ Cache of component details retrieved from the DB
+   { componentIdRaw     :: FastString        -- ^ Unit id
+   , componentIdDetails :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
 
 instance Eq ComponentId where
@@ -529,22 +529,37 @@ instance Eq ComponentId where
 instance Ord ComponentId where
    compare a b = compare (componentIdRaw a) (componentIdRaw b)
 
-data ComponentDetails = ComponentDetails
-   { componentPackageName    :: String
-   , componentPackageVersion :: Version
-   , componentName           :: Maybe String
-   , componentSourcePkdId    :: String
+-- | Subset of UnitInfo: just enough to pretty-print a unit-id
+--
+-- Instead of printing the unit-id which may contain a hash, we print:
+--    package-version:componentname
+--
+data UnitPprInfo = UnitPprInfo
+   { unitPprPackageName    :: String       -- ^ Source package name
+   , unitPprPackageVersion :: Version      -- ^ Source package version
+   , unitPprComponentName  :: Maybe String -- ^ Component name
    }
+
+instance Outputable UnitPprInfo where
+  ppr pprinfo = text $ mconcat
+      [ unitPprPackageName pprinfo
+      , "-" ++ showVersion (unitPprPackageVersion pprinfo)
+      , case unitPprComponentName pprinfo of
+         Nothing    -> ""
+         Just cname -> ":" ++ cname
+      ]
+
 
 instance Uniquable ComponentId where
   getUnique (ComponentId n _) = getUnique n
 
 instance Outputable ComponentId where
-  ppr cid@(ComponentId fs _) =
+  ppr (ComponentId fs Nothing)        = ftext fs
+  ppr (ComponentId fs (Just pprinfo)) =
     getPprStyle $ \sty ->
       if debugStyle sty
          then ftext fs
-         else text (componentIdString cid)
+         else ppr pprinfo
 
 
 
