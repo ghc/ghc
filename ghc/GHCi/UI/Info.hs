@@ -190,7 +190,7 @@ resolveNameFromModule infos name = do
      modL <- maybe (throwE $ "No module for" <+> ppr name) return $
              nameModule_maybe name
 
-     info <- maybe (throwE (ppr (moduleUnitId modL) <> ":" <>
+     info <- maybe (throwE (ppr (moduleUnit modL) <> ":" <>
                             ppr modL)) return $
              M.lookup (moduleName modL) infos
 

@@ -4037,7 +4037,7 @@ checkValidDataCon dflags existential_ok tc con
       -- when we actually fill in the abstract type.  As such, don't
       -- warn in this case (it gives users the wrong idea about whether
       -- or not UNPACK on abstract types is supported; it is!)
-      , unitIdIsDefinite (thisPackage dflags)
+      , unitIsDefinite (thisPackage dflags)
       = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
       where
         is_strict = case strict_mark of

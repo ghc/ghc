@@ -57,7 +57,7 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
                   hsc_dynLinker, hsc_interp )
 import GHC.Types.Module
 import GHC.Types.Name
-import GHC.Driver.Packages ( unitIsTrusted, getPackageDetails, getInstalledPackageDetails,
+import GHC.Driver.Packages ( unitIsTrusted, unsafeGetUnitInfo, getInstalledPackageDetails,
                              listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
@@ -2340,8 +2340,8 @@ isSafeModule m = do
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | thisPackage dflags == moduleUnitId md = True
-        | otherwise = unitIsTrusted $ getPackageDetails dflags (moduleUnitId md)
+        | thisPackage dflags == moduleUnit md = True
+        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
@@ -4185,7 +4185,7 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isHomeModule :: Module -> Bool
-isHomeModule m = GHC.moduleUnitId m == mainUnitId
+isHomeModule m = GHC.moduleUnit m == mainUnitId
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
@@ -4209,7 +4209,7 @@ wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
    dflags <- getDynFlags
-   when (GHC.moduleUnitId modl /= thisPackage dflags) $
+   when (GHC.moduleUnit modl /= thisPackage dflags) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $
