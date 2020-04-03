@@ -32,7 +32,7 @@ module GHC.Types.Module
         stableModuleNameCmp,
 
         -- * The UnitId type
-        ComponentId(..),
+        IndefUnitId(..),
         UnitPprInfo(..),
         UnitId(..),
         unitIdFS,
@@ -48,9 +48,8 @@ module GHC.Types.Module
         unitIdString,
         unitIdFreeHoles,
 
-        newUnitId,
-        newInstantiatedUnit,
-        newSimpleUnitId,
+        mkInstUnit,
+        mkInstantiatedUnit,
         hashUnitId,
         fsToUnitId,
         stringToUnitId,
@@ -71,7 +70,7 @@ module GHC.Types.Module
         -- * Parsers
         parseModuleName,
         parseUnitId,
-        parseComponentId,
+        parseIndefUnitId,
         parseModuleId,
         parseModSubst,
 
@@ -106,7 +105,6 @@ module GHC.Types.Module
         installedUnitIdEq,
         installedUnitIdString,
         fsToInstalledUnitId,
-        componentIdToInstalledUnitId,
         stringToInstalledUnitId,
         emptyInstalledModuleEnv,
         lookupInstalledModuleEnv,
@@ -186,22 +184,22 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, UnitInfoMap, getUnitIn
 --
 -- THE IMPORTANT ONES
 --
--- ComponentId: An opaque identifier provided by Cabal, which should
+-- IndefUnitId: An opaque identifier provided by Cabal, which should
 -- uniquely identify such things as the package name, the package
 -- version, the name of the component, the hash of the source code
 -- tarball, the selected Cabal flags, GHC flags, direct dependencies of
 -- the component.  These are very similar to InstalledPackageId, but
 -- an 'InstalledPackageId' implies that it identifies a package, while
 -- a package may install multiple components with different
--- 'ComponentId's.
---      - Same as Distribution.Package.ComponentId
+-- 'IndefUnitId's.
+--      - Same as Distribution.Package.IndefUnitId
 --
--- UnitId/InstalledUnitId: A ComponentId + a mapping from hole names
+-- UnitId/InstalledUnitId: A IndefUnitId + a mapping from hole names
 -- (ModuleName) to Modules.  This is how the compiler identifies instantiated
 -- components, and also is the main identifier by which GHC identifies things.
---      - When Backpack is not being used, UnitId = ComponentId.
+--      - When Backpack is not being used, UnitId = IndefUnitId.
 --        this means a useful fiction for end-users is that there are
---        only ever ComponentIds, and some ComponentIds happen to have
+--        only ever IndefUnitIds, and some IndefUnitIds happen to have
 --        more information (UnitIds).
 --      - Same as Language.Haskell.TH.Syntax:PkgName, see
 --          https://gitlab.haskell.org/ghc/ghc/issues/10279
@@ -233,10 +231,10 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnitId, UnitInfoMap, getUnitIn
 --
 -- LEGACY ONES
 --
--- InstalledPackageId: This is what we used to call ComponentId.
+-- InstalledPackageId: This is what we used to call IndefUnitId.
 -- It's a still pretty useful concept for packages that have only
 -- one library; in that case the logical InstalledPackageId =
--- ComponentId.  Also, the Cabal nix-local-build continues to
+-- IndefUnitId.  Also, the Cabal nix-local-build continues to
 -- compute an InstalledPackageId which is then forcibly used
 -- for all components in a package.  This means that if a dependency
 -- from one component in a package changes, the InstalledPackageId
@@ -502,32 +500,23 @@ class ContainsModule t where
 class HasModule m where
     getModule :: m Module
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{ComponentId}
-*                                                                      *
-************************************************************************
--}
 
--- | A 'ComponentId' consists of the package name, package version, component
--- ID, the transitive dependencies of the component, and other information to
--- uniquely identify the source code and build configuration of a component.
---
--- This used to be known as an 'InstalledPackageId', but a package can contain
--- multiple components and a 'ComponentId' uniquely identifies a component
--- within a package.  When a package only has one component, the 'ComponentId'
--- coincides with the 'InstalledPackageId'
-data ComponentId = ComponentId
-   { componentIdRaw     :: FastString        -- ^ Unit id
-   , componentIdDetails :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
+-----------------------------------------------------------------------
+-- IndefUnitId
+-----------------------------------------------------------------------
+
+-- | An 'IndefUnitId' is an 'InstalledUnitId' with the invariant that it only
+-- refers to an indefinite library; i.e., one that can be instantiated.
+data IndefUnitId = IndefUnitId
+   { indefUnitId        :: InstalledUnitId   -- ^ Unit id
+   , indefUnitIdPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
 
-instance Eq ComponentId where
-   a == b = componentIdRaw a == componentIdRaw b
+instance Eq IndefUnitId where
+   a == b = indefUnitId a == indefUnitId b
 
-instance Ord ComponentId where
-   compare a b = compare (componentIdRaw a) (componentIdRaw b)
+instance Ord IndefUnitId where
+   compare a b = compare (indefUnitId a) (indefUnitId b)
 
 -- | Subset of UnitInfo: just enough to pretty-print a unit-id
 --
@@ -550,15 +539,15 @@ instance Outputable UnitPprInfo where
       ]
 
 
-instance Uniquable ComponentId where
-  getUnique (ComponentId n _) = getUnique n
+instance Uniquable IndefUnitId where
+  getUnique (IndefUnitId n _) = getUnique n
 
-instance Outputable ComponentId where
-  ppr (ComponentId fs Nothing)        = ftext fs
-  ppr (ComponentId fs (Just pprinfo)) =
+instance Outputable IndefUnitId where
+  ppr (IndefUnitId uid Nothing)        = ppr uid
+  ppr (IndefUnitId uid (Just pprinfo)) =
     getPprStyle $ \sty ->
       if debugStyle sty
-         then ftext fs
+         then ppr uid
          else ppr pprinfo
 
 
@@ -608,7 +597,7 @@ unitIdKey (DefUnit (DefUnitId x)) = installedUnitIdKey x
 -- installed units: see Note [UnitId to InstalledUnitId improvement].
 --
 -- An indefinite unit identifier pretty-prints to something like
--- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'ComponentId', and the
+-- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'IndefUnitId', and the
 -- brackets enclose the module substitution).
 data InstantiatedUnit
     = InstantiatedUnit {
@@ -621,7 +610,7 @@ data InstantiatedUnit
         instUnitIdKey :: Unique,
         -- | The component identity of the indefinite library that
         -- is being instantiated.
-        instUnitInstanceOf :: !ComponentId,
+        instUnitInstanceOf :: !IndefUnitId,
         -- | The sorted (by 'ModuleName') instantiations of this library.
         instUnitInsts :: ![(ModuleName, Module)],
         -- | A cache of the free module variables of 'unitIdInsts'.
@@ -654,8 +643,8 @@ instance Binary InstantiatedUnit where
            }
 
 -- | Create a new 'InstantiatedUnit' given an explicit module substitution.
-newInstantiatedUnit :: ComponentId -> [(ModuleName, Module)] -> InstantiatedUnit
-newInstantiatedUnit cid insts =
+mkInstantiatedUnit :: IndefUnitId -> [(ModuleName, Module)] -> InstantiatedUnit
+mkInstantiatedUnit cid insts =
     InstantiatedUnit {
         instUnitInstanceOf = cid,
         instUnitInsts = sorted_insts,
@@ -735,8 +724,7 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 -- | Lossy conversion to the on-disk 'InstalledUnitId' for a component.
 toInstalledUnitId :: UnitId -> InstalledUnitId
 toInstalledUnitId (DefUnit (DefUnitId iuid)) = iuid
-toInstalledUnitId (InstUnit indef) =
-    componentIdToInstalledUnitId (instUnitInstanceOf indef)
+toInstalledUnitId (InstUnit indef)           = indefUnitId (instUnitInstanceOf indef)
 
 installedUnitIdString :: InstalledUnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
@@ -758,9 +746,6 @@ instance Outputable InstantiatedUnit where
 
 fsToInstalledUnitId :: FastString -> InstalledUnitId
 fsToInstalledUnitId fs = InstalledUnitId fs
-
-componentIdToInstalledUnitId :: ComponentId -> InstalledUnitId
-componentIdToInstalledUnitId (ComponentId fs _) = fsToInstalledUnitId fs
 
 stringToInstalledUnitId :: String -> InstalledUnitId
 stringToInstalledUnitId = fsToInstalledUnitId . mkFastString
@@ -849,12 +834,12 @@ unitIdIsDefinite = isEmptyUniqDSet . unitIdFreeHoles
 -- | Generate a uniquely identifying 'FastString' for a unit
 -- identifier.  This is a one-way function.  You can rely on one special
 -- property: if a unit identifier is in most general form, its 'FastString'
--- coincides with its 'ComponentId'.  This hash is completely internal
+-- coincides with its 'IndefUnitId'.  This hash is completely internal
 -- to GHC and is not used for symbol names or file paths.
-hashUnitId :: ComponentId -> [(ModuleName, Module)] -> FastString
+hashUnitId :: IndefUnitId -> [(ModuleName, Module)] -> FastString
 hashUnitId cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (bytesFS (componentIdRaw cid))
+  . fingerprintUnitId (bytesFS (installedUnitIdFS (indefUnitId cid)))
   $ rawHashUnitId sorted_holes
 
 -- | Generate a hash for a sorted module substitution.
@@ -876,9 +861,9 @@ fingerprintUnitId prefix (Fingerprint a b)
       , BS.Char8.pack (toBase62Padded b) ]
 
 -- | Create a new, un-hashed unit identifier.
-newUnitId :: ComponentId -> [(ModuleName, Module)] -> UnitId
-newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug...
-newUnitId cid insts = InstUnit $ newInstantiatedUnit cid insts
+mkInstUnit :: IndefUnitId -> [(ModuleName, Module)] -> UnitId
+mkInstUnit uid []    = DefUnit  $ DefUnitId (indefUnitId uid)
+mkInstUnit uid insts = InstUnit $ mkInstantiatedUnit uid insts
 
 pprUnitId :: UnitId -> SDoc
 pprUnitId (DefUnit uid) = ppr uid
@@ -922,13 +907,9 @@ instance Binary UnitId where
                 0 -> fmap DefUnit  (get bh)
                 _ -> fmap InstUnit (get bh)
 
-instance Binary ComponentId where
-  put_ bh (ComponentId fs _) = put_ bh fs
-  get bh = do { fs <- get bh; return (ComponentId fs Nothing) }
-
--- | Create a new simple unit identifier (no holes) from a 'ComponentId'.
-newSimpleUnitId :: ComponentId -> UnitId
-newSimpleUnitId (ComponentId fs _) = fsToUnitId fs
+instance Binary IndefUnitId where
+  put_ bh (IndefUnitId fs _) = put_ bh fs
+  get bh = do { fs <- get bh; return (IndefUnitId fs Nothing) }
 
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
@@ -994,7 +975,7 @@ renameHoleUnitId' pkg_map env uid =
                 -- a compiled version of this 'UnitId' we can improve to.
                 -- See Note [UnitId to InstalledUnitId improvement]
                 else improveUnitId pkg_map $
-                        newUnitId cid
+                        mkInstUnit cid
                             (map (\(k,v) -> (k, renameHoleModule' pkg_map env v)) insts)
       _ -> uid
 
@@ -1010,14 +991,13 @@ splitModuleInsts m =
 
 -- | See 'splitModuleInsts'.
 splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
-splitUnitIdInsts (InstUnit iuid) =
-    (componentIdToInstalledUnitId (instUnitInstanceOf iuid), Just iuid)
+splitUnitIdInsts (InstUnit iuid)           = (indefUnitId (instUnitInstanceOf iuid), Just iuid)
 splitUnitIdInsts (DefUnit (DefUnitId uid)) = (uid, Nothing)
 
 generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
 generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
                                            , instUnitInsts = insts } =
-    newInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
+    mkInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
 
 generalizeInstantiatedModule :: InstantiatedModule -> InstantiatedModule
 generalizeInstantiatedModule (Module uid n) = Module (generalizeInstantiatedUnit uid) n
@@ -1027,22 +1007,25 @@ parseModuleName = fmap mkModuleName
                 $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
 
 parseUnitId :: ReadP UnitId
-parseUnitId = parseFullUnitId <++ parseUnitId <++ parseSimpleUnitId
+parseUnitId = parseInstUnitId <++ parseDefUnitId
   where
-    parseFullUnitId = do
-        cid <- parseComponentId
+    parseInstUnitId = do
+        uid   <- parseIndefUnitId
         insts <- parseModSubst
-        return (newUnitId cid insts)
-    parseUnitId = do
-        s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
-        return (stringToUnitId s)
-    parseSimpleUnitId = do
-        cid <- parseComponentId
-        return (newSimpleUnitId cid)
+        return (mkInstUnit uid insts)
+    parseDefUnitId = do
+        s <- parseInstalledUnitId
+        return (DefUnit (DefUnitId s))
 
-parseComponentId :: ReadP ComponentId
-parseComponentId = (flip ComponentId Nothing . mkFastString)  `fmap` Parse.munch1 abi_char
-   where abi_char c = isAlphaNum c || c `elem` "-_."
+parseInstalledUnitId :: ReadP InstalledUnitId
+parseInstalledUnitId = do
+   s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
+   return (InstalledUnitId (mkFastString s))
+
+parseIndefUnitId :: ReadP IndefUnitId
+parseIndefUnitId = do
+   uid <- parseInstalledUnitId
+   return (IndefUnitId uid Nothing)
 
 parseModuleId :: ReadP Module
 parseModuleId = parseModuleVar <++ parseModule

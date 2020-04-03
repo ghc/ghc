@@ -6,7 +6,7 @@ data GenModule a
 data ModuleName
 data UnitId
 data InstalledUnitId
-data ComponentId
+data IndefUnitId
 type Module = GenModule UnitId
 
 moduleName :: GenModule a -> ModuleName

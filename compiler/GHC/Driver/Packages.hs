@@ -54,8 +54,8 @@ module GHC.Driver.Packages (
         packageHsLibs, getLibs,
 
         -- * Utils
-        mkComponentId,
-        updateComponentId,
+        mkIndefUnitId,
+        updateIndefUnitId,
         unwireUnitId,
         pprFlag,
         pprPackages,
@@ -329,9 +329,9 @@ data PackageState = PackageState {
   -- may have the 'exposed' flag be 'False'.)
   unitInfoMap :: UnitInfoMap,
 
-  -- | A mapping of 'PackageName' to 'ComponentId'.  This is used when
+  -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
   -- users refer to packages in Backpack includes.
-  packageNameMap            :: Map PackageName ComponentId,
+  packageNameMap            :: Map PackageName IndefUnitId,
 
   -- | A mapping from wired in names to the original names from the
   -- package database.
@@ -406,18 +406,18 @@ lookupUnit' True m@(UnitInfoMap pkg_map _) uid =
         (_, Nothing) -> lookupUDFM pkg_map uid
 
 {-
--- | Find the indefinite package for a given 'ComponentId'.
+-- | Find the indefinite package for a given 'IndefUnitId'.
 -- The way this works is just by fiat'ing that every indefinite package's
 -- unit key is precisely its component ID; and that they share uniques.
-lookupComponentId :: PackageState -> ComponentId -> Maybe UnitInfo
-lookupComponentId pkgstate (ComponentId cid_fs) = lookupUDFM pkg_map cid_fs
+lookupIndefUnitId :: PackageState -> IndefUnitId -> Maybe UnitInfo
+lookupIndefUnitId pkgstate (IndefUnitId cid_fs) = lookupUDFM pkg_map cid_fs
   where
     UnitInfoMap pkg_map = unitInfoMap pkgstate
 -}
 
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
-lookupPackageName :: PackageState -> PackageName -> Maybe ComponentId
+lookupPackageName :: PackageState -> PackageName -> Maybe IndefUnitId
 lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
 
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
@@ -1102,7 +1102,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
                     in pkg {
                       unitId = fsToInstalledUnitId fs,
-                      unitInstanceOf = mkComponentId pkgstate fs
+                      unitInstanceOf = mkIndefUnitId pkgstate fs
                     }
                   | otherwise
                   = pkg
@@ -1131,7 +1131,7 @@ upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
 upd_wired_in_uid wiredInMap (DefUnit def_uid) =
     DefUnit (upd_wired_in wiredInMap def_uid)
 upd_wired_in_uid wiredInMap (InstUnit indef_uid) =
-    InstUnit $ newInstantiatedUnit
+    InstUnit $ mkInstantiatedUnit
         (instUnitInstanceOf indef_uid)
         (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 
@@ -2109,7 +2109,7 @@ missingDependencyMsg (Just parent)
 
 -- Cabal packages may contain several components (programs, libraries, etc.).
 -- As far as GHC is concerned, installed package components ("units") are
--- identified by an opaque ComponentId string provided by Cabal. As the string
+-- identified by an opaque IndefUnitId string provided by Cabal. As the string
 -- contains a hash, we don't want to display it to users so GHC queries the
 -- database to retrieve some infos about the original source package (name,
 -- version, component name).
@@ -2119,21 +2119,22 @@ missingDependencyMsg (Just parent)
 -- Component name is only displayed if it isn't the default library
 --
 -- To do this we need to query the database (cached in DynFlags). We cache
--- these details in the ComponentId itself because we don't want to query
--- DynFlags each time we pretty-print the ComponentId
+-- these details in the IndefUnitId itself because we don't want to query
+-- DynFlags each time we pretty-print the IndefUnitId
 --
-mkComponentId :: PackageState -> FastString -> ComponentId
-mkComponentId pkgstate raw =
-    case lookupInstalledPackage pkgstate (InstalledUnitId raw) of
-      Nothing -> ComponentId raw Nothing -- we didn't find the unit at all
-      Just c  -> ComponentId raw $ Just $ UnitPprInfo
+mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
+mkIndefUnitId pkgstate raw =
+    let uid = InstalledUnitId raw
+    in case lookupInstalledPackage pkgstate uid of
+         Nothing -> IndefUnitId uid Nothing -- we didn't find the unit at all
+         Just c  -> IndefUnitId uid $ Just $ UnitPprInfo
                                              (unitPackageNameString c)
                                              (unitPackageVersion c)
                                              ((unpackFS . unPackageName) <$> unitComponentName c)
 
 -- | Update component ID details from the database
-updateComponentId :: PackageState -> ComponentId -> ComponentId
-updateComponentId pkgstate (ComponentId raw _) = mkComponentId pkgstate raw
+updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
+updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (installedUnitIdFS (indefUnitId uid))
 
 
 displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
