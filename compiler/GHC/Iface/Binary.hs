@@ -326,7 +326,7 @@ fromOnDiskName nc (pid, mod_name, occ) =
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    put_ bh (moduleUnitId mod, moduleName mod, nameOccName name)
+    put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
 
 
 -- Note [Symbol table representation of names]

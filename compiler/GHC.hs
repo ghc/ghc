@@ -163,7 +163,7 @@ module GHC (
         UnitId,
 
         -- ** Modules
-        Module, mkModule, pprModule, moduleName, moduleUnitId,
+        Module, mkModule, pprModule, moduleName, moduleUnit,
         ModuleName, mkModuleName, moduleNameString,
 
         -- ** Names
@@ -1501,7 +1501,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | moduleUnitId m /= this_pkg -> return m
+             Found loc m | moduleUnit m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 

@@ -215,7 +215,7 @@ checkSynCycles this_uid tcs tyclds = do
         -- This won't hold once we get recursive packages with Backpack,
         -- but for now it's fine.
         | not (isHoleModule mod ||
-               moduleUnitId mod == this_uid ||
+               moduleUnit mod == this_uid ||
                isInteractiveModule mod)
             = return ()
         | Just ty <- synTyConRhs_maybe tc =

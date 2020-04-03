@@ -678,7 +678,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = moduleUnitId mod
+            pkg = moduleUnit mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps

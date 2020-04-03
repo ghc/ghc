@@ -379,7 +379,7 @@ data FrontendResult
 --
 --            if I have a Module, this_mod, in hand representing the module
 --            currently being compiled,
---            then moduleUnitId this_mod == thisPackage dflags
+--            then moduleUnit this_mod == thisPackage dflags
 --
 --      - For any code involving Names, we want semantic modules.
 --        See lookupIfaceTop in GHC.Iface.Env, mkIface and addFingerprints
