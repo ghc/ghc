@@ -14,7 +14,7 @@ import GHC.Iface.Ext.Utils
 
 import GHC.Driver.Session
 import SysTools
-
+import Outputable                 ( Outputable, renderWithStyle, ppr, defaultUserStyle, initSDocContext )
 import qualified Data.Map as M
 import Data.Foldable
 
@@ -32,6 +32,12 @@ foo x = f [x]
 --      ^ this is the point
 point :: (Int,Int)
 point = (31,9)
+
+bar :: String
+bar = show 1
+--      ^ this is the point'
+point' :: (Int,Int)
+point' = (37,9)
 
 makeNc :: IO NameCache
 makeNc = do
@@ -70,6 +76,14 @@ main = do
   (hfr, nc') <- readHieFile nc "HieQueries.hie"
   let hf = hie_file_result hfr
       refmap = generateReferencesMap $ getAsts $ hie_asts hf
+  explainEv df hf refmap point
+  explainEv df hf refmap point'
+  return ()
+
+type RefMap = M.Map Identifier [(Span, IdentifierDetails Int)]
+
+explainEv :: DynFlags -> HieFile -> RefMap -> (Int,Int) -> IO ()
+explainEv df hf refmap point = do
   let (var,dets) = findEvidence $ nodeInfo $ selectPoint hf point
       Just typ = identType dets
   putStr $ "At " ++ show point ++ ", found evidence of type: "
@@ -97,7 +111,12 @@ main = do
                   putStr $ "Evidence of type: "
                   putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
                   putStrLn $ "bound by an instance at " ++ show (nameSrcSpan var)
+                  putStrLn $ "From " ++ pprint df (nameModule var)
                   putStrLn ""
                 _ -> return ()
   describeEvidenceVar var
-  return ()
+
+pprint :: Outputable a => DynFlags -> a -> String
+pprint df = renderWithStyle (initSDocContext df sty) . ppr
+  where sty = defaultUserStyle df
+

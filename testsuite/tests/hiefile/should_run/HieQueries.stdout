@@ -4,8 +4,18 @@ Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C [a]
 Is bound by a let, depending on:
 
 Evidence of type: forall a. C a => C [a]
-bound by an instance at RealSrcSpan SrcSpanOneLine "HieQueries.hs" 27 10 22 (Just (BufSpan {bufSpanStart = BufPos {bufPos = 444}, bufSpanEnd = BufPos {bufPos = 456}}))
+bound by an instance at RealSrcSpan SrcSpanOneLine "HieQueries.hs" 27 10 22 (Just (BufSpan {bufSpanStart = BufPos {bufPos = 549}, bufSpanEnd = BufPos {bufPos = 561}}))
+From Main
 
 Evidence from SrcSpanOneLine "HieQueries.hs" 31 1 14 of type: C a
 Is bound by a signature
+
+At (37,9), found evidence of type: Show Integer
+
+Evidence from SrcSpanMultiLine "HieQueries.hs" 4 1 121 34 of type: Show Integer
+Is bound by a let, depending on:
+
+Evidence of type: Show Integer
+bound by an instance at UnhelpfulSpan "<no location info>"
+From GHC.Show
 
