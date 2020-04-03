@@ -7,7 +7,6 @@ data PackageState
 data UnitInfoMap
 data PackageDatabase
 emptyPackageState :: PackageState
-componentIdString :: ComponentId -> String
 mkComponentId :: PackageState -> FastString -> ComponentId
 displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
 improveUnitId :: UnitInfoMap -> UnitId -> UnitId
