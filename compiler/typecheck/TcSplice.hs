@@ -1089,7 +1089,7 @@ instance TH.Quasi TcM where
                         RealSrcSpan s _ -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
-                                  , TH.loc_package  = unitIdString (moduleUnitId m)
+                                  , TH.loc_package  = unitIdString (moduleUnit m)
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                   , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
@@ -2218,7 +2218,7 @@ reifyName thing
   where
     name    = getName thing
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnitId mod)
+    pkg_str = unitIdString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
     occ     = nameOccName name
@@ -2236,7 +2236,7 @@ reifyFieldLabel fl
   where
     name    = flSelector fl
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnitId mod)
+    pkg_str = unitIdString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = unpackFS (flLabel fl)
 
@@ -2312,7 +2312,7 @@ reifyAnnotations th_name
 
 ------------------------------
 modToTHMod :: Module -> TH.Module
-modToTHMod m = TH.Module (TH.PkgName $ unitIdString  $ moduleUnitId m)
+modToTHMod m = TH.Module (TH.PkgName $ unitIdString  $ moduleUnit m)
                          (TH.ModName $ moduleNameString $ moduleName m)
 
 reifyModule :: TH.Module -> TcM TH.ModuleInfo
@@ -2328,7 +2328,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
         let usages = [modToTHMod m | usage <- mi_usages iface,
-                                     Just m <- [usageToModule (moduleUnitId reifMod) usage] ]
+                                     Just m <- [usageToModule (moduleUnit reifMod) usage] ]
         return $ TH.ModuleInfo usages
 
       usageToModule :: UnitId -> Usage -> Maybe Module

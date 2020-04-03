@@ -1076,7 +1076,7 @@ labelDynamic dflags this_mod lbl =
   where
     externalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
     os = platformOS (targetPlatform dflags)
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 
 -----------------------------------------------------------------------------

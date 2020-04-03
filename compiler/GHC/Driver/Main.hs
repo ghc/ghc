@@ -475,7 +475,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
+    MASSERT( moduleUnit outer_mod == thisPackage dflags )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1126,7 +1126,7 @@ hscCheckSafe' m l = do
         True | isHomePkg dflags m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
-             | otherwise   -> return (Just $ toInstalledUnitId (moduleUnitId m), pkgs)
+             | otherwise   -> return (Just $ toInstalledUnitId (moduleUnit m), pkgs)
   where
     isModSafe :: Module -> SrcSpan -> Hsc (Bool, Set InstalledUnitId)
     isModSafe m l = do
@@ -1176,7 +1176,7 @@ hscCheckSafe' m l = do
                     pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
-                            , text "The package (" <> ppr (moduleUnitId m)
+                            , text "The package (" <> ppr (moduleUnit m)
                                 <> text ") the module resides in isn't trusted."
                             ]
                     modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
@@ -1198,7 +1198,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomePkg dflags m = True
-        | otherwise = unitIsTrusted $ getPackageDetails dflags (moduleUnitId m)
+        | otherwise = unitIsTrusted $ getPackageDetails dflags (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1218,7 +1218,7 @@ hscCheckSafe' m l = do
 
     isHomePkg :: DynFlags -> Module -> Bool
     isHomePkg dflags m
-        | thisPackage dflags == moduleUnitId m = True
+        | thisPackage dflags == moduleUnit m = True
         | otherwise                               = False
 
 -- | Check the list of packages are trusted.

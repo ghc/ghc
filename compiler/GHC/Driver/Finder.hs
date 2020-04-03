@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Driver.Finder (
     flushFinderCaches,
@@ -202,8 +203,8 @@ findLookupResult hsc_env r = case r of
         -- instantiated; you probably also need all of the
         -- implicit locations from the instances
         InstalledFound loc   _ -> return (Found loc m)
-        InstalledNoPackage   _ -> return (NoPackage (moduleUnitId m))
-        InstalledNotFound fp _ -> return (NotFound{ fr_paths = fp, fr_pkg = Just (moduleUnitId m)
+        InstalledNoPackage   _ -> return (NoPackage (moduleUnit m))
+        InstalledNotFound fp _ -> return (NotFound{ fr_paths = fp, fr_pkg = Just (moduleUnit m)
                                          , fr_pkgs_hidden = []
                                          , fr_mods_hidden = []
                                          , fr_unusables = []
@@ -212,13 +213,13 @@ findLookupResult hsc_env r = case r of
        return (FoundMultiple rs)
      LookupHidden pkg_hiddens mod_hiddens ->
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
-                       , fr_pkgs_hidden = map (moduleUnitId.fst) pkg_hiddens
-                       , fr_mods_hidden = map (moduleUnitId.fst) mod_hiddens
+                       , fr_pkgs_hidden = map (moduleUnit.fst) pkg_hiddens
+                       , fr_mods_hidden = map (moduleUnit.fst) mod_hiddens
                        , fr_unusables = []
                        , fr_suggestions = [] })
      LookupUnusable unusable ->
        let unusables' = map get_unusable unusable
-           get_unusable (m, ModUnusable r) = (moduleUnitId m, r)
+           get_unusable (m, ModUnusable r) = (moduleUnit m, r)
            get_unusable (_, r)             =
              pprPanic "findLookupResult: unexpected origin" (ppr r)
        in return (NotFound{ fr_paths = [], fr_pkg = Nothing
@@ -649,7 +650,7 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
   where
     unambiguousPackages = foldl' unambiguousPackage (Just []) mods
     unambiguousPackage (Just xs) (m, ModOrigin (Just _) _ _ _)
-        = Just (moduleUnitId m : xs)
+        = Just (moduleUnit m : xs)
     unambiguousPackage _ _ = Nothing
 
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
@@ -658,7 +659,7 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
     pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
-          then [text "package" <+> ppr (moduleUnitId m)]
+          then [text "package" <+> ppr (moduleUnit m)]
           else [] ++
       map ((text "a reexport in package" <+>)
                 .ppr.packageConfigId) res ++
@@ -758,9 +759,9 @@ cantFindErr cannot_find _ dflags mod_name find_result
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
               | Just True <- e
-                 = parens (text "from" <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnit mod))
               | f && moduleName mod == m
-                 = parens (text "from" <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnit mod))
               | (pkg:_) <- res
                  = parens (text "from" <+> ppr (packageConfigId pkg)
                     <> comma <+> text "reexporting" <+> ppr mod)
@@ -775,7 +776,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                                    fromHiddenReexport = rhs })
               | Just False <- e
                  = parens (text "needs flag -package-key"
-                    <+> ppr (moduleUnitId mod))
+                    <+> ppr (moduleUnit mod))
               | (pkg:_) <- rhs
                  = parens (text "needs flag -package-id"
                     <+> ppr (packageConfigId pkg))
