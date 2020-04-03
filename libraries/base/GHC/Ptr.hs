@@ -1,5 +1,9 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, RoleAnnotations #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -43,9 +47,10 @@ import Numeric          ( showHex )
 -- redundant role annotation checks that this doesn't change
 type role Ptr phantom
 data Ptr a = Ptr Addr#
-  deriving ( Eq  -- ^ @since 2.01
-           , Ord -- ^ @since 2.01
-           )
+  deriving
+  stock ( Eq  -- ^ @since 2.01
+        , Ord -- ^ @since 2.01
+        )
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
 -- of type @a@.
@@ -93,7 +98,9 @@ minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 -- that 'FunPtr's role cannot become nominal without changes elsewhere
 -- in GHC. See Note [FFI type roles] in TcForeign.
 type role FunPtr phantom
-data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
+data FunPtr a = FunPtr Addr#
+  deriving
+  stock (Eq, Ord)
 -- ^ A value of type @'FunPtr' a@ is a pointer to a function callable
 -- from foreign code.  The type @a@ will normally be a /foreign type/,
 -- a function type with zero or more arguments where

@@ -1,6 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE DeriveGeneric, NoImplicitPrelude, MagicHash,
-             ExistentialQuantification, ImplicitParams #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -226,9 +230,10 @@ data AsyncException
         -- ^This exception is raised by default in the main thread of
         -- the program when the user requests to terminate the program
         -- via the usual mechanism(s) (e.g. Control-C in the console).
-  deriving ( Eq  -- ^ @since 4.2.0.0
-           , Ord -- ^ @since 4.2.0.0
-           )
+  deriving
+  stock ( Eq  -- ^ @since 4.2.0.0
+        , Ord -- ^ @since 4.2.0.0
+        )
 
 -- | @since 4.7.0.0
 instance Exception AsyncException where
@@ -243,9 +248,10 @@ data ArrayException
   | UndefinedElement    String
         -- ^An attempt was made to evaluate an element of an
         -- array that had not been initialized.
-  deriving ( Eq  -- ^ @since 4.2.0.0
-           , Ord -- ^ @since 4.2.0.0
-           )
+  deriving
+  stock ( Eq  -- ^ @since 4.2.0.0
+        , Ord -- ^ @since 4.2.0.0
+        )
 
 -- | @since 4.1.0.0
 instance Exception ArrayException
@@ -300,7 +306,8 @@ data ExitCode
                 -- The exact interpretation of the code is
                 -- operating-system dependent.  In particular, some values
                 -- may be prohibited (e.g. 0 on a POSIX-compliant system).
-  deriving (Eq, Ord, Read, Show, Generic)
+  deriving
+  stock (Eq, Ord, Read, Show, Generic)
 
 -- | @since 4.1.0.0
 instance Exception ExitCode
@@ -471,4 +478,3 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
-

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 -- | Things common to all file locking implementations.
 module GHC.IO.Handle.Lock.Common
@@ -12,7 +13,8 @@ import GHC.Show
 -- | Exception thrown by 'hLock' on non-Windows platforms that don't support
 -- 'flock'.
 data FileLockingNotSupported = FileLockingNotSupported
-  deriving Show -- ^ @since 4.10.0.0
+  deriving
+  stock Show -- ^ @since 4.10.0.0
 
 -- ^ @since 4.10.0.0
 instance Exception FileLockingNotSupported
