@@ -486,4 +486,6 @@ typedef struct StgCompactNFData_ {
     StgClosure *result;
       // Used temporarily to store the result of compaction.  Doesn't need to be
       // a GC root.
+    struct StgCompactNFData_ *link;
+      // TODO: Explain
 } StgCompactNFData;

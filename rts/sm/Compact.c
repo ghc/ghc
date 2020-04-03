@@ -473,6 +473,48 @@ thread_TSO (StgTSO *tso)
     return (P_)tso + sizeofW(StgTSO);
 }
 
+static StgCompactNFData *nfdata_chain = NULL;
+
+static void
+thread_nfdata_hash_key(void *data STG_UNUSED, StgWord *key, const void *value STG_UNUSED)
+{
+    thread_((void *)key);
+}
+
+static void
+thread_NFDATA(StgCompactNFData *str)
+{
+    // Thread hash table keys. Values won't be moved as those are inside the
+    // CNF, and the CNF is a large object and so won't ever move.
+    if (str->hash) {
+        mapHashTableKeys(str->hash, NULL, thread_nfdata_hash_key);
+        ASSERT(str->link == NULL);
+        str->link = nfdata_chain;
+        nfdata_chain = str;
+    }
+}
+
+static void
+add_hash_entry(void *data, StgWord key, const void *value)
+{
+    HashTable *new_hash = (HashTable *)data;
+    insertHashTable(new_hash, key, value);
+}
+
+static void
+rehash_CNFs(void)
+{
+    while (nfdata_chain != NULL) {
+        StgCompactNFData *str = nfdata_chain;
+        nfdata_chain = str->link;
+        str->link = NULL;
+
+        HashTable *new_hash = allocHashTable();
+        mapHashTable(str->hash, (void*)new_hash, add_hash_entry);
+        freeHashTable(str->hash, NULL);
+        str->hash = new_hash;
+    }
+}
 
 static void
 update_fwd_large( bdescr *bd )
@@ -489,7 +531,6 @@ update_fwd_large( bdescr *bd )
     switch (info->type) {
 
     case ARR_WORDS:
-    case COMPACT_NFDATA:
       // nothing to follow
       continue;
 
@@ -546,6 +587,12 @@ update_fwd_large( bdescr *bd )
           thread(&e->expected_value);
           thread(&e->new_value);
         }
+        continue;
+    }
+
+    case COMPACT_NFDATA:
+    {
+        thread_NFDATA((StgCompactNFData *)p);
         continue;
     }
 
@@ -983,4 +1030,7 @@ compact(StgClosure *static_objects,
                    gen->no, gen->n_old_blocks, blocks);
         gen->n_old_blocks = blocks;
     }
+
+    // 4. Re-hash hash tables of moved CNFs
+    rehash_CNFs();
 }

@@ -34,8 +34,10 @@ int keyCountHashTable (HashTable *table);
 int keysHashTable(HashTable *table, StgWord keys[], int szKeys);
 
 typedef void (*MapHashFn)(void *data, StgWord key, const void *value);
+typedef void (*MapHashFnKeys)(void *data, StgWord *key, const void *value);
 
 void mapHashTable(HashTable *table, void *data, MapHashFn fn);
+void mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn);
 
 /* Hash table access where the keys are C strings (the strings are
  * assumed to be allocated by the caller, and mustn't be deallocated
