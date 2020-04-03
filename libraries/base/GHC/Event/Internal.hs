@@ -1,5 +1,7 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE ExistentialQuantification, NoImplicitPrelude #-}
 
 module GHC.Event.Internal
     (
@@ -40,7 +42,8 @@ import Data.Semigroup.Internal (stimesMonoid)
 
 -- | An I\/O event.
 newtype Event = Event Int
-    deriving Eq -- ^ @since 4.4.0.0
+    deriving
+    stock Eq -- ^ @since 4.4.0.0
 
 evtNothing :: Event
 evtNothing = Event 0
@@ -94,12 +97,14 @@ evtConcat = foldl' evtCombine evtNothing
 -- | The lifetime of an event registration.
 --
 -- @since 4.8.1.0
-data Lifetime = OneShot   -- ^ the registration will be active for only one
-                          -- event
-              | MultiShot -- ^ the registration will trigger multiple times
-              deriving ( Show -- ^ @since 4.8.1.0
-                       , Eq   -- ^ @since 4.8.1.0
-                       )
+data Lifetime
+    = OneShot   -- ^ the registration will be active for only one
+                -- event
+    | MultiShot -- ^ the registration will trigger multiple times
+    deriving
+    stock ( Show -- ^ @since 4.8.1.0
+          , Eq   -- ^ @since 4.8.1.0
+          )
 
 -- | The longer of two lifetimes.
 elSupremum :: Lifetime -> Lifetime -> Lifetime
@@ -123,9 +128,10 @@ instance Monoid Lifetime where
 -- Here we encode the event in the bottom three bits and the lifetime
 -- in the fourth bit.
 newtype EventLifetime = EL Int
-                      deriving ( Show -- ^ @since 4.8.0.0
-                               , Eq   -- ^ @since 4.8.0.0
-                               )
+    deriving
+    stock ( Show -- ^ @since 4.8.0.0
+          , Eq   -- ^ @since 4.8.0.0
+          )
 
 -- | @since 4.11.0.0
 instance Semigroup EventLifetime where
@@ -153,7 +159,8 @@ elEvent (EL x) = Event (x .&. 0x7)
 -- | A type alias for timeouts, specified in nanoseconds.
 data Timeout = Timeout {-# UNPACK #-} !Word64
              | Forever
-               deriving Show -- ^ @since 4.4.0.0
+    deriving
+    stock Show -- ^ @since 4.4.0.0
 
 -- | Event notification backend.
 data Backend = forall a. Backend {

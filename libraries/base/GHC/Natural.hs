@@ -143,9 +143,10 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                                               -- 'NatS#' constructor.
                                -- NB: Order of constructors *must*
                                -- coincide with 'Ord' relation
-             deriving ( Eq  -- ^ @since 4.8.0.0
-                      , Ord -- ^ @since 4.8.0.0
-                      )
+    deriving
+    stock ( Eq  -- ^ @since 4.8.0.0
+          , Ord -- ^ @since 4.8.0.0
+          )
 
 zero, one :: Natural
 zero = NatS# 0##
@@ -362,6 +363,7 @@ minusNaturalMaybe (NatJ# x) (NatJ# y)
   | isTrue# (isNullBigNat# res) = Nothing
   | True                        = Just (bigNatToNatural res)
   where
+    res :: BigNat
     res = minusBigNat x y
 
 -- | Convert 'BigNat' to 'Natural'.
@@ -412,7 +414,8 @@ wordToNaturalBase w# = NatS# w#
 --
 -- @since 4.8.0.0
 newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
-                  deriving (Eq,Ord)
+    deriving
+    stock (Eq, Ord)
 
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
@@ -605,11 +608,13 @@ powModNatural (Natural b0) (Natural e0) (Natural m)
    | b0 == wordToInteger 1## = wordToNaturalBase 1##
    | True    = go b0 e0 (wordToInteger 1##)
   where
+    go :: Integer -> Integer -> Integer -> Natural
     go !b e !r
       | e `testBitInteger` 0#  = go b' e' ((r `timesInteger` b) `modInteger` m)
       | e == wordToInteger 0## = naturalFromInteger r
       | True                   = go b' e' r
       where
+        b', e' :: Integer
         b' = (b `timesInteger` b) `modInteger` m
         e' = e `shiftRInteger` 1# -- slightly faster than "e `div` 2"
 #endif
