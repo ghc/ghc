@@ -33,7 +33,7 @@ module GHC.Types.Module
         UnitId(..),
         unitIdFS,
         unitIdKey,
-        IndefUnitId(..),
+        InstantiatedUnit(..),
         IndefModule(..),
         indefUnitIdToUnitId,
         indefModuleToModule,
@@ -46,7 +46,7 @@ module GHC.Types.Module
         unitIdFreeHoles,
 
         newUnitId,
-        newIndefUnitId,
+        newInstantiatedUnit,
         newSimpleUnitId,
         hashUnitId,
         fsToUnitId,
@@ -62,7 +62,7 @@ module GHC.Types.Module
         -- * Generalization
         splitModuleInsts,
         splitUnitIdInsts,
-        generalizeIndefUnitId,
+        generalizeInstantiatedUnit,
         generalizeIndefModule,
 
         -- * Parsers
@@ -555,87 +555,92 @@ instance Outputable ComponentId where
 -- have an 'IndefiniteUnitId', which explicitly records the
 -- instantiation, so that we can substitute over it.
 data UnitId
-    = IndefiniteUnitId {-# UNPACK #-} !IndefUnitId
+    = IndefiniteUnitId {-# UNPACK #-} !InstantiatedUnit
     |   DefiniteUnitId {-# UNPACK #-} !DefUnitId
 
 unitIdFS :: UnitId -> FastString
-unitIdFS (IndefiniteUnitId x) = indefUnitIdFS x
+unitIdFS (IndefiniteUnitId x) = instUnitIdFS x
 unitIdFS (DefiniteUnitId (DefUnitId x)) = installedUnitIdFS x
 
 unitIdKey :: UnitId -> Unique
-unitIdKey (IndefiniteUnitId x) = indefUnitIdKey x
+unitIdKey (IndefiniteUnitId x) = instUnitIdKey x
 unitIdKey (DefiniteUnitId (DefUnitId x)) = installedUnitIdKey x
 
--- | A unit identifier which identifies an indefinite
--- library (with holes) that has been *on-the-fly* instantiated
--- with a substitution 'indefUnitIdInsts'.  In fact, an indefinite
--- unit identifier could have no holes, but we haven't gotten
--- around to compiling the actual library yet.
+-- | A dynamically instantiated unit.
+--
+-- It identifies an indefinite library (with holes) that has been *on-the-fly*
+-- instantiated.
+--
+-- This unit may be indefinite or not (i.e. with remaining holes or not). In any
+-- case, it hasn't been compiled and installed (yet). Nevertheless, we have a
+-- mechanism called "improvement" to try to match a fully instantiated unit
+-- (i.e. definite, without any remaining hole) with existing compiled and
+-- installed units: see Note [UnitId to InstalledUnitId improvement].
 --
 -- An indefinite unit identifier pretty-prints to something like
 -- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'ComponentId', and the
 -- brackets enclose the module substitution).
-data IndefUnitId
-    = IndefUnitId {
+data InstantiatedUnit
+    = InstantiatedUnit {
         -- | A private, uniquely identifying representation of
         -- a UnitId.  This string is completely private to GHC
         -- and is just used to get a unique; in particular, we don't use it for
         -- symbols (indefinite libraries are not compiled).
-        indefUnitIdFS :: FastString,
+        instUnitIdFS :: FastString,
         -- | Cached unique of 'unitIdFS'.
-        indefUnitIdKey :: Unique,
+        instUnitIdKey :: Unique,
         -- | The component identity of the indefinite library that
         -- is being instantiated.
-        indefUnitIdComponentId :: !ComponentId,
+        instUnitInstanceOf :: !ComponentId,
         -- | The sorted (by 'ModuleName') instantiations of this library.
-        indefUnitIdInsts :: ![(ModuleName, Module)],
+        instUnitInsts :: ![(ModuleName, Module)],
         -- | A cache of the free module variables of 'unitIdInsts'.
         -- This lets us efficiently tell if a 'UnitId' has been
         -- fully instantiated (free module variables are empty)
         -- and whether or not a substitution can have any effect.
-        indefUnitIdFreeHoles :: UniqDSet ModuleName
+        instUnitHoles :: UniqDSet ModuleName
     }
 
-instance Eq IndefUnitId where
-  u1 == u2 = indefUnitIdKey u1 == indefUnitIdKey u2
+instance Eq InstantiatedUnit where
+  u1 == u2 = instUnitIdKey u1 == instUnitIdKey u2
 
-instance Ord IndefUnitId where
-  u1 `compare` u2 = indefUnitIdFS u1 `compare` indefUnitIdFS u2
+instance Ord InstantiatedUnit where
+  u1 `compare` u2 = instUnitIdFS u1 `compare` instUnitIdFS u2
 
-instance Binary IndefUnitId where
+instance Binary InstantiatedUnit where
   put_ bh indef = do
-    put_ bh (indefUnitIdComponentId indef)
-    put_ bh (indefUnitIdInsts indef)
+    put_ bh (instUnitInstanceOf indef)
+    put_ bh (instUnitInsts indef)
   get bh = do
     cid   <- get bh
     insts <- get bh
     let fs = hashUnitId cid insts
-    return IndefUnitId {
-            indefUnitIdComponentId = cid,
-            indefUnitIdInsts = insts,
-            indefUnitIdFreeHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
-            indefUnitIdFS = fs,
-            indefUnitIdKey = getUnique fs
+    return InstantiatedUnit {
+            instUnitInstanceOf = cid,
+            instUnitInsts = insts,
+            instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
+            instUnitIdFS = fs,
+            instUnitIdKey = getUnique fs
            }
 
--- | Create a new 'IndefUnitId' given an explicit module substitution.
-newIndefUnitId :: ComponentId -> [(ModuleName, Module)] -> IndefUnitId
-newIndefUnitId cid insts =
-    IndefUnitId {
-        indefUnitIdComponentId = cid,
-        indefUnitIdInsts = sorted_insts,
-        indefUnitIdFreeHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
-        indefUnitIdFS = fs,
-        indefUnitIdKey = getUnique fs
+-- | Create a new 'InstantiatedUnit' given an explicit module substitution.
+newInstantiatedUnit :: ComponentId -> [(ModuleName, Module)] -> InstantiatedUnit
+newInstantiatedUnit cid insts =
+    InstantiatedUnit {
+        instUnitInstanceOf = cid,
+        instUnitInsts = sorted_insts,
+        instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
+        instUnitIdFS = fs,
+        instUnitIdKey = getUnique fs
     }
   where
      fs = hashUnitId cid sorted_insts
      sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
 
--- | Injects an 'IndefUnitId' (indefinite library which
+-- | Injects an 'InstantiatedUnit' (indefinite library which
 -- was on-the-fly instantiated) to a 'UnitId' (either
 -- an indefinite or definite library).
-indefUnitIdToUnitId :: DynFlags -> IndefUnitId -> UnitId
+indefUnitIdToUnitId :: DynFlags -> InstantiatedUnit -> UnitId
 indefUnitIdToUnitId dflags iuid =
     -- NB: suppose that we want to compare the indefinite
     -- unit id p[H=impl:H] against p+abcd (where p+abcd
@@ -647,7 +652,7 @@ indefUnitIdToUnitId dflags iuid =
         IndefiniteUnitId iuid
 
 data IndefModule = IndefModule {
-        indefModuleUnitId :: IndefUnitId,
+        indefModuleUnitId :: InstantiatedUnit,
         indefModuleName   :: ModuleName
     } deriving (Eq, Ord)
 
@@ -706,12 +711,12 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 toInstalledUnitId :: UnitId -> InstalledUnitId
 toInstalledUnitId (DefiniteUnitId (DefUnitId iuid)) = iuid
 toInstalledUnitId (IndefiniteUnitId indef) =
-    componentIdToInstalledUnitId (indefUnitIdComponentId indef)
+    componentIdToInstalledUnitId (instUnitInstanceOf indef)
 
 installedUnitIdString :: InstalledUnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
 
-instance Outputable IndefUnitId where
+instance Outputable InstantiatedUnit where
     ppr uid =
       -- getPprStyle $ \sty ->
       ppr cid <>
@@ -723,8 +728,8 @@ instance Outputable IndefUnitId where
                     | (modname, m) <- insts]))
           else empty)
      where
-      cid   = indefUnitIdComponentId uid
-      insts = indefUnitIdInsts uid
+      cid   = instUnitInstanceOf uid
+      insts = instUnitInsts uid
 
 -- | A 'InstalledModule' is a 'Module' which contains a 'InstalledUnitId'.
 data InstalledModule = InstalledModule {
@@ -791,7 +796,7 @@ delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledMod
 delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
 -- Note [UnitId to InstalledUnitId improvement]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Just because a UnitId is definite (has no holes) doesn't
 -- mean it's necessarily a InstalledUnitId; it could just be
 -- that over the course of renaming UnitIds on the fly
@@ -816,7 +821,7 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 
 -- | Retrieve the set of free holes of a 'UnitId'.
 unitIdFreeHoles :: UnitId -> UniqDSet ModuleName
-unitIdFreeHoles (IndefiniteUnitId x) = indefUnitIdFreeHoles x
+unitIdFreeHoles (IndefiniteUnitId x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
 unitIdFreeHoles (DefiniteUnitId _) = emptyUniqDSet
 
@@ -859,7 +864,7 @@ fingerprintUnitId prefix (Fingerprint a b)
 -- | Create a new, un-hashed unit identifier.
 newUnitId :: ComponentId -> [(ModuleName, Module)] -> UnitId
 newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug...
-newUnitId cid insts = IndefiniteUnitId $ newIndefUnitId cid insts
+newUnitId cid insts = IndefiniteUnitId $ newInstantiatedUnit cid insts
 
 pprUnitId :: UnitId -> SDoc
 pprUnitId (DefiniteUnitId uid) = ppr uid
@@ -965,15 +970,15 @@ renameHoleUnitId' :: UnitInfoMap -> ShHoleSubst -> UnitId -> UnitId
 renameHoleUnitId' pkg_map env uid =
     case uid of
       (IndefiniteUnitId
-        IndefUnitId{ indefUnitIdComponentId = cid
-                   , indefUnitIdInsts       = insts
-                   , indefUnitIdFreeHoles   = fh })
+        InstantiatedUnit{ instUnitInstanceOf = cid
+                        , instUnitInsts      = insts
+                        , instUnitHoles      = fh })
           -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
                 then uid
                 -- Functorially apply the substitution to the instantiation,
                 -- then check the 'UnitInfoMap' to see if there is
                 -- a compiled version of this 'UnitId' we can improve to.
-                -- See Note [UnitId to InstalledUnitId] improvement
+                -- See Note [UnitId to InstalledUnitId improvement]
                 else improveUnitId pkg_map $
                         newUnitId cid
                             (map (\(k,v) -> (k, renameHoleModule' pkg_map env v)) insts)
@@ -990,18 +995,18 @@ splitModuleInsts m =
         fmap (\iuid -> IndefModule iuid (moduleName m)) mb_iuid)
 
 -- | See 'splitModuleInsts'.
-splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe IndefUnitId)
+splitUnitIdInsts :: UnitId -> (InstalledUnitId, Maybe InstantiatedUnit)
 splitUnitIdInsts (IndefiniteUnitId iuid) =
-    (componentIdToInstalledUnitId (indefUnitIdComponentId iuid), Just iuid)
+    (componentIdToInstalledUnitId (instUnitInstanceOf iuid), Just iuid)
 splitUnitIdInsts (DefiniteUnitId (DefUnitId uid)) = (uid, Nothing)
 
-generalizeIndefUnitId :: IndefUnitId -> IndefUnitId
-generalizeIndefUnitId IndefUnitId{ indefUnitIdComponentId = cid
-                                 , indefUnitIdInsts = insts } =
-    newIndefUnitId cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
+generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
+generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
+                                           , instUnitInsts = insts } =
+    newInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
 
 generalizeIndefModule :: IndefModule -> IndefModule
-generalizeIndefModule (IndefModule uid n) = IndefModule (generalizeIndefUnitId uid) n
+generalizeIndefModule (IndefModule uid n) = IndefModule (generalizeInstantiatedUnit uid) n
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName
