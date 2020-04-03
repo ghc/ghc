@@ -402,8 +402,8 @@ compileInclude n (i, uid) = do
         Nothing -> do
             case splitUnitIdInsts uid of
                 (_, Just indef) ->
-                    innerBkpM $ compileUnit (indefUnitIdComponentId indef)
-                                            (indefUnitIdInsts indef)
+                    innerBkpM $ compileUnit (instUnitInstanceOf indef)
+                                            (instUnitInsts indef)
                 _ -> return ()
         Just _ -> return ()
 

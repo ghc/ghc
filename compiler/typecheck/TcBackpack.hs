@@ -238,8 +238,8 @@ requirementMerges pkgstate mod_name =
       -- time the ComponentId was created
       fixupModule (IndefModule iud name) = IndefModule iud' name
          where
-            iud' = iud { indefUnitIdComponentId = cid' }
-            cid  = indefUnitIdComponentId iud
+            iud' = iud { instUnitInstanceOf = cid' }
+            cid  = instUnitInstanceOf iud
             cid' = updateComponentId pkgstate cid
 
 -- | For a module @modname@ of type 'HscSource', determine the list
@@ -323,7 +323,7 @@ checkUnitId :: UnitId -> TcM ()
 checkUnitId uid = do
     case splitUnitIdInsts uid of
       (_, Just indef) ->
-        let insts = indefUnitIdInsts indef in
+        let insts = instUnitInsts indef in
         forM_ insts $ \(mod_name, mod) ->
             -- NB: direct hole instantiations are well-typed by construction
             -- (because we FORCE things to be merged in), so don't check them
@@ -567,7 +567,7 @@ mergeSignatures
         --  list.
         --
         gen_subst (nsubst,oks,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
-            let insts = indefUnitIdInsts iuid
+            let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
                         pkg = getInstalledPackageDetails pkgstate inst_uid
@@ -732,7 +732,7 @@ mergeSignatures
 
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((IndefModule iuid _), ireq_iface) ->
-        tcRnModIface (indefUnitIdInsts iuid) (Just nsubst) ireq_iface
+        tcRnModIface (instUnitInsts iuid) (Just nsubst) ireq_iface
     lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
@@ -910,7 +910,7 @@ impl_msg impl_mod (IndefModule req_uid req_mod_name) =
 checkImplements :: Module -> IndefModule -> TcRn TcGblEnv
 checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
   addErrCtxt (impl_msg impl_mod req_mod) $ do
-    let insts = indefUnitIdInsts uid
+    let insts = instUnitInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
     -- for its exports.  Also, add its 'ImportAvails' to 'tcg_imports',
@@ -1005,6 +1005,6 @@ instantiateSignature = do
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     inner_mod `checkImplements`
         IndefModule
-            (newIndefUnitId (thisComponentId dflags)
-                            (thisUnitIdInsts dflags))
+            (newInstantiatedUnit (thisComponentId dflags)
+                                 (thisUnitIdInsts dflags))
             (moduleName outer_mod)
