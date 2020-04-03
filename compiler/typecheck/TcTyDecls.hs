@@ -67,6 +67,7 @@ import Bag
 import FastString
 import FV
 import GHC.Types.Module
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 
@@ -831,6 +832,8 @@ tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
 tcRecSelBinds sel_bind_prs
   = tcExtendGlobalValEnv [sel_id | (L _ (IdSig _ sel_id)) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
+                                     -- See Note [Impredicative record selectors]
+                                     setXOptM LangExt.ImpredicativeTypes $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
@@ -1029,4 +1032,29 @@ The selector we want for fld looks like this:
 The scrutinee of the case has type :R7T (Maybe b), which can be
 gotten by applying the eq_spec to the univ_tvs of the data con.
 
+Note [Impredicative record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are situations where generating code for record selectors requires the
+use of ImpredicativeTypes. Here is one example (adapted from #18005):
+
+  type S = (forall b. b -> b) -> Int
+  data T = MkT {unT :: S}
+         | Dummy
+
+We want to generate HsBinds for unT that look something like this:
+
+  unT :: S
+  unT (MkT x) = x
+  unT _       = recSelError "unT"#
+
+Note that the type of recSelError is `forall r (a :: TYPE r). Addr# -> a`.
+Therefore, when used in the right-hand side of `unT`, GHC attempts to
+instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
+To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
+when typechecking these HsBinds so that the user does not have to.
+
+Although ImpredicativeTypes is somewhat fragile and unpredictable in GHC right
+now, it will become robust when Quick Look impredicativity is implemented. In
+the meantime, using ImpredicativeTypes to instantiate the `a` type variable in
+recSelError's type does actually work, so its use here is benign.
 -}
