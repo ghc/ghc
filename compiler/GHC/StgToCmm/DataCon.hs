@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS -O -ddump-to-file -dumpdir datacondumps -ddump-simpl -ddump-stg #-}
--- {-# OPTIONS -dsuppress-all #-}
 
 -----------------------------------------------------------------------------
 --
