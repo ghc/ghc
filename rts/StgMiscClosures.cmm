@@ -686,11 +686,11 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
    compaction is in progress and the hash table needs to be scanned by the GC.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
 { foreign "C" barf("COMPACT_NFDATA_CLEAN object (%p) entered!", R1) never returns; }
 
-INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 

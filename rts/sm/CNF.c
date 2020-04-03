@@ -381,6 +381,7 @@ compactNew (Capability *cap, StgWord size)
     self->nursery = block;
     self->last = block;
     self->hash = NULL;
+    self->link = NULL;
 
     block->owner = self;
 
