@@ -395,14 +395,14 @@ instance Outputable ContextInfo where
    text "record field" <+> ppr ctx <+> pprBindSpan sp
  ppr (EvidenceVarBind ctx sc sp) =
    text "evidence variable" <+> ppr ctx
-     <+> "with scope: " <+> ppr sc
-     <+> pprBindSpan sp
+     $$ "with scope:" <+> ppr sc
+     $$ pprBindSpan sp
  ppr (EvidenceVarUse) =
    text "usage of evidence variable"
 
 pprBindSpan :: Maybe Span -> SDoc
 pprBindSpan Nothing = text ""
-pprBindSpan (Just sp) = text "at:" <+> ppr sp
+pprBindSpan (Just sp) = text "bound at:" <+> ppr sp
 
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0

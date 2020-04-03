@@ -1,45 +1,80 @@
-At (31, 9), found evidence of type: C [a]
-|---------------------------------------------------------------------
-|Evidence from HieQueries.hs:31:1-13 of type: C [a]
-|Bound by a let, depending on:
-  |-------------------------------------------------------------------
-  |Evidence of type: forall a. C a => C [a]
-  |Bound by an instance at HieQueries.hs:27:10-21
-  |From the module: Main
-  |-------------------------------------------------------------------
-  |Evidence from HieQueries.hs:31:1-13 of type: C a
-  |Bound by a signature for the value at: Just HieQueries.hs:31:1-13
-======================================================================
-At (37, 9), found evidence of type: Show [(Integer, x, A)]
-|---------------------------------------------------------------------
-|Evidence from HieQueries.hs:37:1-22 of type: Show [(Integer, x, A)]
-|Bound by a let, depending on:
-  |-------------------------------------------------------------------
-  |Evidence of type: forall a. Show a => Show [a]
-  |Bound by an instance at <no location info>
-  |From the module: GHC.Show
-  |-------------------------------------------------------------------
-  |Evidence from HieQueries.hs:37:1-22 of type: Show (Integer, x, A)
-  |Bound by a let, depending on:
-    |-----------------------------------------------------------------
-    |Evidence of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
-    |Bound by an instance at <no location info>
-    |From the module: GHC.Show
-    |-----------------------------------------------------------------
-    |Evidence from HieQueries.hs:37:1-22 of type: Show Integer
-    |Bound by a let, depending on:
-      |---------------------------------------------------------------
-      |Evidence of type: Show Integer
-      |Bound by an instance at <no location info>
-      |From the module: GHC.Show
-    |-----------------------------------------------------------------
-    |Evidence from HieQueries.hs:37:1-22 of type: Show x
-    |Bound by a signature for the value at: Just HieQueries.hs:37:1-22
-    |-----------------------------------------------------------------
-    |Evidence from HieQueries.hs:37:1-22 of type: Show A
-    |Bound by a let, depending on:
-      |---------------------------------------------------------------
-      |Evidence of type: Show A
-      |Bound by an instance at HieQueries.hs:42:21-24
-      |From the module: Main
-======================================================================
+==========================
+At point (31,9), we found:
+==========================
+$dC at HieQueries.hs:31:1-13, of type: C [a]
+    is an evidence variable bound by a let, depending on: [$fC[], $dC]
+          with scope: LocalScope HieQueries.hs:31:1-13
+          bound at: HieQueries.hs:31:1-13
+    Defined at <no location info>
+|
++- $fC[] at HieQueries.hs:(4,1)-(80,27), of type: forall a. C a => C [a]
+|      is an evidence variable bound by an instance
+|            with scope: ModuleScope
+|            
+|      Defined at HieQueries.hs:27:10
+|
+`- $dC at HieQueries.hs:31:1-13, of type: C a
+       is an evidence variable bound by a type signature
+             with scope: LocalScope HieQueries.hs:31:1-13
+             bound at: HieQueries.hs:31:1-13
+       Defined at <no location info>
+
+==========================
+At point (37,9), we found:
+==========================
+$dShow at HieQueries.hs:37:1-22, of type: Show [(Integer, x, A)]
+    is an evidence variable bound by a let, depending on: [$fShow[],
+                                                           $dShow]
+          with scope: LocalScope HieQueries.hs:37:1-22
+          bound at: HieQueries.hs:37:1-22
+    Defined at <no location info>
+|
++- $fShow[] at HieQueries.hs:(4,1)-(80,27), of type: forall a. Show a => Show [a]
+|      is an evidence variable bound by an instance
+|            with scope: ModuleScope
+|            
+|      Defined in `GHC.Show'
+|
+`- $dShow at HieQueries.hs:37:1-22, of type: Show (Integer, x, A)
+       is an evidence variable bound by a let, depending on: [$fShow(,,),
+                                                              $dShow, $dShow, $dShow]
+             with scope: LocalScope HieQueries.hs:37:1-22
+             bound at: HieQueries.hs:37:1-22
+       Defined at <no location info>
+   |
+   +- $fShow(,,) at HieQueries.hs:(4,1)-(80,27), of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
+   |      is an evidence variable bound by an instance
+   |            with scope: ModuleScope
+   |            
+   |      Defined in `GHC.Show'
+   |
+   +- $dShow at HieQueries.hs:37:1-22, of type: Show Integer
+   |      is an evidence variable bound by a let, depending on: [$fShowInteger]
+   |            with scope: LocalScope HieQueries.hs:37:1-22
+   |            bound at: HieQueries.hs:37:1-22
+   |      Defined at <no location info>
+   |  |
+   |  `- $fShowInteger at HieQueries.hs:(4,1)-(80,27), of type: Show Integer
+   |         is an evidence variable bound by an instance
+   |               with scope: ModuleScope
+   |               
+   |         Defined in `GHC.Show'
+   |
+   +- $dShow at HieQueries.hs:37:1-22, of type: Show x
+   |      is an evidence variable bound by a type signature
+   |            with scope: LocalScope HieQueries.hs:37:1-22
+   |            bound at: HieQueries.hs:37:1-22
+   |      Defined at <no location info>
+   |
+   `- $dShow at HieQueries.hs:37:1-22, of type: Show A
+          is an evidence variable bound by a let, depending on: [$fShowA]
+                with scope: LocalScope HieQueries.hs:37:1-22
+                bound at: HieQueries.hs:37:1-22
+          Defined at <no location info>
+      |
+      `- $fShowA at HieQueries.hs:(4,1)-(80,27), of type: Show A
+             is an evidence variable bound by an instance
+                   with scope: ModuleScope
+                   
+             Defined at HieQueries.hs:42:21
+

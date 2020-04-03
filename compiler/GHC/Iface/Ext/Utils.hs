@@ -1,7 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 module GHC.Iface.Ext.Utils where
 
 import GhcPrelude
@@ -11,7 +13,8 @@ import GHC.Driver.Session         ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
-import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
+import Outputable hiding ((<>))
+import qualified Outputable as O
 import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
@@ -27,17 +30,19 @@ import qualified Data.Set as S
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
-import Data.Maybe                 ( maybeToList )
+import Data.Maybe                 ( maybeToList, mapMaybe)
 import Data.Monoid
 import Data.List                  (find)
 import Data.Traversable           ( for )
 import Control.Monad.Trans.State.Strict hiding (get)
+import qualified Data.Tree as Tree
 
+type RefMap a = M.Map Identifier [(Span, IdentifierDetails a)]
 
 generateReferencesMap
   :: Foldable f
   => f (HieAST a)
-  -> M.Map Identifier [(Span, IdentifierDetails a)]
+  -> RefMap a
 generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
   where
     go ast = M.unionsWith (++) (this : map go (nodeChildren ast))
@@ -92,6 +97,39 @@ findEvidence ni =
  where
    xs = M.toList $ nodeIdentifiers ni
    go (_,dets) = any isEvidenceContext (identInfo dets)
+
+data EvidenceInfo a
+  = EvidenceInfo
+  { evidenceVar :: Name
+  , evidenceSpan :: RealSrcSpan
+  , evidenceType :: a
+  , evidenceDetails :: [(EvVarSource, Scope, Maybe Span)]
+  } deriving (Eq,Ord,Functor)
+
+instance (Outputable a) => Outputable (EvidenceInfo a) where
+  ppr (EvidenceInfo name span typ dets) =
+    hang (ppr name <+> text "at" <+> ppr span O.<> text ", of type:" <+> ppr typ) 4 $
+      pdets $$ (pprDefinedAt name)
+    where
+      pdets = case dets of
+        [] -> text "is a usage of an evidence variable"
+        xs -> text "is an" <+> (hsep $ punctuate (text "and/or") $
+          map (\(src,scp,spn) -> ppr (EvidenceVarBind src scp spn)) xs)
+
+getEvidenceTree :: RefMap a -> Name -> Maybe (Tree.Tree (EvidenceInfo a))
+getEvidenceTree refmap var = do
+  xs <- M.lookup (Right var) refmap
+  (sp,dets) <- find (any isEvidenceBind . identInfo . snd) xs
+  typ <- identType dets
+  let
+    (evdets,concat -> children) = unzip $ do
+      det <- S.toList $ identInfo dets
+      case det of
+        EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
+          pure ((src,scp,spn),mapMaybe (getEvidenceTree refmap) xs)
+        EvidenceVarBind src scp spn -> pure ((src,scp,spn),[])
+        _ -> []
+  pure $ Tree.Node (EvidenceInfo var sp typ evdets) children
 
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
