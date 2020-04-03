@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -26,7 +27,8 @@ default ()
 -- monad, where all errors are represented by 'Nothing'.  A richer
 -- error monad can be built using the 'Data.Either.Either' type.
 --
-data  Maybe a  =  Nothing | Just a
-  deriving ( Eq  -- ^ @since 2.01
-           , Ord -- ^ @since 2.01
-           )
+data Maybe a = Nothing | Just a
+  deriving
+  stock ( Eq  -- ^ @since 2.01
+        , Ord -- ^ @since 2.01
+        )

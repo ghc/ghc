@@ -1,6 +1,7 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
@@ -124,9 +125,10 @@ data RTSStats = RTSStats {
 
     -- | Details about the most recent GC
   , gc :: GCDetails
-  } deriving ( Read -- ^ @since 4.10.0.0
-             , Show -- ^ @since 4.10.0.0
-             )
+  } deriving
+    stock ( Read -- ^ @since 4.10.0.0
+          , Show -- ^ @since 4.10.0.0
+          )
 
 --
 -- | Statistics about a single GC.  This is a mirror of the C @struct
@@ -172,9 +174,10 @@ data GCDetails = GCDetails {
     -- | The time elapsed during the post-mark pause phase of the concurrent
     -- nonmoving GC.
   , gcdetails_nonmoving_gc_sync_elapsed_ns :: RtsTime
-  } deriving ( Read -- ^ @since 4.10.0.0
-             , Show -- ^ @since 4.10.0.0
-             )
+  } deriving
+    stock ( Read -- ^ @since 4.10.0.0
+          , Show -- ^ @since 4.10.0.0
+          )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64

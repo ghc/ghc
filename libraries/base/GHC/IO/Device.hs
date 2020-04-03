@@ -1,5 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -41,19 +43,19 @@ class RawIO a where
   -- then the function should just return the available data. A return
   -- value of zero indicates that the end of the data stream (e.g. end
   -- of file) has been reached.
-  read                :: a -> Ptr Word8 -> Int -> IO Int
+  read :: a -> Ptr Word8 -> Int -> IO Int
 
   -- | Read up to the specified number of bytes, returning the number
   -- of bytes actually read, or 'Nothing' if the end of the stream has
   -- been reached.
-  readNonBlocking     :: a -> Ptr Word8 -> Int -> IO (Maybe Int)
+  readNonBlocking :: a -> Ptr Word8 -> Int -> IO (Maybe Int)
 
   -- | Write the specified number of bytes.
-  write               :: a -> Ptr Word8 -> Int -> IO ()
+  write :: a -> Ptr Word8 -> Int -> IO ()
 
   -- | Write up to the specified number of bytes without blocking.  Returns
   -- the actual number of bytes written.
-  writeNonBlocking    :: a -> Ptr Word8 -> Int -> IO Int
+  writeNonBlocking :: a -> Ptr Word8 -> Int -> IO Int
 
 
 -- | I/O operations required for implementing a 'System.IO.Handle'.
@@ -154,8 +156,8 @@ data IODeviceType
               -- read and write operations and may be seekable only
               -- to positions of certain granularity (block-
               -- aligned).
-  deriving ( Eq -- ^ @since 4.2.0.0
-           )
+  deriving
+  stock Eq -- ^ @since 4.2.0.0
 
 -- -----------------------------------------------------------------------------
 -- SeekMode type
@@ -167,11 +169,11 @@ data SeekMode
                         -- from the current position.
   | SeekFromEnd         -- ^ the position of @hdl@ is set to offset @i@
                         -- from the end of the file.
-    deriving ( Eq   -- ^ @since 4.2.0.0
-             , Ord  -- ^ @since 4.2.0.0
-             , Ix   -- ^ @since 4.2.0.0
-             , Enum -- ^ @since 4.2.0.0
-             , Read -- ^ @since 4.2.0.0
-             , Show -- ^ @since 4.2.0.0
-             )
-
+    deriving
+    stock ( Eq   -- ^ @since 4.2.0.0
+          , Ord  -- ^ @since 4.2.0.0
+          , Ix   -- ^ @since 4.2.0.0
+          , Enum -- ^ @since 4.2.0.0
+          , Read -- ^ @since 4.2.0.0
+          , Show -- ^ @since 4.2.0.0
+          )

@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns
            , CPP
@@ -67,19 +68,22 @@ import qualified GHC.Event.Poll   as Poll
 -- Types
 
 -- | A timeout registration cookie.
-newtype TimeoutKey   = TK Unique
-    deriving Eq -- ^ @since 4.7.0.0
+newtype TimeoutKey = TK Unique
+    deriving
+    stock Eq -- ^ @since 4.7.0.0
 
 -- | Callback invoked on timeout events.
 type TimeoutCallback = IO ()
 
-data State = Created
-           | Running
-           | Dying
-           | Finished
-             deriving ( Eq   -- ^ @since 4.7.0.0
-                      , Show -- ^ @since 4.7.0.0
-                      )
+data State
+    = Created
+    | Running
+    | Dying
+    | Finished
+    deriving
+    stock ( Eq   -- ^ @since 4.7.0.0
+          , Show -- ^ @since 4.7.0.0
+          )
 
 -- | A priority search queue, with timeouts as priorities.
 type TimeoutQueue = Q.PSQ TimeoutCallback
