@@ -311,7 +311,7 @@ warnUnusedPackages = do
     let loadedPackages
           = map (getPackageDetails dflags)
           . nub . sort
-          . map moduleUnitId
+          . map moduleUnit
           . moduleEnvKeys
           $ pit
 
@@ -1525,7 +1525,7 @@ unitIdsToCheck dflags =
     case splitUnitIdInsts uid of
       (_, Just indef) ->
         let insts = instUnitInsts indef
-        in uid : concatMap (goUnitId . moduleUnitId . snd) insts
+        in uid : concatMap (goUnitId . moduleUnit . snd) insts
       _ -> []
 
 maybeGetIfaceDate :: DynFlags -> ModLocation -> IO (Maybe UTCTime)

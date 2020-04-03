@@ -617,7 +617,7 @@ is_external_sig dflags iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    moduleUnitId (mi_module iface) /= thisPackage dflags
+    moduleUnit (mi_module iface) /= thisPackage dflags
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -724,13 +724,13 @@ wantHiBootFile dflags eps mod from
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
   where
-    this_package = thisPackage dflags == moduleUnitId mod
+    this_package = thisPackage dflags == moduleUnit mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (text "You cannot {-# SOURCE #-} import a module from another package")
        2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
-          <+> quotes (ppr (moduleUnitId mod)))
+          <+> quotes (ppr (moduleUnit mod)))
 
 -----------------------------------------------------
 --      Loading type/class/value decls
@@ -1263,7 +1263,7 @@ badIfaceFile file err
 
 hiModuleNameMismatchWarn :: DynFlags -> Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn dflags requested_mod read_mod
- | moduleUnitId requested_mod == moduleUnitId read_mod =
+ | moduleUnit requested_mod == moduleUnit read_mod =
     sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,
          text "but we were expecting module" <+> quotes (ppr requested_mod),
          sep [text "Probable cause: the source code which generated interface file",

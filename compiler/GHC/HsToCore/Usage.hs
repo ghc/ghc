@@ -70,7 +70,7 @@ mkDependencies iuid pluginModules
  = do
       -- Template Haskell used?
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
+          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
@@ -215,7 +215,7 @@ mkPluginUsage hsc_env pluginModule
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
     pNm      = moduleName (mi_module pluginModule)
-    pPkg     = moduleUnitId (mi_module pluginModule)
+    pPkg     = moduleUnit (mi_module pluginModule)
     deps     = map fst (dep_mods (mi_deps pluginModule))
 
     -- Lookup object file for a plugin dependency,
@@ -224,7 +224,7 @@ mkPluginUsage hsc_env pluginModule
       foundM <- findImportedModule hsc_env nm Nothing
       case foundM of
         Found ml m
-          | moduleUnitId m == pPkg -> Just <$> hashFile (ml_obj_file ml)
+          | moduleUnit m == pPkg -> Just <$> hashFile (ml_obj_file ml)
           | otherwise              -> return Nothing
         _ -> pprPanic "mkPluginUsage: no object for dependency"
                       (ppr pNm <+> ppr nm)
@@ -294,7 +294,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | moduleUnitId mod /= this_pkg
+      | moduleUnit mod /= this_pkg
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }

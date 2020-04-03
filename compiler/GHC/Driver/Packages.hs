@@ -784,7 +784,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                                   (Set.singleton $ InstantiatedModule indef mod_name)
                               | (mod_name, mod) <- instUnitInsts indef
                               , isHoleModule mod ]
-                      recurse = [ collectHoles (moduleUnitId mod)
+                      recurse = [ collectHoles (moduleUnit mod)
                                 | (_, mod) <- instUnitInsts indef ]
                   in Map.unionsWith Set.union $ local ++ recurse
                 -- Other types of unit identities don't have holes
@@ -1922,7 +1922,7 @@ lookupModuleInAllPackages dflags m
       LookupFound a b -> [(a,b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust "lookupModule" (lookupUnit dflags
-                                                         (moduleUnitId m)))
+                                                         (moduleUnit m)))
       _ -> []
 
 -- | The result of performing a lookup
@@ -1993,7 +1993,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
             -> (x:hidden_pkg, hidden_mod, unusable, exposed)
 
     unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
-    mod_unit = unit_lookup . moduleUnitId
+    mod_unit = unit_lookup . moduleUnit
 
     -- Filters out origins which are not associated with the given package
     -- qualifier.  No-op if there is no package qualifier.  Test if this
@@ -2048,7 +2048,7 @@ getPreloadPackagesAnd dflags pkgids0 =
                   -- Fixes #14525
                   if isIndefinite dflags
                     then []
-                    else map (toInstalledUnitId . moduleUnitId . snd)
+                    else map (toInstalledUnitId . moduleUnit . snd)
                              (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = unitInfoMap state
@@ -2178,7 +2178,7 @@ isDynLinkName dflags this_mod name
         -- I much rather have dynamic TH not supported than the entire Dynamic linking
         -- not due to a hack.
         -- Also not sure this would break on Windows anyway.
-        OSMinGW32 -> moduleUnitId mod /= moduleUnitId this_mod
+        OSMinGW32 -> moduleUnit mod /= moduleUnit this_mod
 
         -- For the other platforms, still perform the hack
         _         -> mod /= this_mod
@@ -2215,7 +2215,7 @@ pprModuleMap mod_map =
       pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (Map.toList e)))
       pprEntry :: Outputable a => ModuleName -> (Module, a) -> SDoc
       pprEntry m (m',o)
-        | m == moduleName m' = ppr (moduleUnitId m') <+> parens (ppr o)
+        | m == moduleName m' = ppr (moduleUnit m') <+> parens (ppr o)
         | otherwise = ppr m' <+> parens (ppr o)
 
 fsPackageName :: UnitInfo -> FastString

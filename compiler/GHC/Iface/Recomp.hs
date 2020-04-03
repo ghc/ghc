@@ -212,7 +212,7 @@ checkVersions hsc_env mod_summary iface
        -- readIface will have verified that the InstalledUnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; if moduleUnitId (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
+       ; if moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -332,7 +332,7 @@ checkHsig mod_summary iface = do
     dflags <- getDynFlags
     let outer_mod = ms_mod mod_summary
         inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
+    MASSERT( moduleUnit outer_mod == thisPackage dflags )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -471,7 +471,7 @@ checkDependencies hsc_env summary iface
                          return (RecompBecause reason)
                  else
                          return UpToDate
-           where pkg = moduleUnitId mod
+           where pkg = moduleUnit mod
         _otherwise  -> return (RecompBecause reason)
 
    old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods

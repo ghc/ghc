@@ -4599,7 +4599,7 @@ canonicalizeHomeModule dflags mod_name =
 
 canonicalizeModuleIfHome :: DynFlags -> Module -> Module
 canonicalizeModuleIfHome dflags mod
-    = if thisPackage dflags == moduleUnitId mod
+    = if thisPackage dflags == moduleUnit mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
