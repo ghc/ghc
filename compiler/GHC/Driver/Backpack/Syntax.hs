@@ -35,7 +35,7 @@ import GHC.Unit.Info
 
 data HsComponentId = HsComponentId {
     hsPackageName :: PackageName,
-    hsComponentId :: ComponentId
+    hsComponentId :: IndefUnitId
     }
 
 instance Outputable HsComponentId where

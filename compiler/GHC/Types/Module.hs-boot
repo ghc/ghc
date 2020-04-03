@@ -2,12 +2,16 @@ module GHC.Types.Module where
 
 import GHC.Prelude
 
-data Module
 data ModuleName
 data UnitId
-data InstalledUnitId
-data ComponentId
+data GenModule a
+data GenUnit a
+data Indefinite unit
 
-moduleName :: Module -> ModuleName
-moduleUnitId :: Module -> UnitId
-unitIdString :: UnitId -> String
+type Unit        = GenUnit UnitId
+type IndefUnitId = Indefinite UnitId
+type Module      = GenModule Unit
+
+moduleName :: GenModule a -> ModuleName
+moduleUnit :: GenModule a -> a
+unitString :: Unit -> String

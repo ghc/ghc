@@ -181,10 +181,10 @@ tagToClosure platform tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: Unit -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> Unit -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint pkg fun args safe
    = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe

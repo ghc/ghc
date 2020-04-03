@@ -6,27 +6,27 @@
 --
 -- (c) The University of Glasgow, 2004
 --
-module GHC.Unit.Info (
-        -- $package_naming
+module GHC.Unit.Info
+   ( GenericUnitInfo (..)
+   , GenUnitInfo
+   , UnitInfo
+   , UnitKey (..)
+   , UnitKeyInfo
+   , mkUnitKeyInfo
+   , mapUnitInfo
 
-        -- * UnitId
-        packageConfigId,
-        expandedUnitInfoId,
-        definiteUnitInfoId,
-        installedUnitInfoId,
+   , mkUnit
+   , expandedUnitInfoId
+   , definiteUnitInfoId
 
-        -- * The UnitInfo type: information about a unit
-        UnitInfo,
-        toUnitInfo,
-        GenericUnitInfo(..),
-        ComponentId(..),
-        PackageId(..),
-        PackageName(..),
-        Version(..),
-        unitPackageNameString,
-        unitPackageIdString,
-        pprUnitInfo,
-    ) where
+   , PackageId(..)
+   , PackageName(..)
+   , Version(..)
+   , unitPackageNameString
+   , unitPackageIdString
+   , pprUnitInfo
+   )
+where
 
 #include "HsVersions.h"
 
@@ -41,40 +41,61 @@ import GHC.Utils.Outputable
 import GHC.Types.Module as Module
 import GHC.Types.Unique
 
--- -----------------------------------------------------------------------------
--- Our UnitInfo type is the GenericUnitInfo from ghc-boot,
--- which is similar to a subset of the InstalledPackageInfo type from Cabal.
+-- | Information about an installed unit
+--
+-- We parameterize on the unit identifier:
+--    * UnitKey: identifier used in the database (cf 'UnitKeyInfo')
+--    * UnitId: identifier used to generate code (cf 'UnitInfo')
+--
+-- These two identifiers are different for wired-in packages. See Note [The
+-- identifier lexicon] in GHC.Types.Module
+type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
-type UnitInfo = GenericUnitInfo
-                       ComponentId
-                       PackageId
-                       PackageName
-                       Module.InstalledUnitId
-                       Module.ModuleName
-                       Module.Module
+-- | A unit key in the database
+newtype UnitKey = UnitKey FastString
 
--- | Convert a DbUnitInfo (read from a package database) into `UnitInfo`
-toUnitInfo :: DbUnitInfo -> UnitInfo
-toUnitInfo = mapGenericUnitInfo
-   mkUnitId'
-   mkComponentId'
+unitKeyFS :: UnitKey -> FastString
+unitKeyFS (UnitKey fs) = fs
+
+-- | Information about an installed unit (units are identified by their database
+-- UnitKey)
+type UnitKeyInfo = GenUnitInfo UnitKey
+
+-- | Information about an installed unit (units are identified by their internal
+-- UnitId)
+type UnitInfo    = GenUnitInfo UnitId
+
+-- | Convert a DbUnitInfo (read from a package database) into `UnitKeyInfo`
+mkUnitKeyInfo :: DbUnitInfo -> UnitKeyInfo
+mkUnitKeyInfo = mapGenericUnitInfo
+   mkUnitKey'
+   mkIndefUnitKey'
    mkPackageIdentifier'
    mkPackageName'
    mkModuleName'
    mkModule'
    where
-     mkPackageIdentifier' = PackageId       . mkFastStringByteString
-     mkPackageName'       = PackageName     . mkFastStringByteString
-     mkUnitId'            = InstalledUnitId . mkFastStringByteString
-     mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
-     mkComponentId' cid   = ComponentId (mkFastStringByteString cid) Nothing
-     mkInstUnitId' i = case i of
-      DbInstUnitId cid insts -> newUnitId (mkComponentId' cid) (fmap (bimap mkModuleName' mkModule') insts)
-      DbUnitId uid           -> DefiniteUnitId (DefUnitId (mkUnitId' uid))
+     mkPackageIdentifier' = PackageId      . mkFastStringByteString
+     mkPackageName'       = PackageName    . mkFastStringByteString
+     mkUnitKey'           = UnitKey        . mkFastStringByteString
+     mkModuleName'        = mkModuleNameFS . mkFastStringByteString
+     mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid) Nothing
+     mkVirtUnitKey' i = case i of
+      DbInstUnitId cid insts -> mkGenVirtUnit unitKeyFS (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbUnitId uid           -> RealUnit (Definite (mkUnitKey' uid))
      mkModule' m = case m of
-       DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
+       DbModule uid n -> mkModule (mkVirtUnitKey' uid) (mkModuleName' n)
        DbModuleVar  n -> mkHoleModule (mkModuleName' n)
 
+-- | Map over the unit parameter
+mapUnitInfo :: (u -> v) -> (v -> FastString) -> GenUnitInfo u -> GenUnitInfo v
+mapUnitInfo f gunitFS = mapGenericUnitInfo
+   f         -- unit identifier
+   (fmap f)  -- indefinite unit identifier
+   id        -- package identifier
+   id        -- package name
+   id        -- module name
+   (fmap (mapGenUnit f gunitFS)) -- instantiating modules
 
 -- TODO: there's no need for these to be FastString, as we don't need the uniq
 --       feature, but ghc doesn't currently have convenient support for any
@@ -137,33 +158,18 @@ pprUnitInfo GenericUnitInfo {..} =
   where
     field name body = text name <> colon <+> nest 4 body
 
--- -----------------------------------------------------------------------------
--- UnitId (package names, versions and dep hash)
-
--- $package_naming
--- #package_naming#
--- Mostly the compiler deals in terms of 'UnitId's, which are md5 hashes
--- of a package ID, keys of its dependencies, and Cabal flags. You're expected
--- to pass in the unit id in the @-this-unit-id@ flag. However, for
--- wired-in packages like @base@ & @rts@, we don't necessarily know what the
--- version is, so these are handled specially; see #wired_in_packages#.
-
--- | Get the GHC 'UnitId' right out of a Cabalish 'UnitInfo'
-installedUnitInfoId :: UnitInfo -> InstalledUnitId
-installedUnitInfoId = unitId
-
-packageConfigId :: UnitInfo -> UnitId
-packageConfigId p =
+mkUnit :: UnitInfo -> Unit
+mkUnit p =
     if unitIsIndefinite p
-        then newUnitId (unitInstanceOf p) (unitInstantiations p)
-        else DefiniteUnitId (DefUnitId (unitId p))
+        then mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
+        else RealUnit (Definite (unitId p))
 
-expandedUnitInfoId :: UnitInfo -> UnitId
+expandedUnitInfoId :: UnitInfo -> Unit
 expandedUnitInfoId p =
-    newUnitId (unitInstanceOf p) (unitInstantiations p)
+    mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
-    case packageConfigId p of
-        DefiniteUnitId def_uid -> Just def_uid
-        _ -> Nothing
+    case mkUnit p of
+        RealUnit def_uid -> Just def_uid
+        _               -> Nothing
