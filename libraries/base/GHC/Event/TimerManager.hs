@@ -1,11 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns
-           , CPP
-           , ExistentialQuantification
-           , NoImplicitPrelude
-           , TypeSynonymInstances
-           , FlexibleInstances
-  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Event.TimerManager
     ( -- * Types
@@ -67,19 +68,22 @@ import qualified GHC.Event.Poll   as Poll
 -- Types
 
 -- | A timeout registration cookie.
-newtype TimeoutKey   = TK Unique
-    deriving Eq -- ^ @since 4.7.0.0
+newtype TimeoutKey = TK Unique
+    deriving
+    newtype Eq -- ^ @since 4.7.0.0
 
 -- | Callback invoked on timeout events.
 type TimeoutCallback = IO ()
 
-data State = Created
-           | Running
-           | Dying
-           | Finished
-             deriving ( Eq   -- ^ @since 4.7.0.0
-                      , Show -- ^ @since 4.7.0.0
-                      )
+data State
+    = Created
+    | Running
+    | Dying
+    | Finished
+    deriving
+    stock ( Eq   -- ^ @since 4.7.0.0
+          , Show -- ^ @since 4.7.0.0
+          )
 
 -- | A priority search queue, with timeouts as priorities.
 type TimeoutQueue = Q.PSQ TimeoutCallback
