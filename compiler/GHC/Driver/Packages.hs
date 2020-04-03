@@ -7,7 +7,7 @@ module GHC.Driver.Packages (
         module UnitInfo,
 
         -- * Reading the package config, and processing cmdline args
-        PackageState(preloadPackages, explicitPackages, moduleNameProvidersMap, requirementContext),
+        PackageState(..),
         PackageDatabase (..),
         UnitInfoMap,
         emptyPackageState,
@@ -274,7 +274,7 @@ data UnitVisibility = UnitVisibility
       -- ^ The package name is associated with the 'UnitId'.  This is used
       -- to implement legacy behavior where @-package foo-0.1@ implicitly
       -- hides any packages named @foo@
-    , uv_requirements :: Map ModuleName (Set IndefModule)
+    , uv_requirements :: Map ModuleName (Set InstantiatedModule)
       -- ^ The signatures which are contributed to the requirements context
       -- from this unit ID.
     , uv_explicit :: Bool
@@ -363,7 +363,7 @@ data PackageState = PackageState {
   -- and @r[C=<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
-  requirementContext :: Map ModuleName [IndefModule]
+  requirementContext :: Map ModuleName [InstantiatedModule]
   }
 
 emptyPackageState :: PackageState
@@ -781,7 +781,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                 (_, Just indef) ->
                   let local = [ Map.singleton
                                   (moduleName mod)
-                                  (Set.singleton $ IndefModule indef mod_name)
+                                  (Set.singleton $ InstantiatedModule indef mod_name)
                               | (mod_name, mod) <- instUnitInsts indef
                               , isHoleModule mod ]
                       recurse = [ collectHoles (moduleUnitId mod)
