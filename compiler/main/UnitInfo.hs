@@ -70,7 +70,7 @@ toUnitInfo = mapGenericUnitInfo
      mkComponentId' cid   = ComponentId (mkFastStringByteString cid) Nothing
      mkInstUnitId' i = case i of
       DbInstUnitId cid insts -> newUnitId (mkComponentId' cid) (fmap (bimap mkModuleName' mkModule') insts)
-      DbUnitId uid           -> DefiniteUnitId (DefUnitId (mkUnitId' uid))
+      DbUnitId uid           -> UnitId (DefUnitId (mkUnitId' uid))
      mkModule' m = case m of
        DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
        DbModuleVar  n -> mkHoleModule (mkModuleName' n)
@@ -156,7 +156,7 @@ packageConfigId :: UnitInfo -> UnitId
 packageConfigId p =
     if unitIsIndefinite p
         then newUnitId (unitInstanceOf p) (unitInstantiations p)
-        else DefiniteUnitId (DefUnitId (unitId p))
+        else UnitId (DefUnitId (unitId p))
 
 expandedUnitInfoId :: UnitInfo -> UnitId
 expandedUnitInfoId p =
@@ -165,5 +165,5 @@ expandedUnitInfoId p =
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
     case packageConfigId p of
-        DefiniteUnitId def_uid -> Just def_uid
+        UnitId def_uid -> Just def_uid
         _ -> Nothing
