@@ -187,8 +187,8 @@ instance Contravariant Proxy where
 
 newtype Predicate a = Predicate { getPredicate :: a -> Bool }
   deriving
-    ( -- | @('<>') \@(Predicate)@ conjunctions @('&&')@ of the
-      -- results, without newtypes this equals @'liftA2' (&&)@
+    ( -- | @('<>') \@(Predicate)@ is the logical conjunction @('&&')@ of 
+      -- the results, without newtypes this equals @'liftA2' (&&)@
       --
       -- @
       -- (<>) :: Predicate a -> Predicate a -> Predicate a
