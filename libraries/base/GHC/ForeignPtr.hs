@@ -604,7 +604,7 @@ they be used and what should their key be?  Certainly not 'ForeignPtr' or
 'ForeignPtrContents'. See the warning in "GHC.Weak" about weak pointers with
 lifted (non-primitive) keys. The two finalizer-supporting data constructors of
 'ForeignPtr' have an @'IORef' 'Finalizers'@ (backed by 'MutVar#') field.
-This gets used in two differently depending on the kind of finalizer:
+This gets used in two different ways depending on the kind of finalizer:
 
 * 'HaskellFinalizers': The first @addForeignPtrConcFinalizer_@ call uses
   'mkWeak#' to attach the finalizer @foreignPtrFinalizer@ to the 'MutVar#'.
