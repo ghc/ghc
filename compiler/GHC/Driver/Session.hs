@@ -247,7 +247,7 @@ import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkComponentId)
+import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -524,7 +524,7 @@ data DynFlags = DynFlags {
                                          --   Typically only 1 is needed
 
   thisInstalledUnitId   :: InstalledUnitId,              -- ^ Target unit-id
-  thisComponentId_      :: Maybe ComponentId,            -- ^ Unit-id to instantiate
+  thisComponentId_      :: Maybe IndefUnitId,            -- ^ Unit-id to instantiate
   thisUnitIdInsts_      :: Maybe [(ModuleName, Module)], -- ^ How to instantiate the unit-id above
 
   -- ways
@@ -1956,16 +1956,16 @@ setOutputHi   f d = d { outputHi   = f}
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
 
-thisComponentId :: DynFlags -> ComponentId
+thisComponentId :: DynFlags -> IndefUnitId
 thisComponentId dflags =
   let pkgstate = pkgState dflags
   in case thisComponentId_ dflags of
-    Just (ComponentId raw _) -> mkComponentId pkgstate raw
+    Just uid -> updateIndefUnitId pkgstate uid
     Nothing  ->
       case thisUnitIdInsts_ dflags of
         Just _  ->
           throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-        Nothing -> mkComponentId pkgstate (unitIdFS (thisPackage dflags))
+        Nothing -> mkIndefUnitId pkgstate (unitIdFS (thisPackage dflags))
 
 thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
 thisUnitIdInsts dflags =
@@ -1979,7 +1979,7 @@ thisPackage dflags =
         Nothing -> default_uid
         Just insts
           | all (\(x,y) -> mkHoleModule x == y) insts
-          -> newUnitId (thisComponentId dflags) insts
+          -> mkInstUnit (thisComponentId dflags) insts
           | otherwise
           -> default_uid
   where
@@ -2002,7 +2002,7 @@ setUnitIdInsts s d =
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
-    d { thisComponentId_ = Just (ComponentId (fsLit s) Nothing) }
+    d { thisComponentId_ = Just (IndefUnitId (InstalledUnitId (fsLit s)) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }

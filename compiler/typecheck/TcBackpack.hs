@@ -234,13 +234,13 @@ requirementMerges :: PackageState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
     fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
     where
-      -- update ComponentId cached details as they may have changed since the
-      -- time the ComponentId was created
+      -- update IndefUnitId ppr info as they may have changed since the
+      -- time the IndefUnitId was created
       fixupModule (Module iud name) = Module iud' name
          where
             iud' = iud { instUnitInstanceOf = cid' }
             cid  = instUnitInstanceOf iud
-            cid' = updateComponentId pkgstate cid
+            cid' = updateIndefUnitId pkgstate cid
 
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
@@ -1005,6 +1005,6 @@ instantiateSignature = do
     MASSERT( moduleUnit outer_mod == thisPackage dflags )
     inner_mod `checkImplements`
         Module
-            (newInstantiatedUnit (thisComponentId dflags)
-                                 (thisUnitIdInsts dflags))
+            (mkInstantiatedUnit (thisComponentId dflags)
+                                (thisUnitIdInsts dflags))
             (moduleName outer_mod)
