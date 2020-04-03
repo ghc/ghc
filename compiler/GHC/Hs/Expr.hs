@@ -676,6 +676,16 @@ data HsExpansion a b
   = HsExpanded a b
   deriving (Typeable, Data)
 
+mkExpanded
+  :: (HsExpansion (Located a) (Located b) -> b)  -- XExpr, XCmd
+  -> Located a -- original AST
+  -> Located b -- "desugared" AST
+  -> Located b
+mkExpanded xwrap a b = L (getLoc a) $
+  xwrap (HsExpanded a $ noloc b)
+
+  where noloc (L _ x) = L noSrcSpan x
+
 -- | Just print the original expression.
 instance Outputable a => Outputable (HsExpansion a b) where
   ppr (HsExpanded a _)= ppr a

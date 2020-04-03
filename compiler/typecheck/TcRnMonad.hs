@@ -1450,8 +1450,14 @@ mkErrInfo env ctxts
           ; return (msg $$ rest) }
      | otherwise
      = go dbg n env ctxts
+   -- expansion contexts are never treated as "landmarks", so we
+   -- account for each one that we add until we hit the mAX_CONTEXTS
+   -- limit
    go dbg n env (ExpansionCtxt msg : ctxts)
+     | n < mAX_CONTEXTS
      = (msg $$) <$> go dbg (n+1) env ctxts
+     | otherwise
+     = go dbg n env ctxts
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3

@@ -1390,11 +1390,8 @@ tcArg :: LHsExpr GhcRn                   -- The function (for error messages)
       -> TcRhoType                       -- expected arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)           -- Resulting argument
-tcArg fun arg ty arg_no = do
-  case arg of
-    L _ (XExpr _) -> tcPolyExpr arg ty
-    _             -> addErrCtxt (funAppCtxt fun arg arg_no) $
-      tcPolyExprNC arg ty
+tcArg fun arg ty arg_no = addAppErrCtxt fun arg arg_no $
+  tcPolyExprNC arg ty
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]
@@ -2491,6 +2488,20 @@ checkMissingFields con_like rbinds
 
 Boring and alphabetical:
 -}
+
+addAppErrCtxt
+  :: LHsExpr GhcRn
+  -> LHsExpr GhcRn
+  -> Int
+  -> TcM a
+  -> TcM a
+addAppErrCtxt fun arg arg_no =
+  case arg of
+    L l (XExpr (HsExpanded a _))
+      | l /= noSrcSpan -> addExpansionCtxt (exprCtxt a)
+      | otherwise      -> addErrCtxt (funAppCtxt fun arg arg_no)
+    _ -> addExpansionCtxt (funAppCtxt fun arg arg_no)
+
 
 addExprErrCtxt :: LHsExpr GhcRn -> TcM a -> TcM a
 -- For expressions involved in rebindable syntax, for which we track the source

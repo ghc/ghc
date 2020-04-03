@@ -94,7 +94,7 @@ rnLExpr :: LHsExpr GhcPs -> RnM (LHsExpr GhcRn, FreeVars)
 -- level (and not 'rnExpr') because we need to reuse the 'HsIf' node's
 -- location for some subnodes of the expression that we rename the if to,
 -- when RS is on.
-rnLExpr (L l e@(HsIf _ p b1 b2))
+rnLExpr e@(L l (HsIf _ p b1 b2))
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
@@ -107,16 +107,15 @@ rnLExpr (L l e@(HsIf _ p b1 b2))
            -- RS is on and we found an 'ifThenElse' function in the environment
            Just ifteName ->
              let ifteFun = L l $ HsVar noExtField (noLoc ifteName)
-                 p''     = mkExpanded p  p'
-                 b1''    = mkExpanded b1 b1'
-                 b2''    = mkExpanded b2 b2'
-                 ifteApp = apps ifteFun p'' b1'' b2''
-                 ifteEx  = mkExpanded (L l e) ifteApp
+                 p''     = mkExpanded XExpr p  p'
+                 b1''    = mkExpanded XExpr b1 b1'
+                 b2''    = mkExpanded XExpr b2 b2'
+                 ifteApp = app3 ifteFun p'' b1'' b2''
+                 ifteEx  = mkExpanded XExpr e ifteApp
              in pure (ifteEx, plusFVs [unitFV ifteName, fvP, fvB1, fvB2])
        }
 
-  where mkExpanded a a' = L (getLoc a') (XExpr $ HsExpanded a a')
-        apps f a b c = mkHsApp (mkHsApp (mkHsApp f a) b) c
+  where app3 f a b c = mkHsApp (mkHsApp (mkHsApp f a) b) c
 
 rnLExpr a = wrapLocFstM rnExpr a
 
