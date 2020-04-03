@@ -977,7 +977,7 @@ profiled. The root profiler supports two related but distinct modes:
 In either case the program must use
 :base-ref:`GHC.Profiling.setHeapProfilingRoots` to inform the RTS of the
 set of closures the program is interested in. Closures are considered
-during profiling only when they are rechable from at least one of the the
+during profiling only when they are reachable from at least one of the
 specified roots.
 
 .. NOTE:: The number of roots is currently limited to 20 to keep the
@@ -1048,17 +1048,19 @@ Take the following simple example ::
           c = 3
       setHeapProfilingRoots [Root "a" a, Root "b" b]
 
-roots ``a`` and ``b`` share some data ``c``, but the roots constructors are
-unshared. Here we can think of the root profiler producing three groups ::
+roots ``a`` and ``b`` share some data ``c``, but the roots' constructors
+are unshared. Here we can think of the root profiler producing three groups
+::
 
     a   -> {A _ _, 1}
     b   -> {B _ _, 2}
     a,b -> {3}
 
 though in reality it just sums the closure's sizes. In this case ``A _ _``
-and ``B _ _`` have a size of three machine words, one for the info pointer
-and another two for the references to the boxed integers for a total of
-five while the boxed integers have a size of two words, giving ::
+and ``B _ _`` each have a size of three machine words, one for the info
+pointer and another two for the references to the boxed integers. The boxed
+integers themselves have a size of two machine words, giving the following
+totals for each set ::
 
     a   -> 5
     b   -> 5
