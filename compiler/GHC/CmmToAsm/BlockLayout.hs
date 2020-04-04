@@ -639,7 +639,8 @@ sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
     let weights :: CFG
         weights = --pprTrace "cfg'" (pprEdgeWeights cfg')
-                  cfg'
+                  -- cfg'
+                  weights'
           where
             (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-} mkGlobalWeights entry weights'
             cfg' = {-# SCC rewriteEdges #-}
