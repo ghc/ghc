@@ -37,7 +37,10 @@ import GHC.CmmToAsm.Config
 --      (for allocation purposes, anyway).
 --
 data RegUsage
-        = RU [Reg] [Reg]
+        = RU    {
+                reads :: [Reg],
+                writes :: [Reg]
+                }
 
 -- | No regs read or written to.
 noUsage :: RegUsage

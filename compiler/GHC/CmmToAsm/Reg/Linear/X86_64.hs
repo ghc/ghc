@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | Free regs map for x86_64
 module GHC.CmmToAsm.Reg.Linear.X86_64 where
@@ -9,12 +10,13 @@ import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Utils.Outputable
 
 import Data.Word
 import Data.Bits
 
 newtype FreeRegs = FreeRegs Word64
-    deriving Show
+    deriving (Show,Outputable)
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0

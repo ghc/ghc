@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | Free regs map for SPARC
 module GHC.CmmToAsm.Reg.Linear.SPARC where
@@ -37,6 +38,9 @@ data FreeRegs
 
 instance Show FreeRegs where
         show = showFreeRegs
+
+instance Outputable FreeRegs where
+        ppr = text . showFreeRegs
 
 -- | A reg map where no regs are free to be allocated.
 noFreeRegs :: FreeRegs
