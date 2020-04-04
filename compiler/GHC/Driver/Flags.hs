@@ -181,6 +181,7 @@ data GeneralFlag
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
+   | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
    | Opt_AsmShortcutting
    | Opt_OmitYields

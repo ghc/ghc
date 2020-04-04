@@ -30,6 +30,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Cmm.BlockId
 
+data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
 -- | Used to store the register assignment on entry to a basic block.
 --      We use this to handle join points, where multiple branch instructions
@@ -138,6 +139,8 @@ data RA_State freeRegs
         , ra_config     :: !NCGConfig
 
         -- | (from,fixup,to) : We inserted fixup code between from and to
-        , ra_fixups     :: [(BlockId,BlockId,BlockId)] }
+        , ra_fixups     :: [(BlockId,BlockId,BlockId)]
+
+        }
 
 
