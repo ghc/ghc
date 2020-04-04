@@ -4,7 +4,7 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 
 import GhcPrelude
 
---import GHC.Core    ( Tickish(Breakpoint) )
+import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Name (Name) --, nameIsLocalOrFrom)
@@ -113,7 +113,7 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             )
           where
             (fvs, da_fvs) = args env bounds as
-        go bounds (StgLit lit) =
+        go _ (StgLit lit) =
             (StgLit lit, emptyDVarSet, emptyVarSet)
         go bounds (StgConApp dc as tys) =
             (StgConApp dc as tys, fvs, da_fvs)
@@ -135,7 +135,17 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             -- See Note [Tracking local binders]
             (alts', alt_fvs, alt_da_fvs) =
                 alts (addLocals [bndr] env) (extendVarSet bounds bndr) as
-        go bounds (StgLet ext bind body) = go_bind bounds (StgLet ext) bind body
+        go bounds (StgLet ext bind body) =
+            go_bind bounds (StgLet ext) bind body
+        go bounds (StgLetNoEscape ext bind body) =
+            go_bind bounds (StgLetNoEscape ext) bind body
+        go bounds (StgTick tick e) =
+            (StgTick tick e', fvs', da_fvs)
+          where
+            (e', fvs, da_fvs) = go bounds e
+            fvs' = unionDVarSet (tickish tick) fvs
+            tickish (Breakpoint _ ids) = mkDVarSet ids
+            tickish _                  = emptyDVarSet
 
         go_bind bounds dc bind body =
             ( dc bind' body'
@@ -149,7 +159,6 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             (body', body_fvs, da_body_fvs) =
                 expr env' (extendVarSetList bounds binders) body
             (bind', fvs, da_bind_fvs) = binding env' body_fvs bounds bind
-
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
     alts env bounds as =
@@ -174,133 +183,6 @@ annTopBindingsDeps this_mod bs = map top_bind bs
 
     var :: Env -> BVs -> Var -> (DIdSet, FVs)
     var = undefined this_mod
-
-{-
-    binding env body_fv bounds (StgRec pairs) =
-      ( StgRec pairs'
-      , fvs
-      , unionVarSets $
-          map (bind_non_rec (extendVarSetList bounds (map fst pairs))) pairs)
-      where
-        -- See Note [Tracking local binders]
-        bndrs = map fst pairs
-        (rhss, rhs_fvss) = mapAndUnzip (rhsFV env . snd) pairs
-        pairs' = zip bndrs rhss
-        fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
-
-    rhsFV :: Env -> StgRhs -> (CgStgRhs, DIdSet)
-    rhsFV env (StgRhsClosure _ ccs uf bndrs body)
-      = (StgRhsClosure fvs ccs uf bndrs body', fvs)
-      where
-        -- See Note [Tracking local binders]
-        (body', body_fvs) = exprFV (addLocals bndrs env) body
-        fvs = delDVarSetList body_fvs bndrs
-    rhsFV env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, argsFV env as)
-
-    exprFV :: Env -> StgExpr -> (CgStgExpr, DIdSet)
-    exprFV env = go
-      where
-        go (StgApp occ as)
-          = (StgApp occ as, unionDVarSet (argsFV env as) (mkFreeVarSet env [occ]))
-        go (StgLit lit) = (StgLit lit, emptyDVarSet)
-        go (StgConApp dc as tys) = (StgConApp dc as tys, argsFV env as)
-        go (StgOpApp op as ty) = (StgOpApp op as ty, argsFV env as)
-        go StgLam{} = pprPanic "StgFVs: StgLam" empty
-        go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
-          where
-            (scrut', scrut_fvs) = go scrut
-            -- See Note [Tracking local binders]
-            (alts', alt_fvss) = mapAndUnzip (altFV (addLocals [bndr] env)) alts
-            alt_fvs = unionDVarSets alt_fvss
-            fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
-        go (StgLet ext bind body) = go_bind (StgLet ext) bind body
-        go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
-        go (StgTick tick e) = (StgTick tick e', fvs')
-          where
-            (e', fvs) = go e
-            fvs' = unionDVarSet (tickish tick) fvs
-            tickish (Breakpoint _ ids) = mkDVarSet ids
-            tickish _                  = emptyDVarSet
-    
-        go_bind dc bind body = (dc bind' body', fvs)
-          where
-            -- See Note [Tracking local binders]
-            env' = addLocals (boundIds bind) env
-            (body', body_fvs) = exprFV env' body
-            (bind', fvs, _) = binding env' body_fvs bind
-
-    argsFV :: Env -> [StgArg] -> DIdSet
-    argsFV env = mkFreeVarSet env . mapMaybe f
-      where
-        f (StgVarArg occ) = Just occ
-        f _               = Nothing
-
-    bind_non_rec :: BVs -> (Id, StgRhs) -> FVs
-    bind_non_rec bounds (_, r) =
-        rhs bounds r
-
-    rhs :: BVs -> StgRhs -> FVs
-    rhs bounds (StgRhsClosure _ _ _ as e) =
-      expr (extendVarSetList bounds as) e
-
-    rhs bounds (StgRhsCon _ _ as) =
-      args bounds as
-
-    var :: BVs -> Var -> FVs
-    var bounds v
-      | not (elemVarSet v bounds)
-      , nameIsLocalOrFrom this_mod (idName v)
-      = unitVarSet v
-      | otherwise
-      = emptyVarSet
-
-    arg :: BVs -> StgArg -> FVs
-    arg bounds (StgVarArg v) = var bounds v
-    arg _ StgLitArg{} = emptyVarSet
-
-    args :: BVs -> [StgArg] -> FVs
-    args bounds as = unionVarSets (map (arg bounds) as)
-
-    expr :: BVs -> StgExpr -> FVs
-    expr bounds (StgApp f as) =
-      var bounds f `unionVarSet` args bounds as
-
-    expr _ StgLit{} =
-      emptyVarSet
-
-    expr bounds (StgConApp _ as _) =
-      args bounds as
-    expr bounds (StgOpApp _ as _) =
-      args bounds as
-    expr _ lam@StgLam{} =
-      pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ ppr lam)
-    expr bounds (StgCase scrut scrut_bndr _ as) =
-      expr bounds scrut `unionVarSet`
-        alts (extendVarSet bounds scrut_bndr) as
-    expr bounds (StgLet _ bs e) =
-      binding bounds bs `unionVarSet`
-        expr (extendVarSetList bounds (bindersOf bs)) e
-    expr bounds (StgLetNoEscape _ bs e) =
-      binding bounds bs `unionVarSet`
-        expr (extendVarSetList bounds (bindersOf bs)) e
-
-    expr bounds (StgTick _ e) =
-      expr bounds e
-
-    alts :: BVs -> [StgAlt] -> FVs
-    alts bounds = unionVarSets . map (alt bounds)
-
-    alt :: BVs -> StgAlt -> FVs
-    alt bounds (_, bndrs, e) =
-      expr (extendVarSetList bounds bndrs) e
-
-    altFV :: Env -> StgAlt -> (CgStgAlt, DIdSet)
-    altFV env (con, bndrs, e) = ((con, bndrs, e'), fvs)
-      where
-        -- See Note [Tracking local binders]
-        (e', rhs_fvs) = exprFV (addLocals bndrs env) e
-        fvs = delDVarSetList rhs_fvs bndrs
--}
 
 --------------------------------------------------------------------------------
 -- * Dependency sorting
