@@ -90,8 +90,8 @@ module GHC.Types.SrcLoc (
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost_smallest,
-        spans, isSubspanOf, isRealSubspanOf, sortLocated,
-        sortLocatedUsingBufPos, sortRealLocated,
+        spans, isSubspanOf, isRealSubspanOf,
+        sortLocated, sortRealLocated,
         lookupSrcLoc, lookupSrcSpan,
 
         liftL,
@@ -199,7 +199,7 @@ data RealSrcLoc
 --
 -- Is the Haddock comment located between the module name and the data
 -- declaration? This is impossible to tell because the locations are not
--- comparable, they even refer to different files.
+-- comparable; they even refer to different files.
 --
 -- On the other hand, with 'BufPos', we have the following location information:
 --   * The module name is located at 846-870
@@ -290,12 +290,6 @@ advanceBufPos (BufPos i) = BufPos (i+1)
 
 sortLocated :: [Located a] -> [Located a]
 sortLocated = sortBy (leftmost_smallest `on` getLoc)
-
-sortLocatedUsingBufPos ::  [Located a] -> [Located a]
-sortLocatedUsingBufPos = sortBy (cmp `on` getLoc)
-  where
-    cmp (getBufSpan -> Just a) (getBufSpan -> Just b) = compare a b
-    cmp a b = leftmost_smallest a b
 
 sortRealLocated :: [RealLocated a] -> [RealLocated a]
 sortRealLocated = sortBy (compare `on` getLoc)
@@ -845,7 +839,7 @@ data LayoutInfo =
     --   bar :: a
     -- @
     VirtualBraces
-      !Int -- ^ Layout column (indentation level)
+      !Int -- ^ Layout column (indentation level, begins at 1)
   |
     -- | Empty or compiler-generated blocks do not have layout information
     -- associated with them.

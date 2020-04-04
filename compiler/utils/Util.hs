@@ -5,6 +5,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -51,6 +52,8 @@ module Util (
         changeLast,
 
         whenNonEmpty,
+
+        mergeListsBy,
 
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
@@ -610,6 +613,40 @@ changeLast (x:xs) x' = x : changeLast xs x'
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()
 whenNonEmpty (x:xs) f = f (x :| xs)
+
+-- | Merge an unsorted list of sorted lists, for example:
+--
+--  mergeListsBy compare [ [2,5,15], [1,10,100] ] = [1,2,5,10,15,100] ]
+mergeListsBy :: forall a. (a -> a -> Ordering) -> [[a]] -> [a]
+mergeListsBy cmp lists | debugIsOn, not (all sorted lists) =
+  -- When debugging is on, we check that the input lists are sorted.
+  panic "mergeListsBy: input lists must be sorted"
+  where
+    sorted [] = True
+    sorted [_] = True
+    sorted (x:y:xs) = cmp x y /= GT && sorted (y:xs)
+mergeListsBy cmp lists = merge_lists lists
+  where
+    merge2 :: [a] -> [a] -> [a]
+    merge2 [] ys = ys
+    merge2 xs [] = xs
+    merge2 (x:xs) (y:ys) =
+      case cmp x y of
+        GT -> y : x : merge2 xs ys
+        _  -> x : y : merge2 xs ys
+
+    merge_neighbours :: [[a]] -> [[a]]
+    merge_neighbours []   = []
+    merge_neighbours [xs] = [xs]
+    merge_neighbours (xs : ys : lists) =
+      merge2 xs ys : merge_neighbours lists
+
+    merge_lists :: [[a]] -> [a]
+    merge_lists lists =
+      case merge_neighbours lists of
+        []     -> []
+        [xs]   -> xs
+        lists' -> merge_lists lists'
 
 {-
 ************************************************************************

@@ -91,7 +91,7 @@ module GHC.Hs.Decls (
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
   hsGroupTopLevelFixitySigs,
 
-  partitionBindsAndSigs, flattenBindsAndSigs,
+  partitionBindsAndSigs,
     ) where
 
 -- friends:
@@ -219,6 +219,8 @@ fields, this will result in an error (#17608).
 
 -- | Partition a list of HsDecl into function/pattern bindings, signatures,
 -- type family declarations, type family instances, and documentation comments.
+--
+-- NB. Only works on HsDecls that can appear in a class declaration.
 partitionBindsAndSigs
   :: ((LHsBind GhcPs, [LHsDecl GhcPs]) -> (LHsBind GhcPs, [LHsDecl GhcPs]))
   -> [LHsDecl GhcPs]
@@ -245,37 +247,6 @@ partitionBindsAndSigs getMonoBind = go
         DocD _ d
           -> (bs, ss, ts, tfis, dfis, L l d : docs)
         _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
-
--- | The inverse of 'partitionBindsAndSigs' that merges partitioned items
--- back into a flat list. Elements are put back into the order in which they
--- appeared in the original program before partitioning.
-flattenBindsAndSigs
-  :: (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
-      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
-  -> [LHsDecl GhcPs]
-flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
-  sortLocatedUsingBufPos $ go (bagToList all_bs) all_ss all_ts all_tfis all_dfis all_docs
-  where
-    go (L l b : bs) ss ts tfis dfis docs =
-      L l (ValD noExtField b)
-        : go bs ss ts tfis dfis docs
-    go bs (L l s : ss) ts tfis dfis docs =
-      L l (SigD noExtField s)
-        : go bs ss ts tfis dfis docs
-    go bs ss (L l t : ts) tfis dfis docs =
-      L l (TyClD noExtField (FamDecl noExtField t))
-        : go bs ss ts tfis dfis docs
-    go bs ss ts (L l tfi : tfis) dfis docs =
-      L l (InstD noExtField (TyFamInstD noExtField tfi))
-        : go bs ss ts tfis dfis docs
-    go bs ss ts tfis (L l dfi : dfis) docs =
-      L l (InstD noExtField (DataFamInstD noExtField dfi))
-        : go bs ss ts tfis dfis docs
-    go bs ss ts tfis dfis (L l d : docs) =
-      L l (DocD noExtField d)
-        : go bs ss ts tfis dfis docs
-
-    go [] [] [] [] [] [] = []
 
 -- | Haskell Group
 --
@@ -706,9 +677,28 @@ type instance XDataDecl     GhcPs = NoExtField
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
-type instance XClassDecl    GhcPs = LayoutInfo
+type instance XClassDecl    GhcPs = LayoutInfo  -- See Note [Class LayoutInfo]
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
+
+{- Note [Class LayoutInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The LayoutInfo is used to associate Haddock comments with parts of the declaration.
+Compare the following examples:
+
+    class C a where
+      f :: a -> Int
+      -- ^ comment on f
+
+    class C a where
+      f :: a -> Int
+    -- ^ comment on C
+
+Notice how "comment on f" and "comment on C" differ only by indentation level.
+Thus we have to record the indentation level of the class declarations.
+
+See also Note [Adding Haddock comments to the syntax tree] in HaddockUtils.
+-}
 
 type instance XXTyClDecl    (GhcPass _) = NoExtCon
 

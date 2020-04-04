@@ -5,6 +5,8 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {- | This module implements 'addHaddockToModule', which inserts Haddock
     comments accumulated during parsing into the AST (#17544).
@@ -52,6 +54,7 @@ import GHC.Hs
 import GHC.Types.SrcLoc
 import GHC.Driver.Session ( WarningFlag(..) )
 import Outputable hiding ( (<>) )
+import Bag
 
 import Data.Semigroup
 import Data.Foldable
@@ -63,6 +66,7 @@ import Data.Functor.Identity
 import Data.Coerce
 
 import Lexer
+import Util (mergeListsBy)
 
 {- Note [Adding Haddock comments to the syntax tree]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,7 +110,7 @@ Ignoring the "->" allows us to accomodate alternative coding styles:
        Bool     -- ^ comment on result
 
 Sometimes we also need to take indentation information into account.
-Compare the following example:
+Compare the following examples:
 
     class C a where
       f :: a -> Int
@@ -781,3 +785,31 @@ that GHC could parse succesfully:
 
 This declaration was accepted by ghc but rejected by ghc -haddock.
 -}
+
+-- | The inverse of 'partitionBindsAndSigs' that merges partitioned items back
+-- into a flat list. Elements are put back into the order in which they
+-- appeared in the original program before partitioning, using BufPos to order
+-- them.
+--
+-- Precondition (unchecked): the input lists are already sorted.
+flattenBindsAndSigs
+  :: (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
+      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+  -> [LHsDecl GhcPs]
+flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
+  mergeListsBy cmp [
+    map_l (\b -> ValD noExtField b) (bagToList all_bs),
+    map_l (\s -> SigD noExtField s) all_ss,
+    map_l (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
+    map_l (\tfi -> InstD noExtField (TyFamInstD noExtField tfi)) all_tfis,
+    map_l (\dfi -> InstD noExtField (DataFamInstD noExtField dfi)) all_dfis,
+    map_l (\d -> DocD noExtField d) all_docs
+  ]
+  where
+    cmp :: LHsDecl GhcPs -> LHsDecl GhcPs -> Ordering
+    cmp (L (getBufSpan -> Just a) _) (L (getBufSpan -> Just b) _) =
+      compare a b
+    cmp _ _ = panic "flattenBindsAndSigs: HsDecl without BufSpan"
+
+    map_l :: (a -> b) -> [Located a] -> [Located b]
+    map_l f = map (mapLoc f)
