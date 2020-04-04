@@ -121,30 +121,34 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             (fvs, da_fvs) = args env bounds as
         go bounds (StgLit lit) =
             (StgLit lit, emptyDVarSet, emptyVarSet)
-        go bounds (StgCase scrut bndr ty alts) =
+        go bounds (StgCase scrut bndr ty as) =
             ( StgCase scrut' bndr ty alts'
-            , fvs
-            , unionVarSets (scrut_da_fvs : alt_da_fvss)
+            , delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
+            , scrut_da_fvs `unionVarSet` alt_da_fvs
             )
           where
             (scrut', scrut_fvs, scrut_da_fvs) = go bounds scrut
             -- See Note [Tracking local binders]
-            (alts', alt_fvss, alt_da_fvss) = mapAndUnzip3 (alt (addLocals [bndr] env) (extendVarSet bounds bndr)) alts
-            alt_fvs = unionDVarSets alt_fvss
-            fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
+            (alts', alt_fvs, alt_da_fvs) =
+                alts (addLocals [bndr] env) (extendVarSet bounds bndr) as
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
-    alts = undefined expr
+    alts env bounds as =
+        ( as'
+        , unionDVarSets alt_fvss
+        , unionVarSets alt_da_fvss
+        )
+      where
+        (as', alt_fvss, alt_da_fvss) = mapAndUnzip3 (alt env bounds) as
 
     alt :: Env -> BVs -> StgAlt -> (CgStgAlt, DIdSet, FVs)
     alt env bounds (con, bndrs, e) =
         ( (con, bndrs, e')
-        , fvs
+        , delDVarSetList rhs_fvs bndrs
         , da_fvs
         )
       where
         (e', rhs_fvs, da_fvs) = expr (addLocals bndrs env) (extendVarSetList bounds bndrs) e
-        fvs = delDVarSetList rhs_fvs bndrs
 
     args :: Env -> BVs -> [StgArg] -> (DIdSet, FVs)
     args = undefined var
