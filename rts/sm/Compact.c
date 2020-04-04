@@ -482,19 +482,6 @@ thread_nfdata_hash_key(void *data STG_UNUSED, StgWord *key, const void *value ST
 }
 
 static void
-thread_NFDATA(StgCompactNFData *str)
-{
-    // Thread hash table keys. Values won't be moved as those are inside the
-    // CNF, and the CNF is a large object and so won't ever move.
-    if (str->hash) {
-        mapHashTableKeys(str->hash, NULL, thread_nfdata_hash_key);
-        ASSERT(str->link == NULL);
-        str->link = nfdata_chain;
-        nfdata_chain = str;
-    }
-}
-
-static void
 add_hash_entry(void *data, StgWord key, const void *value)
 {
     HashTable *new_hash = (HashTable *)data;
@@ -513,6 +500,26 @@ rehash_CNFs(void)
         mapHashTable(str->hash, (void*)new_hash, add_hash_entry);
         freeHashTable(str->hash, NULL);
         str->hash = new_hash;
+    }
+}
+
+static void
+update_fwd_cnf( bdescr *bd )
+{
+    while (bd) {
+        ASSERT(bd->flags & BF_COMPACT);
+        StgCompactNFData *str = ((StgCompactNFDataBlock*)bd->start)->owner;
+
+        // Thread hash table keys. Values won't be moved as those are inside the
+        // CNF, and the CNF is a large object and so won't ever move.
+        if (str->hash) {
+            mapHashTableKeys(str->hash, NULL, thread_nfdata_hash_key);
+            ASSERT(str->link == NULL);
+            str->link = nfdata_chain;
+            nfdata_chain = str;
+        }
+
+        bd = bd->link;
     }
 }
 
@@ -587,12 +594,6 @@ update_fwd_large( bdescr *bd )
           thread(&e->expected_value);
           thread(&e->new_value);
         }
-        continue;
-    }
-
-    case COMPACT_NFDATA:
-    {
-        thread_NFDATA((StgCompactNFData *)p);
         continue;
     }
 
@@ -1015,6 +1016,7 @@ compact(StgClosure *static_objects,
             update_fwd(gc_threads[n]->gens[g].part_list);
         }
         update_fwd_large(gen->scavenged_large_objects);
+        update_fwd_cnf(gen->live_compact_objects);
         if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
             debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
             update_fwd_compact(gen->old_blocks);
