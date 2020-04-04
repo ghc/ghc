@@ -7,7 +7,7 @@ import GhcPrelude
 import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Stg.Syntax
 import GHC.Types.Id
-import GHC.Types.Name (Name) --, nameIsLocalOrFrom)
+import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
 import Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -15,7 +15,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Module (Module)
 import Util
 
---import Data.Maybe ( mapMaybe )
+import Data.Maybe ( mapMaybe )
 
 import Data.Graph (SCC (..))
 
@@ -179,10 +179,22 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         (e', rhs_fvs, da_fvs) = expr (addLocals bndrs env) (extendVarSetList bounds bndrs) e
 
     args :: Env -> BVs -> [StgArg] -> (DIdSet, FVs)
-    args = undefined var
+    args env bounds as = (mkFreeVarSet env (mapMaybe f as), unionVarSets (map (arg bounds) as))
+      where
+        f (StgVarArg occ) = Just occ
+        f _               = Nothing
 
-    var :: Env -> BVs -> Var -> (DIdSet, FVs)
-    var = undefined this_mod
+    arg :: BVs -> StgArg -> FVs
+    arg bounds (StgVarArg v) = var bounds v
+    arg _ StgLitArg{} = emptyVarSet
+
+    var :: BVs -> Var -> FVs
+    var bounds v
+      | not (elemVarSet v bounds)
+      , nameIsLocalOrFrom this_mod (idName v)
+      = unitVarSet v
+      | otherwise
+      = emptyVarSet
 
 --------------------------------------------------------------------------------
 -- * Dependency sorting
