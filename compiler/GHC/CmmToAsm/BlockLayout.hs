@@ -636,22 +636,8 @@ sequenceChain :: forall a i. (Instruction i, Outputable i)
               -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
-sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
-    let weights :: CFG
-        weights = --pprTrace "cfg'" (pprEdgeWeights cfg')
-                  cfg'
-          where
-            (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-} mkGlobalWeights entry weights'
-            cfg' = {-# SCC rewriteEdges #-}
-                    mapFoldlWithKey
-                        (\cfg from m ->
-                            mapFoldlWithKey
-                                (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
-                                cfg m )
-                        weights'
-                        globalEdgeWeights
-
-        directEdges :: [CfgEdge]
+sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
+    let directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
           where
             relevantWeight :: CfgEdge -> Maybe CfgEdge

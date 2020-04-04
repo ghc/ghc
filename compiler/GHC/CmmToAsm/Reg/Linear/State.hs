@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
