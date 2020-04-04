@@ -19,8 +19,6 @@ import Data.Maybe ( catMaybes )
 
 import Data.Graph (SCC (..))
 
-
-
 --------------------------------------------------------------------------------
 -- * Dependency analysis
 
