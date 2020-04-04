@@ -42,11 +42,11 @@ addLocals :: [Id] -> Env -> Env
 addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
 
-{-
 -- | This makes sure that only local, non-global free vars make it into the set.
 mkFreeVarSet :: Env -> [Id] -> DIdSet
 mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
 
+{-
 boundIds :: StgBinding -> [Id]
 boundIds (StgNonRec b _) = [b]
 boundIds (StgRec pairs)  = map fst pairs
@@ -110,10 +110,41 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         (fvs, da_fvs) = args env bounds as
 
     expr :: Env -> BVs -> StgExpr -> (CgStgExpr, DIdSet, FVs)
-    expr = undefined alts var expr binding
+    expr env = go
+      where
+        go bounds (StgApp occ as) =
+            ( StgApp occ as
+            , unionDVarSet fvs (mkFreeVarSet env [occ])
+            , da_fvs
+            )
+          where
+            (fvs, da_fvs) = args env bounds as
+        go bounds (StgLit lit) =
+            (StgLit lit, emptyDVarSet, emptyVarSet)
+        go bounds (StgCase scrut bndr ty alts) =
+            ( StgCase scrut' bndr ty alts'
+            , fvs
+            , unionVarSets (scrut_da_fvs : alt_da_fvss)
+            )
+          where
+            (scrut', scrut_fvs, scrut_da_fvs) = go bounds scrut
+            -- See Note [Tracking local binders]
+            (alts', alt_fvss, alt_da_fvss) = mapAndUnzip3 (alt (addLocals [bndr] env) (extendVarSet bounds bndr)) alts
+            alt_fvs = unionDVarSets alt_fvss
+            fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
     alts = undefined expr
+
+    alt :: Env -> BVs -> StgAlt -> (CgStgAlt, DIdSet, FVs)
+    alt env bounds (con, bndrs, e) =
+        ( (con, bndrs, e')
+        , fvs
+        , da_fvs
+        )
+      where
+        (e', rhs_fvs, da_fvs) = expr (addLocals bndrs env) (extendVarSetList bounds bndrs) e
+        fvs = delDVarSetList rhs_fvs bndrs
 
     args :: Env -> BVs -> [StgArg] -> (DIdSet, FVs)
     args = undefined var
