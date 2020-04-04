@@ -89,14 +89,10 @@ selectPoint hf (sl,sc) = getFirst $
    sloc fs = mkRealSrcLoc fs sl sc
    sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
 
-findEvidence :: NodeInfo a -> Maybe (Name, IdentifierDetails a)
-findEvidence ni =
-    case find go xs of
-      Just (Right n,x) -> Just (n,x)
-      _ -> Nothing
+findEvidenceUse :: NodeInfo a -> [Name]
+findEvidenceUse ni = [n | (Right n, dets) <- xs, any isEvidenceUse (identInfo dets)]
  where
    xs = M.toList $ nodeIdentifiers ni
-   go (_,dets) = any isEvidenceContext (identInfo dets)
 
 data EvidenceInfo a
   = EvidenceInfo
@@ -115,6 +111,13 @@ instance (Outputable a) => Outputable (EvidenceInfo a) where
         [] -> text "is a usage of an evidence variable"
         xs -> text "is an" <+> (hsep $ punctuate (text "and/or") $
           map (\(src,scp,spn) -> ppr (EvidenceVarBind src scp spn)) xs)
+
+getEvidenceTreesAtPoint :: HieFile -> RefMap a -> (Int,Int) -> Tree.Forest (EvidenceInfo a)
+getEvidenceTreesAtPoint hf refmap point =
+  [t | Just ast <- pure $ selectPoint hf point
+     , n        <- findEvidenceUse (nodeInfo ast)
+     , Just t   <- pure $ getEvidenceTree refmap n
+     ]
 
 getEvidenceTree :: RefMap a -> Name -> Maybe (Tree.Tree (EvidenceInfo a))
 getEvidenceTree refmap var = do
@@ -365,6 +368,10 @@ isEvidenceContext :: ContextInfo -> Bool
 isEvidenceContext EvidenceVarUse = True
 isEvidenceContext EvidenceVarBind{} = True
 isEvidenceContext _ = False
+
+isEvidenceUse :: ContextInfo -> Bool
+isEvidenceUse EvidenceVarUse = True
+isEvidenceUse _ = False
 
 isOccurrence :: ContextInfo -> Bool
 isOccurrence Use = True

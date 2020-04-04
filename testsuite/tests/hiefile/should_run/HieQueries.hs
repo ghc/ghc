@@ -64,18 +64,19 @@ main = do
 
 explainEv :: DynFlags -> HieFile -> RefMap Int -> (Int,Int) -> IO ()
 explainEv df hf refmap point = do
-  let Just (var,_) = findEvidence $ nodeInfo $
-        fromJust $ selectPoint hf point
-      Just tree = getEvidenceTree refmap var
-      ptree = fmap (pprint . fmap expandType) tree
-
-      expandType = text . renderHieType df .
-        flip recoverFullType (hie_types hf)
-      pprint :: Outputable a => a -> String
-      pprint = pretty . renderWithStyle (initSDocContext df sty) . ppr
-      pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
-      sty = defaultUserStyle df
   putStrLn $ replicate 26 '='
   putStrLn $ "At point " ++ show point ++ ", we found:"
   putStrLn $ replicate 26 '='
-  putStrLn $ drawTree ptree
+  putStr $ drawForest ptrees
+  where
+    trees = getEvidenceTreesAtPoint hf refmap point
+
+    ptrees = fmap (pprint . fmap expandType) <$> trees
+
+    expandType = text . renderHieType df .
+      flip recoverFullType (hie_types hf)
+
+    pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
+
+    pprint = pretty . renderWithStyle (initSDocContext df sty) . ppr
+    sty = defaultUserStyle df
