@@ -670,11 +670,21 @@ findBackEdges root cfg =
     typedEdges =
       classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
 
+optimizeCFG :: Bool -> D.CfgWeights -> RawCmmDecl -> CFG -> CFG
+optimizeCFG _ _ (CmmData {}) cfg = cfg
+optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
+  (if doStaticPred then staticPredCfg (g_entry graph) else id) $
+    optHsPatterns weights proc $ cfg
 
-optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
-optimizeCFG _ (CmmData {}) cfg = cfg
-optimizeCFG weights (CmmProc info _lab _live graph) cfg =
-    {-# SCC optimizeCFG #-}
+-- | Modify branch weights based on educated guess on
+-- patterns GHC tends to produce and how they affect
+-- performance.
+--
+-- Most importantly we penalize jumps across info tables.
+optHsPatterns :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
+optHsPatterns _ (CmmData {}) cfg = cfg
+optHsPatterns weights (CmmProc info _lab _live graph) cfg =
+    {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
     -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
 
@@ -748,6 +758,21 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
           | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
+
+-- | Convert block-local branch weights to global weights.
+staticPredCfg :: BlockId -> CFG -> CFG
+staticPredCfg entry cfg = cfg'
+  where
+    (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
+                             mkGlobalWeights entry cfg
+    cfg' = {-# SCC rewriteEdges #-}
+            mapFoldlWithKey
+                (\cfg from m ->
+                    mapFoldlWithKey
+                        (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
+                        cfg m )
+                cfg
+                globalEdgeWeights
 
 -- | Determine loop membership of blocks based on SCC analysis
 --   This is faster but only gives yes/no answers.
@@ -922,6 +947,10 @@ revPostorderFrom cfg root =
 --   reverse post order. Which is required for diamond control flow to work probably.
 --
 --   We also apply a few prediction heuristics (based on the same paper)
+--
+--   The returned result represents frequences.
+--   For blocks it's the expected number of executions and
+--   for edges is the number of traversals.
 
 {-# NOINLINE mkGlobalWeights #-}
 {-# SCC mkGlobalWeights #-}
