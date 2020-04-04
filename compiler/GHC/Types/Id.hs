@@ -768,7 +768,36 @@ idRuleMatchInfo :: Id -> RuleMatchInfo
 idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)
 
 isConLikeId :: Id -> Bool
-isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
+isConLikeId id
+  =  isDataConWorkId id
+  || isDataConWrapId id -- see Note [DataCon wrappers are conlike]
+  || isConLike (idRuleMatchInfo id)
+
+{- Note [DataCon wrappers are conlike]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Various places in the optimization pipeline care about saturated
+applications of known constructors, most notably the
+case-of-known-constructor simplification and RULE matching (see
+Note [exprIsExpandable] in GHC.Core.Utils). Notably, both those cases
+*do* care about DataCon wrappers as well as DataCon workers!
+
+  * If we have `case $WD a b of { ... }` we still want to apply
+    case-of-known-constructor.
+
+  * User-defined RULEs match on wrappers, not workers, so we might
+    need to look through an unfolding built from a DataCon wrapper to
+    determine if a RULE matches.
+
+Therefore, it’s important that we consider DataCon wrappers conlike in
+addition to DataCon workers. This is especially true now that we
+don’t inline DataCon wrappers until the final simplifier phase; see
+Note [Activation for data constructor wrappers] in GHC.Types.Id.Make.
+
+For further reading, see:
+  * Note [Conlike is interesting] in GHC.Core.Op.Simplify.Utils
+  * Note [Lone variables] in GHC.Core.Unfold
+  * #18012
+-}
 
 {-
         ---------------------------------
