@@ -116,6 +116,10 @@ cpsTop hsc_env proc =
             condPass Opt_CmmSink (cmmSink dflags) g
                      Opt_D_dump_cmm_sink "Sink assignments"
 
+       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
+            condPass Opt_CmmSink (cmmSink dflags) g
+                     Opt_D_dump_cmm_sink "Sink assignments"
+
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (ppr cafEnv)

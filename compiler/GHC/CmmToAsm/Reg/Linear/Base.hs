@@ -138,6 +138,9 @@ data RA_State freeRegs
         , ra_config     :: !NCGConfig
 
         -- | (from,fixup,to) : We inserted fixup code between from and to
-        , ra_fixups     :: [(BlockId,BlockId,BlockId)] }
+        , ra_fixups     :: [(BlockId,BlockId,BlockId)]
+
+        -- | Map virtual regs to regs they have been assigned in the past.
+        , ra_sugg_assig :: RegMap Loc  }
 
 
