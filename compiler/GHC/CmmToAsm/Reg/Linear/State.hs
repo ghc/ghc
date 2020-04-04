@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -52,7 +53,9 @@ import GHC.Cmm.BlockId
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.FM
 
+import Control.Applicative
 import Control.Monad (ap)
 
 -- Avoids using unboxed tuples when loading into GHCi
@@ -111,7 +114,8 @@ runR config block_assig freeregs assig stack us thing =
                 , ra_us         = us
                 , ra_spills     = []
                 , ra_config     = config
-                , ra_fixups     = [] })
+                , ra_fixups     = []
+                , ra_sugg_assig = assig })
    of
         RA_Result state returned_thing
          ->     (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing)
@@ -156,6 +160,24 @@ getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
 setAssigR :: RegMap Loc -> RegM freeRegs ()
 setAssigR assig = RegM $ \ s ->
   RA_Result s{ra_assig=assig} ()
+
+findVirtRegAny :: forall freeRegs u. Uniquable u
+               => u -> RegM freeRegs (Maybe Loc)
+findVirtRegAny vreg = do
+  bassig <- getBlockAssigR :: RegM freeRegs (BlockMap (freeRegs,RegMap Loc))
+  return $ foldr (findVirtRegAssig) Nothing bassig
+  where
+    findVirtRegAssig :: (freeRegs,RegMap Loc) -> Maybe Loc -> Maybe Loc
+    findVirtRegAssig assig z =
+        lookupUFM (snd assig) vreg <|> z
+
+-- suggestAssig :: RegMap Loc -> RegM ()
+-- suggestAssig assig = RegM $ \ s ->
+--   RA_Result s{ra_sugg_assig=plusUFM (ra_sugg_assig s) assig} ()
+
+-- getSug :: Unique -> RegM Loc
+-- getSug = RegM $ \ s@RA_State{ra_sugg_assig = sugg_assig} ->
+--   RA_Result s sugg_assig
 
 getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
 getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->
