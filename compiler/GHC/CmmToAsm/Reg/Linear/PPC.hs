@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 -- | Free regs map for PowerPC
 module GHC.CmmToAsm.Reg.Linear.PPC where
 
@@ -26,6 +28,9 @@ import Data.Bits
 
 data FreeRegs = FreeRegs !Word32 !Word32
               deriving( Show )  -- The Show is used in an ASSERT
+
+instance Outputable FreeRegs where
+    ppr = text . show
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0

@@ -214,6 +214,19 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
+.. ghc-flag:: -fcmm-static-pred
+    :shortdesc: Enable static control flow prediction. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cmm-static-pred
+    :category:
+
+    :default: off but enabled with :ghc-flag:`-O`.
+
+    This enables static control flow prediction on the final Cmm
+    code. If enabled GHC will apply certain heuristics to identify
+    loops and hot code paths. This information is then used by the
+    register allocation and code layout passes.
+
 .. ghc-flag:: -fasm-shortcutting
     :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
     :type: dynamic

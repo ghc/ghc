@@ -10,7 +10,14 @@ following sections.
 Highlights
 ----------
 
-- TODO
+* NCG
+
+  - The linear register allocator saw improvements reducing the number
+    of redundant move instructions. Rare edge cases can see double
+    digit improvements in runtime for inner loops.
+
+    In the mean this improved runtime by about 0.8%. For details
+    see ticket #17823.
 
 Full details
 ------------
@@ -155,11 +162,11 @@ Arrow notation
    ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
    signatures, including those for class methods defined inside classes.
 
-- The ``Exception`` module was boiled down acknowledging the existence of 
+- The ``Exception`` module was boiled down acknowledging the existence of
   the ``exceptions`` dependency. In particular, the ``ExceptionMonad``
   class is not a proper class anymore, but a mere synonym for ``MonadThrow``,
-  ``MonadCatch``, ``MonadMask`` (all from ``exceptions``) and ``MonadIO``. 
-  All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are 
+  ``MonadCatch``, ``MonadMask`` (all from ``exceptions``) and ``MonadIO``.
+  All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are
   erased, and their ``exceptions``-alternatives are meant to be used in the
   GHC code instead.
 
