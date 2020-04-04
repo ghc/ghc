@@ -46,12 +46,6 @@ addLocals bndrs env
 mkFreeVarSet :: Env -> [Id] -> DIdSet
 mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
 
-{-
-boundIds :: StgBinding -> [Id]
-boundIds (StgNonRec b _) = [b]
-boundIds (StgRec pairs)  = map fst pairs
--}
-
 -- | Dependency analysis and free variable annotations on STG terms.
 --
 -- Dependencies of a binding are just free variables in the binding. This
@@ -121,6 +115,16 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             (fvs, da_fvs) = args env bounds as
         go bounds (StgLit lit) =
             (StgLit lit, emptyDVarSet, emptyVarSet)
+        go bounds (StgConApp dc as tys) =
+            (StgConApp dc as tys, fvs, da_fvs)
+          where
+            (fvs, da_fvs) = args env bounds as
+        go bounds (StgOpApp op as ty) =
+            (StgOpApp op as ty, fvs, da_fvs)
+          where
+            (fvs, da_fvs) = args env bounds as
+        go _ lam@StgLam{} =
+            pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ ppr lam)
         go bounds (StgCase scrut bndr ty as) =
             ( StgCase scrut' bndr ty alts'
             , delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
@@ -131,6 +135,21 @@ annTopBindingsDeps this_mod bs = map top_bind bs
             -- See Note [Tracking local binders]
             (alts', alt_fvs, alt_da_fvs) =
                 alts (addLocals [bndr] env) (extendVarSet bounds bndr) as
+        go bounds (StgLet ext bind body) = go_bind bounds (StgLet ext) bind body
+
+        go_bind bounds dc bind body =
+            ( dc bind' body'
+            , fvs
+            , da_bind_fvs `unionVarSet` da_body_fvs
+            )
+          where
+            -- See Note [Tracking local binders]
+            binders = bindersOf bind
+            env' = addLocals binders env
+            (body', body_fvs, da_body_fvs) =
+                expr env' (extendVarSetList bounds binders) body
+            (bind', fvs, da_bind_fvs) = binding env' body_fvs bounds bind
+
 
     alts :: Env -> BVs -> [StgAlt] -> ([CgStgAlt], DIdSet, FVs)
     alts env bounds as =
