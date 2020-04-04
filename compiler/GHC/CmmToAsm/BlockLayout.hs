@@ -639,17 +639,19 @@ sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
     let weights :: CFG
         weights = --pprTrace "cfg'" (pprEdgeWeights cfg')
-                  cfg'
+                  -- cfg'
+                  weights'
           where
-            (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-} mkGlobalWeights entry weights'
-            cfg' = {-# SCC rewriteEdges #-}
-                    mapFoldlWithKey
-                        (\cfg from m ->
-                            mapFoldlWithKey
-                                (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
-                                cfg m )
-                        weights'
-                        globalEdgeWeights
+            -- TODO: Remove
+            -- (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-} mkGlobalWeights entry weights'
+            -- cfg' = {-# SCC rewriteEdges #-}
+            --         mapFoldlWithKey
+            --             (\cfg from m ->
+            --                 mapFoldlWithKey
+            --                     (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
+            --                     cfg m )
+            --             weights'
+            --             globalEdgeWeights
 
         directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
