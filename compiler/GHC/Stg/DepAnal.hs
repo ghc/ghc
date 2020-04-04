@@ -15,7 +15,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Module (Module)
 import Util
 
-import Data.Maybe ( mapMaybe )
+import Data.Maybe ( catMaybes )
 
 import Data.Graph (SCC (..))
 
@@ -109,7 +109,7 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         go bounds (StgApp occ as) =
             ( StgApp occ as
             , unionDVarSet fvs (mkFreeVarSet env [occ])
-            , da_fvs
+            , var bounds occ `unionVarSet` da_fvs
             )
           where
             (fvs, da_fvs) = args env bounds as
@@ -179,14 +179,16 @@ annTopBindingsDeps this_mod bs = map top_bind bs
         (e', rhs_fvs, da_fvs) = expr (addLocals bndrs env) (extendVarSetList bounds bndrs) e
 
     args :: Env -> BVs -> [StgArg] -> (DIdSet, FVs)
-    args env bounds as = (mkFreeVarSet env (mapMaybe f as), unionVarSets (map (arg bounds) as))
+    args env bounds as =
+        ( mkFreeVarSet env (catMaybes mIds)
+        , unionVarSets da_fvss
+        )
       where
-        f (StgVarArg occ) = Just occ
-        f _               = Nothing
+        (mIds, da_fvss) = mapAndUnzip (arg bounds) as
 
-    arg :: BVs -> StgArg -> FVs
-    arg bounds (StgVarArg v) = var bounds v
-    arg _ StgLitArg{} = emptyVarSet
+    arg :: BVs -> StgArg -> (Maybe Id, FVs)
+    arg bounds (StgVarArg v) = (Just v, var bounds v)
+    arg _      StgLitArg{}   = (Nothing, emptyVarSet)
 
     var :: BVs -> Var -> FVs
     var bounds v
