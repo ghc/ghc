@@ -47,6 +47,7 @@ import GHC.Types.Unique ( getUnique )
 import GHC.Utils.Misc ( chkAppend,dropList, filterByList, filterOut )
 import GHC.Types.Var
 import GHC.Types.Var.Set
+import GHC.Types.SrcLoc
 
 import Haddock.Types
 import Haddock.Interface.Specialize
@@ -84,6 +85,15 @@ tyThingToLHsDecl prr t = case t of
            extractFamilyDecl (FamDecl _ d) = return d
            extractFamilyDecl _           =
              Left "tyThingToLHsDecl: impossible associated tycon"
+
+           cvt (UserTyVar _ _ n) = HsTyVar noExtField NotPromoted n
+           cvt (KindedTyVar _ _ (L name_loc n) kind) = HsKindSig noExtField
+              (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
+           cvt (XTyVarBndr nec) = noExtCon nec
+
+           -- | Convert a LHsTyVarBndr to an equivalent LHsType.
+           hsLTyVarBndrToType :: LHsTyVarBndr flag (GhcPass p) -> LHsType (GhcPass p)
+           hsLTyVarBndrToType = mapLoc cvt
 
            extractFamDefDecl :: FamilyDecl GhcRn -> Type -> TyFamDefltDecl GhcRn
            extractFamDefDecl fd rhs =
@@ -210,8 +220,8 @@ synifyTyCon prr _coax tc
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
     mk_hs_tv realKind fakeTyVar
-      | isLiftedTypeKind realKind = noLoc $ UserTyVar noExtField (noLoc (getName fakeTyVar))
-      | otherwise = noLoc $ KindedTyVar noExtField (noLoc (getName fakeTyVar)) (synifyKindSig realKind)
+      | isLiftedTypeKind realKind = noLoc $ UserTyVar noExtField () (noLoc (getName fakeTyVar))
+      | otherwise = noLoc $ KindedTyVar noExtField () (noLoc (getName fakeTyVar)) (synifyKindSig realKind)
 
     conKind = defaultType prr (tyConKind tc)
     tyVarKinds = fst . splitFunTys . snd . splitPiTysInvisible $ conKind
@@ -335,7 +345,7 @@ synifyFamilyResultSig  Nothing    kind
    | isLiftedTypeKind kind = noLoc $ NoSig noExtField
    | otherwise = noLoc $ KindSig  noExtField (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLoc $ TyVarSig noExtField (noLoc $ KindedTyVar noExtField (noLoc name) (synifyKindSig kind))
+   noLoc $ TyVarSig noExtField (noLoc $ KindedTyVar noExtField () (noLoc name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -352,7 +362,7 @@ synifyDataCon use_gadt_syntax dc =
   name = synifyName dc
   -- con_qvars means a different thing depending on gadt-syntax
   (_univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
-  user_tvs = dataConUserTyVars dc -- Used for GADT data constructors
+  user_tvbndrs = dataConUserTyVarBinders dc -- Used for GADT data constructors
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
@@ -382,10 +392,10 @@ synifyDataCon use_gadt_syntax dc =
       \hat ->
         if use_gadt_syntax
            then return $ noLoc $
-              ConDeclGADT { con_g_ext  = noExtField
+              ConDeclGADT { con_g_ext  = []
                           , con_names  = [name]
-                          , con_forall = noLoc $ not $ null user_tvs
-                          , con_qvars  = synifyTyVars user_tvs
+                          , con_forall = noLoc $ not $ null user_tvbndrs
+                          , con_qvars  = map synifyInvisTyVar user_tvbndrs
                           , con_mb_cxt = ctx
                           , con_args   = hat
                           , con_res_ty = synifyType WithinType [] res_ty
@@ -394,7 +404,7 @@ synifyDataCon use_gadt_syntax dc =
               ConDeclH98 { con_ext    = noExtField
                          , con_name   = name
                          , con_forall = noLoc False
-                         , con_ex_tvs = map synifyTyVar ex_tvs
+                         , con_ex_tvs = map (synifyInvisTyVar . (mkTyCoVarBinder InferredSpec)) ex_tvs
                          , con_mb_cxt = ctx
                          , con_args   = hat
                          , con_doc    = Nothing }
@@ -439,20 +449,27 @@ synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
 synifyTyVars ktvs = HsQTvs { hsq_ext = []
                            , hsq_explicit = map synifyTyVar ktvs }
 
-synifyTyVar :: TyVar -> LHsTyVarBndr GhcRn
+synifyTyVar :: TyVar -> LHsTyVarBndr () GhcRn
 synifyTyVar = synifyTyVar' emptyVarSet
+
+synifyInvisTyVar :: InvisTVBinder -> LHsTyVarBndr Specificity GhcRn
+synifyInvisTyVar = synifyInvisTyVar' emptyVarSet
 
 -- | Like 'synifyTyVar', but accepts a set of variables for which to omit kind
 -- signatures (even if they don't have the lifted type kind).
-synifyTyVar' :: VarSet -> TyVar -> LHsTyVarBndr GhcRn
+synifyTyVar' :: VarSet -> TyVar -> LHsTyVarBndr () GhcRn
 synifyTyVar' no_kinds tv
   | isLiftedTypeKind kind || tv `elemVarSet` no_kinds
-  = noLoc (UserTyVar noExtField (noLoc name))
-  | otherwise = noLoc (KindedTyVar noExtField (noLoc name) (synifyKindSig kind))
+  = noLoc (UserTyVar noExtField () (noLoc name))
+  | otherwise = noLoc (KindedTyVar noExtField () (noLoc name) (synifyKindSig kind))
   where
     kind = tyVarKind tv
     name = getName tv
 
+synifyInvisTyVar' :: VarSet -> InvisTVBinder -> LHsTyVarBndr Specificity GhcRn
+synifyInvisTyVar' no_kinds (Bndr tv spec) = case (synifyTyVar' no_kinds tv) of
+  L l (UserTyVar   ne _ n)   -> L l (UserTyVar   ne spec n)
+  L l (KindedTyVar ne _ n k) -> L l (KindedTyVar ne spec n k)
 
 -- | Annotate (with HsKingSig) a type if the first parameter is True
 -- and if the type contains a free variable.
@@ -631,6 +648,7 @@ synifyForAllType
   -> LHsType GhcRn
 synifyForAllType s argf vs ty =
   let (tvs, ctx, tau) = tcSplitSigmaTySameVisPreserveSynonyms argf ty
+      inv_tvs = map to_invis_bndr tvs
       sPhi = HsQualTy { hst_ctxt = synifyCtx ctx
                       , hst_xqual = noExtField
                       , hst_body = synifyType WithinType (tvs' ++ vs) tau }
@@ -640,7 +658,7 @@ synifyForAllType s argf vs ty =
                        , hst_xforall = noExtField
                        , hst_body  = noLoc sPhi }
 
-      sTvs = map synifyTyVar tvs
+      sTvs = map synifyInvisTyVar inv_tvs
 
       -- Figure out what the type variable order would be inferred in the
       -- absence of an explicit forall
@@ -654,8 +672,12 @@ synifyForAllType s argf vs ty =
       | not (null tvs) -> noLoc sTy
       | otherwise -> noLoc sPhi
 
-    ImplicitizeForAll -> implicitForAll [] vs tvs ctx (synifyType WithinType) tau
+    ImplicitizeForAll -> implicitForAll [] vs inv_tvs ctx (synifyType WithinType) tau
 
+  where
+    to_invis_bndr :: TyVarBinder -> InvisTVBinder
+    to_invis_bndr (Bndr tv Required)         = Bndr tv SpecifiedSpec
+    to_invis_bndr (Bndr tv (Invisible spec)) = Bndr tv spec
 
 -- | Put a forall in if there are any type variables which require
 -- explicit kind annotations or if the inferred type variable order
@@ -663,14 +685,14 @@ synifyForAllType s argf vs ty =
 implicitForAll
   :: [TyCon]          -- ^ type constructors that determine their args kinds
   -> [TyVar]          -- ^ free variables in the type to convert
-  -> [TyVar]          -- ^ type variable binders in the forall
+  -> [InvisTVBinder]  -- ^ type variable binders in the forall
   -> ThetaType        -- ^ constraints right after the forall
   -> ([TyVar] -> Type -> LHsType GhcRn) -- ^ how to convert the inner type
   -> Type             -- ^ inner type
   -> LHsType GhcRn
 implicitForAll tycons vs tvs ctx synInner tau
   | any (isHsKindedTyVar . unLoc) sTvs = noLoc sTy
-  | tvs' /= tvs                        = noLoc sTy
+  | tvs' /= (binderVars tvs)           = noLoc sTy
   | otherwise                          = noLoc sPhi
   where
   sRho = synInner (tvs' ++ vs) tau
@@ -685,7 +707,7 @@ implicitForAll tycons vs tvs ctx synInner tau
                    , hst_body = noLoc sPhi }
 
   no_kinds_needed = noKindTyVars tycons tau
-  sTvs = map (synifyTyVar' no_kinds_needed) tvs
+  sTvs = map (synifyInvisTyVar' no_kinds_needed) tvs
 
   -- Figure out what the type variable order would be inferred in the
   -- absence of an explicit forall
@@ -729,7 +751,7 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =
-  let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSig ps
+  let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSigBndr ps
       ts = maybeToList (tyConAppTyCon_maybe res_ty)
 
       -- HACK: a HsQualTy with theta = [unitTy] will be printed as "() =>",
@@ -831,18 +853,18 @@ invariant didn't hold.
 -- | A version of 'TcType.tcSplitSigmaTySameVis' that preserves type synonyms.
 --
 -- See Note [Invariant: Never expand type synonyms]
-tcSplitSigmaTySameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVar], ThetaType, Type)
+tcSplitSigmaTySameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVarBinder], ThetaType, Type)
 tcSplitSigmaTySameVisPreserveSynonyms argf ty =
     case tcSplitForAllTysSameVisPreserveSynonyms argf ty of
       (tvs, rho) -> case tcSplitPhiTyPreserveSynonyms rho of
         (theta, tau) -> (tvs, theta, tau)
 
 -- | See Note [Invariant: Never expand type synonyms]
-tcSplitForAllTysSameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVar], Type)
+tcSplitForAllTysSameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVarBinder], Type)
 tcSplitForAllTysSameVisPreserveSynonyms supplied_argf ty = split ty ty []
   where
-    split _       (ForAllTy (Bndr tv argf) ty') tvs
-      | argf `sameVis` supplied_argf                = split ty' ty' (tv:tvs)
+    split _       (ForAllTy tvbndr@(Bndr _ argf) ty') tvs
+      | argf `sameVis` supplied_argf                = split ty' ty' (tvbndr:tvs)
     split orig_ty _                             tvs = (reverse tvs, orig_ty)
 
 -- | See Note [Invariant: Never expand type synonyms]
