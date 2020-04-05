@@ -7,7 +7,7 @@
 -- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
 -- CPR analysis should happen after strictness analysis.
 -- See Note [Phase ordering].
-module GHC.Core.Op.CprAnal ( cprAnalProgram ) where
+module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
 
@@ -29,7 +29,7 @@ import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
-import GHC.Core.Op.WorkWrap.Lib
+import GHC.Core.Opt.WorkWrap.Utils
 import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust, isNothing )
@@ -108,7 +108,7 @@ cprAnalProgram dflags fam_envs binds = do
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
-  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Op.DmdAnal
+  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
 -- Analyse a (group of) top-level binding(s)
@@ -252,7 +252,7 @@ cprFix top_lvl env orig_pairs
   = loop 1 initial_pairs
   where
     bot_sig = mkCprSig 0 botCpr
-    -- See Note [Initialising strictness] in GHC.Core.Op.DmdAnal
+    -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     initial_pairs | ae_virgin env = [(setIdCprInfo id bot_sig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
@@ -440,7 +440,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     -- to sums (yet); we lack WW for strict binders of sum type.
     do_con_arg env (id, str)
        | is_var scrut
-       -- See Note [Add demands for strict constructors] in WorkWrap.Lib
+       -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
        , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
        = extendAnalEnvForDemand env id dmd
        | otherwise

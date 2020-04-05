@@ -9,7 +9,7 @@ The code for *top-level* bindings is in GHC.Iface.Tidy.
 
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-module GHC.Core.Op.Tidy (
+module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyUnfolding
     ) where
 
@@ -191,7 +191,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         -- Similarly for the demand info - on a let binder, this tells
         -- CorePrep to turn the let into a case.
         -- But: Remove the usage demand here
-        --      (See Note [Zapping DmdEnv after Demand Analyzer] in GHC.Core.Op.WorkWrap)
+        --      (See Note [Zapping DmdEnv after Demand Analyzer] in GHC.Core.Opt.WorkWrap)
         --
         -- Similarly arity info for eta expansion in CorePrep
         -- Don't attempt to recompute arity here; this is just tidying!

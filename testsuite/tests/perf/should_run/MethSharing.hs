@@ -91,7 +91,7 @@ Main.loop [InlPrag=NOINLINE (sat-args=2), Occ=LoopBreaker]
 This is a bit disappointing. I would have expected GHC to float out
 the application of (^) to the two dictionaries during full laziness
 (note that (^) has arity 2 so the application is oversaturated). Why
-doesn't that happen? GHC.Core.Op.SetLevels (if this is the right place to look)
+doesn't that happen? GHC.Core.Opt.SetLevels (if this is the right place to look)
 has this:
 
 -}

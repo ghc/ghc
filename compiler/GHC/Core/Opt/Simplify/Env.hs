@@ -1,12 +1,12 @@
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
-\section[GHC.Core.Op.Simplify.Monad]{The simplifier Monad}
+\section[GHC.Core.Opt.Simplify.Monad]{The simplifier Monad}
 -}
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Op.Simplify.Env (
+module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
         setMode, getMode, updMode, seDynFlags,
 
@@ -47,8 +47,8 @@ module GHC.Core.Op.Simplify.Env (
 
 import GhcPrelude
 
-import GHC.Core.Op.Simplify.Monad
-import GHC.Core.Op.Monad        ( SimplMode(..) )
+import GHC.Core.Opt.Simplify.Monad
+import GHC.Core.Opt.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Var
@@ -669,7 +669,7 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         -- Even though it isn't in the substitution, it may be in
         -- the in-scope set with better IdInfo.
         --
-        -- See also Note [In-scope set as a substitution] in GHC.Core.Op.Simplify.
+        -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
 
 refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v

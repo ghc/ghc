@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-module GHC.Core.Op.Simplify ( simplTopBinds, simplExpr, simplRules ) where
+module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
 
@@ -15,11 +15,11 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.Driver.Session
-import GHC.Core.Op.Simplify.Monad
+import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
-import GHC.Core.Op.Simplify.Env
-import GHC.Core.Op.Simplify.Utils
-import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.Simplify.Env
+import GHC.Core.Opt.Simplify.Utils
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.Id
@@ -35,7 +35,7 @@ import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleCon
    , StrictnessMark (..) )
-import GHC.Core.Op.Monad ( Tick(..), SimplMode(..) )
+import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
@@ -63,7 +63,7 @@ import PrimOp           ( PrimOp (SeqOp) )
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
-the simplifier is in GHC.Core.Op.Simplify.Driver
+the simplifier is in GHC.Core.Opt.Driver
 
 Note [The big picture]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -302,7 +302,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
 
         ; (body_env, tvs') <- {-#SCC "simplBinders" #-} simplBinders rhs_env tvs
-                -- See Note [Floating and type abstraction] in GHC.Core.Op.Simplify.Utils
+                -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
 
         -- Simplify the RHS
         ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
@@ -690,7 +690,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
             occ_info = occInfo old_info
 
          -- Do eta-expansion on the RHS of the binding
-         -- See Note [Eta-expanding at let bindings] in GHC.Core.Op.Simplify.Utils
+         -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
       ; (new_arity, is_bot, final_rhs) <- tryEtaExpandRhs (getMode env)
                                                           new_bndr new_rhs
 
@@ -1832,7 +1832,7 @@ rebuildCall :: SimplEnv
 ---------- Bottoming applications --------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) cont
   -- When we run out of strictness args, it means
-  -- that the call is definitely bottom; see GHC.Core.Op.Simplify.Utils.mkArgInfo
+  -- that the call is definitely bottom; see GHC.Core.Opt.Simplify.Utils.mkArgInfo
   -- Then we want to discard the entire strict continuation.  E.g.
   --    * case (error "hello") of { ... }
   --    * (error "Hello") arg
@@ -2252,7 +2252,7 @@ Start with a simple situation:
 do this for algebraic cases, because we might turn bottom into
 non-bottom!
 
-The code in GHC.Core.Op.Simplify.Utils.prepareAlts has the effect of generalise
+The code in GHC.Core.Opt.Simplify.Utils.prepareAlts has the effect of generalise
 this idea to look for a case where we're scrutinising a variable, and we know
 that only the default case can match.  For example:
 
@@ -2266,7 +2266,7 @@ Here the inner case is first trimmed to have only one alternative, the
 DEFAULT, after which it's an instance of the previous case.  This
 really only shows up in eliminating error-checking code.
 
-Note that GHC.Core.Op.Simplify.Utils.mkCase combines identical RHSs.  So
+Note that GHC.Core.Opt.Simplify.Utils.mkCase combines identical RHSs.  So
 
         case e of       ===> case e of DEFAULT -> r
            True  -> r
@@ -2764,7 +2764,7 @@ NB: simplLamBndrs preserves this eval info
 
 In addition to handling data constructor fields with !s, addEvals
 also records the fact that the result of seq# is always in WHNF.
-See Note [seq# magic] in GHC.Core.Op.ConstantFold.  Example (#15226):
+See Note [seq# magic] in GHC.Core.Opt.ConstantFold.  Example (#15226):
 
   case seq# v s of
     (# s', v' #) -> E
@@ -2888,8 +2888,8 @@ it's also good for case-elimination -- suppose that 'f' was inlined
 and did multi-level case analysis, then we'd solve it in one
 simplifier sweep instead of two.
 
-Exactly the same issue arises in GHC.Core.Op.SpecConstr;
-see Note [Add scrutinee to ValueEnv too] in GHC.Core.Op.SpecConstr
+Exactly the same issue arises in GHC.Core.Opt.SpecConstr;
+see Note [Add scrutinee to ValueEnv too] in GHC.Core.Opt.SpecConstr
 
 HOWEVER, given
   case x of y { Just a -> r1; Nothing -> r2 }
@@ -3106,7 +3106,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                 , StrictBind { sc_bndr = bndr', sc_bndrs = []
                              , sc_body = body2
                              , sc_env  = zapSubstEnv se `setInScopeFromF` floats2
-                                         -- See Note [StaticEnv invariant] in GHC.Core.Op.Simplify.Utils
+                                         -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
@@ -3146,7 +3146,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- Ensure that sc_env includes the free vars of
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
-                                         -- See Note [StaticEnv invariant] in GHC.Core.Op.Simplify.Utils
+                                         -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                               , sc_dup = OkToDup, sc_cont = cont' }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
@@ -3187,7 +3187,7 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_bndr = case_bndr'
                           , sc_alts = alts''
                           , sc_env  = zapSubstEnv se `setInScopeFromF` all_floats
-                                      -- See Note [StaticEnv invariant] in GHC.Core.Op.Simplify.Utils
+                                      -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
 
 mkDupableAlt :: Platform -> OutId
@@ -3250,7 +3250,7 @@ Note [Fusing case continuations]
 It's important to fuse two successive case continuations when the
 first has one alternative.  That's why we call prepareCaseCont here.
 Consider this, which arises from thunk splitting (see Note [Thunk
-splitting] in GHC.Core.Op.WorkWrap):
+splitting] in GHC.Core.Opt.WorkWrap):
 
       let
         x* = case (case v of {pn -> rn}) of
@@ -3307,7 +3307,7 @@ So instead we do both: we pass 'c' and 'c#' , and record in c's inlining
 Absence analysis may later discard 'c'.
 
 NB: take great care when doing strictness analysis;
-    see Note [Lambda-bound unfoldings] in GHC.Core.Op.DmdAnal.
+    see Note [Lambda-bound unfoldings] in GHC.Core.Opt.DmdAnal.
 
 Also note that we can still end up passing stuff that isn't used.  Before
 strictness analysis we have
@@ -3497,7 +3497,7 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty unf
   | isStableUnfolding unf
   = simplStableUnfolding env top_lvl cont_mb id unf rhs_ty
   | isExitJoinId id
-  = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Op.Exitify
+  = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
   | otherwise
   = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
 
@@ -3573,7 +3573,7 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
     is_top_lvl = isTopLevel top_lvl
     act        = idInlineActivation id
     unf_env    = updMode (updModeForStableUnfoldings act) env
-         -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Op.Simplify.Utils
+         -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils
 
 {-
 Note [Force bottoming field]

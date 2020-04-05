@@ -20,7 +20,7 @@ module GHC.CoreToStg.Prep (
 import GhcPrelude
 import GHC.Platform
 
-import GHC.Core.Op.OccurAnal
+import GHC.Core.Opt.OccurAnal
 
 import GHC.Driver.Types
 import PrelNames
@@ -28,7 +28,7 @@ import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
-import GHC.Core.Op.Monad ( CoreToDo(..) )
+import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
@@ -521,7 +521,7 @@ it seems good for CorePrep to be robust.
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
             -> UniqSM (JoinId, CpeRhs)
 -- Used for all join bindings
--- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Op.Simplify.Utils
+-- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
   = ASSERT(isJoinId bndr)
     do { let Just join_arity = isJoinId_maybe bndr
@@ -1562,7 +1562,7 @@ cpCloneBndr env bndr
 
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
-       -- and Note [Preserve evaluatedness] in GHC.Core.Op.Tidy
+       -- and Note [Preserve evaluatedness] in GHC.Core.Tidy
        ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
@@ -1595,7 +1595,7 @@ We want to drop the unfolding/rules on every Id:
     we'd have to substitute in them
 
 HOWEVER, we want to preserve evaluated-ness;
-see Note [Preserve evaluatedness] in GHC.Core.Op.Tidy.
+see Note [Preserve evaluatedness] in GHC.Core.Tidy.
 -}
 
 ------------------------------------------------------------------------------

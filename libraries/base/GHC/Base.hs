@@ -1358,7 +1358,7 @@ eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString _        _        = False
 
 {-# RULES "eqString" (==) = eqString #-}
--- eqString also has a BuiltInRule in GHC.Core.Op.ConstantFold:
+-- eqString also has a BuiltInRule in GHC.Core.Opt.ConstantFold:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
 
@@ -1624,7 +1624,7 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
--- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
+-- There's a built-in rule (in GHC.Core.Opt.ConstantFold) for
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
