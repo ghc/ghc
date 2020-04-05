@@ -48,7 +48,7 @@ class (Monad m) => MonadIO m where
     -- {-\# LANGUAGE FlexibleContexts  \#-}
     -- {-\# LANGUAGE OverloadedStrings \#-}
     --
-    -- module Lib
+    -- module LiftExample
     --     ( someFunc
     --     ) where
     --
@@ -63,11 +63,11 @@ class (Monad m) => MonadIO m where
     --
     -- initialState = AppState "Hello"
     --
-    -- someFunc :: MonadIO m => m AppState
-    -- someFunc = evalStateT foobar initialState
+    -- runExample :: MonadIO m => m AppState
+    -- runExample = evalStateT interpreter initialState
     --
-    -- foobar :: StateIO m => m AppState
-    -- foobar = do
+    -- interpreter :: StateIO m => m AppState
+    -- interpreter = do
     --   outputMessage
     --   put $ AppState{msg = "World"}
     --   outputMessage
