@@ -113,6 +113,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
 import GHC.Tc.Utils.TcType
@@ -686,7 +687,11 @@ typeToLHsType ty
       | otherwise = ty'
        where
         ty' :: LHsType GhcPs
-        ty' = go_app (nlHsTyVar (getRdrName tc)) args (tyConArgFlags tc args)
+        ty' = go_app (noLoc $ HsTyVar noExtField prom $ noLoc $ getRdrName tc)
+                     args (tyConArgFlags tc args)
+
+        prom :: PromotionFlag
+        prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
     go ty@(AppTy {})        = go_app (go head) args (appTyArgFlags head args)
       where
         head :: Type
