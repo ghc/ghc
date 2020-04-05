@@ -54,7 +54,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.Rules
 import GHC.Types.Basic
-import GHC.Core.Op.Monad ( CoreToDo(..) )
+import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint     ( endPassIO )
 import GHC.Types.Var.Set
 import FastString
