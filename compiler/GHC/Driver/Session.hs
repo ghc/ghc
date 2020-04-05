@@ -276,8 +276,8 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, DumpAction, TraceAction
                                , defaultDumpAction, defaultTraceAction )
 import Json
-import SysTools.Terminal ( stderrSupportsAnsiColors )
-import SysTools.BaseDir ( expandToolDir, expandTopDir )
+import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
+import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -460,7 +460,7 @@ data DynFlags = DynFlags {
     --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
-    -- configuration lazily. See Note [LLVM Configuration] in SysTools.
+    -- configuration lazily. See Note [LLVM Configuration] in GHC.SysTools.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -888,7 +888,7 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
--- | See Note [LLVM Configuration] in SysTools.
+-- | See Note [LLVM Configuration] in GHC.SysTools.
 data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
                              , llvmPasses  :: [(Int, String)]
                              }

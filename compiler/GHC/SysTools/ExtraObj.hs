@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module SysTools.ExtraObj (
+module GHC.SysTools.ExtraObj (
   mkExtraObj, mkExtraObjToLinkIntoBinary, mkNoteObjsToLinkIntoBinary,
   checkLinkInfo, getLinkInfo, getCompilerInfo,
   ghcLinkInfoSectionName, ghcLinkInfoNoteName, platformSupportsSavingLinkOpts,
@@ -21,7 +21,7 @@ import GHC.Platform
 import Outputable
 import GHC.Types.SrcLoc ( noSrcSpan )
 import GHC.Types.Module
-import Elf
+import GHC.SysTools.Elf
 import Util
 import GhcPrelude
 
@@ -30,9 +30,9 @@ import Data.Maybe
 
 import Control.Monad.IO.Class
 
-import FileCleanup
-import SysTools.Tasks
-import SysTools.Info
+import GHC.SysTools.FileCleanup
+import GHC.SysTools.Tasks
+import GHC.SysTools.Info
 
 mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
 mkExtraObj dflags extn xs
