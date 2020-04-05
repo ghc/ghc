@@ -29,9 +29,10 @@ module Control.Monad.IO.Class (
 -- * @'liftIO' (m >>= f) = 'liftIO' m >>= ('liftIO' . f)@
 
 class (Monad m) => MonadIO m where
-    -- Lift a computation from the 'IO' monad.
+    -- | Lift a computation from the 'IO' monad.
     -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
     -- (i.e. IO is the base monad for the stack).
+    --
     -- === __Example__
     -- Let us take for example a program that makes use of monad stacks.
     -- While the point of this example is not to teach monad stacks,
@@ -41,6 +42,7 @@ class (Monad m) => MonadIO m where
     --
     -- The following program shows basic state manipulation and IO output sewn together
     -- by the use of a monad stack:
+    --
     -- @
     -- {-# LANGUAGE ConstraintKinds   #-}
     -- {-# LANGUAGE FlexibleContexts  #-}
