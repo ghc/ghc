@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module SysTools.Terminal (stderrSupportsAnsiColors) where
+module GHC.SysTools.Terminal (stderrSupportsAnsiColors) where
 
 import GhcPrelude
 
