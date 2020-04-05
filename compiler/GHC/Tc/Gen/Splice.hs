@@ -51,7 +51,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Core.Coercion( etaExpandCoAxBranch )
-import FileCleanup ( newTempName, TempFileLifetime(..) )
+import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
 

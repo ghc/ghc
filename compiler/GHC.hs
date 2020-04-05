@@ -338,8 +338,8 @@ import GHC.Driver.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Ways
-import SysTools
-import SysTools.BaseDir
+import GHC.SysTools
+import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
 import GHC.Types.Module
 import Panic
@@ -360,7 +360,7 @@ import GHC.Types.Name.Env
 import GHC.Tc.Module
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 import Data.Foldable
 import qualified Data.Map.Strict as Map

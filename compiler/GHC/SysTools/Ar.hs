@@ -15,7 +15,7 @@ with Haskell directly and use ranlib on the final result to get the symbol
 index. This should allow us to work around with the differences/abailability
 of libtool across different platforms.
 -}
-module Ar
+module GHC.SysTools.Ar
   (ArchiveEntry(..)
   ,Archive(..)
   ,afilter

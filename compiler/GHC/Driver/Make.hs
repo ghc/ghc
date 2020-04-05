@@ -70,7 +70,7 @@ import GHC.Types.Unique.Set
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
