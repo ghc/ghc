@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-unbox-small-strict-fields #-}
                 -- Makes f2 a bit more challenging
 
--- Tests inspired by Note [CPR examples] in GHC.Core.Op.DmdAnal, and #10482
+-- Tests inspired by Note [CPR examples] in GHC.Core.Opt.DmdAnal, and #10482
 
 module Foo where
 

@@ -547,7 +547,7 @@ that came up was a NOINLINE pragma on a let-binding inside an INLINE
 function.  The user (Duncan Coutts) really wanted the NOINLINE control
 to cross the separate compilation boundary.
 
-In general we retain all info that is left by GHC.Core.Op.Tidy.tidyLetBndr, since
+In general we retain all info that is left by GHC.Core.Tidy.tidyLetBndr, since
 that is what is seen by importing module with --make
 
 Note [Displaying axiom incompatibilities]

@@ -303,7 +303,7 @@ Library
         GHC.Core.SimpleOpt
         GHC.Core
         TrieMap
-        GHC.Core.Op.Tidy
+        GHC.Core.Tidy
         GHC.Core.Unfold
         GHC.Core.Utils
         GHC.Core.Map
@@ -408,7 +408,7 @@ Library
         KnownUniques
         PrelInfo
         PrelNames
-        GHC.Core.Op.ConstantFold
+        GHC.Core.Opt.ConstantFold
         PrimOp
         ToolSettings
         TysPrim
@@ -427,19 +427,19 @@ Library
         GHC.Rename.Fixity
         GHC.Rename.Utils
         GHC.Rename.Unbound
-        GHC.Core.Op.Monad
-        GHC.Core.Op.CSE
-        GHC.Core.Op.FloatIn
-        GHC.Core.Op.FloatOut
-        GHC.Core.Op.LiberateCase
-        GHC.Core.Op.OccurAnal
-        GHC.Core.Op.StaticArgs
-        GHC.Core.Op.SetLevels
-        GHC.Core.Op.Simplify.Driver
-        GHC.Core.Op.Simplify.Env
-        GHC.Core.Op.Simplify.Monad
-        GHC.Core.Op.Simplify.Utils
-        GHC.Core.Op.Simplify
+        GHC.Core.Opt.Monad
+        GHC.Core.Opt.CSE
+        GHC.Core.Opt.FloatIn
+        GHC.Core.Opt.FloatOut
+        GHC.Core.Opt.LiberateCase
+        GHC.Core.Opt.OccurAnal
+        GHC.Core.Opt.StaticArgs
+        GHC.Core.Opt.SetLevels
+        GHC.Core.Opt.Driver
+        GHC.Core.Opt.Simplify.Env
+        GHC.Core.Opt.Simplify.Monad
+        GHC.Core.Opt.Simplify.Utils
+        GHC.Core.Opt.Simplify
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.CSE
@@ -456,14 +456,14 @@ Library
         GHC.CoreToStg.Prep
         GHC.Types.RepType
         GHC.Core.Rules
-        GHC.Core.Op.SpecConstr
-        GHC.Core.Op.Specialise
-        GHC.Core.Op.CallArity
-        GHC.Core.Op.DmdAnal
-        GHC.Core.Op.CprAnal
-        GHC.Core.Op.Exitify
-        GHC.Core.Op.WorkWrap
-        GHC.Core.Op.WorkWrap.Lib
+        GHC.Core.Opt.SpecConstr
+        GHC.Core.Opt.Specialise
+        GHC.Core.Opt.CallArity
+        GHC.Core.Opt.DmdAnal
+        GHC.Core.Opt.CprAnal
+        GHC.Core.Opt.Exitify
+        GHC.Core.Opt.WorkWrap
+        GHC.Core.Opt.WorkWrap.Utils
         GHC.Tc.Instance.Family
         GHC.Tc.Instance.Class
         GHC.Tc.Utils.Instantiate

@@ -14,7 +14,7 @@ ToDo [Oct 2013]
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.Core.Op.SpecConstr(
+module GHC.Core.Opt.SpecConstr(
         specConstrProgram,
         SpecConstrAnnotation(..)
     ) where
@@ -28,10 +28,10 @@ import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
 import GHC.Core.FVs     ( exprsFreeVarsList )
-import GHC.Core.Op.Monad
+import GHC.Core.Opt.Monad
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Driver.Types ( ModGuts(..) )
-import GHC.Core.Op.WorkWrap.Lib ( isWorkerSmallEnough, mkWorkerArgs )
+import GHC.Core.Opt.WorkWrap.Utils ( isWorkerSmallEnough, mkWorkerArgs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
@@ -420,7 +420,7 @@ Actually in case (2), instead of using the calls from the RHS, it
 would be better to specialise in the importing module.  We'd need to
 add an INLINABLE pragma to the function, and then it can be
 specialised in the importing scope, just as is done for type classes
-in GHC.Core.Op.Specialise.specImports. This remains to be done (#10346).
+in GHC.Core.Opt.Specialise.specImports. This remains to be done (#10346).
 
 Note [Top-level recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1805,7 +1805,7 @@ Note [Transfer activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
   This note is for SpecConstr, but exactly the same thing
   happens in the overloading specialiser; see
-  Note [Auto-specialisation and RULES] in GHC.Core.Op.Specialise.
+  Note [Auto-specialisation and RULES] in GHC.Core.Opt.Specialise.
 
 In which phase should the specialise-constructor rules be active?
 Originally I made them always-active, but Manuel found that this
@@ -2000,7 +2000,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               too_big (vars,_) = not (isWorkerSmallEnough (sc_dflags env) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
-                  -- See Note [Limit w/w arity] in GHC.Core.Op.WorkWrap.Lib
+                  -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils
 
                 -- Discard specialisations if there are too many of them
               trimmed_pats = trim_pats env fn spec_info small_pats

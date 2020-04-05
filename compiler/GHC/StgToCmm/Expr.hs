@@ -64,7 +64,7 @@ cgExpr  :: CgStgExpr -> FCode ReturnKind
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
 -- seq# a s ==> a
--- See Note [seq# magic] in GHC.Core.Op.ConstantFold
+-- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
@@ -325,8 +325,8 @@ calls to nonVoidIds in various places.  So we must not look up
 Note [Dead-binder optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A case-binder, or data-constructor argument, may be marked as dead,
-because we preserve occurrence-info on binders in GHC.Core.Op.Tidy (see
-GHC.Core.Op.Tidy.tidyIdBndr).
+because we preserve occurrence-info on binders in GHC.Core.Tidy (see
+GHC.Core.Tidy.tidyIdBndr).
 
 If the binder is dead, we can sometimes eliminate a load.  While
 CmmSink will eliminate that load, it's very easy to kill it at source
@@ -337,7 +337,7 @@ to keep it for -O0. See also Phab:D5358.
 
 This probably also was the reason for occurrence hack in Phab:D5339 to
 exist, perhaps because the occurrence information preserved by
-'GHC.Core.Op.Tidy.tidyIdBndr' was insufficient.  But now that CmmSink does the
+'GHC.Core.Tidy.tidyIdBndr' was insufficient.  But now that CmmSink does the
 job we deleted the hacks.
 -}
 
@@ -405,7 +405,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
 
 {- Note [Handle seq#]
 ~~~~~~~~~~~~~~~~~~~~~
-See Note [seq# magic] in GHC.Core.Op.ConstantFold.
+See Note [seq# magic] in GHC.Core.Opt.ConstantFold.
 The special case for seq# in cgCase does this:
 
   case seq# a s of v
@@ -420,7 +420,7 @@ is the same as the return convention for just 'a')
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- Note [Handle seq#]
-    -- And see Note [seq# magic] in GHC.Core.Op.ConstantFold
+    -- And see Note [seq# magic] in GHC.Core.Opt.ConstantFold
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 

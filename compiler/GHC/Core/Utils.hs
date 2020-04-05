@@ -162,7 +162,7 @@ isExprLevPoly = go
    go e@(Cast {})                  = check_type e
    go (Tick _ e)                   = go e
    go e@(Type {})                  = pprPanic "isExprLevPoly ty" (ppr e)
-   go (Coercion {})                = False  -- this case can happen in GHC.Core.Op.SetLevels
+   go (Coercion {})                = False  -- this case can happen in GHC.Core.Opt.SetLevels
 
    check_type = isTypeLevPoly . exprType  -- slow approach
 
@@ -625,7 +625,7 @@ for 'Red'.  That's because 'lvl' is unreachable.  So rather than crashing
 we generate (error "Inaccessible alternative").
 
 Similar things can happen (augmented by GADTs) when the Simplifier
-filters down the matching alternatives in GHC.Core.Op.Simplify.rebuildCase.
+filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
@@ -789,7 +789,7 @@ with a specific constructor is desirable.
          C2 -> e0
 
    It isn't obvious that refineDefaultAlt does this but if you look
-   at its one call site in GHC.Core.Op.Simplify.Utils then the
+   at its one call site in GHC.Core.Opt.Simplify.Utils then the
    `imposs_deflt_cons` argument is populated with constructors which
    are matched elsewhere.
 
@@ -841,7 +841,7 @@ Note [Combine identical alternatives: wrinkles]
   isDeadBinder (see #7360).
 
   You can see this in the call to combineIdenticalAlts in
-  GHC.Core.Op.Simplify.Utils.prepareAlts.  Here the alternatives have type InAlt
+  GHC.Core.Opt.Simplify.Utils.prepareAlts.  Here the alternatives have type InAlt
   (the "In" meaning input) rather than OutAlt.
 
 * combineIdenticalAlts does not work well for nullary constructors
@@ -849,10 +849,10 @@ Note [Combine identical alternatives: wrinkles]
          []    -> f []
          (_:_) -> f y
   Here we won't see that [] and y are the same.  Sigh! This problem
-  is solved in CSE, in GHC.Core.Op.CSE.combineAlts, which does a better version
+  is solved in CSE, in GHC.Core.Opt.CSE.combineAlts, which does a better version
   of combineIdenticalAlts. But sadly it doesn't have the occurrence info we have
   here.
-  See Note [Combine case alts: awkward corner] in GHC.Core.Op.CSE).
+  See Note [Combine case alts: awkward corner] in GHC.Core.Opt.CSE).
 
 Note [Care with impossible-constructors when combining alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1643,10 +1643,10 @@ isDivOp _                = False
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprOkForSpeculation accepts very special case expressions.
 Reason: (a ==# b) is ok-for-speculation, but the litEq rules
-in GHC.Core.Op.ConstantFold convert it (a ==# 3#) to
+in GHC.Core.Opt.ConstantFold convert it (a ==# 3#) to
    case a of { DEFAULT -> 0#; 3# -> 1# }
 for excellent reasons described in
-  GHC.Core.Op.ConstantFold Note [The litEq rule: converting equality to case].
+  GHC.Core.Opt.ConstantFold Note [The litEq rule: converting equality to case].
 So, annoyingly, we want that case expression to be
 ok-for-speculation too. Bother.
 
@@ -1660,12 +1660,12 @@ But we restrict it sharply:
 
   Does the RHS of v satisfy the let/app invariant?  Previously we said
   yes, on the grounds that y is evaluated.  But the binder-swap done
-  by GHC.Core.Op.SetLevels would transform the inner alternative to
+  by GHC.Core.Opt.SetLevels would transform the inner alternative to
      DEFAULT -> ... (let v::Int# = case x of { ... }
                      in ...) ....
   which does /not/ satisfy the let/app invariant, because x is
   not evaluated. See Note [Binder-swap during float-out]
-  in GHC.Core.Op.SetLevels.  To avoid this awkwardness it seems simpler
+  in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
   to stick to unlifted scrutinees where the issue does not
   arise.
 
@@ -1686,7 +1686,7 @@ But we restrict it sharply:
 
 
 ----- Historical note: #15696: --------
-  Previously GHC.Core.Op.SetLevels used exprOkForSpeculation to guide
+  Previously GHC.Core.Opt.SetLevels used exprOkForSpeculation to guide
   floating of single-alternative cases; it now uses exprIsHNF
   Note [Floating single-alternative cases].
 
@@ -1696,8 +1696,8 @@ But we restrict it sharply:
             A -> ...
             _ -> ...(case (case x of { B -> p; C -> p }) of
                        I# r -> blah)...
-  If GHC.Core.Op.SetLevels considers the inner nested case as
-  ok-for-speculation it can do case-floating (in GHC.Core.Op.SetLevels).
+  If GHC.Core.Opt.SetLevels considers the inner nested case as
+  ok-for-speculation it can do case-floating (in GHC.Core.Opt.SetLevels).
   So we'd float to:
     case e of x { DEAFULT ->
     case (case x of { B -> p; C -> p }) of I# r ->
@@ -2031,7 +2031,7 @@ we don't want Lint to complain.  The 'y' is evaluated, so the
 case in the RHS of the binding for 'v' is fine.  But only if we
 *know* that 'y' is evaluated.
 
-c.f. add_evals in GHC.Core.Op.Simplify.simplAlt
+c.f. add_evals in GHC.Core.Opt.Simplify.simplAlt
 
 ************************************************************************
 *                                                                      *
@@ -2300,7 +2300,7 @@ There are some particularly delicate points here:
 
 * Note [Arity care]: we need to be careful if we just look at f's
   arity. Currently (Dec07), f's arity is visible in its own RHS (see
-  Note [Arity robustness] in GHC.Core.Op.Simplify.Env) so we must *not* trust the
+  Note [Arity robustness] in GHC.Core.Opt.Simplify.Env) so we must *not* trust the
   arity when checking that 'f' is a value.  Otherwise we will
   eta-reduce
       f = \x. f x

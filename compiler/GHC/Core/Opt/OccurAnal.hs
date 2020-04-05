@@ -14,7 +14,7 @@ core expression with (hopefully) improved usage information.
 {-# LANGUAGE CPP, BangPatterns, MultiWayIf, ViewPatterns  #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-module GHC.Core.Op.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
+module GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
 #include "HsVersions.h"
 
@@ -289,7 +289,7 @@ But what is the graph?  NOT the same graph as was used for Note
 'f' that is *always* inlined if it is applicable.  We do *not* disable
 rules for loop-breakers.  It's up to whoever makes the rules to make
 sure that the rules themselves always terminate.  See Note [Rules for
-recursive functions] in GHC.Core.Op.Simplify
+recursive functions] in GHC.Core.Opt.Simplify
 
 Hence, if
     f's RHS (or its INLINE template if it has one) mentions g, and
@@ -634,7 +634,7 @@ Consider this group, which is typical of what SpecConstr builds:
 So 'f' and 'fs' are in the same Rec group (since f refers to fs via its RULE).
 
 But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite loop:
-  - the RULE is applied in f's RHS (see Note [Self-recursive rules] in GHC.Core.Op.Simplify
+  - the RULE is applied in f's RHS (see Note [Self-recursive rules] in GHC.Core.Opt.Simplify
   - fs is inlined (say it's small)
   - now there's another opportunity to apply the RULE
 
@@ -1689,7 +1689,7 @@ So, when analysing the RHS of x3 we notice that x3 will itself
 definitely inline the next time round, and so we analyse x3's rhs in
 an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
 
-Annoyingly, we have to approximate GHC.Core.Op.Simplify.Utils.preInlineUnconditionally.
+Annoyingly, we have to approximate GHC.Core.Opt.Simplify.Utils.preInlineUnconditionally.
 If (a) the RHS is expandable (see isExpandableApp in occAnalApp), and
    (b) certainly_inline says "yes" when preInlineUnconditionally says "no"
 then the simplifier iterates indefinitely:
@@ -1913,7 +1913,7 @@ occAnalApp env (Var fun, args, ticks)
 
     is_exp     = isExpandableApp fun n_val_args
         -- See Note [CONLIKE pragma] in GHC.Types.Basic
-        -- The definition of is_exp should match that in GHC.Core.Op.Simplify.prepareRhs
+        -- The definition of is_exp should match that in GHC.Core.Opt.Simplify.prepareRhs
 
     one_shots  = argsOneShots (idStrictness fun) guaranteed_val_args
     guaranteed_val_args = n_val_args + length (takeWhile isOneShotInfo

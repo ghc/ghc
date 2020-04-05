@@ -8,7 +8,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.Core.Op.Monad (
+module GHC.Core.Opt.Monad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..), runWhen, runMaybe,
     SimplMode(..),
@@ -153,7 +153,7 @@ pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n
                                             , ppr md ]
 pprPassDetails _ = Outputable.empty
 
-data SimplMode             -- See comments in GHC.Core.Op.Simplify.Monad
+data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
         { sm_names      :: [String] -- Name(s) of the phase
         , sm_phase      :: CompilerPhase
@@ -194,7 +194,7 @@ data FloatOutSwitches = FloatOutSwitches {
                              -- ^ True <=> float out over-saturated applications
                              --            based on arity information.
                              -- See Note [Floating over-saturated applications]
-                             -- in GHC.Core.Op.SetLevels
+                             -- in GHC.Core.Opt.SetLevels
   floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
   }
 instance Outputable FloatOutSwitches where

@@ -17,7 +17,7 @@ ToDo:
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
 
-module GHC.Core.Op.ConstantFold
+module GHC.Core.Opt.ConstantFold
    ( primOpRules
    , builtinRules
    , caseRules
@@ -1112,13 +1112,13 @@ is:
   the returned value.
 
 * An application like (dataToTag# (Just x)) is optimised by
-  dataToTagRule in GHC.Core.Op.ConstantFold.
+  dataToTagRule in GHC.Core.Opt.ConstantFold.
 
 * A case expression like
      case (dataToTag# e) of <alts>
   gets transformed t
      case e of <transformed alts>
-  by GHC.Core.Op.ConstantFold.caseRules; see Note [caseRules for dataToTag]
+  by GHC.Core.Opt.ConstantFold.caseRules; see Note [caseRules for dataToTag]
 
 See #15696 for a long saga.
 -}
@@ -1193,7 +1193,7 @@ Things to note
 
 Implementing seq#.  The compiler has magic for SeqOp in
 
-- GHC.Core.Op.ConstantFold.seqRule: eliminate (seq# <whnf> s)
+- GHC.Core.Opt.ConstantFold.seqRule: eliminate (seq# <whnf> s)
 
 - GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
 
@@ -1202,7 +1202,7 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]
-  in GHC.Core.Op.Simplify
+  in GHC.Core.Opt.Simplify
 -}
 
 seqRule :: RuleM CoreExpr
@@ -2051,7 +2051,7 @@ wordPrimOps platform = PrimOps
 --------------------------------------------------------
 -- Constant folding through case-expressions
 --
--- cf Scrutinee Constant Folding in simplCore/GHC.Core.Op.Simplify.Utils
+-- cf Scrutinee Constant Folding in simplCore/GHC.Core.Opt.Simplify.Utils
 --------------------------------------------------------
 
 -- | Match the scrutinee of a case and potentially return a new scrutinee and a
@@ -2212,7 +2212,7 @@ We don't want to get this!
       DEFAULT -> e1
       DEFAULT -> e2
 
-Instead, we deal with turning one branch into DEFAULT in GHC.Core.Op.Simplify.Utils
+Instead, we deal with turning one branch into DEFAULT in GHC.Core.Opt.Simplify.Utils
 (add_default in mkCase3).
 
 Note [caseRules for dataToTag]

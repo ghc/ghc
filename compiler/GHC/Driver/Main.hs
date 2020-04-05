@@ -93,7 +93,7 @@ import GHC.Runtime.Interpreter ( addSptEntry )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
-import GHC.Core.Op.Tidy        ( tidyExpr )
+import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
 import GHC.Types.Var.Env       ( emptyTidyEnv )
@@ -117,7 +117,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 import GHC.Types.Name.Cache ( initNameCache )
 import PrelInfo
-import GHC.Core.Op.Simplify.Driver
+import GHC.Core.Opt.Driver
 import GHC.HsToCore
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
 import GHC.Iface.Make

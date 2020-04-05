@@ -1227,7 +1227,7 @@ Now we get
 
 Notice that `f` does not inline into the RHS of `c`,
 because the INLINE pragma stops it; see
-Note [Simplifying inside stable unfoldings] in GHC.Core.Op.Simplify.Utils.
+Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils.
 Continuing:
 
   = { foldr/build rule }

@@ -48,7 +48,7 @@ import GhcPrelude
 
 import GHC.Driver.Session
 import GHC.Core
-import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.SimpleOpt
 import GHC.Core.Arity   ( manifestArity )
 import GHC.Core.Utils
@@ -122,7 +122,7 @@ mkWwInlineRule dflags expr arity
                             , ug_boring_ok = boringCxtNotOk })
 
 mkWorkerUnfolding :: DynFlags -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
--- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Op.WorkWrap
+-- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
 mkWorkerUnfolding dflags work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })
@@ -499,7 +499,7 @@ result of #4978.
 Note [Do not inline top-level bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The FloatOut pass has gone to some trouble to float out calls to 'error'
-and similar friends.  See Note [Bottoming floats] in GHC.Core.Op.SetLevels.
+and similar friends.  See Note [Bottoming floats] in GHC.Core.Opt.SetLevels.
 Do not re-inline them!  But we *do* still inline if they are very small
 (the uncondInline stuff).
 
@@ -552,7 +552,7 @@ Things to note:
     unconditional-inline thing for *trivial* expressions.
 
     NB: you might think that PostInlineUnconditionally would do this
-    but it doesn't fire for top-level things; see GHC.Core.Op.Simplify.Utils
+    but it doesn't fire for top-level things; see GHC.Core.Opt.Simplify.Utils
     Note [Top level and postInlineUnconditionally]
 
 Note [Count coercion arguments in boring contexts]

@@ -21,8 +21,8 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs
-import GHC.Core.Op.Tidy
-import GHC.Core.Op.Monad
+import GHC.Core.Tidy
+import GHC.Core.Opt.Monad
 import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
@@ -529,7 +529,7 @@ of exceptions, and finally I gave up the battle:
 
 Note [Injecting implicit bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We inject the implicit bindings right at the end, in GHC.Core.Op.Tidy.
+We inject the implicit bindings right at the end, in GHC.Core.Tidy.
 Some of these bindings, notably record selectors, are not
 constructed in an optimised form.  E.g. record selector for
         data T = MkT { x :: {-# UNPACK #-} !Int }
@@ -896,7 +896,7 @@ Now that RULE *might* be useful to an importing module, but that is
 purely speculative, and meanwhile the code is taking up space and
 codegen time.  I found that binary sizes jumped by 6-10% when I
 started to specialise INLINE functions (again, Note [Inline
-specialisations] in GHC.Core.Op.Specialise).
+specialisations] in GHC.Core.Opt.Specialise).
 
 So it seems better to drop the binding for f_spec, and the rule
 itself, if the auto-generated rule is the *only* reason that it is
@@ -904,7 +904,7 @@ being kept alive.
 
 (The RULE still might have been useful in the past; that is, it was
 the right thing to have generated it in the first place.  See Note
-[Inline specialisations] in GHC.Core.Op.Specialise. But now it has
+[Inline specialisations] in GHC.Core.Opt.Specialise. But now it has
 served its purpose, and can be discarded.)
 
 So findExternalRules does this:
@@ -1186,12 +1186,12 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
-                        --      c.f. GHC.Core.Op.Tidy.tidyLetBndr
+                        --      c.f. GHC.Core.Tidy.tidyLetBndr
         `setArityInfo`      arity
         `setStrictnessInfo` final_sig
         `setCprInfo`        final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
-                                                 -- in GHC.Core.Op.Tidy
+                                                 -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
@@ -1253,7 +1253,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
     -- split (see Note [Worker-wrapper for bottoming functions] in
-    -- GHC.Core.Op.WorkWrap)
+    -- GHC.Core.Opt.WorkWrap)
 
 
     --------- Arity ------------

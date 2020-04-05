@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
-module GHC.Core.Op.CSE (cseProgram, cseOneExpr) where
+module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"
 
@@ -124,7 +124,7 @@ Notice also that in the SUBSTITUTE case we leave behind a binding
   x = y
 even though we /also/ carry a substitution x -> y.  Can we just drop
 the binding instead?  Well, not at top level! See Note [Top level and
-postInlineUnconditionally] in GHC.Core.Op.Simplify.Utils; and in any
+postInlineUnconditionally] in GHC.Core.Opt.Simplify.Utils; and in any
 case CSE applies only to the /bindings/ of the program, and we leave
 it to the simplifier to propate effects to the RULES. Finally, it
 doesn't seem worth the effort to discard the nested bindings because
@@ -231,7 +231,7 @@ the Integer instance of Enum in GHC.Enum.)  Suppose moreover that foo's
 stable unfolding originates from an INLINE or INLINEABLE pragma on foo.
 Then we obviously do NOT want to extend the substitution with (foo->x),
 because we promised to inline foo as what the user wrote.  See similar Note
-[Stable unfoldings and postInlineUnconditionally] in GHC.Core.Op.Simplify.Utils.
+[Stable unfoldings and postInlineUnconditionally] in GHC.Core.Opt.Simplify.Utils.
 
 Nor do we want to change the reverse mapping. Suppose we have
 
@@ -687,7 +687,7 @@ turning K2 into 'x' increases the number of live variables.  But
 Note [Combine case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 combineAlts is just a more heavyweight version of the use of
-combineIdenticalAlts in GHC.Core.Op.Simplify.Utils.prepareAlts.  The basic idea is
+combineIdenticalAlts in GHC.Core.Opt.Simplify.Utils.prepareAlts.  The basic idea is
 to transform
 
     DEFAULT -> e1
@@ -710,7 +710,7 @@ Note [Combine case alts: awkward corner]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We would really like to check isDeadBinder on the binders in the
 alternative.  But alas, the simplifer zaps occ-info on binders in case
-alternatives; see Note [Case alternative occ info] in GHC.Core.Op.Simplify.
+alternatives; see Note [Case alternative occ info] in GHC.Core.Opt.Simplify.
 
 * One alternative (perhaps a good one) would be to do OccAnal
   just before CSE.  Then perhaps we could get rid of combineIdenticalAlts

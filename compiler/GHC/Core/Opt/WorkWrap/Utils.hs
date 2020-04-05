@@ -6,7 +6,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Op.WorkWrap.Lib
+module GHC.Core.Opt.WorkWrap.Utils
    ( mkWwBodies, mkWWstr, mkWorkerArgs
    , DataConAppContext(..), deepSplitProductType_maybe, wantToUnbox
    , findTypeShape
@@ -214,7 +214,7 @@ Note [Always do CPR w/w]
 At one time we refrained from doing CPR w/w for thunks, on the grounds that
 we might duplicate work.  But that is already handled by the demand analyser,
 which doesn't give the CPR property if w/w might waste work: see
-Note [CPR for thunks] in GHC.Core.Op.DmdAnal.
+Note [CPR for thunks] in GHC.Core.Opt.DmdAnal.
 
 And if something *has* been given the CPR property and we don't w/w, it's
 a disaster, because then the enclosing function might say it has the CPR
@@ -637,7 +637,7 @@ unbox_one dflags fam_envs arg cs
                                          data_con unpk_args
                 arg_no_unf = zapStableUnfolding arg
                              -- See Note [Zap unfolding when beta-reducing]
-                             -- in GHC.Core.Op.Simplify; and see #13890
+                             -- in GHC.Core.Opt.Simplify; and see #13890
                 rebox_fn   = Let (NonRec arg_no_unf con_app)
                 con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
          ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
@@ -909,7 +909,7 @@ If we have
    f :: Ord a => [a] -> Int -> a
    {-# INLINABLE f #-}
 and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Op.WorkWrap),
+(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
 which can still be specialised by the type-class specialiser, something like
    fw :: Ord a => [a] -> Int# -> a
 

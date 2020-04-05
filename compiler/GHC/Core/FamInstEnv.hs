@@ -316,7 +316,7 @@ Nevertheless it is still useful to have data families in the FamInstEnv:
  - For finding overlaps and conflicts
 
  - For finding the representation type...see FamInstEnv.topNormaliseType
-   and its call site in GHC.Core.Op.Simplify
+   and its call site in GHC.Core.Opt.Simplify
 
  - In standalone deriving instance Eq (T [Int]) we need to find the
    representation type for T [Int]
