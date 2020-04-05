@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-module FileCleanup
+module GHC.SysTools.FileCleanup
   ( TempFileLifetime(..)
   , cleanTempDirs, cleanTempFiles, cleanCurrentModuleTempFiles
   , addFilesToClean, changeTempFilesLifetime

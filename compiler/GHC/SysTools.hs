@@ -10,14 +10,14 @@
 
 {-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables #-}
 
-module SysTools (
+module GHC.SysTools (
         -- * Initialisation
         initSysTools,
         lazyInitLlvmConfig,
 
         -- * Interface to system tools
-        module SysTools.Tasks,
-        module SysTools.Info,
+        module GHC.SysTools.Tasks,
+        module GHC.SysTools.Info,
 
         linkDynLib,
 
@@ -54,18 +54,18 @@ import Control.Monad.Trans.Except (runExceptT)
 import System.FilePath
 import System.IO
 import System.IO.Unsafe (unsafeInterleaveIO)
-import SysTools.ExtraObj
-import SysTools.Info
-import SysTools.Tasks
-import SysTools.BaseDir
-import SysTools.Settings
+import GHC.SysTools.ExtraObj
+import GHC.SysTools.Info
+import GHC.SysTools.Tasks
+import GHC.SysTools.BaseDir
+import GHC.SysTools.Settings
 import qualified Data.Set as Set
 
 {-
 Note [How GHC finds toolchain utilities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SysTools.initSysProgs figures out exactly where all the auxiliary programs
+GHC.SysTools.initSysProgs figures out exactly where all the auxiliary programs
 are, and initialises mutable variables to make it easy to call them.
 To do this, it makes use of definitions in Config.hs, which is a Haskell
 file containing variables whose value is figured out by the build system.
