@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 
--- Actually, this exercises GHC.Core.Op.ConstantFold, but this is the closest
+-- Actually, this exercises GHC.Core.Opt.ConstantFold, but this is the closest
 -- place I could find to put it...
 
 import GHC.Exts

@@ -1,4 +1,4 @@
-module GHC.Core.Op.Exitify ( exitifyProgram ) where
+module GHC.Core.Opt.Exitify ( exitifyProgram ) where
 
 {-
 Note [Exitification]
@@ -246,7 +246,7 @@ exitifyRec in_scope pairs
 
         -- We are going to abstract over these variables, so we must
         -- zap any IdInfo they have; see #15005
-        -- cf. GHC.Core.Op.SetLevels.abstractVars
+        -- cf. GHC.Core.Opt.SetLevels.abstractVars
         zap v | isId v = setIdInfo v vanillaIdInfo
               | otherwise = v
 

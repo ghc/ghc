@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -O2 #-}
 
--- Ths one fooled the rule-matching in GHC.Core.Op.SpecConstr, and gave a CoreLint error
+-- Ths one fooled the rule-matching in GHC.Core.Opt.SpecConstr, and gave a CoreLint error
 
 module Foo where
 

@@ -49,7 +49,7 @@ module GHC.Driver.Plugins (
 
 import GhcPrelude
 
-import {-# SOURCE #-} GHC.Core.Op.Monad ( CoreToDo, CoreM )
+import {-# SOURCE #-} GHC.Core.Opt.Monad ( CoreToDo, CoreM )
 import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )

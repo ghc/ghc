@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
--- | Types for the Constructed Product Result lattice. "GHC.Core.Op.CprAnal" and "GHC.Core.Op.WorkWrap.Lib"
+-- | Types for the Constructed Product Result lattice. "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
 -- are its primary customers via 'idCprInfo'.
 module GHC.Types.Cpr (
     CprResult, topCpr, botCpr, conCpr, asConCpr,
