@@ -8,16 +8,16 @@ Derived class instances:
       T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
     (GHC.Classes.==)
       = GHC.Prim.coerce
-          @(T14579.Wat @a (Data.Proxy.Proxy @a)
-            -> T14579.Wat @a (Data.Proxy.Proxy @a) -> GHC.Types.Bool)
+          @(T14579.Wat @a ('Data.Proxy.Proxy @a)
+            -> T14579.Wat @a ('Data.Proxy.Proxy @a) -> GHC.Types.Bool)
           @(T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool)
-          ((GHC.Classes.==) @(T14579.Wat @a (Data.Proxy.Proxy @a)))
+          ((GHC.Classes.==) @(T14579.Wat @a ('Data.Proxy.Proxy @a)))
     (GHC.Classes./=)
       = GHC.Prim.coerce
-          @(T14579.Wat @a (Data.Proxy.Proxy @a)
-            -> T14579.Wat @a (Data.Proxy.Proxy @a) -> GHC.Types.Bool)
+          @(T14579.Wat @a ('Data.Proxy.Proxy @a)
+            -> T14579.Wat @a ('Data.Proxy.Proxy @a) -> GHC.Types.Bool)
           @(T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool)
-          ((GHC.Classes./=) @(T14579.Wat @a (Data.Proxy.Proxy @a)))
+          ((GHC.Classes./=) @(T14579.Wat @a ('Data.Proxy.Proxy @a)))
   
   instance forall a (x :: Data.Proxy.Proxy a).
            GHC.Classes.Eq a =>
