@@ -46,7 +46,7 @@ import GHC.Core.Type as Type
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import TysWiredIn           ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
-import GHC.Core.Op.Tidy     ( tidyRules )
+import GHC.Core.Tidy     ( tidyRules )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
 import GHC.Types.Var
@@ -115,7 +115,7 @@ Note [Overall plumbing for rules]
     (d) Rules in the ExternalPackageTable. These can grow in response
         to lazy demand-loading of interfaces.
 
-* At the moment (c) is carried in a reader-monad way by the GHC.Core.Op.Monad.
+* At the moment (c) is carried in a reader-monad way by the GHC.Core.Opt.Monad.
   The HomePackageTable doesn't have a single RuleBase because technically
   we should only be able to "see" rules "below" this module; so we
   generate a RuleBase for (c) by combing rules from all the modules
@@ -128,7 +128,7 @@ Note [Overall plumbing for rules]
 * So in the outer simplifier loop, we combine (b-d) into a single
   RuleBase, reading
      (b) from the ModGuts,
-     (c) from the GHC.Core.Op.Monad, and
+     (c) from the GHC.Core.Opt.Monad, and
      (d) from its mutable variable
   [Of course this means that we won't see new EPS rules that come in
   during a single simplifier iteration, but that probably does not
@@ -326,7 +326,7 @@ but that isn't quite right:
      - PrimOps and ClassOps are born with a bunch of rules inside the Id,
        even when they are imported
 
-     - The rules in GHC.Core.Op.ConstantFold.builtinRules should be active even
+     - The rules in GHC.Core.Opt.ConstantFold.builtinRules should be active even
        in the module defining the Id (when it's a LocalId), but
        the rules are kept in the global RuleBase
 
@@ -1024,7 +1024,7 @@ these cases.
 On the other hand, where we are allowed to insert new cost into the
 tick scope, we can float them upwards to the rule application site.
 
-cf Note [Notes in call patterns] in GHC.Core.Op.SpecConstr
+cf Note [Notes in call patterns] in GHC.Core.Opt.SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~

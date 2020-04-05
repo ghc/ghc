@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-module GHC.Core.Op.WorkWrap ( wwTopBinds ) where
+module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
 import GhcPrelude
 
@@ -23,7 +23,7 @@ import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Core.Op.WorkWrap.Lib
+import GHC.Core.Opt.WorkWrap.Utils
 import Util
 import Outputable
 import GHC.Core.FamInstEnv
@@ -282,7 +282,7 @@ Follows on from Note [Worker-wrapper for INLINABLE functions]
 It is *vital* that if the worker gets an INLINABLE pragma (from the
 original function), then the worker has the same phase activation as
 the wrapper (or later).  That is necessary to allow the wrapper to
-inline into the worker's unfolding: see GHC.Core.Op.Simplify.Utils
+inline into the worker's unfolding: see GHC.Core.Opt.Simplify.Utils
 Note [Simplifying inside stable unfoldings].
 
 If the original is NOINLINE, it's important that the work inherit the
@@ -477,7 +477,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
 
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
-    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Op.CprAnal
+    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
     cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
@@ -511,7 +511,7 @@ Why here?
 
 We also need to do it in TidyCore.tidyLetBndr to clean up after the
 final, worker/wrapper-less run of the demand analyser (see
-Note [Final Demand Analyser run] in GHC.Core.Op.DmdAnal).
+Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal).
 
 Note [Zapping Used Once info in WorkWrap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -712,7 +712,7 @@ Consider this rather common form of binding:
         $j = \x:Void# -> ...no use of x...
 
 Since x is not used it'll be marked as absent.  But there is no point
-in w/w-ing because we'll simply add (\y:Void#), see GHC.Core.Op.WorkWrap.Lib.mkWorerArgs.
+in w/w-ing because we'll simply add (\y:Void#), see GHC.Core.Opt.WorkWrap.Utils.mkWorerArgs.
 
 If x has a more interesting type (eg Int, or Int#), there *is* a point
 in w/w so that we don't pass the argument at all.

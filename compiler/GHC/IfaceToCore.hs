@@ -62,7 +62,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply

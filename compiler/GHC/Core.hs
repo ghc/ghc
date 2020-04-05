@@ -354,7 +354,7 @@ an unlifted literal, like all the others.
 
 Also, we do not permit case analysis with literal patterns on floating-point
 types. See #9238 and Note [Rules for floating-point comparisons] in
-GHC.Core.Op.ConstantFold for the rationale for this restriction.
+GHC.Core.Opt.ConstantFold for the rationale for this restriction.
 
 -------------------------- GHC.Core INVARIANTS ---------------------------
 
@@ -508,7 +508,7 @@ checked by Core Lint.
 
 5. Floating-point values must not be scrutinised against literals.
    See #9238 and Note [Rules for floating-point comparisons]
-   in GHC.Core.Op.ConstantFold for rationale.  Checked in lintCaseExpr;
+   in GHC.Core.Opt.ConstantFold for rationale.  Checked in lintCaseExpr;
    see the call to isFloatingTy.
 
 6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
@@ -784,7 +784,7 @@ is crucial for understanding how case-of-case interacts with join points:
     _  -> False
 
 The simplifier will pull the case into the join point (see Note [Join points
-and case-of-case] in GHC.Core.Op.Simplify):
+and case-of-case] in GHC.Core.Opt.Simplify):
 
   join
     j :: Int -> Bool -> Bool -- changed!
@@ -1296,7 +1296,7 @@ Orphan-hood is computed
 ************************************************************************
 
 The CoreRule type and its friends are dealt with mainly in GHC.Core.Rules, but
-GHC.Core.FVs, GHC.Core.Subst, GHC.Core.Ppr, GHC.Core.Op.Tidy also inspect the
+GHC.Core.FVs, GHC.Core.Subst, GHC.Core.Ppr, GHC.Core.Tidy also inspect the
 representation.
 -}
 
@@ -1816,7 +1816,7 @@ the occurrence info is wrong
 -}
 
 -- The Ord is needed for the FiniteMap used in the lookForConstructor
--- in GHC.Core.Op.Simplify.Env.  If you declared that lookForConstructor
+-- in GHC.Core.Opt.Simplify.Env.  If you declared that lookForConstructor
 -- *ignores* constructor-applications with LitArg args, then you could get rid
 -- of this Ord.
 

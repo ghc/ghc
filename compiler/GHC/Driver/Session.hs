@@ -503,7 +503,7 @@ data DynFlags = DynFlags {
                                         --   by the assembler code generator (0 to disable)
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
-                                        --   See GHC.Core.Op.Monad.FloatOutSwitches
+                                        --   See GHC.Core.Opt.Monad.FloatOutSwitches
 
   liftLamsRecArgs       :: Maybe Int,   -- ^ Maximum number of arguments after lambda lifting a
                                         --   recursive function.
