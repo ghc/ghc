@@ -612,11 +612,14 @@ synifyType _ vs (TyConApp tc tys)
         in noLoc $ HsKindSig noExtField ty' full_kind'
       | otherwise = ty'
 
-synifyType s vs (AppTy t1 (CoercionTy {})) = synifyType s vs t1
-synifyType _ vs (AppTy t1 t2) = let
-  s1 = synifyType WithinType vs t1
-  s2 = synifyType WithinType vs t2
-  in noLoc $ HsAppTy noExtField s1 s2
+synifyType _ vs ty@(AppTy {}) = let
+  (ty_head, ty_args) = splitAppTys ty
+  ty_head' = synifyType WithinType vs ty_head
+  ty_args' = map (synifyType WithinType vs) $
+             filterOut isCoercionTy $
+             filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
+                          ty_args
+  in foldl (\t1 t2 -> noLoc $ HsAppTy noExtField t1 t2) ty_head' ty_args'
 synifyType s vs funty@(FunTy InvisArg _ _) = synifyForAllType s Inferred vs funty
 synifyType _ vs       (FunTy VisArg t1 t2) = let
   s1 = synifyType WithinType vs t1
