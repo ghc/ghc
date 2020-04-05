@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SysTools.Settings
+module GHC.SysTools.Settings
  ( SettingsError (..)
  , initSettings
  ) where
@@ -21,7 +21,7 @@ import GHC.Platform
 import GhcNameVersion
 import Outputable
 import Settings
-import SysTools.BaseDir
+import GHC.SysTools.BaseDir
 import ToolSettings
 
 import Control.Monad.Trans.Except

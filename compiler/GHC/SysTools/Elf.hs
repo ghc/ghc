@@ -8,7 +8,7 @@
 -----------------------------------------------------------------------------
 -}
 
-module Elf (
+module GHC.SysTools.Elf (
     readElfSectionByName,
     readElfNoteAsString,
     makeElfNote

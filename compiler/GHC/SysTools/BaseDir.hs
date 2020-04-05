@@ -11,7 +11,7 @@
 -----------------------------------------------------------------------------
 -}
 
-module SysTools.BaseDir
+module GHC.SysTools.BaseDir
   ( expandTopDir, expandToolDir
   , findTopDir, findToolDir
   , tryFindTopDir

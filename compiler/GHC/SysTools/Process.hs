@@ -6,7 +6,7 @@
 -- (c) The GHC Team 2017
 --
 -----------------------------------------------------------------------------
-module SysTools.Process where
+module GHC.SysTools.Process where
 
 #include "HsVersions.h"
 
@@ -30,7 +30,7 @@ import System.IO
 import System.IO.Error as IO
 import System.Process
 
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
 -- @process >= 1.6.8.0@).
