@@ -56,8 +56,8 @@ import GHC.Driver.Session hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
-import SysTools.BaseDir
-import SysTools.Settings
+import GHC.SysTools.BaseDir
+import GHC.SysTools.Settings
 import GHC.Types.SrcLoc
 import Util
 import Panic

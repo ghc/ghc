@@ -177,8 +177,8 @@ Library
         GHC.Iface.Ext.Binary
         GHC.Iface.Ext.Utils
         GHC.Iface.Ext.Ast
-        Ar
-        FileCleanup
+        GHC.SysTools.Ar
+        GHC.SysTools.FileCleanup
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Types.Name.Shape
@@ -387,15 +387,15 @@ Library
         GHC.Core.Ppr.TyThing
         Settings
         StaticPtrTable
-        SysTools
-        SysTools.BaseDir
-        SysTools.Terminal
-        SysTools.ExtraObj
-        SysTools.Info
-        SysTools.Process
-        SysTools.Tasks
-        SysTools.Settings
-        Elf
+        GHC.SysTools
+        GHC.SysTools.BaseDir
+        GHC.SysTools.Terminal
+        GHC.SysTools.ExtraObj
+        GHC.SysTools.Info
+        GHC.SysTools.Process
+        GHC.SysTools.Tasks
+        GHC.SysTools.Settings
+        GHC.SysTools.Elf
         GHC.Iface.Tidy
         Ctype
         HaddockUtils
