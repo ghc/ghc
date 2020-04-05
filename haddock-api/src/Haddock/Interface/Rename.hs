@@ -304,14 +304,14 @@ renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })
        ; return (HsQTvs { hsq_ext = noExtField
                         , hsq_explicit = tvs' }) }
 
-renameLTyVarBndr :: LHsTyVarBndr GhcRn -> RnM (LHsTyVarBndr DocNameI)
-renameLTyVarBndr (L loc (UserTyVar x (L l n)))
+renameLTyVarBndr :: LHsTyVarBndr flag GhcRn -> RnM (LHsTyVarBndr flag DocNameI)
+renameLTyVarBndr (L loc (UserTyVar x fl (L l n)))
   = do { n' <- rename n
-       ; return (L loc (UserTyVar x (L l n'))) }
-renameLTyVarBndr (L loc (KindedTyVar x (L lv n) kind))
+       ; return (L loc (UserTyVar x fl (L l n'))) }
+renameLTyVarBndr (L loc (KindedTyVar x fl (L lv n) kind))
   = do { n' <- rename n
        ; kind' <- renameLKind kind
-       ; return (L loc (KindedTyVar x (L lv n') kind')) }
+       ; return (L loc (KindedTyVar x fl (L lv n') kind')) }
 
 renameLContext :: Located [LHsType GhcRn] -> RnM (Located [LHsType DocNameI])
 renameLContext (L loc context) = do
@@ -475,7 +475,7 @@ renameCon decl@(ConDeclGADT { con_names = lnames, con_qvars = ltyvars
                             , con_res_ty = res_ty
                             , con_doc = mbldoc }) = do
       lnames'   <- mapM renameL lnames
-      ltyvars'  <- renameLHsQTyVars ltyvars
+      ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameDetails details
       res_ty'   <- renameLType res_ty

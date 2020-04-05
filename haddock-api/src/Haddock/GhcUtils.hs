@@ -161,11 +161,11 @@ nubByName f ns = go emptyNameSet ns
 -- These functions are duplicated from the GHC API, as they must be
 -- instantiated at DocNameI instead of (GhcPass _).
 
-hsTyVarNameI :: HsTyVarBndr DocNameI -> DocName
-hsTyVarNameI (UserTyVar _ (L _ n))     = n
-hsTyVarNameI (KindedTyVar _ (L _ n) _) = n
+hsTyVarNameI :: HsTyVarBndr flag DocNameI -> DocName
+hsTyVarNameI (UserTyVar _ _ (L _ n))     = n
+hsTyVarNameI (KindedTyVar _ _ (L _ n) _) = n
 
-hsLTyVarNameI :: LHsTyVarBndr DocNameI -> DocName
+hsLTyVarNameI :: LHsTyVarBndr flag DocNameI -> DocName
 hsLTyVarNameI = hsTyVarNameI . unLoc
 
 getConNamesI :: ConDecl DocNameI -> [Located DocName]
@@ -189,7 +189,7 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
                             , con_res_ty = res_ty })
  | has_forall = noLoc (HsForAllTy { hst_fvf = ForallInvis
                                   , hst_xforall = noExtField
-                                  , hst_bndrs = hsQTvExplicit qtvs
+                                  , hst_bndrs = qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
  where
@@ -244,7 +244,7 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
                             , con_res_ty = res_ty })
  | has_forall = noLoc (HsForAllTy { hst_fvf = ForallInvis
                                   , hst_xforall = noExtField
-                                  , hst_bndrs = hsQTvExplicit qtvs
+                                  , hst_bndrs = qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
  where
@@ -348,9 +348,9 @@ reparenLType :: (XParTy a ~ NoExtField) => LHsType a -> LHsType a
 reparenLType = fmap reparenType
 
 -- | Add parenthesis around the types in a 'HsTyVarBndr' (see 'reparenTypePrec')
-reparenTyVar :: (XParTy a ~ NoExtField) => HsTyVarBndr a -> HsTyVarBndr a
-reparenTyVar (UserTyVar x n) = UserTyVar x n
-reparenTyVar (KindedTyVar x n kind) = KindedTyVar x n (reparenLType kind)
+reparenTyVar :: (XParTy a ~ NoExtField) => HsTyVarBndr flag a -> HsTyVarBndr flag a
+reparenTyVar (UserTyVar x flag n) = UserTyVar x flag n
+reparenTyVar (KindedTyVar x flag n kind) = KindedTyVar x flag n (reparenLType kind)
 reparenTyVar v@XTyVarBndr{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')

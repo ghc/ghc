@@ -34,6 +34,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
+import GHC.Core.Type ( Specificity(..) )
 import GHC.Types.Basic (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..))
 import GHC.Exts
@@ -188,10 +189,10 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
 
 
 
-ppForAll :: [LHsTyVarBndr DocNameI] -> Unicode -> Qualification -> ForallVisFlag
+ppForAll :: [LHsTyVarBndr flag DocNameI] -> Unicode -> Qualification -> ForallVisFlag
          -> Html
 ppForAll tvs unicode qual fvf =
-  case [ppKTv n k | L _ (KindedTyVar _ (L _ n) k) <- tvs] of
+  case [ppKTv n k | L _ (KindedTyVar _ _ (L _ n) k) <- tvs] of
     [] -> noHtml
     ts -> forallSymbol unicode <+> hsep ts +++ ppForAllSeparator unicode fvf
   where ppKTv n k = parens $
@@ -226,7 +227,8 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
 
 
 -- | Pretty-print type variables.
-ppTyVars :: Unicode -> Qualification -> [LHsTyVarBndr DocNameI] -> [Html]
+ppTyVars :: RenderableBndrFlag flag =>
+  Unicode -> Qualification -> [LHsTyVarBndr flag DocNameI] -> [Html]
 ppTyVars unicode qual tvs = map (ppHsTyVarBndr unicode qual . unLoc) tvs
 
 
@@ -407,7 +409,8 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode pkg qual =
 -- * Type applications
 --------------------------------------------------------------------------------
 
-ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [LHsTyVarBndr DocNameI] -> Html
+ppAppDocNameTyVarBndrs :: RenderableBndrFlag flag =>
+  Bool -> Unicode -> Qualification -> DocName -> [LHsTyVarBndr flag DocNameI] -> Html
 ppAppDocNameTyVarBndrs summ unicode qual n vs =
     ppTypeApp n vs ppDN (ppHsTyVarBndr unicode qual . unLoc)
   where
@@ -1107,12 +1110,28 @@ ppLHsTypeArg unicode qual emptyCtxts (HsValArg ty) = ppLParendType unicode qual 
 ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign unicode <>
                                                        ppLParendType unicode qual emptyCtxts ki
 ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ""
-ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocNameI -> Html
-ppHsTyVarBndr _       qual (UserTyVar _ (L _ name)) =
-    ppDocName qual Raw False name
-ppHsTyVarBndr unicode qual (KindedTyVar _ name kind) =
-    parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
-            ppLKind unicode qual kind)
+
+class RenderableBndrFlag flag where
+  ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr flag DocNameI -> Html
+
+instance RenderableBndrFlag () where
+  ppHsTyVarBndr _       qual (UserTyVar _ _ (L _ name)) =
+      ppDocName qual Raw False name
+  ppHsTyVarBndr unicode qual (KindedTyVar _ _ name kind) =
+      parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
+              ppLKind unicode qual kind)
+
+instance RenderableBndrFlag Specificity where
+  ppHsTyVarBndr _       qual (UserTyVar _ SpecifiedSpec (L _ name)) =
+      ppDocName qual Raw False name
+  ppHsTyVarBndr _       qual (UserTyVar _ InferredSpec (L _ name)) =
+      braces $ ppDocName qual Raw False name
+  ppHsTyVarBndr unicode qual (KindedTyVar _ SpecifiedSpec name kind) =
+      parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
+              ppLKind unicode qual kind)
+  ppHsTyVarBndr unicode qual (KindedTyVar _ InferredSpec name kind) =
+      braces (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
+              ppLKind unicode qual kind)
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
@@ -1146,7 +1165,8 @@ ppPatSigType :: Unicode -> Qualification -> LHsType DocNameI -> Html
 ppPatSigType unicode qual typ =
   let emptyCtxts = patSigContext typ in ppLType unicode qual emptyCtxts typ
 
-ppForAllPart :: Unicode -> Qualification -> ForallVisFlag -> [LHsTyVarBndr DocNameI] -> Html
+ppForAllPart :: RenderableBndrFlag flag =>
+  Unicode -> Qualification -> ForallVisFlag -> [LHsTyVarBndr flag DocNameI] -> Html
 ppForAllPart unicode qual fvf tvs =
   hsep (forallSymbol unicode : ppTyVars unicode qual tvs) +++
   ppForAllSeparator unicode fvf

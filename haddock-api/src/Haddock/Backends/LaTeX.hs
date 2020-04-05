@@ -29,6 +29,7 @@ import GHC
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
 import GHC.Types.Name.Reader ( rdrNameOcc )
+import GHC.Core.Type         ( Specificity(..) )
 import GHC.Data.FastString   ( unpackFS )
 import GHC.Utils.Outputable  ( panic)
 
@@ -518,7 +519,7 @@ ppTypeSig nms ty unicode =
     <+> ppType unicode ty
 
 
-ppTyVars :: [LHsTyVarBndr DocNameI] -> [LaTeX]
+ppTyVars :: [LHsTyVarBndr flag DocNameI] -> [LaTeX]
 ppTyVars = map (ppSymName . getName . hsLTyVarNameI)
 
 
@@ -897,7 +898,8 @@ ppDataHeader _ _ = error "ppDataHeader: illegal argument"
 -- * Type applications
 --------------------------------------------------------------------------------
 
-ppAppDocNameTyVarBndrs :: Bool -> DocName -> [LHsTyVarBndr DocNameI] -> LaTeX
+ppAppDocNameTyVarBndrs :: RenderableBndrFlag flag =>
+  Bool -> DocName -> [LHsTyVarBndr flag DocNameI] -> LaTeX
 ppAppDocNameTyVarBndrs unicode n vs =
     ppTypeApp n vs ppDN (ppHsTyVarBndr unicode . unLoc)
   where
@@ -1007,10 +1009,21 @@ ppLHsTypeArg unicode (HsTypeArg _ ki) = atSign unicode <>
                                        ppLParendType unicode ki
 ppLHsTypeArg _ (HsArgPar _) = text ""
 
-ppHsTyVarBndr :: Bool -> HsTyVarBndr DocNameI -> LaTeX
-ppHsTyVarBndr _ (UserTyVar _ (L _ name)) = ppDocName name
-ppHsTyVarBndr unicode (KindedTyVar _ (L _ name) kind) =
-  parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+class RenderableBndrFlag flag where
+  ppHsTyVarBndr :: Bool -> HsTyVarBndr flag DocNameI -> LaTeX
+
+instance RenderableBndrFlag () where
+  ppHsTyVarBndr _ (UserTyVar _ _ (L _ name)) = ppDocName name
+  ppHsTyVarBndr unicode (KindedTyVar _ _ (L _ name) kind) =
+    parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+
+instance RenderableBndrFlag Specificity where
+  ppHsTyVarBndr _ (UserTyVar _ SpecifiedSpec (L _ name)) = ppDocName name
+  ppHsTyVarBndr _ (UserTyVar _ InferredSpec (L _ name)) = braces $ ppDocName name
+  ppHsTyVarBndr unicode (KindedTyVar _ SpecifiedSpec (L _ name) kind) =
+    parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+  ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
+    braces (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
