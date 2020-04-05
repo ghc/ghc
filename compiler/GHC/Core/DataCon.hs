@@ -71,7 +71,7 @@ import GHC.Core.TyCon
 import GHC.Types.FieldLabel
 import GHC.Core.Class
 import GHC.Types.Name
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Core.Predicate
 import GHC.Types.Var
 import Outputable
@@ -298,7 +298,7 @@ Note that (Foo a) might not be an instance of Ord.
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
 --             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma'
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*

@@ -33,7 +33,7 @@ import GHC.Core.Opt.Monad
 import Bag
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Tc.Utils.TcType ( isFloatingTy )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
@@ -57,7 +57,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Types.Basic
 import ErrUtils as Err
 import ListSetOps
-import PrelNames
+import GHC.Builtin.Names
 import Outputable
 import FastString
 import Util

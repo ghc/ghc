@@ -53,8 +53,8 @@ import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
-import TysWiredIn
+import GHC.Parser.PostProcess ( filterCTuple, setRdrNameSpace )
+import GHC.Builtin.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -64,7 +64,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import ErrUtils         ( MsgDoc )
-import PrelNames        ( rOOT_MAIN )
+import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
 import Outputable
@@ -180,7 +180,7 @@ newTopSrcBinder (L loc rdr_name)
         --
         -- We can get built-in syntax showing up here too, sadly.  If you type
         --      data T = (,,,)
-        -- the constructor is parsed as a type, and then RdrHsSyn.tyConToDataCon
+        -- the constructor is parsed as a type, and then GHC.Parser.PostProcess.tyConToDataCon
         -- uses setRdrNameSpace to make it into a data constructors.  At that point
         -- the nice Exact name for the TyCon gets swizzled to an Orig name.
         -- Hence the badOrigBinding error message.
@@ -1633,7 +1633,7 @@ We store the relevant Name in the HsSyn tree, in
   * NegApp
   * NPlusKPat
   * HsDo
-respectively.  Initially, we just store the "standard" name (PrelNames.fromIntegralName,
+respectively.  Initially, we just store the "standard" name (GHC.Builtin.Names.fromIntegralName,
 fromRationalName etc), but the renamer changes this to the appropriate user
 name if Opt_NoImplicitPrelude is on.  That is what lookupSyntax does.
 

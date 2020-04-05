@@ -45,7 +45,7 @@ module GHC.Iface.Syntax (
 import GhcPrelude
 
 import GHC.Iface.Type
-import BinFingerprint
+import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -70,7 +70,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Utils.Lexeme (isLexSym)
-import TysWiredIn ( constraintKindTyConName )
+import GHC.Builtin.Types ( constraintKindTyConName )
 import Util (seqList)
 
 import Control.Monad

@@ -62,14 +62,15 @@ module GHC.Iface.Type (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
+import {-# SOURCE #-} GHC.Builtin.Types
+                                 ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon, tupleTyConName )
 import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
 import Binary
@@ -267,7 +268,7 @@ We do the same for covars, naturally.
 Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC has several varieties of type equality (see Note [The equality types story]
-in TysPrim for details).  In an effort to avoid confusing users, we suppress
+in GHC.Builtin.Types.Prim for details).  In an effort to avoid confusing users, we suppress
 the differences during pretty printing unless certain flags are enabled.
 Here is how each equality predicate* is printed in homogeneous and
 heterogeneous contexts, depending on which combination of the
@@ -318,7 +319,7 @@ possible since we can't see through type synonyms. Consequently, we need to
 record whether this particular application is homogeneous in IfaceTyConSort
 for the purposes of pretty-printing.
 
-See Note [The equality types story] in TysPrim.
+See Note [The equality types story] in GHC.Builtin.Types.Prim.
 -}
 
 data IfaceTyConInfo   -- Used to guide pretty-printing
@@ -343,7 +344,7 @@ data IfaceCoercion
   | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
        -- There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
-       -- See Note [Adding built-in type families] in TcTypeNats
+       -- See Note [Adding built-in type families] in GHC.Builtin.Types.Literals
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
@@ -1345,7 +1346,7 @@ ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
 --      heqTyCon         (~~)
 --
 -- See Note [Equality predicates in IfaceType]
--- and Note [The equality types story] in TysPrim
+-- and Note [The equality types story] in GHC.Builtin.Types.Prim
 ppr_equality :: PprPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
 ppr_equality ctxt_prec tc args
   | hetero_eq_tc

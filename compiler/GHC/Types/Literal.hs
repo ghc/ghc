@@ -52,15 +52,15 @@ module GHC.Types.Literal
 
 import GhcPrelude
 
-import TysPrim
-import PrelNames
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
 import Outputable
 import FastString
 import GHC.Types.Basic
 import Binary
-import Constants
+import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
 import Util

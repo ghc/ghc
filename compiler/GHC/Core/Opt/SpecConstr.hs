@@ -59,7 +59,7 @@ import GHC.Types.Unique.FM
 import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
-import PrelNames        ( specTyConName )
+import GHC.Builtin.Names ( specTyConName )
 import GHC.Types.Module
 import GHC.Core.TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )

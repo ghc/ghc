@@ -242,11 +242,10 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
-import PlatformConstants
 import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
-import {-# SOURCE #-} PrelNames ( mAIN )
+import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
 import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkComponentId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
@@ -255,8 +254,7 @@ import Config
 import CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd
-import Constants
-import GhcNameVersion
+import GHC.Settings.Constants
 import Panic
 import qualified PprColour as Col
 import Util
@@ -267,17 +265,15 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
-import FileSettings
 import Outputable
-import Settings
-import ToolSettings
+import GHC.Settings
 
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, DumpAction, TraceAction
                                , defaultDumpAction, defaultTraceAction )
 import Json
-import SysTools.Terminal ( stderrSupportsAnsiColors )
-import SysTools.BaseDir ( expandToolDir, expandTopDir )
+import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
+import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -457,10 +453,10 @@ data DynFlags = DynFlags {
 
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
-    --   by GHC-API users. See Note [The integer library] in PrelNames
+    --   by GHC-API users. See Note [The integer library] in GHC.Builtin.Names
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
-    -- configuration lazily. See Note [LLVM Configuration] in SysTools.
+    -- configuration lazily. See Note [LLVM Configuration] in GHC.SysTools.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -888,7 +884,7 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
--- | See Note [LLVM Configuration] in SysTools.
+-- | See Note [LLVM Configuration] in GHC.SysTools.
 data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
                              , llvmPasses  :: [(Int, String)]
                              }

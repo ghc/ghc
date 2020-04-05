@@ -45,7 +45,7 @@ import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
-import PrelNames
+import GHC.Builtin.Names
 
 import GHC.Types.Basic
 import GHC.Types.Name
@@ -60,7 +60,7 @@ import Outputable
 import GHC.Types.SrcLoc
 import FastString
 import Control.Monad
-import TysWiredIn       ( nilDataConName )
+import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Ord
@@ -214,7 +214,7 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 
 ---------------------------------------------
 --      Sections
--- See Note [Parsing sections] in Parser.y
+-- See Note [Parsing sections] in GHC.Parser
 rnExpr (HsPar x (L loc (section@(SectionL {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar x (L loc section'), fvs) }
@@ -396,7 +396,7 @@ rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
 ----------------------
--- See Note [Parsing sections] in Parser.y
+-- See Note [Parsing sections] in GHC.Parser
 rnSection :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSection section@(SectionR x op expr)
   = do  { (op', fvs_op)     <- rnLExpr op

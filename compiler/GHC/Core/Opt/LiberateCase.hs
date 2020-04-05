@@ -14,7 +14,7 @@ import GhcPrelude
 import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
-import TysWiredIn       ( unitDataConId )
+import GHC.Builtin.Types ( unitDataConId )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import Util             ( notNull )
