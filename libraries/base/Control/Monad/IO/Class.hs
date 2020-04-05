@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.IO.Class
@@ -29,9 +30,10 @@ module Control.Monad.IO.Class (
 -- * @'liftIO' (m >>= f) = 'liftIO' m >>= ('liftIO' . f)@
 
 class (Monad m) => MonadIO m where
-    -- Lift a computation from the 'IO' monad.
+    -- | Lift a computation from the 'IO' monad.
     -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
-    -- (i.e. IO is the base monad for the stack).
+    -- (i.e. 'IO' is the base monad for the stack).
+    --
     -- === __Example__
     -- Let us take for example a program that makes use of monad stacks.
     -- While the point of this example is not to teach monad stacks,
@@ -41,11 +43,13 @@ class (Monad m) => MonadIO m where
     --
     -- The following program shows basic state manipulation and IO output sewn together
     -- by the use of a monad stack:
-    -- @
-    -- {-# LANGUAGE ConstraintKinds   #-}
-    -- {-# LANGUAGE FlexibleContexts  #-}
-    -- {-# LANGUAGE OverloadedStrings #-}
     --
+    --
+    -- > {-# LANGUAGE ConstraintKinds   #-}
+    -- > {-# LANGUAGE FlexibleContexts  #-}
+    -- > {-# LANGUAGE OverloadedStrings #-}
+    --
+    -- @
     -- module Lib
     --     ( someFunc
     --     ) where
@@ -76,8 +80,10 @@ class (Monad m) => MonadIO m where
     --   message <- gets msg
     --   liftIO $ T.putStrLn message
     -- @
+    --
     -- Although certainly more complex than a one-liner, the main focus of this example
     -- is its last line. Had we ommitted @'liftIO'@, we would have ended up with this error:
+    --
     -- @
     --     • Couldn't match type ‘m’ with ‘IO’
     --      ‘m’ is a rigid type variable bound by
@@ -86,14 +92,17 @@ class (Monad m) => MonadIO m where
     --      Expected type: m ()
     --        Actual type: IO ()
     -- @
-    -- The important part here is the mismatch between @'m ()'@ and @'IO ()'@.
-    -- Luckily, we know of a function that takes an `IO a` and returns a `m a`: @'liftIO'@.
+    --
+    -- The important part here is the mismatch between @m ()@ and @'IO' ()@.
+    -- Luckily, we know of a function that takes an @'IO' a@ and returns a @m a@: @'liftIO'@.
     -- Which enables us to run the program and see the expect results:
+    --
     -- @
     -- λ❯ someFunc
     -- Hello
     -- World
     -- @
+    --
     liftIO :: IO a -> m a
 
 -- | @since 4.9.0.0
