@@ -62,7 +62,7 @@ implement IO exceptions.
 NOTE: The IO representation is deeply wired in to various parts of the
 system.  The following list may or may not be exhaustive:
 
-Compiler  - types of various primitives in PrimOp.hs
+Compiler  - types of various primitives in GHC.Builtin.PrimOps
 
 RTS       - forceIO (StgStartup.cmm)
           - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast

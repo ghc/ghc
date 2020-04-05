@@ -218,7 +218,7 @@ data HsBindLR idL idR
     --  - 'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
     --    'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     FunBind {
 
         fun_ext :: XFunBind idL idR,
@@ -259,7 +259,7 @@ data HsBindLR idL idR
   --       'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
   --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatBind {
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
@@ -310,7 +310,7 @@ data HsBindLR idL idR
         --          'ApiAnnotation.AnnWhere'
         --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
 
@@ -365,7 +365,7 @@ type instance XXABExport (GhcPass p) = NoExtCon
 --             'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen' @'{'@,
 --             'ApiAnnotation.AnnClose' @'}'@,
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
@@ -824,7 +824,7 @@ type LIPBind id = Located (IPBind id)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | Implicit parameter bindings.
 --
@@ -835,7 +835,7 @@ type LIPBind id = Located (IPBind id)
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
         (XCIPBind id)
@@ -890,7 +890,7 @@ data Sig pass
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
       --          'ApiAnnotation.AnnComma'
 
-      -- For details on above see note [Api annotations] in ApiAnnotation
+      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
        [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
@@ -904,7 +904,7 @@ data Sig pass
       --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnForall'
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
-      -- For details on above see note [Api annotations] in ApiAnnotation
+      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
@@ -935,7 +935,7 @@ data Sig pass
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInfix',
         --           'ApiAnnotation.AnnVal'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | FixSig (XFixSig pass) (FixitySig pass)
 
         -- | An inline pragma
@@ -948,7 +948,7 @@ data Sig pass
         --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnTilde',
         --       'ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
                 (Located (IdP pass)) -- Function name
                 InlinePragma         -- Never defaultInlinePragma
@@ -964,7 +964,7 @@ data Sig pass
         --      'ApiAnnotation.AnnClose' @']'@ and @'\#-}'@,
         --      'ApiAnnotation.AnnDcolon'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
                 (Located (IdP pass)) -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
@@ -982,7 +982,7 @@ data Sig pass
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in GHC.Types.Basic
 
@@ -994,7 +994,7 @@ data Sig pass
         --      'ApiAnnotation.AnnVbar','ApiAnnotation.AnnComma',
         --      'ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)
                SourceText (LBooleanFormula (Located (IdP pass)))
                -- Note [Pragma source text] in GHC.Types.Basic

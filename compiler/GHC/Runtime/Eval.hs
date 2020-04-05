@@ -84,8 +84,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import MonadUtils
 import GHC.Types.Module
-import PrelNames  ( toDynName, pretendNameIsInScope )
-import TysWiredIn ( isCTupleTyConName )
+import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
+import GHC.Builtin.Types ( isCTupleTyConName )
 import Panic
 import Maybes
 import ErrUtils
@@ -95,8 +95,8 @@ import Outputable
 import FastString
 import Bag
 import Util
-import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
-import qualified Parser (parseStmt, parseModule, parseDeclaration, parseImport)
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPState)
+import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
 import System.Directory
 import Data.Dynamic

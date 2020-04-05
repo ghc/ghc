@@ -48,7 +48,7 @@ type LImportDecl pass = Located (ImportDecl pass)
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | If/how an import is 'qualified'.
 data ImportDeclQualifiedStyle
@@ -59,7 +59,7 @@ data ImportDeclQualifiedStyle
 
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
--- 'Nothing'). This is called from 'Parser.y'.
+-- 'Nothing'). This is called from 'GHC.Parser'.
 importDeclQualifiedStyle :: Maybe (Located a)
                          -> Maybe (Located a)
                          -> ImportDeclQualifiedStyle
@@ -107,7 +107,7 @@ data ImportDecl pass
      --    'ApiAnnotation.AnnClose' attached
      --     to location in ideclHiding
 
-     -- For details on above see note [Api annotations] in ApiAnnotation
+     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 type instance XCImportDecl  (GhcPass _) = NoExtField
 type instance XXImportDecl  (GhcPass _) = NoExtCon
@@ -189,7 +189,7 @@ data IEWrappedName name
 -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnType',
 --         'ApiAnnotation.AnnPattern'
 type LIEWrappedName name = Located (IEWrappedName name)
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 
 -- | Located Import or Export
@@ -198,7 +198,7 @@ type LIE pass = Located (IE pass)
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | Imported or exported entity.
 data IE pass
@@ -212,7 +212,7 @@ data IE pass
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
@@ -223,7 +223,7 @@ data IE pass
         --       'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose',
         --                                 'ApiAnnotation.AnnType'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | IEThingWith (XIEThingWith pass)
@@ -240,7 +240,7 @@ data IE pass
         --                                   'ApiAnnotation.AnnComma',
         --                                   'ApiAnnotation.AnnType'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (Located ModuleName)
         -- ^ Imported or exported module contents
         --
@@ -248,7 +248,7 @@ data IE pass
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
   | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc

@@ -37,7 +37,7 @@ import GHC.Core.Arity     ( etaExpandToJoinPointRule )
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import TysPrim            ( voidPrimTy )
+import GHC.Builtin.Types.Prim ( voidPrimTy )
 import Maybes           ( mapMaybe, maybeToList, isJust )
 import MonadUtils       ( foldlM )
 import GHC.Types.Basic

@@ -30,7 +30,7 @@ import GHC.ByteCode.Types
 import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.Module
 import FastString
 import Panic

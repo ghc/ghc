@@ -95,7 +95,7 @@ import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import Util
 import Outputable

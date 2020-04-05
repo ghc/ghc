@@ -18,7 +18,7 @@ import GhcPrelude
 import Control.Monad
 
 import GHC.Driver.Session
-import Lexer
+import GHC.Parser.Lexer
 
 newtype PD a = PD { unPD :: DynFlags -> PState -> ParseResult a }
 

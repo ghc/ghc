@@ -15,7 +15,7 @@ module GHC.Iface.Ext.Binary
    )
 where
 
-import GHC.Settings               ( maybeRead )
+import GHC.Settings.Utils         ( maybeRead )
 
 import Config                     ( cProjectVersion )
 import GhcPrelude
@@ -27,7 +27,7 @@ import GHC.Types.Module           ( Module )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import Outputable
-import PrelInfo
+import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique

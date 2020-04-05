@@ -79,7 +79,7 @@ data HsModule
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
       hsmodImports :: [LImportDecl GhcPs],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
@@ -93,14 +93,14 @@ data HsModule
         --                                   ,'ApiAnnotation.AnnClose'
         --
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
         --                                   ,'ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
    }
      -- ^ 'ApiAnnotation.AnnKeywordId's
      --
@@ -110,7 +110,7 @@ data HsModule
      --    'ApiAnnotation.AnnClose' for explicit braces and semi around
      --    hsmodImports,hsmodDecls if this style is used.
 
-     -- For details on above see note [Api annotations] in ApiAnnotation
+     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 deriving instance Data HsModule
 

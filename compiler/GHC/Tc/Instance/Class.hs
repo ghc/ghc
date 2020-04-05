@@ -26,9 +26,9 @@ import GHC.Core.InstEnv
 import GHC.Tc.Utils.Instantiate( instDFunType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 
-import TysWiredIn
-import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
-import PrelNames
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.Names
 
 import GHC.Types.Id
 import GHC.Core.Type
@@ -569,7 +569,7 @@ if you'd written
 *                                                                     *
 ***********************************************************************-}
 
--- See also Note [The equality types story] in TysPrim
+-- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
 matchHeteroEquality args
@@ -585,7 +585,7 @@ matchHomoEquality args@[k,t1,t2]
                     , cir_what      = BuiltinEqInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
--- See also Note [The equality types story] in TysPrim
+-- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]

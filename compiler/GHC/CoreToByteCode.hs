@@ -35,7 +35,7 @@ import GHC.Core.Utils
 import GHC.Core
 import GHC.Core.Ppr
 import GHC.Types.Literal
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Core.FVs
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -43,7 +43,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import Util
 import GHC.Types.Var.Set
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import ErrUtils
 import GHC.Types.Unique
@@ -56,7 +56,7 @@ import GHC.Data.Bitmap
 import OrdList
 import Maybes
 import GHC.Types.Var.Env
-import PrelNames ( unsafeEqualityProofName )
+import GHC.Builtin.Names ( unsafeEqualityProofName )
 
 import Data.List
 import Foreign

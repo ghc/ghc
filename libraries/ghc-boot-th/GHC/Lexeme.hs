@@ -18,7 +18,7 @@ import Prelude -- See note [Why do we import Prelude here?]
 import Data.Char
 
 -- | Is this character acceptable in a symbol (after the first char)?
--- See alexGetByte in Lexer.x
+-- See alexGetByte in GHC.Parser.Lexer
 okSymChar :: Char -> Bool
 okSymChar c
   | c `elem` "(),;[]`{}_\"'"

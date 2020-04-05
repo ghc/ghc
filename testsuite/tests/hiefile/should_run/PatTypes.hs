@@ -13,7 +13,7 @@ import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
 
 import GHC.Driver.Session
-import SysTools
+import GHC.SysTools
 
 import qualified Data.Map as M
 import Data.Foldable

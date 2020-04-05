@@ -135,7 +135,7 @@ type LHsDecl p = Located (HsDecl p)
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
         --
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | A Haskell Declaration
 data HsDecl p
@@ -452,7 +452,7 @@ have (Just binds) in the tcdMeths field, whereas interface decls have Nothing.
 In *source-code* class declarations:
 
  - When parsing, every ClassOpSig gets a DefMeth with a suitable RdrName
-   This is done by RdrHsSyn.mkClassOpSigDM
+   This is done by GHC.Parser.PostProcess.mkClassOpSigDM
 
  - The renamer renames it to a Name
 
@@ -546,7 +546,7 @@ data TyClDecl pass
     --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnRarrow',
     --             'ApiAnnotation.AnnVbar'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     FamDecl { tcdFExt :: XFamDecl pass, tcdFam :: FamilyDecl pass }
 
   | -- | @type@ declaration
@@ -554,7 +554,7 @@ data TyClDecl pass
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --             'ApiAnnotation.AnnEqual',
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
             , tcdLName  :: Located (IdP pass)     -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
@@ -571,7 +571,7 @@ data TyClDecl pass
     --              'ApiAnnotation.AnnNewType','ApiAnnotation.AnnDcolon'
     --              'ApiAnnotation.AnnWhere',
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
@@ -598,7 +598,7 @@ data TyClDecl pass
         --                          'ApiAnnotation.AnnComma'
         --                          'ApiAnnotation.AnnRarrow'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
 type LHsFunDep pass = Located (FunDep (Located (IdP pass)))
@@ -1047,14 +1047,14 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
     NoSig (XNoSig pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | KindSig  (XCKindSig pass) (LHsKind pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
   --             'ApiAnnotation.AnnCloseP'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | TyVarSig (XTyVarSig pass) (LHsTyVarBndr pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
@@ -1062,7 +1062,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
   --             'ApiAnnotation.AnnCloseP', 'ApiAnnotation.AnnEqual'
   | XFamilyResultSig !(XXFamilyResultSig pass)
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 type instance XNoSig            (GhcPass _) = NoExtField
 type instance XCKindSig         (GhcPass _) = NoExtField
@@ -1093,7 +1093,7 @@ data FamilyDecl pass = FamilyDecl
   --             'ApiAnnotation.AnnEqual', 'ApiAnnotation.AnnRarrow',
   --             'ApiAnnotation.AnnVbar'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 type instance XCFamilyDecl    (GhcPass _) = NoExtField
 type instance XXFamilyDecl    (GhcPass _) = NoExtCon
@@ -1115,7 +1115,7 @@ data InjectivityAnn pass
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnRarrow', 'ApiAnnotation.AnnVbar'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 data FamilyInfo pass
   = DataFamily
@@ -1231,7 +1231,7 @@ data HsDataDefn pass   -- The payload of a data type defn
 
                  dd_derivs :: HsDeriving pass  -- ^ Optional 'deriving' clause
 
-             -- For details on above see note [Api annotations] in ApiAnnotation
+             -- For details on above see note [Api annotations] in GHC.Parser.Annotation
    }
   | XHsDataDefn !(XXHsDataDefn pass)
 
@@ -1348,7 +1348,7 @@ type LConDecl pass = Located (ConDecl pass)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when
       --   in a GADT constructor list
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- |
 --
@@ -1372,7 +1372,7 @@ type LConDecl pass = Located (ConDecl pass)
 --            'ApiAnnotation.AnnDarrow','ApiAnnotation.AnnDarrow',
 --            'ApiAnnotation.AnnForall','ApiAnnotation.AnnDot'
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | data Constructor Declaration
 data ConDecl pass
@@ -1444,7 +1444,7 @@ There's a wrinkle in ConDeclGADT
   so it's hard to split up the arguments until we've done the precedence
   resolution (in the renamer).
 
-  So:  - In the parser (RdrHsSyn.mkGadtDecl), we put the whole constr
+  So:  - In the parser (GHC.Parser.PostProcess.mkGadtDecl), we put the whole constr
          type into the res_ty for a ConDeclGADT for now, and use
          PrefixCon []
             con_args   = PrefixCon []
@@ -1593,7 +1593,7 @@ type LTyFamInstEqn pass = Located (TyFamInstEqn pass)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
   --   when in a list
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 -- | Haskell Type Patterns
 type HsTyPats pass = [LHsTypeArg pass]
@@ -1652,7 +1652,7 @@ newtype TyFamInstDecl pass = TyFamInstDecl { tfid_eqn :: TyFamInstEqn pass }
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --           'ApiAnnotation.AnnInstance',
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 ----------------- Data family instances -------------
 
@@ -1669,7 +1669,7 @@ newtype DataFamInstDecl pass
     --           'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen',
     --           'ApiAnnotation.AnnClose'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 ----------------- Family instances (common types) -------------
 
@@ -1700,7 +1700,7 @@ data FamEqn pass rhs
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
   | XFamEqn !(XXFamEqn pass rhs)
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 type instance XCFamEqn    (GhcPass _) r = NoExtField
 type instance XXFamEqn    (GhcPass _) r = NoExtCon
@@ -1725,14 +1725,14 @@ data ClsInstDecl pass
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
          --                                    'ApiAnnotation.AnnClose',
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
       }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInstance',
     --           'ApiAnnotation.AnnWhere',
     --           'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XClsInstDecl !(XXClsInstDecl pass)
 
 type instance XCClsInstDecl    (GhcPass _) = NoExtField
@@ -1922,7 +1922,7 @@ data DerivDecl pass = DerivDecl
          --        'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
          --        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         }
   | XDerivDecl !(XXDerivDecl pass)
 
@@ -2023,7 +2023,7 @@ data DefaultDecl pass
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnDefault',
         --          'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XDefaultDecl !(XXDefaultDecl pass)
 
 type instance XCDefaultDecl    (GhcPass _) = NoExtField
@@ -2069,7 +2069,7 @@ data ForeignDecl pass
         --           'ApiAnnotation.AnnImport','ApiAnnotation.AnnExport',
         --           'ApiAnnotation.AnnDcolon'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XForeignDecl !(XXForeignDecl pass)
 
 {-
@@ -2250,7 +2250,7 @@ data RuleBndr pass
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
+        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 type instance XCRuleBndr    (GhcPass _) = NoExtField
 type instance XRuleBndrSig  (GhcPass _) = NoExtField
@@ -2386,7 +2386,7 @@ data AnnDecl pass = HsAnnotation
       --           'ApiAnnotation.AnnModule'
       --           'ApiAnnotation.AnnClose'
 
-      -- For details on above see note [Api annotations] in ApiAnnotation
+      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XAnnDecl !(XXAnnDecl pass)
 
 type instance XHsAnnotation (GhcPass _) = NoExtField
@@ -2438,7 +2438,7 @@ data RoleAnnotDecl pass
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
       --           'ApiAnnotation.AnnRole'
 
-      -- For details on above see note [Api annotations] in ApiAnnotation
+      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XRoleAnnotDecl !(XXRoleAnnotDecl pass)
 
 type instance XCRoleAnnotDecl (GhcPass _) = NoExtField

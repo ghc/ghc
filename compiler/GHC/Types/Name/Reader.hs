@@ -117,7 +117,7 @@ import Data.List( sortBy )
 --           'ApiAnnotation.AnnVal'
 --           'ApiAnnotation.AnnTilde',
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data RdrName
   = Unqual OccName
         -- ^ Unqualified  name

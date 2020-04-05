@@ -43,9 +43,9 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 import GHC.Driver.Types
 import GHC.Types.ForeignCall
-import TysWiredIn
-import TysPrim
-import PrelNames
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import Outputable

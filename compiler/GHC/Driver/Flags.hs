@@ -351,7 +351,7 @@ data GeneralFlag
 
 -- Check whether a flag should be considered an "optimisation flag"
 -- for purposes of recompilation avoidance (see
--- Note [Ignoring some flag changes] in FlagChecker). Being listed here is
+-- Note [Ignoring some flag changes] in GHC.Iface.Recomp.Flags). Being listed here is
 -- not a guarantee that the flag has no other effect. We could, and
 -- perhaps should, separate out the flags that have some minor impact on
 -- program semantics and/or error behavior (e.g., assertions), but

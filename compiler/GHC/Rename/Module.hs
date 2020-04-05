@@ -44,7 +44,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Module
 import GHC.Driver.Types ( Warnings(..), plusWarns )
-import PrelNames        ( applicativeClassName, pureAName, thenAName
+import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
@@ -2367,8 +2367,8 @@ add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs
-add_bind _ (XValBindsLR {})     = panic "RdrHsSyn:add_bind"
+add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
 add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
-add_sig _ (XValBindsLR {})     = panic "RdrHsSyn:add_sig"
+add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"

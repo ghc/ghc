@@ -52,7 +52,7 @@ import GHC.Core.Type hiding
    , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id

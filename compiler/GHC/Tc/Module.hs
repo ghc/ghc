@@ -62,15 +62,15 @@ import GHC.Rename.HsType
 import GHC.Rename.Expr
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn )
-import TysWiredIn ( unitTy, mkListTy )
+import GHC.Builtin.Types ( unitTy, mkListTy )
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
 import GHC.Iface.Type   ( ShowForAllFlag(..) )
 import GHC.Core.PatSyn( pprPatSynType )
-import PrelNames
-import PrelInfo
+import GHC.Builtin.Names
+import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
@@ -90,7 +90,7 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
 import GHC.Iface.Make   ( coAxiomToIfaceDecl )
-import HeaderInfo       ( mkPrelImports )
+import GHC.Parser.Header       ( mkPrelImports )
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Rule

@@ -23,9 +23,10 @@ import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Driver.Types ( lookupId )
-import PrelNames
-import TysPrim ( primTyCons )
-import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim ( primTyCons )
+import GHC.Builtin.Types
+                  ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 import GHC.Types.Name
@@ -39,7 +40,7 @@ import GHC.Driver.Session
 import Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map
-import Constants
+import GHC.Settings.Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable
 import FastString ( FastString, mkFastString, fsLit )

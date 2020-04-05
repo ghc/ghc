@@ -136,7 +136,7 @@ import GHC.Types.Module
 import GHC.Types.Name
 import Outputable
 import GHC.Platform
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Tc.Utils.Env (lookupGlobal)
 import GHC.Core.Type
 

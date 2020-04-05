@@ -56,7 +56,7 @@ import Maybes
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Iface.Syntax
-import PrelNames
+import GHC.Builtin.Names
 import qualified Data.Map as Map
 
 import GHC.Driver.Finder

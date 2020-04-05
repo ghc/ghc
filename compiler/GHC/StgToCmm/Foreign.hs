@@ -45,7 +45,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 
 import GHC.Core.TyCo.Rep
-import TysPrim
+import GHC.Builtin.Types.Prim
 import Util (zipEqual)
 
 import Control.Monad

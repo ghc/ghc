@@ -9,7 +9,7 @@ which deal with the instantiated versions are located elsewhere:
 
    Parameterised by          Module
    ----------------          -------------
-   GhcPs/RdrName             parser/RdrHsSyn
+   GhcPs/RdrName             GHC.Parser.PostProcess
    GhcRn/Name                GHC.Rename.*
    GhcTc/Id                  GHC.Tc.Utils.Zonk
 
@@ -116,7 +116,7 @@ import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
-import TysWiredIn ( unitTy )
+import GHC.Builtin.Types ( unitTy )
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -130,7 +130,7 @@ import FastString
 import Util
 import Bag
 import Outputable
-import Constants
+import GHC.Settings.Constants
 
 import Data.Either
 import Data.Function

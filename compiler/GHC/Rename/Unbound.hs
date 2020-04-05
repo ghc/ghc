@@ -26,7 +26,7 @@ import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Types.SrcLoc as SrcLoc
 import Outputable
-import PrelNames ( mkUnboundName, isUnboundName, getUnique)
+import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import Util
 import Maybes
 import GHC.Driver.Session

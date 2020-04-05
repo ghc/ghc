@@ -232,7 +232,7 @@ import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
 import GHC.Cmm.Monad
 import GHC.Runtime.Heap.Layout
-import Lexer
+import GHC.Parser.Lexer
 
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
@@ -247,7 +247,7 @@ import ErrUtils
 import StringBuffer
 import FastString
 import Panic
-import Constants
+import GHC.Settings.Constants
 import Outputable
 import GHC.Types.Basic
 import Bag              ( emptyBag, unitBag )

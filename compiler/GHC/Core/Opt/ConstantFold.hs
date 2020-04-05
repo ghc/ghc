@@ -35,9 +35,9 @@ import GHC.Core.Make
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.SimpleOpt ( exprIsLiteral_maybe )
-import PrimOp             ( PrimOp(..), tagToEnumKey )
-import TysWiredIn
-import TysPrim
+import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
@@ -48,7 +48,7 @@ import GHC.Core.Utils  ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
 import GHC.Core.Unfold ( exprIsConApp_maybe )
 import GHC.Core.Type
 import GHC.Types.Name.Occurrence ( occNameFS )
-import PrelNames
+import GHC.Builtin.Names
 import Maybes      ( orElse )
 import GHC.Types.Name ( Name, nameOccName )
 import Outputable

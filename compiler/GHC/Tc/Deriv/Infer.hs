@@ -26,7 +26,7 @@ import ErrUtils
 import GHC.Tc.Utils.Instantiate
 import Outputable
 import Pair
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
@@ -44,7 +44,7 @@ import GHC.Core.Type
 import GHC.Tc.Solver
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor, checkConstraints)
-import TysWiredIn (typeToTypeKind)
+import GHC.Builtin.Types (typeToTypeKind)
 import GHC.Core.Unify (tcUnifyTy)
 import Util
 import GHC.Types.Var

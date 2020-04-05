@@ -64,7 +64,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon( DataCon, dataConWrapId )
 import GHC.Core.Class( Class )
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate

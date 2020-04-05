@@ -3,7 +3,7 @@ import GHC.Types.Name( Name )
 import GHC.Types.Var( Id )
 import GHC.Core.Class( Class )
 import {-# SOURCE #-} GHC.Core.DataCon( DataCon )
-import {-# SOURCE #-} PrimOp( PrimOp )
+import {-# SOURCE #-} GHC.Builtin.PrimOps( PrimOp )
 
 data DataConBoxer
 

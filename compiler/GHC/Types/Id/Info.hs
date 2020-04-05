@@ -90,7 +90,7 @@ import GHC.Core hiding( hasCoreUnfolding )
 import GHC.Core( hasCoreUnfolding )
 
 import GHC.Core.Class
-import {-# SOURCE #-} PrimOp (PrimOp)
+import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Basic

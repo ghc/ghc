@@ -47,7 +47,7 @@ import GHC.HandleEncoding
 import GHC.Platform
 import GHC.Platform.Host
 import Config
-import Constants
+import GHC.Settings.Constants
 import GHC.Driver.Types
 import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
@@ -56,8 +56,8 @@ import GHC.Driver.Session hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
-import SysTools.BaseDir
-import SysTools.Settings
+import GHC.SysTools.BaseDir
+import GHC.Settings.IO
 import GHC.Types.SrcLoc
 import Util
 import Panic
@@ -69,7 +69,7 @@ import GHC.Iface.Load      ( loadUserInterface )
 import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
 import GHC.Tc.Utils.Monad        ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )
-import BinFingerprint      ( fingerprintBinMem )
+import GHC.Iface.Recomp.Binary      ( fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO

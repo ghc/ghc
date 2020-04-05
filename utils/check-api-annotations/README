@@ -1,5 +1,5 @@
-This programme is intended to be used by any GHC developers working on Parser.y
-or RdrHsSyn.hs, and who want to check that their changes do not break the API
+This programme is intended to be used by any GHC developers working on GHC.Parser
+or GHC.Parser.PostProcess, and who want to check that their changes do not break the API
 Annotations.
 
 It does a basic test that all annotations do make it to the final AST, and dumps

@@ -37,7 +37,7 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Tc.Instance.Family
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.SrcLoc
 import Util
 import Outputable

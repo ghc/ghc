@@ -11,7 +11,7 @@ import Outputable
 import Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
-import PrelNames
+import GHC.Builtin.Names
 
 main :: IO()
 main

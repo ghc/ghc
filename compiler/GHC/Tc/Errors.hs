@@ -45,7 +45,7 @@ import GHC.Tc.Types.EvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
-import PrelNames ( typeableClassName )
+import GHC.Builtin.Names ( typeableClassName )
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set

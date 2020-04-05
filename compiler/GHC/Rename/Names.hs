@@ -43,7 +43,7 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Tc.Utils.Monad
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -52,7 +52,7 @@ import GHC.Types.Avail
 import GHC.Types.FieldLabel
 import GHC.Driver.Types
 import GHC.Types.Name.Reader
-import RdrHsSyn        ( setRdrNameSpace )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
 import Outputable
 import Maybes
 import GHC.Types.SrcLoc as SrcLoc

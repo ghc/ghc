@@ -47,8 +47,8 @@ import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
-import PrelNames
-import TysPrim          ( funTyConName )
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim ( funTyConName )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set

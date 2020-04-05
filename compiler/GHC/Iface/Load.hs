@@ -49,12 +49,12 @@ import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Tc.Utils.Monad
 
 import Binary   ( BinData(..) )
-import Constants
-import PrelNames
-import PrelInfo
-import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
-import GHC.Types.Id.Make ( seqId )
-import TysPrim  ( funTyConName )
+import GHC.Settings.Constants
+import GHC.Builtin.Names
+import GHC.Builtin.Utils
+import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
+import GHC.Types.Id.Make      ( seqId )
+import GHC.Builtin.Types.Prim ( funTyConName )
 import GHC.Core.Rules
 import GHC.Core.TyCon
 import GHC.Types.Annotations

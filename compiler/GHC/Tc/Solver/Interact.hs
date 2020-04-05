@@ -24,7 +24,7 @@ import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
 import GHC.Types.Var
 import GHC.Tc.Utils.TcType
-import PrelNames ( coercibleTyConKey,
+import GHC.Builtin.Names ( coercibleTyConKey,
                    heqTyConKey, eqTyConKey, ipClassKey )
 import GHC.Core.Coercion.Axiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import GHC.Core.Class
@@ -2489,7 +2489,7 @@ matchClassInst dflags inerts clas tys loc
 -- | If a class is "naturally coherent", then we needn't worry at all, in any
 -- way, about overlapping/incoherent instances. Just solve the thing!
 -- See Note [Naturally coherent classes]
--- See also Note [The equality class story] in TysPrim.
+-- See also Note [The equality class story] in GHC.Builtin.Types.Prim.
 naturallyCoherentClass :: Class -> Bool
 naturallyCoherentClass cls
   = isCTupleClass cls
@@ -2590,7 +2590,7 @@ For example, consider (~~), which behaves as if it was defined like
 this:
   class a ~# b => a ~~ b
   instance a ~# b => a ~~ b
-(See Note [The equality types story] in TysPrim.)
+(See Note [The equality types story] in GHC.Builtin.Types.Prim.)
 
 Faced with [W] t1 ~~ t2, it's always OK to reduce it to [W] t1 ~# t2,
 without worrying about Note [Instance and Given overlap].  Why?  Because

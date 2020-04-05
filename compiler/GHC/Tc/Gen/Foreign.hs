@@ -54,7 +54,7 @@ import GHC.Types.Name.Reader
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Driver.Session
 import Outputable
 import GHC.Platform

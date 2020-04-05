@@ -46,12 +46,12 @@ import GHC.Tc.Utils.TcType
 import Outputable
 import GHC.Tc.Gen.Expr
 import GHC.Types.SrcLoc
-import THNames
+import GHC.Builtin.Names.TH
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Core.Coercion( etaExpandCoAxBranch )
-import FileCleanup ( newTempName, TempFileLifetime(..) )
+import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
 
@@ -84,8 +84,8 @@ import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.Name.Env
-import PrelNames
-import TysWiredIn
+import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Driver.Hooks
 import GHC.Types.Var

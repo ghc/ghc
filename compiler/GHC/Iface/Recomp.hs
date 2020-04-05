@@ -15,9 +15,9 @@ where
 import GhcPrelude
 
 import GHC.Iface.Syntax
-import BinFingerprint
+import GHC.Iface.Recomp.Binary
 import GHC.Iface.Load
-import FlagChecker
+import GHC.Iface.Recomp.Flags
 
 import GHC.Types.Annotations
 import GHC.Core

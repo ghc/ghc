@@ -40,7 +40,7 @@ parserDeps libdir =
         (df, _, _) <- parseDynamicFlags df [noLoc "-package=ghc"]
         setSessionDynFlags df
         env <- getSession
-        loop env emptyUniqSet [mkModuleName "Parser"]
+        loop env emptyUniqSet [mkModuleName "GHC.Parser"]
   where
     -- Source imports are only guaranteed to show up in the 'mi_deps'
     -- of modules that import them directly and don’t propagate

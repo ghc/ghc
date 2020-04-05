@@ -160,11 +160,7 @@ Library
 
     hs-source-dirs:
         .
-        iface
         main
-        parser
-        prelude
-        typecheck
         utils
 
     -- we use an explicit Prelude
@@ -177,8 +173,8 @@ Library
         GHC.Iface.Ext.Binary
         GHC.Iface.Ext.Utils
         GHC.Iface.Ext.Ast
-        Ar
-        FileCleanup
+        GHC.SysTools.Ar
+        GHC.SysTools.FileCleanup
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Types.Name.Shape
@@ -258,8 +254,6 @@ Library
         GHC.Cmm.LayoutStack
         CliOption
         EnumSet
-        GhcNameVersion
-        FileSettings
         GHC.Cmm.Graph
         GHC.CmmToAsm.Ppr
         GHC.CmmToAsm.Config
@@ -345,7 +339,7 @@ Library
         GHC.Hs.Utils
         GHC.Hs.Dump
         GHC.Iface.Binary
-        BinFingerprint
+        GHC.Iface.Recomp.Binary
         GHC.Tc.TyCl.Build
         GHC.Iface.Env
         GHC.Iface.Syntax
@@ -355,12 +349,12 @@ Library
         GHC.Iface.Make
         GHC.Iface.Recomp
         GHC.IfaceToCore
-        FlagChecker
+        GHC.Iface.Recomp.Flags
         GHC.Types.Annotations
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         Config
-        Constants
+        GHC.Settings.Constants
         GHC.Driver.MakeFile
         GHC.Driver.Phases
         GHC.Driver.Pipeline.Monad
@@ -372,7 +366,7 @@ Library
         GHC.Driver.Make
         GHC.Plugins
         GhcPrelude
-        HeaderInfo
+        GHC.Parser.Header
         GHC.Driver.Main
         HscStats
         GHC.Driver.Types
@@ -381,38 +375,36 @@ Library
         GHC.Runtime.Loader
         UnitInfo
         GHC.Driver.Packages
-        PlatformConstants
         GHC.Driver.Plugins
         GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing
-        Settings
+        GHC.Settings
         StaticPtrTable
-        SysTools
-        SysTools.BaseDir
-        SysTools.Terminal
-        SysTools.ExtraObj
-        SysTools.Info
-        SysTools.Process
-        SysTools.Tasks
-        SysTools.Settings
-        Elf
+        GHC.SysTools
+        GHC.SysTools.BaseDir
+        GHC.SysTools.Terminal
+        GHC.SysTools.ExtraObj
+        GHC.SysTools.Info
+        GHC.SysTools.Process
+        GHC.SysTools.Tasks
+        GHC.Settings.IO
+        GHC.SysTools.Elf
         GHC.Iface.Tidy
-        Ctype
-        HaddockUtils
-        Lexer
+        GHC.Parser.CharClass
+        GHC.Parser.Lexer
         GHC.Core.Coercion.Opt
-        Parser
-        RdrHsSyn
-        ApiAnnotation
+        GHC.Parser
+        GHC.Parser.PostProcess
+        GHC.Parser.PostProcess.Haddock
+        GHC.Parser.Annotation
         GHC.Types.ForeignCall
-        KnownUniques
-        PrelInfo
-        PrelNames
+        GHC.Builtin.Uniques
+        GHC.Builtin.Utils
+        GHC.Builtin.Names
         GHC.Core.Opt.ConstantFold
-        PrimOp
-        ToolSettings
-        TysPrim
-        TysWiredIn
+        GHC.Builtin.PrimOps
+        GHC.Builtin.Types.Prim
+        GHC.Builtin.Types
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
         GHC.Rename.Bind
@@ -513,12 +505,12 @@ Library
         GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Flatten
         GHC.Tc.Solver.Monad
-        TcTypeNats
+        GHC.Builtin.Types.Literals
         GHC.Tc.Gen.Splice
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.HsToCore.Quote
-        THNames
+        GHC.Builtin.Names.TH
         GHC.Core.FamInstEnv
         GHC.Tc.Instance.FunDeps
         GHC.Core.InstEnv

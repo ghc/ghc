@@ -58,7 +58,7 @@ import FastString
 import Util
 import ErrUtils
 import GHC.Types.Module ( moduleName, pprModuleName )
-import PrimOp           ( PrimOp (SeqOp) )
+import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 
 
 {-
@@ -2516,7 +2516,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
           -- The entire case is dead, so we can drop it
           -- if the scrutinee converges without having imperative
           -- side effects or raising a Haskell exception
-          -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+          -- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
    = simplExprF env rhs cont
 
   -- 2b.  Turn the case into a let, if

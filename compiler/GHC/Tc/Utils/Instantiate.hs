@@ -50,7 +50,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Core.InstEnv
-import TysWiredIn  ( heqDataCon, eqDataCon )
+import GHC.Builtin.Types  ( heqDataCon, eqDataCon )
 import GHC.Core    ( isOrphan )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
@@ -67,7 +67,7 @@ import GHC.Types.Name
 import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
 import GHC.Core.DataCon
 import GHC.Types.Var.Env
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import Util

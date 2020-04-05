@@ -287,8 +287,8 @@ type arity $[[I]]$, a list of roles $[[role_list]]$ for its coercion parameters,
 and an output role $[[R']]$. The definition within GHC also includes a field named
 $[[coaxrProves]]$ which computes the output coercion from a list of types and
 a list of coercions. This is elided in this presentation, as we simply identify
-axiom rules by their names $[[M]]$. See also \coderef{typecheck/TcTypeNats.hs}{mkBinAxiom}
-and \coderef{typecheck/TcTypeNats.hs}{mkAxiom1}.
+axiom rules by their names $[[M]]$. See also \coderef{GHC.Builtin.Types.Literals}{mkBinAxiom}
+and \coderef{GHC.Builtin.Types.Literals}{mkAxiom1}.
 
 In \ottdrulename{Co\_UnivCo}, function $ \textsf{compatibleUnBoxedTys} $ stands for following checks:
 \begin{itemize}
@@ -299,7 +299,7 @@ In \ottdrulename{Co\_UnivCo}, function $ \textsf{compatibleUnBoxedTys} $ stands 
     \item unboxed tuples should have same length and each element should be coercible to
     appropriate element of the target tuple;
 \end{itemize}
-For function implementation see \coderef{coreSyn/CoreLint.hs}{checkTypes}.
+For function implementation see \coderef{GHC.Core.Lint}{checkTypes}.
 For further discussion see \url{https://gitlab.haskell.org/ghc/ghc/wikis/bad-unsafe-coercions}.
 
 \subsection{Type constructors}
@@ -309,7 +309,8 @@ for this formalism:
 
 \gram{\ottT}
 
-We include some representative primitive type constructors. There are many more in \ghcfile{prelude/TysPrim.hs}.
+We include some representative primitive type constructors. There are many more
+in \ghcfile{GHC.Builtin.Types.Prim}.
 
 \gram{\ottH}
 

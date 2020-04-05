@@ -19,7 +19,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Solver
 import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import Outputable
 import FastString

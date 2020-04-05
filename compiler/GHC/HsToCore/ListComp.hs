@@ -30,9 +30,9 @@ import GHC.Driver.Session
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.HsToCore.Match
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import Outputable
 import GHC.Tc.Utils.TcType

@@ -2,7 +2,7 @@
 --
 -- Functions to evaluate whether or not a string is a valid identifier.
 -- There is considerable overlap between the logic here and the logic
--- in Lexer.x, but sadly there seems to be no way to merge them.
+-- in GHC.Parser.Lexer, but sadly there seems to be no way to merge them.
 
 module GHC.Utils.Lexeme (
           -- * Lexical characteristics of Haskell names
@@ -208,7 +208,7 @@ okIdOcc str
                           -- of course, `all` says "True" to an empty list
 
 -- | Is this character acceptable in an identifier (after the first letter)?
--- See alexGetByte in Lexer.x
+-- See alexGetByte in GHC.Parser.Lexer
 okIdChar :: Char -> Bool
 okIdChar c = case generalCategory c of
   UppercaseLetter -> True

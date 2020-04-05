@@ -76,7 +76,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv
-import TysPrim( funTyConName )
+import GHC.Builtin.Types.Prim( funTyConName )
 import Maybes( orElse )
 import Util
 import GHC.Types.Basic( Activation )

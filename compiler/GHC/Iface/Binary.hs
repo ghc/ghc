@@ -36,7 +36,7 @@ module GHC.Iface.Binary (
 import GhcPrelude
 
 import GHC.Tc.Utils.Monad
-import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
+import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
 import GHC.Driver.Types
 import GHC.Types.Module
@@ -54,7 +54,7 @@ import Outputable
 import GHC.Types.Name.Cache
 import GHC.Platform
 import FastString
-import Constants
+import GHC.Settings.Constants
 import Util
 
 import Data.Array
@@ -355,7 +355,7 @@ serialiseName bh name _ = do
 --  10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
 --   A known-key name. x is the Unique's Char, y is the int part. We assume that
 --   all known-key uniques fit in this space. This is asserted by
---   PrelInfo.knownKeyNamesOkay.
+--   GHC.Builtin.Utils.knownKeyNamesOkay.
 --
 -- During serialization we check for known-key things using isKnownKeyName.
 -- During deserialization we use lookupKnownKeyName to get from the unique back

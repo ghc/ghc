@@ -26,7 +26,7 @@ trackGenerateHs :: Expr ()
 trackGenerateHs = expr $ need [sourcePath -/- "Rules/Generate.hs"]
 
 primopsSource :: FilePath
-primopsSource = "compiler/prelude/primops.txt.pp"
+primopsSource = "compiler/GHC/Builtin/primops.txt.pp"
 
 primopsTxt :: Stage -> FilePath
 primopsTxt stage = buildDir (vanillaContext stage compiler) -/- "primops.txt"

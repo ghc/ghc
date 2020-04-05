@@ -37,16 +37,16 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import GHC.Tc.Utils.Env ( checkWellStaged )
-import THNames          ( liftName )
+import GHC.Tc.Utils.Env     ( checkWellStaged )
+import GHC.Builtin.Names.TH ( liftName )
 
 import GHC.Driver.Session
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
 import GHC.Tc.Utils.Env ( tcMetaTy )
 import GHC.Driver.Hooks
-import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
-                        , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+import GHC.Builtin.Names.TH ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
+                            , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcPolyExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice

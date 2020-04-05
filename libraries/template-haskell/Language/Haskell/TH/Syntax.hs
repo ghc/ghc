@@ -1598,7 +1598,7 @@ unboxedSumDataName alt arity
     prefix     = "unboxedSumDataName: "
     debug_info = " (alt: " ++ show alt ++ ", arity: " ++ show arity ++ ")"
 
-    -- Synced with the definition of mkSumDataConOcc in TysWiredIn
+    -- Synced with the definition of mkSumDataConOcc in GHC.Builtin.Types
     sum_occ = '(' : '#' : bars nbars_before ++ '_' : bars nbars_after ++ "#)"
     bars i = replicate i '|'
     nbars_before = alt - 1
@@ -1614,7 +1614,7 @@ unboxedSumTypeName arity
          (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
 
   where
-    -- Synced with the definition of mkSumTyConOcc in TysWiredIn
+    -- Synced with the definition of mkSumTyConOcc in GHC.Builtin.Types
     sum_occ = '(' : '#' : replicate (arity - 1) '|' ++ "#)"
 
 -----------------------------------------------------

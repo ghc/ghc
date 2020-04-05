@@ -122,7 +122,7 @@ import GHC.Driver.Packages
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Unique
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.CostCentre
 import Outputable
 import FastString

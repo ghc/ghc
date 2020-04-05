@@ -23,7 +23,7 @@ import GHC.Platform
 import GHC.Core.Opt.OccurAnal
 
 import GHC.Driver.Types
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
@@ -43,7 +43,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
@@ -1071,7 +1071,7 @@ Note that eta expansion in CorePrep is very fragile due to the "prediction" of
 CAFfyness made during tidying (see Note [CAFfyness inconsistencies due to eta
 expansion in CorePrep] in GHC.Iface.Tidy for details.  We previously saturated primop
 applications here as well but due to this fragility (see #16846) we now deal
-with this another way, as described in Note [Primop wrappers] in PrimOp.
+with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
 
 It's quite likely that eta expansion of constructor applications will
 eventually break in a similar way to how primops did. We really should
@@ -1469,7 +1469,7 @@ lookupMkNaturalName dflags hsc_env
     = guardNaturalUse dflags $ liftM tyThingId $
       lookupGlobal hsc_env mkNaturalName
 
--- See Note [The integer library] in PrelNames
+-- See Note [The integer library] in GHC.Builtin.Names
 lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $

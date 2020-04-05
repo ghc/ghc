@@ -17,8 +17,8 @@
 -- CoreExpr's of the "smart constructors" of the Meta.Exp datatype.
 --
 -- It also defines a bunch of knownKeyNames, in the same way as is done
--- in prelude/PrelNames.  It's much more convenient to do it here, because
--- otherwise we have to recompile PrelNames whenever we add a Name, which is
+-- in prelude/GHC.Builtin.Names.  It's much more convenient to do it here, because
+-- otherwise we have to recompile GHC.Builtin.Names whenever we add a Name, which is
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
@@ -37,16 +37,16 @@ import GHC.HsToCore.Monad
 import qualified Language.Haskell.TH as TH
 
 import GHC.Hs
-import PrelNames
+import GHC.Builtin.Names
 
 import GHC.Types.Module
 import GHC.Types.Id
 import GHC.Types.Name hiding( varName, tcName )
-import THNames
+import GHC.Builtin.Names.TH
 import GHC.Types.Name.Env
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils

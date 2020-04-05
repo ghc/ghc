@@ -62,7 +62,7 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
 import GHC.Rename.HsType
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -72,7 +72,7 @@ import ListSetOps          ( removeDups )
 import Outputable
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
-import TysWiredIn          ( nilDataCon )
+import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 

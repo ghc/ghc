@@ -53,16 +53,16 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import GHC.Tc.Utils.Monad
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCo.Ppr ( pprTyVar )
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.ConLike

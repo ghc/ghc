@@ -34,7 +34,7 @@ import GHC.Platform ( platformArch, Arch(..) )
 import ErrUtils
 import FastString
 import Outputable
-import SysTools ( figureLlvmVersion )
+import GHC.SysTools ( figureLlvmVersion )
 import qualified Stream
 
 import Control.Monad ( when, forM_ )

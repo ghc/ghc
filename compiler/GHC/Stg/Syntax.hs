@@ -79,7 +79,7 @@ import Outputable
 import GHC.Driver.Packages ( isDynLinkName )
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
-import PrimOp            ( PrimOp, PrimCall )
+import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Types.RepType ( typePrimRep1 )

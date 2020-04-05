@@ -60,8 +60,8 @@ import qualified Maybes
 import GHC.Types.Unique.DSet
 import FastString
 import GHC.Platform
-import SysTools
-import FileCleanup
+import GHC.SysTools
+import GHC.SysTools.FileCleanup
 
 -- Standard libraries
 import Control.Monad

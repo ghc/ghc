@@ -10,7 +10,7 @@ module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 import GhcPrelude
 
 import GHC.Hs
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -40,9 +40,9 @@ import FastString (fsLit)
 
 import Control.Monad
 import GHC.Driver.Session
-import GHC.Rename.Doc   ( rnHsDoc )
-import RdrHsSyn         ( setRdrNameSpace )
-import Data.Either      ( partitionEithers )
+import GHC.Rename.Doc         ( rnHsDoc )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import Data.Either            ( partitionEithers )
 
 {-
 ************************************************************************

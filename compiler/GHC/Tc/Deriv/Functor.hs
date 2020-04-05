@@ -31,7 +31,7 @@ import GHC.Core.DataCon
 import FastString
 import GHC.Hs
 import Outputable
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import State
@@ -44,7 +44,7 @@ import Util
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Id.Make (coerceId)
-import TysWiredIn (true_RDR, false_RDR)
+import GHC.Builtin.Types (true_RDR, false_RDR)
 
 import Data.Maybe (catMaybes, isJust)
 

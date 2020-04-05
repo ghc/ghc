@@ -52,7 +52,7 @@ import GHC.HsToCore.Match.Literal
 import GHC.Core.Type
 import GHC.Core.Coercion ( eqCoercion )
 import GHC.Core.TyCon    ( isNewTyCon )
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.SrcLoc
 import Maybes
 import Util

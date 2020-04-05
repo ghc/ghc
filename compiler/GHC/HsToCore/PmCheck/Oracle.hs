@@ -56,8 +56,8 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.TyCon
-import TysWiredIn
-import TysPrim (tYPETyCon)
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)

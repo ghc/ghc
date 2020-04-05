@@ -27,7 +27,7 @@ import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Types.Var.Set
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
 
 import Data.Word

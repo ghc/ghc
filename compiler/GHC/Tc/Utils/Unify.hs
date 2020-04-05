@@ -57,8 +57,8 @@ import GHC.Tc.Types.Origin
 import GHC.Types.Name( isSystemName )
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
-import TysWiredIn
-import TysPrim( tYPE )
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim( tYPE )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env

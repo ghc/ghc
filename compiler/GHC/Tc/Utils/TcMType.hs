@@ -114,11 +114,11 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
-import TysWiredIn
-import TysPrim
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import PrelNames
+import GHC.Builtin.Names
 import Util
 import Outputable
 import FastString

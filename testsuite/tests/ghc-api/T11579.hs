@@ -3,7 +3,7 @@ import GHC.Driver.Session
 import FastString
 import GHC
 import StringBuffer
-import Lexer
+import GHC.Parser.Lexer
 import GHC.Types.SrcLoc
 
 main :: IO ()

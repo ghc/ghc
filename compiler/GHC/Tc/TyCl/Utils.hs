@@ -38,7 +38,7 @@ import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Predicate
-import TysWiredIn( unitTy )
+import GHC.Builtin.Types( unitTy )
 import GHC.Core.Make( rEC_SEL_ERROR_ID )
 import GHC.Hs
 import GHC.Core.Class

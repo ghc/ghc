@@ -1,7 +1,7 @@
 
 module M where
 
--- GHC's RdrHsSyn.lhs had a piece of code like this
+-- GHC's GHC.Parser.PostProcess had a piece of code like this
 
 f :: IO ()
 f

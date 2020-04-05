@@ -924,7 +924,7 @@ sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
 -- package to use in place of @integer-wired-in@ and that two different
 -- package databases supply a different integer library. For more about
 -- the fake @integer-wired-in@ package, see Note [The integer library]
--- in the @PrelNames@ module.
+-- in the @GHC.Builtin.Names@ module.
 compareByPreference
     :: PackagePrecedenceIndex
     -> UnitInfo
@@ -1022,7 +1022,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   let
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
-            -- See Note [The integer library] in PrelNames
+            -- See Note [The integer library] in GHC.Builtin.Names
             | pid == unitIdString integerUnitId
             = packageNameString pc `elem` ["integer-gmp", "integer-simple"]
         pc `matches` pid = packageNameString pc == pid
@@ -1126,7 +1126,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 -- compiler, as described in Note [Wired-in packages] in GHC.Types.Module.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
--- what appears in PrelNames.
+-- what appears in GHC.Builtin.Names.
 
 upd_wired_in_mod :: WiredPackagesMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m

@@ -38,7 +38,7 @@ import GHC.Iface.Load   (loadInterfaceForName)
 import GHC.Types.Module (getModule)
 import GHC.Types.Name
 import Outputable
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
@@ -46,7 +46,7 @@ import GHC.Tc.Deriv.Generics
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import THNames (liftClassKey)
+import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprSourceTyCon)
 import GHC.Core.Type

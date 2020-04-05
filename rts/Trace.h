@@ -374,7 +374,7 @@ void flushTrace(void);
 #endif /* TRACING */
 
 // If DTRACE is enabled, but neither DEBUG nor TRACING, we need a C land
-// wrapper for the user-msg probe (as we can't expand that in PrimOps.cmm)
+// wrapper for the user-msg probe (as we can't expand that in GHC.Builtin.PrimOpss.cmm)
 //
 #if !defined(DEBUG) && !defined(TRACING) && defined(DTRACE)
 

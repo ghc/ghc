@@ -52,8 +52,8 @@ toolArgsTarget = do
     root <- buildRoot
     let dir = buildDir (vanillaContext Stage0 compiler)
     need [ root -/- dir -/- "Config.hs" ]
-    need [ root -/- dir -/- "Parser.hs" ]
-    need [ root -/- dir -/- "Lexer.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Parser.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Parser" -/- "Lexer.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
 

@@ -451,7 +451,7 @@ The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
 GHC.Core.Make.
 
 For discussion of some implications of the let/app invariant primops see
-Note [Checking versus non-checking primops] in PrimOp.
+Note [Checking versus non-checking primops] in GHC.Builtin.PrimOps.
 
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

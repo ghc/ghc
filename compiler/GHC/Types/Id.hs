@@ -137,14 +137,14 @@ import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
 import GHC.Types.RepType
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Core.Class
-import {-# SOURCE #-} PrimOp (PrimOp)
+import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
 import Maybes
 import GHC.Types.SrcLoc
@@ -519,7 +519,7 @@ hasNoBinding :: Id -> Bool
 -- they aren't any more.  Instead, we inject a binding for
 -- them at the CorePrep stage.
 --
--- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in PrimOp.hs.
+-- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in GHC.Builtin.PrimOps.
 -- for the history of this.
 --
 -- Note that CorePrep currently eta expands things no-binding things and this
@@ -528,7 +528,7 @@ hasNoBinding :: Id -> Bool
 --
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> False   -- See Note [Primop wrappers] in PrimOp.hs
+                        PrimOpId _       -> False   -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)

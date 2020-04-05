@@ -62,7 +62,7 @@ infix 4 :~:, :~~:
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
 -- @since 4.7.0.0
-data a :~: b where  -- See Note [The equality types story] in TysPrim
+data a :~: b where  -- See Note [The equality types story] in GHC.Builtin.Types.Prim
   Refl :: a :~: a
 
 -- with credit to Conal Elliott for 'ty', Erik Hesselink & Martijn van

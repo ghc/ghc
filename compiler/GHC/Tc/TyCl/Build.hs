@@ -21,8 +21,8 @@ import GhcPrelude
 
 import GHC.Iface.Env
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
-import TysWiredIn( isCTupleTyConName )
-import TysPrim ( voidPrimTy )
+import GHC.Builtin.Types( isCTupleTyConName )
+import GHC.Builtin.Types.Prim ( voidPrimTy )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Types.Var

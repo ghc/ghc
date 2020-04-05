@@ -44,7 +44,7 @@ import GHC.Types.Name
 import Outputable
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
 import Util
 import GHC.Types.Var.Env

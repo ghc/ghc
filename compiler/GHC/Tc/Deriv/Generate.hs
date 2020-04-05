@@ -50,21 +50,21 @@ import Fingerprint
 import Encoding
 
 import GHC.Driver.Session
-import PrelInfo
+import GHC.Builtin.Utils
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
-import PrelNames
-import THNames
+import GHC.Builtin.Names
+import GHC.Builtin.Names.TH
 import GHC.Types.Id.Make ( coerceId )
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Validity ( checkValidCoAxBranch )
 import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
-import TysPrim
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Types.Var.Set
