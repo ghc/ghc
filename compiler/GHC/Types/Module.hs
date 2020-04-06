@@ -176,11 +176,67 @@ import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayUnitId, getPackageState, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Unit IDs, installed package IDs, ABI hashes, package names,
--- versions, there are a *lot* of different identifiers for closely
--- related things.  What do they all mean? Here's what.  (See also
--- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/packages/concepts )
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Haskell users are used to manipulate Cabal packages. These packages are
+-- identified by:
+--    - a package name :: String
+--    - a package version :: Version
+--    - (a revision number, when they are registered on Hackage)
+--
+-- Cabal packages may contain several components (libraries, programs,
+-- testsuites). In GHC we are mostly interested in libraries because those are
+-- the components that can be depended upon by other components. Components in a
+-- package are identified by their component name. Historically only one library
+-- component was allowed per package, hence it didn't need a name. For this
+-- reason, component name may be empty for one library component in each
+-- package:
+--    - a component name :: Maybe String
+--
+-- UnitId
+-- ------
+--
+-- Cabal libraries can be compiled in various ways (different compiler options
+-- or Cabal flags, different dependencies, etc.), hence using package name,
+-- package version and component name isn't enough to identify a built library.
+-- We use another identifier called UnitId:
+--
+--   package name             \
+--   package version          |                       ________
+--   component name           | hash of all this ==> | UnitId |
+--   Cabal flags              |                       --------
+--   compiler options         |
+--   dependencies' UnitId     /
+--
+-- Fortunately GHC doesn't have to generate these UnitId: they are provided by
+-- external build tools (e.g. Cabal) with `-this-unit-id` command-line flag.
+--
+-- UnitIds are important because they are used to generate internal names
+-- (symbols, etc.).
+--
+-- Wired-in units
+-- -------------~
+--
+-- Certain libraries are known to the compiler, in that we know about certain
+-- entities that reside in these libraries. The compiler needs to declare static
+-- Modules and Names that refer to units built from these libraries.
+--
+-- Hence UnitIds of wired-in libraries are fixed. Instead of letting Cabal chose
+-- the UnitId for these libraries, their .cabal file use the following stanza to
+-- force it to a specific value:
+--
+--    ghc-options: -this-unit-id ghc-prim    -- taken from ghc-prim.cabal
+--
+-- The RTS also uses entities of wired-in units by directly referring to symbols
+-- such as "base_GHCziIOziException_heapOverflow_closure" where the prefix is
+-- the UnitId of "base" unit.
+--
+-- Unit databases
+-- --------------
+--
+--
+--
+-- Package database
 --
 -- THE IMPORTANT ONES
 --
