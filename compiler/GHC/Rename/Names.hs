@@ -306,7 +306,7 @@ rnImportDecl this_mod
                            -- c.f. GHC.findModule, and #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
-                            fsToUnitId pkg_fs == moduleUnit this_mod))
+                            fsToUnit pkg_fs == moduleUnit this_mod))
          (addErr (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also

@@ -639,8 +639,8 @@ computeInterface ::
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     dflags <- getDynFlags
-    case splitModuleInsts mod0 of
-        (imod, Just indef) | not (unitIdIsDefinite (thisPackage dflags)) -> do
+    case getModuleInstantiation mod0 of
+        (imod, Just indef) | not (unitIsDefinite (thisPackage dflags)) -> do
             r <- findAndReadIface doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
@@ -670,7 +670,7 @@ moduleFreeHolesPrecise
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
-   case splitModuleInsts mod of
+   case getModuleInstantiation mod of
     (imod, Just indef) -> do
         let insts = instUnitInsts (moduleUnit indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
@@ -941,7 +941,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
               -- if it's indefinite, the inside will be uninstantiated!
               dflags <- getDynFlags
               let wanted_mod =
-                    case splitModuleInsts wanted_mod_with_insts of
+                    case getModuleInstantiation wanted_mod_with_insts of
                         (_, Nothing) -> wanted_mod_with_insts
                         (_, Just indef_mod) ->
                           instModuleToModule (pkgState dflags)

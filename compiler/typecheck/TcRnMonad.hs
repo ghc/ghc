@@ -1842,7 +1842,7 @@ initIfaceTcRn thing_inside
         ; let !mod = tcg_semantic_mod tcg_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
-              is_instantiate = unitIdIsDefinite (thisPackage dflags) &&
+              is_instantiate = unitIsDefinite (thisPackage dflags) &&
                                not (null (thisUnitIdInsts dflags))
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",

@@ -1092,8 +1092,9 @@ isNoLink _      = False
 -- is used.
 data PackageArg =
       PackageArg String    -- ^ @-package@, by 'PackageName'
-    | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
+    | UnitIdArg Unit       -- ^ @-package-id@, by 'Unit'
   deriving (Eq, Show)
+
 instance Outputable PackageArg where
     ppr (PackageArg pn) = text "package" <+> text pn
     ppr (UnitIdArg uid) = text "unit" <+> ppr uid
@@ -1965,7 +1966,7 @@ thisComponentId dflags =
       case thisUnitIdInsts_ dflags of
         Just _  ->
           throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-        Nothing -> mkIndefUnitId pkgstate (unitIdFS (thisPackage dflags))
+        Nothing -> mkIndefUnitId pkgstate (unitFS (thisPackage dflags))
 
 thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
 thisUnitIdInsts dflags =
@@ -1973,7 +1974,7 @@ thisUnitIdInsts dflags =
         Just insts -> insts
         Nothing    -> []
 
-thisPackage :: DynFlags -> UnitId
+thisPackage :: DynFlags -> Unit
 thisPackage dflags =
     case thisUnitIdInsts_ dflags of
         Nothing -> default_uid
@@ -1985,8 +1986,8 @@ thisPackage dflags =
   where
     default_uid = DefUnit (DefUnitId (thisInstalledUnitId dflags))
 
-parseUnitIdInsts :: String -> [(ModuleName, Module)]
-parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
+parseUnitInsts :: String -> [(ModuleName, Module)]
+parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse -instantiated-with: " ++ str)
   where parse = sepBy parseEntry (R.char ',')
@@ -1998,7 +1999,7 @@ parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
 
 setUnitIdInsts :: String -> DynFlags -> DynFlags
 setUnitIdInsts s d =
-    d { thisUnitIdInsts_ = Just (parseUnitIdInsts s) }
+    d { thisUnitIdInsts_ = Just (parseUnitInsts s) }
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
@@ -4557,13 +4558,13 @@ exposePackage, exposePackageId, hidePackage,
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags =
-    parsePackageFlag "-package-id" parseUnitIdArg p : packageFlags s })
+    parsePackageFlag "-package-id" parseUnitArg p : packageFlags s })
 exposePluginPackage p =
   upd (\s -> s{ pluginPackageFlags =
     parsePackageFlag "-plugin-package" parsePackageArg p : pluginPackageFlags s })
 exposePluginPackageId p =
   upd (\s -> s{ pluginPackageFlags =
-    parsePackageFlag "-plugin-package-id" parseUnitIdArg p : pluginPackageFlags s })
+    parsePackageFlag "-plugin-package-id" parseUnitArg p : pluginPackageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -4583,9 +4584,9 @@ parsePackageArg :: ReadP PackageArg
 parsePackageArg =
     fmap PackageArg (munch1 (\c -> isAlphaNum c || c `elem` ":-_."))
 
-parseUnitIdArg :: ReadP PackageArg
-parseUnitIdArg =
-    fmap UnitIdArg parseUnitId
+parseUnitArg :: ReadP PackageArg
+parseUnitArg =
+    fmap UnitIdArg parseUnit
 
 setUnitId :: String -> DynFlags -> DynFlags
 setUnitId p d = d { thisInstalledUnitId = stringToInstalledUnitId p }

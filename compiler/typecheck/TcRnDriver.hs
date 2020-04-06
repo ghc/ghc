@@ -35,7 +35,7 @@ module TcRnDriver (
         checkBootDecl, checkHiBootIface',
         findExtraSigImports,
         implicitRequirements,
-        checkUnitId,
+        checkUnit,
         mergeSignatures,
         tcRnMergeSignatures,
         instantiateSignature,

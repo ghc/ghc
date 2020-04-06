@@ -112,7 +112,7 @@ computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
     get_reqs (DeclD HsSrcFile _ _) = emptyUniqDSet
     get_reqs (DeclD HsBootFile _ _) = emptyUniqDSet
     get_reqs (IncludeD (IncludeDecl (L _ hsuid) _ _)) =
-        unitIdFreeHoles (convertHsUnitId hsuid)
+        unitFreeModuleHoles (convertHsComponentId hsuid)
 
 -- | Tiny enum for all types of Backpack operations we may do.
 data SessionType
@@ -131,7 +131,7 @@ data SessionType
 -- compilation.
 withBkpSession :: IndefUnitId
                -> [(ModuleName, Module)]
-               -> [(UnitId, ModRenaming)]
+               -> [(Unit, ModRenaming)]
                -> SessionType   -- what kind of session are we doing
                -> BkpM a        -- actual action to run
                -> BkpM a
@@ -139,7 +139,7 @@ withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
     let cid_fs = installedUnitIdFS (indefUnitId cid)
         is_primary = False
-        uid_str = unpackFS (hashUnitId cid insts)
+        uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
         -- There are multiple units in a single Backpack file, so we
         -- need to separate out the results in those cases.  Right now,
@@ -179,7 +179,7 @@ withBkpSession cid insts deps session_type do_this = do
                 TcSession -> newInstalledUnitId cid Nothing
                 -- No hash passed if no instances
                 _ | null insts -> newInstalledUnitId cid Nothing
-                  | otherwise  -> newInstalledUnitId cid (Just (hashUnitId cid insts)),
+                  | otherwise  -> newInstalledUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
         -- Setup all of the output directories according to our hierarchy
         objectDir   = Just (outdir objectDir),
         hiDir       = Just (outdir hiDir),
@@ -192,7 +192,7 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnitId dflags (improveUnitId (getUnitInfoMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
+          let uid = unwireUnit dflags (improveUnit (getUnitInfoMap dflags) $ renameHoleUnit dflags (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -204,7 +204,7 @@ withBkpSession cid insts deps session_type do_this = do
         _ <- setSessionDynFlags dflags
         do_this
 
-withBkpExeSession :: [(UnitId, ModRenaming)] -> BkpM a -> BkpM a
+withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
     withBkpSession (IndefUnitId (InstalledUnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
 
@@ -229,16 +229,16 @@ compileUnit cid insts = do
 
 -- | Compute the dependencies with instantiations of a syntactic
 -- HsUnit; e.g., wherever you see @dependency p[A=<A>]@ in a
--- unit file, return the 'UnitId' corresponding to @p[A=<A>]@.
+-- unit file, return the 'Unit' corresponding to @p[A=<A>]@.
 -- The @include_sigs@ parameter controls whether or not we also
 -- include @dependency signature@ declarations in this calculation.
 --
 -- Invariant: this NEVER returns InstalledUnitId.
-hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(UnitId, ModRenaming)]
+hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(Unit, ModRenaming)]
 hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
   where
     get_dep (L _ (IncludeD (IncludeDecl (L _ hsuid) mb_lrn is_sig)))
-        | include_sigs || not is_sig = [(convertHsUnitId hsuid, go mb_lrn)]
+        | include_sigs || not is_sig = [(convertHsComponentId hsuid, go mb_lrn)]
         | otherwise = []
       where
         go Nothing = ModRenaming True []
@@ -260,7 +260,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnitId dflags hsubst) raw_deps
+        deps0 = map (renameHoleUnit dflags hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -273,7 +273,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnitId (getUnitInfoMap dflags)) deps0
+    let deps = map (improveUnit (getUnitInfoMap dflags)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -327,7 +327,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toInstalledUnitId . unwireUnitId dflags)
+                        _ -> map (toInstalledUnitId . unwireUnit dflags)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -391,21 +391,17 @@ addPackage pkg = do
          _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
          return ()
 
--- Precondition: UnitId is NOT InstalledUnitId
-compileInclude :: Int -> (Int, UnitId) -> BkpM ()
+compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
     msgInclude (i, n) uid
     -- Check if we've compiled it already
-    case lookupUnit dflags uid of
-        Nothing -> do
-            case splitUnitIdInsts uid of
-                (_, Just indef) ->
-                    innerBkpM $ compileUnit (instUnitInstanceOf indef)
-                                            (instUnitInsts indef)
-                _ -> return ()
-        Just _ -> return ()
+    case uid of
+      DefUnit {} -> return ()
+      InstUnit i -> case lookupUnit dflags uid of
+        Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
+        Just _  -> return ()
 
 -- ----------------------------------------------------------------------------
 -- Backpack monad
@@ -535,7 +531,7 @@ msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
         $ showModuleIndex (i, n) ++ "Processing " ++ unpackFS fs_pn
 
 -- | Message when we instantiate a Backpack unit.
-msgUnitId :: UnitId -> BkpM ()
+msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
@@ -545,7 +541,7 @@ msgUnitId pk = do
                                 (ppr pk)
 
 -- | Message when we include a Backpack unit.
-msgInclude :: (Int,Int) -> UnitId -> BkpM ()
+msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     dflags <- getDynFlags
     level <- getBkpLevel
@@ -609,8 +605,8 @@ renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
     renameHsModuleId (HsModuleVar lm) = HsModuleVar lm
     renameHsModuleId (HsModuleId luid lm) = HsModuleId (fmap renameHsUnitId luid) lm
 
-convertHsUnitId :: HsUnitId HsComponentId -> UnitId
-convertHsUnitId (HsUnitId (L _ hscid) subst)
+convertHsComponentId :: HsUnitId HsComponentId -> Unit
+convertHsComponentId (HsUnitId (L _ hscid) subst)
     = mkInstUnit (hsComponentId hscid) (map (convertHsModuleSubst . unLoc) subst)
 
 convertHsModuleSubst :: HsModuleSubst HsComponentId -> (ModuleName, Module)
@@ -618,7 +614,7 @@ convertHsModuleSubst (L _ modname, L _ m) = (modname, convertHsModuleId m)
 
 convertHsModuleId :: HsModuleId HsComponentId -> Module
 convertHsModuleId (HsModuleVar (L _ modname)) = mkHoleModule modname
-convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsUnitId hsuid) modname
+convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsComponentId hsuid) modname
 
 
 

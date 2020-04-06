@@ -309,7 +309,7 @@ getSymbolTable bh ncu = do
     newSTArray_ :: forall s. (Int, Int) -> ST s (STArray s Int Name)
     newSTArray_ = newArray_
 
-type OnDiskName = (UnitId, ModuleName, OccName)
+type OnDiskName = (Unit, ModuleName, OccName)
 
 fromOnDiskName :: NameCache -> OnDiskName -> (NameCache, Name)
 fromOnDiskName nc (pid, mod_name, occ) =

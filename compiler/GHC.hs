@@ -159,8 +159,8 @@ module GHC (
 
         -- * Abstract syntax elements
 
-        -- ** Packages
-        UnitId,
+        -- ** Units
+        Unit,
 
         -- ** Modules
         Module, mkModule, pprModule, moduleName, moduleUnit,
@@ -1357,7 +1357,7 @@ packageDbModules only_exposed = do
      [ mkModule pid modname
      | p <- pkgs
      , not only_exposed || exposed p
-     , let pid = packageConfigId p
+     , let pid = mkUnit p
      , modname <- exposedModules p
                ++ map exportName (reexportedModules p) ]
                -}
@@ -1489,7 +1489,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     this_pkg = thisPackage dflags
   --
   case maybe_pkg of
-    Just pkg | fsToUnitId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | fsToUnit pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m

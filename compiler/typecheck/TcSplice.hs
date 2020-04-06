@@ -1089,7 +1089,7 @@ instance TH.Quasi TcM where
                         RealSrcSpan s _ -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
-                                  , TH.loc_package  = unitIdString (moduleUnit m)
+                                  , TH.loc_package  = unitString (moduleUnit m)
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                   , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
@@ -2218,7 +2218,7 @@ reifyName thing
   where
     name    = getName thing
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnit mod)
+    pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
     occ     = nameOccName name
@@ -2236,7 +2236,7 @@ reifyFieldLabel fl
   where
     name    = flSelector fl
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnit mod)
+    pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = unpackFS (flLabel fl)
 
@@ -2298,7 +2298,7 @@ lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
 lookupThAnnLookup (TH.AnnLookupName th_nm) = fmap NamedTarget (lookupThName th_nm)
 lookupThAnnLookup (TH.AnnLookupModule (TH.Module pn mn))
   = return $ ModuleTarget $
-    mkModule (stringToUnitId $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
+    mkModule (stringToUnit $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
 
 reifyAnnotations :: Data a => TH.AnnLookup -> TcM [a]
 reifyAnnotations th_name
@@ -2312,13 +2312,13 @@ reifyAnnotations th_name
 
 ------------------------------
 modToTHMod :: Module -> TH.Module
-modToTHMod m = TH.Module (TH.PkgName $ unitIdString  $ moduleUnit m)
+modToTHMod m = TH.Module (TH.PkgName $ unitString  $ moduleUnit m)
                          (TH.ModName $ moduleNameString $ moduleName m)
 
 reifyModule :: TH.Module -> TcM TH.ModuleInfo
 reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   this_mod <- getModule
-  let reifMod = mkModule (stringToUnitId pkgString) (mkModuleName mString)
+  let reifMod = mkModule (stringToUnit pkgString) (mkModuleName mString)
   if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
     where
       reifyThisModule = do
@@ -2331,7 +2331,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
                                      Just m <- [usageToModule (moduleUnit reifMod) usage] ]
         return $ TH.ModuleInfo usages
 
-      usageToModule :: UnitId -> Usage -> Maybe Module
+      usageToModule :: Unit -> Usage -> Maybe Module
       usageToModule _ (UsageFile {}) = Nothing
       usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
       usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m
