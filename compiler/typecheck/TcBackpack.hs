@@ -565,8 +565,8 @@ mergeSignatures
         gen_subst (nsubst,oks,ifaces) (imod@(Module iuid _), ireq_iface) = do
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
-                    let inst_uid = fst (getUnitInstantiations (InstUnit iuid))
-                        pkg = getInstalledPackageDetails pkgstate inst_uid
+                    let inst_uid = instUnitInstanceOf iuid
+                        pkg = getInstalledPackageDetails pkgstate (indefUnitId inst_uid)
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
