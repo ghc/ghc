@@ -883,29 +883,29 @@ data InstalledFindResult
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
-  | NoPackage UnitId
-        -- ^ The requested package was not found
+  | NoPackage Unit
+        -- ^ The requested unit was not found
   | FoundMultiple [(Module, ModuleOrigin)]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
   | NotFound
-      { fr_paths       :: [FilePath]       -- Places where I looked
+      { fr_paths       :: [FilePath]       -- ^ Places where I looked
 
-      , fr_pkg         :: Maybe UnitId  -- Just p => module is in this package's
-                                           --           manifest, but couldn't find
-                                           --           the .hi file
+      , fr_pkg         :: Maybe Unit       -- ^ Just p => module is in this unit's
+                                           --   manifest, but couldn't find the
+                                           --   .hi file
 
-      , fr_mods_hidden :: [UnitId]      -- Module is in these packages,
+      , fr_mods_hidden :: [Unit]           -- ^ Module is in these units,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [UnitId]      -- Module is in these packages,
-                                           --   but the *package* is hidden
+      , fr_pkgs_hidden :: [Unit]           -- ^ Module is in these units,
+                                           --   but the *unit* is hidden
 
-        -- Modules are in these packages, but it is unusable
-      , fr_unusables   :: [(UnitId, UnusablePackageReason)]
+        -- | Module is in these units, but it is unusable
+      , fr_unusables   :: [(Unit, UnusablePackageReason)]
 
-      , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
+      , fr_suggestions :: [ModuleSuggestion] -- ^ Possible mis-spelled modules
       }
 
 {-
@@ -1134,7 +1134,7 @@ mi_semantic_module iface = case mi_sig_of iface of
 -- 'ModIface' depends on.
 mi_free_holes :: ModIface -> UniqDSet ModuleName
 mi_free_holes iface =
-  case splitModuleInsts (mi_module iface) of
+  case getModuleInstantiation (mi_module iface) of
     (_, Just indef)
         -- A mini-hack: we rely on the fact that 'renameFreeHoles'
         -- drops things that aren't holes.
@@ -1944,8 +1944,8 @@ Note [Printing unit ids]
 In the old days, original names were tied to PackageIds, which directly
 corresponded to the entities that users wrote in Cabal files, and were perfectly
 suitable for printing when we need to disambiguate packages.  However, with
-UnitId, the situation can be different: if the key is instantiated with
-some holes, we should try to give the user some more useful information.
+instantiated units, the situation can be different: if the key is instantiated
+with some holes, we should try to give the user some more useful information.
 -}
 
 -- | Creates some functions that work out the best ways to format
@@ -2014,7 +2014,7 @@ mkQualModule dflags mod
      | moduleUnit mod == thisPackage dflags = False
 
      | [(_, pkgconfig)] <- lookup,
-       packageConfigId pkgconfig == moduleUnit mod
+       mkUnit pkgconfig == moduleUnit mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
@@ -2932,7 +2932,7 @@ data ModSummary
      }
 
 ms_installed_mod :: ModSummary -> InstalledModule
-ms_installed_mod = fst . splitModuleInsts . ms_mod
+ms_installed_mod = fst . getModuleInstantiation . ms_mod
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod

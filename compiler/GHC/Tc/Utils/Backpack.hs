@@ -10,8 +10,8 @@ module GHC.Tc.Utils.Backpack (
     findExtraSigImports,
     implicitRequirements',
     implicitRequirements,
-    checkUnitId,
-    tcRnCheckUnitId,
+    checkUnit,
+    tcRnCheckUnit,
     tcRnMergeSignatures,
     mergeSignatures,
     tcRnInstantiateSignature,
@@ -314,32 +314,28 @@ implicitRequirements' hsc_env normal_imports
             _ -> return []
   where dflags = hsc_dflags hsc_env
 
--- | Given a 'UnitId', make sure it is well typed.  This is because
+-- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or
 -- not; a component may have been filled with implementations for the holes
 -- that don't actually fulfill the requirements.
---
--- INVARIANT: the UnitId is NOT a InstalledUnitId
-checkUnitId :: UnitId -> TcM ()
-checkUnitId uid = do
-    case splitUnitIdInsts uid of
-      (_, Just indef) ->
-        let insts = instUnitInsts indef in
-        forM_ insts $ \(mod_name, mod) ->
-            -- NB: direct hole instantiations are well-typed by construction
-            -- (because we FORCE things to be merged in), so don't check them
-            when (not (isHoleModule mod)) $ do
-                checkUnitId (moduleUnit mod)
-                _ <- mod `checkImplements` Module indef mod_name
-                return ()
-      _ -> return () -- if it's hashed, must be well-typed
+checkUnit :: Unit -> TcM ()
+checkUnit (DefUnit _)      = return () -- if it's definite, must be well-typed
+checkUnit (InstUnit indef) = do
+   let insts = instUnitInsts indef
+   forM_ insts $ \(mod_name, mod) ->
+       -- NB: direct hole instantiations are well-typed by construction
+       -- (because we FORCE things to be merged in), so don't check them
+       when (not (isHoleModule mod)) $ do
+           checkUnit (moduleUnit mod)
+           _ <- mod `checkImplements` Module indef mod_name
+           return ()
 
 -- | Top-level driver for signature instantiation (run when compiling
 -- an @hsig@ file.)
-tcRnCheckUnitId ::
-    HscEnv -> UnitId ->
+tcRnCheckUnit ::
+    HscEnv -> Unit ->
     IO (Messages, Maybe ())
-tcRnCheckUnitId hsc_env uid =
+tcRnCheckUnit hsc_env uid =
    withTiming dflags
               (text "Check unit id" <+> ppr uid)
               (const ()) $
@@ -348,7 +344,7 @@ tcRnCheckUnitId hsc_env uid =
           False
           mAIN -- bogus
           (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
-    $ checkUnitId uid
+    $ checkUnit uid
   where
    dflags = hsc_dflags hsc_env
    loc_str = "Command line argument: -unit-id " ++ showSDoc dflags (ppr uid)
@@ -549,7 +545,7 @@ mergeSignatures
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(Module iuid mod_name) ->
         let m = mkModule (InstUnit iuid) mod_name
-            im = fst (splitModuleInsts m)
+            im = fst (getModuleInstantiation m)
         in fmap fst
          . withException
          $ findAndReadIface (text "mergeSignatures") im m False
@@ -570,7 +566,7 @@ mergeSignatures
         gen_subst (nsubst,oks,ifaces) (imod@(Module iuid _), ireq_iface) = do
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
-                    let inst_uid = fst (splitUnitIdInsts (InstUnit iuid))
+                    let inst_uid = fst (getUnitInstantiations (InstUnit iuid))
                         pkg = getInstalledPackageDetails pkgstate inst_uid
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
@@ -955,7 +951,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
     -- but we must proceed slowly, because it is NOT known if the
     -- instantiation is correct.
     let sig_mod = mkModule (InstUnit uid) mod_name
-        isig_mod = fst (splitModuleInsts sig_mod)
+        isig_mod = fst (getModuleInstantiation sig_mod)
     mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod False
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface

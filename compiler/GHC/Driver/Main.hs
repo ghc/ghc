@@ -1054,7 +1054,7 @@ checkSafeImports tcg_env
     imports  = imp_mods impInfo        -- ImportedMods
     imports1 = moduleEnvToList imports -- (Module, [ImportedBy])
     imports' = map (fmap importedByUser) imports1 -- (Module, [ImportedModsVal])
-    pkgReqs  = imp_trust_pkgs impInfo  -- [UnitId]
+    pkgReqs  = imp_trust_pkgs impInfo  -- [Unit]
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
     condense (_, [])   = panic "GHC.Driver.Main.condense: Pattern match failure!"
@@ -1197,7 +1197,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomePkg dflags m = True
-        | otherwise = unitIsTrusted $ getPackageDetails dflags (moduleUnit m)
+        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do

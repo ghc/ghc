@@ -195,7 +195,7 @@ findExposedPluginPackageModule hsc_env mod_name
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
      LookupFound m pkg_conf -> do
-       let im = fst (splitModuleInsts m)
+       let im = fst (getModuleInstantiation m)
        r' <- findPackageModule_ hsc_env im pkg_conf
        case r' of
         -- TODO: ghc -M is unlikely to do the right thing
@@ -662,7 +662,7 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
           then [text "package" <+> ppr (moduleUnit m)]
           else [] ++
       map ((text "a reexport in package" <+>)
-                .ppr.packageConfigId) res ++
+                .ppr.mkUnit) res ++
       if f then [text "a package flag"] else []
       )
 
@@ -715,7 +715,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
          text "try running 'ghc-pkg check'." $$
          tried_these files dflags
 
-    pkg_hidden :: UnitId -> SDoc
+    pkg_hidden :: Unit -> SDoc
     pkg_hidden uid =
         text "It is a member of the hidden package"
         <+> quotes (ppr uid)
@@ -763,7 +763,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
               | f && moduleName mod == m
                  = parens (text "from" <+> ppr (moduleUnit mod))
               | (pkg:_) <- res
-                 = parens (text "from" <+> ppr (packageConfigId pkg)
+                 = parens (text "from" <+> ppr (mkUnit pkg)
                     <> comma <+> text "reexporting" <+> ppr mod)
               | f
                  = parens (text "defined via package flags to be"
@@ -779,7 +779,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                     <+> ppr (moduleUnit mod))
               | (pkg:_) <- rhs
                  = parens (text "needs flag -package-id"
-                    <+> ppr (packageConfigId pkg))
+                    <+> ppr (mkUnit pkg))
               | otherwise = Outputable.empty
 
 cantFindInstalledErr :: PtrString -> PtrString -> DynFlags -> ModuleName
