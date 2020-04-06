@@ -49,7 +49,7 @@ type UnitInfo = GenericUnitInfo
                        IndefUnitId
                        PackageId
                        PackageName
-                       Module.InstalledUnitId
+                       Module.UnitId
                        Module.ModuleName
                        Module.Module
 
@@ -65,9 +65,9 @@ toUnitInfo = mapGenericUnitInfo
    where
      mkPackageIdentifier' = PackageId       . mkFastStringByteString
      mkPackageName'       = PackageName     . mkFastStringByteString
-     mkUnitId'            = InstalledUnitId . mkFastStringByteString
+     mkUnitId'            = UnitId . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
-     mkIndefUnitId' cid   = IndefUnitId (InstalledUnitId (mkFastStringByteString cid)) Nothing
+     mkIndefUnitId' cid   = IndefUnitId (UnitId (mkFastStringByteString cid)) Nothing
      mkInstUnitId' i = case i of
       DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)
       DbUnitId uid           -> DefUnit (DefUnitId (mkUnitId' uid))
@@ -149,7 +149,7 @@ pprUnitInfo GenericUnitInfo {..} =
 -- version is, so these are handled specially; see #wired_in_packages#.
 
 -- | Get the GHC 'UnitId' right out of a Cabalish 'UnitInfo'
-installedUnitInfoId :: UnitInfo -> InstalledUnitId
+installedUnitInfoId :: UnitInfo -> UnitId
 installedUnitInfoId = unitId
 
 mkUnit :: UnitInfo -> Unit

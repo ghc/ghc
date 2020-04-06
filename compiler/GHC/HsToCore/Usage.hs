@@ -61,7 +61,7 @@ its dep_orphs. This was the cause of #14128.
 -- a dependencies information for the module being compiled.
 --
 -- The first argument is additional dependencies from plugins
-mkDependencies :: InstalledUnitId -> [Module] -> TcGblEnv -> IO Dependencies
+mkDependencies :: UnitId -> [Module] -> TcGblEnv -> IO Dependencies
 mkDependencies iuid pluginModules
           (TcGblEnv{ tcg_mod = mod,
                     tcg_imports = imports,
@@ -70,7 +70,7 @@ mkDependencies iuid pluginModules
  = do
       -- Template Haskell used?
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnit) ms)
+          plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
@@ -87,7 +87,7 @@ mkDependencies iuid pluginModules
 
           raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) raw_pkgs
+          pkgs | th_used   = Set.insert (toUnitId thUnitId) raw_pkgs
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
