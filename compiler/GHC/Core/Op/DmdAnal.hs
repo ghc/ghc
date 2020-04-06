@@ -27,6 +27,7 @@ import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Core.Arity ( typeArity )
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -152,7 +153,7 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
 dmdAnal' _ _ (Lit lit)     = (emptyDmdType conDiv, Lit lit)
 dmdAnal' _ _ (Type ty)     = (emptyDmdType conDiv, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
-  = (unitDmdType (coercionDmdEnv co), Coercion co)
+  = (DmdType (coercionDmdEnv co) [] conDiv, Coercion co)
 
 dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
@@ -410,7 +411,7 @@ forcesRealWorld fam_envs = go initRecTc
       -- search depth-first
       | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
           <- deepSplitProductType_maybe fam_envs ty
-      -- don't check the same TyCon twice
+      -- don't check the same TyCon more than n times
       , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
       = any (strict_field_forces rec_tc') field_tys
       | otherwise
@@ -510,27 +511,63 @@ dmdTransform :: AnalEnv         -- The strictness environment
         -- this function plus demand on its free variables
 
 dmdTransform env var dmd
-  | isDataConWorkId var                          -- Data constructor
+  -- Data constructors
+  | isDataConWorkId var
   = dmdTransformDataConSig (idArity var) dmd
-
+  -- Dictionary component selectors
   | gopt Opt_DmdTxDictSel (ae_dflags env),
-    Just _ <- isClassOpId_maybe var -- Dictionary component selector
+    Just _ <- isClassOpId_maybe var
   = dmdTransformDictSelSig (idStrictness var) dmd
-
-  | isGlobalId var                               -- Imported function
-  , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  -- Imported functions
+  | isGlobalId var
+  , let res = dmdTransformSig (globalIdStrictness env var) dmd
+  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr (globalIdStrictness var), ppr dmd, ppr res])
     res
-
-  | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
+  -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
+  -- In that case, we have a strictness signature to unleash in our AnalEnv.
+  | Just (sig, top_lvl) <- lookupSigEnv env var
   , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+  = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
-    then fn_ty   -- Don't record top level things
+    then fn_ty   -- Don't record demand on top-level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
+  -- Everything else:
+  --   * Local let binders for which we use LetUp (cf. 'useLetUp')
+  --   * Lambda binders
+  --   * Case and constructor field binders
+  | let sig     = mkConservativeSig env (idType var)
+  , let res     = dmdTransformSig sig dmd
+  = -- pprTrace "dmdTransform:Other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
+    addVarDmd res var (mkOnceUsedDmd dmd)
 
-  | otherwise                                    -- Local non-letrec-bound thing
-  = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
+-- | Returns 'idStrictness' or a conservative strictness signature for an
+-- imported global variable for which 'idStrictness' is Top.
+globalIdStrictness :: AnalEnv -> Id -> StrictSig
+globalIdStrictness env var
+  | isTopSig (idStrictness var) = mkConservativeSig env (idType var)
+  | otherwise                   = idStrictness var
+
+mkConservativeSig :: AnalEnv -> Type -> StrictSig
+mkConservativeSig env ty
+  -- Binders of unlifted types can't throw anything. This special case isn't
+  -- handled well by forcesRealWorld, which focuses on case scrutinees.
+  | unlifted  = emptySig conDiv
+  -- no point in retaining cleared_sig when it's just Top
+  | no_change = topSig
+  | otherwise = cleared_sig
+  where
+    unlifted        = isLiftedType_maybe ty == Just False
+    fam_envs        = ae_fam_envs env
+    -- This is isomorphic to topSig. But this one has the right number of
+    -- arguments and will possibly have conDiv after the call to
+    -- tryClearPreciseException!
+    pessimistic_sig = StrictSig $ DmdType emptyVarEnv args topDiv
+    args            = replicate (length (typeArity ty)) topDmd
+    -- In contrast to pessimistic_sig, cleared_sig might not have conDiv
+    -- Divergence!
+    cleared_sig     = tryClearPreciseException fam_envs ty pessimistic_sig
+    sig_div         = snd . splitStrictSig
+    no_change       = sig_div cleared_sig == topDiv
 
 {-
 ************************************************************************
@@ -603,7 +640,7 @@ dmdFix top_lvl env let_dmd orig_pairs
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdStrictness pairs
-      = [(setIdStrictnessClearExn env id (emptySig topDiv), rhs) | (id, rhs) <- pairs ]
+      = [(setIdStrictnessClearExn env id topSig, rhs) | (id, rhs) <- pairs ]
 
 {-
 Note [Safe abortion in the fixed-point iteration]
@@ -658,7 +695,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
       = mkRhsDmd env rhs_arity rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
+    sig            = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
     id'            = -- pprTraceWith "dmdAnalRhsLetDown" (\sig'-> ppr id <+> ppr sig <+> ppr sig') $
                      setIdStrictnessClearExn env id sig
         -- See Note [NOINLINE and strictness]
@@ -943,9 +980,6 @@ deleted the special case.
 *                                                                      *
 ************************************************************************
 -}
-
-unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] conDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)

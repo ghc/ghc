@@ -658,7 +658,7 @@ setIdCprInfo :: Id -> CprSig -> Id
 setIdCprInfo id sig = modifyIdInfo (\info -> setCprInfo info sig) id
 
 zapIdStrictness :: Id -> Id
-zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` emptySig topDiv) id
+zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` topSig) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (i.e an
