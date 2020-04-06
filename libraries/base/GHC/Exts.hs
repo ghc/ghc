@@ -56,7 +56,7 @@ module GHC.Exts
         breakpoint, breakpointCond,
 
         -- * Ids with special behaviour
-        lazy, inline, oneShot,
+        inline, noinline, lazy, oneShot,
 
         -- * Running 'RealWorld' state thread
         runRW#,
