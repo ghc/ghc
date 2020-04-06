@@ -94,7 +94,6 @@ import GHC.Utils.Exception
 
 import System.Directory
 import System.FilePath as FilePath
-import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
@@ -656,7 +655,7 @@ mungeUnitInfo :: FilePath -> FilePath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
     mungeDynLibFields
-  . mungePackagePaths top_dir pkgroot
+  . mungeUnitInfoPaths top_dir pkgroot
 
 mungeDynLibFields :: UnitInfo -> UnitInfo
 mungeDynLibFields pkg =
@@ -665,57 +664,6 @@ mungeDynLibFields pkg =
          [] -> unitLibraryDirs pkg
          ds -> ds
     }
-
--- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
-mungePackagePaths :: FilePath -> FilePath -> UnitInfo -> UnitInfo
--- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
--- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
--- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
--- The "pkgroot" is the directory containing the package database.
---
--- Also perform a similar substitution for the older GHC-specific
--- "$topdir" variable. The "topdir" is the location of the ghc
--- installation (obtained from the -B option).
-mungePackagePaths top_dir pkgroot pkg =
-    pkg {
-      unitImportDirs  = munge_paths (unitImportDirs pkg),
-      unitIncludeDirs = munge_paths (unitIncludeDirs pkg),
-      unitLibraryDirs = munge_paths (unitLibraryDirs pkg),
-      unitLibraryDynDirs = munge_paths (unitLibraryDynDirs pkg),
-      unitExtDepFrameworkDirs = munge_paths (unitExtDepFrameworkDirs pkg),
-      unitHaddockInterfaces = munge_paths (unitHaddockInterfaces pkg),
-      unitHaddockHTMLs = munge_urls (unitHaddockHTMLs pkg)
-    }
-  where
-    munge_paths = map munge_path
-    munge_urls  = map munge_url
-
-    munge_path p
-      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
-      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
-      | otherwise                                = p
-
-    munge_url p
-      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
-      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
-      | otherwise                                   = p
-
-    toUrlPath r p = "file:///"
-                 -- URLs always use posix style '/' separators:
-                 ++ FilePath.Posix.joinPath
-                        (r : -- We need to drop a leading "/" or "\\"
-                             -- if there is one:
-                             dropWhile (all isPathSeparator)
-                                       (FilePath.splitDirectories p))
-
-    -- We could drop the separator here, and then use </> above. However,
-    -- by leaving it in and using ++ we keep the same path separator
-    -- rather than letting FilePath change it to use \ as the separator
-    stripVarPrefix var path = case stripPrefix var path of
-                              Just [] -> Just []
-                              Just cs@(c : _) | isPathSeparator c -> Just cs
-                              _ -> Nothing
-
 
 -- -----------------------------------------------------------------------------
 -- Modify our copy of the package database based on trust flags,
