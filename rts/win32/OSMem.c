@@ -459,7 +459,7 @@ void *osReserveHeapMemory (void *startAddress, W_ *len)
     void *start;
 
     heap_base = VirtualAlloc(startAddress, *len + MBLOCK_SIZE,
-                              MEM_RESERVE, PAGE_READWRITE);
+                              MEM_RESERVE | MEM_TOP_DOWN, PAGE_READWRITE);
     if (heap_base == NULL) {
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
             errorBelch("out of memory");

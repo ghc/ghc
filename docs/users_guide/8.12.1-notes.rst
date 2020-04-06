@@ -21,11 +21,11 @@ Highlights
 
 * Pattern-Match Coverage Checking
 
-  - The revamp of the pattern-match coverage checker that started in 8.10 concludes with this release and implements the 
+  - The revamp of the pattern-match coverage checker that started in 8.10 concludes with this release and implements the
     novel `*Lower Your Guards* <https://www.microsoft.com/en-us/research/uploads/prod/2020/03/lyg.pdf>`_ algorithm.
   - Compared to 8.10, end users might notice improvements to "long-distance information": :: haskell
 
-      :linenos:   
+      :linenos:
       f True = 1
       f x    = ... case x of { False -> 2; True -> 3 } ...
 
@@ -157,6 +157,12 @@ Runtime system
 
 - Support for Windows Vista has been dropped. GHC-compiled programs now require
   Windows 7 or later.
+
+- Windows now uses the large address space allocator by default.
+  In extreme cases we saw improvements by up to 3% decreased runtime.
+
+  The downside is that haskell apps run on older (Pre Win-8.1/Server 2012)
+  systems will have higher memory footprints.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
