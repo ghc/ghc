@@ -40,7 +40,7 @@ Language
 
   There is a chance we will tweak the lookup scheme in the future, to make this
   workaround unnecessary.
-  
+
 Compiler
 ~~~~~~~~
 
@@ -51,6 +51,9 @@ GHCi
 
 Runtime system
 ~~~~~~~~~~~~~~
+
+ - Windows now uses the large address space allocator by default.
+   In extreme cases we saw improvements by up to 3% decreased runtime.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

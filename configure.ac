@@ -1203,11 +1203,15 @@ if test "$ac_cv_sizeof_void_p" -eq 8 ; then
     if test "x$EnableLargeAddressSpace" = "xyes" ; then
         if test "$ghc_host_os" = "darwin" ; then
             use_large_address_space=yes
-	elif test "$ghc_host_os" = "openbsd" ; then
-	    # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
-	    # The flag MAP_NORESERVE is supported for source compatibility reasons,
-	    # but is completely ignored by OS mmap
-            use_large_address_space=no
+        elif test "$ghc_host_os" = "openbsd" ; then
+            # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
+            # The flag MAP_NORESERVE is supported for source compatibility reasons,
+            # but is completely ignored by OS mmap
+                  use_large_address_space=no
+        elif test "$ghc_host_os" = "mingw32" ; then
+            # as of Windows 8.1/Server 2012 windows does no longer allocate the page
+            # tabe for reserved memory eagerly. So we are now free to use LAS there too.
+                  use_large_address_space=yes
         else
             AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
                 [
