@@ -23,8 +23,7 @@ module GHC.Types.Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
-        emptyDmdType, botDmdType, mkDmdType, addDemand,
-        mayThrowPreciseDmdType,
+        emptyDmdType, botDmdType, addDemand, mayThrowPreciseDmdType,
 
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
@@ -33,7 +32,7 @@ module GHC.Types.Demand (
         topDiv, botDiv, exnDiv, conDiv,
         appIsDeadEnd, isDeadEndSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
-        emptySig, botSig, cprProdSig,
+        emptySig, topSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
         prependArgsStrictSig, etaConvertStrictSig,
@@ -1275,6 +1274,9 @@ emptyDmdType div = DmdType emptyDmdEnv [] div
 botDmdType :: DmdType
 botDmdType = emptyDmdType botDiv
 
+topDmdType :: DmdType
+topDmdType = emptyDmdType topDiv
+
 isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env args div)
   = div == topDiv && null args && isEmptyVarEnv env
@@ -1283,9 +1285,6 @@ mayThrowPreciseDmdType :: DmdType -> Bool
 mayThrowPreciseDmdType (DmdType _ _ Dunno)    = True
 mayThrowPreciseDmdType (DmdType _ _ ExnOrDiv) = True
 mayThrowPreciseDmdType _                      = False
-
-mkDmdType :: DmdEnv -> [Demand] -> Divergence -> DmdType
-mkDmdType fv ds res = DmdType fv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
@@ -1787,6 +1786,9 @@ emptySig div = StrictSig (emptyDmdType div)
 
 botSig :: StrictSig
 botSig = StrictSig botDmdType
+
+topSig :: StrictSig
+topSig = StrictSig topDmdType
 
 cprProdSig :: Arity -> StrictSig
 cprProdSig _arity = emptySig conDiv -- constructor applications never throw precise exceptions
