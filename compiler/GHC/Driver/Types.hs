@@ -872,8 +872,8 @@ type FinderCache = InstalledModuleEnv InstalledFindResult
 
 data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
-  | InstalledNoPackage InstalledUnitId
-  | InstalledNotFound [FilePath] (Maybe InstalledUnitId)
+  | InstalledNoPackage UnitId
+  | InstalledNotFound [FilePath] (Maybe UnitId)
 
 -- | The result of searching for an imported module.
 --
@@ -1517,7 +1517,7 @@ data CgGuts
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
         cg_foreign_files :: ![(ForeignSrcLang, FilePath)],
-        cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
+        cg_dep_pkgs  :: ![UnitId], -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
         cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
@@ -1850,7 +1850,7 @@ setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
    = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { thisInstalledUnitId = toInstalledUnitId interactiveUnitId } }
+                { thisUnitId = toUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -2509,7 +2509,7 @@ data Dependencies
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(InstalledUnitId, Bool)]
+         , dep_pkgs   :: [(UnitId, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules

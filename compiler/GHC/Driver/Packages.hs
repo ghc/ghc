@@ -27,7 +27,7 @@ module GHC.Driver.Packages (
         searchPackageId,
         unsafeGetUnitInfo,
         getInstalledPackageDetails,
-        displayInstalledUnitId,
+        displayUnitId,
         listVisibleModuleNames,
         lookupModuleInAllPackages,
         lookupModuleWithSuggestions,
@@ -243,17 +243,17 @@ originEmpty :: ModuleOrigin -> Bool
 originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
--- | 'UniqFM' map from 'InstalledUnitId'
-type InstalledUnitIdMap = UniqDFM
+-- | 'UniqFM' map from 'UnitId'
+type UnitIdMap = UniqDFM
 
 -- | 'UniqFM' map from 'UnitId' to 'UnitInfo', plus
 -- the transitive closure of preload packages.
 data UnitInfoMap = UnitInfoMap {
-        unUnitInfoMap :: InstalledUnitIdMap UnitInfo,
+        unUnitInfoMap :: UnitIdMap UnitInfo,
         -- | The set of transitively reachable packages according
         -- to the explicitly provided command line arguments.
         -- See Note [InstUnit to DefUnit improvement]
-        preloadClosure :: UniqSet InstalledUnitId
+        preloadClosure :: UniqSet UnitId
     }
 
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
@@ -310,7 +310,7 @@ instance Monoid UnitVisibility where
     mappend = (Semigroup.<>)
 
 type WiredUnitId = DefUnitId
-type PreloadUnitId = InstalledUnitId
+type PreloadUnitId = UnitId
 
 -- | Map from 'ModuleName' to a set of of module providers (i.e. a 'Module' and
 -- its 'ModuleOrigin').
@@ -381,7 +381,7 @@ data PackageDatabase = PackageDatabase
    , packageDatabaseUnits :: [UnitInfo]
    }
 
-type InstalledPackageIndex = Map InstalledUnitId UnitInfo
+type InstalledPackageIndex = Map UnitId UnitInfo
 
 -- | Empty package configuration map
 emptyUnitInfoMap :: UnitInfoMap
@@ -442,13 +442,13 @@ unsafeGetUnitInfo dflags pid =
       Just config -> config
       Nothing -> pprPanic "unsafeGetUnitInfo" (ppr pid)
 
-lookupInstalledPackage :: PackageState -> InstalledUnitId -> Maybe UnitInfo
+lookupInstalledPackage :: PackageState -> UnitId -> Maybe UnitInfo
 lookupInstalledPackage pkgstate uid = lookupInstalledPackage' (unitInfoMap pkgstate) uid
 
-lookupInstalledPackage' :: UnitInfoMap -> InstalledUnitId -> Maybe UnitInfo
+lookupInstalledPackage' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
 lookupInstalledPackage' (UnitInfoMap db _) uid = lookupUDFM db uid
 
-getInstalledPackageDetails :: HasDebugCallStack => PackageState -> InstalledUnitId -> UnitInfo
+getInstalledPackageDetails :: HasDebugCallStack => PackageState -> UnitId -> UnitInfo
 getInstalledPackageDetails pkgstate uid =
     case lookupInstalledPackage pkgstate uid of
       Just config -> config
@@ -838,7 +838,7 @@ matchingStr str p
         =  str == unitPackageIdString p
         || str == unitPackageNameString p
 
-matchingId :: InstalledUnitId -> UnitInfo -> Bool
+matchingId :: UnitId -> UnitInfo -> Bool
 matchingId uid p = uid == installedUnitInfoId p
 
 matching :: PackageArg -> UnitInfo -> Bool
@@ -1038,7 +1038,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
         wiredInMap :: Map WiredUnitId WiredUnitId
         wiredInMap = Map.fromList
-          [ (key, DefUnitId (stringToInstalledUnitId wiredInUnitId))
+          [ (key, DefUnitId (stringToUnitId wiredInUnitId))
           | (wiredInUnitId, pkg) <- wired_in_pkgs
           , Just key <- pure $ definiteUnitInfoId pkg
           ]
@@ -1049,7 +1049,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
                   = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
                     in pkg {
-                      unitId = fsToInstalledUnitId fs,
+                      unitId = fsToUnitId fs,
                       unitInstanceOf = mkIndefUnitId pkgstate fs
                     }
                   | otherwise
@@ -1104,17 +1104,17 @@ data UnusablePackageReason
     IgnoredWithFlag
     -- | This package transitively depends on a package that was never present
     -- in any of the provided databases.
-  | BrokenDependencies   [InstalledUnitId]
+  | BrokenDependencies   [UnitId]
     -- | This package transitively depends on a package involved in a cycle.
-    -- Note that the list of 'InstalledUnitId' reports the direct dependencies
+    -- Note that the list of 'UnitId' reports the direct dependencies
     -- of this package that (transitively) depended on the cycle, and not
     -- the actual cycle itself (which we report separately at high verbosity.)
-  | CyclicDependencies   [InstalledUnitId]
+  | CyclicDependencies   [UnitId]
     -- | This package transitively depends on a package which was ignored.
-  | IgnoredDependencies  [InstalledUnitId]
+  | IgnoredDependencies  [UnitId]
     -- | This package transitively depends on a package which was
     -- shadowed by an ABI-incompatible package.
-  | ShadowedDependencies [InstalledUnitId]
+  | ShadowedDependencies [UnitId]
 
 instance Outputable UnusablePackageReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
@@ -1123,7 +1123,7 @@ instance Outputable UnusablePackageReason where
     ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
     ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
 
-type UnusablePackages = Map InstalledUnitId
+type UnusablePackages = Map UnitId
                             (UnitInfo, UnusablePackageReason)
 
 pprReason :: SDoc -> UnusablePackageReason -> SDoc
@@ -1166,9 +1166,9 @@ reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
 -- Utilities on the database
 --
 
--- | A reverse dependency index, mapping an 'InstalledUnitId' to
--- the 'InstalledUnitId's which have a dependency on it.
-type RevIndex = Map InstalledUnitId [InstalledUnitId]
+-- | A reverse dependency index, mapping an 'UnitId' to
+-- the 'UnitId's which have a dependency on it.
+type RevIndex = Map UnitId [UnitId]
 
 -- | Compute the reverse dependency index of a package database.
 reverseDeps :: InstalledPackageIndex -> RevIndex
@@ -1177,12 +1177,12 @@ reverseDeps db = Map.foldl' go Map.empty db
     go r pkg = foldl' (go' (unitId pkg)) r (unitDepends pkg)
     go' from r to = Map.insertWith (++) to [from] r
 
--- | Given a list of 'InstalledUnitId's to remove, a database,
+-- | Given a list of 'UnitId's to remove, a database,
 -- and a reverse dependency index (as computed by 'reverseDeps'),
 -- remove those packages, plus any packages which depend on them.
 -- Returns the pruned database, as well as a list of 'UnitInfo's
 -- that was removed.
-removePackages :: [InstalledUnitId] -> RevIndex
+removePackages :: [UnitId] -> RevIndex
                -> InstalledPackageIndex
                -> (InstalledPackageIndex, [UnitInfo])
 removePackages uids index m = go uids (m,[])
@@ -1201,7 +1201,7 @@ removePackages uids index m = go uids (m,[])
 -- that do not exist in the index.
 depsNotAvailable :: InstalledPackageIndex
                  -> UnitInfo
-                 -> [InstalledUnitId]
+                 -> [UnitId]
 depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (unitDepends pkg)
 
 -- | Given a 'UnitInfo' from some 'InstalledPackageIndex'
@@ -1209,7 +1209,7 @@ depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (unitDepend
 -- that do not exist, OR have mismatching ABIs.
 depsAbiMismatch :: InstalledPackageIndex
                 -> UnitInfo
-                -> [InstalledUnitId]
+                -> [UnitId]
 depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends pkg
   where
     abiMatch (dep_uid, abi)
@@ -1242,7 +1242,7 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
 -- the command line.  We use this mapping to make sure we prefer
 -- packages that were defined later on the command line, if there
 -- is an ambiguity.
-type PackagePrecedenceIndex = Map InstalledUnitId Int
+type PackagePrecedenceIndex = Map UnitId Int
 
 -- | Given a list of databases, merge them together, where
 -- packages with the same unit id in later databases override
@@ -1267,7 +1267,7 @@ mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
       -- The set of UnitIds which appear in both db and pkgs.  These are the
       -- ones that get overridden.  Compute this just to give some
       -- helpful debug messages at -v2
-      override_set :: Set InstalledUnitId
+      override_set :: Set UnitId
       override_set = Set.intersection (Map.keysSet db_map)
                                       (Map.keysSet pkg_map)
 
@@ -1566,7 +1566,7 @@ mkPackageState dflags dbs preload0 = do
                         $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
-  dep_preload <- closeDeps dflags pkg_db (zip (map toInstalledUnitId preload3) (repeat Nothing))
+  dep_preload <- closeDeps dflags pkg_db (zip (map toUnitId preload3) (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let mod_map1 = mkModuleNameProvidersMap dflags pkg_db vis_map
@@ -1994,7 +1994,7 @@ getPreloadPackagesAnd dflags pkgids0 =
                   -- Fixes #14525
                   if isIndefinite dflags
                     then []
-                    else map (toInstalledUnitId . moduleUnit . snd)
+                    else map (toUnitId . moduleUnit . snd)
                              (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = unitInfoMap state
@@ -2008,8 +2008,8 @@ getPreloadPackagesAnd dflags pkgids0 =
 -- in reverse dependency order (a package appears before those it depends on).
 closeDeps :: DynFlags
           -> UnitInfoMap
-          -> [(InstalledUnitId, Maybe InstalledUnitId)]
-          -> IO [InstalledUnitId]
+          -> [(UnitId, Maybe UnitId)]
+          -> IO [UnitId]
 closeDeps dflags pkg_map ps
     = throwErr dflags (closeDepsErr dflags pkg_map ps)
 
@@ -2021,8 +2021,8 @@ throwErr dflags m
 
 closeDepsErr :: DynFlags
              -> UnitInfoMap
-             -> [(InstalledUnitId,Maybe InstalledUnitId)]
-             -> MaybeErr MsgDoc [InstalledUnitId]
+             -> [(UnitId,Maybe UnitId)]
+             -> MaybeErr MsgDoc [UnitId]
 closeDepsErr dflags pkg_map ps = foldM (add_package dflags pkg_map) [] ps
 
 -- internal helper
@@ -2048,7 +2048,7 @@ add_package dflags pkg_db ps (p, mb_parent)
 missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
 missingPackageMsg p = text "unknown package:" <+> ppr p
 
-missingDependencyMsg :: Maybe InstalledUnitId -> SDoc
+missingDependencyMsg :: Maybe UnitId -> SDoc
 missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
   = space <> parens (text "dependency of" <+> ftext (installedUnitIdFS parent))
@@ -2072,7 +2072,7 @@ missingDependencyMsg (Just parent)
 --
 mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 mkIndefUnitId pkgstate raw =
-    let uid = InstalledUnitId raw
+    let uid = UnitId raw
     in case lookupInstalledPackage pkgstate uid of
          Nothing -> IndefUnitId uid Nothing -- we didn't find the unit at all
          Just c  -> IndefUnitId uid $ Just $ UnitPprInfo
@@ -2085,8 +2085,8 @@ updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
 updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (installedUnitIdFS (indefUnitId uid))
 
 
-displayInstalledUnitId :: PackageState -> InstalledUnitId -> Maybe String
-displayInstalledUnitId pkgstate uid =
+displayUnitId :: PackageState -> UnitId -> Maybe String
+displayUnitId pkgstate uid =
     fmap unitPackageIdString (lookupInstalledPackage pkgstate uid)
 
 -- | Will the 'Name' come from a dynamically linked package?
