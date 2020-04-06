@@ -253,12 +253,12 @@ instance HasHaddock (Located HsModule) where
       HdkA (getBufSpan l_name) $ do
         docs <-
           inLocRange (locRangeTo (getBufPos (srcSpanStart l_name))) $
-          takeHdkComments getDocNext
+          takeHdkComments mkDocNext
         pure $ concatLHsDocString docs
     hsmodExports' <- traverse @Maybe addHaddock (hsmodExports mod)
     traverse_ registerHdkA (hsmodImports mod)
     let layout_info = hsmodLayout mod
-    hsmodDecls' <- addHaddockInterleaveItems layout_info (getDocDecl layout_info) (hsmodDecls mod)
+    hsmodDecls' <- addHaddockInterleaveItems layout_info (mkDocHsDecl layout_info) (hsmodDecls mod)
     pure $ L l_mod $
       mod { hsmodExports = hsmodExports'
           , hsmodDecls = hsmodDecls'
@@ -267,15 +267,62 @@ instance HasHaddock (Located HsModule) where
 instance HasHaddock (Located [LIE GhcPs]) where
   addHaddock (L l_exports exports) =
     delimitHdkA l_exports $ do
-      exports' <- addHaddockInterleaveItems NoLayoutInfo getDocIE exports
+      exports' <- addHaddockInterleaveItems NoLayoutInfo mkDocIE exports
       registerHdkA (L (srcLocSpan (srcSpanEnd l_exports)) ()) -- Do not conume comments after the closing parenthesis
       pure $ L l_exports exports'
 
 instance HasHaddock (LIE GhcPs) where
   addHaddock a = a <$ registerHdkA a
 
--- Add Haddock items to a list of non-Haddock items.
--- Used to process export lists (with getDocIE) and declarations (with getDocDecl).
+{- Add Haddock items to a list of non-Haddock items.
+Used to process export lists (with mkDocIE) and declarations (with mkDocHsDecl).
+
+For example:
+
+  module M where
+    -- | Comment on D
+    data D = MkD  -- ^ Comment on MkD
+    data C = MkC  -- ^ Comment on MkC
+    -- ^ Comment on C
+
+In this case, we should produce four HsDecl items (pseudo-code):
+
+  1. DocD (DocCommentNext "Comment on D")
+  2. TyClD (DataDecl "D" ... [ConDeclH98 "MkD" ... (Just "Comment on MkD")])
+  3. TyClD (DataDecl "C" ... [ConDeclH98 "MkC" ... (Just "Comment on MkC")])
+  4. DocD (DocCommentPrev "Comment on C")
+
+The inputs to addHaddockInterleaveItems are:
+
+  * layout_info :: LayoutInfo
+
+    In the example above, note that the indentation level inside the module is
+    2 spaces. It would be represented as layout_info = VirtualBraces 2.
+
+    It is used to delimit the search space for comments when processing
+    declarations. Here, we restrict indentation levels to >=(2+1), so that when
+    we look up comment on MkC, we get "Comment on MkC" but not "Comment on C".
+
+  * get_doc_item :: PsLocated HdkComment -> Maybe a
+
+    This is the function used to look up documentation comments.
+    In the above example, get_doc_item = mkDocHsDecl layout_info,
+    and it will produce the following parts of the output:
+
+      DocD (DocCommentNext "Comment on D")
+      DocD (DocCommentPrev "Comment on C")
+
+  * The list of items. These are the declarations that will be annotated with
+    documentation comments.
+
+    Before processing:
+       TyClD (DataDecl "D" ... [ConDeclH98 "MkD" ... Nothing])
+       TyClD (DataDecl "C" ... [ConDeclH98 "MkC" ... Nothing])
+
+    After processing:
+       TyClD (DataDecl "D" ... [ConDeclH98 "MkD" ... (Just "Comment on MkD")])
+       TyClD (DataDecl "C" ... [ConDeclH98 "MkC" ... (Just "Comment on MkC")])
+-}
 addHaddockInterleaveItems
   :: forall a.
      HasHaddock a
@@ -302,11 +349,11 @@ addHaddockInterleaveItems layout_info get_doc_item = go
           let loc_range = LocRange mempty mempty (ColumnFrom (n+1))
           in HdkA l (inLocRange loc_range m)
 
-getDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
-getDocDecl layout_info a = mapLoc (DocD noExtField) <$> getDocDecl' layout_info a
+mkDocHsDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
+mkDocHsDecl layout_info a = mapLoc (DocD noExtField) <$> mkDocDecl layout_info a
 
-getDocDecl' :: LayoutInfo -> PsLocated HdkComment -> Maybe LDocDecl
-getDocDecl' layout_info (L l_comment hdk_comment)
+mkDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe LDocDecl
+mkDocDecl layout_info (L l_comment hdk_comment)
   | indent_mismatch = Nothing
   | otherwise =
     Just $ L (mkSrcSpanPs l_comment) $
@@ -321,8 +368,8 @@ getDocDecl' layout_info (L l_comment hdk_comment)
       ExplicitBraces -> False
       VirtualBraces n -> n /= srcSpanStartCol (psRealSpan l_comment)
 
-getDocIE :: PsLocated HdkComment -> Maybe (LIE GhcPs)
-getDocIE (L l_comment hdk_comment) =
+mkDocIE :: PsLocated HdkComment -> Maybe (LIE GhcPs)
+mkDocIE (L l_comment hdk_comment) =
   case hdk_comment of
     HdkCommentSection n doc -> Just $ L l (IEGroup noExtField n doc)
     HdkCommentNamed s _doc -> Just $ L l (IEDocNamed noExtField s)
@@ -330,13 +377,13 @@ getDocIE (L l_comment hdk_comment) =
     _ -> Nothing
   where l = mkSrcSpanPs l_comment
 
-getDocNext :: PsLocated HdkComment -> Maybe LHsDocString
-getDocNext (L l (HdkCommentNext doc)) = Just $ L (mkSrcSpanPs l) doc
-getDocNext _ = Nothing
+mkDocNext :: PsLocated HdkComment -> Maybe LHsDocString
+mkDocNext (L l (HdkCommentNext doc)) = Just $ L (mkSrcSpanPs l) doc
+mkDocNext _ = Nothing
 
-getDocPrev :: PsLocated HdkComment -> Maybe LHsDocString
-getDocPrev (L l (HdkCommentPrev doc)) = Just $ L (mkSrcSpanPs l) doc
-getDocPrev _ = Nothing
+mkDocPrev :: PsLocated HdkComment -> Maybe LHsDocString
+mkDocPrev (L l (HdkCommentPrev doc)) = Just $ L (mkSrcSpanPs l) doc
+mkDocPrev _ = Nothing
 
 instance HasHaddock (LHsDecl GhcPs) where
   addHaddock ldecl =
@@ -391,7 +438,7 @@ instance HasHaddock (HsDecl GhcPs) where
     = do
         registerHdkA tcdLName
         where_cls' <-
-          addHaddockInterleaveItems tcdLayout (getDocDecl tcdLayout) $
+          addHaddockInterleaveItems tcdLayout (mkDocHsDecl tcdLayout) $
           flattenBindsAndSigs (tcdMeths, tcdSigs, tcdATs, tcdATDefs, [], [])
         pure $
           let (tcdMeths', tcdSigs', tcdATs', tcdATDefs', _, tcdDocs) = partitionBindsAndSigs id where_cls'
@@ -481,22 +528,22 @@ instance HasHaddock (LConDecl GhcPs) where
     trailingConDocs <- do
       nextDocs <-
         inLocRange (locRangeTo (getBufPos (srcSpanStart l_con))) $
-        peekHdkComments getDocNext
+        peekHdkComments mkDocNext
       -- See Note [Trailing comment on constructor declaration]
       let inner_docs_range = locRangeFrom (getBufPos (srcSpanStart l_con)) <>
                              locRangeTo (getBufPos (srcSpanEnd l_con))
       innerDocs <- inLocRange inner_docs_range (peekHdkComments Just)
       if null innerDocs && null nextDocs
         then inLocRange (locRangeFrom (getBufPos (srcSpanEnd l_con))) $
-             takeHdkComments getDocPrev
+             takeHdkComments mkDocPrev
         else return []
     let getConDoc (L l _) = HdkA (getBufSpan l) $ do
           nextDocs <-
             inLocRange (locRangeTo (getBufPos (srcSpanStart l))) $
-            takeHdkComments getDocNext
+            takeHdkComments mkDocNext
           prevDocs <-
             inLocRange (locRangeFrom (getBufPos (srcSpanEnd l))) $
-            takeHdkComments getDocPrev
+            takeHdkComments mkDocPrev
           return $ concatLHsDocString (nextDocs ++ prevDocs ++ trailingConDocs)
         hdk_a_m (HdkA _ m) = m
     hdk_a_m $ case con of
@@ -566,10 +613,10 @@ instance HasHaddock (LConDeclField GhcPs) where
     HdkA (getBufSpan l_fld) $ do
       nextDocs <-
         inLocRange (locRangeTo (getBufPos (srcSpanStart l_fld))) $
-        takeHdkComments getDocNext
+        takeHdkComments mkDocNext
       prevDocs <-
         inLocRange (locRangeFrom (getBufPos (srcSpanEnd l_fld))) $
-        takeHdkComments getDocPrev
+        takeHdkComments mkDocPrev
       let cd_fld_doc = concatLHsDocString (nextDocs ++ prevDocs)
       return $ L l_fld $ case fld of
         ConDeclField { cd_fld_ext, cd_fld_names, cd_fld_type } ->
@@ -616,13 +663,31 @@ instance HasHaddock (LHsType GhcPs) where
             (l_start, l_end) = (srcSpanStart l, srcSpanEnd l)
             before_t = locRangeTo (getBufPos l_start)
             after_t = locRangeFrom (getBufPos l_end)
-        nextDocs <- inLocRange before_t $ takeHdkComments getDocNext
-        prevDocs <- inLocRange after_t $ takeHdkComments getDocPrev
+        nextDocs <- inLocRange before_t $ takeHdkComments mkDocNext
+        prevDocs <- inLocRange after_t $ takeHdkComments mkDocPrev
         let mDoc = concatLHsDocString (nextDocs ++ prevDocs)
         return $ case mDoc of
           Nothing -> t
           Just doc -> HsDocTy noExtField ltype doc
 
+-- | Represents a predicate on BufPos:
+--
+--   LowerLocBound |   BufPos -> Bool
+--   --------------+-----------------
+--   StartOfFile   |   const True
+--   StartLoc p    |   (>= p)
+--
+--  The semigroup instance corresponds to (&&).
+--
+--  We don't use the  BufPos -> Bool  representation
+--  as it would lead to redundant checks.
+--
+--  That is, instead of
+--
+--      (pos >= 20) && (pos >= 30) && (pos >= 40)
+--
+--  We'd rather only do the (>=40) check. So we reify the predicate to make
+--  sure we only check for the most restrictive bound.
 data LowerLocBound = StartOfFile | StartLoc BufPos
 
 instance Semigroup LowerLocBound where
@@ -633,6 +698,24 @@ instance Semigroup LowerLocBound where
 instance Monoid LowerLocBound where
   mempty = StartOfFile
 
+-- | Represents a predicate on BufPos:
+--
+--   UpperLocBound |   BufPos -> Bool
+--   --------------+-----------------
+--   EndOfFile     |   const True
+--   EndLoc p      |   (<= p)
+--
+--  The semigroup instance corresponds to (&&).
+--
+--  We don't use the  BufPos -> Bool  representation
+--  as it would lead to redundant checks.
+--
+--  That is, instead of
+--
+--      (pos <= 40) && (pos <= 30) && (pos <= 20)
+--
+--  We'd rather only do the (<=20) check. So we reify the predicate to make
+--  sure we only check for the most restrictive bound.
 data UpperLocBound = EndOfFile | EndLoc BufPos
 
 instance Semigroup UpperLocBound where
@@ -643,6 +726,14 @@ instance Semigroup UpperLocBound where
 instance Monoid UpperLocBound where
   mempty = EndOfFile
 
+-- | Represents a predicate on the column number.
+--
+--   ColumnBound   |   Int -> Bool
+--   --------------+-----------------
+--   ColumnFrom n  |   (>=n)
+--
+--  The semigroup instance corresponds to (&&).
+--
 newtype ColumnBound = ColumnFrom Int -- n >= 1
 
 instance Semigroup ColumnBound where
@@ -654,9 +745,9 @@ instance Monoid ColumnBound where
 -- | A location range for extracting documentation comments.
 data LocRange =
   LocRange
-    LowerLocBound  -- from
-    UpperLocBound  -- to
-    ColumnBound
+    { loc_range_from :: LowerLocBound,
+      loc_range_to   :: UpperLocBound,
+      loc_range_col  :: ColumnBound }
 
 instance Semigroup LocRange where
   LocRange from1 to1 col1 <> LocRange from2 to2 col2 =
@@ -666,11 +757,11 @@ instance Monoid LocRange where
   mempty = LocRange mempty mempty mempty
 
 locRangeFrom :: Maybe BufPos -> LocRange
-locRangeFrom (Just l) = LocRange (StartLoc l) EndOfFile mempty
+locRangeFrom (Just l) = mempty { loc_range_from = StartLoc l }
 locRangeFrom Nothing = mempty
 
 locRangeTo :: Maybe BufPos -> LocRange
-locRangeTo (Just l) = LocRange StartOfFile (EndLoc l) mempty
+locRangeTo (Just l) = mempty { loc_range_to = EndLoc l }
 locRangeTo Nothing = mempty
 
 inLocRange :: LocRange -> HdkM a -> HdkM a
