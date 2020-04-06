@@ -58,7 +58,6 @@ import Distribution.Types.MungedPackageId
 import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
-import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
@@ -966,10 +965,7 @@ mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
 
--- TODO: This code is duplicated in compiler/main/Packages.hs
-mungePackagePaths :: FilePath -> FilePath
-                  -> InstalledPackageInfo -> InstalledPackageInfo
--- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
+-- | Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
 -- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
 -- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
 -- The "pkgroot" is the directory containing the package database.
@@ -977,7 +973,10 @@ mungePackagePaths :: FilePath -> FilePath
 -- Also perform a similar substitution for the older GHC-specific
 -- "$topdir" variable. The "topdir" is the location of the ghc
 -- installation (obtained from the -B option).
+mungePackagePaths :: FilePath -> FilePath
+                  -> InstalledPackageInfo -> InstalledPackageInfo
 mungePackagePaths top_dir pkgroot pkg =
+   -- TODO: similar code is duplicated in GHC.PackageDb
     pkg {
       importDirs  = munge_paths (importDirs pkg),
       includeDirs = munge_paths (includeDirs pkg),
@@ -985,39 +984,13 @@ mungePackagePaths top_dir pkgroot pkg =
       libraryDynDirs = munge_paths (libraryDynDirs pkg),
       frameworkDirs = munge_paths (frameworkDirs pkg),
       haddockInterfaces = munge_paths (haddockInterfaces pkg),
-                     -- haddock-html is allowed to be either a URL or a file
+      -- haddock-html is allowed to be either a URL or a file
       haddockHTMLs = munge_paths (munge_urls (haddockHTMLs pkg))
     }
   where
     munge_paths = map munge_path
     munge_urls  = map munge_url
-
-    munge_path p
-      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
-      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
-      | otherwise                                = p
-
-    munge_url p
-      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
-      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
-      | otherwise                                   = p
-
-    toUrlPath r p = "file:///"
-                 -- URLs always use posix style '/' separators:
-                 ++ FilePath.Posix.joinPath
-                        (r : -- We need to drop a leading "/" or "\\"
-                             -- if there is one:
-                             dropWhile (all isPathSeparator)
-                                       (FilePath.splitDirectories p))
-
-    -- We could drop the separator here, and then use </> above. However,
-    -- by leaving it in and using ++ we keep the same path separator
-    -- rather than letting FilePath change it to use \ as the separator
-    stripVarPrefix var path = case stripPrefix var path of
-                              Just [] -> Just []
-                              Just cs@(c : _) | isPathSeparator c -> Just cs
-                              _ -> Nothing
-
+    (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
 
 -- -----------------------------------------------------------------------------
 -- Workaround for old single-file style package dbs

@@ -64,6 +64,9 @@ module GHC.PackageDb
    , PackageDbLock
    , lockPackageDb
    , unlockPackageDb
+   -- * Misc
+   , mkMungePathUrl
+   , mungeUnitInfoPaths
    )
 where
 
@@ -81,12 +84,14 @@ import Data.Binary.Put as Bin
 import Data.Binary.Get as Bin
 import Control.Exception as Exception
 import Control.Monad (when)
-import System.FilePath
+import System.FilePath as FilePath
+import qualified System.FilePath.Posix as FilePath.Posix
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
 import GHC.IO.Handle.Lock
 import System.Directory
+import Data.List (stripPrefix)
 
 -- | @ghc-boot@'s UnitInfo, serialized to the database.
 type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
@@ -629,3 +634,70 @@ instance Binary DbInstUnitId where
     case b of
       0 -> DbUnitId <$> get
       _ -> DbInstUnitId <$> get <*> get
+
+
+-- | Return functions to perform path/URL variable substitution as per the Cabal
+-- ${pkgroot} spec
+-- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
+--
+-- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
+-- The "pkgroot" is the directory containing the package database.
+--
+-- Also perform a similar substitution for the older GHC-specific
+-- "$topdir" variable. The "topdir" is the location of the ghc
+-- installation (obtained from the -B option).
+mkMungePathUrl :: FilePath -> FilePath -> (FilePath -> FilePath, FilePath -> FilePath)
+mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
+   where
+    munge_path p
+      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
+      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
+      | otherwise                                = p
+
+    munge_url p
+      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
+      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
+      | otherwise                                   = p
+
+    toUrlPath r p = "file:///"
+                 -- URLs always use posix style '/' separators:
+                 ++ FilePath.Posix.joinPath
+                        (r : -- We need to drop a leading "/" or "\\"
+                             -- if there is one:
+                             dropWhile (all isPathSeparator)
+                                       (FilePath.splitDirectories p))
+
+    -- We could drop the separator here, and then use </> above. However,
+    -- by leaving it in and using ++ we keep the same path separator
+    -- rather than letting FilePath change it to use \ as the separator
+    stripVarPrefix var path = case stripPrefix var path of
+                              Just [] -> Just []
+                              Just cs@(c : _) | isPathSeparator c -> Just cs
+                              _ -> Nothing
+
+
+-- | Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
+-- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
+-- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
+-- The "pkgroot" is the directory containing the package database.
+--
+-- Also perform a similar substitution for the older GHC-specific
+-- "$topdir" variable. The "topdir" is the location of the ghc
+-- installation (obtained from the -B option).
+mungeUnitInfoPaths :: FilePath -> FilePath -> GenericUnitInfo a b c d e f -> GenericUnitInfo a b c d e f
+mungeUnitInfoPaths top_dir pkgroot pkg =
+   -- TODO: similar code is duplicated in utils/ghc-pkg/Main.hs
+    pkg
+      { unitImportDirs          = munge_paths (unitImportDirs pkg)
+      , unitIncludeDirs         = munge_paths (unitIncludeDirs pkg)
+      , unitLibraryDirs         = munge_paths (unitLibraryDirs pkg)
+      , unitLibraryDynDirs      = munge_paths (unitLibraryDynDirs pkg)
+      , unitExtDepFrameworkDirs = munge_paths (unitExtDepFrameworkDirs pkg)
+      , unitHaddockInterfaces   = munge_paths (unitHaddockInterfaces pkg)
+        -- haddock-html is allowed to be either a URL or a file
+      , unitHaddockHTMLs        = munge_paths (munge_urls (unitHaddockHTMLs pkg))
+      }
+   where
+      munge_paths = map munge_path
+      munge_urls  = map munge_url
+      (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
