@@ -132,6 +132,8 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
     -- the entire collection of Ifaces.
 
 {- Note [Plugin dependencies]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Modules for which plugins were used in the compilation process, should be
 recompiled whenever one of those plugins changes. But how do we know if a
 plugin changed from the previous time a module was compiled?
@@ -155,7 +157,7 @@ During recompilation we then compare the hashes of those files again to see
 if anything has changed.
 
 One issue with this approach is that object files are currently (GHC 8.6.1)
-not created fully deterministicly, which could sometimes induce accidental
+not created fully deterministically, which could sometimes induce accidental
 recompilation of a module for which plugins were used in the compile process.
 
 One way to improve this is to either:

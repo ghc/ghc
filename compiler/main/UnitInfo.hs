@@ -10,7 +10,7 @@ module UnitInfo (
         -- $package_naming
 
         -- * UnitId
-        packageConfigId,
+        mkUnit,
         expandedUnitInfoId,
         definiteUnitInfoId,
         installedUnitInfoId,
@@ -152,18 +152,18 @@ pprUnitInfo GenericUnitInfo {..} =
 installedUnitInfoId :: UnitInfo -> InstalledUnitId
 installedUnitInfoId = unitId
 
-packageConfigId :: UnitInfo -> UnitId
-packageConfigId p =
+mkUnit :: UnitInfo -> Unit
+mkUnit p =
     if unitIsIndefinite p
         then mkInstUnit (unitInstanceOf p) (unitInstantiations p)
         else DefUnit (DefUnitId (unitId p))
 
-expandedUnitInfoId :: UnitInfo -> UnitId
+expandedUnitInfoId :: UnitInfo -> Unit
 expandedUnitInfoId p =
     mkInstUnit (unitInstanceOf p) (unitInstantiations p)
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
-    case packageConfigId p of
+    case mkUnit p of
         DefUnit def_uid -> Just def_uid
         _               -> Nothing

@@ -302,11 +302,11 @@ nameIsHomePackageImport this_mod
 
 -- | Returns True if the Name comes from some other package: neither this
 -- package nor the interactive package.
-nameIsFromExternalPackage :: UnitId -> Name -> Bool
-nameIsFromExternalPackage this_pkg name
+nameIsFromExternalPackage :: Unit -> Name -> Bool
+nameIsFromExternalPackage this_unit name
   | Just mod <- nameModule_maybe name
-  , moduleUnit mod /= this_pkg    -- Not this package
-  , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  , moduleUnit mod /= this_unit   -- Not the current unit
+  , not (isInteractiveModule mod) -- Not the 'interactive' package
   = True
   | otherwise
   = False
