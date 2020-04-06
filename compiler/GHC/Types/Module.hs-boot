@@ -4,11 +4,11 @@ import GhcPrelude
 
 data GenModule a
 data ModuleName
-data UnitId
+data Unit
 data InstalledUnitId
 data IndefUnitId
-type Module = GenModule UnitId
+type Module = GenModule Unit
 
 moduleName :: GenModule a -> ModuleName
 moduleUnit :: GenModule a -> a
-unitIdString :: UnitId -> String
+unitString :: Unit -> String
