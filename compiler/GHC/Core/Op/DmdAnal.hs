@@ -152,7 +152,7 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
 dmdAnal' _ _ (Lit lit)     = (emptyDmdType conDiv, Lit lit)
 dmdAnal' _ _ (Type ty)     = (emptyDmdType conDiv, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
-  = (unitDmdType (coercionDmdEnv co), Coercion co)
+  = (DmdType (coercionDmdEnv co) [] conDiv, Coercion co)
 
 dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
@@ -410,7 +410,7 @@ forcesRealWorld fam_envs = go initRecTc
       -- search depth-first
       | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
           <- deepSplitProductType_maybe fam_envs ty
-      -- don't check the same TyCon twice
+      -- don't check the same TyCon more than n times
       , Just rec_tc' <- checkRecTc rec_tc (dataConTyCon dc)
       = any (strict_field_forces rec_tc') field_tys
       | otherwise
@@ -518,19 +518,35 @@ dmdTransform env var dmd
   = dmdTransformDictSelSig (idStrictness var) dmd
 
   | isGlobalId var                               -- Imported function
-  , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  , let res = dmdTransformSig (globalIdStrictness env var) dmd
+  = -- pprTrace "dmdTransform:global" (vcat [ppr var, ppr (idStrictness var), ppr (globalIdStrictness var), ppr dmd, ppr res])
     res
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
   , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+  = -- pprTrace "dmdTransform:local" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
     then fn_ty   -- Don't record top level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
 
   | otherwise                                    -- Local non-letrec-bound thing
-  = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
+  = mkConservativeSig env var (unitVarEnv var (mkOnceUsedDmd dmd))
+
+-- | Returns 'idStrictness' or a conservative strictness signature for an
+-- imported global variable for which 'idStrictness' is Top.
+globalIdStrictness :: AnalEnv -> Id -> StrictSig
+globalIdStrictness env var
+  | isTopSig (idStrictness var) = mkConservativeSig emptyVarEnv env (idType var)
+  | otherwise                   = idStrictness var
+
+mkConservativeSig :: AnalEnv -> VarEnv -> Type -> StrictSig
+mkConservativeSig env ty fvs
+  = tryClearPreciseException fam_envs ty optimistic_sig
+  where
+    fam_envs        = ae_fam_envs env
+    -- This is almost isomorphic to topSig, except for the Divergence!
+    optimistic_sig  = StrictSig $ DmdType fvs optimistic_args conDiv
+    optimistic_args = replicate (length (typeArity ty)) topDmd
 
 {-
 ************************************************************************
@@ -943,9 +959,6 @@ deleted the special case.
 *                                                                      *
 ************************************************************************
 -}
-
-unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] conDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
