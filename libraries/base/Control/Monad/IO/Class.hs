@@ -34,71 +34,35 @@ class (Monad m) => MonadIO m where
     -- (i.e. 'IO' is the base monad for the stack).
     --
     -- === __Example__
-    -- Let us take for example a program that makes use of monad stacks.
-    -- While the point of this example is not to teach monad stacks,
-    -- know that they are useful to combine different capabilities
-    -- provided by different monads: IO operations such as output functions
-    -- for the 'IO' Monad, and state manipulation for the 'State' Monad.
-    --
-    -- The following program shows basic state manipulation and IO output sewn together
-    -- by the use of a monad stack:
     --
     -- @
-    -- {-\# LANGUAGE ConstraintKinds   \#-}
-    -- {-\# LANGUAGE FlexibleContexts  \#-}
-    -- {-\# LANGUAGE OverloadedStrings \#-}
+    -- import Control.Monad.Trans.State -- from the "transformers" library
     --
-    -- module LiftExample
-    --     ( someFunc
-    --     ) where
-    --
-    -- import           Control.Monad.IO.Class
-    -- import           Control.Monad.State
-    -- import           Data.Text              (Text)
-    -- import qualified Data.Text.IO           as T
-    --
-    -- data AppState = AppState {msg :: Text}
-    --
-    -- type StateIO m = (MonadState AppState m, MonadIO m)
-    --
-    -- initialState = AppState "Hello"
-    --
-    -- runExample :: MonadIO m => m AppState
-    -- runExample = evalStateT interpreter initialState
-    --
-    -- interpreter :: StateIO m => m AppState
-    -- interpreter = do
-    --   outputMessage
-    --   put $ AppState{msg = "World"}
-    --   outputMessage
-    --   get >>= return
-    --
-    -- outputMessage :: (StateIO m) => m ()
-    -- outputMessage = do
-    --   message <- gets msg
-    --   liftIO $ T.putStrLn message
+    -- printState :: Show s => StateT s IO ()
+    -- printState = do
+    --   state <- get
+    --   liftIO $ print state
     -- @
     --
-    -- Although certainly more complex than a one-liner, the main focus of this example
-    -- is its last line. Had we ommitted @'liftIO'@, we would have ended up with this error:
+    -- Had we omitted @'liftIO'@, we would have ended up with this error:
     --
     -- @
-    --     • Couldn't match type ‘m’ with ‘IO’
-    --      ‘m’ is a rigid type variable bound by
-    --        the type signature for:
-    --          outputMessage :: forall (m :: * -> *). StateIO m => m ()
-    --      Expected type: m ()
-    --        Actual type: IO ()
+    -- • Couldn't match type ‘IO’ with ‘StateT s IO’
+    --   Expected type: StateT s IO ()
+    --     Actual type: IO ()
     -- @
     --
-    -- The important part here is the mismatch between @m ()@ and @'IO' ()@.
-    -- Luckily, we know of a function that takes an @'IO' a@ and returns a @m a@: @'liftIO'@.
+    -- The important part here is the mismatch between @StateT s IO ()@ and @'IO' ()@.
+    --
+    -- Luckily, we know of a function that takes an @'IO' a@ and returns an @(m a)@: @'liftIO'@.
     -- Which enables us to run the program and see the expect results:
     --
     -- @
-    -- λ❯ someFunc
-    -- Hello
-    -- World
+    -- λ❯ evalStateT printState "hello"
+    -- "hello"
+    --
+    -- λ❯ evalStateT printState 3
+    -- 3
     -- @
     --
     liftIO :: IO a -> m a
