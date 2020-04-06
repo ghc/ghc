@@ -40,6 +40,11 @@ Highlights
     GHC is now able to detect the case alt returning 3 as redundant.
   - Some more performance improvements in edge cases.
 
+* Windows: Use the larg address space allocator.
+
+  This improves runtime but causes increased memory usage on Windows versions
+  older than Win 8.1/Server 2012.
+
 Full details
 ------------
 
@@ -165,6 +170,12 @@ Runtime system
 
 - Support for Windows Vista has been dropped. GHC-compiled programs now require
   Windows 7 or later.
+
+- Windows now uses the large address space allocator by default.
+  In extreme cases we saw improvements by up to 3% decreased runtime.
+
+  The downside is that haskell apps run on older (Pre Win-8.1/Server 2012)
+  systems will have higher memory footprints.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
