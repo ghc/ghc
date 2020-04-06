@@ -396,13 +396,11 @@ lookupUnit dflags = lookupUnit' (isIndefinite dflags) (unitInfoMap (pkgState dfl
 -- just a 'UnitInfoMap' rather than a 'DynFlags' (so it can
 -- be used while we're initializing 'DynFlags'
 lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
-lookupUnit' False (UnitInfoMap pkg_map _) uid = lookupUDFM pkg_map uid
-lookupUnit' True m@(UnitInfoMap pkg_map _) uid =
-    case getUnitInstantiations uid of
-        (iuid, Just indef) ->
-            fmap (renamePackage m (instUnitInsts indef))
-                 (lookupUDFM pkg_map iuid)
-        (_, Nothing) -> lookupUDFM pkg_map uid
+lookupUnit' False (UnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
+lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
+   DefUnit {} -> lookupUDFM pkg_map uid
+   InstUnit i -> fmap (renamePackage m (instUnitInsts i))
+                      (lookupUDFM pkg_map (instUnitInstanceOf i))
 
 {-
 -- | Find the indefinite package for a given 'IndefUnitId'.
@@ -723,8 +721,9 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
            reqs | UnitIdArg orig_uid <- arg = collectHoles orig_uid
                 | otherwise                 = Map.empty
 
-           collectHoles uid = case getUnitInstantiations uid of
-                (_, Just indef) ->
+           collectHoles uid = case uid of
+             DefUnit {}     -> Map.empty -- definite units don't have holes
+             InstUnit indef ->
                   let local = [ Map.singleton
                                   (moduleName mod)
                                   (Set.singleton $ Module indef mod_name)
@@ -733,9 +732,6 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                       recurse = [ collectHoles (moduleUnit mod)
                                 | (_, mod) <- instUnitInsts indef ]
                   in Map.unionsWith Set.union $ local ++ recurse
-                -- Other types of unit identities don't have holes
-                (_, Nothing) -> Map.empty
-
 
            uv = UnitVisibility
                 { uv_expose_all = b
@@ -799,12 +795,14 @@ findPackages prec_map pkg_db arg pkgs unusable
           then Just p
           else Nothing
     finder (UnitIdArg uid) p
-      = let (iuid, mb_indef) = getUnitInstantiations uid
-        in if iuid == installedUnitInfoId p
-              then Just (case mb_indef of
-                            Nothing    -> p
-                            Just indef -> renamePackage pkg_db (instUnitInsts indef) p)
-              else Nothing
+      = case uid of
+          DefUnit (DefUnitId iuid)
+            | iuid == installedUnitInfoId p
+            -> Just p
+          InstUnit inst
+            | indefUnitId (instUnitInstanceOf inst) == installedUnitInfoId p
+            -> Just (renamePackage pkg_db (instUnitInsts inst) p)
+          _ -> Nothing
 
 selectPackages :: PackagePrecedenceIndex -> PackageArg -> [UnitInfo]
                -> UnusablePackages
