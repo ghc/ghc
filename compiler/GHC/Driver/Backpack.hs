@@ -96,7 +96,7 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == IndefUnitId (InstalledUnitId (fsLit "main")) Nothing
+                            then if cid == IndefUnitId (UnitId (fsLit "main")) Nothing
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
@@ -174,12 +174,12 @@ withBkpSession cid insts deps session_type do_this = do
                         _ -> hscTarget dflags,
         thisUnitIdInsts_ = Just insts,
         thisComponentId_ = Just cid,
-        thisInstalledUnitId =
+        thisUnitId =
             case session_type of
-                TcSession -> newInstalledUnitId cid Nothing
+                TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
-                _ | null insts -> newInstalledUnitId cid Nothing
-                  | otherwise  -> newInstalledUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
+                _ | null insts -> newUnitId cid Nothing
+                  | otherwise  -> newUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
         -- Setup all of the output directories according to our hierarchy
         objectDir   = Just (outdir objectDir),
         hiDir       = Just (outdir hiDir),
@@ -206,7 +206,7 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (IndefUnitId (InstalledUnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
+    withBkpSession (IndefUnitId (UnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
 
 getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
@@ -233,7 +233,7 @@ compileUnit cid insts = do
 -- The @include_sigs@ parameter controls whether or not we also
 -- include @dependency signature@ declarations in this calculation.
 --
--- Invariant: this NEVER returns InstalledUnitId.
+-- Invariant: this NEVER returns UnitId.
 hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(Unit, ModRenaming)]
 hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
   where
@@ -313,7 +313,7 @@ buildUnit session cid insts lunit = do
             unitPackageId = PackageId compat_fs,
             unitPackageName = compat_pn,
             unitPackageVersion = makeVersion [],
-            unitId = toInstalledUnitId (thisPackage dflags),
+            unitId = toUnitId (thisPackage dflags),
             unitComponentName = Nothing,
             unitInstanceOf = cid,
             unitInstantiations = insts,
@@ -327,7 +327,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toInstalledUnitId . unwireUnit dflags)
+                        _ -> map (toUnitId . unwireUnit dflags)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -820,7 +820,7 @@ hsModuleToModSummary pn hsc_src modname
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
-newInstalledUnitId :: IndefUnitId -> Maybe FastString -> InstalledUnitId
-newInstalledUnitId uid mhash = case mhash of
+newUnitId :: IndefUnitId -> Maybe FastString -> UnitId
+newUnitId uid mhash = case mhash of
    Nothing   -> indefUnitId uid
-   Just hash -> InstalledUnitId (installedUnitIdFS (indefUnitId uid) `appendFS` mkFastString "+" `appendFS` hash)
+   Just hash -> UnitId (installedUnitIdFS (indefUnitId uid) `appendFS` mkFastString "+" `appendFS` hash)

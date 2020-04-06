@@ -60,7 +60,7 @@ codeOutput :: DynFlags
            -> ForeignStubs
            -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with with the C compiler
-           -> [InstalledUnitId]
+           -> [UnitId]
            -> Stream IO RawCmmGroup a                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
@@ -120,7 +120,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
-        -> [InstalledUnitId]
+        -> [UnitId]
         -> IO a
 
 outputC dflags filenm cmm_stream packages

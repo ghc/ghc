@@ -442,7 +442,7 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
              | otherwise  = dep_finsts deps
 
       pkg = moduleUnit (mi_module iface)
-      ipkg = toInstalledUnitId pkg
+      ipkg = toUnitId pkg
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]

@@ -5,7 +5,7 @@ import GhcPrelude
 data GenModule a
 data ModuleName
 data Unit
-data InstalledUnitId
+data UnitId
 data IndefUnitId
 type Module = GenModule Unit
 

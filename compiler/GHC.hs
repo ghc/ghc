@@ -594,7 +594,7 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags'' <- liftIO $ interpretPackageEnv dflags'
@@ -643,7 +643,7 @@ setSessionDynFlags dflags = do
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
 -- 'load' is called.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
 -- | Set the action taken when the compiler produces a message.  This
@@ -655,7 +655,7 @@ setLogAction action = do
   void $ setProgramDynFlags_ False $
     dflags' { log_action = action }
 
-setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [InstalledUnitId]
+setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [UnitId]
 setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
@@ -1545,7 +1545,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set InstalledUnitId)
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set UnitId)
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

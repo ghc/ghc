@@ -40,8 +40,8 @@ module GHC.Types.Module
         InstantiatedUnit(..),
         instUnitToUnit,
         instModuleToModule,
-        InstalledUnitId(..),
-        toInstalledUnitId,
+        UnitId(..),
+        toUnitId,
         ShHoleSubst,
 
         unitIsDefinite,
@@ -104,8 +104,8 @@ module GHC.Types.Module
         installedModuleEq,
         installedUnitIdEq,
         installedUnitIdString,
-        fsToInstalledUnitId,
-        stringToInstalledUnitId,
+        fsToUnitId,
+        stringToUnitId,
         emptyInstalledModuleEnv,
         lookupInstalledModuleEnv,
         extendInstalledModuleEnv,
@@ -173,7 +173,7 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId, getPackageState, PackageState, unitInfoMap)
+import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayUnitId, getPackageState, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -194,7 +194,7 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 -- 'IndefUnitId's.
 --      - Same as Distribution.Package.IndefUnitId
 --
--- UnitId/InstalledUnitId: A IndefUnitId + a mapping from hole names
+-- UnitId/UnitId: A IndefUnitId + a mapping from hole names
 -- (ModuleName) to Modules.  This is how the compiler identifies instantiated
 -- components, and also is the main identifier by which GHC identifies things.
 --      - When Backpack is not being used, UnitId = IndefUnitId.
@@ -206,12 +206,12 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 --      - The same as PackageKey in GHC 7.10 (we renamed it because
 --        they don't necessarily identify packages anymore.)
 --      - Same as -this-package-key/-package-name flags
---      - An InstalledUnitId corresponds to an actual package which
+--      - An UnitId corresponds to an actual package which
 --        we have installed on disk.  It could be definite or indefinite,
 --        but if it's indefinite, it has nothing instantiated (we
 --        never install partially instantiated units.)
 --
--- Module/InstalledModule: A UnitId/InstalledUnitId + ModuleName. This is how
+-- Module/InstalledModule: A UnitId/UnitId + ModuleName. This is how
 -- the compiler identifies modules (e.g. a Name is a Module + OccName)
 --      - Same as Language.Haskell.TH.Syntax:Module
 --
@@ -420,8 +420,8 @@ data GenModule unit = Module
 type Module = GenModule Unit
 
 -- | A 'InstalledModule' is a 'Module' whose unit is identified with an
--- 'InstalledUnitId'.
-type InstalledModule = GenModule InstalledUnitId
+-- 'UnitId'.
+type InstalledModule = GenModule UnitId
 
 -- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
 type InstantiatedModule = GenModule InstantiatedUnit
@@ -505,10 +505,10 @@ class HasModule m where
 -- IndefUnitId
 -----------------------------------------------------------------------
 
--- | An 'IndefUnitId' is an 'InstalledUnitId' with the invariant that it only
+-- | An 'IndefUnitId' is an 'UnitId' with the invariant that it only
 -- refers to an indefinite library; i.e., one that can be instantiated.
 data IndefUnitId = IndefUnitId
-   { indefUnitId        :: InstalledUnitId   -- ^ Unit id
+   { indefUnitId        :: UnitId   -- ^ Unit id
    , indefUnitIdPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
 
@@ -692,44 +692,44 @@ instModuleToModule pkgstate (Module iuid mod_name) =
 --
 -- Installed unit identifiers look something like @p+af23SAj2dZ219@,
 -- or maybe just @p@ if they don't use Backpack.
-newtype InstalledUnitId =
-    InstalledUnitId {
+newtype UnitId =
+    UnitId {
       -- | The full hashed unit identifier, including the component id
       -- and the hash.
       installedUnitIdFS :: FastString
     }
 
-instance Binary InstalledUnitId where
-  put_ bh (InstalledUnitId fs) = put_ bh fs
-  get bh = do fs <- get bh; return (InstalledUnitId fs)
+instance Binary UnitId where
+  put_ bh (UnitId fs) = put_ bh fs
+  get bh = do fs <- get bh; return (UnitId fs)
 
-instance Eq InstalledUnitId where
+instance Eq UnitId where
     uid1 == uid2 = installedUnitIdKey uid1 == installedUnitIdKey uid2
 
-instance Ord InstalledUnitId where
+instance Ord UnitId where
     u1 `compare` u2 = installedUnitIdFS u1 `compare` installedUnitIdFS u2
 
-instance Uniquable InstalledUnitId where
+instance Uniquable UnitId where
     getUnique = installedUnitIdKey
 
-instance Outputable InstalledUnitId where
-    ppr uid@(InstalledUnitId fs) =
+instance Outputable UnitId where
+    ppr uid@(UnitId fs) =
         getPprStyle $ \sty ->
         sdocWithDynFlags $ \dflags ->
-          case displayInstalledUnitId (getPackageState dflags) uid of
+          case displayUnitId (getPackageState dflags) uid of
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
 
-installedUnitIdKey :: InstalledUnitId -> Unique
+installedUnitIdKey :: UnitId -> Unique
 installedUnitIdKey = getUnique . installedUnitIdFS
 
--- | Return the InstalledUnitId of the Unit. For instantiated units, return the
--- InstalledUnitId of the indefinite unit this unit is an instance of.
-toInstalledUnitId :: Unit -> InstalledUnitId
-toInstalledUnitId (DefUnit (DefUnitId iuid)) = iuid
-toInstalledUnitId (InstUnit indef)           = indefUnitId (instUnitInstanceOf indef)
+-- | Return the UnitId of the Unit. For instantiated units, return the
+-- UnitId of the indefinite unit this unit is an instance of.
+toUnitId :: Unit -> UnitId
+toUnitId (DefUnit (DefUnitId iuid)) = iuid
+toUnitId (InstUnit indef)           = indefUnitId (instUnitInstanceOf indef)
 
-installedUnitIdString :: InstalledUnitId -> String
+installedUnitIdString :: UnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
 
 instance Outputable InstantiatedUnit where
@@ -747,11 +747,11 @@ instance Outputable InstantiatedUnit where
       cid   = instUnitInstanceOf uid
       insts = instUnitInsts uid
 
-fsToInstalledUnitId :: FastString -> InstalledUnitId
-fsToInstalledUnitId fs = InstalledUnitId fs
+fsToUnitId :: FastString -> UnitId
+fsToUnitId fs = UnitId fs
 
-stringToInstalledUnitId :: String -> InstalledUnitId
-stringToInstalledUnitId = fsToInstalledUnitId . mkFastString
+stringToUnitId :: String -> UnitId
+stringToUnitId = fsToUnitId . mkFastString
 
 -- | Test if a 'Module' corresponds to a given 'InstalledModule',
 -- modulo instantiation.
@@ -759,15 +759,15 @@ installedModuleEq :: InstalledModule -> Module -> Bool
 installedModuleEq imod mod =
     fst (getModuleInstantiation mod) == imod
 
--- | Test if a 'Unit' corresponds to a given 'InstalledUnitId',
+-- | Test if a 'Unit' corresponds to a given 'UnitId',
 -- modulo instantiation.
-installedUnitIdEq :: InstalledUnitId -> Unit -> Bool
-installedUnitIdEq iuid uid = toInstalledUnitId uid == iuid
+installedUnitIdEq :: UnitId -> Unit -> Bool
+installedUnitIdEq iuid uid = toUnitId uid == iuid
 
--- | A 'DefUnitId' is an 'InstalledUnitId' with the invariant that
+-- | A 'DefUnitId' is an 'UnitId' with the invariant that
 -- it only refers to a definite library; i.e., one we have generated
 -- code for.
-newtype DefUnitId = DefUnitId { unDefUnitId :: InstalledUnitId }
+newtype DefUnitId = DefUnitId { unDefUnitId :: UnitId }
     deriving (Eq, Ord)
 
 instance Outputable DefUnitId where
@@ -799,7 +799,7 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 -- Note [InstUnit to DefUnit improvement]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Just because a UnitId is definite (has no holes) doesn't
--- mean it's necessarily a InstalledUnitId; it could just be
+-- mean it's necessarily a UnitId; it could just be
 -- that over the course of renaming UnitIds on the fly
 -- while typechecking an indefinite library, we
 -- ended up with a fully instantiated unit id with no hash,
@@ -919,7 +919,7 @@ instance Binary IndefUnitId where
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnit :: FastString -> Unit
-fsToUnit = DefUnit . DefUnitId . InstalledUnitId
+fsToUnit = DefUnit . DefUnitId . UnitId
 
 stringToUnit :: String -> Unit
 stringToUnit = fsToUnit . mkFastString
@@ -995,7 +995,7 @@ getModuleInstantiation m =
         fmap (\iuid -> Module iuid (moduleName m)) mb_iuid)
 
 -- | Return the unit-id this unit is an instance of and the module instantiations (if any).
-getUnitInstantiations :: Unit -> (InstalledUnitId, Maybe InstantiatedUnit)
+getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
 getUnitInstantiations (InstUnit iuid)           = (indefUnitId (instUnitInstanceOf iuid), Just iuid)
 getUnitInstantiations (DefUnit (DefUnitId uid)) = (uid, Nothing)
 
@@ -1019,17 +1019,17 @@ parseUnit = parseInstUnitId <++ parseDefUnitId
         insts <- parseModSubst
         return (mkInstUnit uid insts)
     parseDefUnitId = do
-        s <- parseInstalledUnitId
+        s <- parseUnitId
         return (DefUnit (DefUnitId s))
 
-parseInstalledUnitId :: ReadP InstalledUnitId
-parseInstalledUnitId = do
+parseUnitId :: ReadP UnitId
+parseUnitId = do
    s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
-   return (InstalledUnitId (mkFastString s))
+   return (UnitId (mkFastString s))
 
 parseIndefUnitId :: ReadP IndefUnitId
 parseIndefUnitId = do
-   uid <- parseInstalledUnitId
+   uid <- parseUnitId
    return (IndefUnitId uid Nothing)
 
 parseModuleId :: ReadP Module

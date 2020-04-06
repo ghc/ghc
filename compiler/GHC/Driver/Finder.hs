@@ -246,7 +246,7 @@ modLocationCache hsc_env mod do_this = do
 
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
-  let iuid = thisInstalledUnitId dflags
+  let iuid = thisUnitId dflags
   in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
@@ -809,7 +809,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
     build_tag = buildTag dflags
     pkgstate = pkgState dflags
 
-    looks_like_srcpkgid :: InstalledUnitId -> SDoc
+    looks_like_srcpkgid :: UnitId -> SDoc
     looks_like_srcpkgid pk
      -- Unsafely coerce a unit id (i.e. an installed package component
      -- identifier) into a PackageId and see if it means anything.

@@ -523,7 +523,7 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisInstalledUnitId   :: InstalledUnitId,              -- ^ Target unit-id
+  thisUnitId   :: UnitId,              -- ^ Target unit-id
   thisComponentId_      :: Maybe IndefUnitId,            -- ^ Unit-id to instantiate
   thisUnitIdInsts_      :: Maybe [(ModuleName, Module)], -- ^ How to instantiate the unit-id above
 
@@ -1325,7 +1325,7 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        thisInstalledUnitId     = toInstalledUnitId mainUnitId,
+        thisUnitId     = toUnitId mainUnitId,
         thisUnitIdInsts_        = Nothing,
         thisComponentId_        = Nothing,
 
@@ -1984,7 +1984,7 @@ thisPackage dflags =
           | otherwise
           -> default_uid
   where
-    default_uid = DefUnit (DefUnitId (thisInstalledUnitId dflags))
+    default_uid = DefUnit (DefUnitId (thisUnitId dflags))
 
 parseUnitInsts :: String -> [(ModuleName, Module)]
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
@@ -2003,7 +2003,7 @@ setUnitIdInsts s d =
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
-    d { thisComponentId_ = Just (IndefUnitId (InstalledUnitId (fsLit s)) Nothing) }
+    d { thisComponentId_ = Just (IndefUnitId (UnitId (fsLit s)) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -4589,7 +4589,7 @@ parseUnitArg =
     fmap UnitIdArg parseUnit
 
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p d = d { thisInstalledUnitId = stringToInstalledUnitId p }
+setUnitId p d = d { thisUnitId = stringToUnitId p }
 
 -- | Given a 'ModuleName' of a signature in the home library, find
 -- out how it is instantiated.  E.g., the canonical form of

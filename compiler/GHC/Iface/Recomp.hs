@@ -209,7 +209,7 @@ checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
-       -- readIface will have verified that the InstalledUnitId matches,
+       -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; if moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
@@ -463,7 +463,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if toInstalledUnitId pkg `notElem` (map fst prev_dep_pkgs)
+           -> if toUnitId pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
