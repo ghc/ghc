@@ -532,7 +532,9 @@ data UnitPprInfo = UnitPprInfo
 instance Outputable UnitPprInfo where
   ppr pprinfo = text $ mconcat
       [ unitPprPackageName pprinfo
-      , "-" ++ showVersion (unitPprPackageVersion pprinfo)
+      , case unitPprPackageVersion pprinfo of
+         Version [] [] -> ""
+         version       -> "-" ++ showVersion version
       , case unitPprComponentName pprinfo of
          Nothing    -> ""
          Just cname -> ":" ++ cname
