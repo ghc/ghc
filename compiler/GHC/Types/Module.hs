@@ -75,7 +75,6 @@ module GHC.Types.Module
         parseModSubst,
 
         -- * Wired-in UnitIds
-        -- $wired_in_packages
         primUnitId,
         integerUnitId,
         baseUnitId,
@@ -176,77 +175,193 @@ import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayUnitId, getPackageState, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Unit IDs, installed package IDs, ABI hashes, package names,
--- versions, there are a *lot* of different identifiers for closely
--- related things.  What do they all mean? Here's what.  (See also
--- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/packages/concepts )
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- THE IMPORTANT ONES
+-- Haskell users are used to manipulate Cabal packages. These packages are
+-- identified by:
+--    - a package name :: String
+--    - a package version :: Version
+--    - (a revision number, when they are registered on Hackage)
 --
--- IndefUnitId: An opaque identifier provided by Cabal, which should
--- uniquely identify such things as the package name, the package
--- version, the name of the component, the hash of the source code
--- tarball, the selected Cabal flags, GHC flags, direct dependencies of
--- the component.  These are very similar to InstalledPackageId, but
--- an 'InstalledPackageId' implies that it identifies a package, while
--- a package may install multiple components with different
--- 'IndefUnitId's.
---      - Same as Distribution.Package.IndefUnitId
+-- Cabal packages may contain several components (libraries, programs,
+-- testsuites). In GHC we are mostly interested in libraries because those are
+-- the components that can be depended upon by other components. Components in a
+-- package are identified by their component name. Historically only one library
+-- component was allowed per package, hence it didn't need a name. For this
+-- reason, component name may be empty for one library component in each
+-- package:
+--    - a component name :: Maybe String
 --
--- UnitId/UnitId: A IndefUnitId + a mapping from hole names
--- (ModuleName) to Modules.  This is how the compiler identifies instantiated
--- components, and also is the main identifier by which GHC identifies things.
---      - When Backpack is not being used, UnitId = IndefUnitId.
---        this means a useful fiction for end-users is that there are
---        only ever IndefUnitIds, and some IndefUnitIds happen to have
---        more information (UnitIds).
---      - Same as Language.Haskell.TH.Syntax:PkgName, see
---          https://gitlab.haskell.org/ghc/ghc/issues/10279
---      - The same as PackageKey in GHC 7.10 (we renamed it because
---        they don't necessarily identify packages anymore.)
---      - Same as -this-package-key/-package-name flags
---      - An UnitId corresponds to an actual package which
---        we have installed on disk.  It could be definite or indefinite,
---        but if it's indefinite, it has nothing instantiated (we
---        never install partially instantiated units.)
+-- UnitId
+-- ------
 --
--- Module/InstalledModule: A UnitId/UnitId + ModuleName. This is how
--- the compiler identifies modules (e.g. a Name is a Module + OccName)
---      - Same as Language.Haskell.TH.Syntax:Module
+-- Cabal libraries can be compiled in various ways (different compiler options
+-- or Cabal flags, different dependencies, etc.), hence using package name,
+-- package version and component name isn't enough to identify a built library.
+-- We use another identifier called UnitId:
 --
--- THE LESS IMPORTANT ONES
+--   package name             \
+--   package version          |                       ________
+--   component name           | hash of all this ==> | UnitId |
+--   Cabal flags              |                       --------
+--   compiler options         |
+--   dependencies' UnitId     /
 --
--- PackageName: The "name" field in a Cabal file, something like "lens".
---      - Same as Distribution.Package.PackageName
---      - DIFFERENT FROM Language.Haskell.TH.Syntax:PkgName, see
---          https://gitlab.haskell.org/ghc/ghc/issues/10279
---      - DIFFERENT FROM -package-name flag
---      - DIFFERENT FROM the 'name' field in an installed package
---        information.  This field could more accurately be described
---        as a munged package name: when it's for the main library
---        it is the same as the package name, but if it's an internal
---        library it's a munged combination of the package name and
---        the component name.
+-- Fortunately GHC doesn't have to generate these UnitId: they are provided by
+-- external build tools (e.g. Cabal) with `-this-unit-id` command-line flag.
 --
--- LEGACY ONES
+-- UnitIds are important because they are used to generate internal names
+-- (symbols, etc.).
 --
--- InstalledPackageId: This is what we used to call IndefUnitId.
--- It's a still pretty useful concept for packages that have only
--- one library; in that case the logical InstalledPackageId =
--- IndefUnitId.  Also, the Cabal nix-local-build continues to
--- compute an InstalledPackageId which is then forcibly used
--- for all components in a package.  This means that if a dependency
--- from one component in a package changes, the InstalledPackageId
--- changes: you don't get as fine-grained dependency tracking,
--- but it means your builds are hermetic.  Eventually, Cabal will
--- deal completely in components and we can get rid of this.
+-- Wired-in units
+-- --------------
 --
--- PackageKey: This is what we used to call UnitId.  We ditched
--- "Package" from the name when we realized that you might want to
--- assign different "PackageKeys" to components from the same package.
--- (For a brief, non-released period of time, we also called these
--- UnitKeys).
+-- Certain libraries are known to the compiler, in that we know about certain
+-- entities that reside in these libraries. The compiler needs to declare static
+-- Modules and Names that refer to units built from these libraries.
+--
+-- Hence UnitIds of wired-in libraries are fixed. Instead of letting Cabal chose
+-- the UnitId for these libraries, their .cabal file use the following stanza to
+-- force it to a specific value:
+--
+--    ghc-options: -this-unit-id ghc-prim    -- taken from ghc-prim.cabal
+--
+-- The RTS also uses entities of wired-in units by directly referring to symbols
+-- such as "base_GHCziIOziException_heapOverflow_closure" where the prefix is
+-- the UnitId of "base" unit.
+--
+-- Unit databases
+-- --------------
+--
+-- Units are stored in databases in order to be reused by other codes:
+--
+--    UnitKey ---> UnitInfo { exposed modules, package name, package version
+--                            component name, various file paths,
+--                            dependencies :: [UnitKey], etc. }
+--
+-- Because of the wired-in units described above, we can't exactly use UnitIds
+-- as UnitKeys in the database: if we did this, we could only have a single unit
+-- (compiled library) for each wired-in library. As we want to support several
+-- units for the same wired-in library, we do this:
+--
+--    * for non wired-in units:
+--       * UnitId = UnitKey = Identifier (hash) computed by Cabal
+--
+--    * for wired-in units:
+--       * UnitKey = Identifier computed by Cabal (just like for non wired-in units)
+--       * UnitId  = unit-id specified with -this-unit-id command-line flag
+--
+-- We can expose several units to GHC via the `package-id <UnitKey>`
+-- command-line parameter. We must use the UnitKeys of the units so that GHC can
+-- find them in the database.
+--
+-- GHC then replaces the UnitKeys with UnitIds by taking into account wired-in
+-- units: these units are detected thanks to their UnitInfo (especially their
+-- package name).
+--
+-- For example, knowing that "base", "ghc-prim" and "rts" are wired-in packages,
+-- the following dependency graph expressed with UnitKeys (as found in the
+-- database) will be transformed into a similar graph expressed with UnitIds
+-- (that are what matters for compilation):
+--
+--    UnitKeys
+--    ~~~~~~~~                             ---> rts-1.0-hashABC <--
+--                                         |                      |
+--                                         |                      |
+--    foo-2.0-hash123 --> base-4.1-hashXYZ ---> ghc-prim-0.5.3-hashABC
+--
+--    UnitIds
+--    ~~~~~~~                              ---> rts <--
+--                                         |          |
+--                                         |          |
+--    foo-2.0-hash123 --> base ---------------> ghc-prim
+--
+--
+-- Module signatures / indefinite units / instantiated units
+-- ---------------------------------------------------------
+--
+-- GHC distinguishes two kinds of units:
+--
+--    * definite: units for which every module has an associated code object
+--    (i.e. real compiled code in a .o/.a/.so/.dll/...)
+--
+--    * indefinite: units for which some modules are replaced by module
+--    signatures.
+--
+-- Module signatures are a kind of interface (similar to .hs-boot files). They
+-- are used in place of some real code. GHC allows real modules from other
+-- units to be used to fill these module holes.
+--
+-- You can think of this as polymorphism at the module level: module signatures
+-- give constraints on the "type" of module that can be used to fill the hole
+-- (where "type" means types of the entitites it exports, etc.)
+--
+-- Module signatures contain enough information (datatypes, abstract types, type
+-- synonyms, classes, etc.) to typecheck modules depending on them but not
+-- enough to compile them. As such, indefinite units found in databases only
+-- provide module interfaces (the .hi ones this time), not object code.
+--
+-- To distinguish between indefinite and finite unit ids at the type level, we
+-- respectively use 'IndefUnitId' and 'DefUnitId' datatypes that are basically
+-- wrappers over a UnitId.
+--
+-- Unit instantiation
+-- ------------------
+--
+-- Indefinite units can be instantiated with modules from other units. The
+-- instantiating units can also be instantiated themselves (if there are
+-- indefinite) and so on. The 'Unit' datatype represents a unit which may have
+-- been instantiated:
+--
+--    data Unit = DefUnit DefUnitId
+--              | InstUnit InstantiatedUnit
+--
+-- 'InstantiatedUnit' has two interesting fields:
+--
+--    * instUnitInstanceOf :: IndefUnitId
+--       -- ^ the indefinite unit that is instantiated
+--
+--    * instUnitInsts :: [(ModuleName,(Unit,ModuleName)]
+--       -- ^ a list of instantiations where an instantiation is:
+--            (module hole name, (instantiating unit, instantiating module name))
+--
+-- A 'Unit' may be indefinite or definite, it depends on whether some holes
+-- remain in the instantiated unit OR in the instantiating units (recursively).
+--
+-- Pretty-printing UnitId
+-- ----------------------
+--
+-- GHC mostly deals with UnitIds which are some opaque strings. We could display
+-- them when we pretty-print a module origin, a name, etc. But it wouldn't be
+-- very friendly to the user because of the hash they usually contain. E.g.
+--
+--    foo-4.18.1:thelib-XYZsomeUglyHashABC
+--
+-- Instead when we want to pretty-print a 'UnitId' we query the database to
+-- get the 'UnitInfo' and print something nicer to the user:
+--
+--    foo-4.18.1:thelib
+--
+-- We do the same for wired-in units.
+--
+-- Currently (2020-04-06), we don't thread the database into every function that
+-- pretty-prints a Name/Module/Unit. Instead querying the database is delayed
+-- until the `SDoc` is transformed into a `Doc` using the database that is
+-- active at this point in time. This is an issue because we want to be able to
+-- unload units from the database and we also want to support several
+-- independent databases loaded at the same time (see #14335). The alternatives
+-- we have are:
+--
+--    * threading the database into every function that pretty-prints a UnitId
+--    for the user (directly or indirectly).
+--
+--    * storing enough info to correctly display a UnitId into the UnitId
+--    datatype itself. This is done in the IndefUnitId wrapper (see
+--    'UnitPprInfo' datatype) but not for every 'UnitId'. Statically defined
+--    'UnitId' for wired-in units would have empty UnitPprInfo so we need to
+--    find some places to update them if we want to display wired-in UnitId
+--    correctly. This leads to a solution similar to the first one above.
+--
 
 {-
 ************************************************************************
