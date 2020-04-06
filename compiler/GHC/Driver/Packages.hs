@@ -243,18 +243,19 @@ originEmpty :: ModuleOrigin -> Bool
 originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
--- | 'UniqFM' map from 'UnitId'
-type UnitIdMap = UniqDFM
+-- | Map from 'UnitId' to 'UnitInfo', plus
+-- the transitive closure of preload units.
+data UnitInfoMap = UnitInfoMap
+   { unUnitInfoMap :: UniqDFM UnitInfo
+      -- ^ Map from 'UnitId' to 'UnitInfo'
 
--- | 'UniqFM' map from 'UnitId' to 'UnitInfo', plus
--- the transitive closure of preload packages.
-data UnitInfoMap = UnitInfoMap {
-        unUnitInfoMap :: UnitIdMap UnitInfo,
-        -- | The set of transitively reachable packages according
-        -- to the explicitly provided command line arguments.
-        -- See Note [InstUnit to DefUnit improvement]
-        preloadClosure :: UniqSet UnitId
-    }
+   , preloadClosure :: UniqSet UnitId
+     -- ^ The set of transitively reachable units according
+     -- to the explicitly provided command line arguments.
+     -- A fully instantiated InstUnit may only be replaced by a DefUnit from
+     -- this set.
+     -- See Note [InstUnit to DefUnit improvement]
+   }
 
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
 type VisibilityMap = Map Unit UnitVisibility
