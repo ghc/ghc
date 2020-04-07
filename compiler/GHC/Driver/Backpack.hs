@@ -137,7 +137,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let cid_fs = installedUnitIdFS (indefUnit cid)
+    let cid_fs = unitIdFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
@@ -304,7 +304,7 @@ buildUnit session cid insts lunit = do
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
 
-        let compat_fs = installedUnitIdFS (indefUnit cid)
+        let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
 
         return GenericUnitInfo {
@@ -823,4 +823,4 @@ hsModuleToModSummary pn hsc_src modname
 newUnitId :: IndefUnitId -> Maybe FastString -> UnitId
 newUnitId uid mhash = case mhash of
    Nothing   -> indefUnit uid
-   Just hash -> UnitId (installedUnitIdFS (indefUnit uid) `appendFS` mkFastString "+" `appendFS` hash)
+   Just hash -> UnitId (unitIdFS (indefUnit uid) `appendFS` mkFastString "+" `appendFS` hash)

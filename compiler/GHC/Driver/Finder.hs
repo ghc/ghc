@@ -813,9 +813,9 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
     looks_like_srcpkgid pk
      -- Unsafely coerce a unit id (i.e. an installed package component
      -- identifier) into a PackageId and see if it means anything.
-     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (installedUnitIdFS pk))
+     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (unitIdFS pk))
      = parens (text "This unit ID looks like the source package ID;" $$
-       text "the real unit ID is" <+> quotes (ftext (installedUnitIdFS (unitId pkg))) $$
+       text "the real unit ID is" <+> quotes (ftext (unitIdFS (unitId pkg))) $$
        (if null pkgs then Outputable.empty
         else text "and" <+> int (length pkgs) <+> text "other candidates"))
      -- Todo: also check if it looks like a package name!

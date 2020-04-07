@@ -704,7 +704,7 @@ data Unit
 
 unitFS :: Unit -> FastString
 unitFS (InstUnit x)           = instUnitFS x
-unitFS (DefUnit (Definite x)) = installedUnitIdFS x
+unitFS (DefUnit (Definite x)) = unitIdFS x
 
 unitKey :: Unit -> Unique
 unitKey (InstUnit x)           = instUnitKey x
@@ -817,7 +817,7 @@ newtype UnitId =
     UnitId {
       -- | The full hashed unit identifier, including the component id
       -- and the hash.
-      installedUnitIdFS :: FastString
+      unitIdFS :: FastString
     }
 
 instance Binary UnitId where
@@ -828,7 +828,7 @@ instance Eq UnitId where
     uid1 == uid2 = installedUnitIdKey uid1 == installedUnitIdKey uid2
 
 instance Ord UnitId where
-    u1 `compare` u2 = installedUnitIdFS u1 `compare` installedUnitIdFS u2
+    u1 `compare` u2 = unitIdFS u1 `compare` unitIdFS u2
 
 instance Uniquable UnitId where
     getUnique = installedUnitIdKey
@@ -842,7 +842,7 @@ instance Outputable UnitId where
             _ -> ftext fs
 
 installedUnitIdKey :: UnitId -> Unique
-installedUnitIdKey = getUnique . installedUnitIdFS
+installedUnitIdKey = getUnique . unitIdFS
 
 -- | Return the UnitId of the Unit. For instantiated units, return the
 -- UnitId of the indefinite unit this unit is an instance of.
@@ -851,7 +851,7 @@ toUnitId (DefUnit (Definite iuid)) = iuid
 toUnitId (InstUnit indef)          = indefUnit (instUnitInstanceOf indef)
 
 installedUnitIdString :: UnitId -> String
-installedUnitIdString = unpackFS . installedUnitIdFS
+installedUnitIdString = unpackFS . unitIdFS
 
 instance Outputable InstantiatedUnit where
     ppr uid =
@@ -968,7 +968,7 @@ unitIsDefinite = isEmptyUniqDSet . unitFreeModuleHoles
 mkInstantiatedUnitHash :: IndefUnitId -> [(ModuleName, Module)] -> FastString
 mkInstantiatedUnitHash cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (bytesFS (installedUnitIdFS (indefUnit cid)))
+  . fingerprintUnitId (bytesFS (unitIdFS (indefUnit cid)))
   $ hashInstantiations sorted_holes
 
 -- | Generate a hash for a sorted module instantiation.
