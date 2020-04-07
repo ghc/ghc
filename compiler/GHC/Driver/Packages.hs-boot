@@ -5,7 +5,7 @@ import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Types.Module(IndefUnitId, Unit, UnitId)
 data PackageState
 data UnitInfoMap
-data PackageDatabase
+data PackageDatabase unit
 emptyPackageState :: PackageState
 mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 displayUnitId :: PackageState -> UnitId -> Maybe String

@@ -377,9 +377,9 @@ emptyPackageState = PackageState {
     }
 
 -- | Package database
-data PackageDatabase = PackageDatabase
+data PackageDatabase unit = PackageDatabase
    { packageDatabasePath  :: FilePath
-   , packageDatabaseUnits :: [UnitInfo]
+   , packageDatabaseUnits :: [GenUnitInfo unit]
    }
 
 type InstalledPackageIndex = Map UnitId UnitInfo
@@ -506,7 +506,7 @@ initPackages dflags = withTiming dflags
 -- -----------------------------------------------------------------------------
 -- Reading the package database(s)
 
-readPackageDatabases :: DynFlags -> IO [PackageDatabase]
+readPackageDatabases :: DynFlags -> IO [PackageDatabase UnitId]
 readPackageDatabases dflags = do
   conf_refs <- getPackageConfRefs dflags
   confs     <- liftM catMaybes $ mapM (resolvePackageDatabase dflags) conf_refs
@@ -562,7 +562,7 @@ resolvePackageDatabase dflags UserPkgDb = runMaybeT $ do
   if exist then return pkgconf else mzero
 resolvePackageDatabase _ (PkgDbPath name) = return $ Just name
 
-readPackageDatabase :: DynFlags -> FilePath -> IO PackageDatabase
+readPackageDatabase :: DynFlags -> FilePath -> IO (PackageDatabase UnitId)
 readPackageDatabase dflags conf_file = do
   isdir <- doesDirectoryExist conf_file
 
@@ -1250,7 +1250,7 @@ type PackagePrecedenceIndex = Map UnitId Int
 -- packages with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
-mergeDatabases :: DynFlags -> [PackageDatabase]
+mergeDatabases :: DynFlags -> [PackageDatabase UnitId]
                -> IO (InstalledPackageIndex, PackagePrecedenceIndex)
 mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
@@ -1344,7 +1344,7 @@ mkPackageState
     :: DynFlags
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
-    -> [PackageDatabase]
+    -> [PackageDatabase UnitId]
     -> [PreloadUnitId]              -- preloaded packages
     -> IO (PackageState,
            [PreloadUnitId],         -- new packages to preload
