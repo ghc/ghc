@@ -10,7 +10,10 @@ module UnitInfo
    ( GenericUnitInfo (..)
    , GenUnitInfo
    , UnitInfo
-   , toUnitInfo
+   , UnitKey (..)
+   , UnitKeyInfo
+   , mkUnitKeyInfo
+   , mapUnitInfo
 
    , mkUnit
    , expandedUnitInfoId
@@ -48,15 +51,25 @@ import GHC.Types.Unique
 -- identifier lexicon] in GHC.Types.Module
 type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
+-- | A unit key in the database
+newtype UnitKey = UnitKey FastString
+
+unitKeyFS :: UnitKey -> FastString
+unitKeyFS (UnitKey fs) = fs
+
+-- | Information about an installed unit (units are identified by their database
+-- UnitKey)
+type UnitKeyInfo = GenUnitInfo UnitKey
+
 -- | Information about an installed unit (units are identified by their internal
 -- UnitId)
 type UnitInfo    = GenUnitInfo UnitId
 
 -- | Convert a DbUnitInfo (read from a package database) into `UnitKeyInfo`
-toUnitInfo :: DbUnitInfo -> UnitInfo
-toUnitInfo = mapGenericUnitInfo
-   mkUnitId'
-   mkIndefUnitId'
+mkUnitKeyInfo :: DbUnitInfo -> UnitKeyInfo
+mkUnitKeyInfo = mapGenericUnitInfo
+   mkUnitKey'
+   mkIndefUnitKey'
    mkPackageIdentifier'
    mkPackageName'
    mkModuleName'
@@ -64,16 +77,25 @@ toUnitInfo = mapGenericUnitInfo
    where
      mkPackageIdentifier' = PackageId      . mkFastStringByteString
      mkPackageName'       = PackageName    . mkFastStringByteString
-     mkUnitId'            = UnitId         . mkFastStringByteString
+     mkUnitKey'           = UnitKey        . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS . mkFastStringByteString
-     mkIndefUnitId' cid   = Indefinite (UnitId (mkFastStringByteString cid)) Nothing
-     mkInstUnitId' i = case i of
-      DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)
-      DbUnitId uid           -> DefUnit (Definite (mkUnitId' uid))
+     mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid) Nothing
+     mkInstUnitKey' i = case i of
+      DbInstUnitId cid insts -> mkGenInstUnit unitKeyFS (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbUnitId uid           -> DefUnit (Definite (mkUnitKey' uid))
      mkModule' m = case m of
-       DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
+       DbModule uid n -> mkModule (mkInstUnitKey' uid) (mkModuleName' n)
        DbModuleVar  n -> mkHoleModule (mkModuleName' n)
 
+-- | Map over the unit parameter
+mapUnitInfo :: (u -> v) -> (v -> FastString) -> GenUnitInfo u -> GenUnitInfo v
+mapUnitInfo f gunitFS = mapGenericUnitInfo
+   f         -- unit identifier
+   (fmap f)  -- indefinite unit identifier
+   id        -- package identifier
+   id        -- package name
+   id        -- module name
+   (fmap (mapGenUnit f gunitFS)) -- instantiating modules
 
 -- TODO: there's no need for these to be FastString, as we don't need the uniq
 --       feature, but ghc doesn't currently have convenient support for any
