@@ -45,7 +45,6 @@ module GHC.Types.Unique.DFM (
         isNullUDFM,
         sizeUDFM,
         intersectUDFM, udfmIntersectUFM,
-        intersectsUDFM,
         disjointUDFM, disjointUdfmUfm,
         equalKeysUDFM,
         minusUDFM,
@@ -317,9 +316,6 @@ udfmIntersectUFM :: UniqDFM elt1 -> UniqFM elt2 -> UniqDFM elt1
 udfmIntersectUFM (UDFM x i) y = UDFM (M.intersection x (ufmToIntMap y)) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.
-
-intersectsUDFM :: UniqDFM elt -> UniqDFM elt -> Bool
-intersectsUDFM x y = not (x `disjointUDFM` y)
 
 disjointUDFM :: UniqDFM elt -> UniqDFM elt -> Bool
 disjointUDFM (UDFM x _i) (UDFM y _j) = M.disjoint x y

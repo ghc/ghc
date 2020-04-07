@@ -15,7 +15,7 @@ module GHC.Types.Var.Env (
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv, delVarEnv_Directly,
-        minusVarEnv, intersectsVarEnv,
+        minusVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
@@ -476,7 +476,6 @@ restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
-intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 plusMaybeVarEnv_C :: (a -> a -> Maybe a) -> VarEnv a -> VarEnv a -> VarEnv a
@@ -507,7 +506,6 @@ plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
-intersectsVarEnv e1 e2 = not (e1 `disjointUFM` e2)
 plusVarEnv       = plusUFM
 plusVarEnvList   = plusUFMList
 lookupVarEnv     = lookupUFM
