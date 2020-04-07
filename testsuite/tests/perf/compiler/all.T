@@ -1,10 +1,5 @@
 # Tests that call 'collect_compiler_stats' are skipped when debugging is on.
 # See testsuite/driver/testlib.py.
-
-def no_lint(name, opts):
-   opts.compiler_always_flags = \
-       [opt for opt in opts.compiler_always_flags if opt != '-dcore-lint' and opt != '-dcmm-lint']
-
 setTestOpts(no_lint)
 
 test('T1969',
