@@ -1984,7 +1984,7 @@ thisPackage dflags =
   where
     default_uid = DefUnit (Definite (thisUnitId dflags))
 
-parseUnitInsts :: String -> [(ModuleName, Module)]
+parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse -instantiated-with: " ++ str)
@@ -1992,7 +1992,7 @@ parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
         parseEntry = do
             n <- parseModuleName
             _ <- R.char '='
-            m <- parseModuleId
+            m <- parseHoleyModule
             return (n, m)
 
 setUnitIdInsts :: String -> DynFlags -> DynFlags

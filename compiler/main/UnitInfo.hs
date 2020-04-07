@@ -6,25 +6,24 @@
 --
 -- (c) The University of Glasgow, 2004
 --
-module UnitInfo (
-        -- $package_naming
+module UnitInfo
+   ( GenericUnitInfo (..)
+   , GenUnitInfo
+   , UnitInfo
+   , toUnitInfo
 
-        -- * UnitId
-        mkUnit,
-        expandedUnitInfoId,
-        definiteUnitInfoId,
+   , mkUnit
+   , expandedUnitInfoId
+   , definiteUnitInfoId
 
-        -- * The UnitInfo type: information about a unit
-        UnitInfo,
-        toUnitInfo,
-        GenericUnitInfo(..),
-        PackageId(..),
-        PackageName(..),
-        Version(..),
-        unitPackageNameString,
-        unitPackageIdString,
-        pprUnitInfo,
-    ) where
+   , PackageId(..)
+   , PackageName(..)
+   , Version(..)
+   , unitPackageNameString
+   , unitPackageIdString
+   , pprUnitInfo
+   )
+where
 
 #include "HsVersions.h"
 
@@ -39,13 +38,21 @@ import Outputable
 import GHC.Types.Module as Module
 import GHC.Types.Unique
 
--- -----------------------------------------------------------------------------
--- Our UnitInfo type is the GenericUnitInfo from ghc-boot,
--- which is similar to a subset of the InstalledPackageInfo type from Cabal.
+-- | Information about an installed unit
+--
+-- We parameterize on the unit identifier:
+--    * UnitKey: identifier used in the database (cf 'UnitKeyInfo')
+--    * UnitId: identifier used to generate code (cf 'UnitInfo')
+--
+-- These two identifiers are different for wired-in packages. See Note [The
+-- identifier lexicon] in GHC.Types.Module
+type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
-type UnitInfo = GenericUnitInfo IndefUnitId PackageId PackageName UnitId ModuleName Module
+-- | Information about an installed unit (units are identified by their internal
+-- UnitId)
+type UnitInfo    = GenUnitInfo UnitId
 
--- | Convert a DbUnitInfo (read from a package database) into `UnitInfo`
+-- | Convert a DbUnitInfo (read from a package database) into `UnitKeyInfo`
 toUnitInfo :: DbUnitInfo -> UnitInfo
 toUnitInfo = mapGenericUnitInfo
    mkUnitId'
@@ -55,10 +62,10 @@ toUnitInfo = mapGenericUnitInfo
    mkModuleName'
    mkModule'
    where
-     mkPackageIdentifier' = PackageId       . mkFastStringByteString
-     mkPackageName'       = PackageName     . mkFastStringByteString
-     mkUnitId'            = UnitId . mkFastStringByteString
-     mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
+     mkPackageIdentifier' = PackageId      . mkFastStringByteString
+     mkPackageName'       = PackageName    . mkFastStringByteString
+     mkUnitId'            = UnitId         . mkFastStringByteString
+     mkModuleName'        = mkModuleNameFS . mkFastStringByteString
      mkIndefUnitId' cid   = Indefinite (UnitId (mkFastStringByteString cid)) Nothing
      mkInstUnitId' i = case i of
       DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)

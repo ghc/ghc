@@ -398,6 +398,7 @@ compileInclude n (i, uid) = do
     msgInclude (i, n) uid
     -- Check if we've compiled it already
     case uid of
+      HoleUnit   -> return ()
       DefUnit {} -> return ()
       InstUnit i -> case lookupUnit dflags uid of
         Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)

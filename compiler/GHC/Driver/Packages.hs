@@ -399,6 +399,7 @@ lookupUnit dflags = lookupUnit' (isIndefinite dflags) (unitInfoMap (pkgState dfl
 lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
 lookupUnit' False (UnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
 lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
+   HoleUnit   -> error "Hole unit"
    DefUnit {} -> lookupUDFM pkg_map uid
    InstUnit i -> fmap (renamePackage m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
@@ -723,6 +724,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                 | otherwise                 = Map.empty
 
            collectHoles uid = case uid of
+             HoleUnit       -> Map.empty
              DefUnit {}     -> Map.empty -- definite units don't have holes
              InstUnit indef ->
                   let local = [ Map.singleton
@@ -1075,10 +1077,11 @@ upd_wired_in_mod :: WiredPackagesMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
 
 upd_wired_in_uid :: WiredPackagesMap -> Unit -> Unit
-upd_wired_in_uid wiredInMap (DefUnit def_uid) =
-    DefUnit (upd_wired_in wiredInMap def_uid)
-upd_wired_in_uid wiredInMap (InstUnit indef_uid) =
-    InstUnit $ mkInstantiatedUnit
+upd_wired_in_uid wiredInMap u = case u of
+   HoleUnit           -> HoleUnit
+   DefUnit def_uid    -> DefUnit (upd_wired_in wiredInMap def_uid)
+   InstUnit indef_uid ->
+      InstUnit $ mkInstantiatedUnit
         (instUnitInstanceOf indef_uid)
         (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 

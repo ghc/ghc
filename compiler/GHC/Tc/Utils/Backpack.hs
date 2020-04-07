@@ -319,6 +319,7 @@ implicitRequirements' hsc_env normal_imports
 -- not; a component may have been filled with implementations for the holes
 -- that don't actually fulfill the requirements.
 checkUnit :: Unit -> TcM ()
+checkUnit HoleUnit         = return ()
 checkUnit (DefUnit _)      = return () -- if it's definite, must be well-typed
 checkUnit (InstUnit indef) = do
    let insts = instUnitInsts indef
