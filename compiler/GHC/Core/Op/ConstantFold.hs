@@ -1510,7 +1510,7 @@ match_eq_string _ _ _ _ = Nothing
 --           _    -> False
 --
 -- Where knownString is one of:
--- * (build ((unpackFoldrCString# "abc"#)
+-- * (build (unpackFoldrCString# "abc"#))
 -- * (unpackCString*# "abc"#)
 -- Limits matches to strings <=500 bytes.
 -- Also matches utf8 versions.
