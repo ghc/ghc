@@ -1525,6 +1525,7 @@ instantiatedUnitsToCheck :: DynFlags -> [Unit]
 instantiatedUnitsToCheck dflags =
   nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
  where
+  goUnit HoleUnit         = []
   goUnit (DefUnit _)      = []
   goUnit uid@(InstUnit i) = uid : concatMap (goUnit . moduleUnit . snd) (instUnitInsts i)
 

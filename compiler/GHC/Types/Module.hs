@@ -46,13 +46,18 @@ module GHC.Types.Module
         UnitId(..),
         toUnitId,
         ShHoleSubst,
+        Instantiations,
+        GenInstantiations,
 
         unitIsDefinite,
         unitString,
         unitFreeModuleHoles,
 
+        mkGenInstUnit,
         mkInstUnit,
+        mkGenInstantiatedUnit,
         mkInstantiatedUnit,
+        mkGenInstantiatedUnitHash,
         mkInstantiatedUnitHash,
         fsToUnit,
         stringToUnit,
@@ -67,14 +72,14 @@ module GHC.Types.Module
         -- * Generalization
         getModuleInstantiation,
         getUnitInstantiations,
-        generalizeInstantiatedUnit,
-        generalizeInstantiatedModule,
+        uninstantiateInstantiatedUnit,
+        uninstantiateInstantiatedModule,
 
         -- * Parsers
         parseModuleName,
         parseUnit,
         parseIndefUnitId,
-        parseModuleId,
+        parseHoleyModule,
         parseModSubst,
 
         -- * Wired-in UnitIds
@@ -533,11 +538,6 @@ data GenModule unit = Module
    deriving (Eq,Ord,Data)
 
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
---
--- Module variables (i.e. @<H>@) which can be instantiated to a
--- specific module at some later point in time are represented
--- with 'moduleUnit' set to 'holeUnitId' (this allows us to
--- avoid having to make 'moduleUnit' a partial operation.)
 type Module = GenModule Unit
 
 -- | A 'InstalledModule' is a 'Module' whose unit is identified with an
@@ -547,25 +547,22 @@ type InstalledModule = GenModule UnitId
 -- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
 type InstantiatedModule = GenModule InstantiatedUnit
 
+type GenInstantiations unit = [(ModuleName,GenModule (GenUnit unit))]
+type Instantiations = GenInstantiations UnitId
+
 -- | Calculate the free holes of a 'Module'.  If this set is non-empty,
 -- this module was defined in an indefinite library that had required
 -- signatures.
 --
 -- If a module has free holes, that means that substitutions can operate on it;
 -- if it has no free holes, substituting over a module has no effect.
-moduleFreeHoles :: Module -> UniqDSet ModuleName
-moduleFreeHoles m
-    | isHoleModule m = unitUniqDSet (moduleName m)
-    | otherwise = unitFreeModuleHoles (moduleUnit m)
+moduleFreeHoles :: GenModule (GenUnit u) -> UniqDSet ModuleName
+moduleFreeHoles (Module HoleUnit name) = unitUniqDSet name
+moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 
 -- | A 'Module' is definite if it has no free holes.
 moduleIsDefinite :: Module -> Bool
 moduleIsDefinite = isEmptyUniqDSet . moduleFreeHoles
-
--- | Create a module variable at some 'ModuleName'.
--- See Note [Representation of module/name variables]
-mkHoleModule :: ModuleName -> Module
-mkHoleModule = mkModule holeUnitId
 
 instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitFS p `appendFS` moduleNameFS n)
@@ -596,6 +593,7 @@ stableModuleCmp (Module p1 n1) (Module p2 n2)
    = (p1 `stableUnitCmp`  p2) `thenCmp`
      (n1 `stableModuleNameCmp` n2)
 
+-- | Create a concrete module
 mkModule :: Unit -> ModuleName -> Module
 mkModule = Module
 
@@ -609,9 +607,9 @@ pprModule mod@(Module p n)  = getPprStyle doc
                 else ztext (zEncodeFS (unitFS p)) <> char '_')
             <> pprModuleName n
     | qualModule sty mod =
-        if isHoleModule mod
-            then angleBrackets (pprModuleName n)
-            else ppr (moduleUnit mod) <> char ':' <> pprModuleName n
+        case p of
+          HoleUnit -> angleBrackets (pprModuleName n)
+          _        -> ppr (moduleUnit mod) <> char ':' <> pprModuleName n
     | otherwise =
         pprModuleName n
 
@@ -709,13 +707,27 @@ data GenUnit unit
       -- ^ Instantiated indefinite unit (may be definite if all the holes are
       -- instantiated)
 
+    | HoleUnit
+      -- ^ Fake hole unit
+
 unitFS :: Unit -> FastString
-unitFS (InstUnit x)           = instUnitFS x
-unitFS (DefUnit (Definite x)) = unitIdFS x
+unitFS = genUnitFS unitIdFS
+
+holeFS :: FastString
+holeFS = fsLit "<hole>"
+
+holeUnique :: Unique
+holeUnique = getUnique holeFS
+
+genUnitFS :: (unit -> FastString) -> GenUnit unit -> FastString
+genUnitFS _gunitFS (InstUnit x)           = instUnitFS x
+genUnitFS gunitFS  (DefUnit (Definite x)) = gunitFS x
+genUnitFS _gunitFS HoleUnit               = holeFS
 
 unitKey :: Unit -> Unique
 unitKey (InstUnit x)           = instUnitKey x
 unitKey (DefUnit (Definite x)) = unitIdKey x
+unitKey HoleUnit               = holeUnique
 
 -- | A dynamically instantiated unit.
 --
@@ -744,7 +756,7 @@ data GenInstantiatedUnit unit
         -- | The indefinite unit being instantiated.
         instUnitInstanceOf :: !(Indefinite unit),
         -- | The sorted (by 'ModuleName') instantiations of this unit.
-        instUnitInsts :: ![(ModuleName, GenModule (GenUnit unit))],
+        instUnitInsts :: !(GenInstantiations unit),
         -- | A cache of the free module holes of 'instUnitInsts'.
         -- This lets us efficiently tell if a 'InstantiatedUnit' has been
         -- fully instantiated (empty set of free module holes)
@@ -774,9 +786,9 @@ instance Binary InstantiatedUnit where
             instUnitKey = getUnique fs
            }
 
--- | Create a new 'InstantiatedUnit' given an explicit module substitution.
-mkInstantiatedUnit :: IndefUnitId -> [(ModuleName, Module)] -> InstantiatedUnit
-mkInstantiatedUnit cid insts =
+-- | Create a new 'GenInstantiatedUnit' given an explicit module substitution.
+mkGenInstantiatedUnit :: (unit -> FastString) -> Indefinite unit -> GenInstantiations unit -> GenInstantiatedUnit unit
+mkGenInstantiatedUnit gunitFS cid insts =
     InstantiatedUnit {
         instUnitInstanceOf = cid,
         instUnitInsts = sorted_insts,
@@ -785,8 +797,12 @@ mkInstantiatedUnit cid insts =
         instUnitKey = getUnique fs
     }
   where
-     fs = mkInstantiatedUnitHash cid sorted_insts
+     fs = mkGenInstantiatedUnitHash gunitFS cid sorted_insts
      sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
+
+-- | Create a new 'InstantiatedUnit' given an explicit module substitution.
+mkInstantiatedUnit :: IndefUnitId -> Instantiations -> InstantiatedUnit
+mkInstantiatedUnit = mkGenInstantiatedUnit unitIdFS
 
 -- | Check the database to see if we already have an installed unit that
 -- corresponds to the given 'InstantiatedUnit'.
@@ -858,6 +874,7 @@ unitIdKey = getUnique . unitIdFS
 toUnitId :: Unit -> UnitId
 toUnitId (DefUnit (Definite iuid)) = iuid
 toUnitId (InstUnit indef)          = indefUnit (instUnitInstanceOf indef)
+toUnitId HoleUnit                  = error "Hole unit"
 
 unitIdString :: UnitId -> String
 unitIdString = unpackFS . unitIdFS
@@ -954,10 +971,11 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 -- closure of all the packages which were explicitly specified.
 
 -- | Retrieve the set of free module holes of a 'Unit'.
-unitFreeModuleHoles :: Unit -> UniqDSet ModuleName
+unitFreeModuleHoles :: GenUnit u -> UniqDSet ModuleName
 unitFreeModuleHoles (InstUnit x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
-unitFreeModuleHoles (DefUnit _) = emptyUniqDSet
+unitFreeModuleHoles (DefUnit _)  = emptyUniqDSet
+unitFreeModuleHoles HoleUnit     = emptyUniqDSet
 
 instance Show Unit where
     show = unitString
@@ -974,21 +992,24 @@ unitIsDefinite = isEmptyUniqDSet . unitFreeModuleHoles
 -- This hash is completely internal to GHC and is not used for symbol names or
 -- file paths. It is different from the hash Cabal would produce for the same
 -- instantiated unit.
-mkInstantiatedUnitHash :: IndefUnitId -> [(ModuleName, Module)] -> FastString
-mkInstantiatedUnitHash cid sorted_holes =
+mkGenInstantiatedUnitHash :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> FastString
+mkGenInstantiatedUnitHash gunitFS cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (bytesFS (unitIdFS (indefUnit cid)))
-  $ hashInstantiations sorted_holes
+  . fingerprintUnitId (bytesFS (gunitFS (indefUnit cid)))
+  $ hashInstantiations gunitFS sorted_holes
+
+mkInstantiatedUnitHash :: IndefUnitId -> Instantiations -> FastString
+mkInstantiatedUnitHash = mkGenInstantiatedUnitHash unitIdFS
 
 -- | Generate a hash for a sorted module instantiation.
-hashInstantiations :: [(ModuleName, Module)] -> Fingerprint
-hashInstantiations sorted_holes =
+hashInstantiations :: (unit -> FastString) -> [(ModuleName, GenModule (GenUnit unit))] -> Fingerprint
+hashInstantiations gunitFS sorted_holes =
     fingerprintByteString
   . BS.concat $ do
         (m, b) <- sorted_holes
-        [ bytesFS (moduleNameFS m),                BS.Char8.singleton ' ',
-          bytesFS (unitFS (moduleUnit b)), BS.Char8.singleton ':',
-          bytesFS (moduleNameFS (moduleName b)),   BS.Char8.singleton '\n']
+        [ bytesFS (moduleNameFS m),                   BS.Char8.singleton ' ',
+          bytesFS (genUnitFS gunitFS (moduleUnit b)), BS.Char8.singleton ':',
+          bytesFS (moduleNameFS (moduleName b)),      BS.Char8.singleton '\n']
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString
 fingerprintUnitId prefix (Fingerprint a b)
@@ -998,14 +1019,19 @@ fingerprintUnitId prefix (Fingerprint a b)
       , BS.Char8.pack (toBase62Padded a)
       , BS.Char8.pack (toBase62Padded b) ]
 
+-- | Smart constructor for instantiated GenUnit
+mkGenInstUnit :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> GenUnit unit
+mkGenInstUnit _gunitFS uid []    = DefUnit  $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
+mkGenInstUnit gunitFS  uid insts = InstUnit $ mkGenInstantiatedUnit gunitFS uid insts
+
 -- | Smart constructor for InstUnit
-mkInstUnit :: IndefUnitId -> [(ModuleName, Module)] -> Unit
-mkInstUnit uid []    = DefUnit  $ Definite (indefUnit uid)
-mkInstUnit uid insts = InstUnit $ mkInstantiatedUnit uid insts
+mkInstUnit :: IndefUnitId -> Instantiations -> Unit
+mkInstUnit = mkGenInstUnit unitIdFS
 
 pprUnit :: Unit -> SDoc
-pprUnit (DefUnit uid) = ppr uid
+pprUnit (DefUnit uid)  = ppr uid
 pprUnit (InstUnit uid) = ppr uid
+pprUnit HoleUnit       = ftext holeFS
 
 instance Eq Unit where
   uid1 == uid2 = unitKey uid1 == unitKey uid2
@@ -1040,10 +1066,13 @@ instance Binary Unit where
   put_ bh (InstUnit indef_uid) = do
     putByte bh 1
     put_ bh indef_uid
+  put_ bh HoleUnit = do
+    putByte bh 2
   get bh = do b <- getByte bh
               case b of
                 0 -> fmap DefUnit  (get bh)
-                _ -> fmap InstUnit (get bh)
+                1 -> fmap InstUnit (get bh)
+                _ -> pure HoleUnit
 
 instance Binary unit => Binary (Indefinite unit) where
   put_ bh (Indefinite fs _) = put_ bh fs
@@ -1131,14 +1160,18 @@ getModuleInstantiation m =
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
 getUnitInstantiations (InstUnit iuid)          = (indefUnit (instUnitInstanceOf iuid), Just iuid)
 getUnitInstantiations (DefUnit (Definite uid)) = (uid, Nothing)
+getUnitInstantiations HoleUnit                 = error "Hole unit"
 
-generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
-generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
-                                           , instUnitInsts = insts } =
-    mkInstantiatedUnit cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
+-- | Remove instantiations of the given instantiated unit
+uninstantiateInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
+uninstantiateInstantiatedUnit u =
+    mkInstantiatedUnit (instUnitInstanceOf u)
+                       (map (\(m,_) -> (m, mkHoleModule m))
+                         (instUnitInsts u))
 
-generalizeInstantiatedModule :: InstantiatedModule -> InstantiatedModule
-generalizeInstantiatedModule (Module uid n) = Module (generalizeInstantiatedUnit uid) n
+-- | Remove instantiations of the given module instantiated unit
+uninstantiateInstantiatedModule :: InstantiatedModule -> InstantiatedModule
+uninstantiateInstantiatedModule (Module uid n) = Module (uninstantiateInstantiatedUnit uid) n
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName
@@ -1165,26 +1198,26 @@ parseIndefUnitId = do
    uid <- parseUnitId
    return (Indefinite uid Nothing)
 
-parseModuleId :: ReadP Module
-parseModuleId = parseModuleVar <++ parseModule
+parseHoleyModule :: ReadP Module
+parseHoleyModule = parseModuleVar <++ parseModule
     where
       parseModuleVar = do
         _ <- Parse.char '<'
         modname <- parseModuleName
         _ <- Parse.char '>'
-        return (mkHoleModule modname)
+        return (Module HoleUnit modname)
       parseModule = do
         uid <- parseUnit
         _ <- Parse.char ':'
         modname <- parseModuleName
-        return (mkModule uid modname)
+        return (Module uid modname)
 
 parseModSubst :: ReadP [(ModuleName, Module)]
 parseModSubst = Parse.between (Parse.char '[') (Parse.char ']')
       . flip Parse.sepBy (Parse.char ',')
       $ do k <- parseModuleName
            _ <- Parse.char '='
-           v <- parseModuleId
+           v <- parseHoleyModule
            return (k, v)
 
 
@@ -1238,13 +1271,6 @@ interactiveUnitId = fsToUnit (fsLit "interactive")
 -- to symbol names, since there can be only one main package per program.
 mainUnitId      = fsToUnit (fsLit "main")
 
--- | This is a fake package id used to provide identities to any un-implemented
--- signatures.  The set of hole identities is global over an entire compilation.
--- Don't use this directly: use 'mkHoleModule' or 'isHoleModule' instead.
--- See Note [Representation of module/name variables]
-holeUnitId :: Unit
-holeUnitId      = fsToUnit (fsLit "hole")
-
 isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = moduleUnit mod == interactiveUnitId
 
@@ -1252,7 +1278,7 @@ isInteractiveModule mod = moduleUnit mod == interactiveUnitId
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In our ICFP'16, we use <A> to represent module holes, and {A.T} to represent
 -- name holes.  This could have been represented by adding some new cases
--- to the core data types, but this would have made the existing 'nameModule'
+-- to the core data types, but this would have made the existing 'moduleName'
 -- and 'moduleUnit' partial, which would have required a lot of modifications
 -- to existing code.
 --
@@ -1268,8 +1294,14 @@ isInteractiveModule mod = moduleUnit mod == interactiveUnitId
 -- and 'renameHoleUnit' assume they are NOT operating on a
 -- 'Name'; 'NameShape' handles name substitutions exclusively.
 
-isHoleModule :: Module -> Bool
-isHoleModule mod = moduleUnit mod == holeUnitId
+-- | Test if a Module is not instantiated
+isHoleModule :: GenModule (GenUnit u) -> Bool
+isHoleModule (Module HoleUnit _) = True
+isHoleModule _                   = False
+
+-- | Create a hole Module
+mkHoleModule :: ModuleName -> GenModule (GenUnit u)
+mkHoleModule = Module HoleUnit
 
 wiredInUnitIds :: [Unit]
 wiredInUnitIds = [ primUnitId,
