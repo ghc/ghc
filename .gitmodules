@@ -64,7 +64,7 @@
 	ignore = untracked
 [submodule "libraries/parsec"]
 	path = libraries/parsec
-	url = https://gitlab.haskell.org/ghc/packages/parsec.git
+	url = https://github.com/lexi-lambda/parsec.git
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
