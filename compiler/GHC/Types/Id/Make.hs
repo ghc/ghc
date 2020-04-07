@@ -510,6 +510,7 @@ mkDataConWorkId wkr_name data_con
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
                    `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
+                   `setInlinePragInfo`     dataConWorkerInlinePragma
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
                    `setLevityInfoWithType` wkr_ty
@@ -522,7 +523,7 @@ mkDataConWorkId wkr_name data_con
     arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
-                  `setInlinePragInfo`     alwaysInlinePragma
+                  `setInlinePragInfo`     dataConWrapperInlinePragma
                   `setUnfoldingInfo`      newtype_unf
                   `setLevityInfoWithType` wkr_ty
     id_arg1      = mkTemplateLocal 1 (head arg_tys)
@@ -652,8 +653,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
 
-             wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
-                         activeDuringFinal
+             wrap_prag = dataConWrapperInlinePragma
+                         `setInlinePragmaActivation` activeDuringFinal
                          -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
@@ -783,7 +784,6 @@ instance, on the order of type argument of that constructors. Therefore changing
 the order of type argument could make previously working RULEs fail.
 
 See also https://gitlab.haskell.org/ghc/ghc/issues/15840 .
-
 
 Note [Bangs on imported data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

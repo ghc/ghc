@@ -89,7 +89,8 @@ module GHC.Types.Basic (
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
-        neverInlinePragma, dfunInlinePragma,
+        neverInlinePragma, dataConWorkerInlinePragma,
+        dataConWrapperInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
         isInlinePragma, isInlinablePragma, isAnyInlinePragma,
         inlinePragmaSpec, inlinePragmaSat,
@@ -1378,12 +1379,44 @@ The main effects of CONLIKE are:
       CONLIKE thing like constructors, by ANF-ing them
 
     - New function GHC.Core.Utils.exprIsExpandable is like exprIsCheap, but
-      additionally spots applications of CONLIKE functions
+      additionally spots applications of CONLIKE functions (see
+      Note [exprIsExpandable] in GHC.Core.Utils)
 
     - A CoreUnfolding has a field that caches exprIsExpandable
 
     - The rule matcher consults this field.  See
       Note [Expanding variables] in GHC.Core.Rules.
+
+Note [DataCon wrappers are conlike]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DataCon workers are clearly ConLike --- they are the “Con” in
+“ConLike”, after all --- but what about DataCon wrappers? Should they
+be marked ConLike, too?
+
+Yes, absolutely! As described in Note [CONLIKE pragma], isConLike
+influences GHC.Core.Utils.exprIsExpandable, which is used by both RULE
+matching and the case-of-known-constructor optimization. It’s crucial
+that both of those things can see applications of DataCon wrappers:
+
+  * User-defined RULEs match on wrappers, not workers, so we might
+    need to look through an unfolding built from a DataCon wrapper to
+    determine if a RULE matches.
+
+  * Likewise, if we have something like
+        let x = $WC a b in ... case x of { C y z -> e } ...
+    we still want to apply case-of-known-constructor.
+
+Therefore, it’s important that we consider DataCon wrappers conlike.
+This is especially true now that we don’t inline DataCon wrappers
+until the final simplifier phase; see Note [Activation for data
+constructor wrappers] in GHC.Types.Id.Make.
+
+For further reading, see:
+  * Note [Conlike is interesting] in GHC.Core.Op.Simplify.Utils
+  * Note [Lone variables] in GHC.Core.Unfold
+  * Note [exprIsConApp_maybe on data constructors with wrappers]
+    in GHC.Core.SimpleOpt
+  * #18012
 -}
 
 isConLike :: RuleMatchInfo -> Bool
@@ -1398,7 +1431,8 @@ noUserInlineSpec :: InlineSpec -> Bool
 noUserInlineSpec NoUserInline = True
 noUserInlineSpec _            = False
 
-defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
+defaultInlinePragma, alwaysInlinePragma, neverInlinePragma,
+  dataConWorkerInlinePragma, dataConWrapperInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_act = AlwaysActive
@@ -1411,6 +1445,11 @@ neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
 
 inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
+
+dataConWorkerInlinePragma = defaultInlinePragma { inl_rule = ConLike }
+-- See Note [DataCon wrappers are conlike]
+dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
+                                                , inl_inline = Inline }
 
 -- A DFun has an always-active inline activation so that
 -- exprIsConApp_maybe can "see" its unfolding
