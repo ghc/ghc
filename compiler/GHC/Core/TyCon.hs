@@ -2310,6 +2310,9 @@ expandSynTyCon_maybe tc tys
               LT -> Nothing
    | otherwise
    = Nothing
+{-# INLINE expandSynTyCon_maybe #-}
+-- Inline to avoid allocation of tuples due to lack of nested CPR on sums.
+-- Particularly relevant to coreView and tcView, which are hammered.
 
 ----------------
 
