@@ -2001,7 +2001,7 @@ setUnitIdInsts s d =
 
 setComponentId :: String -> DynFlags -> DynFlags
 setComponentId s d =
-    d { thisComponentId_ = Just (IndefUnitId (UnitId (fsLit s)) Nothing) }
+    d { thisComponentId_ = Just (Indefinite (UnitId (fsLit s)) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }

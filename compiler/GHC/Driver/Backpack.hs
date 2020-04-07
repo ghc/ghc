@@ -96,7 +96,7 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == IndefUnitId (UnitId (fsLit "main")) Nothing
+                            then if cid == Indefinite (UnitId (fsLit "main")) Nothing
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
@@ -137,7 +137,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let cid_fs = installedUnitIdFS (indefUnitId cid)
+    let cid_fs = installedUnitIdFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
@@ -206,7 +206,7 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (IndefUnitId (UnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
+    withBkpSession (Indefinite (UnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
 
 getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
@@ -304,7 +304,7 @@ buildUnit session cid insts lunit = do
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
 
-        let compat_fs = installedUnitIdFS (indefUnitId cid)
+        let compat_fs = installedUnitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
 
         return GenericUnitInfo {
@@ -822,5 +822,5 @@ hsModuleToModSummary pn hsc_src modname
 -- a hash.
 newUnitId :: IndefUnitId -> Maybe FastString -> UnitId
 newUnitId uid mhash = case mhash of
-   Nothing   -> indefUnitId uid
-   Just hash -> UnitId (installedUnitIdFS (indefUnitId uid) `appendFS` mkFastString "+" `appendFS` hash)
+   Nothing   -> indefUnit uid
+   Just hash -> UnitId (installedUnitIdFS (indefUnit uid) `appendFS` mkFastString "+" `appendFS` hash)
