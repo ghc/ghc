@@ -6,7 +6,8 @@ data GenModule a
 data ModuleName
 data Unit
 data UnitId
-data IndefUnitId
+type IndefUnitId = Indefinite UnitId
+data Indefinite unit
 type Module = GenModule Unit
 
 moduleName :: GenModule a -> ModuleName

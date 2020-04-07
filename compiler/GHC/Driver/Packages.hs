@@ -801,7 +801,7 @@ findPackages prec_map pkg_db arg pkgs unusable
             | iuid == unitId p
             -> Just p
           InstUnit inst
-            | indefUnitId (instUnitInstanceOf inst) == unitId p
+            | indefUnit (instUnitInstanceOf inst) == unitId p
             -> Just (renamePackage pkg_db (instUnitInsts inst) p)
           _ -> Nothing
 
@@ -2073,15 +2073,15 @@ mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 mkIndefUnitId pkgstate raw =
     let uid = UnitId raw
     in case lookupInstalledPackage pkgstate uid of
-         Nothing -> IndefUnitId uid Nothing -- we didn't find the unit at all
-         Just c  -> IndefUnitId uid $ Just $ UnitPprInfo
+         Nothing -> Indefinite uid Nothing -- we didn't find the unit at all
+         Just c  -> Indefinite uid $ Just $ UnitPprInfo
                                              (unitPackageNameString c)
                                              (unitPackageVersion c)
                                              ((unpackFS . unPackageName) <$> unitComponentName c)
 
 -- | Update component ID details from the database
 updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
-updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (installedUnitIdFS (indefUnitId uid))
+updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (installedUnitIdFS (indefUnit uid))
 
 
 displayUnitId :: PackageState -> UnitId -> Maybe String
