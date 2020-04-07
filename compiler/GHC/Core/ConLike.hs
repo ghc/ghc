@@ -12,6 +12,7 @@ module GHC.Core.ConLike (
         , conLikeArity
         , conLikeFieldLabels
         , conLikeInstOrigArgTys
+        , conLikeUserTyVarBinders
         , conLikeExTyCoVars
         , conLikeName
         , conLikeStupidTheta
@@ -112,6 +113,18 @@ conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
     patSynInstArgTys pat_syn tys
+
+-- | 'TyVarBinder's for the type variables of the 'ConLike'. For pattern
+-- synonyms, this will always consist of the universally quantified variables
+-- followed by the existentially quantified type variables. For data
+-- constructors, the situation is slightly more complicated—see
+-- @Note [DataCon user type variable binders]@ in "GHC.Core.DataCon".
+conLikeUserTyVarBinders :: ConLike -> [TyVarBinder]
+conLikeUserTyVarBinders (RealDataCon data_con) =
+    dataConUserTyVarBinders data_con
+conLikeUserTyVarBinders (PatSynCon pat_syn) =
+    patSynUnivTyVarBinders pat_syn ++ patSynExTyVarBinders pat_syn
+    -- The order here is because of the order in `GHC.Tc.TyCl.PatSyn`.
 
 -- | Existentially quantified type/coercion variables
 conLikeExTyCoVars :: ConLike -> [TyCoVar]
