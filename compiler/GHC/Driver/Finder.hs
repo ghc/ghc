@@ -356,7 +356,7 @@ findPackageModule hsc_env mod = do
 -- for the appropriate config.
 findPackageModule_ :: HscEnv -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ hsc_env mod pkg_conf =
-  ASSERT2( moduleUnit mod == installedUnitInfoId pkg_conf, ppr (moduleUnit mod) <+> ppr (installedUnitInfoId pkg_conf) )
+  ASSERT2( moduleUnit mod == unitId pkg_conf, ppr (moduleUnit mod) <+> ppr (unitId pkg_conf) )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
