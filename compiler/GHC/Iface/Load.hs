@@ -945,7 +945,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                         (_, Nothing) -> wanted_mod_with_insts
                         (_, Just indef_mod) ->
                           instModuleToModule (pkgState dflags)
-                            (generalizeInstantiatedModule indef_mod)
+                            (uninstantiateInstantiatedModule indef_mod)
               read_result <- readIface wanted_mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
