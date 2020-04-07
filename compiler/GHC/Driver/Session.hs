@@ -629,7 +629,7 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [PackageDatabase],
+  pkgDatabase           :: Maybe [PackageDatabase UnitId],
         -- ^ Stack of package databases for the target platform.
         --
         -- A "package database" is a misleading name as it is really a Unit
