@@ -925,7 +925,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if moduleUnit mod `installedUnitIdEq` thisPackage dflags &&
+                       if moduleUnit mod `unitIdEq` thisPackage dflags &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
