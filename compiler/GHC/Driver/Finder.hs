@@ -77,7 +77,7 @@ flushFinderCaches hsc_env =
  where
         this_pkg = thisPackage (hsc_dflags hsc_env)
         fc_ref = hsc_FC hsc_env
-        is_ext mod _ | not (moduleUnit mod `installedUnitIdEq` this_pkg) = True
+        is_ext mod _ | not (moduleUnit mod `unitIdEq` this_pkg) = True
                      | otherwise = False
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
@@ -136,7 +136,7 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if moduleUnit mod `installedUnitIdEq` thisPackage dflags
+    in if moduleUnit mod `unitIdEq` thisPackage dflags
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
@@ -795,7 +795,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (pkg `installedUnitIdEq` thisPackage dflags)
+                | Just pkg <- mb_pkg, not (pkg `unitIdEq` thisPackage dflags)
                 -> not_found_in_package pkg files
 
                 | null files

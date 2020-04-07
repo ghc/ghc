@@ -142,7 +142,7 @@ outputC dflags filenm cmm_stream packages
                  '<':_      -> "#include "++h_file
                  _          -> "#include \""++h_file++"\""
 
-         let pkg_names = map installedUnitIdString packages
+         let pkg_names = map unitIdString packages
 
          doOutput filenm $ \ h -> do
             hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
