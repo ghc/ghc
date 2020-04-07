@@ -2938,6 +2938,7 @@ during type inference.
 
 isConstraintKindCon :: TyCon -> Bool
 isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
+{-# NOINLINE isConstraintKindCon #-}
 
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
