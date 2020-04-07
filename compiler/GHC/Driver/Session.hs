@@ -1982,7 +1982,7 @@ thisPackage dflags =
           | otherwise
           -> default_uid
   where
-    default_uid = DefUnit (DefUnitId (thisUnitId dflags))
+    default_uid = DefUnit (Definite (thisUnitId dflags))
 
 parseUnitInsts :: String -> [(ModuleName, Module)]
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of

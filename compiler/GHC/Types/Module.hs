@@ -110,7 +110,8 @@ module GHC.Types.Module
         extendInstalledModuleEnv,
         filterInstalledModuleEnv,
         delInstalledModuleEnv,
-        DefUnitId(..),
+        DefUnitId,
+        Definite(..),
 
         -- * The ModuleLocation type
         ModLocation(..),
@@ -241,8 +242,9 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 --
 -- Because of the wired-in units described above, we can't exactly use UnitIds
 -- as UnitKeys in the database: if we did this, we could only have a single unit
--- (compiled library) for each wired-in library. As we want to support several
--- units for the same wired-in library, we do this:
+-- (compiled library) in the database for each wired-in library. As we want to
+-- support databases containing several different units for the same wired-in
+-- library, we do this:
 --
 --    * for non wired-in units:
 --       * UnitId = UnitKey = Identifier (hash) computed by Cabal
@@ -290,11 +292,12 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 --
 -- Module signatures are a kind of interface (similar to .hs-boot files). They
 -- are used in place of some real code. GHC allows real modules from other
--- units to be used to fill these module holes.
+-- units to be used to fill these module holes. The process is called
+-- "unit/module instantiation".
 --
 -- You can think of this as polymorphism at the module level: module signatures
 -- give constraints on the "type" of module that can be used to fill the hole
--- (where "type" means types of the entitites it exports, etc.)
+-- (where "type" means types of the exported module entitites, etc.).
 --
 -- Module signatures contain enough information (datatypes, abstract types, type
 -- synonyms, classes, etc.) to typecheck modules depending on them but not
@@ -303,7 +306,7 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 --
 -- To distinguish between indefinite and finite unit ids at the type level, we
 -- respectively use 'IndefUnitId' and 'DefUnitId' datatypes that are basically
--- wrappers over a UnitId.
+-- wrappers over 'UnitId'.
 --
 -- Unit instantiation
 -- ------------------
@@ -322,7 +325,7 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 --       -- ^ the indefinite unit that is instantiated
 --
 --    * instUnitInsts :: [(ModuleName,(Unit,ModuleName)]
---       -- ^ a list of instantiations where an instantiation is:
+--       -- ^ a list of instantiations, where an instantiation is:
 --            (module hole name, (instantiating unit, instantiating module name))
 --
 -- A 'Unit' may be indefinite or definite, it depends on whether some holes
@@ -697,12 +700,12 @@ data Unit
     | DefUnit  {-# UNPACK #-} !DefUnitId        -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
 
 unitFS :: Unit -> FastString
-unitFS (InstUnit x)            = instUnitFS x
-unitFS (DefUnit (DefUnitId x)) = installedUnitIdFS x
+unitFS (InstUnit x)           = instUnitFS x
+unitFS (DefUnit (Definite x)) = installedUnitIdFS x
 
 unitKey :: Unit -> Unique
-unitKey (InstUnit x)            = instUnitKey x
-unitKey (DefUnit (DefUnitId x)) = installedUnitIdKey x
+unitKey (InstUnit x)           = instUnitKey x
+unitKey (DefUnit (Definite x)) = installedUnitIdKey x
 
 -- | A dynamically instantiated unit.
 --
@@ -841,8 +844,8 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 -- | Return the UnitId of the Unit. For instantiated units, return the
 -- UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
-toUnitId (DefUnit (DefUnitId iuid)) = iuid
-toUnitId (InstUnit indef)           = indefUnitId (instUnitInstanceOf indef)
+toUnitId (DefUnit (Definite iuid)) = iuid
+toUnitId (InstUnit indef)          = indefUnitId (instUnitInstanceOf indef)
 
 installedUnitIdString :: UnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
@@ -882,15 +885,18 @@ installedUnitIdEq iuid uid = toUnitId uid == iuid
 -- | A 'DefUnitId' is an 'UnitId' with the invariant that
 -- it only refers to a definite library; i.e., one we have generated
 -- code for.
-newtype DefUnitId = DefUnitId { unDefUnitId :: UnitId }
+type DefUnitId = Definite UnitId
+
+-- | A definite unit (i.e. without any free module hole)
+newtype Definite unit = Definite { unDefinite :: unit }
     deriving (Eq, Ord)
 
-instance Outputable DefUnitId where
-    ppr (DefUnitId uid) = ppr uid
+instance Outputable unit => Outputable (Definite unit) where
+    ppr (Definite uid) = ppr uid
 
-instance Binary DefUnitId where
-    put_ bh (DefUnitId uid) = put_ bh uid
-    get bh = do uid <- get bh; return (DefUnitId uid)
+instance Binary unit => Binary (Definite unit) where
+    put_ bh (Definite uid) = put_ bh uid
+    get bh = do uid <- get bh; return (Definite uid)
 
 -- | A map keyed off of 'InstalledModule'
 newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
@@ -982,7 +988,7 @@ fingerprintUnitId prefix (Fingerprint a b)
 
 -- | Smart constructor for InstUnit
 mkInstUnit :: IndefUnitId -> [(ModuleName, Module)] -> Unit
-mkInstUnit uid []    = DefUnit  $ DefUnitId (indefUnitId uid)
+mkInstUnit uid []    = DefUnit  $ Definite (indefUnitId uid)
 mkInstUnit uid insts = InstUnit $ mkInstantiatedUnit uid insts
 
 pprUnit :: Unit -> SDoc
@@ -1034,7 +1040,7 @@ instance Binary IndefUnitId where
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnit :: FastString -> Unit
-fsToUnit = DefUnit . DefUnitId . UnitId
+fsToUnit = DefUnit . Definite . UnitId
 
 stringToUnit :: String -> Unit
 stringToUnit = fsToUnit . mkFastString
@@ -1111,8 +1117,8 @@ getModuleInstantiation m =
 
 -- | Return the unit-id this unit is an instance of and the module instantiations (if any).
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
-getUnitInstantiations (InstUnit iuid)           = (indefUnitId (instUnitInstanceOf iuid), Just iuid)
-getUnitInstantiations (DefUnit (DefUnitId uid)) = (uid, Nothing)
+getUnitInstantiations (InstUnit iuid)          = (indefUnitId (instUnitInstanceOf iuid), Just iuid)
+getUnitInstantiations (DefUnit (Definite uid)) = (uid, Nothing)
 
 generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
 generalizeInstantiatedUnit InstantiatedUnit{ instUnitInstanceOf = cid
@@ -1135,7 +1141,7 @@ parseUnit = parseInstUnitId <++ parseDefUnitId
         return (mkInstUnit uid insts)
     parseDefUnitId = do
         s <- parseUnitId
-        return (DefUnit (DefUnitId s))
+        return (DefUnit (Definite s))
 
 parseUnitId :: ReadP UnitId
 parseUnitId = do
