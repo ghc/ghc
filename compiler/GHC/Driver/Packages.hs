@@ -1046,7 +1046,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
           where upd_pkg pkg
                   | Just def_uid <- definiteUnitInfoId pkg
                   , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
-                  = let fs = installedUnitIdFS (unDefinite wiredInUnitId)
+                  = let fs = unitIdFS (unDefinite wiredInUnitId)
                     in pkg {
                       unitId = fsToUnitId fs,
                       unitInstanceOf = mkIndefUnitId pkgstate fs
@@ -2050,7 +2050,7 @@ missingPackageMsg p = text "unknown package:" <+> ppr p
 missingDependencyMsg :: Maybe UnitId -> SDoc
 missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
-  = space <> parens (text "dependency of" <+> ftext (installedUnitIdFS parent))
+  = space <> parens (text "dependency of" <+> ftext (unitIdFS parent))
 
 -- -----------------------------------------------------------------------------
 
@@ -2081,7 +2081,7 @@ mkIndefUnitId pkgstate raw =
 
 -- | Update component ID details from the database
 updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
-updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (installedUnitIdFS (indefUnit uid))
+updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (unitIdFS (indefUnit uid))
 
 
 displayUnitId :: PackageState -> UnitId -> Maybe String
@@ -2138,7 +2138,7 @@ pprPackagesWith pprIPI pkgstate =
 -- be different from the package databases (exposure, trust)
 pprPackagesSimple :: PackageState -> SDoc
 pprPackagesSimple = pprPackagesWith pprIPI
-    where pprIPI ipi = let i = installedUnitIdFS (unitId ipi)
+    where pprIPI ipi = let i = unitIdFS (unitId ipi)
                            e = if unitIsExposed ipi then text "E" else text " "
                            t = if unitIsTrusted ipi then text "T" else text " "
                        in e <> t <> text "  " <> ftext i
