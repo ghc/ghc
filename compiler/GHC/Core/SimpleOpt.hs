@@ -889,6 +889,10 @@ And now we have a known-constructor MkT that we can return.
 Notice that both (2) and (3) require exprIsConApp_maybe to gather and return
 a bunch of floats, both let and case bindings.
 
+Note that this strategy introduces some subtle scenarios where a data-con
+wrapper can be replaced by a data-con worker earlier than we’d like, see
+Note [exprIsConApp_maybe for data-con wrappers: tricky corner].
+
 Note [beta-reduction in exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The unfolding a definition (_e.g._ a let-bound variable or a datacon wrapper) is
@@ -949,6 +953,52 @@ exprIsConApp_maybe does not return Just) then nothing happens, and nothing
 will happen the next time either.
 
 See test T16254, which checks the behavior of newtypes.
+
+Note [exprIsConApp_maybe for data-con wrappers: tricky corner]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As discussed in Note [exprIsConApp_maybe on data constructors with wrappers], we
+want case-of-known-constructor to fire on data-con wrappers, so we have to
+inline them earlier than we usually would. For the most part, this is okay:
+after case-of-known-constructor fires, the constructor will (naturally) be
+eliminated, so the worker doesn’t stick around for very long.
+
+However, surprisingly, there are situations where this plan can backfire, and we
+end up turning a wrapper into a worker earlier than we’d like. An example:
+
+    data T = C !A B
+    foo p q = let x = C e1 e2 in seq x $ f x
+    {-# RULE "wurble" f (C a b) = b #-}
+
+In Core, the RHS of foo is
+
+    let x = $WC e1 e2 in case x of y { C _ _ -> f x }
+
+and after doing a binder swap and inlining x, we have:
+
+    case $WC e1 e2 of y { C _ _ -> f y }
+
+Now case-of-known-constructor fires, but now we have to reconstruct a binding
+for `y` (which was dead before the binder swap) on the RHS of the case
+alternative. Naturally, we’ll use the worker:
+
+    case e1 of a { DEFAULT -> let y = C a e2 in f y }
+
+and after inlining `y`, we have:
+
+    case e1 of a { DEFAULT -> f (C a e2) }
+
+Now we might hope the "wurble" rule would fire, but alas, it will not: we have
+replaced $WC with C, but the (desugared) rule matches on $WC! We weren’t
+supposed to inline $WC yet for precisely that reason (see Note [Activation for
+data constructor wrappers]), but our cheating in exprIsConApp_maybe came back to
+bite us.
+
+This is rather unfortunate, especially since this can happen inside stable
+unfoldings as well as ordinary code (which really happened, see !3041). But
+there is no obvious solution except to delay case-of-known-constructor on
+data-con wrappers, and that cure would be worse than the disease.
+
+This Note exists solely to document the problem.
 -}
 
 data ConCont = CC [CoreExpr] Coercion
@@ -1033,7 +1083,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
         -- Look through data constructor wrappers: they inline late (See Note
         -- [Activation for data constructor wrappers]) but we want to do
-        -- case-of-known-constructor optimisation eagerly.
+        -- case-of-known-constructor optimisation eagerly (see Note
+        -- [exprIsConApp_maybe on data constructors with wrappers]).
         | isDataConWrapId fun
         , let rhs = uf_tmpl (realIdUnfolding fun)
         = go (Left in_scope) floats rhs cont
