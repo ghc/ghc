@@ -116,7 +116,11 @@ example: ::
         }
 
 Here ``tag`` is a public field, with a well-typed selector function
-``tag :: Counter a -> a``. The ``self`` type is hidden from the outside;
+``tag :: Counter a -> a``. See :ref:`field-selectors-and-type-applications`
+for a full description of how the types of top-level field selectors are
+determined.
+
+The ``self`` type is hidden from the outside;
 any attempt to apply ``_this``, ``_inc`` or ``_display`` as functions
 will raise a compile-time error. In other words, *GHC defines a record
 selector function only for fields whose type does not mention the

@@ -1,3 +1,5 @@
+.. _arbitrary-rank-polymorphism:
+
 Arbitrary-rank polymorphism
 ===========================
 

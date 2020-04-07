@@ -18,6 +18,34 @@ Full details
 Language
 ~~~~~~~~
 
+* Record field selectors are now given type signatures that preserve the
+  user-written order of quantified type variables. Moreover, field selector
+  type signatures no longer make inferred type variables avaiable for explicit
+  type application. See :ref:`field-selectors-and-type-applications` for more
+  details.
+
+  In certain situations, this will constitute a breaking change as this can
+  affect :extension:`TypeApplications`. For instance, given the following
+  definitions: ::
+
+    {-# LANGUAGE PolyKinds #-}
+
+    newtype P a = MkP { unP :: Proxy a }
+
+    newtype N :: Type -> Type -> Type where
+      MkN :: forall b a. { unN :: Either a b } -> N a b
+
+  Previous versions of GHC would give the following types to ``unP`` and
+  ``unN``: ::
+
+    unP :: forall k (a :: k). P a -> Proxy a
+    unN :: forall a b. N a b -> Either a b
+
+  GHC will now give them the following types instead: ::
+
+    unP :: forall {k} (a :: k). P a -> Proxy a
+    unN :: forall b a. N a b -> Either a b
+
 * In obscure scenarios, GHC now rejects programs it previously accepted, but
   with unhelpful types. For example, if (with ``-XPartialTypeSignatures``) you
   were to write ``x :: forall (f :: forall a (b :: a -> Type). b _). f _``, GHC previously
@@ -40,7 +68,7 @@ Language
 
   There is a chance we will tweak the lookup scheme in the future, to make this
   workaround unnecessary.
-  
+
 Compiler
 ~~~~~~~~
 
