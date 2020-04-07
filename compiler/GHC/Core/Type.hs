@@ -358,8 +358,11 @@ See also #11715, which tracks removing this inconsistency.
 -- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
-tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+tcView (TyConApp tc tys)
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  = Just $ case tenv of
+             [] -> mkAppTys rhs tys'
+             _  -> mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here.
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
