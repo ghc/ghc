@@ -15,6 +15,7 @@ the keys.
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Types.Module
     (
@@ -36,6 +37,7 @@ module GHC.Types.Module
         IndefUnitId,
         UnitPprInfo(..),
         GenUnit(..),
+        mapGenUnit,
         Unit,
         unitFS,
         unitKey,
@@ -173,6 +175,7 @@ import Control.DeepSeq
 import Data.Coerce
 import Data.Data
 import Data.Function
+import Data.Bifunctor
 import Data.Map (Map)
 import Data.Set (Set)
 import qualified Data.Map as Map
@@ -535,7 +538,7 @@ data GenModule unit = Module
    { moduleUnit :: !unit       -- ^ Unit the module belongs to
    , moduleName :: !ModuleName -- ^ Module name (e.g. A.B.C)
    }
-   deriving (Eq,Ord,Data)
+   deriving (Eq,Ord,Data,Functor)
 
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
 type Module = GenModule Unit
@@ -593,8 +596,7 @@ stableModuleCmp (Module p1 n1) (Module p2 n2)
    = (p1 `stableUnitCmp`  p2) `thenCmp`
      (n1 `stableModuleNameCmp` n2)
 
--- | Create a concrete module
-mkModule :: Unit -> ModuleName -> Module
+mkModule :: u -> ModuleName -> GenModule u
 mkModule = Module
 
 pprModule :: Module -> SDoc
@@ -632,6 +634,7 @@ data Indefinite unit = Indefinite
    { indefUnit        :: unit              -- ^ Unit identifier
    , indefUnitPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
+   deriving (Functor)
 
 instance Eq unit => Eq (Indefinite unit) where
    a == b = indefUnit a == indefUnit b
@@ -709,6 +712,18 @@ data GenUnit unit
 
     | HoleUnit
       -- ^ Fake hole unit
+
+-- | Map over the unit type of a 'GenUnit'
+mapGenUnit :: (u -> v) -> (v -> FastString) -> GenUnit u -> GenUnit v
+mapGenUnit f gunitFS = go
+   where
+      go gu = case gu of
+               HoleUnit   -> HoleUnit
+               DefUnit d  -> DefUnit (fmap f d)
+               InstUnit i ->
+                  InstUnit $ mkGenInstantiatedUnit gunitFS
+                     (fmap f (instUnitInstanceOf i))
+                     (fmap (second (fmap go)) (instUnitInsts i))
 
 unitFS :: Unit -> FastString
 unitFS = genUnitFS unitIdFS
@@ -918,7 +933,7 @@ type DefUnitId = Definite UnitId
 
 -- | A definite unit (i.e. without any free module hole)
 newtype Definite unit = Definite { unDefinite :: unit }
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Functor)
 
 instance Outputable unit => Outputable (Definite unit) where
     ppr (Definite uid) = ppr uid

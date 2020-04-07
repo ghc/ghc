@@ -589,7 +589,7 @@ readPackageDatabase dflags conf_file = do
       conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file'
-      pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . toUnitInfo)
+      pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) unitIdFS . mkUnitKeyInfo)
                          proto_pkg_configs
   --
   return $ PackageDatabase conf_file' pkg_configs1
