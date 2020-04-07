@@ -102,8 +102,8 @@ module GHC.Types.Module
         -- * Installed unit ids and modules
         InstalledModuleEnv,
         installedModuleEq,
-        installedUnitIdEq,
-        installedUnitIdString,
+        unitIdEq,
+        unitIdString,
         fsToUnitId,
         stringToUnitId,
         emptyInstalledModuleEnv,
@@ -850,8 +850,8 @@ toUnitId :: Unit -> UnitId
 toUnitId (DefUnit (Definite iuid)) = iuid
 toUnitId (InstUnit indef)          = indefUnit (instUnitInstanceOf indef)
 
-installedUnitIdString :: UnitId -> String
-installedUnitIdString = unpackFS . unitIdFS
+unitIdString :: UnitId -> String
+unitIdString = unpackFS . unitIdFS
 
 instance Outputable InstantiatedUnit where
     ppr uid =
@@ -882,8 +882,8 @@ installedModuleEq imod mod =
 
 -- | Test if a 'Unit' corresponds to a given 'UnitId',
 -- modulo instantiation.
-installedUnitIdEq :: UnitId -> Unit -> Bool
-installedUnitIdEq iuid uid = toUnitId uid == iuid
+unitIdEq :: UnitId -> Unit -> Bool
+unitIdEq iuid uid = toUnitId uid == iuid
 
 -- | A 'DefUnitId' is an 'UnitId' with the invariant that
 -- it only refers to a definite library; i.e., one we have generated
