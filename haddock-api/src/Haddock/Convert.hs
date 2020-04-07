@@ -34,7 +34,7 @@ import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Core.PatSyn
 import GHC.Types.SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
-import GHC.Tc.Utils.Type
+import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
