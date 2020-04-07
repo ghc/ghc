@@ -1,0 +1,5 @@
+
+T18008.hs:5:43: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘String’
+    • In the type ‘(forall a. Show a => a -> String) -> _’
+      In the type signature: f :: (forall a. Show a => a -> String) -> _
