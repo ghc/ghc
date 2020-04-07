@@ -44,7 +44,7 @@ class (Monad m) => MonadIO m where
     --   liftIO $ print state
     -- @
     --
-    -- Had we ommitted @'liftIO'@, we would have ended up with this error:
+    -- Had we omitted @'liftIO'@, we would have ended up with this error:
     --
     -- @
     -- • Couldn't match type ‘IO’ with ‘StateT s IO’
