@@ -2835,10 +2835,13 @@ kindGeneralizeAll ty = do { traceTc "kindGeneralizeAll" empty
                           ; kindGeneralizeSome (const True) ty }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
--- can be generalized. Use this variant when it is unknowable whether metavariables
--- might later be constrained.
--- See Note [Recipe for checking a signature] for why and where this
--- function is needed.
+-- can be generalized, but perhaps some may neeed to be promoted.
+-- Use this variant when it is unknowable whether metavariables might
+-- later be constrained.
+--
+-- To see why this promotion is needed, see
+-- Note [Recipe for checking a signature], and especially
+-- Note [Promotion in signatures].
 kindGeneralizeNone :: TcType  -- needn't be zonked
                    -> TcM ()
 kindGeneralizeNone ty
@@ -3176,7 +3179,7 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
-         -- No kind-generalization here:
+       -- No kind-generalization here, but perhaps some promotion
        ; kindGeneralizeNone (mkSpecForAllTys implicit_tvs $
                              mkSpecForAllTys explicit_tvs $
                              mkPhiTy theta $
@@ -3187,6 +3190,16 @@ tcHsPartialSigType ctxt sig_ty
        -- See Note [Extra-constraint holes in partial type signatures]
        ; emitNamedWildCardHoleConstraints wcs
 
+       -- Zonk, so that any nested foralls can "see" their occurrences
+       -- and to get any casts out of the way of instantiation
+       -- Example: #18008 had
+       --      foo :: (forall a. (Show a => blah) |> Refl) -> _
+       -- and that Refl cast messed things up
+       ; implicit_tvs <- mapM zonkTcTyVarToTyVar implicit_tvs
+       ; explicit_tvs <- mapM zonkTcTyVarToTyVar explicit_tvs
+       ; theta        <- mapM zonkTcType theta
+       ; tau          <- zonkTcType tau
+
          -- We return a proper (Name,TyVar) environment, to be sure that
          -- we bring the right name into scope in the function body.
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
@@ -3195,7 +3208,7 @@ tcHsPartialSigType ctxt sig_ty
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it
-      --     here because we don't have a complete tuype to check
+      --     here because we don't have a complete type to check
 
        ; traceTc "tcHsPartialSigType" (ppr tv_prs)
        ; return (wcs, wcx, tv_prs, theta, tau) }
