@@ -229,11 +229,11 @@ liftExpr (StgApp f args) = do
 liftExpr (StgConApp con args tys) = StgConApp con <$> traverse liftArgs args <*> pure tys
 liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftArgs args <*> pure ty
 liftExpr (StgLam _ _) = pprPanic "stgLiftLams" (text "StgLam")
-liftExpr (StgCase scrut info ty alts) = do
+liftExpr (StgCase scrut info ty do_gc alts) = do
   scrut' <- liftExpr scrut
   withSubstBndr (binderInfoBndr info) $ \bndr' -> do
     alts' <- traverse liftAlt alts
-    pure (StgCase scrut' bndr' ty alts')
+    pure (StgCase scrut' bndr' ty do_gc alts')
 liftExpr (StgLet scope bind body)
   = withLiftedBind NotTopLevel bind scope $ \mb_bind' -> do
       body' <- liftExpr body

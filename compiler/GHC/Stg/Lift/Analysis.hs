@@ -232,8 +232,8 @@ tagSkeletonExpr (StgApp f args)
       | null args = unitVarSet f
       | otherwise = mkArgOccs args
 tagSkeletonExpr (StgLam _ _) = pprPanic "stgLiftLams" (text "StgLam")
-tagSkeletonExpr (StgCase scrut bndr ty alts)
-  = (skel, arg_occs, StgCase scrut' bndr' ty alts')
+tagSkeletonExpr (StgCase scrut bndr ty do_gc alts)
+  = (skel, arg_occs, StgCase scrut' bndr' ty do_gc alts')
   where
     (scrut_skel, scrut_arg_occs, scrut') = tagSkeletonExpr scrut
     (alt_skels, alt_arg_occss, alts') = mapAndUnzip3 tagSkeletonAlt alts

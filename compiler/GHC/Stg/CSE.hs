@@ -307,8 +307,8 @@ stgCseExpr _ (StgLam _ _)
 stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body
       in StgTick tick body'
-stgCseExpr env (StgCase scrut bndr ty alts)
-    = mkStgCase scrut' bndr' ty alts'
+stgCseExpr env (StgCase scrut bndr ty do_gc alts)
+    = mkStgCase scrut' bndr' ty do_gc alts'
   where
     scrut' = stgCseExpr env scrut
     (env1, bndr') = substBndr env bndr
@@ -406,9 +406,10 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
       in (Just (substVar env bndr, StgRhsClosure ext ccs upd args' body'), env)
 
 
-mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr
-mkStgCase scrut bndr ty alts | all isBndr alts = scrut
-                             | otherwise       = StgCase scrut bndr ty alts
+mkStgCase :: StgExpr -> OutId -> AltType -> Bool -> [StgAlt] -> StgExpr
+mkStgCase scrut bndr ty do_gc alts
+  | all isBndr alts = scrut
+  | otherwise       = StgCase scrut bndr ty do_gc alts
 
   where
     -- see Note [All alternatives are the binder]

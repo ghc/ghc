@@ -277,9 +277,23 @@ This has the same boxed/unboxed business as Core case expressions.
         (GenStgExpr pass) -- the thing to examine
         (BinderP pass) -- binds the result of evaluating the scrutinee
         AltType
+        Bool           -- GC in alts? See Note [Case alternative allocation strategy]
         [GenStgAlt pass]
                     -- The DEFAULT case is always *first*
                     -- if it is there at all
+
+-- Note [Case alternative allocation strategy]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The STG case expression is extended with a boolean flag to carry
+-- information about whether we should put a heap check in its alternatives.
+--  * True  - do the heap check before the case - no need to put it in alts
+--  * False - we must put heap checks at the start or each alternative branch
+-- We compute this information in @annTopBindindingsFreeVars@ and then,
+-- in @cgCase@ we can consult that flag to decide the actual GCPlan. We
+-- currently set this flag to 'True' being conservative and assuming that the
+-- generated code _will_ inevitably perform the GC check in alternatives. The
+-- worst-case scenario here is that we place the checks in a less-than-perfect
+-- position.
 
 {-
 ************************************************************************
@@ -763,21 +777,21 @@ pprStgExpr (StgTick tickish expr)
 
 
 -- Don't indent for a single case alternative.
-pprStgExpr (StgCase expr bndr alt_type [alt])
+pprStgExpr (StgCase expr bndr alt_type do_gc [alt])
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            pprStgAlt False alt,
-           char '}']
+           char '}', text "GC in alts:" <+> ppr do_gc]
 
-pprStgExpr (StgCase expr bndr alt_type alts)
+pprStgExpr (StgCase expr bndr alt_type do_gc alts)
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            nest 2 (vcat (map (pprStgAlt True) alts)),
-           char '}']
+           char '}', text "GC in alts:" <+> ppr do_gc]
 
 
 pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc

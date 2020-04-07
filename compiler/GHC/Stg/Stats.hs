@@ -162,7 +162,7 @@ statExpr (StgLet _ binds body)
   = statBinding False{-not top-level-} binds    `combineSE`
     statExpr body
 
-statExpr (StgCase expr _ _ alts)
+statExpr (StgCase expr _ _ _ alts)
   = statExpr expr       `combineSE`
     stat_alts alts      `combineSE`
     countOne StgCases
