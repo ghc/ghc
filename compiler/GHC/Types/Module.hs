@@ -708,7 +708,7 @@ unitFS (DefUnit (Definite x)) = unitIdFS x
 
 unitKey :: Unit -> Unique
 unitKey (InstUnit x)           = instUnitKey x
-unitKey (DefUnit (Definite x)) = installedUnitIdKey x
+unitKey (DefUnit (Definite x)) = unitIdKey x
 
 -- | A dynamically instantiated unit.
 --
@@ -825,13 +825,13 @@ instance Binary UnitId where
   get bh = do fs <- get bh; return (UnitId fs)
 
 instance Eq UnitId where
-    uid1 == uid2 = installedUnitIdKey uid1 == installedUnitIdKey uid2
+    uid1 == uid2 = unitIdKey uid1 == unitIdKey uid2
 
 instance Ord UnitId where
     u1 `compare` u2 = unitIdFS u1 `compare` unitIdFS u2
 
 instance Uniquable UnitId where
-    getUnique = installedUnitIdKey
+    getUnique = unitIdKey
 
 instance Outputable UnitId where
     ppr uid@(UnitId fs) =
@@ -841,8 +841,8 @@ instance Outputable UnitId where
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
 
-installedUnitIdKey :: UnitId -> Unique
-installedUnitIdKey = getUnique . unitIdFS
+unitIdKey :: UnitId -> Unique
+unitIdKey = getUnique . unitIdFS
 
 -- | Return the UnitId of the Unit. For instantiated units, return the
 -- UnitId of the indefinite unit this unit is an instance of.
