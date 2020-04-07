@@ -54,7 +54,7 @@ class (Monad m) => MonadIO m where
     --
     -- The important part here is the mismatch between @StateT s IO ()@ and @'IO' ()@.
     --
-    -- Luckily, we know of a function that takes an @'IO' a@ and returns a @m a@: @'liftIO'@.
+    -- Luckily, we know of a function that takes an @'IO' a@ and returns an @(m a)@: @'liftIO'@.
     -- Which enables us to run the program and see the expect results:
     --
     -- @
