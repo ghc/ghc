@@ -1,6 +1,12 @@
 test('hie001',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
-test('hie002',       collect_compiler_stats('bytes allocated',10),
-                                               compile, ['-fno-code -fwrite-ide-info'])
+test('hie002',
+     [# Allocation numbers unstable on 32-bit, skip:
+      when(arch('i386'), skip),
+      # No linting in perf tests:
+      no_lint,
+      collect_compiler_stats('bytes allocated',10)],
+     compile,
+     ['-fno-code -fwrite-ide-info'])
 test('hie003',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie004',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie005',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
