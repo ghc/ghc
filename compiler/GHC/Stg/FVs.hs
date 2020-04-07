@@ -128,13 +128,15 @@ expr env = go
     go (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
     go StgLam{} = pprPanic "StgFVs: StgLam" empty
-    go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
+    go (StgCase scrut bndr ty _ alts) = (StgCase scrut' bndr ty do_gc alts', fvs)
       where
         (scrut', scrut_fvs) = go scrut
         -- See Note [Tracking local binders]
         (alts', alt_fvss) = mapAndUnzip (alt (addLocals [bndr] env)) alts
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
+        -- See Note [Case alternative allocation strategy] 
+        do_gc = True -- TODO: analyze alts and compute the flag
     go (StgLet ext bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
     go (StgTick tick e) = (StgTick tick e', fvs')

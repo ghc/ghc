@@ -336,24 +336,24 @@ unariseExpr rho (StgOpApp op args ty)
 unariseExpr _ e@StgLam{}
   = pprPanic "unariseExpr: found lambda" (ppr e)
 
-unariseExpr rho (StgCase scrut bndr alt_ty alts)
+unariseExpr rho (StgCase scrut bndr alt_ty do_gc alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
   | StgApp v [] <- scrut
   , Just (MultiVal xs) <- lookupVarEnv rho v
-  = elimCase rho xs bndr alt_ty alts
+  = elimCase rho xs bndr alt_ty do_gc alts
 
   -- Handle strict lets for tuples and sums:
   --   case (# a,b #) of r -> rhs
   -- and analogously for sums
   | StgConApp dc args ty_args <- scrut
   , Just args' <- unariseMulti_maybe rho dc args ty_args
-  = elimCase rho args' bndr alt_ty alts
+  = elimCase rho args' bndr alt_ty do_gc alts
 
   -- general case
   | otherwise
   = do scrut' <- unariseExpr rho scrut
-       alts'  <- unariseAlts rho alt_ty bndr alts
-       return (StgCase scrut' bndr alt_ty alts')
+       alts'  <- unariseAlts rho alt_ty bndr do_gc alts
+       return (StgCase scrut' bndr alt_ty do_gc alts')
                        -- bndr may have a unboxed sum/tuple type but it will be
                        -- dead after unarise (checked in GHC.Stg.Lint)
 
@@ -383,9 +383,9 @@ unariseMulti_maybe rho dc args ty_args
 
 elimCase :: UnariseEnv
          -> [OutStgArg] -- non-void args
-         -> InId -> AltType -> [InStgAlt] -> UniqSM OutStgExpr
+         -> InId -> AltType -> Bool -> [InStgAlt] -> UniqSM OutStgExpr
 
-elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
+elimCase rho args bndr (MultiValAlt _) _ [(_, bndrs, rhs)]
   = do let rho1 = extendRho rho bndr (MultiVal args)
            rho2
              | isUnboxedTupleBndr bndr
@@ -397,7 +397,7 @@ elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
 
        unariseExpr rho2 rhs
 
-elimCase rho args bndr (MultiValAlt _) alts
+elimCase rho args bndr (MultiValAlt _) do_gc alts
   | isUnboxedSumBndr bndr
   = do let (tag_arg : real_args) = args
        tag_bndr <- mkId (mkFastString "tag") tagTy
@@ -408,22 +408,22 @@ elimCase rho args bndr (MultiValAlt _) alts
                       StgLitArg l     -> StgLit l
 
        alts' <- unariseSumAlts rho1 real_args alts
-       return (StgCase scrut' tag_bndr tagAltTy alts')
+       return (StgCase scrut' tag_bndr tagAltTy do_gc alts')
 
-elimCase _ args bndr alt_ty alts
+elimCase _ args bndr alt_ty _ alts
   = pprPanic "elimCase - unhandled case"
       (ppr args <+> ppr bndr <+> ppr alt_ty $$ ppr alts)
 
 --------------------------------------------------------------------------------
 
-unariseAlts :: UnariseEnv -> AltType -> InId -> [StgAlt] -> UniqSM [StgAlt]
-unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e)]
+unariseAlts :: UnariseEnv -> AltType -> InId -> Bool -> [StgAlt] -> UniqSM [StgAlt]
+unariseAlts rho (MultiValAlt n) bndr _ [(DEFAULT, [], e)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys) <- unariseConArgBinder rho bndr
        e' <- unariseExpr rho' e
        return [(DataAlt (tupleDataCon Unboxed n), ys, e')]
 
-unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
+unariseAlts rho (MultiValAlt n) bndr _ [(DataAlt _, ys, e)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys1) <- unariseConArgBinders rho ys
        MASSERT(ys1 `lengthIs` n)
@@ -431,27 +431,27 @@ unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
        e' <- unariseExpr rho'' e
        return [(DataAlt (tupleDataCon Unboxed n), ys1, e')]
 
-unariseAlts _ (MultiValAlt _) bndr alts
+unariseAlts _ (MultiValAlt _) bndr _ alts
   | isUnboxedTupleBndr bndr
   = pprPanic "unariseExpr: strange multi val alts" (ppr alts)
 
 -- In this case we don't need to scrutinize the tag bit
-unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
+unariseAlts rho (MultiValAlt _) bndr _ [(DEFAULT, _, rhs)]
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, sum_bndrs) <- unariseConArgBinder rho bndr
        rhs' <- unariseExpr rho_sum_bndrs rhs
        return [(DataAlt (tupleDataCon Unboxed (length sum_bndrs)), sum_bndrs, rhs')]
 
-unariseAlts rho (MultiValAlt _) bndr alts
+unariseAlts rho (MultiValAlt _) bndr do_gc alts
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
-       let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
+       let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy do_gc alts'
        return [ (DataAlt (tupleDataCon Unboxed (length scrt_bndrs)),
                  scrt_bndrs,
                  inner_case) ]
 
-unariseAlts rho _ _ alts
+unariseAlts rho _ _ _ alts
   = mapM (\alt -> unariseAlt rho alt) alts
 
 unariseAlt :: UnariseEnv -> StgAlt -> UniqSM StgAlt
