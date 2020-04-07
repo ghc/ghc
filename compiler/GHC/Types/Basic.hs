@@ -1414,6 +1414,8 @@ constructor wrappers] in GHC.Types.Id.Make.
 For further reading, see:
   * Note [Conlike is interesting] in GHC.Core.Op.Simplify.Utils
   * Note [Lone variables] in GHC.Core.Unfold
+  * Note [exprIsConApp_maybe on data constructors with wrappers]
+    in GHC.Core.SimpleOpt
   * #18012
 -}
 
@@ -1445,7 +1447,7 @@ inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
 
 dataConWorkerInlinePragma = defaultInlinePragma { inl_rule = ConLike }
--- See Note [DataCon wrappers are conlike].
+-- See Note [DataCon wrappers are conlike]
 dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
                                                 , inl_inline = Inline }
 
