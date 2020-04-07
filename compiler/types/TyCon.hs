@@ -135,9 +135,10 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTyMany )
 import {-# SOURCE #-} TyCoPpr    ( pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
+                                 , multiplicityTyCon
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
                                  , dataConTyCon, dataConFullSig
@@ -484,7 +485,7 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (AnonTCB af))   k = mkFunTy af (varType tv) k
+    mk (Bndr tv (AnonTCB af))   k = mkFunTyMany af (varType tv) k
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
 tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
@@ -2195,6 +2196,7 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+                                          , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
@@ -2392,7 +2394,7 @@ tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
 tyConRoles tc
   = case tc of
-    { FunTyCon {}                         -> [Nominal, Nominal, Representational, Representational]
+    { FunTyCon {}                         -> [Nominal, Nominal, Nominal, Representational, Representational]
     ; AlgTyCon { tcRoles = roles }        -> roles
     ; SynonymTyCon { tcRoles = roles }    -> roles
     ; FamilyTyCon {}                      -> const_role Nominal
