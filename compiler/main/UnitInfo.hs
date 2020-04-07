@@ -13,7 +13,6 @@ module UnitInfo (
         mkUnit,
         expandedUnitInfoId,
         definiteUnitInfoId,
-        installedUnitInfoId,
 
         -- * The UnitInfo type: information about a unit
         UnitInfo,
@@ -45,13 +44,7 @@ import GHC.Types.Unique
 -- Our UnitInfo type is the GenericUnitInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
-type UnitInfo = GenericUnitInfo
-                       IndefUnitId
-                       PackageId
-                       PackageName
-                       Module.UnitId
-                       Module.ModuleName
-                       Module.Module
+type UnitInfo = GenericUnitInfo IndefUnitId PackageId PackageName UnitId ModuleName Module
 
 -- | Convert a DbUnitInfo (read from a package database) into `UnitInfo`
 toUnitInfo :: DbUnitInfo -> UnitInfo
@@ -70,7 +63,7 @@ toUnitInfo = mapGenericUnitInfo
      mkIndefUnitId' cid   = IndefUnitId (UnitId (mkFastStringByteString cid)) Nothing
      mkInstUnitId' i = case i of
       DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)
-      DbUnitId uid           -> DefUnit (DefUnitId (mkUnitId' uid))
+      DbUnitId uid           -> DefUnit (Definite (mkUnitId' uid))
      mkModule' m = case m of
        DbModule uid n -> mkModule (mkInstUnitId' uid) (mkModuleName' n)
        DbModuleVar  n -> mkHoleModule (mkModuleName' n)
@@ -137,26 +130,11 @@ pprUnitInfo GenericUnitInfo {..} =
   where
     field name body = text name <> colon <+> nest 4 body
 
--- -----------------------------------------------------------------------------
--- UnitId (package names, versions and dep hash)
-
--- $package_naming
--- #package_naming#
--- Mostly the compiler deals in terms of 'UnitId's, which are md5 hashes
--- of a package ID, keys of its dependencies, and Cabal flags. You're expected
--- to pass in the unit id in the @-this-unit-id@ flag. However, for
--- wired-in packages like @base@ & @rts@, we don't necessarily know what the
--- version is, so these are handled specially; see #wired_in_packages#.
-
--- | Get the GHC 'UnitId' right out of a Cabalish 'UnitInfo'
-installedUnitInfoId :: UnitInfo -> UnitId
-installedUnitInfoId = unitId
-
 mkUnit :: UnitInfo -> Unit
 mkUnit p =
     if unitIsIndefinite p
         then mkInstUnit (unitInstanceOf p) (unitInstantiations p)
-        else DefUnit (DefUnitId (unitId p))
+        else DefUnit (Definite (unitId p))
 
 expandedUnitInfoId :: UnitInfo -> Unit
 expandedUnitInfoId p =

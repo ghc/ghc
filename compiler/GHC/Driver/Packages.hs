@@ -431,7 +431,7 @@ extendUnitInfoMap (UnitInfoMap pkg_map closure) new_pkgs
     -- We also add the expanded version of the mkUnit, so that
     -- 'improveUnit' can find it.
   where add pkg_map p = addToUDFM (addToUDFM pkg_map (expandedUnitInfoId p) p)
-                                  (installedUnitInfoId p) p
+                                  (unitId p) p
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
@@ -797,11 +797,11 @@ findPackages prec_map pkg_db arg pkgs unusable
           else Nothing
     finder (UnitIdArg uid) p
       = case uid of
-          DefUnit (DefUnitId iuid)
-            | iuid == installedUnitInfoId p
+          DefUnit (Definite iuid)
+            | iuid == unitId p
             -> Just p
           InstUnit inst
-            | indefUnitId (instUnitInstanceOf inst) == installedUnitInfoId p
+            | indefUnitId (instUnitInstanceOf inst) == unitId p
             -> Just (renamePackage pkg_db (instUnitInsts inst) p)
           _ -> Nothing
 
@@ -838,11 +838,11 @@ matchingStr str p
         || str == unitPackageNameString p
 
 matchingId :: UnitId -> UnitInfo -> Bool
-matchingId uid p = uid == installedUnitInfoId p
+matchingId uid p = uid == unitId p
 
 matching :: PackageArg -> UnitInfo -> Bool
 matching (PackageArg str) = matchingStr str
-matching (UnitIdArg (DefUnit (DefUnitId uid)))  = matchingId uid
+matching (UnitIdArg (DefUnit (Definite uid)))  = matchingId uid
 matching (UnitIdArg _)  = \_ -> False -- TODO: warn in this case
 
 -- | This sorts a list of packages, putting "preferred" packages first.
@@ -1037,7 +1037,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
         wiredInMap :: Map WiredUnitId WiredUnitId
         wiredInMap = Map.fromList
-          [ (key, DefUnitId (stringToUnitId wiredInUnitId))
+          [ (key, Definite (stringToUnitId wiredInUnitId))
           | (wiredInUnitId, pkg) <- wired_in_pkgs
           , Just key <- pure $ definiteUnitInfoId pkg
           ]
@@ -1046,7 +1046,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
           where upd_pkg pkg
                   | Just def_uid <- definiteUnitInfoId pkg
                   , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
-                  = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
+                  = let fs = installedUnitIdFS (unDefinite wiredInUnitId)
                     in pkg {
                       unitId = fsToUnitId fs,
                       unitInstanceOf = mkIndefUnitId pkgstate fs
@@ -1055,7 +1055,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   = pkg
                 upd_deps pkg = pkg {
                       -- temporary harmless DefUnitId invariant violation
-                      unitDepends = map (unDefUnitId . upd_wired_in wiredInMap . DefUnitId) (unitDepends pkg),
+                      unitDepends = map (unDefinite . upd_wired_in wiredInMap . Definite) (unitDepends pkg),
                       unitExposedModules
                         = map (\(k,v) -> (k, fmap (upd_wired_in_mod wiredInMap) v))
                               (unitExposedModules pkg)
@@ -2171,7 +2171,7 @@ improveUnit pkg_map uid =
             -- Do NOT improve if the indefinite unit id is not
             -- part of the closure unique set.  See
             -- Note [InstUnit to DefUnit improvement]
-            if installedUnitInfoId pkg `elementOfUniqSet` preloadClosure pkg_map
+            if unitId pkg `elementOfUniqSet` preloadClosure pkg_map
                 then mkUnit pkg
                 else uid
 
