@@ -356,8 +356,8 @@ warnUnusedPackages = do
         realUnit dflags
           = unwireUnit dflags
           . DefUnit
-          . DefUnitId
-          . installedUnitInfoId
+          . Definite
+          . unitId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
