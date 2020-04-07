@@ -94,8 +94,8 @@ cgExpr (StgLetNoEscape _ binds expr) =
      ; emitLabel join_id
      ; return r }
 
-cgExpr (StgCase expr bndr alt_type alts) =
-  cgCase expr bndr alt_type alts
+cgExpr (StgCase expr bndr alt_type do_gc alts) =
+  cgCase expr bndr alt_type do_gc alts
 
 cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 
@@ -302,7 +302,21 @@ data GcPlan
                         -- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
+
+-- Note [Case alternative allocation strategy]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The STG case expression is extended with a boolean flag to carry
+-- information about whether we should put a heap check in its alternatives.
+--  * True  - do the heap check before the case - no need to put it in alts
+--  * False - we must put heap checks at the start or each alternative branch
+-- We compute this information in @annTopBindindingsFreeVars@ and then,
+-- in @cgCase@ we can consult that flag to decide the actual GCPlan. We
+-- currently set this flag to 'True' being conservative and assuming that the
+-- generated code _will_ inevitably perform the GC check in alternatives. The
+-- worst-case scenario here is that we place the checks in a less-than-perfect
+-- position.
+
+cgCase :: CgStgExpr -> Id -> AltType -> Bool -> [CgStgAlt] -> FCode ReturnKind
 
 {-
 Note [Scrutinising VoidRep]
@@ -341,7 +355,7 @@ exist, perhaps because the occurrence information preserved by
 job we deleted the hacks.
 -}
 
-cgCase (StgApp v []) _ (PrimAlt _) alts
+cgCase (StgApp v []) _ (PrimAlt _) _ alts
   | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
   , [(DEFAULT, _, rhs)] <- alts
   = cgExpr rhs
@@ -362,7 +376,7 @@ then we'll get a runtime panic, because the HValue really is a
 MutVar#.  The types are compatible though, so we can just generate an
 assignment.
 -}
-cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
+cgCase (StgApp v []) bndr alt_type@(PrimAlt _) _ alts
   | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   = -- assignment suffices for unlifted types
     do { platform <- getPlatform
@@ -390,7 +404,7 @@ because bottom must be untagged, it will be entered.  The Sequel is a
 type-correct assignment, albeit bogus.  The (dead) continuation loops;
 it would be better to invoke some kind of panic function here.
 -}
-cgCase scrut@(StgApp v []) _ (PrimAlt _) _
+cgCase scrut@(StgApp v []) _ (PrimAlt _) _ _
   = do { platform <- getPlatform
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel
@@ -418,13 +432,13 @@ The special case for seq# in cgCase does this:
 is the same as the return convention for just 'a')
 -}
 
-cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
+cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type do_gc alts
   = -- Note [Handle seq#]
     -- And see Note [seq# magic] in GHC.Core.Op.ConstantFold
     -- Use the same return convention as vanilla 'a'.
-    cgCase (StgApp a []) bndr alt_type alts
+    cgCase (StgApp a []) bndr alt_type do_gc alts
 
-cgCase scrut bndr alt_type alts
+cgCase scrut bndr alt_type _doGc alts
   = -- the general case
     do { platform <- getPlatform
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage

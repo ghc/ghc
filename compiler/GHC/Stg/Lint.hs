@@ -202,7 +202,7 @@ lintStgExpr (StgLetNoEscape _ binds body) = do
 
 lintStgExpr (StgTick _ expr) = lintStgExpr expr
 
-lintStgExpr (StgCase scrut bndr alts_type alts) = do
+lintStgExpr (StgCase scrut bndr alts_type _ alts) = do
     lintStgExpr scrut
 
     lf <- getLintFlags

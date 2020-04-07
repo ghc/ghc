@@ -277,6 +277,7 @@ This has the same boxed/unboxed business as Core case expressions.
         (GenStgExpr pass) -- the thing to examine
         (BinderP pass) -- binds the result of evaluating the scrutinee
         AltType
+        Bool           -- GC in alts? See Note [Case alternative allocation strategy]
         [GenStgAlt pass]
                     -- The DEFAULT case is always *first*
                     -- if it is there at all
@@ -763,21 +764,21 @@ pprStgExpr (StgTick tickish expr)
 
 
 -- Don't indent for a single case alternative.
-pprStgExpr (StgCase expr bndr alt_type [alt])
+pprStgExpr (StgCase expr bndr alt_type do_gc [alt])
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            pprStgAlt False alt,
-           char '}']
+           char '}', text "GC in alts:" <+> ppr do_gc]
 
-pprStgExpr (StgCase expr bndr alt_type alts)
+pprStgExpr (StgCase expr bndr alt_type do_gc alts)
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            nest 2 (vcat (map (pprStgAlt True) alts)),
-           char '}']
+           char '}', text "GC in alts:" <+> ppr do_gc]
 
 
 pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc

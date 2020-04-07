@@ -432,7 +432,11 @@ coreToStgExpr (Case scrut _ _ [])
 coreToStgExpr e0@(Case scrut bndr _ alts) = do
     alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
     scrut2 <- coreToStgExpr scrut
-    let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
+    -- We conservatively set the GC flag to 'True' expecting case alternatives
+    -- to always allocate. We then patch it up in @annTopBindingsFreeVars@.
+    -- See Note [Case alternative allocation strategy]
+    let do_gc = True
+        stg   = StgCase scrut2 bndr (mkStgAltType bndr alts) do_gc alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
       StgApp id [] | idName id == unsafeEqualityProofName ->
