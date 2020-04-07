@@ -641,11 +641,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
-                 user_tvs =
-                   case con of
-                     RealDataCon data_con -> dataConUserTyVars data_con
-                     PatSynCon _          -> univ_tvs ++ ex_tvs
-                       -- The order here is because of the order in `GHC.Tc.TyCl.PatSyn`.
+                 user_tvs  = binderVars $ conLikeUserTyVarBinders con
                  in_subst  = zipTvSubst univ_tvs in_inst_tys
                  out_subst = zipTvSubst univ_tvs out_inst_tys
 

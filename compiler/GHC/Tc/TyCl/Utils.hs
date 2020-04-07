@@ -872,19 +872,17 @@ mkOneRecordSelector all_cons idDetails fl
 
     -- Selector type; Note [Polymorphic selectors]
     field_ty   = conLikeFieldType con1 lbl
-    data_tvs   = tyCoVarsOfTypesWellScoped inst_tys
-    data_tv_set= mkVarSet data_tvs
+    data_tvbs  = filter (\tvb -> binderVar tvb `elemVarSet` data_tv_set) $
+                 conLikeUserTyVarBinders con1
+    data_tv_set= tyCoVarsOfTypes inst_tys
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
-    (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkSpecForAllTys data_tvs          $
+           | otherwise  = mkForAllTys data_tvbs             $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
-                          mkVisFunTy data_ty                $
-                          mkSpecForAllTys field_tvs         $
-                          mkPhiTy field_theta               $
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          field_tau
+                          mkVisFunTy data_ty                $
+                          field_ty
 
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -936,6 +934,16 @@ mkOneRecordSelector all_cons idDetails fl
     (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
 
     eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
+    -- inst_tys corresponds to one of the following:
+    --
+    -- * The arguments to the user-written return type (for GADT constructors).
+    --   In this scenario, eq_subst provides a mapping from the universally
+    --   quantified type variables to the argument types. Note that eq_subst
+    --   does not need to be applied to any other part of the DataCon
+    --   (see Note [The dcEqSpec domain invariant] in GHC.Core.DataCon).
+    -- * The universally quantified type variables
+    --   (for Haskell98-style constructors and pattern synonyms). In these
+    --   scenarios, eq_subst is an empty substitution.
     inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr []
@@ -945,13 +953,44 @@ mkOneRecordSelector all_cons idDetails fl
 Note [Polymorphic selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We take care to build the type of a polymorphic selector in the right
-order, so that visible type application works.
+order, so that visible type application works according to the specification in
+the GHC User's Guide (see the "Field selectors and TypeApplications" section).
+We won't bother rehashing the entire specification in this Note, but the tricky
+part is dealing with GADT constructor fields. Here is an appropriately tricky
+example to illustrate the challenges:
 
-  data Ord a => T a = MkT { field :: forall b. (Num a, Show b) => (a, b) }
+  {-# LANGUAGE PolyKinds #-}
+  data T a b where
+    MkT :: forall b a x.
+           { field1 :: forall c. (Num a, Show c) => (Either a c, Proxy b)
+           , field2 :: x
+           }
+        -> T a b
 
-We want
+Our goal is to obtain the following type for `field1`:
 
-  field :: forall a. Ord a => T a -> forall b. (Num a, Show b) => (a, b)
+  field1 :: forall {k} (b :: k) a.
+            T a b -> forall c. (Num a, Show c) => (Either a c, Proxy b)
+
+(`field2` is naughty, per Note [Naughty record selectors], so we cannot turn
+it into a top-level field selector.)
+
+Some potential gotchas, inspired by #18023:
+
+1. Since the user wrote `forall b a x.` in the type of `MkT`, we want the `b`
+   to appear before the `a` when quantified in the type of `field1`.
+2. On the other hand, we *don't* want to quantify `x` in the type of `field1`.
+   This is because `x` does not appear in the GADT return type, so it is not
+   needed in the selector type.
+3. Because of PolyKinds, the kind of `b` is generalized to `k`. Moreover, since
+   this `k` is not written in the source code, it is inferred (i.e., not
+   available for explicit type applications) and thus written as {k} in the type
+   of `field1`.
+
+In order to address these gotchas, we start by looking at the
+conLikeUserTyVarBinders, which gives the order and specificity of each binder.
+This effectively solves (1) and (3). To solve (2), we filter the binders to
+leave only those that are needed for the selector type.
 
 Note [Naughty record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
