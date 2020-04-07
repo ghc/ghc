@@ -275,7 +275,7 @@ data Pat p
 
   -- | Trees that Grow extension point for new constructors
   | XPat
-      (XXPat p)
+      !(XXPat p)
 
 
 -- ---------------------------------------------------------------------
@@ -563,7 +563,6 @@ pprPat (ConPatOut { pat_con = con
                   <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
                                  , pprIfTc @p $ ppr binds ])
                   <+> pprConArgs details
-pprPat (XPat n)                 = noExtCon n
 
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
@@ -736,8 +735,6 @@ isIrrefutableHsPat
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
-
-    go (XPat nec)          = noExtCon nec
 
 -- | Is the pattern any of combination of:
 --

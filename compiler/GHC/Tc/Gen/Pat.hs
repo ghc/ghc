@@ -1017,8 +1017,6 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
            ; return (L l (HsRecField (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                     pun), res) }
-    tc_field (L _ (HsRecField (L _ (XFieldOcc _)) _ _)) _ _
-           = panic "tcConArgs"
 
 
     find_field_ty :: Name -> FieldLabelString -> TcM TcType

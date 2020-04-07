@@ -274,7 +274,6 @@ brackTy b =
     (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
     (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
     (TExpBr {}) -> panic "tcUntypedBracket: Unexpected TExpBr"
-    (XBracket nec) -> noExtCon nec
 
 ---------------
 -- | Typechecking a pending splice from a untyped bracket

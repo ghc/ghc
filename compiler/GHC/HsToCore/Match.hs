@@ -770,7 +770,6 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     mk_eqn_infos [] _ = return []
     -- Called once per equation in the match, or alternative in the case
     mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) rhss_deltas
-      | XGRHSs nec <- grhss = noExtCon nec
       | GRHSs _ grhss' _  <- grhss, let n_grhss = length grhss'
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
@@ -786,12 +785,10 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                               , eqn_orig = FromSource
                               , eqn_rhs = match_result }
                     , rhss_deltas' ) }
-    mk_eqn_info (XMatch nec) _ = noExtCon nec
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
-matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
 
 matchEquations  :: HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type

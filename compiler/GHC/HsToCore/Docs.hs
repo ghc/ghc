@@ -151,12 +151,6 @@ getInstLoc = \case
     -- equation. This does not happen for data family instances, for some
     -- reason.
     { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}}) -> l
-  ClsInstD _ (XClsInstDecl _) -> error "getInstLoc"
-  DataFamInstD _ (DataFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
-  TyFamInstD _ (TyFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
-  XInstDecl _ -> error "getInstLoc"
-  DataFamInstD _ (DataFamInstDecl (XHsImplicitBndrs _)) -> error "getInstLoc"
-  TyFamInstD _ (TyFamInstDecl (XHsImplicitBndrs _)) -> error "getInstLoc"
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -292,9 +286,11 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
   mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
+    typesigs :: HsValBinds GhcRn -> [LSig GhcRn]
     typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
     typesigs ValBinds{} = error "expected XValBindsLR"
 
+    valbinds :: HsValBinds GhcRn -> [LHsBind GhcRn]
     valbinds (XValBindsLR (NValBinds binds _)) =
       concatMap bagToList . snd . unzip $ binds
     valbinds ValBinds{} = error "expected XValBindsLR"

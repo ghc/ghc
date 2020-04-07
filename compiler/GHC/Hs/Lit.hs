@@ -79,7 +79,7 @@ data HsLit x
   | HsDoublePrim (XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
 
-  | XLit (XXLit x)
+  | XLit !(XXLit x)
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
@@ -120,7 +120,7 @@ data HsOverLit p
       ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
 
   | XOverLit
-      (XXOverLit p)
+      !(XXOverLit p)
 
 data OverLitTc
   = OverLitTc {
@@ -150,7 +150,6 @@ negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit (OverLitTc _ ty) _ _) = ty
-overLitType (XOverLit nec) = noExtCon nec
 
 -- | Convert a literal from one index type to another
 convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
@@ -167,7 +166,6 @@ convertLit (HsInteger a x b)  = HsInteger a x b
 convertLit (HsRat a x b)      = HsRat a x b
 convertLit (HsFloatPrim a x)  = HsFloatPrim a x
 convertLit (HsDoublePrim a x) = HsDoublePrim a x
-convertLit (XLit a)           = XLit a
 
 {-
 Note [ol_rebindable]
@@ -244,7 +242,6 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
     ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
     ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
-    ppr (XLit x) = ppr x
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
 pp_st_suffix NoSourceText         _ doc = doc
@@ -255,7 +252,6 @@ instance OutputableBndrId p
        => Outputable (HsOverLit (GhcPass p)) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
-  ppr (XOverLit x) = ppr x
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
@@ -282,7 +278,6 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
-pmPprHsLit (XLit x)           = ppr x
 
 -- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
 -- to be parenthesized under precedence @p@.

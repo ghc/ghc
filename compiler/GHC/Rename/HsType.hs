@@ -137,10 +137,6 @@ rn_hs_sig_wc_type scoping ctxt
                             , hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
-rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs nec)) _
-  = noExtCon nec
-rn_hs_sig_wc_type _ _ (XHsWildCardBndrs nec) _
-  = noExtCon nec
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
@@ -149,7 +145,6 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
-rnHsWcType _ (XHsWildCardBndrs nec) = noExtCon nec
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
@@ -311,7 +306,6 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
                 , fvs ) } }
-rnHsSigType _ _ (XHsImplicitBndrs nec) = noExtCon nec
 
 rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            -- E.g.  f :: forall a. a->b
@@ -986,8 +980,6 @@ bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind))
                $ thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
            ; return (b, fvs1 `plusFV` fvs2) }
 
-bindLHsTyVarBndr _ _ (L _ (XTyVarBndr nec)) _ = noExtCon nec
-
 newTyVarNameRn :: Maybe a -> Located RdrName -> RnM Name
 newTyVarNameRn mb_assoc (L loc rdr)
   = do { rdr_env <- getLocalRdrEnv
@@ -1035,8 +1027,6 @@ rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
       where
         lbl = occNameFS $ rdrNameOcc rdr
         fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
-    lookupField (XFieldOcc nec) = noExtCon nec
-rnField _ _ (L _ (XConDeclField nec)) = noExtCon nec
 
 {-
 ************************************************************************
@@ -1278,7 +1268,6 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
         -- but the second eqn has no args (an error, but not discovered
         -- until the type checker).  So we don't want to crash on the
         -- second eqn.
-checkPrecMatch _ (XMatchGroup nec) = noExtCon nec
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
@@ -1659,7 +1648,6 @@ extractRdrKindSigVars (L _ resultSig)
 extractDataDefnKindVars :: HsDataDefn GhcPs ->  FreeKiTyVarsNoDups
 extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
-extractDataDefnKindVars (XHsDataDefn nec) = noExtCon nec
 
 extract_lctxt :: LHsContext GhcPs
               -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups

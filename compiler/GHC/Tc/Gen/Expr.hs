@@ -203,7 +203,6 @@ tcExpr (HsPragE x prag expr) res_ty
     tc_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
     tc_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
     tc_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
-    tc_prag (XHsPragE x) = noExtCon x
 
 tcExpr (HsOverLit x lit) res_ty
   = do  { lit' <- newOverloadedLit lit res_ty
@@ -1406,7 +1405,6 @@ tcTupArgs args tys
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
     go (L l (Present x expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
                                            ; return (L l (Present x expr')) }
-    go (L _ (XTupArg nec), _) = noExtCon nec
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
@@ -1724,7 +1722,6 @@ tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
       Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
                           ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl)
                                                     res_ty }
-tcCheckRecSelId _ (XAmbiguousFieldOcc nec) _ = noExtCon nec
 
 ------------------------
 tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> TcM (HsExpr GhcTcId, TcRhoType)
@@ -1733,7 +1730,6 @@ tcInferRecSelId (Unambiguous sel (L _ lbl))
        ; return (expr', ty) }
 tcInferRecSelId (Ambiguous _ lbl)
   = ambiguousSelector lbl
-tcInferRecSelId (XAmbiguousFieldOcc nec) = noExtCon nec
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTcId, TcSigmaType)
@@ -1955,9 +1951,9 @@ too_many_args fun args
     hang (text "Too many type arguments to" <+> text fun <> colon)
        2 (sep (map pp args))
   where
+    pp :: LHsExprArgIn -> SDoc
     pp (HsValArg e)                             = ppr e
     pp (HsTypeArg _ (HsWC { hswc_body = L _ t })) = pprHsType t
-    pp (HsTypeArg _ (XHsWildCardBndrs nec)) = noExtCon nec
     pp (HsArgPar _) = empty
 
 
@@ -2242,7 +2238,6 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     isUnambiguous x = case unLoc (hsRecFieldLbl (unLoc x)) of
                         Unambiguous sel_name _ -> Just (x, sel_name)
                         Ambiguous{}            -> Nothing
-                        XAmbiguousFieldOcc nec -> noExtCon nec
 
     -- Look up the possible parents and selector GREs for each field
     getUpdFieldsParents :: TcM [(LHsRecUpdField GhcRn
@@ -2442,7 +2437,6 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
            ; return Nothing }
   where
         field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
-tcRecordField _ _ (L _ (XFieldOcc nec)) _ = noExtCon nec
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> TcM ()

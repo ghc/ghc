@@ -557,7 +557,6 @@ tc_rn_src_decls ds
                                 ("Declaration splices are not "
                                   ++ "permitted inside top-level "
                                   ++ "declarations added with addTopDecls"))
-                        ; Just (XSpliceDecl nec, _) -> noExtCon nec
                         }
                       -- Rename TH-generated top-level declarations
                     ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
@@ -604,7 +603,6 @@ tc_rn_src_decls ds
 
                ; return (tcg_env, tcl_env, lie2)
                }
-          ; Just (XSpliceDecl nec, _) -> noExtCon nec
           }
       }
 
@@ -641,7 +639,6 @@ tcRnHsBootDecls hsc_src decls
                 -- Check for illegal declarations
         ; case group_tail of
              Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" d
-             Just (XSpliceDecl nec, _)  -> noExtCon nec
              Nothing                    -> return ()
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
