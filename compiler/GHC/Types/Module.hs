@@ -35,10 +35,12 @@ module GHC.Types.Module
         Indefinite(..),
         IndefUnitId,
         UnitPprInfo(..),
-        Unit(..),
+        GenUnit(..),
+        Unit,
         unitFS,
         unitKey,
-        InstantiatedUnit(..),
+        GenInstantiatedUnit(..),
+        InstantiatedUnit,
         instUnitToUnit,
         instModuleToModule,
         UnitId(..),
@@ -697,10 +699,15 @@ instance Outputable unit => Outputable (Indefinite unit) where
 -- don't have any on-disk representation.)  In that case, you have an
 -- 'InstantiatedUnit', which explicitly records the instantiation, so that we
 -- can substitute over it.
---
-data Unit
-    = InstUnit {-# UNPACK #-} !InstantiatedUnit
-    | DefUnit  {-# UNPACK #-} !DefUnitId        -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
+type Unit = GenUnit UnitId
+
+data GenUnit unit
+    = DefUnit  !(Definite unit)
+      -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
+
+    | InstUnit !(GenInstantiatedUnit unit)
+      -- ^ Instantiated indefinite unit (may be definite if all the holes are
+      -- instantiated)
 
 unitFS :: Unit -> FastString
 unitFS (InstUnit x)           = instUnitFS x
@@ -724,7 +731,9 @@ unitKey (DefUnit (Definite x)) = unitIdKey x
 -- An indefinite unit identifier pretty-prints to something like
 -- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'IndefUnitId', and the
 -- brackets enclose the module substitution).
-data InstantiatedUnit
+type InstantiatedUnit = GenInstantiatedUnit UnitId
+
+data GenInstantiatedUnit unit
     = InstantiatedUnit {
         -- | A private, uniquely identifying representation of
         -- an InstantiatedUnit. This string is completely private to GHC
@@ -733,9 +742,9 @@ data InstantiatedUnit
         -- | Cached unique of 'unitFS'.
         instUnitKey :: Unique,
         -- | The indefinite unit being instantiated.
-        instUnitInstanceOf :: !IndefUnitId,
+        instUnitInstanceOf :: !(Indefinite unit),
         -- | The sorted (by 'ModuleName') instantiations of this unit.
-        instUnitInsts :: ![(ModuleName, Module)],
+        instUnitInsts :: ![(ModuleName, GenModule (GenUnit unit))],
         -- | A cache of the free module holes of 'instUnitInsts'.
         -- This lets us efficiently tell if a 'InstantiatedUnit' has been
         -- fully instantiated (empty set of free module holes)
