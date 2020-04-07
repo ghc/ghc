@@ -118,6 +118,9 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
          num :: Term Int -> Term Int
          arg :: Term Bool -> Term Int
 
+   See :ref:`field-selectors-and-type-applications` for a full description of
+   how the types of top-level field selectors are determined.
+
 -  When pattern-matching against data constructors drawn from a GADT,
    for example in a ``case`` expression, the following rules apply:
 

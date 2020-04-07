@@ -384,7 +384,9 @@ data DataCon
                 --      MkT :: forall a b. (a ~ [b]) => b -> T a
                 --      MkT :: forall b. b -> T [b]
                 -- Each equality is of the form (a ~ ty), where 'a' is one of
-                -- the universally quantified type variables
+                -- the universally quantified type variables. Moreover, the
+                -- only place in the DataCon where this 'a' will occur is in
+                -- dcUnivTyVars. See [The dcEqSpec domain invariant].
 
                 -- The next two fields give the type context of the data constructor
                 --      (aside from the GADT constraints,
@@ -595,6 +597,35 @@ dcUserTyVarBinders, as the name suggests, is the one that users will see most of
 the time. It's used when computing the type signature of a data constructor (see
 dataConUserType), and as a result, it's what matters from a TypeApplications
 perspective.
+
+Note [The dcEqSpec domain invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example of a GADT constructor:
+
+  data Y a where
+    MkY :: Bool -> Y Bool
+
+The user-written type of MkY is `Bool -> Y Bool`, but what is the underlying
+Core type for MkY? There are two conceivable possibilities:
+
+1. MkY :: forall a. (a ~# Bool) => Bool -> Y a
+2. MkY :: forall a. (a ~# Bool) => a    -> Y a
+
+In practice, GHC picks (1) as the Core type for MkY. This is because we
+maintain an invariant that the type variables in the domain of dcEqSpec will
+only ever appear in the dcUnivTyVars. As a consequence, the type variables in
+the domain of dcEqSpec will /never/ appear in the dcExTyCoVars, dcOtherTheta,
+dcOrigArgTys, or dcOrigResTy; these can only ever mention variables from
+dcUserTyVarBinders, which excludes things in the domain of dcEqSpec.
+(See Note [DataCon user type variable binders].) This explains why GHC would
+not pick (2) as the Core type, since the argument type `a` mentions a type
+variable in the dcEqSpec.
+
+There are certain parts of the codebase where it is convenient to apply the
+substitution arising from the dcEqSpec to the dcUnivTyVars in order to obtain
+the user-written return type of a GADT constructor. A consequence of the
+dcEqSpec domain invariant is that you /never/ need to apply the substitution
+to any other part of the constructor type, as they don't require it.
 -}
 
 -- | Data Constructor Representation
