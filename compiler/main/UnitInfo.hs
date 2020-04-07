@@ -18,7 +18,6 @@ module UnitInfo (
         UnitInfo,
         toUnitInfo,
         GenericUnitInfo(..),
-        IndefUnitId(..),
         PackageId(..),
         PackageName(..),
         Version(..),
@@ -60,7 +59,7 @@ toUnitInfo = mapGenericUnitInfo
      mkPackageName'       = PackageName     . mkFastStringByteString
      mkUnitId'            = UnitId . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS  . mkFastStringByteString
-     mkIndefUnitId' cid   = IndefUnitId (UnitId (mkFastStringByteString cid)) Nothing
+     mkIndefUnitId' cid   = Indefinite (UnitId (mkFastStringByteString cid)) Nothing
      mkInstUnitId' i = case i of
       DbInstUnitId cid insts -> mkInstUnit (mkIndefUnitId' cid) (fmap (bimap mkModuleName' mkModule') insts)
       DbUnitId uid           -> DefUnit (Definite (mkUnitId' uid))

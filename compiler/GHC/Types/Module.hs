@@ -32,7 +32,8 @@ module GHC.Types.Module
         stableModuleNameCmp,
 
         -- * The Unit type
-        IndefUnitId(..),
+        Indefinite(..),
+        IndefUnitId,
         UnitPprInfo(..),
         Unit(..),
         unitFS,
@@ -625,16 +626,18 @@ class HasModule m where
 
 -- | An 'IndefUnitId' is an 'UnitId' with the invariant that it only
 -- refers to an indefinite library; i.e., one that can be instantiated.
-data IndefUnitId = IndefUnitId
-   { indefUnitId        :: UnitId   -- ^ Unit id
-   , indefUnitIdPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
+type IndefUnitId = Indefinite UnitId
+
+data Indefinite unit = Indefinite
+   { indefUnit        :: unit              -- ^ Unit identifier
+   , indefUnitPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
 
-instance Eq IndefUnitId where
-   a == b = indefUnitId a == indefUnitId b
+instance Eq unit => Eq (Indefinite unit) where
+   a == b = indefUnit a == indefUnit b
 
-instance Ord IndefUnitId where
-   compare a b = compare (indefUnitId a) (indefUnitId b)
+instance Ord unit => Ord (Indefinite unit) where
+   compare a b = compare (indefUnit a) (indefUnit b)
 
 -- | Subset of UnitInfo: just enough to pretty-print a unit-id
 --
@@ -659,12 +662,12 @@ instance Outputable UnitPprInfo where
       ]
 
 
-instance Uniquable IndefUnitId where
-  getUnique (IndefUnitId n _) = getUnique n
+instance Uniquable unit => Uniquable (Indefinite unit) where
+  getUnique (Indefinite n _) = getUnique n
 
-instance Outputable IndefUnitId where
-  ppr (IndefUnitId uid Nothing)        = ppr uid
-  ppr (IndefUnitId uid (Just pprinfo)) =
+instance Outputable unit => Outputable (Indefinite unit) where
+  ppr (Indefinite uid Nothing)        = ppr uid
+  ppr (Indefinite uid (Just pprinfo)) =
     getPprStyle $ \sty ->
       if debugStyle sty
          then ppr uid
@@ -845,7 +848,7 @@ installedUnitIdKey = getUnique . installedUnitIdFS
 -- UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
 toUnitId (DefUnit (Definite iuid)) = iuid
-toUnitId (InstUnit indef)          = indefUnitId (instUnitInstanceOf indef)
+toUnitId (InstUnit indef)          = indefUnit (instUnitInstanceOf indef)
 
 installedUnitIdString :: UnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
@@ -965,7 +968,7 @@ unitIsDefinite = isEmptyUniqDSet . unitFreeModuleHoles
 mkInstantiatedUnitHash :: IndefUnitId -> [(ModuleName, Module)] -> FastString
 mkInstantiatedUnitHash cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (bytesFS (installedUnitIdFS (indefUnitId cid)))
+  . fingerprintUnitId (bytesFS (installedUnitIdFS (indefUnit cid)))
   $ hashInstantiations sorted_holes
 
 -- | Generate a hash for a sorted module instantiation.
@@ -988,7 +991,7 @@ fingerprintUnitId prefix (Fingerprint a b)
 
 -- | Smart constructor for InstUnit
 mkInstUnit :: IndefUnitId -> [(ModuleName, Module)] -> Unit
-mkInstUnit uid []    = DefUnit  $ Definite (indefUnitId uid)
+mkInstUnit uid []    = DefUnit  $ Definite (indefUnit uid)
 mkInstUnit uid insts = InstUnit $ mkInstantiatedUnit uid insts
 
 pprUnit :: Unit -> SDoc
@@ -1033,9 +1036,9 @@ instance Binary Unit where
                 0 -> fmap DefUnit  (get bh)
                 _ -> fmap InstUnit (get bh)
 
-instance Binary IndefUnitId where
-  put_ bh (IndefUnitId fs _) = put_ bh fs
-  get bh = do { fs <- get bh; return (IndefUnitId fs Nothing) }
+instance Binary unit => Binary (Indefinite unit) where
+  put_ bh (Indefinite fs _) = put_ bh fs
+  get bh = do { fs <- get bh; return (Indefinite fs Nothing) }
 
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
@@ -1117,7 +1120,7 @@ getModuleInstantiation m =
 
 -- | Return the unit-id this unit is an instance of and the module instantiations (if any).
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
-getUnitInstantiations (InstUnit iuid)          = (indefUnitId (instUnitInstanceOf iuid), Just iuid)
+getUnitInstantiations (InstUnit iuid)          = (indefUnit (instUnitInstanceOf iuid), Just iuid)
 getUnitInstantiations (DefUnit (Definite uid)) = (uid, Nothing)
 
 generalizeInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit
@@ -1151,7 +1154,7 @@ parseUnitId = do
 parseIndefUnitId :: ReadP IndefUnitId
 parseIndefUnitId = do
    uid <- parseUnitId
-   return (IndefUnitId uid Nothing)
+   return (Indefinite uid Nothing)
 
 parseModuleId :: ReadP Module
 parseModuleId = parseModuleVar <++ parseModule
