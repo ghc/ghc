@@ -93,7 +93,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
-import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
+import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
 
@@ -611,7 +611,7 @@ mkTyVar name kind = TyVar { varName    = name
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
-  = -- NB: 'kind' may be a coercion kind; cf, 'TcMType.newMetaCoVar'
+  = -- NB: 'kind' may be a coercion kind; cf, 'GHC.Tc.Utils.TcMType.newMetaCoVar'
     TcTyVar {   varName    = name,
                 realUnique = getKey (nameUnique name),
                 varType  = kind,
@@ -619,7 +619,7 @@ mkTcTyVar name kind details
         }
 
 tcTyVarDetails :: TyVar -> TcTyVarDetails
--- See Note [TcTyVars in the typechecker] in TcType
+-- See Note [TcTyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
 tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))

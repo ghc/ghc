@@ -600,7 +600,7 @@ post-typechecking environment created by compiling a module.
       = ModDetails {
            moduleExports :: Avails
            moduleEnv     :: GlobalRdrEnv    -- == FM RdrName [Name]
-           typeEnv       :: FM Name TyThing -- TyThing is in TcEnv.lhs
+           typeEnv       :: FM Name TyThing -- TyThing is in GHC.Tc.Utils.Env
            instEnv       :: InstEnv
            fixityEnv     :: FM Name Fixity
            ruleEnv       :: FM Id [Rule]

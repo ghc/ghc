@@ -597,7 +597,7 @@ isDefaultMethodOcc occ =
 
 -- | Is an 'OccName' one of a Typeable @TyCon@ or @Module@ binding?
 -- This is needed as these bindings are renamed differently.
--- See Note [Grand plan for Typeable] in TcTypeable.
+-- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 isTypeableBindOcc :: OccName -> Bool
 isTypeableBindOcc occ =
    case occNameString occ of
@@ -639,7 +639,7 @@ mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
--- TyConRepName stuff; see Note [Grand plan for Typeable] in TcTypeable
+-- TyConRepName stuff; see Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable
 mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
   where
     prefix | isDataOcc occ = "$tc'"
@@ -729,7 +729,7 @@ We used to add a '$m' to indicate a method, but that gives rise to bad
 error messages from the type checker when we print the function name or pattern
 of an instance-decl binding.  Why? Because the binding is zapped
 to use the method name in place of the selector name.
-(See TcClassDcl.tcMethodBind)
+(See GHC.Tc.TyCl.Class.tcMethodBind)
 
 The way it is now, -ddump-xx output may look confusing, but
 you can always say -dppr-debug to get the uniques.

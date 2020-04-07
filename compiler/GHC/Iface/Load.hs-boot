@@ -1,7 +1,7 @@
 module GHC.Iface.Load where
 
 import GHC.Types.Module (Module)
-import TcRnMonad (IfM)
+import GHC.Tc.Utils.Monad (IfM)
 import GHC.Driver.Types (ModIface)
 import Outputable (SDoc)
 

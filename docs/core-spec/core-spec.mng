@@ -530,7 +530,7 @@ $[[tyConRoles]]$, but with an arbitrary number of $[[Nom]]$ at the end, to accou
 for potential oversaturation.
 
 The checks encoded in the following
-judgments are run from \coderef{typecheck/TcTyClsDecls.hs}{checkValidTyCon}
+judgments are run from \coderef{GHC/Tc/TyCl.hs}{checkValidTyCon}
 when \texttt{-dcore-lint} is set.
 
 \ottdefncheckValidRoles{}

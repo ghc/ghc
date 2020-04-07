@@ -39,8 +39,8 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import TcHsSyn ( shortCutLit )
-import TcType
+import GHC.Tc.Utils.Zonk ( shortCutLit )
+import GHC.Tc.Utils.TcType
 import GHC.Types.Name
 import GHC.Core.Type
 import PrelNames

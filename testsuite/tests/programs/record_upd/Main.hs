@@ -1,6 +1,6 @@
 {-      The purpose of this is to test that record update is
         sufficiently polymorphic.  See comments with
-        tcExpr (RecordUpd) in TcExpr.lhs
+        tcExpr (RecordUpd) in GHC.Tc.Gen.Expr
 -}
 
 module Main where

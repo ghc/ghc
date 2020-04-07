@@ -3554,7 +3554,7 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see
-                        -- Note [Single-method classes] in TcInstDcls.
+                        -- Note [Single-method classes] in GHC.Tc.TyCl.Instance.
                         -- A test case is #4138
                         -- But retain a previous boring_ok of True; e.g. see
                         -- the way it is set in calcUnfoldingGuidanceWithArity

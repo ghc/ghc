@@ -41,7 +41,7 @@ import           GHC.Types.Name
 import           GHC.Types.Name.Set
 import           Outputable
 import           GHC.Types.SrcLoc
-import           TcHsSyn
+import           GHC.Tc.Utils.Zonk
 import           GHC.Types.Var
 
 -- | Info about a module. This information is generated every time a

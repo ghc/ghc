@@ -36,7 +36,7 @@ import GHC.Hs.Types
 import GHC.Hs.Binds
 
 -- others:
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import GHC.Core
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -48,8 +48,8 @@ import Outputable
 import FastString
 import GHC.Core.Type
 import TysWiredIn (mkTupleStr)
-import TcType (TcType)
-import {-# SOURCE #-} TcRnTypes (TcLclEnv)
+import GHC.Tc.Utils.TcType (TcType)
+import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -836,7 +836,7 @@ A tuple data constructor like () or (,,,) is parsed as an `HsVar`, not an
 
      Note that the tuple section has *inferred* arguments, while the data
      constructor has *specified* ones.
-     (See Note [Required, Specified, and Inferred for types] in TcTyClsDecls
+     (See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
      for background.)
 
 Sadly, the grammar for this is actually ambiguous, and it's only thanks to the
@@ -2376,7 +2376,7 @@ data HsSplice id
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
-   | HsQuasiQuote        -- See Note [Quasi-quote overview] in TcSplice
+   | HsQuasiQuote        -- See Note [Quasi-quote overview] in GHC.Tc.Gen.Splice
         (XQuasiQuote id)
         (IdP id)         -- Splice point
         (IdP id)         -- Quoter
@@ -2435,7 +2435,7 @@ instance Data ThModFinalizers where
   dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
 
 -- See Note [Running typed splices in the zonker]
--- These are the arguments that are passed to `TcSplice.runTopSplice`
+-- These are the arguments that are passed to `GHC.Tc.Gen.Splice.runTopSplice`
 data DelayedSplice =
   DelayedSplice
     TcLclEnv          -- The local environment to run the splice in

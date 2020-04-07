@@ -32,11 +32,11 @@ import GHC.Core (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
 import GHC.Hs
-import TcHsSyn   ( shortCutLit )
+import GHC.Tc.Utils.Zonk (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
-import FamInst
+import GHC.Tc.Instance.Family
 import TysWiredIn
 import GHC.Types.SrcLoc
 import Util
@@ -45,8 +45,8 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
-import TcEvidence ( HsWrapper(..), isIdHsWrapper )
-import TcType (evVarPred)
+import GHC.Tc.Types.Evidence ( HsWrapper(..), isIdHsWrapper )
+import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
 import GHC.HsToCore.Utils (selectMatchVar)

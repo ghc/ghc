@@ -49,7 +49,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
-import TcType
+import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Utils   ( mkCast, mkDefaultCase )
@@ -420,14 +420,14 @@ mkDictSelId name clas
          = base_info `setInlinePragInfo` alwaysInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
                                            (mkDictSelRhs clas val_index)
-                   -- See Note [Single-method classes] in TcInstDcls
+                   -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
 
          | otherwise
          = base_info `setRuleInfo` mkRuleInfo [rule]
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
-                   -- See Note [ClassOp/DFun selection] in TcInstDcls
+                   -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
@@ -1187,7 +1187,7 @@ wrapNewTypeBody tycon args result_expr
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
 -- computing the right type arguments for the coercion requires more than just
--- a splitting operation (cf, TcPat.tcConPat).
+-- a splitting operation (cf, GHC.Tc.Gen.Pat.tcConPat).
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
@@ -1298,7 +1298,7 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
             -> Class
             -> [Type]
             -> Id
--- Implements the DFun Superclass Invariant (see TcInstDcls)
+-- Implements the DFun Superclass Invariant (see GHC.Tc.TyCl.Instance)
 -- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
@@ -1477,7 +1477,7 @@ b) It has quite a bit of desugaring magic.
 c) There is some special rule handing: Note [User-defined RULES for seq]
 
 Historical note:
-    In TcExpr we used to need a special typing rule for 'seq', to handle calls
+    In GHC.Tc.Gen.Expr we used to need a special typing rule for 'seq', to handle calls
     whose second argument had an unboxed type, e.g.  x `seq` 3#
 
     However, with levity polymorphism we can now give seq the type seq ::

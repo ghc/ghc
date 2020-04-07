@@ -38,12 +38,12 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import qualified GHC.Core.Unify as U
 import GHC.Types.Var
-import TcRnMonad
-import TcType
-import TcMType
-import TcHsSyn ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
-import TcUnify
-import TcEnv
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.Zonk ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
+import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.Env
 
 import GHC.Core.TyCon
 import GHC.Types.Name
@@ -566,7 +566,7 @@ traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti
 
 
--- Semantically different to recoverM in TcRnMonad
+-- Semantically different to recoverM in GHC.Tc.Utils.Monad
 -- recoverM retains the errors in the first action,
 --  whereas recoverTc here does not
 recoverTR :: TR a -> TR a -> TR a

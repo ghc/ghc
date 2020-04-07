@@ -25,7 +25,7 @@ import GHC.HsToCore.Monad
 import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
                         collectLStmtsBinders, collectLStmtBinders,
                         collectStmtBinders )
-import TcHsSyn
+import GHC.Tc.Utils.Zonk
 import qualified GHC.Hs.Utils as HsUtils
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -36,9 +36,9 @@ import qualified GHC.Hs.Utils as HsUtils
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
                                           dsSyntaxExpr )
 
-import TcType
+import GHC.Tc.Utils.TcType
 import GHC.Core.Type( splitPiTy )
-import TcEvidence
+import GHC.Tc.Types.Evidence
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
