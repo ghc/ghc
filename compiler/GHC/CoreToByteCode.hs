@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 --
@@ -28,7 +29,7 @@ import GHC.Platform
 import Name
 import MkId
 import Id
-import Var             ( updateVarType )
+import Var             ( updateVarTypeButNotMult )
 import ForeignCall
 import GHC.Driver.Types
 import GHC.Core.Utils
@@ -37,6 +38,7 @@ import GHC.Core.Ppr
 import Literal
 import PrimOp
 import GHC.Core.FVs
+import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon
@@ -622,7 +624,7 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           -- Here (k n) :: a :: Type r, so we don't know if it's lifted
           -- or not; but that should be fine provided we add that void arg.
 
-          id <- newId (mkVisFunTy realWorldStatePrimTy ty)
+          id <- newId (mkVisFunTyMany realWorldStatePrimTy ty)
           st <- newId realWorldStatePrimTy
           let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyDVarSet, exp)))
                               (emptyDVarSet, (AnnApp (emptyDVarSet, AnnVar id)
@@ -705,7 +707,7 @@ protectNNLJoinPointBind x rhs@(fvs, _)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = ASSERT( isNNLJoinPoint x )
-    updateVarType (voidPrimTy `mkVisFunTy`) x
+    updateVarTypeButNotMult (voidPrimTy `mkVisFunTyMany`) x
 
 {-
    Ticked Expressions
@@ -2051,7 +2053,7 @@ getTopStrings = BcM $ \st -> return (st, topStrings st)
 newId :: Type -> BcM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal tickFS uniq ty
+    return $ mkSysLocal tickFS uniq Many ty
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

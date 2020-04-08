@@ -45,6 +45,7 @@ import ClsInst( AssocInstInfo(..) )
 import TcMType
 import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
+import GHC.Core.Multiplicity
 import GHC.Rename.Env( lookupConstructorFields )
 import FamInst
 import GHC.Core.FamInstEnv
@@ -826,9 +827,9 @@ swizzleTcTyConBndrs tc_infos
     swizzle_var :: Var -> Var
     swizzle_var v
       | Just nm <- lookupVarEnv swizzle_env v
-      = updateVarType swizzle_ty (v `setVarName` nm)
+      = updateVarTypeAndMult swizzle_ty (v `setVarName` nm)
       | otherwise
-      = updateVarType swizzle_ty v
+      = updateVarTypeAndMult swizzle_ty v
 
     (map_type, _, _, _) = mapTyCo swizzleMapper
     swizzle_ty ty = runIdentity (map_type ty)
@@ -1229,7 +1230,7 @@ mkPromotionErrorEnv :: [LTyClDecl GhcRn] -> TcTypeEnv
 -- Maps each tycon/datacon to a suitable promotion error
 --    tc :-> APromotionErr TyConPE
 --    dc :-> APromotionErr RecDataConPE
---    See Note [Recursion and promoting data constructors]
+--    See Note [ARecDataCon: Recursion and promoting data constructors]
 
 mkPromotionErrorEnv decls
   = foldr (plusNameEnv . mk_prom_err_env . unLoc)
@@ -1578,17 +1579,17 @@ kcTyClDecl (XTyClDecl nec)                      _ = noExtCon nec
 -- here.)
 unifyNewtypeKind :: DynFlags
                  -> NewOrData
-                 -> [LHsType GhcRn]   -- user-written argument types, should be just 1
-                 -> [TcType]          -- type-checked argument types, should be just 1
+                 -> [HsScaled GhcRn (LHsType GhcRn)]   -- user-written argument types, should be just 1
+                 -> [Scaled TcType]          -- type-checked argument types, should be just 1
                  -> TcKind            -- expected kind of newtype
-                 -> TcM [TcType]      -- casted argument types (should be just 1)
+                 -> TcM [Scaled TcType]      -- casted argument types (should be just 1)
                                       --  result = orig_arg |> kind_co
                                       -- where kind_co :: orig_arg_ki ~N expected_ki
-unifyNewtypeKind dflags NewType [hs_ty] [tc_ty] ki
+unifyNewtypeKind dflags NewType [HsScaled _ hs_ty] [Scaled tc_w tc_ty] ki
   | xopt LangExt.UnliftedNewtypes dflags
   = do { traceTc "unifyNewtypeKind" (ppr hs_ty $$ ppr tc_ty $$ ppr ki)
        ; co <- unifyKind (Just (unLoc hs_ty)) (typeKind tc_ty) ki
-       ; return [tc_ty `mkCastTy` co] }
+       ; return [Scaled tc_w (tc_ty `mkCastTy` co)] }
   -- See comments above: just do nothing here
 unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
 
@@ -1596,13 +1597,13 @@ unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: NewOrData -> Kind -> [LHsType GhcRn] -> TcM ()
+kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
-  { arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
+  { arg_tc_tys <- mapM tcConArg arg_tys
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   ; dflags <- getDynFlags
   ; discardResult $
-      unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
+      unifyNewtypeKind dflags new_or_data arg_tys (map fst arg_tc_tys) res_kind
   }
 
 kcConDecls :: NewOrData
@@ -2978,7 +2979,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrs kvs
        ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
-       ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
+       ; arg_tys         <- zonkScaledTcTypesToTypesX ze arg_tys
        ; ctxt            <- zonkTcTypesToTypesX ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
@@ -3055,7 +3056,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
-       ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
+       ; arg_tys <- zonkScaledTcTypesToTypesX ze arg_tys
        ; ctxt    <- zonkTcTypesToTypesX ze ctxt
        ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
@@ -3073,7 +3074,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
              all_user_bndrs = tkv_bndrs ++ user_tv_bndrs
 
              ctxt'      = substTys arg_subst ctxt
-             arg_tys'   = substTys arg_subst arg_tys
+             arg_tys'   = substScaledTys arg_subst arg_tys
              res_ty'    = substTy  arg_subst res_ty
 
 
@@ -3103,7 +3104,7 @@ tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _)
 tcConDecl _ _ _ _ _ _ (XConDecl nec) = noExtCon nec
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails a b
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
@@ -3111,7 +3112,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -3119,13 +3120,13 @@ tcConIsInfixGADT con details
            RecCon {}    -> return False
            PrefixCon arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- arg_tys
+               , [_ty1,_ty2] <- map hsScaledThing arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
 tcConArgs :: HsConDeclDetails GhcRn
-          -> TcM [(TcType, HsSrcBang)]
+          -> TcM [(Scaled TcType, HsSrcBang)]
 tcConArgs (PrefixCon btys)
   = mapM tcConArg btys
 tcConArgs (InfixCon bty1 bty2)
@@ -3136,22 +3137,22 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f))
+    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
                    (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
 
-tcConArg :: LHsType GhcRn -> TcM (TcType, HsSrcBang)
-tcConArg bty
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
+tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
+        ; w' <- tcMult w
              -- Newtypes can't have unboxed types, but we check
-             -- that in checkValidDataCon; this tcConArg stuff
-             -- doesn't happen for GADT-style declarations
+             -- that in checkValidDataCon
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (arg_ty, getBangStrictness bty) }
+        ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]
@@ -3769,12 +3770,12 @@ checkValidDataCon dflags existential_ok tc con
 
 
         ; checkTc (isJust (tcMatchTy res_ty_tmpl orig_res_ty))
-                  (badDataConTyCon con res_ty_tmpl)
+                  (badDataConTyCon data_con_display_type con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
-            -- critical to avoid panicking when we call dataConUserType
+            -- critical to avoid panicking when we call dataConDisplayType
             -- on an un-rejiggable datacon!
 
-        ; traceTc "checkValidDataCon 2" (ppr (dataConUserType con))
+        ; traceTc "checkValidDataCon 2" (ppr data_con_display_type)
 
           -- Check that the result type is a *monotype*
           --  e.g. reject this:   MkT :: T (forall a. a->a)
@@ -3782,14 +3783,14 @@ checkValidDataCon dflags existential_ok tc con
         ; checkValidMonoType orig_res_ty
 
           -- Check all argument types for validity
-        ; checkValidType ctxt (dataConUserType con)
+        ; checkValidType ctxt data_con_display_type
 
           -- If we are dealing with a newtype, we allow levity polymorphism
           -- regardless of whether or not UnliftedNewtypes is enabled. A
           -- later check in checkNewDataCon handles this, producing a
           -- better error message than checkForLevPoly would.
         ; unless (isNewTyCon tc)
-            (mapM_ (checkForLevPoly empty) (dataConOrigArgTys con))
+            (mapM_ (checkForLevPoly empty) (map scaledThing $ dataConOrigArgTys con))
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
@@ -3822,8 +3823,9 @@ checkValidDataCon dflags existential_ok tc con
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con
-               , text "Datacon user type:" <+> ppr (dataConUserType con)
+               , text "Datacon wrapper type:" <+> ppr (dataConWrapperType con)
                , text "Datacon rep type:" <+> ppr (dataConRepType con)
+               , text "Datacon display type:" <+> ppr data_con_display_type
                , text "Rep typcon binders:" <+> ppr (tyConBinders (dataConTyCon con))
                , case tyConFamInst_maybe (dataConTyCon con) of
                    Nothing -> text "not family"
@@ -3865,6 +3867,9 @@ checkValidDataCon dflags existential_ok tc con
     bad_bang n herald
       = hang herald 2 (text "on the" <+> speakNth n
                        <+> text "argument of" <+> quotes (ppr con))
+
+    data_con_display_type = dataConDisplayType dflags con
+
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
 -- Further checks for the data constructor of a newtype
@@ -3874,11 +3879,18 @@ checkNewDataCon con
 
         ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
         ; let allowedArgType =
-                unlifted_newtypes || isLiftedType_maybe arg_ty1 == Just True
+                unlifted_newtypes || isLiftedType_maybe (scaledThing arg_ty1) == Just True
         ; checkTc allowedArgType $ vcat
           [ text "A newtype cannot have an unlifted argument type"
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
+        ; dflags <- getDynFlags
+
+        ; let check_con what msg =
+               checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con))
+
+        ; checkTc (ok_mult (scaledMult arg_ty1)) $
+          text "A newtype constructor must be linear"
 
         ; check_con (null eq_spec) $
           text "A newtype constructor must have a return type of form T a1 ... an"
@@ -3898,14 +3910,15 @@ checkNewDataCon con
   where
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
       = dataConFullSig con
-    check_con what msg
-       = checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConUserType con))
 
     (arg_ty1 : _) = arg_tys
 
     ok_bang (HsSrcBang _ _ SrcStrict) = False
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
+
+    ok_mult One = True
+    ok_mult _   = False
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -4353,7 +4366,7 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
+                    eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys) }
                     -- See Note [Role-checking data constructor arguments] in TcTyDecls
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -4390,8 +4403,9 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (FunTy _ ty1 ty2)
-      =  check_ty_roles env role ty1
+    check_ty_roles env role (FunTy _ w ty1 ty2)
+      =  check_ty_roles env role w
+      >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
     check_ty_roles env role (ForAllTy (Bndr tv _) ty)
@@ -4548,8 +4562,8 @@ noClassTyVarErr clas fam_tc
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
-badDataConTyCon :: DataCon -> Type -> SDoc
-badDataConTyCon data_con res_ty_tmpl
+badDataConTyCon :: Type -> DataCon -> Type -> SDoc
+badDataConTyCon data_con_display_type data_con res_ty_tmpl
   | ASSERT( all isTyVar tvs )
     tcIsForAllTy actual_res_ty
   = nested_foralls_contexts_suggestion
@@ -4591,7 +4605,7 @@ badDataConTyCon data_con res_ty_tmpl
     --    underneath the nested foralls and contexts.
     -- 3) Smash together the type variables and class predicates from 1) and
     --    2), and prepend them to the rho type from 2).
-    (tvs, theta, rho) = tcSplitNestedSigmaTys (dataConUserType data_con)
+    (tvs, theta, rho) = tcSplitNestedSigmaTys data_con_display_type
     suggested_ty = mkSpecSigmaTy tvs theta rho
 
 badGadtDecl :: Name -> SDoc
@@ -4601,10 +4615,11 @@ badGadtDecl tc_name
 
 badExistential :: DataCon -> SDoc
 badExistential con
-  = hang (text "Data constructor" <+> quotes (ppr con) <+>
-                text "has existential type variables, a context, or a specialised result type")
-       2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
-               , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ])
+  = sdocWithDynFlags (\dflags ->
+      hang (text "Data constructor" <+> quotes (ppr con) <+>
+                  text "has existential type variables, a context, or a specialised result type")
+         2 (vcat [ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con)
+                 , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ]))
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name

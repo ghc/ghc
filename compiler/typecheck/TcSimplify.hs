@@ -50,7 +50,7 @@ import GHC.Core.Predicate
 import TcOrigin
 import TcType
 import GHC.Core.Type
-import TysWiredIn     ( liftedRepTy )
+import TysWiredIn     ( liftedRepTy, manyDataConTy )
 import GHC.Core.Unify ( tcMatchTyKi )
 import Util
 import Var
@@ -65,6 +65,7 @@ import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Maybes             ( isJust )
+import GHC.Core.Multiplicity
 
 {-
 *********************************************************************************
@@ -657,7 +658,7 @@ tcNormalise given_ids ty
     mk_wanted_ct = do
       let occ = mkVarOcc "$tcNorm"
       name <- newSysName occ
-      let ev = mkLocalId name ty
+      let ev = mkLocalId name Many ty -- evidences are always unrestricted
       newHoleCt ExprHole ev ty
 
 {- Note [Superclasses and satisfiability]
@@ -2113,6 +2114,13 @@ defaultTyVarTcS the_tv
     -- and Note [Inferring kinds for type declarations] in TcTyClsDecls
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isMultiplicityVar the_tv
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
+                             -- never with a type; c.f. TcMType.defaultTyVar
+                             -- See Note [Kind generalisation and SigTvs]
+  = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
+       ; unifyTyVar the_tv manyDataConTy
        ; return True }
   | otherwise
   = return False  -- the common case
