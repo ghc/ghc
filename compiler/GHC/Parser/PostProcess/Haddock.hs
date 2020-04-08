@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module HaddockUtils where
+module GHC.Parser.PostProcess.Haddock where
 
 import GhcPrelude
 

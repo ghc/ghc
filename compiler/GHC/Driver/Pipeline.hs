@@ -41,7 +41,7 @@ import GhcPrelude
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Packages
 import GHC.Driver.Ways
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Driver.Phases
 import GHC.SysTools
 import GHC.SysTools.ExtraObj

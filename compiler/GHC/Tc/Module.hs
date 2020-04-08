@@ -90,7 +90,7 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
 import GHC.Iface.Make   ( coAxiomToIfaceDecl )
-import HeaderInfo       ( mkPrelImports )
+import GHC.Parser.Header       ( mkPrelImports )
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Rule

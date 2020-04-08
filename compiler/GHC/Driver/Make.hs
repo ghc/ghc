@@ -43,7 +43,7 @@ import GHC.Driver.Session
 import ErrUtils
 import GHC.Driver.Finder
 import GHC.Driver.Monad
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.IfaceToCore  ( typecheckIface )

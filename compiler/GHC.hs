@@ -352,9 +352,9 @@ import StringBuffer
 import Outputable
 import GHC.Types.Basic
 import FastString
-import qualified Parser
-import Lexer
-import ApiAnnotation
+import qualified GHC.Parser as Parser
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
 import GHC.Tc.Module
@@ -857,7 +857,7 @@ data ParsedModule =
                , pm_parsed_source :: ParsedSource
                , pm_extra_src_files :: [FilePath]
                , pm_annotations :: ApiAnns }
-               -- See Note [Api annotations] in ApiAnnotation.hs
+               -- See Note [Api annotations] in GHC.Parser.Annotation
 
 instance ParsedMod ParsedModule where
   modSummary m    = pm_mod_summary m
@@ -951,7 +951,7 @@ parseModule ms = do
    hpm <- liftIO $ hscParse hsc_env_tmp ms
    return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm)
                            (hpm_annotations hpm))
-               -- See Note [Api annotations] in ApiAnnotation.hs
+               -- See Note [Api annotations] in GHC.Parser.Annotation
 
 -- | Typecheck and rename a parsed module.
 --
