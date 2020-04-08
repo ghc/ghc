@@ -368,13 +368,6 @@ data InferResult
 
        , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in GHC.Tc.Utils.TcMType
 
-       , ir_inst :: Bool
-         -- True <=> deeply instantiate before returning
-         --           i.e. return a RhoType
-         -- False <=> do not instantiate before returning
-         --           i.e. return a SigmaType
-         -- See Note [Deep instantiation of InferResult] in GHC.Tc.Utils.Unify
-
        , ir_ref  :: IORef (Maybe TcType) }
          -- The type that fills in this hole should be a Type,
          -- that is, its kind should be (TYPE rr) for some rr
@@ -387,9 +380,8 @@ instance Outputable ExpType where
   ppr (Infer ir) = ppr ir
 
 instance Outputable InferResult where
-  ppr (IR { ir_uniq = u, ir_lvl = lvl
-          , ir_inst = inst })
-    = text "Infer" <> braces (ppr u <> comma <> ppr lvl <+> ppr inst)
+  ppr (IR { ir_uniq = u, ir_lvl = lvl })
+    = text "Infer" <> braces (ppr u <> comma <> ppr lvl)
 
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
