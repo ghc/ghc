@@ -2,7 +2,7 @@
 tcfail001.hs:9:2: error:
     • Couldn't match expected type ‘[a]’
                   with actual type ‘[a0] -> [a1]’
-    • The equation(s) for ‘op’ have one argument,
-      but its type ‘[a]’ has none
+    • The equation(s) for ‘op’ have one value argument,
+        but its type ‘[a]’ has none
       In the instance declaration for ‘A [a]’
     • Relevant bindings include op :: [a] (bound at tcfail001.hs:9:2)

@@ -316,9 +316,9 @@ dsExpr e@(HsApp _ fun arg)
        ; dsWhenNoErrs (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
-dsExpr (HsAppType _ e _)
-    -- ignore type arguments here; they're in the wrappers instead at this point
-  = dsLExpr e
+dsExpr (HsAppType ty e _)
+  = do { e' <- dsLExpr e
+       ; return (App e' (Type ty)) }
 
 {-
 Note [Desugaring vars]
