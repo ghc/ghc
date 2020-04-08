@@ -26,8 +26,8 @@ Defer01.hs:25:4: warning: [-Winaccessible-code (in -Wdefault)]
 
 Defer01.hs:31:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    • The function ‘e’ is applied to one argument,
-      but its type ‘Char’ has none
+    • The function ‘e’ is applied to one value argument,
+        but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
     • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
@@ -79,7 +79,7 @@ Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 (deferred type error)
-*** Exception: Defer01.hs:18:7: error:
+*** Exception: Defer01.hs:18:9: error:
     • No instance for (Eq B) arising from a use of ‘==’
     • In the expression: x == x
       In an equation for ‘b’: b x = x == x
@@ -100,8 +100,8 @@ Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 (deferred type error)
 *** Exception: Defer01.hs:31:5: error:
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    • The function ‘e’ is applied to one argument,
-      but its type ‘Char’ has none
+    • The function ‘e’ is applied to one value argument,
+        but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
     • Relevant bindings include f :: t (bound at Defer01.hs:31:1)

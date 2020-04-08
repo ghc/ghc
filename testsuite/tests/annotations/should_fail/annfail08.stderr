@@ -5,7 +5,7 @@ annfail08.hs:9:1: error:
         (maybe you haven't applied a function to enough arguments?)
     • In the annotation: {-# ANN f (id + 1) #-}
 
-annfail08.hs:9:12: error:
+annfail08.hs:9:15: error:
     • No instance for (Num (a0 -> a0)) arising from a use of ‘+’
         (maybe you haven't applied a function to enough arguments?)
     • In the annotation: {-# ANN f (id + 1) #-}
