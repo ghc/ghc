@@ -475,7 +475,7 @@ void checkHeapChain (bdescr *bd)
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
 
-                /* skip over slop */
+                /* skip over slop, see Note [slop on the heap] */
                 while (p < bd->free &&
                        (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
             }

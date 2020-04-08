@@ -474,31 +474,35 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    OVERWRITING_CLOSURE(p) on the old closure that is about to be
    overwritten.
 
-   Note [zeroing slop]
+   Note [zeroing slop when overwriting closures]
 
-   In some scenarios we write zero words into "slop"; memory that is
-   left unoccupied after we overwrite a closure in the heap with a
-   smaller closure.
+   When we overwrite a closure in the heap with a smaller one, in some scenarios
+   we need to write zero words into "slop"; the memory that is left
+   unoccupied. See Note [slop on the heap]
 
    Zeroing slop is required for:
 
-    - full-heap sanity checks (DEBUG, and +RTS -DS)
-    - LDV profiling (PROFILING, and +RTS -hb)
+    - full-heap sanity checks (DEBUG, and +RTS -DS),
+    - LDV profiling (PROFILING, and +RTS -hb) and
+    - regular heap profiling (PROFILING , and +RTS -h).
 
-   Zeroing slop must be disabled for:
+   However we can get into trouble if we're zeroing slop for ordinarily
+   immutable closures when using multiple threads, since there is nothing
+   preventing another thread from still being in the process of reading the
+   memory we're about to zero.
 
-    - THREADED_RTS with +RTS -N2 and greater, because we cannot
-      overwrite slop when another thread might be reading it.
+   Thus, with the THREADED RTS and +RTS -N2 or greater we must not zero
+   immutable closure's slop.
 
-   Hence, slop is zeroed when either:
+   Hence, an immutable closure's slop is zeroed when either:
 
-    - PROFILING && era <= 0 (LDV is on)
-    - !THREADED_RTS && DEBUG
+    - PROFILING && era <= 0 (LDV is off) or
+    - !THREADED && DEBUG
 
-   And additionally:
+   Additionally:
 
-    - LDV profiling and +RTS -N2 are incompatible
-    - full-heap sanity checks are disabled for THREADED_RTS
+    - LDV profiling and +RTS -N2 are incompatible,
+    - full-heap sanity checks are disabled for the THREADED RTS.
 
    -------------------------------------------------------------------------- */
 
@@ -514,12 +518,18 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #define ZERO_SLOP_FOR_SANITY_CHECK 0
 #endif
 
+#if defined(PROFILING)
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) overwritingClosureOfs(c, off)
+#else
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) do { (void) c; } while(0)
+#endif
+
 #if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
 #define OVERWRITING_CLOSURE(c) overwritingClosure(c)
-#define OVERWRITING_CLOSURE_OFS(c,n) overwritingClosureOfs(c,n)
+#define OVERWRITING_CLOSURE_OFS(c, off) overwritingClosureOfs(c, off)
 #else
-#define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
+#define OVERWRITING_CLOSURE(c) do { (void) c; } while(0)
+#define OVERWRITING_CLOSURE_OFS(c, off) do { (void) c; (void) n; } while(0)
 #endif
 
 #if defined(PROFILING)
@@ -534,7 +544,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
 EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
 {
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
-    // see Note [zeroing slop], also #8402
+    // see Note [zeroing slop when overwriting closures], also #8402
     if (era <= 0) return;
 #endif
 
