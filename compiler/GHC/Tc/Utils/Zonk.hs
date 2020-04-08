@@ -754,9 +754,10 @@ zonkExpr env (HsApp x e1 e2)
        new_e2 <- zonkLExpr env e2
        return (HsApp x new_e1 new_e2)
 
-zonkExpr env (HsAppType x e t)
+zonkExpr env (HsAppType ty e t)
   = do new_e <- zonkLExpr env e
-       return (HsAppType x new_e t)
+       new_ty <- zonkTcTypeToTypeX env ty
+       return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
 zonkExpr _ e@(HsRnBracketOut _ _ _)

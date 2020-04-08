@@ -1,5 +1,5 @@
 
-tcfail034.hs:17:11: error:
+tcfail034.hs:17:13: error:
     • Could not deduce (Integral a) arising from a use of ‘mod’
       from the context: (Num a, Eq a)
         bound by the type signature for:

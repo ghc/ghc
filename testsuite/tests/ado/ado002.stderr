@@ -2,8 +2,8 @@
 ado002.hs:8:8: error:
     • Couldn't match expected type ‘Char -> IO b0’
                   with actual type ‘IO Char’
-    • The function ‘getChar’ is applied to one argument,
-      but its type ‘IO Char’ has none
+    • The function ‘getChar’ is applied to one value argument,
+        but its type ‘IO Char’ has none
       In a stmt of a 'do' block: y <- getChar 'a'
       In the expression:
         do x <- getChar
@@ -45,8 +45,8 @@ ado002.hs:15:13: error:
 ado002.hs:23:9: error:
     • Couldn't match expected type ‘Char -> IO t0’
                   with actual type ‘IO Char’
-    • The function ‘getChar’ is applied to one argument,
-      but its type ‘IO Char’ has none
+    • The function ‘getChar’ is applied to one value argument,
+        but its type ‘IO Char’ has none
       In a stmt of a 'do' block: x5 <- getChar x4
       In the expression:
         do x1 <- getChar

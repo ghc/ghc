@@ -13,7 +13,7 @@ T2245.hs:5:10: warning: [-Wmissing-methods (in -Wdefault)]
 
 T2245.hs:7:27: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraints to type ‘T’
-        (Ord a0) arising from a use of ‘<’ at T2245.hs:7:27-33
+        (Ord a0) arising from a use of ‘<’ at T2245.hs:7:27
         (Fractional a0)
           arising from the literal ‘1e400’ at T2245.hs:7:29-33
         (Read a0) arising from a use of ‘read’ at T2245.hs:7:38-41

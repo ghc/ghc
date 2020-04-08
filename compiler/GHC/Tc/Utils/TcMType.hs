@@ -33,7 +33,7 @@ module GHC.Tc.Utils.TcMType (
   -- Expected types
   ExpType(..), ExpSigmaType, ExpRhoType,
   mkCheckExpType,
-  newInferExpType, newInferExpTypeInst, newInferExpTypeNoInst,
+  newInferExpType,
   readExpType, readExpType_maybe,
   expTypeToType, checkingExpType_maybe, checkingExpType,
   tauifyExpType, inferResultToType,
@@ -440,21 +440,14 @@ test gadt/gadt-escape1.
 
 -- actual data definition is in GHC.Tc.Utils.TcType
 
--- | Make an 'ExpType' suitable for inferring a type of kind * or #.
-newInferExpTypeNoInst :: TcM ExpSigmaType
-newInferExpTypeNoInst = newInferExpType False
-
-newInferExpTypeInst :: TcM ExpRhoType
-newInferExpTypeInst = newInferExpType True
-
-newInferExpType :: Bool -> TcM ExpType
-newInferExpType inst
+newInferExpType :: TcM ExpType
+newInferExpType
   = do { u <- newUnique
        ; tclvl <- getTcLevel
-       ; traceTc "newOpenInferExpType" (ppr u <+> ppr inst <+> ppr tclvl)
+       ; traceTc "newInferExpType" (ppr u <+> ppr tclvl)
        ; ref <- newMutVar Nothing
        ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl
-                           , ir_ref = ref, ir_inst = inst })) }
+                           , ir_ref = ref })) }
 
 -- | Extract a type out of an ExpType, if one exists. But one should always
 -- exist. Unless you're quite sure you know what you're doing.

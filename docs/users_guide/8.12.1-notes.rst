@@ -69,6 +69,16 @@ Language
   There is a chance we will tweak the lookup scheme in the future, to make this
   workaround unnecessary.
 
+* GHC now consistently does eager instantiation during type inference.
+  As a consequence, visible type application (VTA) now only works when
+  the head of the application is:
+  * A variable
+  * An expression with a type signature
+  For example `(let x = blah in id) @Bool True` no longer typechecks.
+  You should write `let x = blah in id @Bool True` instead.
+
+  This change prepares the way for Quick Look impredicativity.
+
 Compiler
 ~~~~~~~~
 
