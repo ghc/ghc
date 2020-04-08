@@ -110,13 +110,13 @@ static void *itimer_thread_func(void *_handle_tick)
 
     timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
     if (timerfd == -1) {
-        barf("timerfd_create");
+        barf("timerfd_create: %s", strerror(errno));
     }
     if (!TFD_CLOEXEC) {
         fcntl(timerfd, F_SETFD, FD_CLOEXEC);
     }
     if (timerfd_settime(timerfd, 0, &it, NULL)) {
-        barf("timerfd_settime");
+        barf("timerfd_settime: %s", strerror(errno));
     }
 #endif
 
@@ -124,7 +124,7 @@ static void *itimer_thread_func(void *_handle_tick)
         if (USE_TIMERFD_FOR_ITIMER) {
             if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
                 if (errno != EINTR) {
-                    barf("Itimer: read(timerfd) failed");
+                    barf("Itimer: read(timerfd) failed: %s", strerror(errno));
                 }
             }
         } else {
@@ -170,7 +170,7 @@ initTicker (Time interval, TickProc handle_tick)
         pthread_setname_np(thread, "ghc_ticker");
 #endif
     } else {
-        barf("Itimer: Failed to spawn thread");
+        barf("Itimer: Failed to spawn thread: %s", strerror(errno));
     }
 }
 
@@ -204,7 +204,7 @@ exitTicker (bool wait)
     // wait for ticker to terminate if necessary
     if (wait) {
         if (pthread_join(thread, NULL)) {
-            sysErrorBelch("Itimer: Failed to join");
+            sysErrorBelch("Itimer: Failed to join: %s", strerror(errno));
         }
         closeMutex(&mutex);
         closeCondition(&start_cond);
