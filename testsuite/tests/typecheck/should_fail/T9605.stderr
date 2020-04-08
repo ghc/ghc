@@ -3,9 +3,7 @@ T9605.hs:7:6: error:
     • Couldn't match type ‘Bool’ with ‘m Bool’
       Expected type: t0 -> m Bool
         Actual type: t0 -> Bool
-    • The function ‘f1’ is applied to one argument,
-      its type is ‘m0 Bool’,
-      it is specialized to ‘t0 -> Bool’
+    • In the result of a function call
       In the expression: f1 undefined
       In an equation for ‘f2’: f2 = f1 undefined
     • Relevant bindings include f2 :: m Bool (bound at T9605.hs:7:1)

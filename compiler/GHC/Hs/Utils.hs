@@ -187,8 +187,7 @@ mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExtField e1 e2)
 
-mkHsAppType :: (NoGhcTc (GhcPass id) ~ GhcRn)
-            => LHsExpr (GhcPass id) -> LHsWcType GhcRn -> LHsExpr (GhcPass id)
+mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
 mkHsAppType e t = addCLoc e t_body (HsAppType noExtField e paren_wct)
   where
     t_body    = hswc_body t

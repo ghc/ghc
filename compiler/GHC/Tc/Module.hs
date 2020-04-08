@@ -56,7 +56,6 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
 import GHC.Tc.Gen.Match
-import GHC.Tc.Utils.Instantiate( deeplyInstantiate )
 import GHC.Tc.Utils.Unify( checkConstraints )
 import GHC.Rename.HsType
 import GHC.Rename.Expr
@@ -1785,8 +1784,8 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar noExtField (L loc main_name)))
-                             (mkCheckExpType io_ty)
+                  tcLExpr (L loc (HsVar noExtField (L loc main_name)))
+                          (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -2491,15 +2490,11 @@ tcRnExpr hsc_env mode rdr_expr
         -- Now typecheck the expression, and generalise its type
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
-    let { fresh_it  = itName uniq (getLoc rdr_expr)
-        ; orig = lexprCtOrigin rn_expr } ;
-    ((tclvl, res_ty), lie)
+    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
+    ((tclvl, (_tc_expr, res_ty)), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
-                ; if inst
-                  then snd <$> deeplyInstantiate orig expr_ty
-                  else return expr_ty } ;
+             tc_infer rn_expr ;
 
     -- Generalise
     (qtvs, dicts, _, residual, _)
@@ -2525,11 +2520,34 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
+    tc_infer expr | inst      = tcInferRho expr
+                  | otherwise = tcInferSigma expr
+                  -- tcInferSigma: see Note [Implementing :type]
+
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)
       TM_NoInst  -> (False, NoRestrictions, id)
       TM_Default -> (True,  EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
+
+{- Note [Implementing :type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   :type const
+
+We want    forall a b. a -> b -> a
+and not    forall {a}{b}. a -> b -> a
+
+The latter is what we'd get if we eagerly instantiated and then
+re-generalised with Inferred binders.  It makes a difference, because
+it tells us we where we can use Visible Type Application (VTA).
+
+And also for   :type const @Int
+we want        forall b. Int -> b -> Int
+and not        forall {b}. Int -> b -> Int
+
+Solution: use tcInferSigma, which in turn uses tcInferApp, which
+has a special case for application chains.
+-}
 
 --------------------------
 tcRnImportDecls :: HscEnv

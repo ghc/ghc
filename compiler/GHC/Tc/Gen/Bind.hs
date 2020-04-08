@@ -23,7 +23,7 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun )
-import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcMonoExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcLExpr )
 import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import GHC.Core (Tickish (..))
 import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
@@ -354,7 +354,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
+            ; expr' <- tcLExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
@@ -1263,9 +1263,7 @@ tcMonoBinds is_rec sig_fn no_gen
         --      We want to infer a higher-rank type for f
     setSrcSpan b_loc    $
     do  { ((co_fn, matches'), rhs_ty)
-            <- tcInferInst $ \ exp_ty ->
-                  -- tcInferInst: see GHC.Tc.Utils.Unify,
-                  -- Note [Deep instantiation of InferResult] in GHC.Tc.Utils.Unify
+            <- tcInfer $ \ exp_ty ->
                tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
@@ -1362,7 +1360,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
             -- See Note [Existentials in pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
-               tcInferNoInst $ \ exp_ty ->
+               tcInfer $ \ exp_ty ->
                tcLetPat inst_sig_fun no_gen pat exp_ty $
                mapM lookup_info nosig_names
 
