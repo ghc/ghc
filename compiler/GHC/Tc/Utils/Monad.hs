@@ -835,9 +835,8 @@ addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
--- wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
-                                                ; return (L loc b) }
+                                            ; return (L loc b) }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =

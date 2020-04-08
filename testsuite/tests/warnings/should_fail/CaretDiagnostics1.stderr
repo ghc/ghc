@@ -55,8 +55,8 @@ CaretDiagnostics1.hs:13:7-11: error:
 
 CaretDiagnostics1.hs:(13,16)-(14,13): error:
     • Couldn't match expected type ‘Char -> p0’ with actual type ‘()’
-    • The function ‘()’ is applied to one argument,
-      but its type ‘()’ has none
+    • The function ‘()’ is applied to one value argument,
+        but its type ‘()’ has none
       In the expression: () '0'
       In a case alternative: "γηξ" -> () '0'
    |

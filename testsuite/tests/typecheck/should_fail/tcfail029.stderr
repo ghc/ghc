@@ -1,5 +1,5 @@
 
-tcfail029.hs:6:7: error:
+tcfail029.hs:6:9: error:
     • No instance for (Ord Foo) arising from a use of ‘>’
     • In the expression: x > Bar
       In an equation for ‘f’: f x = x > Bar

@@ -1,0 +1,17 @@
+
+T17173.hs:6:7: error:
+    • Cannot apply expression of type ‘a0 -> a0’
+      to a visible type argument ‘Bool’
+    • In the expression:
+        (let
+           myId :: forall a. a -> a
+           myId x = x
+         in myId)
+          @Bool True
+      In an equation for ‘foo’:
+          foo
+            = (let
+                 myId :: forall a. a -> a
+                 myId x = x
+               in myId)
+                @Bool True

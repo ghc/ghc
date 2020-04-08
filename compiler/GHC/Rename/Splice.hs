@@ -48,7 +48,7 @@ import GHC.Driver.Hooks
 import GHC.Builtin.Names.TH ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                             , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcPolyExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
     ( runMetaD
     , runMetaE
@@ -324,7 +324,7 @@ runRnSplice flavour run_meta ppr_res splice
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
        ; zonked_q_expr <- zonkTopLExpr =<<
                             tcTopSpliceExpr Untyped
-                              (tcPolyExpr the_expr meta_exp_ty)
+                              (tcCheckExpr the_expr meta_exp_ty)
 
              -- Run the expression
        ; mod_finalizers_ref <- newTcRef []
@@ -760,7 +760,7 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
     spliceDebugDoc loc
       = let code = case mb_src of
                      Nothing -> ending
-                     Just e  -> nest 2 (ppr (stripParensHsExpr e)) : ending
+                     Just e  -> nest 2 (ppr (stripParensLHsExpr e)) : ending
             ending = [ text "======>", nest 2 gen ]
         in  hang (ppr loc <> colon <+> text "Splicing" <+> text sd)
                2 (sep code)

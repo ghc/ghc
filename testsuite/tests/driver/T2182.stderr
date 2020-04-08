@@ -5,7 +5,7 @@ T2182.hs:5:5: error:
     • In the expression: show (\ x -> x)
       In an equation for ‘y’: y = show (\ x -> x)
 
-T2182.hs:6:5: error:
+T2182.hs:6:15: error:
     • No instance for (Eq (p0 -> p0)) arising from a use of ‘==’
         (maybe you haven't applied a function to enough arguments?)
     • In the expression: (\ x -> x) == (\ y -> y)
@@ -17,7 +17,7 @@ T2182.hs:5:5: error:
     • In the expression: show (\ x -> x)
       In an equation for ‘y’: y = show (\ x -> x)
 
-T2182.hs:6:5: error:
+T2182.hs:6:15: error:
     • No instance for (Eq (p0 -> p0)) arising from a use of ‘==’
         (maybe you haven't applied a function to enough arguments?)
     • In the expression: (\ x -> x) == (\ y -> y)

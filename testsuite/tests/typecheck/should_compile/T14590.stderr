@@ -1,9 +1,9 @@
 
 T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
-    • In the expression: _
-      In the expression: x `_`
+    • In the expression: x `_`
       In the expression: (x `_`) y
+      In an equation for ‘f1’: f1 x y = (x `_`) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:4:6)
         x :: Int (bound at T14590.hs:4:4)
@@ -89,9 +89,9 @@ T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
 T14590.hs:5:13: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
       Or perhaps ‘_a’ is mis-spelled, or not in scope
-    • In the expression: _a
-      In the expression: x `_a`
+    • In the expression: x `_a`
       In the expression: (x `_a`) y
+      In an equation for ‘f2’: f2 x y = (x `_a`) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:5:6)
         x :: Int (bound at T14590.hs:5:4)
@@ -176,9 +176,9 @@ T14590.hs:5:13: warning: [-Wtyped-holes (in -Wdefault)]
 
 T14590.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
-    • In the expression: _
-      In the expression: `_` x
+    • In the expression: `_` x
       In the expression: (`_` x) y
+      In an equation for ‘f3’: f3 x y = (`_` x) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:6:6)
         x :: Int (bound at T14590.hs:6:4)
@@ -264,9 +264,9 @@ T14590.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
 T14590.hs:7:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
       Or perhaps ‘_a’ is mis-spelled, or not in scope
-    • In the expression: _a
-      In the expression: `_a` x
+    • In the expression: `_a` x
       In the expression: (`_a` x) y
+      In an equation for ‘f4’: f4 x y = (`_a` x) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:7:6)
         x :: Int (bound at T14590.hs:7:4)

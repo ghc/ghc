@@ -1,7 +1,6 @@
 
 overloadedrecfldsfail07.hs:7:7: error:
     • Couldn't match expected type ‘T’ with actual type ‘T -> Int’
-    • Probable cause: ‘x’ is applied to too few arguments
-      In the first argument of ‘x’, namely ‘x’
+    • In the first argument of ‘x’, namely ‘x’
       In the expression: x x
       In an equation for ‘y’: y = x x

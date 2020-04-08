@@ -1,12 +1,13 @@
 
 <interactive>:1:1: error:
-    Ambiguous type variable ‘a0’ arising from a use of ‘foo’
-    prevents the constraint ‘(Num a0)’ from being solved.
-    Probable fix: use a type annotation to specify what ‘a0’ should be.
-    These potential instances exist:
-      instance Num Integer -- Defined in ‘GHC.Num’
-      instance Num Double -- Defined in ‘GHC.Float’
-      instance Num Float -- Defined in ‘GHC.Float’
-      ...plus two others
-      ...plus 8 instances involving out-of-scope types
-      (use -fprint-potential-instances to see them all)
+    • Ambiguous type variable ‘a0’ arising from a use of ‘foo’
+      prevents the constraint ‘(Num a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        ...plus 8 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: foo

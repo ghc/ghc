@@ -1,5 +1,5 @@
 
-T5853.hs:15:46: error:
+T5853.hs:15:52: error:
     • Could not deduce: Subst (Subst fa a) b ~ Subst fa b
         arising from a use of ‘<$>’
       from the context: (F fa, Elem (Subst fa b) ~ b,
