@@ -42,11 +42,10 @@ import GHC.Core.Predicate
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import GHC.Types.Var              ( Id, Var, setVarName, varName, varType )
 import GHC.Tc.Types
+import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType, varUnique )
 import GHC.Types.Var.Env
 import GHC.Types.Unique
-import TcRnTypes
-import TcEvidence
 import GHC.Iface.Make             ( mkIfaceExports )
 import Panic
 import Maybes
