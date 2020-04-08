@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module ApiAnnotation (
+module GHC.Parser.Annotation (
   getAnnotation, getAndRemoveAnnotation,
   getAnnotationComments,getAndRemoveAnnotationComments,
   ApiAnns(..),
@@ -83,8 +83,8 @@ For any given element in the AST, there is only a set number of
 keywords that are applicable for it (e.g., you'll never see an
 'import' keyword associated with a let-binding.)  The set of allowed
 keywords is documented in a comment associated with the constructor
-of a given AST element, although the ground truth is in Parser
-and RdrHsSyn (which actually add the annotations; see #13012).
+of a given AST element, although the ground truth is in GHC.Parser
+and GHC.Parser.PostProcess (which actually add the annotations; see #13012).
 
 COMMENT ELEMENTS
 

@@ -9,7 +9,7 @@ which deal with the instantiated versions are located elsewhere:
 
    Parameterised by          Module
    ----------------          -------------
-   GhcPs/RdrName             parser/RdrHsSyn
+   GhcPs/RdrName             GHC.Parser.PostProcess
    GhcRn/Name                GHC.Rename.*
    GhcTc/Id                  GHC.Tc.Utils.Zonk
 

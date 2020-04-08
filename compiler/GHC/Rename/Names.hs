@@ -52,7 +52,7 @@ import GHC.Types.Avail
 import GHC.Types.FieldLabel
 import GHC.Driver.Types
 import GHC.Types.Name.Reader
-import RdrHsSyn        ( setRdrNameSpace )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
 import Outputable
 import Maybes
 import GHC.Types.SrcLoc as SrcLoc
