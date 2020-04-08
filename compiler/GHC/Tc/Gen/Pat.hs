@@ -29,7 +29,7 @@ where
 
 import GhcPrelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -392,7 +392,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  {
          -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
-        ; (expr',expr'_inferred) <- tcInferSigma expr
+        ; (expr',expr'_inferred) <- tcInferRho expr
 
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr

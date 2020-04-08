@@ -16,10 +16,6 @@ tcMonoExpr, tcMonoExprNC ::
        -> ExpRhoType
        -> TcM (LHsExpr GhcTcId)
 
-tcInferSigma ::
-          LHsExpr GhcRn
-       -> TcM (LHsExpr GhcTcId, TcSigmaType)
-
 tcInferRho, tcInferRhoNC ::
           LHsExpr GhcRn
        -> TcM (LHsExpr GhcTcId, TcRhoType)
