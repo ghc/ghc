@@ -16,7 +16,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module   RdrHsSyn (
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
+module GHC.Parser.PostProcess (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
@@ -98,8 +100,7 @@ module   RdrHsSyn (
         DisambECP(..),
         ecpFromExp,
         ecpFromCmd,
-        PatBuilder,
-
+        PatBuilder
     ) where
 
 import GhcPrelude
@@ -111,7 +112,7 @@ import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Basic
-import Lexer
+import GHC.Parser.Lexer
 import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Core.Type    ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
@@ -128,7 +129,7 @@ import Outputable
 import FastString
 import Maybes
 import Util
-import ApiAnnotation
+import GHC.Parser.Annotation
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import ErrUtils ( Messages )
@@ -489,7 +490,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
 getMonoBind bind binds = (bind, binds)
 
 has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
-has_args []                                  = panic "RdrHsSyn:has_args"
+has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
 has_args (L _ (Match { m_pats = args }) : _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
@@ -885,7 +886,7 @@ mkRuleTyVarBndrs = fmap (fmap cvt_one)
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"
 
--- See note [Parsing explicit foralls in Rules] in Parser.y
+-- See note [Parsing explicit foralls in Rules] in GHC.Parser
 checkRuleTyVarBndrNames :: [LHsTyVarBndr GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (L loc (Unqual occ)) = do

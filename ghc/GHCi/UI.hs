@@ -64,7 +64,7 @@ import GHC.Core.Ppr.TyThing
 import PrelNames
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
-import qualified Lexer
+import qualified GHC.Parser.Lexer as Lexer
 
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay )

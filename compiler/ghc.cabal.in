@@ -162,7 +162,6 @@ Library
         .
         iface
         main
-        parser
         prelude
         typecheck
         utils
@@ -372,7 +371,7 @@ Library
         GHC.Driver.Make
         GHC.Plugins
         GhcPrelude
-        HeaderInfo
+        GHC.Parser.Header
         GHC.Driver.Main
         HscStats
         GHC.Driver.Types
@@ -397,13 +396,13 @@ Library
         GHC.SysTools.Settings
         GHC.SysTools.Elf
         GHC.Iface.Tidy
-        Ctype
-        HaddockUtils
-        Lexer
+        GHC.Parser.CharClass
+        GHC.Parser.Lexer
         GHC.Core.Coercion.Opt
-        Parser
-        RdrHsSyn
-        ApiAnnotation
+        GHC.Parser
+        GHC.Parser.PostProcess
+        GHC.Parser.PostProcess.Haddock
+        GHC.Parser.Annotation
         GHC.Types.ForeignCall
         KnownUniques
         PrelInfo
