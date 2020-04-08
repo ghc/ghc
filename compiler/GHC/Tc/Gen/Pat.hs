@@ -16,8 +16,7 @@ module GHC.Tc.Gen.Pat
    ( tcLetPat
    , newLetBndr
    , LetBndrSpec(..)
-   , tcPat
-   , tcPat_O
+   , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcPats
    , addDataConStupidTheta
    , badFieldCon
@@ -29,7 +28,7 @@ where
 
 import GhcPrelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferAppHead )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -63,6 +62,7 @@ import Util
 import Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
+import Control.Monad  ( when )
 import ListSetOps ( getNth )
 
 {-
@@ -112,20 +112,29 @@ tcPats ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcPat :: HsMatchContext GhcRn
-      -> LPat GhcRn -> ExpSigmaType
-      -> TcM a                     -- Checker for body
-      -> TcM (LPat GhcTcId, a)
-tcPat ctxt = tcPat_O ctxt PatOrigin
+tcInferPat :: HsMatchContext GhcRn -> LPat GhcRn
+           -> TcM a
+           -> TcM ((LPat GhcTcId, a), TcSigmaType)
+tcInferPat ctxt pat thing_inside
+  = tcInferInst $ \ exp_ty ->    -- The ir_inst flag is irrelevant in tcPat
+    tc_lpat pat exp_ty penv thing_inside
+ where
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
+
+tcCheckPat :: HsMatchContext GhcRn
+           -> LPat GhcRn -> TcSigmaType
+           -> TcM a                     -- Checker for body
+           -> TcM (LPat GhcTcId, a)
+tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
-tcPat_O :: HsMatchContext GhcRn
-        -> CtOrigin              -- ^ origin to use if the type needs inst'ing
-        -> LPat GhcRn -> ExpSigmaType
-        -> TcM a                 -- Checker for body
-        -> TcM (LPat GhcTcId, a)
-tcPat_O ctxt orig pat pat_ty thing_inside
-  = tc_lpat pat pat_ty penv thing_inside
+tcCheckPat_O :: HsMatchContext GhcRn
+             -> CtOrigin              -- ^ origin to use if the type needs inst'ing
+             -> LPat GhcRn -> TcSigmaType
+             -> TcM a                 -- Checker for body
+             -> TcM (LPat GhcTcId, a)
+tcCheckPat_O ctxt orig pat pat_ty thing_inside
+  = tc_lpat pat (mkCheckExpType pat_ty) penv thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = orig }
 
@@ -390,22 +399,25 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  {
-         -- Expr must have type `forall a1...aN. OPT' -> B`
-         -- where overall_pat_ty is an instance of OPT'.
-        ; (expr',expr'_inferred) <- tcInferSigma expr
+         -- Using tcInferAppHead here, rather than tcMonoExpr, lets us
+         -- have view functions with types like:
+         --    (forall a. blah) -> forall b. burble
+         -- So the overall_pat_ty is (forall a. blah), while the
+         -- inner pattern is checked with (forall b. burble)
+        ; (expr',expr_ty) <- tcInferAppHead expr
 
-         -- expression must be a function
+         -- Expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
         ; (expr_wrap1, [inf_arg_ty], inf_res_ty)
-            <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
-            -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
+            <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr_ty
+            -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_ty)
 
-         -- check that overall pattern is more polymorphic than arg type
+         -- Check that overall pattern is more polymorphic than arg type
         ; expr_wrap2 <- tcSubTypePat penv overall_pat_ty inf_arg_ty
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
-         -- pattern must have inf_res_ty
+         -- Pattern must have inf_res_ty
         ; (pat', res) <- tc_lpat pat (mkCheckExpType inf_res_ty) penv thing_inside
 
         ; overall_pat_ty <- readExpType overall_pat_ty
@@ -665,6 +677,66 @@ because they won't be in scope when we do the desugaring
 
 
 ************************************************************************
+*                                                                      *
+            Pattern signatures   (pat :: type)
+*                                                                      *
+************************************************************************
+-}
+
+tcPatSig :: Bool                    -- True <=> pattern binding
+         -> LHsSigWcType GhcRn
+         -> ExpSigmaType
+         -> TcM (TcType,            -- The type to use for "inside" the signature
+                 [(Name,TcTyVar)],  -- The new bit of type environment, binding
+                                    -- the scoped type variables
+                 [(Name,TcTyVar)],  -- The wildcards
+                 HsWrapper)         -- Coercion due to unification with actual ty
+                                    -- Of shape:  res_ty ~ sig_ty
+tcPatSig in_pat_bind sig res_ty
+ = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
+        -- sig_tvs are the type variables free in 'sig',
+        -- and not already in scope. These are the ones
+        -- that should be brought into scope
+
+        ; if null sig_tvs then do {
+                -- Just do the subsumption check and return
+                  wrap <- addErrCtxtM (mk_msg sig_ty) $
+                          tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
+                ; return (sig_ty, [], sig_wcs, wrap)
+        } else do
+                -- Type signature binds at least one scoped type variable
+
+                -- A pattern binding cannot bind scoped type variables
+                -- It is more convenient to make the test here
+                -- than in the renamer
+        { when in_pat_bind (addErr (patBindSigErr sig_tvs))
+
+        -- Now do a subsumption check of the pattern signature against res_ty
+        ; wrap <- addErrCtxtM (mk_msg sig_ty) $
+                  tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
+
+        -- Phew!
+        ; return (sig_ty, sig_tvs, sig_wcs, wrap)
+        } }
+  where
+    mk_msg sig_ty tidy_env
+       = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
+            ; res_ty <- readExpType res_ty   -- should be filled in by now
+            ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
+            ; let msg = vcat [ hang (text "When checking that the pattern signature:")
+                                  4 (ppr sig_ty)
+                             , nest 2 (hang (text "fits the type of its context:")
+                                          2 (ppr res_ty)) ]
+            ; return (tidy_env, msg) }
+
+patBindSigErr :: [(Name,TcTyVar)] -> SDoc
+patBindSigErr sig_tvs
+  = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
+          <+> pprQuotedList (map fst sig_tvs))
+       2 (text "in a pattern binding signature")
+
+
+{- *********************************************************************
 *                                                                      *
         Most of the work for constructors is here
         (the rest is in the ConPatIn case of tc_pat)
