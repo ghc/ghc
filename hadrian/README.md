@@ -101,6 +101,9 @@ time when you are working on a feature that affects both Stage1 and Stage2
 compilers, but may lead to incorrect build results. To unfreeze Stage1 GHC
 simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 
+* `--freeze2`: just like `--freeze1` but tell Hadrian to additionally freeze
+Stage2 GHC.
+
 * `--integer-simple`: build GHC using the `integer-simple` integer library
 (instead of `integer-gmp`).
 
