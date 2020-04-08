@@ -145,7 +145,7 @@ data RealSrcLoc
 --
 -- Unlike 'RealSrcLoc', it is not affected by #line and {-# LINE ... #-}
 -- pragmas. In particular, notice how 'setSrcLoc' and 'resetAlrLastLoc' in
--- Lexer.x update 'PsLoc' preserving 'BufPos'.
+-- GHC.Parser.Lexer update 'PsLoc' preserving 'BufPos'.
 --
 -- The parser guarantees that 'BufPos' are monotonic. See #17632.
 newtype BufPos = BufPos { bufPos :: Int }
@@ -305,7 +305,7 @@ data SrcSpan =
   | UnhelpfulSpan !FastString   -- Just a general indication
                                 -- also used to indicate an empty span
 
-  deriving (Eq, Show) -- Show is used by Lexer.x, because we
+  deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
 
 {- Note [Why Maybe BufPos]
@@ -530,7 +530,7 @@ instance Show RealSrcLoc where
   show (SrcLoc filename row col)
       = "SrcLoc " ++ show filename ++ " " ++ show row ++ " " ++ show col
 
--- Show is used by Lexer.x, because we derive Show for Token
+-- Show is used by GHC.Parser.Lexer, because we derive Show for Token
 instance Show RealSrcSpan where
   show span@(RealSrcSpan' file sl sc el ec)
     | isPointRealSpan span

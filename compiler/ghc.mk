@@ -22,7 +22,7 @@ compiler_stage1_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 compiler_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
-compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
+compiler_stage1_C_FILES_NODEPS = compiler/cbits/cutils.c
 
 # This package doesn't pass the Cabal checks because include-dirs
 # points outside the source directory. This isn't a real problem, so
