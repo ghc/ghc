@@ -1,5 +1,5 @@
 
-T17458.hs:32:27: error:
+T17458.hs:32:32: error:
     • Reduction stack overflow; size = 201
       When simplifying the following type: Typeable Void
       Use -freduction-depth=0 to disable this check

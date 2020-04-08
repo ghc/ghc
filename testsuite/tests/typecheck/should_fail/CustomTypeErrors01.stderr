@@ -1,5 +1,5 @@
 
-CustomTypeErrors01.hs:12:9: error:
+CustomTypeErrors01.hs:12:11: error:
     • Values of type 'MyType' cannot be compared for equality.
     • In the expression: x == MyType
       In an equation for ‘err’: err x = x == MyType
