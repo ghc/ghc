@@ -12,11 +12,15 @@
 --
 -----------------------------------------------------------------------------
 
-module HeaderInfo ( getImports
-                  , mkPrelImports -- used by the renamer too
-                  , getOptionsFromFile, getOptions
-                  , optionsErrorMsgs,
-                    checkProcessArgsResult ) where
+module GHC.Parser.Header
+   ( getImports
+   , mkPrelImports -- used by the renamer too
+   , getOptionsFromFile
+   , getOptions
+   , optionsErrorMsgs
+   , checkProcessArgsResult
+   )
+where
 
 #include "HsVersions.h"
 
@@ -24,8 +28,8 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.Driver.Types
-import Parser           ( parseHeader )
-import Lexer
+import GHC.Parser           ( parseHeader )
+import GHC.Parser.Lexer
 import FastString
 import GHC.Hs
 import GHC.Types.Module

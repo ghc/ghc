@@ -40,9 +40,9 @@ import FastString (fsLit)
 
 import Control.Monad
 import GHC.Driver.Session
-import GHC.Rename.Doc   ( rnHsDoc )
-import RdrHsSyn         ( setRdrNameSpace )
-import Data.Either      ( partitionEithers )
+import GHC.Rename.Doc         ( rnHsDoc )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import Data.Either            ( partitionEithers )
 
 {-
 ************************************************************************

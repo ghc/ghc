@@ -100,7 +100,7 @@ import GHC.Types.Var.Env       ( emptyTidyEnv )
 import Panic
 import GHC.Core.ConLike
 
-import ApiAnnotation
+import GHC.Parser.Annotation
 import GHC.Types.Module
 import GHC.Driver.Packages
 import GHC.Types.Name.Reader
@@ -108,8 +108,8 @@ import GHC.Hs
 import GHC.Hs.Dump
 import GHC.Core
 import StringBuffer
-import Parser
-import Lexer
+import GHC.Parser
+import GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
 import GHC.Tc.Module
 import GHC.IfaceToCore  ( typecheckIface )
