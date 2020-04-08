@@ -372,8 +372,9 @@ evacuate_large(StgPtr p)
 /* ----------------------------------------------------------------------------
    Evacuate static objects
 
-   When a static object is visited for the first time in this GC, it
-   is chained on to the gct->static_objects list.
+   When a static object is visited for the first time in this GC, it is chained
+   on to the gct->static_objects list. Note that some static objects are
+   ignored, see Note [STATIC_LINK fields]
 
    evacuate_static_object (link_field, q)
      - link_field must be STATIC_LINK(q)
