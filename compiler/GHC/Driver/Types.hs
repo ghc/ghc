@@ -182,7 +182,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..), RecSelParent(..))
 import GHC.Core.Type
 
-import ApiAnnotation    ( ApiAnns )
+import GHC.Parser.Annotation    ( ApiAnns )
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -3154,7 +3154,7 @@ data HsParsedModule = HsParsedModule {
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
     hpm_annotations :: ApiAnns
-    -- See note [Api annotations] in ApiAnnotation.hs
+    -- See note [Api annotations] in GHC.Parser.Annotation
   }
 
 {-

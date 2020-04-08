@@ -48,7 +48,7 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module Lexer (
+module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),
    P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
    appendWarning,
@@ -112,9 +112,9 @@ import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
                          SourceText(..) )
 
 -- compiler/parser
-import Ctype
+import GHC.Parser.CharClass
 
-import ApiAnnotation
+import GHC.Parser.Annotation
 }
 
 -- -----------------------------------------------------------------------------
@@ -2121,7 +2121,7 @@ data PState = PState {
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
-        -- See note [Api annotations] in ApiAnnotation.hs
+        -- See note [Api annotations] in GHC.Parser.Annotation
         annotations :: [(ApiAnnKey,[RealSrcSpan])],
         eof_pos :: Maybe RealSrcSpan,
         comment_q :: [RealLocated AnnotationComment],
@@ -2834,7 +2834,7 @@ lexer queueComments cont = do
     then queueComment (L (psRealSpan span) tok) >> lexer queueComments cont
     else cont (L (mkSrcSpanPs span) tok)
 
--- Use this instead of 'lexer' in Parser.y to dump the tokens for debugging.
+-- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
 lexerDbg queueComments cont = lexer queueComments contDbg
   where
     contDbg tok = trace ("token: " ++ show (unLoc tok)) (cont tok)
