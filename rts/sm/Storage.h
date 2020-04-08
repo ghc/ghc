@@ -144,6 +144,15 @@ void move_STACK (StgStack *src, StgStack *dest);
   bits = link_field & 3;
   if ((bits | prev_static_flag) != 3) { ... }
 
+  Some static closure types don't have a static link field. Currently this is
+  CONSTR_0_1, CONSTR_0_2 and CONSTR_NOCAF. See evacuate(). The
+  staticClosureNeedsLink function in Closure.hs determines whether to allocate
+  the extra space or not.
+
+  See also:
+    - Note [STATIC OBJECT LIST] in GC.c and
+    - evacuate_static_object in Evac.c
+
   -------------------------------------------------------------------------- */
 
 #define STATIC_BITS 3
@@ -193,8 +202,8 @@ extern uint32_t prev_static_flag, static_flag;
  UNTAG_STATIC_LIST_PTR().
  --------------------------------------------------------------------------- */
 
-extern StgIndStatic * dyn_caf_list;
-extern StgIndStatic * debug_caf_list;
-extern StgIndStatic * revertible_caf_list;
+extern StgIndStatic * dyn_caf_list; // See Note [dyn_caf_list]
+extern StgIndStatic * debug_caf_list; // See Note [debug_caf_list]
+extern StgIndStatic * revertible_caf_list; // See Note [revertible_caf_list]
 
 #include "EndPrivate.h"

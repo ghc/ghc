@@ -61,7 +61,7 @@
    Global variables
    -------------------------------------------------------------------------- */
 
-/* STATIC OBJECT LIST.
+/* Note [STATIC OBJECT LIST]
  *
  * During GC:
  * We maintain a linked list of static objects that are still live.
