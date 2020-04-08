@@ -29,11 +29,14 @@
 --       buffer = stringToStringBuffer str
 --       parseState = mkPState flags buffer location
 -- @
-module Parser (parseModule, parseSignature, parseImport, parseStatement, parseBackpack,
-               parseDeclaration, parseExpression, parsePattern,
-               parseTypeSignature,
-               parseStmt, parseIdentifier,
-               parseType, parseHeader) where
+module GHC.Parser
+   ( parseModule, parseSignature, parseImport, parseStatement, parseBackpack
+   , parseDeclaration, parseExpression, parsePattern
+   , parseTypeSignature
+   , parseStmt, parseIdentifier
+   , parseType, parseHeader
+   )
+where
 
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
@@ -75,10 +78,9 @@ import GHC.Core.Type    ( funTyCon )
 import GHC.Core.Class   ( FunDep )
 
 -- compiler/parser
-import RdrHsSyn
-import Lexer
-import HaddockUtils
-import ApiAnnotation
+import GHC.Parser.PostProcess
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
@@ -96,7 +98,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
 
-    happy -agc --strict compiler/parser/Parser.y -idetailed-info
+    happy -agc --strict compiler/GHC/Parser.y -idetailed-info
 
 How is this section formatted? Look up the state the conflict is
 reported at, and copy the list of applicable rules (at the top, without the
@@ -1736,7 +1738,8 @@ first or second case of the above.
 
 This is resolved by using rule_vars (which is more general) for both, and
 ensuring that type-level quantified variables do not have the names "forall",
-"family", or "role" in the function 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+"family", or "role" in the function 'checkRuleTyVarBndrNames' in
+GHC.Parser.PostProcess.
 Thus, whenever the definition of tyvarid (used for tv_bndrs) is changed relative
 to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 -}
@@ -3223,7 +3226,7 @@ pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runECP_P) $1 }
 
 bindpat :: { LPat GhcPs }
-bindpat :  exp            {% -- See Note [Parser-Validator ReaderT SDoc] in RdrHsSyn
+bindpat :  exp            {% -- See Note [Parser-Validator ReaderT SDoc] in GHC.Parser.PostProcess
                              checkPattern_msg (text "Possibly caused by a missing 'do'?")
                                               (runECP_PV $1) }
 
@@ -3603,7 +3606,8 @@ tyvarid :: { Located RdrName }
         | 'unsafe'         { sL1 $1 $! mkUnqual tvName (fsLit "unsafe") }
         | 'safe'           { sL1 $1 $! mkUnqual tvName (fsLit "safe") }
         | 'interruptible'  { sL1 $1 $! mkUnqual tvName (fsLit "interruptible") }
-        -- If this changes relative to varid, update 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+        -- If this changes relative to varid, update 'checkRuleTyVarBndrNames'
+        -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
 
 -----------------------------------------------------------------------------
@@ -3641,7 +3645,8 @@ varid :: { Located RdrName }
         | 'forall'         { sL1 $1 $! mkUnqual varName (fsLit "forall") }
         | 'family'         { sL1 $1 $! mkUnqual varName (fsLit "family") }
         | 'role'           { sL1 $1 $! mkUnqual varName (fsLit "role") }
-        -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+        -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames'
+        -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
 
 qvarsym :: { Located RdrName }
@@ -4013,7 +4018,7 @@ reportEmptyDoubleQuotes span = do
 %************************************************************************
 
 For the general principles of the following routines, see Note [Api annotations]
-in ApiAnnotation.hs
+in GHC.Parser.Annotation
 
 -}
 
