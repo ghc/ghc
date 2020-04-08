@@ -639,6 +639,7 @@ typeNatKind    = mkTyConTy typeNatKindCon
 typeSymbolKind = mkTyConTy typeSymbolKindCon
 
 constraintKindTyCon :: TyCon
+-- 'TyCon.isConstraintKindCon' assumes that this is an AlgTyCon!
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
