@@ -29,11 +29,14 @@
 --       buffer = stringToStringBuffer str
 --       parseState = mkPState flags buffer location
 -- @
-module Parser (parseModule, parseSignature, parseImport, parseStatement, parseBackpack,
-               parseDeclaration, parseExpression, parsePattern,
-               parseTypeSignature,
-               parseStmt, parseIdentifier,
-               parseType, parseHeader) where
+module GHC.Parser
+   ( parseModule, parseSignature, parseImport, parseStatement, parseBackpack
+   , parseDeclaration, parseExpression, parsePattern
+   , parseTypeSignature
+   , parseStmt, parseIdentifier
+   , parseType, parseHeader
+   )
+where
 
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
@@ -75,10 +78,9 @@ import GHC.Core.Type    ( funTyCon )
 import GHC.Core.Class   ( FunDep )
 
 -- compiler/parser
-import RdrHsSyn
-import Lexer
-import HaddockUtils
-import ApiAnnotation
+import GHC.Parser.PostProcess
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
@@ -96,7 +98,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
 
-    happy -agc --strict compiler/parser/Parser.y -idetailed-info
+    happy -agc --strict compiler/GHC/Parser.y -idetailed-info
 
 How is this section formatted? Look up the state the conflict is
 reported at, and copy the list of applicable rules (at the top, without the
@@ -1680,7 +1682,7 @@ rule_activation :: { ([AddAnn],Maybe Activation) }
 -- Note that it can be written either
 --   without a space [~1]  (the PREFIX_TILDE case), or
 --   with    a space [~ 1] (the VARSYM case).
--- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+-- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
 rule_activation_marker :: { [AddAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
@@ -1736,7 +1738,8 @@ first or second case of the above.
 
 This is resolved by using rule_vars (which is more general) for both, and
 ensuring that type-level quantified variables do not have the names "forall",
-"family", or "role" in the function 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+"family", or "role" in the function 'checkRuleTyVarBndrNames' in
+GHC.Parser.PostProcess.
 Thus, whenever the definition of tyvarid (used for tv_bndrs) is changed relative
 to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 -}
@@ -2036,7 +2039,7 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
 
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_AT atype               { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
 
         | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
@@ -2053,7 +2056,7 @@ atype :: { LHsType GhcPs }
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
 
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_TILDE atype             {% ams (sLL $1 $> (mkBangTy SrcLazy $2)) [mj AnnTilde $1] }
         | PREFIX_BANG  atype             {% ams (sLL $1 $> (mkBangTy SrcStrict $2)) [mj AnnBang $1] }
 
@@ -2718,7 +2721,7 @@ fexp    :: { ECP }
                                           runECP_PV $2 >>= \ $2 ->
                                           mkHsAppPV (comb2 $1 $>) $1 $2 }
 
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | fexp PREFIX_AT atype       {% runECP_P $1 >>= \ $1 ->
                                         runPV (checkExpBlockArguments $1) >>= \_ ->
                                         fmap ecpFromExp $
@@ -2732,13 +2735,13 @@ fexp    :: { ECP }
         | aexp                       { $1 }
 
 aexp    :: { ECP }
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : qvar TIGHT_INFIX_AT aexp
                                 { ECP $
                                    runECP_PV $3 >>= \ $3 ->
                                    amms (mkHsAsPatPV (comb2 $1 $>) $1 $3) [mj AnnAt $2] }
 
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_TILDE aexp     { ECP $
                                    runECP_PV $2 >>= \ $2 ->
                                    amms (mkHsLazyPatPV (comb2 $1 $>) $2) [mj AnnTilde $1] }
@@ -2893,13 +2896,13 @@ splice_exp :: { LHsExpr GhcPs }
         | splice_typed   { mapLoc (HsSpliceE noExtField) $1 }
 
 splice_untyped :: { Located (HsSplice GhcPs) }
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR aexp2   {% runECP_P $2 >>= \ $2 ->
                                    ams (sLL $1 $> $ mkUntypedSplice DollarSplice $2)
                                        [mj AnnDollar $1] }
 
 splice_typed :: { Located (HsSplice GhcPs) }
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR_DOLLAR aexp2
                                 {% runECP_P $2 >>= \ $2 ->
                                    ams (sLL $1 $> $ mkTypedSplice DollarSplice $2)
@@ -3223,7 +3226,7 @@ pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runECP_P) $1 }
 
 bindpat :: { LPat GhcPs }
-bindpat :  exp            {% -- See Note [Parser-Validator ReaderT SDoc] in RdrHsSyn
+bindpat :  exp            {% -- See Note [Parser-Validator ReaderT SDoc] in GHC.Parser.PostProcess
                              checkPattern_msg (text "Possibly caused by a missing 'do'?")
                                               (runECP_PV $1) }
 
@@ -3603,7 +3606,8 @@ tyvarid :: { Located RdrName }
         | 'unsafe'         { sL1 $1 $! mkUnqual tvName (fsLit "unsafe") }
         | 'safe'           { sL1 $1 $! mkUnqual tvName (fsLit "safe") }
         | 'interruptible'  { sL1 $1 $! mkUnqual tvName (fsLit "interruptible") }
-        -- If this changes relative to varid, update 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+        -- If this changes relative to varid, update 'checkRuleTyVarBndrNames'
+        -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
 
 -----------------------------------------------------------------------------
@@ -3631,7 +3635,7 @@ qvarid :: { Located RdrName }
 -- Note that 'role' and 'family' get lexed separately regardless of
 -- the use of extensions. However, because they are listed here,
 -- this is OK and they can be used as normal varids.
--- See Note [Lexing type pseudo-keywords] in Lexer.x
+-- See Note [Lexing type pseudo-keywords] in GHC.Parser.Lexer
 varid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual varName (getVARID $1) }
         | special_id       { sL1 $1 $! mkUnqual varName (unLoc $1) }
@@ -3641,7 +3645,8 @@ varid :: { Located RdrName }
         | 'forall'         { sL1 $1 $! mkUnqual varName (fsLit "forall") }
         | 'family'         { sL1 $1 $! mkUnqual varName (fsLit "family") }
         | 'role'           { sL1 $1 $! mkUnqual varName (fsLit "role") }
-        -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames' in RdrHsSyn.hs
+        -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames'
+        -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
 
 qvarsym :: { Located RdrName }
@@ -4013,7 +4018,7 @@ reportEmptyDoubleQuotes span = do
 %************************************************************************
 
 For the general principles of the following routines, see Note [Api annotations]
-in ApiAnnotation.hs
+in GHC.Parser.Annotation
 
 -}
 

@@ -214,7 +214,7 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 
 ---------------------------------------------
 --      Sections
--- See Note [Parsing sections] in Parser.y
+-- See Note [Parsing sections] in GHC.Parser
 rnExpr (HsPar x (L loc (section@(SectionL {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar x (L loc section'), fvs) }
@@ -396,7 +396,7 @@ rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
 ----------------------
--- See Note [Parsing sections] in Parser.y
+-- See Note [Parsing sections] in GHC.Parser
 rnSection :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSection section@(SectionR x op expr)
   = do  { (op', fvs_op)     <- rnLExpr op
