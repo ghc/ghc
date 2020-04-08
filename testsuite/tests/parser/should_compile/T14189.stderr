@@ -41,12 +41,14 @@
             []
             (Nothing)
             (PrefixCon
-             [({ T14189.hs:6:18-20 }
-               (HsTyVar
-                (NoExtField)
-                (NotPromoted)
-                ({ T14189.hs:6:18-20 }
-                 {Name: GHC.Types.Int})))])
+             [(HsScaled
+               (HsLinearArrow)
+               ({ T14189.hs:6:18-20 }
+                (HsTyVar
+                 (NoExtField)
+                 (NotPromoted)
+                 ({ T14189.hs:6:18-20 }
+                  {Name: GHC.Types.Int}))))])
             (Nothing)))
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98
