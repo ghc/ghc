@@ -45,7 +45,7 @@ module GHC.Core.TyCon(
         noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
-        isAlgTyCon, isVanillaAlgTyCon,
+        isAlgTyCon, isVanillaAlgTyCon, isConstraintKindCon,
         isClassTyCon, isFamInstTyCon,
         isFunTyCon,
         isPrimTyCon,
@@ -1867,6 +1867,15 @@ isAlgTyCon _               = False
 isVanillaAlgTyCon :: TyCon -> Bool
 isVanillaAlgTyCon (AlgTyCon { algTcParent = VanillaAlgTyCon _ }) = True
 isVanillaAlgTyCon _                                              = False
+
+-- | Returns @True@ for the 'TyCon' of the 'Constraint' kind.
+isConstraintKindCon :: TyCon -> Bool
+-- NB: We intentionally match on AlgTyCon, because 'constraintKindTyCon' is
+-- always an AlgTyCon (see 'pcTyCon' in TysWiredIn) and the record selector
+-- for 'tyConUnique' would generate unreachable code for every other data
+-- constructor of TyCon (see #18026).
+isConstraintKindCon AlgTyCon { tyConUnique = u } = u == constraintKindTyConKey
+isConstraintKindCon _                            = False
 
 isDataTyCon :: TyCon -> Bool
 -- ^ Returns @True@ for data types that are /definitely/ represented by

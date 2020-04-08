@@ -2924,9 +2924,6 @@ distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
 
-isConstraintKindCon :: TyCon -> Bool
-isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
-
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 -- E.g.  True of   TYPE k, TYPE (F Int)
