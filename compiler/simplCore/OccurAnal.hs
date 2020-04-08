@@ -35,6 +35,7 @@ import BasicTypes
 import Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 
 import VarSet
 import VarEnv
@@ -1786,7 +1787,7 @@ occAnal env (Case scrut bndr ty alts)
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
     alt_env = mkAltEnv env scrut bndr
-    occ_anal_alt = occAnalAlt alt_env
+    occ_anal_alt = occAnalAlt alt_env (eqType (idMult bndr) Many)
 
     occ_anal_scrut (Var v) (alt1 : other_alts)
         | not (null other_alts) || not (isDefaultAlt alt1)
@@ -2008,14 +2009,15 @@ occAnalLamOrRhs env binders body
     (env_body, binders') = oneShotGroup env binders
 
 occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
+           -> Bool  -- is this case-many? See Note [Suppressing binder-swaps on linear case]
            -> CoreAlt
            -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt (env, scrut_bind) (con, bndrs, rhs)
+occAnalAlt (env, scrut_bind) caseMany (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage1, rhs1) ->
     let
       (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage1 bndrs
                                 -- See Note [Binders in case alternatives]
-      (alt_usg', rhs2) = wrapAltRHS env scrut_bind alt_usg tagged_bndrs rhs1
+      (alt_usg', rhs2) = wrapAltRHS env scrut_bind alt_usg tagged_bndrs rhs1 caseMany
     in
     (alt_usg', (con, tagged_bndrs, rhs2)) }
 
@@ -2024,12 +2026,14 @@ wrapAltRHS :: OccEnv
            -> UsageDetails              -- usage for entire alt (p -> rhs)
            -> [Var]                     -- alt binders
            -> CoreExpr                  -- alt RHS
+           -> Bool                      -- is this case-many? See Note [Suppressing binder-swaps on linear case]
            -> (UsageDetails, CoreExpr)
-wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs
+wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs caseMany
   | occ_binder_swap env
   , scrut_var `usedIn` alt_usg -- bndrs are not be present in alt_usg so this
                                -- handles condition (a) in Note [Binder swap]
   , not captured               -- See condition (b) in Note [Binder swap]
+  , caseMany
   = ( alt_usg' `andUDs` let_rhs_usg
     , Let (NonRec tagged_scrut_var let_rhs') alt_rhs )
   where
@@ -2044,7 +2048,7 @@ wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs
 
     (alt_usg', tagged_scrut_var) = tagLamBinder alt_usg scrut_var
 
-wrapAltRHS _ _ alt_usg _ alt_rhs
+wrapAltRHS _ _ alt_usg _ alt_rhs _
   = (alt_usg, alt_rhs)
 
 {-
@@ -2334,6 +2338,22 @@ binding x = cb.  See #5028.
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
 doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
+Note [Suppressing binder-swaps on linear case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    case[1] x of cb { p -> ... }
+It is not correct to replace it by
+    case[1] x of cb { p -> let x = cb in ... }
+
+It can go wrong if `x` is unrestricted:
+    case[1] x of cb { p -> (x, cb) }
+The above is well-typed: the variables of `p` are ignored, but `cb` is used
+exactly once. Were we to binder swap, we would get the following:
+    case[1] x of cb { p -> let x = cb in (cb, cb) }
+This, on the other hand, uses `cb` twice, so is not accepted by the linter.
+
+Therefore, we limit binder swap to case[Many]
+
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when
@@ -2426,6 +2446,7 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
     -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
     -- Also we don't want any INLINE or NOINLINE pragmas!
     localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var))
+                                          (idMult scrut_var)
                                           (idType scrut_var)
 
 {-
