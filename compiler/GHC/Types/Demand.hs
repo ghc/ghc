@@ -1671,12 +1671,10 @@ dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on
 -- the result into the constructor arguments.
-dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
-                             (JD { sd = str, ud = abs })
+dmdTransformDataConSig arity (JD { sd = str, ud = abs })
   | Just str_dmds <- go_str arity str
   , Just abs_dmds <- go_abs arity abs
-  = DmdType emptyDmdEnv (mkJointDmds str_dmds abs_dmds) con_res
-                -- Must remember whether it's a product, hence con_res, not TopRes
+  = DmdType emptyDmdEnv (mkJointDmds str_dmds abs_dmds) topDiv
 
   | otherwise   -- Not saturated
   = nopDmdType

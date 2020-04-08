@@ -506,10 +506,9 @@ mkDataConWorkId wkr_name data_con
     tycon  = dataConTyCon data_con  -- The representation TyCon
     wkr_ty = dataConRepType data_con
 
-        ----------- Workers for data types --------------
+    ----------- Workers for data types --------------
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
-                   `setStrictnessInfo`     wkr_sig
                    `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
@@ -518,27 +517,7 @@ mkDataConWorkId wkr_name data_con
                      -- setNeverLevPoly
 
     wkr_arity = dataConRepArity data_con
-    wkr_sig   = mkClosedStrictSig (replicate wkr_arity topDmd) topDiv
-        --      Note [Data-con worker strictness]
-        -- Notice that we do *not* say the worker Id is strict
-        -- even if the data constructor is declared strict
-        --      e.g.    data T = MkT !(Int,Int)
-        -- Why?  Because the *wrapper* $WMkT is strict (and its unfolding has
-        -- case expressions that do the evals) but the *worker* MkT itself is
-        --  not. If we pretend it is strict then when we see
-        --      case x of y -> MkT y
-        -- the simplifier thinks that y is "sure to be evaluated" (because
-        -- the worker MkT is strict) and drops the case.  No, the workerId
-        -- MkT is not strict.
-        --
-        -- However, the worker does have StrictnessMarks.  When the simplifier
-        -- sees a pattern
-        --      case e of MkT x -> ...
-        -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
-        -- but that's fine... dataConRepStrictness comes from the data con
-        -- not from the worker Id.
-
-        ----------- Workers for newtypes --------------
+    ----------- Workers for newtypes --------------
     univ_tvs = dataConUnivTyVars data_con
     arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo

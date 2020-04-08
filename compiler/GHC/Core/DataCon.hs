@@ -614,7 +614,7 @@ data DataConRep
                                  -- and *including* all evidence args
 
         , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
-                -- See also Note [Data-con worker strictness] in GHC.Types.Id.Make
+                -- See also Note [Data-con worker strictness]
 
         , dcr_bangs :: [HsImplBang]  -- The actual decisions made (including failures)
                                      -- about the original arguments; 1-1 with orig_arg_tys
@@ -715,8 +715,26 @@ filterEqSpec eq_spec
 instance Outputable EqSpec where
   ppr (EqSpec tv ty) = ppr (tv, ty)
 
-{- Note [Bangs on data constructor arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Data-con worker strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Notice that we do *not* say the worker Id is strict even if the data
+constructor is declared strict
+     e.g.    data T = MkT !(Int,Int)
+Why?  Because the *wrapper* $WMkT is strict (and its unfolding has case
+expressions that do the evals) but the *worker* MkT itself is not. If we
+pretend it is strict then when we see
+     case x of y -> MkT y
+the simplifier thinks that y is "sure to be evaluated" (because the worker MkT
+is strict) and drops the case.  No, the workerId MkT is not strict.
+
+However, the worker does have StrictnessMarks.  When the simplifier sees a
+pattern
+     case e of MkT x -> ...
+it uses the dataConRepStrictness of MkT to mark x as evaluated; but that's
+fine... dataConRepStrictness comes from the data con not from the worker Id.
+
+Note [Bangs on data constructor arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data T = MkT !Int {-# UNPACK #-} !Int Bool
 

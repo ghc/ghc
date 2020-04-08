@@ -2758,7 +2758,7 @@ a case pattern.  This is *important*.  Consider
 
 We really must record that b is already evaluated so that we don't
 go and re-evaluate it when constructing the result.
-See Note [Data-con worker strictness] in GHC.Types.Id.Make
+See Note [Data-con worker strictness] in GHC.Core.DataCon
 
 NB: simplLamBndrs preserves this eval info
 
