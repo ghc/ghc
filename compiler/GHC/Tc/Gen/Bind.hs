@@ -1366,7 +1366,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
             -- See Note [Existentials in pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
-               tcInferNoInst $ \ exp_ty ->
+               tcInferInst $ \ exp_ty ->   -- The ir_inst field is irrelevant for patterns
                tcLetPat inst_sig_fun no_gen pat exp_ty $
                mapM lookup_info nosig_names
 

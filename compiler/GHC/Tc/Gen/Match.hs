@@ -422,8 +422,8 @@ tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
 tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
   = do  { (rhs', rhs_ty) <- tcInferRhoNC rhs
                                    -- Stmt has a context already
-        ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
-                                    pat (mkCheckExpType rhs_ty) $
+        ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
+                                         pat rhs_ty $
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
@@ -456,7 +456,7 @@ tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
 tcLcStmt m_tc ctxt (BindStmt _ pat rhs _ _) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
         ; rhs'   <- tcMonoExpr rhs (mkCheckExpType $ mkTyConApp m_tc [pat_ty])
-        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+        ; (pat', thing)  <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                             thing_inside elt_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
@@ -580,8 +580,7 @@ tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
                           [SynRho, SynFun SynAny SynRho] res_ty $
                \ [rhs_ty, pat_ty, new_res_ty] ->
                do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                           (mkCheckExpType pat_ty) $
+                  ; (pat', thing) <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                                      thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', pat', thing, new_res_ty) }
 
@@ -840,8 +839,7 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] ->
                 do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                   ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                            (mkCheckExpType pat_ty) $
+                   ; (pat', thing) <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                                       thing_inside (mkCheckExpType new_res_ty)
                    ; return (rhs', pat', new_res_ty, thing) }
 
@@ -1038,7 +1036,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
-           ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+           ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                           return ()
            ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op body_ty
 
@@ -1054,7 +1052,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { L _ ret' <- tcMonoExprNC (noLoc ret) res_ty
-                  ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+                  ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                                  return ()
                   ; return (ret', pat')
                   }

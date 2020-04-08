@@ -14,14 +14,9 @@
 -- | Typecheck an expression
 module GHC.Tc.Gen.Expr
    ( tcPolyExpr
-   , tcMonoExpr
-   , tcMonoExprNC
-   , tcInferSigma
-   , tcInferSigmaNC
-   , tcInferRho
-   , tcInferRhoNC
-   , tcSyntaxOp
-   , tcSyntaxOpGen
+   , tcMonoExpr, tcMonoExprNC
+   , tcInferRho, tcInferRhoNC, tcInferAppHead
+   , tcSyntaxOp, tcSyntaxOpGen
    , SyntaxOpType(..)
    , synKnownType
    , tcCheckId
@@ -151,25 +146,14 @@ tcMonoExprNC (L loc expr) res_ty
         ; return (L loc expr') }
 
 ---------------
-tcInferSigma, tcInferSigmaNC :: LHsExpr GhcRn -> TcM ( LHsExpr GhcTcId
-                                                    , TcSigmaType )
--- Infer a *sigma*-type.
-tcInferSigma expr = addErrCtxt (exprCtxt expr) (tcInferSigmaNC expr)
-
-tcInferSigmaNC (L loc expr)
-  = setSrcSpan loc $
-    do { (expr', sigma) <- tcInferNoInst (tcExpr expr)
-       ; return (L loc expr', sigma) }
-
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcRhoType)
 -- Infer a *rho*-type. The return type is always (shallowly) instantiated.
 tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
-tcInferRhoNC expr
-  = do { (expr', sigma) <- tcInferSigmaNC expr
-       ; (wrap, rho) <- topInstantiate (lexprCtOrigin expr) sigma
-       ; return (mkLHsWrap wrap expr', rho) }
-
+tcInferRhoNC (L loc expr)
+  = setSrcSpan loc $
+    do { (expr', rho) <- tcInferInst (tcExpr expr)
+       ; return (L loc expr', rho) }
 
 {-
 ************************************************************************
@@ -281,13 +265,9 @@ tcExpr e@(HsLamCase x matches) res_ty
               , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-tcExpr e@(ExprWithTySig _ expr sig_ty) res_ty
-  = do { let loc = getLoc (hsSigWcType sig_ty)
-       ; sig_info <- checkNoErrs $  -- Avoid error cascade
-                     tcUserTypeSig loc sig_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig expr sig_info
-       ; let expr'' = ExprWithTySig noExtField expr' sig_ty
-       ; tcWrapResult e expr'' poly_ty res_ty }
+tcExpr e@(ExprWithTySig _ expr hs_ty) res_ty
+  = do { (expr', poly_ty) <- tcExprWithSig expr hs_ty
+       ; tcWrapResult e expr' poly_ty res_ty }
 
 {-
 Note [Type-checking overloaded labels]
@@ -352,7 +332,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
-       ; (arg1', arg1_ty) <- tcInferSigma arg1
+       ; (arg1', arg1_ty) <- tcInferAppHead arg1
 
        ; let doc   = text "The first argument of ($) takes"
              orig1 = lexprCtOrigin arg1
@@ -413,7 +393,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 --      \ x -> op x expr
 
 tcExpr expr@(SectionR x op arg2) res_ty
-  = do { (op', op_ty) <- tcInferFun op
+  = do { (op', op_ty) <- tcInferAppHead op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
@@ -428,7 +408,7 @@ tcExpr expr@(SectionR x op arg2) res_ty
     -- See #13285
 
 tcExpr expr@(SectionL x arg1 op) res_ty
-  = do { (op', op_ty) <- tcInferFun op
+  = do { (op', op_ty) <- tcInferAppHead op
        ; dflags <- getDynFlags      -- Note [Left sections]
        ; let n_reqd_args | xopt LangExt.PostfixOperators dflags = 1
                          | otherwise                            = 2
@@ -1009,6 +989,23 @@ tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
   -- Also HsTcBracketOut, HsQuasiQuoteE
 
+
+{- *********************************************************************
+*                                                                      *
+             Expression with type signature e::ty
+*                                                                      *
+********************************************************************* -}
+
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+              -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprWithSig expr hs_ty
+  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig loc hs_ty Nothing
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
+  where
+    loc = getLoc (hsSigWcType hs_ty)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1147,7 +1144,7 @@ tcApp _m_herald (L loc (HsVar _ (L _ fun_id))) args res_ty
     n_val_args = count isHsValArg args
 
 tcApp m_herald fun args res_ty
-  = do { (tc_fun, fun_ty) <- tcInferFun fun
+  = do { (tc_fun, fun_ty) <- tcInferAppHead fun
        ; tcFunApp m_herald fun tc_fun fun_ty args res_ty }
 
 ---------------------
@@ -1198,23 +1195,27 @@ mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
 ----------------
-tcInferFun :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
--- Infer type of a function
-tcInferFun (L loc (HsVar _ (L _ name)))
-  = do { (fun, ty) <- setSrcSpan loc (tcInferId name)
-               -- Don't wrap a context around a plain Id
-       ; return (L loc fun, ty) }
+tcInferAppHead :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
+-- Infer type of the head of an application,
+--   i.e. the 'f' in (f e1 ... en)
+-- We get back a SigmaType because we have special cases for
+--   * A bare identifier (just look it up)
+--     This case also covers a record selectro HsRecFld
+--   * An expression with a type signature (e :: ty)
 
-tcInferFun (L loc (HsRecFld _ f))
-  = do { (fun, ty) <- setSrcSpan loc (tcInferRecSelId f)
-               -- Don't wrap a context around a plain Id
-       ; return (L loc fun, ty) }
+tcInferAppHead el@(L loc e)
+  = case e of
+      HsVar _ (L _ nm)        -> add_loc $ tcInferId nm
+      HsRecFld _ f            -> add_loc $ tcInferRecSelId f
+      ExprWithTySig _ e hs_ty -> add_loc_ctxt $ tcExprWithSig e hs_ty
+      _                       -> add_loc_ctxt $ tcInferInst (tcExpr e)
+  where
+    add_loc_ctxt thing = addErrCtxt (exprCtxt el) $
+                         add_loc thing
 
-tcInferFun fun
-  = tcInferSigma fun
-      -- NB: tcInferSigma; see GHC.Tc.Utils.Unify
-      -- Note [Deep instantiation of InferResult] in GHC.Tc.Utils.Unify
-
+    add_loc thing = setSrcSpan loc $
+                    do { (e', ty) <- thing
+                       ; return (L loc e', ty) }
 
 ----------------
 -- | Type-check the arguments to a function, possibly including visible type
@@ -1431,7 +1432,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaType] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferSigma $ noLoc op
+  = do { (expr, sigma) <- tcInferAppHead $ noLoc op
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
@@ -1711,7 +1712,7 @@ tcCheckId name res_ty
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
-                                                          actual_res_ty res_ty }
+                                           actual_res_ty res_ty }
 
 tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty

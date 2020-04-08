@@ -56,7 +56,6 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
 import GHC.Tc.Gen.Match
-import GHC.Tc.Utils.Instantiate( deeplyInstantiate )
 import GHC.Tc.Utils.Unify( checkConstraints )
 import GHC.Rename.HsType
 import GHC.Rename.Expr
@@ -2492,15 +2491,12 @@ tcRnExpr hsc_env mode rdr_expr
         -- Now typecheck the expression, and generalise its type
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
-    let { fresh_it  = itName uniq (getLoc rdr_expr)
-        ; orig = lexprCtOrigin rn_expr } ;
+    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((tclvl, res_ty), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
-                ; if inst
-                  then snd <$> deeplyInstantiate orig expr_ty
-                  else return expr_ty } ;
+             do { (_tc_expr, expr_ty) <- tc_infer rn_expr
+                ; return expr_ty } ;
 
     -- Generalise
     (qtvs, dicts, _, residual, _)
@@ -2526,6 +2522,8 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
+    tc_infer | inst      = tcInferRhoNC
+             | otherwise = tcInferAppHead
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)

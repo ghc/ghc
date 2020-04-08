@@ -91,7 +91,7 @@ tcProc pat cmd exp_ty
         ; (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-        ; (pat', cmd') <- tcPat ProcExpr pat (mkCheckExpType arg_ty) $
+        ; (pat', cmd') <- tcCheckPat ProcExpr pat arg_ty $
                           tcCmdTop cmd_env cmd (unitTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
@@ -371,7 +371,7 @@ tcArrDoStmt env _ (BodyStmt _ rhs _ _) res_ty thing_inside
 
 tcArrDoStmt env ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
-        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+        ; (pat', thing)  <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
