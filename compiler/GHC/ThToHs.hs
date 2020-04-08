@@ -31,7 +31,7 @@ import PrelNames
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name
 import GHC.Types.Module
-import RdrHsSyn
+import GHC.Parser.PostProcess
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
 import GHC.Core.Type
@@ -672,7 +672,7 @@ cvt_fundep (FunDep xs ys) = do { xs' <- mapM tNameL xs
 cvtForD :: Foreign -> CvtM (ForeignDecl GhcPs)
 cvtForD (ImportF callconv safety from nm ty)
   -- the prim and javascript calling conventions do not support headers
-  -- and are inserted verbatim, analogous to mkImport in RdrHsSyn
+  -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
   | callconv == TH.Prim || callconv == TH.JavaScript
   = mk_imp (CImport (noLoc (cvt_conv callconv)) (noLoc safety') Nothing
                     (CFunction (StaticTarget (SourceText from)

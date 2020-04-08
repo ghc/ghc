@@ -1219,8 +1219,8 @@ sdist-ghc-prep-tree :
 # These rules depend on sdist-ghc-prep-tree.
 $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Lexer,x))
 $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Parser,y))
-$(eval $(call sdist-ghc-file,compiler,stage2,parser,Lexer,x))
-$(eval $(call sdist-ghc-file,compiler,stage2,parser,Parser,y))
+$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser/Lexer,x))
+$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser,y))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))

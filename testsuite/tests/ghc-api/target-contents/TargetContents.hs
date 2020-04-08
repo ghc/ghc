@@ -12,7 +12,7 @@ import Data.Maybe
 import Data.Time.Calendar
 import Data.Time.Clock
 import Exception
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Driver.Types
 import Outputable
 import StringBuffer

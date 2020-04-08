@@ -53,7 +53,7 @@ import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
+import GHC.Parser.PostProcess ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -180,7 +180,7 @@ newTopSrcBinder (L loc rdr_name)
         --
         -- We can get built-in syntax showing up here too, sadly.  If you type
         --      data T = (,,,)
-        -- the constructor is parsed as a type, and then RdrHsSyn.tyConToDataCon
+        -- the constructor is parsed as a type, and then GHC.Parser.PostProcess.tyConToDataCon
         -- uses setRdrNameSpace to make it into a data constructors.  At that point
         -- the nice Exact name for the TyCon gets swizzled to an Orig name.
         -- Hence the badOrigBinding error message.

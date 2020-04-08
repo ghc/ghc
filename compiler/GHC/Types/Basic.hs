@@ -619,7 +619,7 @@ instance Outputable Origin where
 --                              @'\{-\# INCOHERENT'@,
 --      'ApiAnnotation.AnnClose' @`\#-\}`@,
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
@@ -1285,7 +1285,7 @@ data Activation = NeverActive
 data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
                    | FunLike
                    deriving( Eq, Data, Show )
-        -- Show needed for Lexer.x
+        -- Show needed for GHC.Parser.Lexer
 
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
@@ -1313,7 +1313,7 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
-        -- Show needed for Lexer.x
+        -- Show needed for GHC.Parser.Lexer
 
 {- Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1591,7 +1591,7 @@ data FractionalLit
        , fl_value :: Rational      -- Numeric value of the literal
        }
   deriving (Data, Show)
-  -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
+  -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
 
 mkFractionalLit :: Real a => a -> FractionalLit
 mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
