@@ -299,8 +299,8 @@ data DocNameI
 
 type instance IdP DocNameI = DocName
 
-instance XCollectPat DocNameI where
-  collectPatX _ ext = noExtCon ext
+instance CollectPass DocNameI where
+  collectXXPat _ ext = noExtCon ext
 
 instance NamedThing DocName where
   getName (Documented name _) = name

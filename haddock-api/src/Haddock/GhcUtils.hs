@@ -41,7 +41,7 @@ import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Type     ( isRuntimeRepVar )
 import TysWiredIn( liftedRepDataConTyCon )
-import GHC.Hs.Utils (XCollectPat(..))
+import GHC.Hs.Utils (CollectPass(..))
 
 import           StringBuffer ( StringBuffer )
 import qualified StringBuffer             as S
@@ -56,7 +56,7 @@ moduleString = moduleNameString . moduleName
 isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
 
-getMainDeclBinder :: (XCollectPat (GhcPass p)) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
+getMainDeclBinder :: (CollectPass (GhcPass p)) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
