@@ -623,6 +623,9 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
         }
 
 #if defined(DEBUG)
+        // Note [debug_caf_list]
+        // ~~~~~~~~~~~~~~~~~~~~~
+        //
         // In the DEBUG rts, we keep track of live CAFs by chaining them
         // onto a list debug_caf_list.  This is so that we can tell if we
         // ever enter a GC'd CAF, and emit a suitable barf().
@@ -654,6 +657,9 @@ setHighMemDynamic (void)
     highMemDynamic = 1;
 }
 
+// Note [revertible_caf_list]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
 // An alternate version of newCAF which is used for dynamically loaded
 // object code in GHCi.  In this case we want to retain *all* CAFs in
 // the object code, because they might be demanded at any time from an
