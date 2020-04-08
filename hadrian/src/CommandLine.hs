@@ -1,6 +1,6 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2,
+    cmdIntegerSimple, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -24,6 +24,7 @@ data CommandLineArgs = CommandLineArgs
     { configure      :: Bool
     , flavour        :: Maybe String
     , freeze1        :: Bool
+    , freeze2        :: Bool
     , integerSimple  :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
@@ -38,6 +39,7 @@ defaultCommandLineArgs = CommandLineArgs
     { configure      = False
     , flavour        = Nothing
     , freeze1        = False
+    , freeze2        = False
     , integerSimple  = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
@@ -100,8 +102,9 @@ readBuildRoot ms =
     set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { buildRoot = flag }
 
-readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
+readFreeze1, readFreeze2 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
+readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
 
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
@@ -239,6 +242,8 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
+    , Option [] ["freeze2"] (NoArg readFreeze2)
+      "Freeze Stage2 GHC."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
@@ -335,6 +340,9 @@ lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
+
+lookupFreeze2 :: Map.HashMap TypeRep Dynamic -> Bool
+lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs

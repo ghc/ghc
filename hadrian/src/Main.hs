@@ -30,7 +30,12 @@ main = do
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
         rebuild = [ (RebuildLater, buildRoot -/- "stage0/**")
-                  | CommandLine.lookupFreeze1 argsMap ]
+                  | CommandLine.lookupFreeze1 argsMap ||
+                    CommandLine.lookupFreeze2 argsMap
+                  ] ++
+                  [ (RebuildLater, buildRoot -/- "stage1/**")
+                  | CommandLine.lookupFreeze2 argsMap
+                  ]
 
     cwd <- getCurrentDirectory
     shakeColor <- shouldUseColor
