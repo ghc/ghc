@@ -87,8 +87,7 @@ T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
 
 T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
-    • In the expression: _
-      In the expression: x `_` y
+    • In the expression: x `_` y
       In an equation for ‘g’: g x y = x `_` y
     • Relevant bindings include
         y :: Int (bound at T13050.hs:5:5)
@@ -174,8 +173,7 @@ T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
 T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
       Or perhaps ‘_a’ is mis-spelled, or not in scope
-    • In the expression: _a
-      In the expression: x `_a` y
+    • In the expression: x `_a` y
       In an equation for ‘q’: q x y = x `_a` y
     • Relevant bindings include
         y :: Int (bound at T13050.hs:6:5)
