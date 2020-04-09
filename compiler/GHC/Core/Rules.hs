@@ -1025,7 +1025,7 @@ these cases.
 On the other hand, where we are allowed to insert new cost into the
 tick scope, we can float them upwards to the rule application site.
 
-cf Note [Notes in call patterns] in GHC.Core.Opt.SpecConstr
+cf Note [Tick annotations in call patterns] in GHC.Core.Opt.SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
