@@ -1947,7 +1947,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
 
               -- Remove ones that have too many worker variables
               small_pats = filterOut too_big non_dups
-              too_big (vars,_) = not (isWorkerSmallEnough (sc_dflags env) vars)
+              too_big (vars,args) = not (isWorkerSmallEnough (sc_dflags env) (valArgCount args) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
                   -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils
@@ -2101,12 +2101,12 @@ argToPat _env _in_scope _val_env arg@(Type {}) _arg_occ
 
 argToPat env in_scope val_env (Tick _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
-        -- Note [Notes in call patterns]
+        -- Note [Tick annotations in call patterns]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         -- Ignore Notes.  In particular, we want to ignore any InlineMe notes
         -- Perhaps we should not ignore profiling notes, but I'm going to
         -- ride roughshod over them all for now.
-        --- See Note [Notes in RULE matching] in GHC.Core.Rules
+        --- See Note [Tick annotations in RULE matching] in GHC.Core.Rules
 
 argToPat env in_scope val_env (Let _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
