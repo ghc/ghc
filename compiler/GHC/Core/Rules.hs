@@ -1034,7 +1034,7 @@ ways in which these may be introduced (e.g. #18162, #17619). Such ticks are
 ignored by the matcher. See Note [Simplifying rules] in
 GHC.Core.Opt.Simplify.Utils for details.
 
-cf Note [Notes in call patterns] in GHC.Core.Opt.SpecConstr
+cf Note [Tick annotations in call patterns] in GHC.Core.Opt.SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
