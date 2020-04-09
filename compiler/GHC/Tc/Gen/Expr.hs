@@ -1182,8 +1182,8 @@ tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
             -- this is just like tcWrapResult, but the types don't line
             -- up to call that function
        ; wrap_res <- addFunResCtxt True (unLoc rn_fun) actual_res_ty res_ty $
-                     tcSubTypeNC orig GenSigCtxt
-                       (Just $ unLoc $ wrapHsArgs rn_fun rn_args)
+                     tcSubTypeHR orig
+                       (unLoc $ wrapHsArgs rn_fun rn_args)
                        actual_res_ty res_ty
 
        ; return (wrap_res, mkLHsWrap wrap_fun tc_fun, tc_args) }
