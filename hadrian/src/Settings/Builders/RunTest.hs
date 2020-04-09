@@ -165,7 +165,7 @@ getTestArgs = do
         brokenTestArgs = concat [ ["--broken-test", t] | t <- brokenTests args ]
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg   = case testSummary args of
-                           Just filepath -> Just $ "--summary-file " ++ show filepath
+                           Just filepath -> Just $ "--summary-file=" ++ filepath
                            Nothing -> Just $ "--summary-file=testsuite_summary.txt"
         junitArg     = case testJUnit args of
                            Just filepath -> Just $ "--junit=" ++ filepath
