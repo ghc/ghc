@@ -390,22 +390,25 @@ tcValBinds top_lvl binds sigs thing_inside
             -- It's easier to do so now, once for all the SCCs together
             -- because a single signature  f,g :: <type>
             -- might relate to more than one SCC
-        ; (poly_ids, sig_fn) <- tcAddPatSynPlaceholders patsyns $
+          (poly_ids, sig_fn) <- tcAddPatSynPlaceholders patsyns $
                                 tcTySigs sigs
 
-                -- Extend the envt right away with all the Ids
-                -- declared with complete type signatures
-                -- Do not extend the TcBinderStack; instead
-                -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendSigIds top_lvl poly_ids $ do
-            { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
-                   { thing <- thing_inside
-                     -- See Note [Pattern synonym builders don't yield dependencies]
-                     --     in GHC.Rename.Bind
-                   ; patsyn_builders <- mapM tcPatSynBuilderBind patsyns
-                   ; let extra_binds = [ (NonRecursive, builder) | builder <- patsyn_builders ]
-                   ; return (extra_binds, thing) }
-            ; return (binds' ++ extra_binds', thing) }}
+        -- Extend the envt right away with all the Ids
+        --   declared with complete type signatures
+        -- Do not extend the TcBinderStack; instead
+        --   we extend it on a per-rhs basis in tcExtendForRhs
+        --   See Note [Relevant bindings and the binder stack]
+        ; tcExtendSigIds top_lvl poly_ids $
+     do { (binds', (extra_binds', thing))
+              <- tcBindGroups top_lvl sig_fn prag_fn binds $
+                 do { thing <- thing_inside
+                       -- See Note [Pattern synonym builders don't yield dependencies]
+                       --     in GHC.Rename.Bind
+                    ; patsyn_builders <- mapM tcPatSynBuilderBind patsyns
+                    ; let extra_binds = [ (NonRecursive, builder)
+                                        | builder <- patsyn_builders ]
+                    ; return (extra_binds, thing) }
+        ; return (binds' ++ extra_binds', thing) }}
   where
     patsyns = getPatSynBinds binds
     prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
@@ -687,22 +690,23 @@ tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id
                          , sig_ctxt  = ctxt
                          , sig_loc   = sig_loc })
-            (L loc (FunBind { fun_id = (L nm_loc name)
+            (L loc (FunBind { fun_id = L nm_loc name
                             , fun_matches = matches }))
   = setSrcSpan sig_loc $
     do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
-       ; let rhs_ty  = idType poly_id
-             mono_id = mkLocalId mono_name rhs_ty
-
-       ; (wrap_gen, (wrap_res, matches'))
-             <- tcExtendBinderStack [TcIdBndr poly_id NotTopLevel]  $
-                tcSkolemise ctxt rhs_ty $ \_ rho_ty ->
+       ; (wrap_gen, (mono_id, (wrap_res, matches')))
+             <- tcSkolemise ctxt (idType poly_id) $ \_ rho_ty ->
                 -- NB: tcSkolemise makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
-                tcMatchesFun (L nm_loc mono_name) matches
-                             (mkCheckExpType rho_ty)
+                do { let mono_id = mkLocalId mono_name rho_ty
+                   ; matches' <- tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
+                                 -- Why mono_id in the BinderStack?
+                                 --    See Note [Relevant bindings and the binder stack]
+                                 tcMatchesFun (L nm_loc mono_name) matches
+                                              (mkCheckExpType rho_ty)
+                   ; return (mono_id, matches') }
 
        ; let prag_sigs = lookupPragEnv prag_fn name
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -712,11 +716,11 @@ tcPolyCheck prag_fn
        ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
-                             , fun_ext     = wrap_gen <.> wrap_res
+                             , fun_ext     = wrap_res
                              , fun_tick    = tick }
 
              export = ABE { abe_ext   = noExtField
-                          , abe_wrap  = idHsWrapper
+                          , abe_wrap  = wrap_gen
                           , abe_poly  = poly_id
                           , abe_mono  = mono_id
                           , abe_prags = SpecPrags spec_prags }
@@ -1451,17 +1455,7 @@ tcExtendTyVarEnvFromSig sig_inst thing_inside
     thing_inside
 
 tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
--- Extend the TcBinderStack for the RHS of the binding, with
--- the monomorphic Id.  That way, if we have, say
---     f = \x -> blah
--- and something goes wrong in 'blah', we get a "relevant binding"
--- looking like  f :: alpha -> beta
--- This applies if 'f' has a type signature too:
---    f :: forall a. [a] -> [a]
---    f x = True
--- We can't unify True with [a], and a relevant binding is f :: [a] -> [a]
--- If we had the *polymorphic* version of f in the TcBinderStack, it
--- would not be reported as relevant, because its type is closed
+-- See Note [Relevant bindings and the binder stack]
 tcExtendIdBinderStackForRhs infos thing_inside
   = tcExtendBinderStack [ TcIdBndr mono_id NotTopLevel
                         | MBI { mbi_mono_id = mono_id } <- infos ]
@@ -1477,7 +1471,22 @@ getMonoBindInfo tc_binds
     get_info (TcPatBind infos _ _ _) rest = infos ++ rest
 
 
-{- Note [Typechecking pattern bindings]
+{- Note [Relevant bindings and the binder stack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typecking a binding we extend the TcBinderStack for the RHS of
+the binding, with the /monomorphic/ Id.  That way, if we have, say
+    f = \x -> blah
+and something goes wrong in 'blah', we get a "relevant binding"
+looking like  f :: alpha -> beta
+This applies if 'f' has a type signature too:
+   f :: forall a. [a] -> [a]
+   f x = True
+We can't unify True with [a], and a relevant binding is f :: [a] -> [a]
+If we had the *polymorphic* version of f in the TcBinderStack, it
+would not be reported as relevant, because its type is closed.
+(See TcErrors.relevantBindings.)
+
+Note [Typechecking pattern bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Look at:
    - typecheck/should_compile/ExPat

@@ -14,8 +14,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubType, tcSubTypeSigma, tcSubTypeET, tcSubTypeNC,
-  tcSubTypeHR,
+  tcSubType, tcSubTypeSigma, tcSubTypeET, tcSubTypeHR,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, emitResidualTvConstraint,
 
@@ -500,8 +499,14 @@ tcSubTypeET :: CtOrigin -> UserTypeCtxt
 --   to tcSubType
 -- If wrap = tc_sub_type_et t1 t2
 --    => wrap :: t1 ~> t2
-tcSubTypeET orig ctxt (Check ty_actual) ty_expected
-  = tc_sub_type Nothing orig ctxt ty_actual ty_expected
+tcSubTypeET inst_orig ctxt (Check ty_actual) ty_expected
+  = tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
+  where
+    -- In patterns, we reverse the acutal/expected in the TypeEqOrigin
+    eq_orig = TypeEqOrigin { uo_actual   = ty_expected
+                           , uo_expected = ty_actual
+                           , uo_thing    = Nothing
+                           , uo_visible  = True }
 
 tcSubTypeET _ _ (Infer inf_res) ty_expected
   = ASSERT2( not (ir_inst inf_res), ppr inf_res $$ ppr ty_expected )
@@ -522,10 +527,9 @@ tcSubType orig ctxt ty_actual ty_expected
        ; tcSubTypeNC orig ctxt Nothing ty_actual ty_expected }
 
 -- | Call this variant when you are in a higher-rank situation
-tcSubTypeHR :: CtOrigin       -- ^ of the actual type
-            -> HsExpr GhcRn   -- ^ Has type ty_actual
-            -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
-tcSubTypeHR orig expr = tcSubTypeNC orig GenSigCtxt (Just expr)
+tcSubTypeHR :: CtOrigin -> HsExpr GhcRn -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubTypeHR orig expr
+  = tcSubTypeNC orig GenSigCtxt (Just expr)
 
 tcSubTypeNC :: CtOrigin   -- origin used for instantiation only
             -> UserTypeCtxt
@@ -533,10 +537,15 @@ tcSubTypeNC :: CtOrigin   -- origin used for instantiation only
             -> TcSigmaType            -- Actual type
             -> ExpRhoType             -- Expected type
             -> TcM HsWrapper
-tcSubTypeNC inst_orig ctxt m_thing ty_actual ty_expected
-  = case ty_expected of
-      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
-      Check ty      -> tc_sub_type m_thing inst_orig ctxt ty_actual ty
+tcSubTypeNC inst_orig ctxt m_thing ty_actual (Infer inf_res)
+  = fillInferResult inst_orig ty_actual inf_res
+tcSubTypeNC inst_orig ctxt m_thing ty_actual (Check ty_expected)
+  = tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
+  where
+    eq_orig = TypeEqOrigin { uo_actual   = ty_actual
+                           , uo_expected = ty_expected
+                           , uo_thing    = ppr <$> m_thing
+                           , uo_visible  = True }
 
 ---------------
 tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
@@ -544,17 +553,16 @@ tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
 tcSubTypeSigma ctxt ty_actual ty_expected
-  = do { traceTc "tcSubTypeSigma" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
-       ; tc_sub_type Nothing origin ctxt ty_actual ty_expected }
+  = tc_sub_type eq_orig eq_orig ctxt ty_actual ty_expected
   where
-    origin = TypeEqOrigin { uo_actual   = ty_actual
-                          , uo_expected = ty_expected
-                          , uo_thing    = Nothing
-                          , uo_visible  = True }
+    eq_orig = TypeEqOrigin { uo_actual   = ty_actual
+                           , uo_expected = ty_expected
+                           , uo_thing    = Nothing
+                           , uo_visible  = True }
 
 ---------------
-tc_sub_type :: Maybe (HsExpr GhcRn)  -- The expression that has type 'actual' (if known)
-            -> CtOrigin              -- Used when instantiating
+tc_sub_type :: CtOrigin       -- Used when calling uType
+            -> CtOrigin       -- Used when instantiating
             -> UserTypeCtxt
             -> TcSigmaType    -- Actual; a sigma-type
             -> TcSigmaType    -- Expected; also a sigma-type
@@ -562,14 +570,14 @@ tc_sub_type :: Maybe (HsExpr GhcRn)  -- The expression that has type 'actual' (i
 -- Checks that actual_ty is more polymorphic than expected_ty
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
-tc_sub_type m_thing inst_orig ctxt ty_actual ty_expected
+tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
   , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_type (drop to equality)" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; mkWpCastN <$>
-         unifyType m_thing ty_actual ty_expected }
+         uType TypeLevel eq_orig ty_actual ty_expected }
 
   | otherwise   -- This is the general case
   = do { traceTc "tc_sub_type (general case)" $
@@ -579,7 +587,7 @@ tc_sub_type m_thing inst_orig ctxt ty_actual ty_expected
        ; (sk_wrap, inner_wrap)
            <- tcSkolemise ctxt ty_expected $ \ _ sk_rho ->
               do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
-                 ; cow           <- unifyType m_thing rho_a sk_rho
+                 ; cow           <- uType TypeLevel eq_orig rho_a sk_rho
                  ; return (mkWpCastN cow <.> wrap) }
 
        ; return (sk_wrap <.> inner_wrap) }
