@@ -759,9 +759,8 @@ GHC's internal ``Binary`` class. The interface to work with these fields is:
     writeIfaceField :: Binary a => FieldName -> a -> ModIface -> IO ModIface
     deleteIfaceField :: FieldName -> ModIface -> ModIface
 
-These fields are currently serialized at the end of the `.hi` file, with their
-own sub-header within the file. A pointer to the sub-header exists after the
-way descriptor.
+To read an interface file from an external tool without linking to GHC, the format
+is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
