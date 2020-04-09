@@ -42,7 +42,7 @@ import Outputable (text, sep, (<+>))
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
-import TysPrim( funTyConName )
+import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Types.Var hiding (varName)
 
 type ExportedNames = Set.Set Name

@@ -40,7 +40,7 @@ import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Type     ( isRuntimeRepVar )
-import TysWiredIn( liftedRepDataConTyCon )
+import GHC.Builtin.Types( liftedRepDataConTyCon )
 
 import           StringBuffer ( StringBuffer )
 import qualified StringBuffer             as S
@@ -612,7 +612,7 @@ orderedFVs vs tys =
 --
 -- >>> import GHC.Types.Name
 -- >>> import TyCoRep
--- >>> import TysPrim
+-- >>> import GHC.Builtin.Types.Prim
 -- >>> import GHC.Types.Var
 -- >>> a = TyVarTy alphaTyVar
 -- >>> b = TyVarTy betaTyVar

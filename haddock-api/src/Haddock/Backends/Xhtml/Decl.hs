@@ -40,7 +40,6 @@ import GHC.Exts
 import GHC.Types.Name
 import BooleanFormula
 import GHC.Types.Name.Reader ( rdrNameOcc )
-import Outputable ( panic )
 
 -- | Pretty print a declaration
 ppDecl :: Bool                                     -- ^ print summary info only
