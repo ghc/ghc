@@ -6,7 +6,6 @@
 {-# OPTIONS_GHC -Wno-identities #-}
 -- Whether there are identities depends on the platform
 {-# OPTIONS_HADDOCK not-home #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.FD
@@ -47,6 +46,7 @@ import GHC.IO.Exception
 #if defined(mingw32_HOST_OS)
 import GHC.Windows
 import Data.Bool
+import GHC.IO.SubSystem ((<!>))
 #endif
 
 import Foreign
@@ -102,29 +102,37 @@ fdIsSocket fd = fdIsSocket_ fd /= 0
 instance Show FD where
   show fd = show (fdFD fd)
 
+{-# INLINE ifSupported #-}
+ifSupported :: String -> a -> a
+#if defined(mingw32_HOST_OS)
+ifSupported s a = a <!> (error $ "FD:" ++ s ++ " not supported")
+#else
+ifSupported _ = id
+#endif
+
 -- | @since 4.1.0.0
 instance GHC.IO.Device.RawIO FD where
-  read             = fdRead
-  readNonBlocking  = fdReadNonBlocking
-  write            = fdWrite
-  writeNonBlocking = fdWriteNonBlocking
+  read             = ifSupported "fdRead" fdRead
+  readNonBlocking  = ifSupported "fdReadNonBlocking" fdReadNonBlocking
+  write            = ifSupported "fdWrite" fdWrite
+  writeNonBlocking = ifSupported "fdWriteNonBlocking" fdWriteNonBlocking
 
 -- | @since 4.1.0.0
 instance GHC.IO.Device.IODevice FD where
-  ready         = ready
-  close         = close
-  isTerminal    = isTerminal
-  isSeekable    = isSeekable
-  seek          = seek
-  tell          = tell
-  getSize       = getSize
-  setSize       = setSize
-  setEcho       = setEcho
-  getEcho       = getEcho
-  setRaw        = setRaw
-  devType       = devType
-  dup           = dup
-  dup2          = dup2
+  ready         = ifSupported "ready" ready
+  close         = ifSupported "close" close
+  isTerminal    = ifSupported "isTerm" isTerminal
+  isSeekable    = ifSupported "isSeek" isSeekable
+  seek          = ifSupported "seek" seek
+  tell          = ifSupported "tell" tell
+  getSize       = ifSupported "getSize" getSize
+  setSize       = ifSupported "setSize" setSize
+  setEcho       = ifSupported "setEcho" setEcho
+  getEcho       = ifSupported "getEcho" getEcho
+  setRaw        = ifSupported "setRaw" setRaw
+  devType       = ifSupported "devType" devType
+  dup           = ifSupported "dup" dup
+  dup2          = ifSupported "dup2" dup2
 
 -- We used to use System.Posix.Internals.dEFAULT_BUFFER_SIZE, which is
 -- taken from the value of BUFSIZ on the current platform.  This value
@@ -135,11 +143,11 @@ dEFAULT_FD_BUFFER_SIZE = 8192
 
 -- | @since 4.1.0.0
 instance BufferedIO FD where
-  newBuffer _dev state = newByteBuffer dEFAULT_FD_BUFFER_SIZE state
-  fillReadBuffer    fd buf = readBuf' fd buf
-  fillReadBuffer0   fd buf = readBufNonBlocking fd buf
-  flushWriteBuffer  fd buf = writeBuf' fd buf
-  flushWriteBuffer0 fd buf = writeBufNonBlocking fd buf
+  newBuffer _dev state = ifSupported "newBuf" $ newByteBuffer dEFAULT_FD_BUFFER_SIZE state
+  fillReadBuffer    fd buf = ifSupported "readBuf" $ readBuf' fd buf
+  fillReadBuffer0   fd buf = ifSupported "readBufNonBlock" $ readBufNonBlocking fd buf
+  flushWriteBuffer  fd buf = ifSupported "writeBuf" $ writeBuf' fd buf
+  flushWriteBuffer0 fd buf = ifSupported "writeBufNonBlock" $ writeBufNonBlocking fd buf
 
 readBuf' :: FD -> Buffer Word8 -> IO (Int, Buffer Word8)
 readBuf' fd buf = do
