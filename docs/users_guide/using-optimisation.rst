@@ -655,14 +655,15 @@ by saying ``-fno-wombat``.
     Sets the maximal number of iterations for the simplifier.
 
 .. ghc-flag:: -fmax-worker-args=⟨n⟩
-    :shortdesc: *default: 10.* If a worker has that many arguments, none will
-        be unpacked anymore.
+    :shortdesc: *default: 10.* Maximum number of value arguments for a worker.
     :type: dynamic
     :category:
 
     :default: 10
 
-    If a worker has that many arguments, none will be unpacked anymore.
+    A function will not be split into worker and wrapper if the number of
+    value arguments of the resulting worker exceeds both that of the original
+    function and this setting.
 
 .. ghc-flag:: -fno-opt-coercion
     :shortdesc: Turn off the coercion optimiser
