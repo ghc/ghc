@@ -541,10 +541,34 @@ mkPrimTcName built_in_syntax occ key tycon
 -- | Given a RuntimeRep, applies TYPE to it.
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
-  -- static cases
 tYPE (TyConApp tc [])
   | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedPtrRep
 tYPE rr = TyConApp tYPETyCon [rr]
+
+-- Note [Prefer Type over TYPE 'LiftedPtrRep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The Core of nearly any program will have numerous occurrences of
+-- @TYPE 'LiftedPtrRep@ floating about. Consequently, we try hard to ensure
+-- that operations on such types are efficient:
+--
+--   * Instead of representing the lifted kind as
+--     @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
+--     use the 'GHC.Types.Type' type synonym (available in GHC as
+--     'TysPrim.liftedTypeKind'). Note only is this a smaller AST but it also
+--     guarantees sharing on the heap.
+--
+--   * To avoid allocating 'TyConApp' constructors 'TysPrim.tYPE'
+--     catches the lifted case and uses `liftedTypeKind` instead of building an
+--     application.
+--
+--   * Similarly, 'Type.mkTyConApp' catches applications of TYPE and
+--     handles them using 'TysPrim.tYPE', ensuring that it benefits from the
+--     optimisation described above.
+--
+--   * Since 'liftedTypeKind' is a nullary type synonym application,
+--     it benefits from the optimisation described in Note [Comparing nullary
+--     type synonyms] in "GHC.Core.Type".
 
 {-
 ************************************************************************

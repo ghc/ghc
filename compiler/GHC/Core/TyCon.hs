@@ -2303,16 +2303,13 @@ expandSynTyCon_maybe
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
   = case tys of
-      [] -> Just ([], rhs, tys)
+      [] -> Just ([], rhs, []) -- Avoid a bit of work in the case of nullary synonyms
       _  -> case tys `listLengthCmp` arity of
               GT -> Just (tvs `zip` tys, rhs, drop arity tys)
               EQ -> Just (tvs `zip` tys, rhs, [])
               LT -> Nothing
    | otherwise
    = Nothing
-{-# INLINE expandSynTyCon_maybe #-}
--- Inline to avoid allocation of tuples due to lack of nested CPR on sums.
--- Particularly relevant to coreView and tcView, which are hammered.
 
 ----------------
 
