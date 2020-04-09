@@ -1997,7 +1997,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
 
               -- Remove ones that have too many worker variables
               small_pats = filterOut too_big non_dups
-              too_big (vars,_) = not (isWorkerSmallEnough (sc_dflags env) vars)
+              too_big (vars,args) = not (isWorkerSmallEnough (sc_dflags env) (length args) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
                   -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils
