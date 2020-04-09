@@ -1,0 +1,119 @@
+[1 of 1] Compiling Lib              ( T18122.hs, T18122.o )
+
+==================== Worker Wrapper binds ====================
+Result size of Worker Wrapper binds
+  = {terms: 62, types: 49, coercions: 0, joins: 0/6}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sBL :: GHC.Prim.Addr#
+$trModule_sBL = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sBM :: GHC.Types.TrName
+$trModule_sBM = GHC.Types.TrNameS $trModule_sBL
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sBN :: GHC.Prim.Addr#
+$trModule_sBN = "Lib"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sBO :: GHC.Types.TrName
+$trModule_sBO = GHC.Types.TrNameS $trModule_sBN
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule :: GHC.Types.Module
+Lib.$trModule = GHC.Types.Module $trModule_sBM $trModule_sBO
+
+-- RHS size: {terms: 28, types: 22, coercions: 0, joins: 0/6}
+$wfoo_sHl :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+$wfoo_sHl
+  = \ (ww_sHa :: GHC.Prim.Int#) (ww_sHg :: GHC.Prim.Int#) ->
+      let {
+        ww_sH7 :: Int
+        ww_sH7 = GHC.Types.I# ww_sHa } in
+      let {
+        ww_sHc :: Int
+        ww_sHc = Control.Exception.Base.absentError @Int "ww Int"# } in
+      let {
+        w_sH3 :: (Int, Int)
+        w_sH3 = (ww_sH7, ww_sHc) } in
+      let {
+        w_sH4 :: Int
+        w_sH4 = GHC.Types.I# ww_sHg } in
+      case let {
+             ds_dBF :: (Int, Int)
+             ds_dBF = w_sH3 } in
+           let {
+             z_atJ :: Int
+             z_atJ = w_sH4 } in
+           case ds_dBF of { (x_atH, y_atI) ->
+           GHC.Num.$fNumInt_$c+ x_atH z_atJ
+           }
+      of ww_sHj
+      { GHC.Types.I# ww_sHk ->
+      ww_sHk
+      }
+
+-- RHS size: {terms: 18, types: 14, coercions: 0, joins: 0/0}
+foo :: (Int, Int) -> Int -> Int
+foo
+  = \ (w_sH3 :: (Int, Int)) (w_sH4 :: Int) ->
+      case case w_sH3 of ww_sH6 { (ww_sH7, ww_sHc) ->
+           case ww_sH7 of ww_sH9 { GHC.Types.I# ww_sHa ->
+           case w_sH4 of ww_sHf { GHC.Types.I# ww_sHg ->
+           $wfoo_sHl ww_sHa ww_sHg
+           }
+           }
+           }
+      of ww_sHk
+      { __DEFAULT ->
+      GHC.Types.I# ww_sHk
+      }
+
+
+
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 35, types: 27, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule4 :: GHC.Prim.Addr#
+Lib.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule3 :: GHC.Types.TrName
+Lib.$trModule3 = GHC.Types.TrNameS Lib.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule2 :: GHC.Prim.Addr#
+Lib.$trModule2 = "Lib"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule1 :: GHC.Types.TrName
+Lib.$trModule1 = GHC.Types.TrNameS Lib.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule :: GHC.Types.Module
+Lib.$trModule = GHC.Types.Module Lib.$trModule3 Lib.$trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$wfoo :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+Lib.$wfoo = (GHC.Prim.+#)
+
+-- RHS size: {terms: 18, types: 14, coercions: 0, joins: 0/0}
+foo :: (Int, Int) -> Int -> Int
+foo
+  = \ (w_sH3 :: (Int, Int)) (w1_sH4 :: Int) ->
+      case w_sH3 of { (ww1_sH7, ww2_sHc) ->
+      case ww1_sH7 of { GHC.Types.I# ww4_sHa ->
+      case w1_sH4 of { GHC.Types.I# ww6_sHg ->
+      case Lib.$wfoo ww4_sHa ww6_sHg of ww7_sHk { __DEFAULT ->
+      GHC.Types.I# ww7_sHk
+      }
+      }
+      }
+      }
+
+
+
