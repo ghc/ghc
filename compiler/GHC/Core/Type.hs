@@ -353,18 +353,16 @@ See also #11715, which tracks removing this inconsistency.
 -}
 
 -- | Gives the typechecker view of a type. This unwraps synonyms but
--- leaves 'Constraint' alone. c.f. coreView, which turns Constraint into
--- TYPE LiftedRep. Returns Nothing if no unwrapping happens.
+-- leaves 'Constraint' alone. c.f. 'coreView', which turns 'Constraint' into
+-- @TYPE LiftedRep@. Returns 'Nothing' if no unwrapping happens.
 -- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
 tcView (TyConApp tc tys)
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just $ case tenv of
-             [] -> mkAppTys rhs tys'
-             _  -> mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
-               -- ok to use 'substTy' here.
+               -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
@@ -373,19 +371,16 @@ tcView _ = Nothing
 
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
--- ^ This function Strips off the /top layer only/ of a type synonym
+-- ^ This function strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
--- Returns Nothing if there is nothing to look through.
+-- Returns 'Nothing' if there is nothing to look through.
 -- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView ty@(TyConApp tc tys)
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just $ case tenv of
-            [] -> mkAppTys rhs tys'
-            _  -> mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
-    -- This equation is exactly like tcView
+  | res@(Just _) <- expandSynTyConApp_maybe tc tys
+  = res
 
   -- At the Core level, Constraint = Type
   -- See Note [coreView vs tcView]
@@ -396,6 +391,21 @@ coreView ty@(TyConApp tc tys)
 coreView _ = Nothing
 
 -----------------------------------------------
+expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
+expandSynTyConApp_maybe tc tys
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc
+  = case tys of
+      [] -> Just (mkAppTys rhs tys)
+      _  -> case tys `listLengthCmp` arity of
+              GT -> Just (mkAppTys rhs' (drop arity tys))
+              EQ -> Just rhs'
+              LT -> Nothing
+        where
+          arity = tyConArity tc
+          rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
+  | otherwise
+  = Nothing
+
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
 -- just the ones that discard type variables (e.g.  type Funny a = Int)
@@ -1227,8 +1237,10 @@ TyConApp constructors were all duplicates of `Type` applied to no arguments.
 
 Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
 only one `TyConApp 'Type []` closure is allocated during the course of
-compilation. In order to avoid a potentially expensive series of checks in
-`mkTyConApp` only this egregious case is special cased at the moment.
+compilation.
+
+We also have a similar special-case for applications of TYPE; see
+Note [Prefer Type over TYPE 'LiftedPtrRep] for details.
 
 
 ---------------------------------------------------------------------
@@ -1240,7 +1252,6 @@ compilation. In order to avoid a potentially expensive series of checks in
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
--- TODO: TYPE 'LiftedRep
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
   -- The FunTyCon (->) is always a visible one
@@ -1249,7 +1260,7 @@ mkTyConApp tycon tys
   | tycon == liftedTypeKindTyCon
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     liftedTypeKindTyConApp
-  -- Note [mkTyConApp and Type]
+  -- Note [Prefer Type over TYPE 'LiftedPtrRep]
   | tycon == tYPETyCon
   , [rep] <- tys
   = tYPE rep
@@ -2210,6 +2221,36 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
+
+Note [Comparing nullary type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the task of testing equality between two 'Type's of the form
+
+  TyConApp tc []
+
+where @tc@ is a type synonym. A naive way to perform this comparison these
+would first expand the synonym and then compare the resulting expansions.
+
+However, this is obviously wasteful and the RHS of @tc@ may be large; it is
+much better to rather compare the TyCons directly. Consequently, before
+expanding type synonyms in type comparisons we first look for a nullary
+TyConApp and simply compare the TyCons if we find one. Of course, if we find
+that the TyCons are *not* equal then we still need to perform the expansion as
+their RHSs may still be equal.
+
+We perform this optimisation in a number of places:
+
+ * GHC.Core.Types.eqType
+ * GHC.Core.Types.nonDetCmpType
+ * GHC.Core.Unify.unify_ty
+ * TcCanonical.can_eq_nc'
+ * TcUnify.uType
+
+This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
+since GHC prefers to use the type synonym over @TYPE 'LiftedPtr@ applications
+whenever possible. See [Prefer Type over TYPE 'LiftedPtrRep] in TysPrim for
+details.
+
 -}
 
 eqType :: Type -> Type -> Bool
@@ -2283,7 +2324,6 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   | TGT  -- ^ @t1 > t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
--- TODO: nullary synonym optimization
 nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
 nonDetCmpTypeX env orig_t1 orig_t2 =

@@ -956,7 +956,7 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 
 unify_ty env ty1 ty2 kco
-  -- See Note [Comparing nullary type synonyms].
+  -- See Note [Comparing nullary type synonyms] in GHC.Core.Type.
   | TyConApp tc1 [] <- ty1
   , TyConApp tc2 [] <- ty2
   , tc1 == tc2                = return ()
