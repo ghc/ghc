@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Core.Map (
    -- * Maps over Core expressions
@@ -179,7 +180,8 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) = case (lookupCME env1 v1, lookupCME env2 v2) of
+    go (Var v1) (Var v2)
+      = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
                             _ -> False
@@ -193,6 +195,7 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
+      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -520,8 +523,8 @@ instance Eq (DeBruijn Type) where
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy _ t1 t2, FunTy _ t1' t2')
-            -> D env t1 == D env' t1' && D env t2 == D env' t2'
+        (FunTy _ w1 t1 t2, FunTy _ w1' t1' t2')
+            -> D env w1 == D env w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -745,6 +748,11 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
                                       D env xs == D env' xs'
     _            == _               = False
 
+instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
+    D _   Nothing  == D _    Nothing   = True
+    D env (Just x) == D env' (Just x') = D env x  == D env' x'
+    _              == _                = False
+
 --------- Variable binders -------------
 
 -- | A 'BndrMap' is a 'TypeMapG' which allows us to distinguish between
@@ -753,7 +761,26 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
-type BndrMap = TypeMapG
+--
+-- We also need to do the same for multiplicity! Which, since multiplicities are
+-- encoded simply as a 'Type', amounts to have a Trie for a pair of types. Tries
+-- of pairs are composition.
+data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
+
+instance TrieMap BndrMap where
+   type Key BndrMap = Var
+   emptyTM  = BndrMap emptyTM
+   lookupTM = lkBndr emptyCME
+   alterTM  = xtBndr emptyCME
+   foldTM   = fdBndrMap
+   mapTM    = mapBndrMap
+
+mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
+mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
+
+fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
+fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
+
 
 -- Note [Binders]
 -- ~~~~~~~~~~~~~~
@@ -761,10 +788,15 @@ type BndrMap = TypeMapG
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v m = lkG (D env (varType v)) m
+lkBndr env v (BndrMap tymap) = do
+  multmap <- lkG (D env (varType v)) tymap
+  lookupTM (D env <$> varMultMaybe v) multmap
 
-xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v f = xtG (D env (varType v)) f
+
+xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
+xtBndr env v xt (BndrMap tymap)  =
+  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
+
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
