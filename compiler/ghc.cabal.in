@@ -160,7 +160,6 @@ Library
 
     hs-source-dirs:
         .
-        iface
         main
         utils
 
@@ -342,7 +341,7 @@ Library
         GHC.Hs.Utils
         GHC.Hs.Dump
         GHC.Iface.Binary
-        BinFingerprint
+        GHC.Iface.Recomp.Binary
         GHC.Tc.TyCl.Build
         GHC.Iface.Env
         GHC.Iface.Syntax
@@ -352,7 +351,7 @@ Library
         GHC.Iface.Make
         GHC.Iface.Recomp
         GHC.IfaceToCore
-        FlagChecker
+        GHC.Iface.Recomp.Flags
         GHC.Types.Annotations
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput

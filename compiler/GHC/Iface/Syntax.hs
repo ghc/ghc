@@ -45,7 +45,7 @@ module GHC.Iface.Syntax (
 import GhcPrelude
 
 import GHC.Iface.Type
-import BinFingerprint
+import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
 import GHC.Types.Demand
 import GHC.Types.Cpr
