@@ -36,7 +36,7 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
 import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Rename.Names ( gresFromAvails )
 import GHC.Driver.Plugins
-import PrelNames        ( pluginTyConName, frontendPluginTyConName )
+import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Types
 import GHCi.RemoteTypes  ( HValue )

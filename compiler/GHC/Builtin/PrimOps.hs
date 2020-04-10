@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module PrimOp (
+module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,
         primOpTag, maxPrimOpTag, primOpOcc,
@@ -27,15 +27,15 @@ module PrimOp (
 
 import GhcPrelude
 
-import TysPrim
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 
 import GHC.Cmm.Type
 import GHC.Types.Demand
 import GHC.Types.Id      ( Id, mkVanillaGlobalWithInfo )
 import GHC.Types.Id.Info ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
 import GHC.Types.Name
-import PrelNames         ( gHC_PRIMOPWRAPPERS )
+import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
 import GHC.Types.RepType ( typePrimRep1, tyConPrimRep1 )

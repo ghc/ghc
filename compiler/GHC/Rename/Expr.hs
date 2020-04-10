@@ -45,7 +45,7 @@ import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
-import PrelNames
+import GHC.Builtin.Names
 
 import GHC.Types.Basic
 import GHC.Types.Name
@@ -60,7 +60,7 @@ import Outputable
 import GHC.Types.SrcLoc
 import FastString
 import Control.Monad
-import TysWiredIn       ( nilDataConName )
+import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Ord

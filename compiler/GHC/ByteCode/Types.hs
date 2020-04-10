@@ -20,7 +20,7 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import Outputable
-import PrimOp
+import GHC.Builtin.PrimOps
 import SizedSeq
 import GHC.Core.Type
 import GHC.Types.SrcLoc

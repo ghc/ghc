@@ -36,7 +36,7 @@ import GHC.Core.TyCon
 import GHC.Types.Var
 import GHC.Core.Coercion
 
-import PrelNames
+import GHC.Builtin.Names
 
 import FastString
 import Outputable

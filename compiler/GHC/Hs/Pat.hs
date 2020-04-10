@@ -60,7 +60,7 @@ import GHC.Types.Basic
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Var
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.ConLike

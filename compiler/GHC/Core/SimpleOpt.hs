@@ -45,8 +45,8 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 import GHC.Core.TyCon ( tyConArity )
-import TysWiredIn
-import PrelNames
+import GHC.Builtin.Types
+import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Types.Module ( Module )
 import ErrUtils

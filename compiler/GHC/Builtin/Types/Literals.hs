@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module TcTypeNats
+module GHC.Builtin.Types.Literals
   ( typeNatTyCons
   , typeNatCoAxiomRules
   , BuiltInSynFamily(..)
@@ -32,9 +32,10 @@ import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
-import TysWiredIn
-import TysPrim    ( mkTemplateAnonTyConBinders )
-import PrelNames  ( gHC_TYPELITS
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders )
+import GHC.Builtin.Names
+                  ( gHC_TYPELITS
                   , gHC_TYPENATS
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
@@ -60,7 +61,7 @@ import Data.List  ( isPrefixOf, isSuffixOf )
 Note [Type-level literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are currently two forms of type-level literals: natural numbers, and
-symbols (even though this module is named TcTypeNats, it covers both).
+symbols (even though this module is named GHC.Builtin.Types.Literals, it covers both).
 
 Type-level literals are supported by CoAxiomRules (conditional axioms), which
 power the built-in type families (see Note [Adding built-in type families]).
@@ -77,20 +78,20 @@ There are a few steps to adding a built-in type family:
 
 * Adding a unique for the type family TyCon
 
-  These go in PrelNames. It will likely be of the form
+  These go in GHC.Builtin.Names. It will likely be of the form
   @myTyFamNameKey = mkPreludeTyConUnique xyz@, where @xyz@ is a number that
-  has not been chosen before in PrelNames. There are several examples already
-  in PrelNames—see, for instance, typeNatAddTyFamNameKey.
+  has not been chosen before in GHC.Builtin.Names. There are several examples already
+  in GHC.Builtin.Names—see, for instance, typeNatAddTyFamNameKey.
 
 * Adding the type family TyCon itself
 
-  This goes in TcTypeNats. There are plenty of examples of how to define
+  This goes in GHC.Builtin.Types.Literals. There are plenty of examples of how to define
   these—see, for instance, typeNatAddTyCon.
 
   Once your TyCon has been defined, be sure to:
 
-  - Export it from TcTypeNats. (Not doing so caused #14632.)
-  - Include it in the typeNatTyCons list, defined in TcTypeNats.
+  - Export it from GHC.Builtin.Types.Literals. (Not doing so caused #14632.)
+  - Include it in the typeNatTyCons list, defined in GHC.Builtin.Types.Literals.
 
 * Exposing associated type family axioms
 
@@ -100,7 +101,7 @@ There are a few steps to adding a built-in type family:
   axAdd0L and axAdd0R).
 
   After you have defined all of these axioms, be sure to include them in the
-  typeNatCoAxiomRules list, defined in TcTypeNats.
+  typeNatCoAxiomRules list, defined in GHC.Builtin.Types.Literals.
   (Not doing so caused #14934.)
 
 * Define the type family somewhere
@@ -109,7 +110,7 @@ There are a few steps to adding a built-in type family:
   Currently, all of the built-in type families are defined in GHC.TypeLits or
   GHC.TypeNats, so those are likely candidates.
 
-  Since the behavior of your built-in type family is specified in TcTypeNats,
+  Since the behavior of your built-in type family is specified in GHC.Builtin.Types.Literals,
   you should give an open type family definition with no instances, like so:
 
     type family MyTypeFam (m :: Nat) (n :: Nat) :: Nat
