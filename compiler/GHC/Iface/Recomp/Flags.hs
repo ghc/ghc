@@ -2,7 +2,7 @@
 
 -- | This module manages storing the various GHC option flags in a modules
 -- interface file as part of the recompilation checking infrastructure.
-module FlagChecker (
+module GHC.Iface.Recomp.Flags (
         fingerprintDynFlags
       , fingerprintOptFlags
       , fingerprintHpcFlags
@@ -16,7 +16,7 @@ import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.Types.Name
 import Fingerprint
-import BinFingerprint
+import GHC.Iface.Recomp.Binary
 -- import Outputable
 
 import qualified EnumSet
