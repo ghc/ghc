@@ -47,7 +47,7 @@ import GHC.HandleEncoding
 import GHC.Platform
 import GHC.Platform.Host
 import Config
-import Constants
+import GHC.Settings.Constants
 import GHC.Driver.Types
 import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
@@ -57,7 +57,7 @@ import ErrUtils
 import FastString
 import Outputable
 import GHC.SysTools.BaseDir
-import GHC.SysTools.Settings
+import GHC.Settings.IO
 import GHC.Types.SrcLoc
 import Util
 import Panic

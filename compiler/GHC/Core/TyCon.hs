@@ -163,7 +163,7 @@ import Maybes
 import Outputable
 import FastStringEnv
 import GHC.Types.FieldLabel
-import Constants
+import GHC.Settings.Constants
 import Util
 import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import GHC.Types.Unique.Set
