@@ -62,11 +62,11 @@ import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
 import GHC.Tc.Types
-import ToolSettings
 import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Ar
+import GHC.Settings
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
 import GHC.Iface.Make   ( mkFullIface )
