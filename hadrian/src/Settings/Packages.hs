@@ -127,7 +127,12 @@ packageArgs = do
         -- refer to the RTS.  This is harmless if you don't use it (adds a bit
         -- of overhead to startup and increases the binary sizes) but if you
         -- need it there's no alternative.
-        , package iserv ? mconcat
+        --
+        -- The Solaris linker does not support --export-dynamic option. It also
+        -- does not need it since it exports all dynamic symbols by default
+        , package iserv
+          ? expr isElfTarget
+          ? notM (expr $ anyTargetOs ["freebsd", "solaris2"])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
         -------------------------------- haddock -------------------------------
