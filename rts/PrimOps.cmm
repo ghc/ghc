@@ -175,8 +175,8 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 {
    ASSERT(new_size <= StgArrBytes_bytes(mba));
 
-   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
-                                 ROUNDUP_BYTES_TO_WDS(new_size)));
+   OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
+                                     ROUNDUP_BYTES_TO_WDS(new_size)));
    StgArrBytes_bytes(mba) = new_size;
    // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
@@ -199,8 +199,8 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
    new_size_wds = ROUNDUP_BYTES_TO_WDS(new_size);
 
    if (new_size_wds <= BYTE_ARR_WDS(mba)) {
-      OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
-                                    new_size_wds));
+      OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
+                                        new_size_wds));
       StgArrBytes_bytes(mba) = new_size;
       // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
@@ -228,8 +228,8 @@ stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
 {
    ASSERT(new_size <= StgSmallMutArrPtrs_ptrs(mba));
 
-   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
-                                 new_size));
+   OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
+                                     new_size));
    StgSmallMutArrPtrs_ptrs(mba) = new_size;
    // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
