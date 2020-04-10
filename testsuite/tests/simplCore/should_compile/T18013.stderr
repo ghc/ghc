@@ -1,0 +1,210 @@
+Rule fired: Class op arr (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op first (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op ||| (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @(_, ()) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+Rule fired: mkRule @((), _) (T18013a)
+Rule fired: Class op fmap (BUILTIN)
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 52, types: 106, coercions: 15, joins: 0/1}
+
+-- RHS size: {terms: 37, types: 87, coercions: 15, joins: 0/1}
+mapMaybeRule
+  :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
+[GblId,
+ Arity=1,
+ Str=<S,1*U>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 150 30}]
+mapMaybeRule
+  = \ (@a) (@b) (f :: Rule IO a b) ->
+      case f of { Rule @s t0 g ->
+      let {
+        lvl :: Result s (Maybe b)
+        [LclId, Unf=OtherCon []]
+        lvl = T18013a.Result @s @(Maybe b) t0 (GHC.Maybe.Nothing @b) } in
+      T18013a.Rule
+        @IO
+        @(Maybe a)
+        @(Maybe b)
+        @s
+        t0
+        ((\ (s2 :: s)
+            (a1 :: Maybe a)
+            (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+            case a1 of {
+              Nothing -> (# s1, lvl #);
+              Just x ->
+                case ((g s2 x) `cast` <Co:4>) s1 of { (# ipv, ipv1 #) ->
+                case ipv1 of { Result t2 c1 ->
+                (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
+                }
+                }
+            })
+         `cast` <Co:11>)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18013.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T18013.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18013.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18013.$trModule3 = GHC.Types.TrNameS T18013.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18013.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T18013.$trModule2 = "T18013"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18013.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18013.$trModule :: GHC.Types.Module
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T18013.$trModule
+  = GHC.Types.Module T18013.$trModule3 T18013.$trModule1
+
+
+
