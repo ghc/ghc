@@ -21,6 +21,7 @@ Language extensions
     exts/constraints
     exts/type_signatures
     exts/bindings
+    exts/linear_types
     exts/template_haskell
     exts/strict
     exts/parallel
