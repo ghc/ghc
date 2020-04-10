@@ -1,5 +1,16 @@
-module Settings
+{-# LANGUAGE CPP #-}
+
+-- | Run-time settings
+module GHC.Settings
   ( Settings (..)
+  , ToolSettings (..)
+  , FileSettings (..)
+  , GhcNameVersion (..)
+  , PlatformConstants (..)
+  , Platform (..)
+  , PlatformMisc (..)
+  , PlatformMini (..)
+  -- * Accessors
   , sProgramName
   , sProjectVersion
   , sGhcUsagePath
@@ -62,11 +73,7 @@ import GhcPrelude
 
 import CliOption
 import Fingerprint
-import FileSettings
-import GhcNameVersion
 import GHC.Platform
-import PlatformConstants
-import ToolSettings
 
 data Settings = Settings
   { sGhcNameVersion    :: {-# UNPACk #-} !GhcNameVersion
@@ -80,6 +87,85 @@ data Settings = Settings
   -- They should have their own fields instead.
   , sRawSettings       :: [(String, String)]
   }
+
+-- | Settings for other executables GHC calls.
+--
+-- Probably should further split down by phase, or split between
+-- platform-specific and platform-agnostic.
+data ToolSettings = ToolSettings
+  { toolSettings_ldSupportsCompactUnwind :: Bool
+  , toolSettings_ldSupportsBuildId       :: Bool
+  , toolSettings_ldSupportsFilelist      :: Bool
+  , toolSettings_ldIsGnuLd               :: Bool
+  , toolSettings_ccSupportsNoPie         :: Bool
+
+  -- commands for particular phases
+  , toolSettings_pgm_L       :: String
+  , toolSettings_pgm_P       :: (String, [Option])
+  , toolSettings_pgm_F       :: String
+  , toolSettings_pgm_c       :: String
+  , toolSettings_pgm_a       :: (String, [Option])
+  , toolSettings_pgm_l       :: (String, [Option])
+  , toolSettings_pgm_dll     :: (String, [Option])
+  , toolSettings_pgm_T       :: String
+  , toolSettings_pgm_windres :: String
+  , toolSettings_pgm_libtool :: String
+  , toolSettings_pgm_ar      :: String
+  , toolSettings_pgm_ranlib  :: String
+  , -- | LLVM: opt llvm optimiser
+    toolSettings_pgm_lo      :: (String, [Option])
+  , -- | LLVM: llc static compiler
+    toolSettings_pgm_lc      :: (String, [Option])
+  , -- | LLVM: c compiler
+    toolSettings_pgm_lcc     :: (String, [Option])
+  , toolSettings_pgm_i       :: String
+
+  -- options for particular phases
+  , toolSettings_opt_L             :: [String]
+  , toolSettings_opt_P             :: [String]
+  , -- | cached Fingerprint of sOpt_P
+    -- See Note [Repeated -optP hashing]
+    toolSettings_opt_P_fingerprint :: Fingerprint
+  , toolSettings_opt_F             :: [String]
+  , toolSettings_opt_c             :: [String]
+  , toolSettings_opt_cxx           :: [String]
+  , toolSettings_opt_a             :: [String]
+  , toolSettings_opt_l             :: [String]
+  , toolSettings_opt_windres       :: [String]
+  , -- | LLVM: llvm optimiser
+    toolSettings_opt_lo            :: [String]
+  , -- | LLVM: llc static compiler
+    toolSettings_opt_lc            :: [String]
+  , -- | LLVM: c compiler
+    toolSettings_opt_lcc           :: [String]
+  , -- | iserv options
+    toolSettings_opt_i             :: [String]
+
+  , toolSettings_extraGccViaCFlags :: [String]
+  }
+
+
+-- | Paths to various files and directories used by GHC, including those that
+-- provide more settings.
+data FileSettings = FileSettings
+  { fileSettings_ghcUsagePath          :: FilePath       -- ditto
+  , fileSettings_ghciUsagePath         :: FilePath       -- ditto
+  , fileSettings_toolDir               :: Maybe FilePath -- ditto
+  , fileSettings_topDir                :: FilePath       -- ditto
+  , fileSettings_tmpDir                :: String      -- no trailing '/'
+  , fileSettings_globalPackageDatabase :: FilePath
+  }
+
+
+-- | Settings for what GHC this is.
+data GhcNameVersion = GhcNameVersion
+  { ghcNameVersion_programName    :: String
+  , ghcNameVersion_projectVersion :: String
+  }
+
+-- Produced by deriveConstants
+-- Provides PlatformConstants datatype
+#include "GHCConstantsHaskellType.hs"
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'Settings'
