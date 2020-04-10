@@ -15,7 +15,6 @@ import FastString
 import Outputable
 
 import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Utils
 import GHC.Types.Name
 
