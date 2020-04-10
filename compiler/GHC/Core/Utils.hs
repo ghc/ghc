@@ -66,7 +66,7 @@ import GhcPrelude
 import GHC.Platform
 
 import GHC.Core
-import PrelNames ( makeStaticName )
+import GHC.Builtin.Names ( makeStaticName )
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars )
 import GHC.Types.Var
@@ -76,10 +76,10 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import PrelNames( absentErrorIdKey )
+import GHC.Builtin.Names( absentErrorIdKey )
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
@@ -87,7 +87,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Types.Unique
 import Outputable
-import TysPrim
+import GHC.Builtin.Types.Prim
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
@@ -1499,7 +1499,7 @@ it's applied only to dictionaries.
 --    exprIsHNF            implies exprOkForSpeculation
 --    exprOkForSpeculation implies exprOkForSideEffects
 --
--- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+-- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
 -- and Note [Transformations affected by can_fail and has_side_effects]
 --
 -- As an example of the considerations in this test, consider:
@@ -1628,7 +1628,7 @@ altsAreExhaustive ((con1,_,_) : alts)
 
 -- | True of dyadic operators that can fail only if the second arg is zero!
 isDivOp :: PrimOp -> Bool
--- This function probably belongs in PrimOp, or even in
+-- This function probably belongs in GHC.Builtin.PrimOps, or even in
 -- an automagically generated file.. but it's such a
 -- special case I thought I'd leave it here for now.
 isDivOp IntQuotOp        = True

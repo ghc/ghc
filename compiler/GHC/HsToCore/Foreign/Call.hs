@@ -39,13 +39,13 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
-import PrimOp
-import TysPrim
+import GHC.Builtin.PrimOps
+import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.Literal
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Driver.Session
 import Outputable
 import Util

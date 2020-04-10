@@ -215,8 +215,8 @@ import Outputable
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
-import TysWiredIn
+import GHC.Builtin.Types.Prim (intPrimTy,wordPrimTy,word64PrimTy)
+import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import Util
 import GHC.Types.Var.Env

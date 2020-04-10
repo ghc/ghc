@@ -43,9 +43,9 @@ import GHC.Tc.Utils.Zonk ( shortCutLit )
 import GHC.Tc.Utils.TcType
 import GHC.Types.Name
 import GHC.Core.Type
-import PrelNames
-import TysWiredIn
-import TysPrim
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
 import Data.Ratio

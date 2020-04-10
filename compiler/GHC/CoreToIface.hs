@@ -54,10 +54,10 @@ import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
-import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
-import TysWiredIn ( heqTyCon )
+import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.Types ( heqTyCon )
 import GHC.Types.Id.Make ( noinlineIdName )
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.Type

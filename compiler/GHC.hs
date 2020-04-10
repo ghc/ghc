@@ -319,7 +319,7 @@ import GHC.Hs
 import GHC.Core.Type  hiding( typeKind )
 import GHC.Tc.Utils.TcType
 import GHC.Types.Id
-import TysPrim          ( alphaTyVars )
+import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr   ( pprForAll )
 import GHC.Core.Class

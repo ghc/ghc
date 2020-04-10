@@ -18,7 +18,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.DFM
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import TysWiredIn
+import GHC.Builtin.Types
 import Outputable
 import Control.Monad.Trans.RWS.CPS
 import Util

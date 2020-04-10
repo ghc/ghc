@@ -71,7 +71,7 @@ import GHC.Core.TyCon
 import GHC.Types.FieldLabel
 import GHC.Core.Class
 import GHC.Types.Name
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Core.Predicate
 import GHC.Types.Var
 import Outputable

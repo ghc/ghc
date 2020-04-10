@@ -1,7 +1,7 @@
 {-
 (c) The GRASP Project, Glasgow University, 1994-1998
 
-\section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
+Wired-in knowledge about {\em non-primitive} types
 -}
 
 {-# LANGUAGE CPP #-}
@@ -10,10 +10,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module is about types that can be defined in Haskell, but which
---   must be wired into the compiler nonetheless.  C.f module TysPrim
-module TysWiredIn (
+--   must be wired into the compiler nonetheless.  C.f module GHC.Builtin.Types.Prim
+module GHC.Builtin.Types (
         -- * Helper functions defined here
-        mkWiredInTyConName, -- This is used in TcTypeNats to define the
+        mkWiredInTyConName, -- This is used in GHC.Builtin.Types.Literals to define the
                             -- built-in functions for evaluation.
 
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
@@ -135,9 +135,9 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
 -- friends:
-import PrelNames
-import TysPrim
-import {-# SOURCE #-} KnownUniques
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
+import {-# SOURCE #-} GHC.Builtin.Uniques
 
 -- others:
 import GHC.Core.Coercion.Axiom
@@ -193,10 +193,10 @@ See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType.
 ************************************************************************
 
 If you change which things are wired in, make sure you change their
-names in PrelNames, so they use wTcQual, wDataQual, etc
+names in GHC.Builtin.Names, so they use wTcQual, wDataQual, etc
 -}
 
--- This list is used only to define PrelInfo.wiredInThings. That in turn
+-- This list is used only to define GHC.Builtin.Utils.wiredInThings. That in turn
 -- is used to initialise the name environment carried around by the renamer.
 -- This means that if we look up the name of a TyCon (or its implicit binders)
 -- that occurs in this list that name will be assigned the wired-in key we
@@ -375,7 +375,7 @@ It has these properties:
 
   * If (Any k) is the type of a value, it must be a /lifted/ value. So
     if we have (Any @(TYPE rr)) then rr must be 'LiftedRep.  See
-    Note [TYPE and RuntimeRep] in TysPrim.  This is a convenient
+    Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.  This is a convenient
     invariant, and makes isUnliftedTyCon well-defined; otherwise what
     would (isUnliftedTyCon Any) be?
 
@@ -654,7 +654,7 @@ constraintKind   = mkTyConApp constraintKindTyCon []
 *                                                                      *
 ************************************************************************
 
-Note [How tuples work]  See also Note [Known-key names] in PrelNames
+Note [How tuples work]  See also Note [Known-key names] in GHC.Builtin.Names
 ~~~~~~~~~~~~~~~~~~~~~~
 * There are three families of tuple TyCons and corresponding
   DataCons, expressed by the type BasicTypes.TupleSort:
@@ -701,7 +701,7 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
 * Serialization to interface files works via the usual mechanism for known-key
   things: instead of serializing the OccName we just serialize the key. During
   deserialization we lookup the Name associated with the unique with the logic
-  in KnownUniques. See Note [Symbol table representation of names] for details.
+  in GHC.Builtin.Uniques. See Note [Symbol table representation of names] for details.
 
 Note [One-tuples]
 ~~~~~~~~~~~~~~~~~
@@ -1091,7 +1091,7 @@ mk_sum arity = (tycon, sum_cons)
 *                                                                      *
 ********************************************************************* -}
 
--- See Note [The equality types story] in TysPrim
+-- See Note [The equality types story] in GHC.Builtin.Types.Prim
 -- ((~~) :: forall k1 k2 (a :: k1) (b :: k2). a -> b -> Constraint)
 --
 -- It's tempting to put functional dependencies on (~~), but it's not
@@ -1171,11 +1171,11 @@ mk_class tycon sc_pred sc_sel_id
 ********************************************************************* -}
 
 -- For information about the usage of the following type,
--- see Note [TYPE and RuntimeRep] in module TysPrim
+-- see Note [TYPE and RuntimeRep] in module GHC.Builtin.Types.Prim
 runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
--- Type synonyms; see Note [TYPE and RuntimeRep] in TysPrim
+-- Type synonyms; see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim
 -- type Type = tYPE 'LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName

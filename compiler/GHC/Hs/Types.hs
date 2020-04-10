@@ -83,7 +83,7 @@ import GHC.Types.Name( Name, NamedThing(getName) )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
-import TysWiredIn( mkTupleStr )
+import GHC.Builtin.Types( mkTupleStr )
 import GHC.Core.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic

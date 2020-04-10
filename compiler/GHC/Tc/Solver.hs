@@ -36,8 +36,8 @@ import GHC.Tc.Utils.Instantiate
 import ListSetOps
 import GHC.Types.Name
 import Outputable
-import PrelInfo
-import PrelNames
+import GHC.Builtin.Utils
+import GHC.Builtin.Names
 import GHC.Tc.Errors
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Interact
@@ -50,8 +50,8 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
-import TysWiredIn     ( liftedRepTy )
-import GHC.Core.Unify ( tcMatchTyKi )
+import GHC.Builtin.Types ( liftedRepTy )
+import GHC.Core.Unify    ( tcMatchTyKi )
 import Util
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -665,7 +665,7 @@ tcNormalise given_ids ty
 Expand superclasses before starting, because (Int ~ Bool), has
 (Int ~~ Bool) as a superclass, which in turn has (Int ~N# Bool)
 as a superclass, and it's the latter that is insoluble.  See
-Note [The equality types story] in TysPrim.
+Note [The equality types story] in GHC.Builtin.Types.Prim.
 
 If we fail to prove unsatisfiability we (arbitrarily) try just once to
 find superclasses, using try_harder.  Reason: we might have a type

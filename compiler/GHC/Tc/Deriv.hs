@@ -58,7 +58,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import Util
 import Outputable
