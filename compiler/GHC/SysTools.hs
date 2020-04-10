@@ -40,7 +40,7 @@ module GHC.SysTools (
 
 import GhcPrelude
 
-import GHC.Settings
+import GHC.Settings.Utils
 
 import GHC.Types.Module
 import GHC.Driver.Packages
@@ -58,7 +58,7 @@ import GHC.SysTools.ExtraObj
 import GHC.SysTools.Info
 import GHC.SysTools.Tasks
 import GHC.SysTools.BaseDir
-import GHC.SysTools.Settings
+import GHC.Settings.IO
 import qualified Data.Set as Set
 
 {-

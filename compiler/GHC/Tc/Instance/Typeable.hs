@@ -40,7 +40,7 @@ import GHC.Driver.Session
 import Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map
-import Constants
+import GHC.Settings.Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable
 import FastString ( FastString, mkFastString, fsLit )
