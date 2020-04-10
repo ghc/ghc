@@ -5,7 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 
--- | The @PrelInfo@ interface to the compiler's prelude knowledge.
+-- | The @GHC.Builtin.Utils@ interface to the compiler's prelude knowledge.
 --
 -- This module serves as the central gathering point for names which the
 -- compiler knows something about. This includes functions for,
@@ -17,7 +17,7 @@
 -- See Note [Known-key names] and Note [About wired-in things] for information
 -- about the two types of prelude things in GHC.
 --
-module PrelInfo (
+module GHC.Builtin.Utils (
         -- * Known-key names
         isKnownKeyName,
         lookupKnownKeyName,
@@ -48,29 +48,29 @@ module PrelInfo (
 
 import GhcPrelude
 
-import KnownUniques
+import GHC.Builtin.Uniques
 import GHC.Types.Unique ( isValidKnownKeyUnique )
 
 import GHC.Core.ConLike ( ConLike(..) )
-import THNames          ( templateHaskellNames )
-import PrelNames
+import GHC.Builtin.Names.TH ( templateHaskellNames )
+import GHC.Builtin.Names
 import GHC.Core.Opt.ConstantFold
 import GHC.Types.Avail
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
 import Outputable
-import TysPrim
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 import GHC.Driver.Types
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
 import Util
-import TcTypeNats ( typeNatTyCons )
+import GHC.Builtin.Types.Literals ( typeNatTyCons )
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate )
@@ -107,7 +107,7 @@ Note [About wired-in things]
 
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
--- Note [Known-key names] in PrelNames)
+-- Note [Known-key names] in GHC.Builtin.Names)
 knownKeyNames :: [Name]
 knownKeyNames
   | debugIsOn

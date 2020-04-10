@@ -44,7 +44,7 @@ import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
    , mkEmptyTCvSubst, substTy )
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
-import TysWiredIn           ( anyTypeOfKind )
+import GHC.Builtin.Types    ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Types.Id

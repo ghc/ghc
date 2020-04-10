@@ -34,8 +34,8 @@ import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import Util
 import Maybes           ( isJust )
-import TysWiredIn
-import TysPrim          ( realWorldStatePrimTy )
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 

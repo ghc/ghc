@@ -142,8 +142,8 @@ import Outputable
 import GHC.Types.Unique
 import Pair
 import GHC.Types.SrcLoc
-import PrelNames
-import TysPrim
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
 import ListSetOps
 import Maybes
 import GHC.Types.Unique.FM

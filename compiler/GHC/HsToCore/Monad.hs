@@ -62,7 +62,7 @@ import GHC.Core.Utils ( exprType, isExprLevPoly )
 import GHC.Hs
 import GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import Bag

@@ -1,4 +1,4 @@
-module PrimOp where
+module GHC.Builtin.PrimOps where
 
 import GhcPrelude ()
 

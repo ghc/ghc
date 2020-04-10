@@ -161,7 +161,7 @@ import GHC.Core.Type
 import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import PrelNames
+import GHC.Builtin.Names
 
 import GHC.Types.Id
 import GHC.Types.Var.Set

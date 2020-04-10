@@ -85,10 +85,10 @@ import GHC.Parser.Annotation
 import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
 -- compiler/prelude
-import TysPrim          ( eqPrimTyCon )
-import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
-                          unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
+import GHC.Builtin.Types.Prim ( eqPrimTyCon )
+import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
+                           unboxedUnitTyCon, unboxedUnitDataCon,
+                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 }
 
 %expect 232 -- shift/reduce conflicts
@@ -3539,7 +3539,7 @@ qtyconsym :: { Located RdrName }
 tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                { sL1 $1 $!
-                                    -- See Note [eqTyCon (~) is built-in syntax] in TysWiredIn
+                                    -- See Note [eqTyCon (~) is built-in syntax] in GHC.Builtin.Types
                                     if getVARSYM $1 == fsLit "~"
                                       then eqTyCon_RDR
                                       else mkUnqual tcClsName (getVARSYM $1) }

@@ -376,7 +376,7 @@ mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
--- See Note [Primop wrappers] in PrimOp.hs.
+-- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
 mkPrimOpWrapperUnique  :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkCoVarUnique          :: Int -> Unique

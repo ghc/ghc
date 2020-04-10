@@ -40,7 +40,7 @@ import GHC.Driver.Types
 import GHC.Driver.Packages
 import FastString
 import Util
-import PrelNames        ( gHC_PRIM )
+import GHC.Builtin.Names ( gHC_PRIM )
 import GHC.Driver.Session
 import Outputable
 import Maybes           ( expectJust )

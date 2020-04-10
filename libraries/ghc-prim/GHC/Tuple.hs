@@ -28,7 +28,7 @@ data () = ()
 
 -- The desugarer uses 1-tuples,
 -- but "()" is already used up for 0-tuples
--- See Note [One-tuples] in TysWiredIn
+-- See Note [One-tuples] in GHC.Builtin.Types
 data Unit a = Unit a
 
 data (a,b) = (a,b)
