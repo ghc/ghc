@@ -759,6 +759,22 @@ GHC's internal ``Binary`` class. The interface to work with these fields is:
     writeIfaceField :: Binary a => FieldName -> a -> ModIface -> IO ModIface
     deleteIfaceField :: FieldName -> ModIface -> ModIface
 
+The ``FieldName`` is open-ended, but typically it should contain the producing
+package name, a version number, and the actual field name. For example, a GHC
+Core field might be named like:
+
+::
+
+    ghc-n.n.n/core
+
+In this example, the version would probably correspond to the package name, but
+a field that changes slower than the package version might associate the version
+with the field:
+
+::
+
+    example/field-n
+
 To read an interface file from an external tool without linking to GHC, the format
 is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
