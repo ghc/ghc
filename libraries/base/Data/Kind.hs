@@ -14,6 +14,7 @@
 -- @since 4.9.0.0
 -----------------------------------------------------------------------------
 
-module Data.Kind ( Type, Constraint ) where
+module Data.Kind ( Type, Constraint, FUN ) where
 
+import GHC.Prim
 import GHC.Types

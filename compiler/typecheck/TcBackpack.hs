@@ -49,6 +49,7 @@ import SrcLoc
 import GHC.Driver.Types
 import Outputable
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import FastString
 import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
@@ -215,7 +216,7 @@ check_inst sig_inst = do
                            (substTy skol_subst pred)
        givens <- forM theta $ \given -> do
            loc <- getCtLocM origin (Just TypeLevel)
-           let given_pred = substTy skol_subst given
+           let given_pred = substTy skol_subst (scaledThing given)
            new_ev <- newEvVar given_pred
            return CtGiven { ctev_pred = given_pred
                           -- Doesn't matter, make something up

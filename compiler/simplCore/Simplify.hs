@@ -56,6 +56,7 @@ import FastString
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
+import GHC.Core.Multiplicity
 import PrimOp          ( PrimOp (SeqOp) )
 
 
@@ -583,7 +584,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name expr_ty info
+              var  = mkLocalIdWithInfo name Many expr_ty info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
@@ -896,8 +897,8 @@ simplExprF env e cont
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
-simplExprF1 _ (Type ty) _
-  = pprPanic "simplExprF: type" (ppr ty)
+simplExprF1 _ (Type ty) cont
+  = pprPanic "simplExprF: type" (ppr ty <+> text"cont: " <+> ppr cont)
     -- simplExprF does only with term-valued expressions
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
@@ -924,7 +925,8 @@ simplExprF1 env (App fun arg) cont
                       ApplyToTy { sc_arg_ty  = arg'
                                 , sc_hole_ty = hole'
                                 , sc_cont    = cont } }
-      _       -> simplExprF env fun $
+      _       ->
+        simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont }
 
@@ -2117,8 +2119,15 @@ trySeqRules in_env scrut rhs cont
                 , TyArg { as_arg_ty  = rhs_ty
                         , as_hole_ty = res2_ty }
                 , ValArg no_cast_scrut]
+                -- The multiplicity of the scrutiny above is Many because the type
+                -- of seq requires that its first argument is unrestricted. The
+                -- typing rule of case also guarantees it though. In a more
+                -- general world, where the first argument of seq would have
+                -- affine multiplicity, then we could use the multiplicity of
+                -- the case (held in the case binder) instead.
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont }
+
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
@@ -2471,13 +2480,14 @@ rebuildCase env scrut case_bndr alts cont
         -- as well as when it's an explicit constructor application
   , let env0 = setInScopeSet env in_scope'
   = do  { tick (KnownBranch case_bndr)
+        ; let scaled_wfloats = wfloats
         ; case findAlt (DataAlt con) alts of
             Nothing  -> missingAlt env0 case_bndr alts cont
             Just (DEFAULT, bs, rhs) -> let con_app = Var (dataConWorkId con)
                                                  `mkTyApps` ty_args
                                                  `mkApps`   other_args
-                                       in simple_rhs env0 wfloats con_app bs rhs
-            Just (_, bs, rhs)       -> knownCon env0 scrut wfloats con ty_args other_args
+                                       in simple_rhs env0 scaled_wfloats con_app bs rhs
+            Just (_, bs, rhs)       -> knownCon env0 scrut scaled_wfloats con ty_args other_args
                                                 case_bndr bs rhs cont
         }
   where
@@ -2494,7 +2504,6 @@ rebuildCase env scrut case_bndr alts cont
                    ( emptyFloats env,
                      GHC.Core.Make.wrapFloats wfloats $
                      wrapFloats (floats1 `addFloats` floats2) expr' )}
-
 
 --------------------------------------------------
 --      2. Eliminate the case if scrutinee is evaluated
@@ -2656,6 +2665,39 @@ taking advantage of the `seq`.
 At one point I did transformation in LiberateCase, but it's more
 robust here.  (Otherwise, there's a danger that we'll simply drop the
 'seq' altogether, before LiberateCase gets to see it.)
+
+Note [Scaling in case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When two cases commute, if done naively, the multiplicities will be wrong:
+
+  case (case u of w[1] { (x[1], y[1]) } -> f x y) of w'[Many]
+  { (z[Many], t[Many]) -> z
+  }
+
+The multiplicities here, are correct, but if I perform a case of case:
+
+  case u of w[1]
+  { (x[1], y[1]) -> case f x y of w'[Many] of { (z[Many], t[Many]) -> z }
+  }
+
+This is wrong! Using `f x y` inside a `case … of w'[Many]` means that `x` and
+`y` must have multiplicities `Many` not `1`! The correct solution is to make
+all the `1`-s be `Many`-s instead:
+
+  case u of w[Many]
+  { (x[Many], y[Many]) -> case f x y of w'[Many] of { (z[Many], t[Many]) -> z }
+  }
+
+In general, when commuting two cases, the rule has to be:
+
+  case (case … of x[p] {…}) of y[q] { … }
+  ===> case … of x[p*q] { … case … of y[q] { … } }
+
+This is materialised, in the simplifier, by the fact that every time we simplify
+case alternatives with a continuation (the surrounded case (or more!)), we must
+scale the entire case we are simplifying, by a scaling factor which can be
+computed in the continuation (with function `contHoleScaling`).
 -}
 
 simplAlts :: SimplEnv
@@ -2698,7 +2740,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ty2
+  = do { case_bndr2 <- newId (fsLit "nt") Many ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -2820,11 +2862,12 @@ addAltUnfoldings env scrut case_bndr con_app
              env1 = addBinderUnfolding env case_bndr con_app_unf
 
              -- See Note [Add unfolding for scrutinee]
-             env2 = case scrut of
+             env2 | Many <- idMult case_bndr = case scrut of
                       Just (Var v)           -> addBinderUnfolding env1 v con_app_unf
                       Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
                                                 mk_simple_unf (Cast con_app (mkSymCo co))
                       _                      -> env1
+                  | otherwise = env1
 
        ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
@@ -2898,6 +2941,9 @@ piece of information.
 
 So instead we add the unfolding x -> Just a, and x -> Nothing in the
 respective RHSs.
+
+Since this transformation is tantamount to a binder swap, the same caveat as in
+Note [Suppressing binder-swaps on linear case] in OccurAnal apply.
 
 
 ************************************************************************
@@ -3118,7 +3164,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                 , StrictArg { sc_fun = info { ai_args = args' }
                             , sc_cci = cci
                             , sc_cont = cont'
-                            , sc_dup = OkToDup} ) }
+                            , sc_dup = OkToDup } ) }
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
                              , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
@@ -3161,6 +3207,7 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                 -- And this is important: see Note [Fusing case continuations]
 
         ; let alt_env = se `setInScopeFromF` floats
+          -- See Note [Scaling in case-of-case]
         ; (alt_env', case_bndr') <- simplBinder alt_env case_bndr
         ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' alt_cont) alts
         -- Safe to say that there are no handled-cons for the DEFAULT case

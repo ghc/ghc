@@ -26,7 +26,7 @@ module GHC.Core.Coercion.Axiom (
        Role(..), fsFromRole,
 
        CoAxiomRule(..), TypeEqn,
-       BuiltInSynFamily(..)
+       BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
 import GhcPrelude
@@ -562,4 +562,12 @@ data BuiltInSynFamily = BuiltInSynFamily
   , sfInteractTop   :: [Type] -> Type -> [TypeEqn]
   , sfInteractInert :: [Type] -> Type ->
                        [Type] -> Type -> [TypeEqn]
+  }
+
+-- Provides default implementations that do nothing.
+trivialBuiltInFamily :: BuiltInSynFamily
+trivialBuiltInFamily = BuiltInSynFamily
+  { sfMatchFam      = \_ -> Nothing
+  , sfInteractTop   = \_ _ -> []
+  , sfInteractInert = \_ _ _ _ -> []
   }
