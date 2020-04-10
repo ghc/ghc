@@ -242,7 +242,6 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
-import PlatformConstants
 import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
@@ -255,8 +254,7 @@ import Config
 import CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd
-import Constants
-import GhcNameVersion
+import GHC.Settings.Constants
 import Panic
 import qualified PprColour as Col
 import Util
@@ -267,10 +265,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
-import FileSettings
 import Outputable
-import Settings
-import ToolSettings
+import GHC.Settings
 
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, DumpAction, TraceAction

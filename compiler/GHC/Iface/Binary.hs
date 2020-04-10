@@ -54,7 +54,7 @@ import Outputable
 import GHC.Types.Name.Cache
 import GHC.Platform
 import FastString
-import Constants
+import GHC.Settings.Constants
 import Util
 
 import Data.Array
