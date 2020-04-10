@@ -513,13 +513,17 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #if defined(PROFILING) || defined(DEBUG)
 #define OVERWRITING_CLOSURE(c) \
     overwritingClosure(c)
-#define OVERWRITING_CLOSURE_OFS(c, off) \
-    overwritingClosureOfs(c, off)
 #else
 #define OVERWRITING_CLOSURE(c) \
     do { (void) c; } while(0)
-#define OVERWRITING_CLOSURE_OFS(c, off) \
-    do { (void) c; (void) n; } while(0)
+#endif
+
+#if defined(PROFILING)
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) \
+    overwritingMutableClosureOfs(c, off)
+#else
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) \
+    do { (void) c; (void) off; } while(0)
 #endif
 
 #if defined(PROFILING)
@@ -532,24 +536,28 @@ overwritingClosure_ (
     StgClosure *p,
     uint32_t offset, /*< offset to start zeroing at, in words */
     uint32_t size,   /*< total closure size, in words */
-    bool inherently_used /*< whether to call LDV_recordDead */
+    bool inherently_used, /*< whether to call LDV_recordDead */
+    bool mutable     /*< is this a closure who's slop we can always zero? */
     );
 
 EXTERN_INLINE void
 overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size,
-                     bool inherently_used USED_IF_PROFILING)
+                     bool inherently_used USED_IF_PROFILING,
+                     bool mutable USED_IF_PROFILING)
 {
     // see Note [zeroing slop when overwriting closures], also #8402
 
+    if (!mutable) {
 #if defined(THREADED_RTS)
-    if(RTS_DEREF(RtsFlags).ParFlags.nCapabilities >= 2)
-        return;
+        if (RTS_DEREF(RtsFlags).ParFlags.nCapabilities >= 2)
+            return;
 #endif
 
 #if defined(PROFILING)
-    if (era <= 0 && !RTS_DEREF(RtsFlags).DebugFlags.sanity)
-        return;
+        if (era <= 0 && !RTS_DEREF(RtsFlags).DebugFlags.sanity)
+            return;
 #endif
+    }
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
@@ -569,7 +577,7 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
     ASSERT(!isInherentlyUsed(get_itbl(p)->type));
 #endif
     overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p),
-                        /*inherently_used=*/false);
+                        /*inherently_used=*/false, /*mutable=*/false);
 }
 
 // Version of 'overwritingClosure' which overwrites only a suffix of a
@@ -579,8 +587,11 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 //
 // Note: As this calls LDV_recordDead() you have to call LDV_RECORD_CREATE()
 //       on the final state of the closure at the call-site
-EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
-EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
+EXTERN_INLINE void
+overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
+
+EXTERN_INLINE void
+overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 {
     // Since overwritingClosureOfs is only ever called by:
     //
@@ -591,7 +602,8 @@ EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
     // we can safely set inherently_used = true, which means LDV_recordDead
     // won't be invoked below. Since these closures are inherenlty used we don't
     // need to track their destruction.
-    overwritingClosure_(p, offset, closure_sizeW(p), /*inherently_used=*/true);
+    overwritingClosure_(p, offset, closure_sizeW(p),
+                        /*inherently_used=*/true, /*mutable=*/true);
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
@@ -601,5 +613,6 @@ EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
 #if defined(PROFILING)
     ASSERT(!isInherentlyUsed(get_itbl(p)->type));
 #endif
-    overwritingClosure_(p, sizeofW(StgThunkHeader), size, /*inherently_used=*/false);
+    overwritingClosure_(p, sizeofW(StgThunkHeader), size,
+                        /*inherently_used=*/false, /*mutable=*/false);
 }
