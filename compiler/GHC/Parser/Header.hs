@@ -33,7 +33,7 @@ import GHC.Parser.Lexer
 import FastString
 import GHC.Hs
 import GHC.Types.Module
-import PrelNames
+import GHC.Builtin.Names
 import StringBuffer
 import GHC.Types.SrcLoc
 import GHC.Driver.Session

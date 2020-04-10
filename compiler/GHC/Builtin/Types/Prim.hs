@@ -2,16 +2,16 @@
 (c) The AQUA Project, Glasgow University, 1994-1998
 
 
-\section[TysPrim]{Wired-in knowledge about primitive types}
+Wired-in knowledge about primitive types
 -}
 
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
---   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
-module TysPrim(
-        mkPrimTyConName, -- For implicit parameters in TysWiredIn only
+--   They are all, therefore, wired-in TyCons.  C.f module GHC.Builtin.Types
+module GHC.Builtin.Types.Prim(
+        mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
 
         mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
@@ -92,7 +92,7 @@ module TysPrim(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TysWiredIn
+import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy
@@ -115,7 +115,7 @@ import GHC.Types.Name
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
-import PrelNames
+import GHC.Builtin.Names
 import FastString
 import Outputable
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
@@ -467,7 +467,7 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
                              (a :: TYPE r1) (b :: TYPE r2).
                              a -> b
 
-* Unboxed tuples, and unboxed sums, defined in TysWiredIn
+* Unboxed tuples, and unboxed sums, defined in GHC.Builtin.Types
   Always inlined, and hence specialised to the call site
      (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                      (a :: TYPE r1) (b :: TYPE r2).
@@ -532,7 +532,7 @@ tYPE rr = TyConApp tYPETyCon [rr]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-basic]{Basic primitive types (@Char#@, @Int#@, etc.)}
+   Basic primitive types (@Char#@, @Int#@, etc.)
 *                                                                      *
 ************************************************************************
 -}
@@ -665,7 +665,7 @@ doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName DoubleRep
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-state]{The @State#@ type (and @_RealWorld@ types)}
+   The @State#@ type (and @_RealWorld@ types)
 *                                                                      *
 ************************************************************************
 
@@ -711,7 +711,7 @@ All wanted constraints of this type are built with coercion holes.
 Note [Deferred errors for coercion holes] in GHC.Tc.Errors to see how
 equality constraints are deferred.
 
-Within GHC, ~# is called eqPrimTyCon, and it is defined in TysPrim.
+Within GHC, ~# is called eqPrimTyCon, and it is defined in GHC.Builtin.Types.Prim.
 
 
     --------------------------
@@ -745,7 +745,7 @@ equalities. There is some special-casing in GHC.Tc.Solver.Interact.matchClassIns
 pretend that there is an instance of this class, as we can't write the instance
 in Haskell.
 
-Within GHC, ~~ is called heqTyCon, and it is defined in TysWiredIn.
+Within GHC, ~~ is called heqTyCon, and it is defined in GHC.Builtin.Types.
 
 
     --------------------------
@@ -761,7 +761,7 @@ It is an almost-ordinary class defined as if by
  * In addition (~) is magical syntax, as ~ is a reserved symbol.
    It cannot be exported or imported.
 
-Within GHC, ~ is called eqTyCon, and it is defined in TysWiredIn.
+Within GHC, ~ is called eqTyCon, and it is defined in GHC.Builtin.Types.
 
 Historical note: prior to July 18 (~) was defined as a
   more-ordinary class with (~~) as a superclass.  But that made it
@@ -785,7 +785,7 @@ The is the representational analogue of ~#. This is the type of representational
 equalities that the solver works on. All wanted constraints of this type are
 built with coercion holes.
 
-Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in TysPrim.
+Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in GHC.Builtin.Types.Prim.
 
 
     --------------------------
@@ -803,7 +803,7 @@ split required that both types be fully wired-in. Instead of doing this,
 I just got rid of HCoercible, as I'm not sure who would use it, anyway.
 
 Within GHC, Coercible is called coercibleTyCon, and it is defined in
-TysWiredIn.
+GHC.Builtin.Types.
 
 
     --------------------------
@@ -865,7 +865,7 @@ realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
 
 -- Note: the ``state-pairing'' types are not truly primitive,
--- so they are defined in \tr{TysWiredIn.hs}, not here.
+-- so they are defined in \tr{GHC.Builtin.Types}, not here.
 
 
 voidPrimTy :: Type
@@ -980,7 +980,7 @@ mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [s, elt]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-synch-var]{The synchronizing variable type}
+   The synchronizing variable type
 *                                                                      *
 ************************************************************************
 -}
@@ -994,7 +994,7 @@ mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [s, elt]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-stm-var]{The transactional variable type}
+   The transactional variable type
 *                                                                      *
 ************************************************************************
 -}
@@ -1008,7 +1008,7 @@ mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [s, elt]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-stable-ptrs]{The stable-pointer type}
+   The stable-pointer type
 *                                                                      *
 ************************************************************************
 -}
@@ -1022,7 +1022,7 @@ mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [ty]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-stable-names]{The stable-name type}
+   The stable-name type
 *                                                                      *
 ************************************************************************
 -}
@@ -1036,7 +1036,7 @@ mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [ty]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-compact-nfdata]{The Compact NFData (CNF) type}
+   The Compact NFData (CNF) type
 *                                                                      *
 ************************************************************************
 -}
@@ -1050,7 +1050,7 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-BCOs]{The ``bytecode object'' type}
+   The ``bytecode object'' type
 *                                                                      *
 ************************************************************************
 -}
@@ -1066,7 +1066,7 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-Weak]{The ``weak pointer'' type}
+   The ``weak pointer'' type
 *                                                                      *
 ************************************************************************
 -}
@@ -1080,7 +1080,7 @@ mkWeakPrimTy v = TyConApp weakPrimTyCon [v]
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysPrim-thread-ids]{The ``thread id'' type}
+   The ``thread id'' type
 *                                                                      *
 ************************************************************************
 

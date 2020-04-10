@@ -26,7 +26,7 @@ module GHC.IfaceToCore (
 
 import GhcPrelude
 
-import TcTypeNats(typeNatCoAxiomRules)
+import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -54,8 +54,8 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import PrelNames
-import TysWiredIn
+import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set

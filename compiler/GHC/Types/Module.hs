@@ -1101,7 +1101,7 @@ Make sure you change 'Packages.findWiredInPackages' if you add an entry here.
 
 For `integer-gmp`/`integer-simple` we also change the base name to
 `integer-wired-in`, but this is fundamentally no different.
-See Note [The integer library] in PrelNames.
+See Note [The integer library] in GHC.Builtin.Names.
 -}
 
 integerUnitId, primUnitId,
@@ -1109,7 +1109,7 @@ integerUnitId, primUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
 integerUnitId     = fsToUnitId (fsLit "integer-wired-in")
-   -- See Note [The integer library] in PrelNames
+   -- See Note [The integer library] in GHC.Builtin.Names
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")

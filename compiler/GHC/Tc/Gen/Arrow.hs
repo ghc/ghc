@@ -30,9 +30,9 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Var.Set
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
 import GHC.Types.SrcLoc
 import Outputable

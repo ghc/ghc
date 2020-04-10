@@ -45,8 +45,8 @@ import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
-import TysPrim
-import TysWiredIn( mkBoxedTupleTy )
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types( mkBoxedTupleTy )
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
@@ -63,7 +63,7 @@ import Maybes
 import Util
 import GHC.Types.Basic
 import Outputable
-import PrelNames( ipClassName )
+import GHC.Builtin.Names( ipClassName )
 import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set

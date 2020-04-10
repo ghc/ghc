@@ -7,7 +7,7 @@
  *
  * This file contains the implementations of all the primitive
  * operations ("primops") which are not expanded inline.  See
- * ghc/compiler/prelude/primops.txt.pp for a list of all the primops;
+ * ghc/compiler/GHC/Builtin/primops.txt.pp for a list of all the primops;
  * this file contains code for most of those with the attribute
  * out_of_line=True.
  *

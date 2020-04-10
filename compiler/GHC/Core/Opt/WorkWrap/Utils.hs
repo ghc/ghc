@@ -28,8 +28,8 @@ import GHC.Types.Cpr
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import TysWiredIn       ( tupleDataCon )
-import TysPrim          ( voidPrimTy )
+import GHC.Builtin.Types      ( tupleDataCon )
+import GHC.Builtin.Types.Prim ( voidPrimTy )
 import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Var.Set ( VarSet )
