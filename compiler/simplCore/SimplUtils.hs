@@ -19,7 +19,7 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
-        contIsDupable, contResultType, contHoleType,
+        contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
@@ -60,6 +60,7 @@ import SimplMonad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
+import GHC.Core.Multiplicity
 import VarSet
 import BasicTypes
 import Util
@@ -121,7 +122,8 @@ data SimplCont
       { sc_dup  :: DupFlag      -- See Note [DupFlag invariants]
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
-      , sc_cont :: SimplCont }
+      , sc_cont :: SimplCont
+      , sc_mult :: Mult }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -151,7 +153,8 @@ data SimplCont
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
-      , sc_cont :: SimplCont }
+      , sc_cont :: SimplCont
+      , sc_mult :: Mult }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -310,7 +313,7 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest }
+      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_mult = One }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -409,14 +412,36 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)
+contHoleType (StrictArg  { sc_fun = ai, sc_mult = _m })      = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
-contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
-  = mkVisFunTy (perhapsSubstTy dup se (exprType e))
-               (contHoleType k)
+contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
+                         , sc_mult = m })
+  = mkVisFunTy m (perhapsSubstTy dup se (exprType e))
+                 (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
+
+-- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
+-- x ::(p) _ { … }) (respectively for arguments of functions), the scaling
+-- factor is p. And in E[G[]], the scaling factor is the product of the scaling
+-- factor of E and that of G.
+--
+-- The scaling factor at the hole of E[] is used to determine how a binder
+-- should be scaled if it commutes with E. This appears, in particular, in the
+-- case-of-case transformation.
+contHoleScaling :: SimplCont -> Mult
+contHoleScaling (Stop _ _) = One
+contHoleScaling (CastIt _ k) = contHoleScaling k
+contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k }) =
+  (idMult id) `mkMultMul` contHoleScaling k
+contHoleScaling (StrictArg { sc_mult = w, sc_cont = k }) =
+  w `mkMultMul` contHoleScaling k
+contHoleScaling (Select { sc_bndr = id, sc_cont = k }) =
+  (idMult id) `mkMultMul` contHoleScaling k
+contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
+contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
+contHoleScaling (TickIt _ k) = contHoleScaling k
 -------------------
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions, and other values
@@ -518,7 +543,7 @@ mkArgInfo env fun rules n_val_args call_cont
 
     add_type_str _ [] = []
     add_type_str fun_ty all_strs@(str:strs)
-      | Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (Scaled _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       = (str || Just False == isLiftedType_maybe arg_ty)
         : add_type_str fun_ty' strs
           -- If the type is levity-polymorphic, we can't know whether it's
@@ -1800,7 +1825,7 @@ abstractFloats dflags top_lvl main_tvs floats body
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
                   poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
-                              mkLocalId poly_name poly_ty
+                              mkLocalId poly_name (idMult var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!
@@ -1918,7 +1943,10 @@ prepareAlts scrut case_bndr' alts
            --   Test simpl013 is an example
   = do { us <- getUniquesM
        ; let (idcs1, alts1)       = filterAlts tc tys imposs_cons alts
-             (yes2,  alts2)       = refineDefaultAlt us tc tys idcs1 alts1
+             (yes2,  alts2)       = refineDefaultAlt us (idMult case_bndr') tc tys idcs1 alts1
+               -- the multiplicity on case_bndr's is the multiplicity of the
+               -- case expression The newly introduced patterns in
+               -- refineDefaultAlt must be scaled by this multiplicity
              (yes3, idcs3, alts3) = combineIdenticalAlts idcs1 alts2
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
@@ -2149,7 +2177,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       _               -> True
   , gopt Opt_CaseFolding dflags
   , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
-  = do { bndr' <- newId (fsLit "lwild") (exprType scrut')
+  = do { bndr' <- newId (fsLit "lwild") Many (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives
@@ -2200,7 +2228,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       = -- For non-nullary data cons we must invent some fake binders
         -- See Note [caseRules for dataToTag] in PrelRules
         do { us <- getUniquesM
-           ; let (ex_tvs, arg_ids) = dataConRepInstPat us dc
+           ; let (ex_tvs, arg_ids) = dataConRepInstPat us (idMult new_bndr) dc
                                         (tyConAppArgs (idType new_bndr))
            ; return (ex_tvs ++ arg_ids) }
     mk_new_bndrs _ _ = return []
