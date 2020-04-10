@@ -69,7 +69,7 @@ import GHC.Iface.Load      ( loadUserInterface )
 import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
 import GHC.Tc.Utils.Monad        ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )
-import BinFingerprint      ( fingerprintBinMem )
+import GHC.Iface.Recomp.Binary      ( fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO
