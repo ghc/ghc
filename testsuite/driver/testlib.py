@@ -116,6 +116,12 @@ def expect_fail( name, opts ):
     # future.
     opts.expect = 'fail';
 
+def no_lint( name, opts ):
+   """Disable Core, STG and Cmm lints. Useful when testing compiler perf."""
+   opts.compiler_always_flags = \
+       [opt for opt in opts.compiler_always_flags \
+            if opt not in ['-dcore-lint', '-dstg-lint', '-dcmm-lint']]
+
 def reqlib( lib ):
     return lambda name, opts, l=lib: _reqlib (name, opts, l )
 
