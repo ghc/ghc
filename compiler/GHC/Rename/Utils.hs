@@ -53,7 +53,7 @@ import GHC.Driver.Session
 import FastString
 import Control.Monad
 import Data.List
-import Constants        ( mAX_TUPLE_SIZE )
+import GHC.Settings.Constants ( mAX_TUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 
