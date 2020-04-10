@@ -326,3 +326,4 @@ test('T17966',
      makefile_test, ['T17966'])
 # NB: T17810: -fspecialise-aggressively
 test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
+test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
