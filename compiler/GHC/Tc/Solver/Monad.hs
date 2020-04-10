@@ -246,7 +246,7 @@ Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We prioritise equalities in the solver (see selectWorkItem). But class
 constraints like (a ~ b) and (a ~~ b) are actually equalities too;
-see Note [The equality types story] in TysPrim.
+see Note [The equality types story] in GHC.Builtin.Types.Prim.
 
 Failing to prioritise these is inefficient (more kick-outs etc).
 But, worse, it can prevent us spotting a "recursive knot" among

@@ -240,13 +240,14 @@ import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 
 import GHC.Core.TyCon
-import TysPrim
-import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
+import GHC.Builtin.Types.Prim
+import {-# SOURCE #-} GHC.Builtin.Types
+                                 ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , liftedTypeKindTyCon
                                  , constraintKind )
 import GHC.Types.Name( Name )
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkNomReflCo, mkGReflCo, mkReflCo

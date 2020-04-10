@@ -141,7 +141,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep
    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
-import {-# SOURCE #-} TysWiredIn
+import {-# SOURCE #-} GHC.Builtin.Types
    ( runtimeRepTyCon, constraintKind
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -158,7 +158,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.Coercion.Axiom
-import PrelNames
+import GHC.Builtin.Names
 import Maybes
 import Outputable
 import FastStringEnv

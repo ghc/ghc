@@ -128,7 +128,7 @@ PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 define preprocessCompilerFiles
 # $1 = compiler stage (build system stage + 1)
 compiler/stage$1/build/primops.txt: \
-		compiler/prelude/primops.txt.pp \
+		compiler/GHC/Builtin/primops.txt.pp \
 		$(includes_$(dec$1)_H_CONFIG) \
 		$(includes_$(dec$1)_H_PLATFORM)
 	$$(HS_CPP) -P $$(compiler_CPP_OPTS) \

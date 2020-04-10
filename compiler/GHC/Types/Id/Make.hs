@@ -42,8 +42,8 @@ module GHC.Types.Id.Make (
 
 import GhcPrelude
 
-import TysPrim
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -59,7 +59,7 @@ import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Name.Set
 import GHC.Types.Name
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.ForeignCall
 import GHC.Core.DataCon
 import GHC.Types.Id
@@ -69,7 +69,7 @@ import GHC.Types.Cpr
 import GHC.Core
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
 import Util
 import GHC.Driver.Session

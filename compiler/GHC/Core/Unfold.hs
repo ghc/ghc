@@ -56,12 +56,12 @@ import GHC.Types.Id
 import GHC.Types.Demand ( StrictSig, isBottomingSig )
 import GHC.Core.DataCon
 import GHC.Types.Literal
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
 import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
 import GHC.Core.Type
-import PrelNames
-import TysPrim          ( realWorldStatePrimTy )
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import Bag
 import Util
 import Outputable
