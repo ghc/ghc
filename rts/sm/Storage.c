@@ -948,7 +948,7 @@ accountAllocation(Capability *cap, W_ n)
  *
  * When profiling we zero:
  *  - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned.
- *  - Shrunk array slop, see OVERWRITING_MUTABLE_CLOSURE.
+ *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
  *
  * When performing LDV profiling or using a (single threaded) debug RTS we zero
  * slop even when overwriting immutable closures, see Note [zeroing slop when
