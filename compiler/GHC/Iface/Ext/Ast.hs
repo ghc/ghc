@@ -41,7 +41,6 @@ import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
 import GHC.Core.Type              ( mkVisFunTys, Type )
 import GHC.Core.Predicate
 import TysWiredIn                 ( mkListTy, mkSumTy )
-import GHC.Types.Var              ( Id, Var, setVarName, varName, varType )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType, varUnique )
@@ -802,7 +801,6 @@ instance ( ToHie (Context (Located (IdP (GhcPass a))))
       PatSynBind _ psb ->
         [ toHie $ L span psb -- PatSynBinds only occur at the top level
         ]
-      XHsBindsLR _ -> []
 
 instance ( ToHie (LMatch a body)
          ) => ToHie (MatchGroup a body) where
@@ -841,7 +839,6 @@ instance ( ToHie (Context (Located (IdP a)))
           toBind (PrefixCon args) = PrefixCon $ map (C Use) args
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
-      XPatSynBind _ -> []
 
 instance ( ToHie (MatchGroup a (LHsExpr a))
          ) => ToHie (HsPatSynDir a) where
@@ -958,7 +955,6 @@ instance ( a ~ GhcPass p
         [ toHie $ L ospan wrap
         , toHie $ PS rsp scope pscope $ (L ospan pat :: LPat a)
         ]
-      XPat nec -> noExtCon nec
     where
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
@@ -990,7 +986,6 @@ instance ( ToHie (Located body)
       [ toHie $ listScopes (mkLScope body) guards
       , toHie body
       ]
-    XGRHS _ -> []
 
 instance ( a ~ GhcPass p
          , ToHie (Context (Located (IdP a)))
