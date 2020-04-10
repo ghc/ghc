@@ -246,7 +246,7 @@ import PlatformConstants
 import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
-import {-# SOURCE #-} PrelNames ( mAIN )
+import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
 import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkComponentId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
@@ -457,7 +457,7 @@ data DynFlags = DynFlags {
 
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
-    --   by GHC-API users. See Note [The integer library] in PrelNames
+    --   by GHC-API users. See Note [The integer library] in GHC.Builtin.Names
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
     -- configuration lazily. See Note [LLVM Configuration] in GHC.SysTools.

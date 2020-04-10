@@ -53,9 +53,9 @@ import GHC.Iface.Env
 import Util
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
-import TysPrim
-import PrelNames
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Driver.Session
 import Outputable as Ppr
 import GHC.Char

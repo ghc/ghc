@@ -43,10 +43,10 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
-import PrelNames
-import TysPrim
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
 import GHC.Core.Coercion
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Types.Module
@@ -558,7 +558,7 @@ subsequent transformations could fire.
 Note [Patching magic definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to have access to defined Ids in pure contexts. Usually, we
-simply "wire in" these entities, as we do for types in TysWiredIn and for Ids
+simply "wire in" these entities, as we do for types in GHC.Builtin.Types and for Ids
 in GHC.Types.Id.Make. See Note [Wired-in Ids] in GHC.Types.Id.Make.
 
 However, it is sometimes *much* easier to define entities in Haskell,

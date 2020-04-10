@@ -84,7 +84,7 @@ data Symbol
 -- to @x@.
 --
 type family Any :: k where { }
--- See Note [Any types] in TysWiredIn. Also, for a bit of history on Any see
+-- See Note [Any types] in GHC.Builtin.Types. Also, for a bit of history on Any see
 -- #10886. Note that this must be a *closed* type family: we need to ensure
 -- that this can't reduce to a `data` type for the results discussed in
 -- Note [Any types].
@@ -214,7 +214,7 @@ for them, e.g. to compile the constructor's info table.
 Furthermore the type of MkCoercible cannot be written in Haskell
 (no syntax for ~#R).
 
-So we define them as regular data types in GHC.Types, and do magic in TysWiredIn,
+So we define them as regular data types in GHC.Types, and do magic in GHC.Builtin.Types,
 inside GHC, to change the kind and type.
 -}
 
@@ -227,13 +227,13 @@ inside GHC, to change the kind and type.
 -- homogeneous equality @~@, this is printed as @~@ unless
 -- @-fprint-equality-relations@ is set.
 class a ~~ b
-  -- See also Note [The equality types story] in TysPrim
+  -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | Lifted, homogeneous equality. By lifted, we mean that it
 -- can be bogus (deferred type error). By homogeneous, the two
 -- types @a@ and @b@ must have the same kinds.
 class a ~ b
-  -- See also Note [The equality types story] in TysPrim
+  -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
 --      the compiler can infer that they have the same representation. This class
@@ -283,7 +283,7 @@ class a ~ b
 --
 --      @since 4.7.0.0
 class Coercible (a :: k) (b :: k)
-  -- See also Note [The equality types story] in TysPrim
+  -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 {- *********************************************************************
 *                                                                      *
@@ -409,7 +409,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 
 -- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
 -- Note [RuntimeRep and PrimRep] in RepType.
--- See also Note [Wiring in RuntimeRep] in TysWiredIn
+-- See also Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 
 -- | Length of a SIMD vector type
 data VecCount = Vec2

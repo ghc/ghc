@@ -41,7 +41,7 @@ import GHC.Core.DataCon
 import GHC.Driver.Session ( mAX_PTR_TAG )
 import GHC.Types.ForeignCall
 import GHC.Types.Id
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )

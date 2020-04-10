@@ -47,13 +47,13 @@ import GHC.Core.FVs
 import Digraph
 import GHC.Core.Predicate
 
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Core.TyCon
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
-import TysWiredIn ( typeNatKind, typeSymbolKind )
+import GHC.Builtin.Types ( typeNatKind, typeSymbolKind )
 import GHC.Types.Id
 import GHC.Types.Id.Make(proxyHashId)
 import GHC.Types.Name
