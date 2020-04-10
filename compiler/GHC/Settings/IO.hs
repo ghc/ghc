@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module GHC.SysTools.Settings
+module GHC.Settings.IO
  ( SettingsError (..)
  , initSettings
  ) where
@@ -11,18 +11,16 @@ module GHC.SysTools.Settings
 
 import GhcPrelude
 
-import GHC.Settings
+import GHC.Settings.Platform
+import GHC.Settings.Utils
 
 import Config
 import CliOption
-import FileSettings
 import Fingerprint
 import GHC.Platform
-import GhcNameVersion
 import Outputable
-import Settings
+import GHC.Settings
 import GHC.SysTools.BaseDir
-import ToolSettings
 
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
