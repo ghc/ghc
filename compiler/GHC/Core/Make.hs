@@ -65,14 +65,14 @@ import GHC.Types.Literal
 import GHC.Driver.Types
 import GHC.Platform
 
-import TysWiredIn
-import PrelNames
+import GHC.Builtin.Types
+import GHC.Builtin.Names
 
 import GHC.Hs.Utils      ( mkChunkified, chunkify )
 import GHC.Core.Type
 import GHC.Core.Coercion ( isCoVar )
 import GHC.Core.DataCon  ( DataCon, dataConWorkId )
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -343,7 +343,7 @@ We could do one of two things:
 * Flatten it out, so that
     mkCoreTup [e1] = e1
 
-* Build a one-tuple (see Note [One-tuples] in TysWiredIn)
+* Build a one-tuple (see Note [One-tuples] in GHC.Builtin.Types)
     mkCoreTup1 [e1] = Unit e1
   We use a suffix "1" to indicate this.
 

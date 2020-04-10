@@ -44,7 +44,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Module
 import GHC.Driver.Types ( Warnings(..), plusWarns )
-import PrelNames        ( applicativeClassName, pureAName, thenAName
+import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName

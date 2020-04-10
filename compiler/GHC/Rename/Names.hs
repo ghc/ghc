@@ -43,7 +43,7 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Tc.Utils.Monad
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env

@@ -58,7 +58,7 @@ import GHC.Types.Var
 import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )

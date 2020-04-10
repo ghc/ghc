@@ -7,14 +7,14 @@ Note [The Type-related module hierarchy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   GHC.Core.Class
   GHC.Core.Coercion.Axiom
-  GHC.Core.TyCon      imports GHC.Core.{Class, Coercion.Axiom}
-  GHC.Core.TyCo.Rep   imports GHC.Core.{Class, Coercion.Axiom, TyCon}
-  GHC.Core.TyCo.Ppr   imports GHC.Core.TyCo.Rep
-  GHC.Core.TyCo.FVs   imports GHC.Core.TyCo.Rep
-  GHC.Core.TyCo.Subst imports GHC.Core.TyCo.{Rep, FVs, Ppr}
-  GHC.Core.TyCo.Tidy  imports GHC.Core.TyCo.{Rep, FVs}
-  TysPrim             imports GHC.Core.TyCo.Rep ( including mkTyConTy )
-  GHC.Core.Coercion   imports GHC.Core.Type
+  GHC.Core.TyCon           imports GHC.Core.{Class, Coercion.Axiom}
+  GHC.Core.TyCo.Rep        imports GHC.Core.{Class, Coercion.Axiom, TyCon}
+  GHC.Core.TyCo.Ppr        imports GHC.Core.TyCo.Rep
+  GHC.Core.TyCo.FVs        imports GHC.Core.TyCo.Rep
+  GHC.Core.TyCo.Subst      imports GHC.Core.TyCo.{Rep, FVs, Ppr}
+  GHC.Core.TyCo.Tidy       imports GHC.Core.TyCo.{Rep, FVs}
+  GHC.Builtin.Types.Prim   imports GHC.Core.TyCo.Rep ( including mkTyConTy )
+  GHC.Core.Coercion        imports GHC.Core.Type
 -}
 
 -- We expose the relevant stuff from this module via the Type module
@@ -105,7 +105,7 @@ import Data.IORef ( IORef )   -- for CoercionHole
 
 Despite the fact that DataCon has to be imported via a hi-boot route,
 this module seems the right place for TyThing, because it's needed for
-funTyCon and all the types in TysPrim.
+funTyCon and all the types in GHC.Builtin.Types.Prim.
 
 It is also SOURCE-imported into Name.hs
 
@@ -377,7 +377,7 @@ How does this work?
 
 * We support both homogeneous (~) and heterogeneous (~~)
   equality.  (See Note [The equality types story]
-  in TysPrim for a primer on these equality types.)
+  in GHC.Builtin.Types.Prim for a primer on these equality types.)
 
 * How do we prevent a MkT having an illegal constraint like
   Eq a?  We check for this at use-sites; see GHC.Tc.Gen.HsType.tcTyVar,
@@ -948,7 +948,7 @@ represented by evidence of type p.
 %*                                                                      *
 %************************************************************************
 
-These functions are here so that they can be used by TysPrim,
+These functions are here so that they can be used by GHC.Builtin.Types.Prim,
 which in turn is imported by Type
 -}
 
@@ -1594,7 +1594,7 @@ During typechecking, constraint solving for type classes works by
     which actually binds d7 to the (Num a) evidence
 
 For equality constraints we use a different strategy.  See Note [The
-equality types story] in TysPrim for background on equality constraints.
+equality types story] in GHC.Builtin.Types.Prim for background on equality constraints.
   - For /boxed/ equality constraints, (t1 ~N t2) and (t1 ~R t2), it's just
     like type classes above. (Indeed, boxed equality constraints *are* classes.)
   - But for /unboxed/ equality constraints (t1 ~R# t2) and (t1 ~N# t2)

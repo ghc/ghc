@@ -30,7 +30,7 @@ import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
-import PrelNames ( gHC_ERR )
+import GHC.Builtin.Names ( gHC_ERR )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -59,7 +59,7 @@ import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
 import GHC.Driver.Types        ( ModIface_(..) )
 import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
 
-import PrelInfo (knownKeyNames)
+import GHC.Builtin.Utils (knownKeyNames)
 
 import GHC.Tc.Errors.Hole.FitTypes
 

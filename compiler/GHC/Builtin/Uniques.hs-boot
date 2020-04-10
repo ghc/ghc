@@ -1,11 +1,11 @@
-module KnownUniques where
+module GHC.Builtin.Uniques where
 
 import GhcPrelude
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.Basic
 
--- Needed by TysWiredIn
+-- Needed by GHC.Builtin.Types
 knownUniqueName :: Unique -> Maybe Name
 
 mkSumTyConUnique :: Arity -> Unique

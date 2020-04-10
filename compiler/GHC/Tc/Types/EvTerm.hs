@@ -17,7 +17,7 @@ import GHC.Driver.Session
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Core.Utils
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 
 -- Used with Opt_DeferTypeErrors
