@@ -626,11 +626,15 @@
 #if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
 #define OVERWRITING_CLOSURE_SIZE(c, size) foreign "C" overwritingClosureSize(c "ptr", size)
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
-#define OVERWRITING_CLOSURE_OFS(c, off) foreign "C" overwritingClosureOfs(c "ptr", off)
 #else
 #define OVERWRITING_CLOSURE_SIZE(c, size) /* nothing */
 #define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_OFS(c, off) /* nothing */
+#endif
+
+#if defined(PROFILING)
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) foreign "C" overwritingMutableClosureOfs(c "ptr", off)
+#else
+#define OVERWRITING_MUTABLE_CLOSURE(c, off) /* nothing */
 #endif
 
 // Memory barriers.
