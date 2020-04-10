@@ -79,8 +79,8 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Iface.Load
-import PrelNames
-import TysWiredIn
+import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name.Reader

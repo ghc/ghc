@@ -47,14 +47,14 @@ import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Session
 import GHC.Types.SrcLoc

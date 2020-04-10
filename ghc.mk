@@ -1316,7 +1316,7 @@ $(foreach n,0 1 2, \
         $(eval CLEAN_FILES += $h)))
 CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
-CLEAN_FILES += compiler/prelude/primops.txt
+CLEAN_FILES += compiler/GHC/Builtin/primops.txt
 CLEAN_FILES += $(wildcard compiler/primop*incl)
 
 clean : clean_files clean_libraries

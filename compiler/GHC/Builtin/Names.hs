@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[PrelNames]{Definitions of prelude modules and names}
+\section[GHC.Builtin.Names]{Definitions of prelude modules and names}
 
 
 Nota Bene: all Names defined in here should come from the base package
@@ -63,7 +63,7 @@ This is accomplished through a combination of mechanisms:
 
   2. The knownKeyNames (which consist of the basicKnownKeyNames from
      the module, and those names reachable via the wired-in stuff from
-     TysWiredIn) are used to initialise the "OrigNameCache" in
+     GHC.Builtin.Types) are used to initialise the "OrigNameCache" in
      GHC.Iface.Env.  This initialization ensures that when the type checker
      or renamer (both of which use GHC.Iface.Env) look up an original name
      (i.e. a pair of a Module and an OccName) for a known-key name
@@ -98,7 +98,7 @@ things,
      GHC.Iface.Binary.putName, with that special treatment detected when we read
      back to ensure that we get back to the correct uniques. See Note [Symbol
      table representation of names] in GHC.Iface.Binary and Note [How tuples
-     work] in TysWiredIn.
+     work] in GHC.Builtin.Types.
 
 Most of the infinite families cannot occur in source code, so mechanisms (a) and (b)
 suffice to ensure that they always have the right Unique. In particular,
@@ -145,16 +145,17 @@ Note [Wired-in packages] in GHC.Types.Module. This is done in Packages.findWired
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
-module PrelNames (
-        Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
+module GHC.Builtin.Names
+   ( Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
 
-        -----------------------------------------------------------
-        module PrelNames,       -- A huge bunch of (a) Names,  e.g. intTyConName
-                                --                 (b) Uniques e.g. intTyConKey
-                                --                 (c) Groups of classes and types
-                                --                 (d) miscellaneous things
-                                -- So many that we export them all
-    ) where
+   -----------------------------------------------------------
+   module GHC.Builtin.Names, -- A huge bunch of (a) Names,  e.g. intTyConName
+                             --                 (b) Uniques e.g. intTyConKey
+                             --                 (c) Groups of classes and types
+                             --                 (d) miscellaneous things
+                             -- So many that we export them all
+   )
+where
 
 #include "HsVersions.h"
 
@@ -210,7 +211,7 @@ isUnboundName name = name `hasKey` unboundKey
 
 This section tells what the compiler knows about the association of
 names with uniques.  These ones are the *non* wired-in ones.  The
-wired in ones are defined in TysWiredIn etc.
+wired in ones are defined in GHC.Builtin.Types etc.
 -}
 
 basicKnownKeyNames :: [Name]  -- See Note [Known-key names]
@@ -1648,7 +1649,7 @@ hasFieldClassNameKey = mkPreludeClassUnique 49
 
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES ClassUniques 200-299
+--      GHC.Builtin.Names.TH: USES ClassUniques 200-299
 -----------------------------------------------------
 
 {-
@@ -1895,7 +1896,7 @@ unsafeEqualityTyConKey = mkPreludeTyConUnique 191
 
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES TyConUniques 200-299
+--      GHC.Builtin.Names.TH: USES TyConUniques 200-299
 -----------------------------------------------------
 
 ----------------------- SIMD ------------------------
@@ -2025,7 +2026,7 @@ vecRepDataConKey                        = mkPreludeDataConUnique 71
 tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
 
--- See Note [Wiring in RuntimeRep] in TysWiredIn
+-- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
@@ -2036,12 +2037,12 @@ unliftedRepDataConKeys = vecRepDataConKey :
                          sumRepDataConKey :
                          unliftedSimpleRepDataConKeys
 
--- See Note [Wiring in RuntimeRep] in TysWiredIn
+-- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 -- VecCount
 vecCountDataConKeys :: [Unique]
 vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
 
--- See Note [Wiring in RuntimeRep] in TysWiredIn
+-- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 -- VecElem
 vecElemDataConKeys :: [Unique]
 vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
@@ -2068,7 +2069,7 @@ unsafeReflDataConKey :: Unique
 unsafeReflDataConKey      = mkPreludeDataConUnique 114
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES DataUniques 200-250
+--      GHC.Builtin.Names.TH: USES DataUniques 200-250
 -----------------------------------------------------
 
 
@@ -2319,7 +2320,7 @@ proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES IdUniques 200-499
+--      GHC.Builtin.Names.TH: USES IdUniques 200-499
 -----------------------------------------------------
 
 -- Used to make `Typeable` dictionaries

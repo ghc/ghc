@@ -115,7 +115,7 @@ import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
-import TysWiredIn ( unitTy )
+import GHC.Builtin.Types ( unitTy )
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
 import GHC.Core.ConLike

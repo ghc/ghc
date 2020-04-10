@@ -190,8 +190,8 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
-import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
-import TysWiredIn
+import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
+import GHC.Builtin.Types
 import GHC.Driver.Packages hiding  ( Version(..) )
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
@@ -1561,7 +1561,7 @@ as if they were defined in modules
    ...etc...
 with each bunch of declarations using a new module, all sharing a
 common package 'interactive' (see Module.interactiveUnitId, and
-PrelNames.mkInteractiveModule).
+GHC.Builtin.Names.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
 

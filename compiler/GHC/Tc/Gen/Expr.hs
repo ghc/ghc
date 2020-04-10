@@ -36,7 +36,7 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
-import THNames( liftStringName, liftName )
+import GHC.Builtin.Names.TH( liftStringName, liftName )
 
 import GHC.Hs
 import GHC.Tc.Types.Constraint ( HoleSort(..) )
@@ -77,10 +77,10 @@ import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
-import TysWiredIn
-import TysPrim( intPrimTy )
-import PrimOp( tagToEnumKey )
-import PrelNames
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim( intPrimTy )
+import GHC.Builtin.PrimOps( tagToEnumKey )
+import GHC.Builtin.Names
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import Util
@@ -2013,14 +2013,14 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                -- just going to flag an error for now
 
         ; lift <- if isStringTy id_ty then
-                     do { sid <- tcLookupId THNames.liftStringName
+                     do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
                                      -- See Note [Lifting strings]
                         ; return (HsVar noExtField (noLoc sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
                      newMethodFromName (OccurrenceOf id_name)
-                                       THNames.liftName
+                                       GHC.Builtin.Names.TH.liftName
                                        [getRuntimeRep id_ty, id_ty]
 
                    -- Update the pending splices

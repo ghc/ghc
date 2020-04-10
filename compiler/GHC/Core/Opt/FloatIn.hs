@@ -407,7 +407,7 @@ floating in cases with a single alternative that may bind values.
 
 But there are wrinkles
 
-* Which unlifted cases do we float? See PrimOp.hs
+* Which unlifted cases do we float? See GHC.Builtin.PrimOps
   Note [PrimOp can_fail and has_side_effects] which explains:
    - We can float-in can_fail primops, but we can't float them out.
    - But we can float a has_side_effects primop, but NOT inside a lambda,

@@ -319,7 +319,7 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 #endif
 
 // AtomicReadByteArrayOp_Int
-// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// Implies a full memory barrier (see compiler/GHC/Builtin/primops.txt.pp)
 // __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
 // of code) and synchronizes with acquire loads and release stores in
 // all threads.
@@ -375,7 +375,7 @@ hs_atomicread64(StgWord x)
 #endif
 
 // AtomicWriteByteArrayOp_Int
-// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// Implies a full memory barrier (see compiler/GHC/Builtin/primops.txt.pp)
 // __ATOMIC_SEQ_CST: Full barrier (see hs_atomicread8 above).
 
 extern void hs_atomicwrite8(StgWord x, StgWord val);
