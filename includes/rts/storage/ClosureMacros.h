@@ -501,11 +501,6 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
    Additionally:
 
-#if defined(PROFILING)
-#define ZERO_SLOP_FOR_LDV_PROF 1
-#else
-#define ZERO_SLOP_FOR_LDV_PROF 0
-#endif
     - LDV profiling and +RTS -N2 are incompatible,
 
     - full-heap sanity checks are disabled for the THREADED RTS, at least when
@@ -514,39 +509,50 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
    -------------------------------------------------------------------------- */
 
-#if defined(DEBUG) && !defined(THREADED_RTS)
-#define ZERO_SLOP_FOR_SANITY_CHECK 1
+#if defined(PROFILING) || defined(DEBUG)
+#define OVERWRITING_CLOSURE(c) \
+    overwritingClosure(c)
+#define OVERWRITING_CLOSURE_OFS(c, off) \
+    overwritingClosureOfs(c, off)
 #else
-#define ZERO_SLOP_FOR_SANITY_CHECK 0
-#endif
-
-#if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
-#define OVERWRITING_CLOSURE(c) overwritingClosure(c)
-#define OVERWRITING_CLOSURE_OFS(c,n) overwritingClosureOfs(c,n)
-#else
-#define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
+#define OVERWRITING_CLOSURE(c) \
+    do { (void) c; } while(0)
+#define OVERWRITING_CLOSURE_OFS(c, off) \
+    do { (void) c; (void) n; } while(0)
 #endif
 
 #if defined(PROFILING)
 void LDV_recordDead (const StgClosure *c, uint32_t size);
 #endif
 
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
-                                        uint32_t offset /* in words */,
-                                        uint32_t size /* closure size, in words */,
-                                        bool prim /* Whether to call LDV_recordDead */
-                                        );
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
+EXTERN_INLINE void
+overwritingClosure_ (
+    StgClosure *p,
+    uint32_t offset, /*< offset to start zeroing at, in words */
+    uint32_t size,   /*< total closure size, in words */
+    bool prim        /*< whether to call LDV_recordDead */
+    );
+
+EXTERN_INLINE void
+overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size,
+                     bool prim USED_IF_PROFILING)
 {
-#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop when overwriting closures], also #8402
-    if (era <= 0) return;
+
+#if defined(THREADED_RTS)
+    if(RtsFlags.ParFlags.nCapabilities >= 2)
+        return;
+#endif
+
+#if defined(PROFILING)
+    if (era <= 0 && !RtsFlags.DebugFlags.sanity)
+        return;
 #endif
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    if (!prim) { LDV_recordDead(p, size); };
+    if (!prim)
+        LDV_recordDead(p, size);
 #endif
 
     for (uint32_t i = offset; i < size; i++) {
