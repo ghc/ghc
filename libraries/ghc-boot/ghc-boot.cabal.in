@@ -45,7 +45,8 @@ Library
             GHC.HandleEncoding
             GHC.Platform
             GHC.Platform.Host
-            GHC.Settings
+            GHC.Settings.Platform
+            GHC.Settings.Utils
             GHC.UniqueSubdir
             GHC.Version
 

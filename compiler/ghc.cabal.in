@@ -254,8 +254,6 @@ Library
         GHC.Cmm.LayoutStack
         CliOption
         EnumSet
-        GhcNameVersion
-        FileSettings
         GHC.Cmm.Graph
         GHC.CmmToAsm.Ppr
         GHC.CmmToAsm.Config
@@ -356,7 +354,7 @@ Library
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         Config
-        Constants
+        GHC.Settings.Constants
         GHC.Driver.MakeFile
         GHC.Driver.Phases
         GHC.Driver.Pipeline.Monad
@@ -377,11 +375,10 @@ Library
         GHC.Runtime.Loader
         UnitInfo
         GHC.Driver.Packages
-        PlatformConstants
         GHC.Driver.Plugins
         GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing
-        Settings
+        GHC.Settings
         StaticPtrTable
         GHC.SysTools
         GHC.SysTools.BaseDir
@@ -390,7 +387,7 @@ Library
         GHC.SysTools.Info
         GHC.SysTools.Process
         GHC.SysTools.Tasks
-        GHC.SysTools.Settings
+        GHC.Settings.IO
         GHC.SysTools.Elf
         GHC.Iface.Tidy
         GHC.Parser.CharClass
@@ -405,7 +402,6 @@ Library
         GHC.Builtin.Names
         GHC.Core.Opt.ConstantFold
         GHC.Builtin.PrimOps
-        ToolSettings
         GHC.Builtin.Types.Prim
         GHC.Builtin.Types
         GHC.Types.CostCentre
