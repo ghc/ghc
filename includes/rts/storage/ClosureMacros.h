@@ -564,16 +564,17 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    // Set prim = true because overwritingClosureOfs is only
-    // ever called by
-    //   shrinkMutableByteArray# (ARR_WORDS)
-    //   shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
-    // This causes LDV_recordDead to be invoked. We want this
-    // to happen because the implementations of the above
-    // primops both call LDV_RECORD_CREATE after calling this,
-    // effectively replacing the LDV closure biography.
-    // See Note [LDV Profiling when Shrinking Arrays]
-    overwritingClosure_(p, offset, closure_sizeW(p), true);
+    // Since overwritingClosureOfs is only ever called by:
+    //
+    //   - shrinkMutableByteArray# (ARR_WORDS) and
+    //
+    //   - shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
+    //
+    // we set prim = false, which causes LDV_recordDead to be invoked below. We
+    // want this to happen because the implementations of the above primops both
+    // call LDV_RECORD_CREATE after calling this function, effectively replacing
+    // the LDV closure biography. See Note [LDV profiling when resizing arrays]
+    overwritingClosure_(p, offset, closure_sizeW(p), false);
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
