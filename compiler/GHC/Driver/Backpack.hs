@@ -47,7 +47,7 @@ import GHC.Parser.Header
 import GHC.Iface.Recomp
 import GHC.Driver.Make
 import GHC.Types.Unique.DSet
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Finder
 import Util

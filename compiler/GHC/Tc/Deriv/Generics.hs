@@ -36,9 +36,9 @@ import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
-import TysPrim
-import TysWiredIn
-import PrelNames
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
+import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Driver.Types

@@ -116,7 +116,7 @@ import GHC.IfaceToCore  ( typecheckIface )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 import GHC.Types.Name.Cache ( initNameCache )
-import PrelInfo
+import GHC.Builtin.Utils
 import GHC.Core.Opt.Driver
 import GHC.HsToCore
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
@@ -144,7 +144,7 @@ import GHC.Core.FamInstEnv
 import Fingerprint      ( Fingerprint )
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Env
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
 

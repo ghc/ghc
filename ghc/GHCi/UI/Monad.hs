@@ -47,7 +47,7 @@ import GHC.Driver.Types
 import GHC.Types.SrcLoc
 import GHC.Types.Module
 import GHC.Types.Name.Reader as RdrName (mkOrig)
-import PrelNames (gHC_GHCI_HELPERS)
+import GHC.Builtin.Names (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)

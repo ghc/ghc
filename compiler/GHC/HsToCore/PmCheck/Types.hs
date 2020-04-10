@@ -61,9 +61,9 @@ import GHC.Types.Literal
 import GHC.Core
 import GHC.Core.Map
 import GHC.Core.Utils (exprType)
-import PrelNames
-import TysWiredIn
-import TysPrim
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Tc.Utils.TcType (evVarPred)
 
 import Numeric (fromRat)

@@ -35,7 +35,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
-import TysWiredIn       ( unboxedUnitDataCon, unitDataConId )
+import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )
 import GHC.Types.Literal
 import Outputable
 import MonadUtils
@@ -44,10 +44,10 @@ import Util
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.ForeignCall
-import GHC.Types.Demand ( isUsedOnce )
-import PrimOp           ( PrimCall(..), primOpWrapperId )
-import GHC.Types.SrcLoc ( mkGeneralSrcSpan )
-import PrelNames        ( unsafeEqualityProofName )
+import GHC.Types.Demand    ( isUsedOnce )
+import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
+import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
+import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -539,7 +539,7 @@ coreToStgApp f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
+                -- As described in Note [Primop wrappers] in GHC.Builtin.PrimOps, here we
                 -- turn unsaturated primop applications into applications of
                 -- the primop's wrapper.
                 PrimOpId op

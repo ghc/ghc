@@ -47,7 +47,7 @@ import Util
 import Outputable
 import FastString
 import GHC.Core.Type
-import TysWiredIn (mkTupleStr)
+import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
@@ -853,7 +853,7 @@ various phases and why.
 Parsing
 -------
 An empty list is parsed by the sysdcon nonterminal. It thus comes to life via
-HsVar nilDataCon (defined in TysWiredIn). A freshly-parsed (HsExpr GhcPs) empty list
+HsVar nilDataCon (defined in GHC.Builtin.Types). A freshly-parsed (HsExpr GhcPs) empty list
 is never a ExplicitList.
 
 Renaming
