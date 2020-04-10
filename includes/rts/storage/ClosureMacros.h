@@ -526,12 +526,15 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 void LDV_recordDead (const StgClosure *c, uint32_t size);
 #endif
 
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
-                                        uint32_t offset /* in words */,
-                                        uint32_t size /* closure size, in words */,
-                                        bool prim /* Whether to call LDV_recordDead */
-                                        );
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
+EXTERN_INLINE void
+overwritingClosure_ (
+    StgClosure *p,
+    uint32_t offset, /*< offset to start zeroing at, in words */
+    uint32_t size    /*< total closure size, in words */
+    );
+
+EXTERN_INLINE void
+overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size)
 {
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop], also #8402
@@ -540,7 +543,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    if (!prim) { LDV_recordDead(p, size); };
+    LDV_recordDead(p, size);
 #endif
 
     for (uint32_t i = offset; i < size; i++) {
@@ -551,7 +554,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
-    overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p), false);
+    overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p));
 }
 
 // Version of 'overwritingClosure' which overwrites only a suffix of a
@@ -564,22 +567,12 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    // Since overwritingClosureOfs is only ever called by:
-    //
-    //   - shrinkMutableByteArray# (ARR_WORDS) and
-    //
-    //   - shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
-    //
-    // we set prim = false, which causes LDV_recordDead to be invoked below. We
-    // want this to happen because the implementations of the above primops both
-    // call LDV_RECORD_CREATE after calling this function, effectively replacing
-    // the LDV closure biography. See Note [LDV profiling when resizing arrays]
-    overwritingClosure_(p, offset, closure_sizeW(p), false);
+    overwritingClosure_(p, offset, closure_sizeW(p));
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
-    overwritingClosure_(p, sizeofW(StgThunkHeader), size, false);
+    overwritingClosure_(p, sizeofW(StgThunkHeader), size);
 }
