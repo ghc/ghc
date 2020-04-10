@@ -162,8 +162,6 @@ Library
         .
         iface
         main
-        prelude
-        typecheck
         utils
 
     -- we use an explicit Prelude
@@ -404,14 +402,14 @@ Library
         GHC.Parser.PostProcess.Haddock
         GHC.Parser.Annotation
         GHC.Types.ForeignCall
-        KnownUniques
-        PrelInfo
-        PrelNames
+        GHC.Builtin.Uniques
+        GHC.Builtin.Utils
+        GHC.Builtin.Names
         GHC.Core.Opt.ConstantFold
-        PrimOp
+        GHC.Builtin.PrimOps
         ToolSettings
-        TysPrim
-        TysWiredIn
+        GHC.Builtin.Types.Prim
+        GHC.Builtin.Types
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
         GHC.Rename.Bind
@@ -512,12 +510,12 @@ Library
         GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Flatten
         GHC.Tc.Solver.Monad
-        TcTypeNats
+        GHC.Builtin.Types.Literals
         GHC.Tc.Gen.Splice
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.HsToCore.Quote
-        THNames
+        GHC.Builtin.Names.TH
         GHC.Core.FamInstEnv
         GHC.Tc.Instance.FunDeps
         GHC.Core.InstEnv

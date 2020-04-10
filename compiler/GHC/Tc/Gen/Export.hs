@@ -10,7 +10,7 @@ module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 import GhcPrelude
 
 import GHC.Hs
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env

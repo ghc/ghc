@@ -30,7 +30,7 @@ import GHC.Tc.Gen.Sig( emptyPragEnv, completeSigFromId )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Core.PatSyn
@@ -47,7 +47,7 @@ import GHC.Types.Basic
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Unify
 import GHC.Core.Predicate
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin

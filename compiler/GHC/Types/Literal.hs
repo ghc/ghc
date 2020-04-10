@@ -52,8 +52,8 @@ module GHC.Types.Literal
 
 import GhcPrelude
 
-import TysPrim
-import PrelNames
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
 import Outputable

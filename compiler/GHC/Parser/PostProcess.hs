@@ -115,12 +115,12 @@ import GHC.Types.Basic
 import GHC.Parser.Lexer
 import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Core.Type    ( TyThing(..), funTyCon )
-import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
+import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
                           tupleTyConName, cTupleTyConNameArity_maybe )
 import GHC.Types.ForeignCall
-import PrelNames        ( allNameStrings )
+import GHC.Builtin.Names ( allNameStrings )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import OrdList          ( OrdList, fromOL )

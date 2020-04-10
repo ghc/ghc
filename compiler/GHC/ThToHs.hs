@@ -27,7 +27,7 @@ where
 import GhcPrelude
 
 import GHC.Hs as Hs
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name
 import GHC.Types.Module
@@ -36,7 +36,7 @@ import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
 import GHC.Core.Type
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Basic as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique

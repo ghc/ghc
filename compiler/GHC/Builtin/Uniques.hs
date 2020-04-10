@@ -7,7 +7,7 @@
 -- names] for details.
 --
 
-module KnownUniques
+module GHC.Builtin.Uniques
     ( -- * Looking up known-key names
       knownUniqueName
 
@@ -28,7 +28,7 @@ module KnownUniques
 
 import GhcPrelude
 
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Types.Id
