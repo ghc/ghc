@@ -15,7 +15,7 @@ module GHC.Iface.Ext.Binary
    )
 where
 
-import GHC.Settings               ( maybeRead )
+import GHC.Settings.Utils         ( maybeRead )
 
 import Config                     ( cProjectVersion )
 import GhcPrelude

@@ -60,7 +60,7 @@ import Outputable
 import FastString
 import GHC.Types.Basic
 import Binary
-import Constants
+import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
 import Util

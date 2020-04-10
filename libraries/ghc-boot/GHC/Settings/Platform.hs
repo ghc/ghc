@@ -11,14 +11,14 @@
 --
 -- The  "0" suffix is because the caller will partially apply it, and that will
 -- in turn be used a few more times.
-module GHC.Settings where
+module GHC.Settings.Platform where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 
 import GHC.BaseDir
 import GHC.Platform
+import GHC.Settings.Utils
 
-import Data.Char (isSpace)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -93,16 +93,3 @@ readSetting0 settingsFile mySettings key = case Map.lookup key mySettings of
     Just v -> Right v
     Nothing -> Left $ "Failed to read " ++ show key ++ " value " ++ show xs
   Nothing -> Left $ "No entry for " ++ show key ++ " in " ++ show settingsFile
-
------------------------------------------------------------------------------
--- read helpers
-
-maybeRead :: Read a => String -> Maybe a
-maybeRead str = case reads str of
-  [(x, "")] -> Just x
-  _ -> Nothing
-
-maybeReadFuzzy :: Read a => String -> Maybe a
-maybeReadFuzzy str = case reads str of
-  [(x, s)] | all isSpace s -> Just x
-  _ -> Nothing

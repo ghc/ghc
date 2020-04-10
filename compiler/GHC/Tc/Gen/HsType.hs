@@ -103,7 +103,7 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import Constants ( mAX_CTUPLE_SIZE )
+import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
 import ErrUtils( MsgDoc )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set

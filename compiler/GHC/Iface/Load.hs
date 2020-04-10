@@ -49,7 +49,7 @@ import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Tc.Utils.Monad
 
 import Binary   ( BinData(..) )
-import Constants
+import GHC.Settings.Constants
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
 import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
