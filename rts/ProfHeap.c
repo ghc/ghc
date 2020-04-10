@@ -668,10 +668,9 @@ strMatchesSelector( const char* str, const char* sel )
  * testing against all the specified constraints.
  * -------------------------------------------------------------------------- */
 static bool
-closureSatisfiesConstraints( const StgClosure* p )
+closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING )
 {
 #if !defined(PROFILING)
-    (void)p;   /* keep gcc -Wall happy */
     return true;
 #else
    bool b;
@@ -683,7 +682,7 @@ closureSatisfiesConstraints( const StgClosure* p )
        return false;
    }
 
-   if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
+   if (RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
        return false;
    }
 
@@ -990,12 +989,9 @@ heapInsertNewCounter(Census *census, const void *identity)
     return ctr;
 }
 
-static void heapProfObject(Census *census, StgClosure *p, size_t size,
-                           bool prim
-#if !defined(PROFILING)
-                           STG_UNUSED
-#endif
-                           )
+static void
+heapProfObject(Census *census, StgClosure *p, size_t size,
+               bool prim USED_IF_PROFILING)
 {
     size_t real_size;
     counter *ctr;
