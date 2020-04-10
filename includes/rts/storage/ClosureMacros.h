@@ -510,24 +510,16 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING)
-#define ZERO_SLOP_FOR_LDV_PROF 1
+#if defined(PROFILING) || defined(DEBUG)
+#define OVERWRITING_CLOSURE(c) \
+    overwritingClosure(c)
+#define OVERWRITING_CLOSURE_OFS(c, off) \
+    overwritingClosureOfs(c, off)
 #else
-#define ZERO_SLOP_FOR_LDV_PROF 0
-#endif
-
-#if defined(DEBUG) && !defined(THREADED_RTS)
-#define ZERO_SLOP_FOR_SANITY_CHECK 1
-#else
-#define ZERO_SLOP_FOR_SANITY_CHECK 0
-#endif
-
-#if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
-#define OVERWRITING_CLOSURE(c) overwritingClosure(c)
-#define OVERWRITING_CLOSURE_OFS(c,n) overwritingClosureOfs(c,n)
-#else
-#define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
+#define OVERWRITING_CLOSURE(c) \
+    do { (void) c; } while(0)
+#define OVERWRITING_CLOSURE_OFS(c, off) \
+    do { (void) c; (void) n; } while(0)
 #endif
 
 #if defined(PROFILING)
@@ -535,21 +527,34 @@ void LDV_recordDead (const StgClosure *c, uint32_t size);
 RTS_PRIVATE bool isInherentlyUsed ( StgHalfWord closure_type );
 #endif
 
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
-                                        uint32_t offset /* in words */,
-                                        uint32_t size /* closure size, in words */,
-                                        bool inherently_used USED_IF_PROFILING
-                                        );
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool inherently_used USED_IF_PROFILING)
+EXTERN_INLINE void
+overwritingClosure_ (
+    StgClosure *p,
+    uint32_t offset, /*< offset to start zeroing at, in words */
+    uint32_t size,   /*< total closure size, in words */
+    bool inherently_used /*< whether to call LDV_recordDead */
+    );
+
+EXTERN_INLINE void
+overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size,
+                     bool inherently_used USED_IF_PROFILING)
 {
-#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop when overwriting closures], also #8402
-    if (era <= 0) return;
+
+#if defined(THREADED_RTS)
+    if(RTS_DEREF(RtsFlags).ParFlags.nCapabilities >= 2)
+        return;
+#endif
+
+#if defined(PROFILING)
+    if (era <= 0 && !RTS_DEREF(RtsFlags).DebugFlags.sanity)
+        return;
 #endif
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    if (!inherently_used) { LDV_recordDead(p, size); };
+    if (!inherently_used)
+        LDV_recordDead(p, size);
 #endif
 
     for (uint32_t i = offset; i < size; i++) {
