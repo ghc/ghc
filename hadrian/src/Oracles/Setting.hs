@@ -11,6 +11,7 @@ module Oracles.Setting (
 
     -- ** Target platform things
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
+    isElfTarget,
     ArmVersion(..),
     targetArmVersion,
     ghcWithInterpreter, useLibFFIForAdjustors
@@ -230,6 +231,13 @@ anyTargetArch = matchSetting TargetArch
 -- | Check whether the host OS setting matches one of the given strings.
 anyHostOs :: [String] -> Action Bool
 anyHostOs = matchSetting HostOs
+
+-- | Check whether the target OS uses the ELF object format.
+isElfTarget :: Action Bool
+isElfTarget = anyTargetOs
+    [ "linux", "freebsd", "dragonfly", "openbsd", "netbsd", "solaris2", "kfreebsdgnu"
+    , "haiku", "linux-android"
+    ]
 
 -- | Check whether the host OS supports the @-rpath@ linker option when
 -- using dynamic linking.
