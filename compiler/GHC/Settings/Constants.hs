@@ -1,10 +1,5 @@
-{-
-(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-
-\section[Constants]{Info about this compilation}
--}
-
-module Constants (module Constants) where
+-- | Compile-time settings
+module GHC.Settings.Constants where
 
 import GhcPrelude
 
