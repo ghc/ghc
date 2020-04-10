@@ -77,3 +77,67 @@ instance Category Coercion where
 -- | Left-to-right composition
 (>>>) :: Category cat => cat a b -> cat b c -> cat a c
 f >>> g = g . f
+{-# INLINE (>>>) #-} -- see Note [INLINE on >>>]
+
+{- Note [INLINE on >>>]
+~~~~~~~~~~~~~~~~~~~~~~~
+It’s crucial that we include an INLINE pragma on >>>, which may be
+surprising. After all, its unfolding is tiny, so GHC will be extremely
+keen to inline it even without the pragma. Indeed, it is actually
+/too/ keen: unintuitively, the pragma is needed to rein in inlining,
+not to encourage it.
+
+How is that possible? The difference lies entirely in whether GHC will
+inline unsaturated calls. With no pragma at all, we get the following
+unfolding guidance:
+    ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)
+But with the pragma, we restrict inlining to saturated calls:
+    ALWAYS_IF(arity=3,unsat_ok=False,boring_ok=True)
+Why does this matter? Because the programmer may have put an INLINE
+pragma on (.):
+
+    instance Functor f => Category (Blah f) where
+      id = ...
+      Blah f . Blah g = buildBlah (\x -> ...)
+      {-# INLINE (.) #-}
+
+The intent here is to inline (.) at all saturated call sites. Perhaps
+there is a RULE on buildBlah the programmer wants to fire, or maybe
+they just expect the inlining to expose further simplifications.
+Either way, code that uses >>> should not defeat this inlining, but if
+we inline unsaturated calls, it might! Consider:
+
+    let comp = (>>>) ($fCategoryBlah $dFunctor) in f `comp` (g `comp` h)
+
+While simplifying this expression, we’ll start with the RHS of comp.
+Without the INLINE pragma on >>>, we’ll inline it immediately, even
+though it isn’t saturated:
+
+    let comp = \f g -> $fCategoryBlah_$c. $dFunctor g f
+     in f `comp` (g `comp` h)
+
+Now `$fCategoryBlah_$c. $dFunctor g f` /is/ a fully-saturated call, so
+it will get inlined immediately, too:
+
+    let comp = \(Blah g) (Blah f) -> buildBlah (\x -> ...)
+     in f `comp` (g `comp` h)
+
+All okay so far. But if the RHS of (.) is large, comp won’t be inlined
+at its use sites, and any RULEs on `buildBlah` will never fire. Bad!
+
+What happens differently with the INLINE pragma on >>>? Well, we won’t
+inline >>> immediately, since it isn’t saturated, which means comp’s
+unfolding will be tiny. GHC will inline it at both use sites:
+
+    (>>>) ($fCategoryBlah $dFunctor) f
+          ((>>>) ($fCategoryBlah $dFunctor) g h)
+
+And now the calls to >>> are saturated, so they’ll be inlined,
+followed by (.), and any RULEs can fire as desired. Problem solved.
+
+This situation might seem academic --- who would ever write a
+definition like comp? Probably nobody, but GHC generates such
+definitions when desugaring proc notation, which causes real problems
+(see #18013). That could be fixed by changing the proc desugaring, but
+fixing it this way is the Right Thing, it might benefit other programs
+in more subtle ways too, and it’s easier to boot. -}
