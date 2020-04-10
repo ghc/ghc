@@ -907,6 +907,53 @@ accountAllocation(Capability *cap, W_ n)
 
 }
 
+/* Note [slop on the heap]
+ *
+ * We use the term "slop" to refer to allocated memory on the heap which isn't
+ * occupied by any closure. Usually closures are packet tightly into the heap
+ * blocks, storage for one immediately following another. However there are
+ * situations where slop is left behind:
+ *
+ * - Allocating large objects (BF_LARGE)
+ *
+ *   These are given an entire block, but if they don't fill the entire block
+ *   the rest is slop. See allocateMightFail in Storage.c.
+ *
+ * - Allocating pinned objects with alignment (BF_PINNED)
+ *
+ *   These are packet into blocks like normal closures, however they
+ *   can have alignment constraints and any memory that needed to be skipped for
+ *   alignment becomes slop. See allocatePinned in Storage.c.
+ *
+ * - Shrinking (Small)Mutable(Byte)Array#
+ *
+ *    The size of these closures can be decreased after allocation, leaving any,
+ *    now unused memory, behind as slop. See stg_resizzeMutableByteArrayzh,
+ *    stg_shrinkSmallMutableArrayzh, and stg_shrinkMutableByteArrayzh in
+ *    PrimOps.cmm.
+ *
+ *    This type of slop is extra tricky because it can also be pinned and
+ *    large.
+ *
+ * - Overwriting closures
+ *
+ *   During GC the RTS overwrites closures with forwarding pointers, this can
+ *   leave slop behind depending on the size of the closure being
+ *   overwritten. See Note [zeroing slop when overwriting closures].
+ *
+ * Under various ways we actually zero slop so we can linearly scan over blocks
+ * of closures. This trick is used by the sanity checking code and the heap
+ * profiler, see Note [skipping slop in the heap profiler].
+ *
+ * When profiling we zero:
+ *  - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned.
+ *  - Shrunk array slop, see OVERWRITING_MUTABLE_CLOSURE.
+ *
+ * When performing LDV profiling or using a (single threaded) debug RTS we zero
+ * slop even when overwriting immutable closures, see Note [zeroing slop when
+ * overwriting closures].
+ */
+
 /* -----------------------------------------------------------------------------
    StgPtr allocate (Capability *cap, W_ n)
 
@@ -1069,6 +1116,8 @@ allocateMightFail (Capability *cap, W_ n)
 /**
  * When profiling we zero the space used for alignment. This allows us to
  * traverse pinned blocks in the heap profiler.
+ *
+ * See Note [skipping slop in the heap profiler]
  */
 #if defined(PROFILING)
 #define MEMSET_IF_PROFILING_W(p, val, len) memset(p, val, (len) * sizeof(W_))

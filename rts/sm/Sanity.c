@@ -475,7 +475,7 @@ void checkHeapChain (bdescr *bd)
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
 
-                /* skip over slop */
+                /* skip over slop, see Note [slop on the heap] */
                 while (p < bd->free &&
                        (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
             }
@@ -796,12 +796,16 @@ static void checkGeneration (generation *gen,
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
 #if defined(THREADED_RTS)
-    // heap sanity checking doesn't work with SMP for two reasons:
-    //   * we can't zero the slop (see Updates.h).  However, we can sanity-check
-    //     the heap after a major gc, because there is no slop.
+    // Note [heap sanity checking with SMP]
     //
-    //   * the nonmoving collector may be mutating its large object lists, unless we
-    //     were in fact called by the nonmoving collector.
+    // heap sanity checking doesn't work with SMP for two reasons:
+    //
+    //   * We can't zero the slop. However, we can sanity-check the heap after a
+    //     major gc, because there is no slop. See also Updates.h and Note
+    //     [zeroing slop when overwriting closures].
+    //
+    //   * The nonmoving collector may be mutating its large object lists,
+    //     unless we were in fact called by the nonmoving collector.
     if (!after_major_gc) return;
 #endif
 

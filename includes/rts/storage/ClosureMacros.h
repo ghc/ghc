@@ -474,31 +474,38 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    OVERWRITING_CLOSURE(p) on the old closure that is about to be
    overwritten.
 
-   Note [zeroing slop]
+   Note [zeroing slop when overwriting closures]
 
-   In some scenarios we write zero words into "slop"; memory that is
-   left unoccupied after we overwrite a closure in the heap with a
-   smaller closure.
+   When we overwrite a closure in the heap with a smaller one, in some scenarios
+   we need to write zero words into "slop"; the memory that is left
+   unoccupied. See Note [slop on the heap]
 
    Zeroing slop is required for:
 
-    - full-heap sanity checks (DEBUG, and +RTS -DS)
-    - LDV profiling (PROFILING, and +RTS -hb)
+    - full-heap sanity checks (DEBUG, and +RTS -DS),
 
-   Zeroing slop must be disabled for:
+    - LDV profiling (PROFILING, and +RTS -hb) and
 
-    - THREADED_RTS with +RTS -N2 and greater, because we cannot
-      overwrite slop when another thread might be reading it.
+   However we can get into trouble if we're zeroing slop for ordinarily
+   immutable closures when using multiple threads, since there is nothing
+   preventing another thread from still being in the process of reading the
+   memory we're about to zero.
 
-   Hence, slop is zeroed when either:
+   Thus, with the THREADED RTS and +RTS -N2 or greater we must not zero
+   immutable closure's slop.
 
-    - PROFILING && era <= 0 (LDV is on)
-    - !THREADED_RTS && DEBUG
+   Hence, an immutable closure's slop is zeroed when either:
 
-   And additionally:
+    - PROFILING && era > 0 (LDV is on) or
+    - !THREADED && DEBUG
 
-    - LDV profiling and +RTS -N2 are incompatible
-    - full-heap sanity checks are disabled for THREADED_RTS
+   Additionally:
+
+    - LDV profiling and +RTS -N2 are incompatible,
+
+    - full-heap sanity checks are disabled for the THREADED RTS, at least when
+      they don't run right after GC when there is no slop.
+      See Note [heap sanity checking with SMP].
 
    -------------------------------------------------------------------------- */
 
@@ -534,7 +541,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
 EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
 {
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
-    // see Note [zeroing slop], also #8402
+    // see Note [zeroing slop when overwriting closures], also #8402
     if (era <= 0) return;
 #endif
 
