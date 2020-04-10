@@ -98,7 +98,7 @@ templateHaskellNames = [
     -- Type
     forallTName, forallVisTName, varTName, conTName, infixTName, appTName,
     appKindTName, equalityTName, tupleTName, unboxedTupleTName,
-    unboxedSumTName, arrowTName, listTName, sigTName, litTName,
+    unboxedSumTName, arrowTName, mulArrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName,
     -- TyLit
@@ -435,8 +435,8 @@ recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
 forallTName, forallVisTName, varTName, conTName, infixTName, tupleTName,
-    unboxedTupleTName, unboxedSumTName, arrowTName, listTName, appTName,
-    appKindTName, sigTName, equalityTName, litTName, promotedTName,
+    unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
+    appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
@@ -447,6 +447,7 @@ tupleTName          = libFun (fsLit "tupleT")         tupleTIdKey
 unboxedTupleTName   = libFun (fsLit "unboxedTupleT")  unboxedTupleTIdKey
 unboxedSumTName     = libFun (fsLit "unboxedSumT")    unboxedSumTIdKey
 arrowTName          = libFun (fsLit "arrowT")         arrowTIdKey
+mulArrowTName       = libFun (fsLit "mulArrowT")      mulArrowTIdKey
 listTName           = libFun (fsLit "listT")          listTIdKey
 appTName            = libFun (fsLit "appT")           appTIdKey
 appKindTName        = libFun (fsLit "appKindT")       appKindTIdKey
@@ -1025,6 +1026,10 @@ interruptibleIdKey = mkPreludeMiscIdUnique 442
 -- data FunDep = ...
 funDepIdKey :: Unique
 funDepIdKey = mkPreludeMiscIdUnique 445
+
+-- mulArrow. TODO move before merging
+mulArrowTIdKey :: Unique
+mulArrowTIdKey = mkPreludeMiscIdUnique 446
 
 -- data TySynEqn = ...
 tySynEqnIdKey :: Unique

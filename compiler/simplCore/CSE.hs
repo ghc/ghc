@@ -33,6 +33,7 @@ import BasicTypes
 import GHC.Core.Map
 import Util             ( filterOut, equalLength, debugIsOn )
 import Data.List        ( mapAccumL )
+import GHC.Core.Multiplicity
 
 {-
                         Simple common sub-expression

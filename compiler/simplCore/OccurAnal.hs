@@ -2334,6 +2334,22 @@ binding x = cb.  See #5028.
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
 doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
+Note [Suppressing binder-swaps on linear case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    case[1] x of cb { p -> ... }
+It is not correct to replace it by
+    case[1] x of cb { p -> let x = cb in ... }
+
+It can go wrong if `x` is unrestricted:
+    case[1] x of cb { p -> (x, cb) }
+The above is well-typed: the variables of `p` are ignored, but `cb` is used
+exactly once. Were we to binder swap, we would get the following:
+    case[1] x of cb { p -> let x = cb in (cb, cb) }
+This, on the other hand, uses `cb` twice, so is not accepted by the linter.
+
+Therefore, we limit binder swap to case[Many]
+
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when
@@ -2426,6 +2442,7 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
     -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
     -- Also we don't want any INLINE or NOINLINE pragmas!
     localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var))
+                                          (idMult scrut_var)
                                           (idType scrut_var)
 
 {-
