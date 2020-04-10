@@ -104,6 +104,7 @@ import GHC.Event.Windows.ConsoleEvent
 import GHC.IOPort
 import GHC.Num
 import GHC.Real
+import GHC.Enum (maxBound)
 import GHC.Windows
 import GHC.List (null)
 import GHC.Ptr
@@ -704,8 +705,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                      -- OTOH any of the two should be a massive improvement over
                      -- The old I/O Manager.
                      when threadedIOMgr $ do
-                       let secs = 100 / 1000000.0
-                       reg <- registerTimeout mgr secs $
+                       let usecs = 100 -- 0.1ms
+                       reg <- registerTimeout mgr usecs $
                                 writeIOPort m () >> return ()
                        readIOPort m `onException` unregisterTimeout mgr reg
                      spinWaitComplete fhndl lpol
@@ -749,23 +750,33 @@ ioFailed = return . IOFailed . Just . fromIntegral
 ------------------------------------------------------------------------
 -- Timeouts
 
+-- | Convert uS(Int) to nS(Word64/Q.Prio) capping at maxBound
+expirationTime :: Clock -> Int -> IO Q.Prio
+expirationTime mgr us = do
+    now <- getTime mgr :: IO Seconds -- Double
+    let now_ns = ceiling $ now * 1000 * 1000 * 1000 :: Word64
+    let expTime
+          -- Currently we treat overflows by clamping to maxBound. If humanity
+          -- still exists in 2500 CE we will ned to be a bit more careful here.
+          -- See #15158.
+          | (maxBound - now_ns) `quot` 1000 < fromIntegral us  = maxBound :: Q.Prio
+          | otherwise                                          = now_ns + ns
+          where ns = 1000 * fromIntegral us
+    return expTime
+
 -- | Register an action to be performed in the given number of seconds.  The
 -- returned 'TimeoutKey' can be used to later un-register or update the timeout.
 -- The timeout is automatically unregistered when it fires.
 --
 -- The 'TimeoutCallback' will not be called more than once.
-registerTimeout :: Manager -> Seconds -> TimeoutCallback -> IO TimeoutKey
-registerTimeout mgr@Manager{..} relTime cb = do
+{-# NOINLINE registerTimeout #-}
+registerTimeout :: Manager -> Int -> TimeoutCallback -> IO TimeoutKey
+registerTimeout mgr@Manager{..} uSrelTime cb = do
     key <- newUnique mgrUniqueSource
-    if relTime <= 0 then cb
+    if uSrelTime <= 0 then cb
     else do
-      now <- getTime mgrClock
-      let !expTime = secondsToNanoSeconds $ now + relTime
-      debugIO $ "preEditTimeouts:: expTime:" ++ show expTime ++
-                    " now:" ++ show now ++
-                    " relTime:" ++ show relTime
+      !expTime <- expirationTime mgrClock uSrelTime :: IO Q.Prio
       editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
-      debugIO $ "preWakeupIOManager:: expTime:" ++ show expTime ++ " now:" ++ show now
       wakeupIOManager
     return $ TK key
 
