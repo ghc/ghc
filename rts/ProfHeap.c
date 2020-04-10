@@ -96,6 +96,7 @@ free_prof_locale( void )
 STATIC_INLINE void
 set_prof_locale( void )
 {
+    ASSERT(saved_locale == NULL);
 #if defined(mingw32_HOST_OS)
     prof_locale_per_thread = _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
     saved_locale = setlocale(LC_NUMERIC, NULL);
@@ -108,12 +109,14 @@ set_prof_locale( void )
 STATIC_INLINE void
 restore_locale( void )
 {
+    ASSERT(saved_locale);
 #if defined(mingw32_HOST_OS)
     _configthreadlocale(prof_locale_per_thread);
     setlocale(LC_NUMERIC, saved_locale);
 #else
     uselocale(saved_locale);
 #endif
+    saved_locale = NULL;
 }
 
 /* -----------------------------------------------------------------------------
@@ -825,8 +828,6 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
-    set_prof_locale();
-
     printSample(true, census->time);
 
 
@@ -959,7 +960,6 @@ dumpCensus( Census *census )
     traceHeapProfSampleEnd(era);
     printSample(false, census->time);
 
-    restore_locale();
 }
 
 counter*
@@ -1242,6 +1242,7 @@ Census* performHeapCensus(Time t)
   census->time  = TimeToSecondsDbl(t);
   census->rtime = TimeToNS(stat_getElapsedTime());
 
+  set_prof_locale();
 
 #if defined(PROFILING)
   // calculate retainer sets if necessary
@@ -1294,6 +1295,8 @@ Census* performHeapCensus(Time t)
 #else
     dumpCensus( census );
 #endif
+
+    restore_locale();
 
     return census;
 }
