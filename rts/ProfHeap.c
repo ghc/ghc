@@ -151,7 +151,7 @@ static void aggregateCensusInfo( void );
 
 static void dumpCensus( Census *census );
 
-static bool closureSatisfiesConstraints( const StgClosure* p );
+static bool closureSatisfiesConstraints( const StgClosure* p, StgHalfWord type );
 
 /**
  * Find a unique pointer representing the band to which this closure's heap
@@ -259,10 +259,11 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
 {
     uint32_t t;
     counter *ctr;
+    const StgInfoTable *info = get_itbl(c);
 
-    ASSERT(!isInherentlyUsed(get_itbl(c)->type));
+    ASSERT(!isInherentlyUsed(info->type));
 
-    if (era > 0 && closureSatisfiesConstraints(c)) {
+    if (era > 0 && closureSatisfiesConstraints(c, info->type)) {
         size -= sizeofW(StgProfHeader);
         ASSERT(LDVW(c) != 0);
         if ((LDVW((c)) & LDV_STATE_MASK) == LDV_STATE_CREATE) {
@@ -652,10 +653,10 @@ strMatchesSelector( const char* str, const char* sel )
  * testing against all the specified constraints.
  * -------------------------------------------------------------------------- */
 static bool
-closureSatisfiesConstraints( const StgClosure* p )
+closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
+                             StgHalfWord type USED_IF_PROFILING )
 {
 #if !defined(PROFILING)
-    (void)p;   /* keep gcc -Wall happy */
     return true;
 #else
    bool b;
@@ -667,6 +668,9 @@ closureSatisfiesConstraints( const StgClosure* p )
        return false;
    }
 
+   if (RtsFlags.ProfFlags.includeTSOs && (type == TSO || type == STACK)) {
+       return false;
+   }
    if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
        return false;
    }
@@ -974,12 +978,9 @@ heapInsertNewCounter(Census *census, const void *identity)
     return ctr;
 }
 
-static void heapProfObject(Census *census, StgClosure *p, size_t size,
-                           bool prim
-#if !defined(PROFILING)
-                           STG_UNUSED
-#endif
-                           )
+static void
+heapProfObject(Census *census, StgClosure *p, StgHalfWord type, size_t size,
+               bool prim USED_IF_PROFILING)
 {
     size_t real_size;
     counter *ctr;
@@ -991,7 +992,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
             real_size = size;
 #endif
 
-            if (closureSatisfiesConstraints((StgClosure*)p)) {
+            if (closureSatisfiesConstraints((StgClosure*)p, type)) {
 #if defined(PROFILING)
                 if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
                     if (prim)
@@ -1035,8 +1036,9 @@ heapCensusCompactList(Census *census, bdescr *bd)
     for (; bd != NULL; bd = bd->link) {
         StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
         StgCompactNFData *str = block->owner;
-        heapProfObject(census, (StgClosure*)str,
-                       compact_nfdata_full_sizeW(str), true);
+        StgClosure *p = (StgClosure*)str;
+        heapProfObject(census, p, compact_nfdata_full_sizeW(str),
+                       get_itbl(p)->type, true);
     }
 }
 
@@ -1060,7 +1062,8 @@ heapCensusChain( Census *census, bdescr *bd )
         if (bd->flags & BF_PINNED) {
             StgClosure arr;
             SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
-            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, true);
+            heapProfObject(census, &arr, stg_ARR_WORDS_info.type,
+                           bd->blocks * BLOCK_SIZE_W, true);
             continue;
         }
 
@@ -1077,7 +1080,7 @@ heapCensusChain( Census *census, bdescr *bd )
             && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
             size = arr_words_sizeW((StgArrBytes *)p);
             prim = true;
-            heapProfObject(census, (StgClosure *)p, size, prim);
+            heapProfObject(census, (StgClosure *)p, ARR_WORDS, size, prim);
             continue;
         }
 
@@ -1185,35 +1188,13 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case TSO:
                 prim = true;
-#if defined(PROFILING)
-                if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = sizeofW(StgTSO);
-                    break;
-                } else {
-                    // Skip this TSO and move on to the next object
-                    p += sizeofW(StgTSO);
-                    continue;
-                }
-#else
                 size = sizeofW(StgTSO);
                 break;
-#endif
 
             case STACK:
                 prim = true;
-#if defined(PROFILING)
-                if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = stack_sizeW((StgStack*)p);
-                    break;
-                } else {
-                    // Skip this TSO and move on to the next object
-                    p += stack_sizeW((StgStack*)p);
-                    continue;
-                }
-#else
                 size = stack_sizeW((StgStack*)p);
                 break;
-#endif
 
             case TREC_CHUNK:
                 prim = true;
@@ -1228,7 +1209,7 @@ heapCensusChain( Census *census, bdescr *bd )
                 barf("heapCensus, unknown object: %d", info->type);
             }
 
-            heapProfObject(census,(StgClosure*)p,size,prim);
+            heapProfObject(census,(StgClosure*)p,info->type,size,prim);
 
             p += size;
 
