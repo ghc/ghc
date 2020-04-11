@@ -219,6 +219,7 @@ Library
         GHC.Types.Module
         GHC.Types.Module.Name
         GHC.Types.Module.Location
+        GHC.Types.Unit.Id
         GHC.Types.Name
         GHC.Types.Name.Env
         GHC.Types.Name.Set
