@@ -64,3 +64,8 @@ bool startEventLogging(const EventLogWriter *writer);
  * Stop event logging and destroy the current EventLogWriter.
  */
 void endEventLogging(void);
+
+/*
+ * Flush the eventlog. cap can be NULL if one is not held.
+ */
+void flushEventLog(Capability **cap);
