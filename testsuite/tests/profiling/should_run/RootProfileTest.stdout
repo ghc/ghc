@@ -1,25 +1,37 @@
 = simple =
-bin xs = 2
-bin xs = 8
-bin xs = 13
-bin xs = 18
-bin xs = 23
-bin xs = 28
-bin xs = 33
-bin xs = 38
-bin xs = 43
-bin xs = 48
-bin xs = 53
-bin xs = 58
+
+xs	8
+
+xs	13
+
+xs	18
+
+xs	23
+
+xs	28
+
+xs	33
+
+xs	38
+
+xs	43
+
+xs	48
+
+xs	53
+
+xs	58
+
 
 
 
 
 = sharing =
-bin 1 = 5
-bin 1,2 = 5
-bin 1,2,3 = 5
-bin 1,2,3,4 = 5
-bin 1,2,3,4,5 = 5
-bin 1,2,3,4,5,6 = 5
-bin 1,2,3,4,5,6,[] = 2
+1	5
+1,2	5
+1,2,3	5
+1,2,3,4	5
+1,2,3,4,5	5
+1,2,3,4,5,6	5
+1,2,3,4,5,6,[]	2
+
