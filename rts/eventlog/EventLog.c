@@ -271,7 +271,7 @@ stopEventLogWriter(void)
 }
 
 void
-flushEventLog(void)
+flushEventLogWriter(void)
 {
     if (event_log_writer != NULL &&
             event_log_writer->flushEventLog != NULL) {
@@ -1563,6 +1563,25 @@ void postEventType(EventsBuf *eb, EventType *et)
     }
     postWord32(eb, 0); // no extensions yet
     postInt32(eb, EVENT_ET_END);
+}
+
+void flushLocalEventsBuf(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    printAndClearEventBuf(eb);
+}
+
+void flushEventLog(Capability **cap USED_IF_THREADS) {
+    ACQUIRE_LOCK(&eventBufMutex);
+    printAndClearEventBuf(&eventBuf);
+    RELEASE_LOCK(&eventBufMutex);
+
+#if defined(THREADED_RTS)
+    Task *task = myTask();
+    stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
+    releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
+#endif
+    flushEventLogWriter();
 }
 
 #else
