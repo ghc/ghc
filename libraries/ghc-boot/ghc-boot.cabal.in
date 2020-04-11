@@ -13,7 +13,7 @@ synopsis:       Shared functionality between GHC and its boot libraries
 description:    This library is shared between GHC, ghc-pkg, and other boot
                 libraries.
                 .
-                A note about "GHC.PackageDb": it only deals with the subset of
+                A note about "GHC.Unit.Database": it only deals with the subset of
                 the package database that the compiler cares about: modules
                 paths etc and not package metadata like description, authors
                 etc. It is thus not a library interface to ghc-pkg and is *not*
@@ -39,7 +39,7 @@ Library
     exposed-modules:
             GHC.BaseDir
             GHC.LanguageExtensions
-            GHC.PackageDb
+            GHC.Unit.Database
             GHC.Serialized
             GHC.ForeignSrcLang
             GHC.HandleEncoding

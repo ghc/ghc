@@ -23,7 +23,7 @@ import Binary
 import GHC.Iface.Binary           ( getDictFastString )
 import FastMutInt
 import FastString                 ( FastString )
-import GHC.Types.Module           ( Module )
+import GHC.Unit.Module           ( Module )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import Outputable

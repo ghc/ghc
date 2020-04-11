@@ -39,7 +39,7 @@ import qualified Language.Haskell.TH as TH
 import GHC.Hs
 import GHC.Builtin.Names
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Id
 import GHC.Types.Name hiding( varName, tcName )
 import GHC.Builtin.Names.TH

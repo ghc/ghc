@@ -95,7 +95,7 @@ import Outputable
 import FastString
 import GHC.Types.Unique.Set
 import ErrUtils
-import GHC.Types.Module
+import GHC.Unit
 import Stream (Stream)
 import qualified Stream
 

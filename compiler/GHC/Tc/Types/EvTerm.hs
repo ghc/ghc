@@ -15,7 +15,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Core.Utils
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc

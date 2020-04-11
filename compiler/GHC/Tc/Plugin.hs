@@ -71,7 +71,7 @@ import GHC.Tc.Types.Evidence   ( TcCoercion, CoercionHole, EvTerm(..)
                                , EvExpr, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Core.TyCon
 import GHC.Core.DataCon
