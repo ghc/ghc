@@ -6,26 +6,18 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Roles12.N:C2 :: C2 a = a -> a
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]
 
 ==================== Typechecker ====================
 Roles12.$tcC2
   = GHC.Types.TyCon
-      7996680154108933333##
-      9454227235464419996##
-      Roles12.$trModule
-      (GHC.Types.TrNameS "C2"#)
-      0
-      $krep
+      7996680154108933333## 9454227235464419996## Roles12.$trModule
+      (GHC.Types.TrNameS "C2"#) 0 $krep
 Roles12.$tc'C:C2
   = GHC.Types.TyCon
-      7087988437584478859##
-      11477953550142401435##
-      Roles12.$trModule
-      (GHC.Types.TrNameS "'C:C2"#)
-      1
-      $krep
+      7087988437584478859## 11477953550142401435## Roles12.$trModule
+      (GHC.Types.TrNameS "'C:C2"#) 1 $krep
 $krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
@@ -38,4 +30,5 @@ $krep [InlPrag=NOUSERINLINE[~]]
 Roles12.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles12"#)
+
 

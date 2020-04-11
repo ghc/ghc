@@ -53,7 +53,7 @@ import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Make
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Ppr( pprWithTYPE )

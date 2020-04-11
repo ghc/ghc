@@ -60,7 +60,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import Outputable
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import Fingerprint
 import Binary

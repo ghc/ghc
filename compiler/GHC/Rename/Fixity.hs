@@ -25,7 +25,7 @@ import GHC.Driver.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Basic  ( Fixity(..), FixityDirection(..), minPrecedence,
                           defaultFixity, SourceText(..) )
 import GHC.Types.SrcLoc

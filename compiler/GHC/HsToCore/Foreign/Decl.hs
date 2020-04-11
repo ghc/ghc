@@ -30,7 +30,7 @@ import GHC.Core.DataCon
 import GHC.Core.Unfold
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Types.RepType

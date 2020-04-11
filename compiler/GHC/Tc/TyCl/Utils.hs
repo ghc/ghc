@@ -65,7 +65,7 @@ import Maybes
 import Bag
 import FastString
 import FV
-import GHC.Types.Module
+import GHC.Unit.Module
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

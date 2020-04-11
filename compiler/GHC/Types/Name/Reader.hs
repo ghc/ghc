@@ -72,7 +72,7 @@ module GHC.Types.Name.Reader (
 
 import GhcPrelude
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Avail
 import GHC.Types.Name.Set
