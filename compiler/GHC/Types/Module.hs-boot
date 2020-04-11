@@ -2,8 +2,8 @@ module GHC.Types.Module where
 
 import GhcPrelude
 import {-# SOURCE #-} GHC.Types.Module.Name
+import {-# SOURCE #-} GHC.Types.Unit.Id
 
-data UnitId
 data GenModule a
 data GenUnit a
 data Indefinite unit
