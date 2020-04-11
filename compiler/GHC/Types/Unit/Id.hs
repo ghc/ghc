@@ -12,7 +12,7 @@ import GHC.Types.Unique
 import FastString
 import Binary
 
-import {-# SOURCE #-} GHC.Driver.Packages (displayUnitId, getPackageState)
+import {-# SOURCE #-} GHC.Types.Unit.State (displayUnitId, getPackageState)
 
 -- | A UnitId identifies a built library in a database and is used to generate
 -- unique symbols, etc. It's usually of the form:

@@ -39,7 +39,7 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Packages as Packages
+import GHC.Types.Unit.State as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types

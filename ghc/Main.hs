@@ -49,7 +49,7 @@ import GHC.Platform.Host
 import Config
 import Constants
 import GHC.Driver.Types
-import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
+import GHC.Types.Unit.State ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
 import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))

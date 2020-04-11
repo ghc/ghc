@@ -40,7 +40,7 @@ import Binary
 import Fingerprint
 import Exception
 import GHC.Types.Unique.Set
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 
 import Control.Monad
 import Data.Function
