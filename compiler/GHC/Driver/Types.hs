@@ -171,6 +171,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Types.Avail
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Core.InstEnv ( InstEnv, ClsInst, identicalClsInstHead )
 import GHC.Core.FamInstEnv
 import GHC.Core         ( CoreProgram, RuleBase, CoreRule )

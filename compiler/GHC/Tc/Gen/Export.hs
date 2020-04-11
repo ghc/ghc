@@ -22,6 +22,7 @@ import ErrUtils
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

@@ -29,6 +29,7 @@ import GHC.Driver.Session
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import ErrUtils
 import Digraph
 import GHC.Types.SrcLoc
