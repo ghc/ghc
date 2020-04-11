@@ -885,6 +885,10 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
                 debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
                 break;
 
+            case SYNC_FLUSH_EVENT_LOG:
+                flushLocalEventsBuf(cap);
+                break;
+
             default:
                 break;
             }
