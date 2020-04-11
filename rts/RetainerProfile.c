@@ -67,16 +67,6 @@ static uint32_t timesAnyObjectVisited;  // number of times any objects are
                                         // visited
 
 /* -----------------------------------------------------------------------------
- * Retainer stack - header
- *   Note:
- *     Although the retainer stack implementation could be separated *
- *     from the retainer profiling engine, there does not seem to be
- *     any advantage in doing that; retainer stack is an integral part
- *     of retainer profiling engine and cannot be use elsewhere at
- *     all.
- * -------------------------------------------------------------------------- */
-
-/* -----------------------------------------------------------------------------
  * RETAINER PROFILING ENGINE
  * -------------------------------------------------------------------------- */
 
