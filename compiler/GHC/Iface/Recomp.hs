@@ -28,7 +28,7 @@ import GHC.Driver.Finder
 import GHC.Driver.Session
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 import ErrUtils
 import Digraph
 import GHC.Types.SrcLoc
@@ -40,7 +40,7 @@ import Binary
 import Fingerprint
 import Exception
 import GHC.Types.Unique.Set
-import GHC.Driver.Packages
+import GHC.Unit.State
 
 import Control.Monad
 import Data.Function

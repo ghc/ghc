@@ -17,7 +17,7 @@ import GhcPrelude
 
 import Outputable
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Types.FieldLabel

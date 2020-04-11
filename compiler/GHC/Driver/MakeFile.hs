@@ -24,7 +24,7 @@ import GHC.Driver.Ways
 import Util
 import GHC.Driver.Types
 import qualified SysTools
-import GHC.Types.Module
+import GHC.Unit.Module
 import Digraph          ( SCC(..) )
 import GHC.Driver.Finder
 import Outputable

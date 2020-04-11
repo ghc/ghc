@@ -35,7 +35,7 @@ import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.PatSyn
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 
