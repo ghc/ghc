@@ -101,6 +101,7 @@ import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import Outputable
 import Encoding
 import FastString

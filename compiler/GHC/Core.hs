@@ -113,6 +113,7 @@ import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Types.Basic
 import Outputable
 import Util

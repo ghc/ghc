@@ -90,6 +90,7 @@ import GHC.Types.Name.Occurrence as OccName
 import GHC.Driver.Hooks
 import GHC.Types.Var
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Iface.Load
 import GHC.Core.Class
 import GHC.Core.TyCon
