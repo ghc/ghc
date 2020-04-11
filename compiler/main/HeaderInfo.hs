@@ -28,7 +28,7 @@ import Parser           ( parseHeader )
 import Lexer
 import FastString
 import GHC.Hs
-import GHC.Types.Module
+import GHC.Unit.Module
 import PrelNames
 import StringBuffer
 import GHC.Types.SrcLoc

@@ -39,7 +39,7 @@ module GHC.Driver.Pipeline (
 import GhcPrelude
 
 import GHC.Driver.Pipeline.Monad
-import GHC.Driver.Packages
+import GHC.Unit.State
 import GHC.Driver.Ways
 import HeaderInfo
 import GHC.Driver.Phases
@@ -49,7 +49,7 @@ import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
 import Outputable
-import GHC.Types.Module
+import GHC.Unit
 import ErrUtils
 import GHC.Driver.Session
 import Panic

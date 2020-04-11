@@ -49,7 +49,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Driver.Session
 import FastString
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply

@@ -48,11 +48,11 @@ T10482.$trModule1 :: GHC.Types.TrName
 T10482.$trModule1 = GHC.Types.TrNameS T10482.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T10482.$trModule :: GHC.Types.Module
+T10482.$trModule :: GHC.Unit.Module
 [GblId,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T10482.$trModule = GHC.Types.Module T10482.$trModule3 T10482.$trModule1
+T10482.$trModule = GHC.Unit.Module T10482.$trModule3 T10482.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep_r1Gw :: GHC.Types.KindRep
