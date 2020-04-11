@@ -62,7 +62,7 @@ import GHC.Core.Rules
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
 import Outputable
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import Maybes
 import OrdList

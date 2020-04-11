@@ -78,7 +78,7 @@ import Outputable
 import Util
 import GHC.Types.Basic
 import FastString
-import GHC.Types.Module
+import GHC.Unit
 import Binary
 import GHC.Types.Unique.Set
 import GHC.Types.Unique( mkAlphaTyVarUnique )
