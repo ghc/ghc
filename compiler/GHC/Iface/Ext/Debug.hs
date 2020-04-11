@@ -10,7 +10,7 @@ module GHC.Iface.Ext.Debug where
 import GHC.Prelude
 
 import GHC.Types.SrcLoc
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 

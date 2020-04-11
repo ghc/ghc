@@ -24,7 +24,7 @@ import GHC.Driver.Ways
 import GHC.Utils.Misc
 import GHC.Driver.Types
 import qualified GHC.SysTools as SysTools
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Driver.Finder
 import GHC.Utils.Outputable

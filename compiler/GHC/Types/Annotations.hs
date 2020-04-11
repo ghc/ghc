@@ -20,10 +20,8 @@ module GHC.Types.Annotations (
 import GHC.Prelude
 
 import GHC.Utils.Binary
-import GHC.Types.Module ( Module
-                        , ModuleEnv, emptyModuleEnv, extendModuleEnvWith
-                        , plusModuleEnv_C, lookupWithDefaultModuleEnv
-                        , mapModuleEnv )
+import GHC.Unit.Module ( Module )
+import GHC.Unit.Module.Env
 import GHC.Types.Name.Env
 import GHC.Types.Name
 import GHC.Utils.Outputable

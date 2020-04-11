@@ -21,7 +21,7 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Utils.Error
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

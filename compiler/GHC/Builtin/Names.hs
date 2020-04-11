@@ -143,7 +143,8 @@ this constructor directly (see  CorePrep.lookupIntegerSDataConName)
 When GHC reads the package data base, it (internally only) pretends it has UnitId
 `integer-wired-in` instead of the actual UnitId (which includes the version
 number); just like for `base` and other packages, as described in
-Note [Wired-in packages] in GHC.Types.Module. This is done in Packages.findWiredInPackages.
+Note [Wired-in units] in GHC.Unit.Module. This is done in
+GHC.Unit.State.findWiredInPackages.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -165,7 +166,8 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.Module
+import GHC.Unit.Types
+import GHC.Unit.Module.Name
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.Unique

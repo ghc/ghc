@@ -19,14 +19,13 @@ import GHC.Driver.Types
 import GHC.Tc.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Utils.Fingerprint
 import GHC.Data.Maybe
-import GHC.Driver.Packages
 import GHC.Driver.Finder
 
 import Control.Monad (filterM)

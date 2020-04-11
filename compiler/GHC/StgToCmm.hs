@@ -41,7 +41,7 @@ import GHC.Types.Id.Info
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Data.Stream
 import GHC.Types.Basic

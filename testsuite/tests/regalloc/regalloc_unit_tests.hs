@@ -33,7 +33,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
 import GHC.Cmm.Info
 import GHC.Cmm
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Cmm.DebugBlock
 import GHC
 import GHC.Driver.Monad

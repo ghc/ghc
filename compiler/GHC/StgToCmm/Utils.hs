@@ -67,7 +67,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 import GHC.Utils.Misc

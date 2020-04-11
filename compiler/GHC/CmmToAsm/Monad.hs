@@ -64,7 +64,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique         ( Unique )
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import Control.Monad    ( ap )
 
