@@ -9,6 +9,7 @@ module GHC.Types.Module.Name
     , mkModuleName
     , mkModuleNameFS
     , stableModuleNameCmp
+    , parseModuleName
     )
 where
 
@@ -23,6 +24,10 @@ import Util
 import Control.DeepSeq
 import Data.Data
 import System.FilePath
+
+import qualified Text.ParserCombinators.ReadP as Parse
+import Text.ParserCombinators.ReadP (ReadP)
+import Data.Char (isAlphaNum)
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
@@ -86,3 +91,8 @@ moduleNameSlashes = dots_to_slashes . moduleNameString
 moduleNameColons :: ModuleName -> String
 moduleNameColons = dots_to_colons . moduleNameString
   where dots_to_colons = map (\c -> if c == '.' then ':' else c)
+
+parseModuleName :: ReadP ModuleName
+parseModuleName = fmap mkModuleName
+                $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
+
