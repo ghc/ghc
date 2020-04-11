@@ -86,6 +86,22 @@ returnToOldStack( traverseState *ts, bdescr *bd )
     bd->free = (StgPtr)ts->stackLimit;
 }
 
+static void
+resetStaticObjects(traverseState *ts)
+{
+    StgClosure **p;
+    bdescr *bd = ts->firstStaticObjects;
+
+    while(bd) {
+        p = (StgClosure**)bd->start;
+        while(p < (StgClosure**)bd->free) {
+            (*p)->header.prof.hp = (union StgProfHeapHeader){};
+            p++;
+        }
+        bd = bd->link;
+    }
+}
+
 /**
  *  Initializes the traversal work-stack.
  */
@@ -1107,7 +1123,7 @@ resetMutableObjects(traverseState* ts)
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
             for (ml = bd->start; ml < bd->free; ml++) {
-                traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
+                ((StgClosure *)*ml)->header.prof.hp = (union StgProfHeapHeader){};
             }
           }
         }
@@ -1380,6 +1396,8 @@ traverseInvalidateAllClosureData(traverseState* ts)
     // invalidated by the flip below
     resetMutableObjects(ts);
 
+    resetStaticObjects(ts);
+
     // Then flip the flip bit, invalidating all closures.
     ts->flip = ts->flip ^ 1;
 }
@@ -1408,6 +1426,7 @@ traverseInvalidateAllClosureData(traverseState* ts)
 void
 resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objects )
 {
+    (void) ts;
     uint32_t count = 0;
     StgClosure *p;
 
@@ -1424,7 +1443,7 @@ resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objec
             p = (StgClosure*)*IND_STATIC_LINK(p);
             break;
         case THUNK_STATIC:
-            traverseMaybeInitClosureData(ts, p);
+            p->header.prof.hp = (union StgProfHeapHeader){};
             p = (StgClosure*)*THUNK_STATIC_LINK(p);
             break;
         case FUN_STATIC:
@@ -1433,7 +1452,7 @@ resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objec
         case CONSTR_2_0:
         case CONSTR_1_1:
         case CONSTR_NOCAF:
-            traverseMaybeInitClosureData(ts, p);
+            p->header.prof.hp = (union StgProfHeapHeader){};
             p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
             break;
         default:
