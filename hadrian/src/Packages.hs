@@ -180,6 +180,7 @@ autogenPath context@Context {..}
     | isLibrary package = autogen "build"
     | package == ghc    = autogen "build/ghc"
     | package == hpcBin = autogen "build/hpc"
+    | package == haddock= autogen "build/Haddock"
     | otherwise         = autogen $ "build" -/- pkgName package
   where
     autogen dir = contextPath context <&> (-/- dir -/- "autogen")
