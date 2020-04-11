@@ -28,8 +28,10 @@ void initEventLogging(void);
 void restartEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort
-void flushEventLog(void);     // event log inherited from parent
+void flushEventLogWriter(void);     // event log inherited from parent
 void moreCapEventBufs (uint32_t from, uint32_t to);
+void flushLocalEventsBuf(Capability *cap);
+void flushAllEventsBufs(Capability *cap);
 
 /*
  * Post a scheduler event to the capability's event buffer (an event

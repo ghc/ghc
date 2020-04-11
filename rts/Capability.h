@@ -263,7 +263,8 @@ typedef enum {
     SYNC_OTHER,
     SYNC_GC_SEQ,
     SYNC_GC_PAR,
-    SYNC_FLUSH_UPD_REM_SET
+    SYNC_FLUSH_UPD_REM_SET,
+    SYNC_FLUSH_EVENT_LOG
 } SyncType;
 
 //
