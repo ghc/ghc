@@ -25,6 +25,9 @@ module GHC.Types.Module
         -- * The ModLocation type
         module GHC.Types.Module.Location,
 
+        -- * The UnitId type
+        module GHC.Types.Unit.Id,
+
         -- * The Unit type
         Indefinite(..),
         IndefUnitId,
@@ -38,7 +41,6 @@ module GHC.Types.Module
         InstantiatedUnit,
         instUnitToUnit,
         instModuleToModule,
-        UnitId(..),
         toUnitId,
         ShHoleSubst,
         Instantiations,
@@ -108,7 +110,6 @@ module GHC.Types.Module
         InstalledModuleEnv,
         installedModuleEq,
         unitIdEq,
-        unitIdString,
         fsToUnitId,
         stringToUnitId,
         emptyInstalledModuleEnv,
@@ -149,6 +150,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
 import GHC.Types.Module.Name
 import GHC.Types.Module.Location
+import GHC.Types.Unit.Id
 import FastString
 import Binary
 import Util
@@ -176,7 +178,7 @@ import qualified Data.Set as Set
 import qualified FiniteMap as Map
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayUnitId, getPackageState, PackageState, unitInfoMap)
+import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -593,7 +595,7 @@ genUnitFS _gunitFS HoleUnit                = holeFS
 
 unitKey :: Unit -> Unique
 unitKey (VirtUnit x)            = instUnitKey x
-unitKey (RealUnit (Definite x)) = unitIdKey x
+unitKey (RealUnit (Definite x)) = getUnique x
 unitKey HoleUnit                = holeUnique
 
 -- | A dynamically instantiated unit.
@@ -695,56 +697,12 @@ instModuleToModule :: PackageState -> InstantiatedModule -> Module
 instModuleToModule pkgstate (Module iuid mod_name) =
     mkModule (instUnitToUnit pkgstate iuid) mod_name
 
--- | An installed unit identifier identifies a library which has
--- been installed to the package database.  These strings are
--- provided to us via the @-this-unit-id@ flag.  The library
--- in question may be definite or indefinite; if it is indefinite,
--- none of the holes have been filled (we never install partially
--- instantiated libraries.)  Put another way, an installed unit id
--- is either fully instantiated, or not instantiated at all.
---
--- Installed unit identifiers look something like @p+af23SAj2dZ219@,
--- or maybe just @p@ if they don't use Backpack.
-newtype UnitId =
-    UnitId {
-      -- | The full hashed unit identifier, including the component id
-      -- and the hash.
-      unitIdFS :: FastString
-    }
-
-instance Binary UnitId where
-  put_ bh (UnitId fs) = put_ bh fs
-  get bh = do fs <- get bh; return (UnitId fs)
-
-instance Eq UnitId where
-    uid1 == uid2 = unitIdKey uid1 == unitIdKey uid2
-
-instance Ord UnitId where
-    u1 `compare` u2 = unitIdFS u1 `compare` unitIdFS u2
-
-instance Uniquable UnitId where
-    getUnique = unitIdKey
-
-instance Outputable UnitId where
-    ppr uid@(UnitId fs) =
-        getPprStyle $ \sty ->
-        sdocWithDynFlags $ \dflags ->
-          case displayUnitId (getPackageState dflags) uid of
-            Just str | not (debugStyle sty) -> text str
-            _ -> ftext fs
-
-unitIdKey :: UnitId -> Unique
-unitIdKey = getUnique . unitIdFS
-
 -- | Return the UnitId of the Unit. For instantiated units, return the
 -- UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
 toUnitId (RealUnit (Definite iuid)) = iuid
 toUnitId (VirtUnit indef)           = indefUnit (instUnitInstanceOf indef)
 toUnitId HoleUnit                   = error "Hole unit"
-
-unitIdString :: UnitId -> String
-unitIdString = unpackFS . unitIdFS
 
 instance Outputable InstantiatedUnit where
     ppr uid =
