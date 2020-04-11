@@ -116,11 +116,10 @@ testReturn(StgClosure *c, const stackAccum acc,
 }
 
 static bool
-testVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
+testVisit(StgClosure *c, const StgClosure *cp,
           const stackData data, const bool first_visit,
           stackAccum *acc, stackData *child_data)
 {
-    (void) ts;
     (void) cp;
     (void) data;
     (void) acc;
@@ -139,63 +138,58 @@ int main(int argc, char *argv[])
 
     traverseState *ts = &state;
 
-    initializeTestHeap();
-
-    StgClosure *tests[] = {
-        c10, c11, c20
+    StgClosure **tests[] = {
+            &c10, &c11, &c20
     };
 
     {
         printf("with return\n");
 
+        initializeTestHeap();
         initializeTraverseStack(ts);
-        traverseInvalidateAllClosureData(ts);
 
         for(size_t i=0; i < (sizeof(tests)/sizeof(*tests)); i++) {
             stackElement se;
             memset(&se, 0, sizeof(se));
 
-            printf("\n\npush   %lu\n", synthClosureId(&sh, tests[i]));
-            traversePushClosure(ts, tests[i], tests[i], &se, nullStackData);
+            printf("\n\npush   %lu\n", synthClosureId(&sh, *tests[i]));
+            traversePushClosure(ts, *tests[i], *tests[i], &se, nullStackData);
             traverseWorkStack(ts, &testVisit, &testReturn);
         }
 
         closeTraverseStack(ts);
+        freeSynthHeap(sh);
     }
 
     {
         printf("\n\n\n\njust visit\n");
 
+        initializeTestHeap();
         initializeTraverseStack(ts);
-        traverseInvalidateAllClosureData(ts);
 
         for(size_t i=0; i < (sizeof(tests)/sizeof(*tests)); i++) {
-            printf("\n\npush   %lu\n", synthClosureId(&sh, tests[i]));
-            traversePushClosure(ts, tests[i], tests[i], NULL, nullStackData);
+            printf("\n\npush   %lu\n", synthClosureId(&sh, *tests[i]));
+            traversePushClosure(ts, *tests[i], *tests[i], NULL, nullStackData);
             traverseWorkStack(ts, &testVisit, NULL);
         }
 
         closeTraverseStack(ts);
-
+        freeSynthHeap(sh);
     }
 
     {
         printf("\n\n\n\nnew closures\n");
 
+        initializeTestHeap();
         initializeTraverseStack(ts);
-        traverseInvalidateAllClosureData(ts);
-
-        if(ts->flip != 1)
-            abort();
 
         printf("\n\npush   %lu\n", synthClosureId(&sh, c30));
         traversePushClosure(ts, c30, c30, NULL, nullStackData);
         traverseWorkStack(ts, &testVisit, NULL);
 
         closeTraverseStack(ts);
+        freeSynthHeap(sh);
     }
-
-    freeSynthHeap(sh);
 
     hs_exit();
 
