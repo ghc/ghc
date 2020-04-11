@@ -28,7 +28,7 @@ where
 
 import GhcPrelude
 
-import GHC.PackageDb
+import GHC.Types.Unit.Database
 import Data.Version
 import Data.Bifunctor
 
