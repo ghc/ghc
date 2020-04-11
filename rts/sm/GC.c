@@ -95,7 +95,15 @@
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
  *
- * See also: Note [STATIC_LINK fields] in Storage.h.
+ * See also:
+ *
+ * - Note [STATIC_LINK fields] in Storage.h,
+ *
+ * - evacuate_static_object in Evac.c where objects get chained onto the
+ *   static_objects list and
+ *
+ * - scavenge_static where they get moved from static_objects to
+ *   scavanged_static_objects.
  */
 
 /* N is the oldest generation being collected, where the generations

@@ -1703,6 +1703,8 @@ scavenge_capability_mut_lists (Capability *cap)
    We treat the mutable list of each generation > N (i.e. all the
    generations older than the one being collected) as roots.  We also
    remove non-mutable objects from the mutable list at this point.
+
+   See also Note [STATIC OBJECT LIST]
    -------------------------------------------------------------------------- */
 
 static void
