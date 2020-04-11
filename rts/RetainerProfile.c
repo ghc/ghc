@@ -239,35 +239,34 @@ getRetainerFrom( StgClosure *c )
  *    s != NULL
  * -------------------------------------------------------------------------- */
 STATIC_INLINE void
-associate( traverseState *ts, StgClosure *c, RetainerSet *s )
+associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    traverseSetClosureData(ts, c, (StgWord)s);
+    traverseSetClosureData(c, (StgWord)s);
 }
 
-bool isRetainerSetValid( traverseState *ts, const StgClosure *c )
+bool isRetainerSetValid( const StgClosure *c )
 {
-    return traverseIsClosureDataValid(ts, c);
+    return traverseIsClosureDataValid(c);
 }
 
 inline RetainerSet*
-retainerSetOf( traverseState *ts, const StgClosure *c )
+retainerSetOf( const StgClosure *c )
 {
-    (void) ts;
-    ASSERT(isRetainerSetValid(ts, c));
+    ASSERT(isRetainerSetValid(c));
     return (RetainerSet*)traverseGetClosureData(c);
 }
 
 static bool
-retainVisitClosure( traverseState *ts, StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackAccum *acc, stackData *out_data )
+retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackAccum *acc, stackData *out_data )
 {
     (void) first_visit;
     (void) acc;
 
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
-    retainerSetOfc = retainerSetOf(ts, c);
+    retainerSetOfc = retainerSetOf(c);
 
     timesAnyObjectVisited++;
 
@@ -289,7 +288,7 @@ retainVisitClosure( traverseState *ts, StgClosure *c, const StgClosure *cp, cons
     if (isRetainer(cp))
         s = NULL;
     else
-        s = retainerSetOf(ts, cp);
+        s = retainerSetOf(cp);
 
     // (c, cp, r, s) is available.
 
@@ -299,10 +298,10 @@ retainVisitClosure( traverseState *ts, StgClosure *c, const StgClosure *cp, cons
         numObjectVisited++;
 
         if (s == NULL)
-            associate(ts, c, singleton(r));
+            associate(c, singleton(r));
         else
             // s is actually the retainer set of *c!
-            associate(ts, c, s);
+            associate(c, s);
 
         // compute c_child_r
         out_data->c_child_r = isRetainer(c) ? getRetainerFrom(c) : r;
@@ -312,18 +311,18 @@ retainVisitClosure( traverseState *ts, StgClosure *c, const StgClosure *cp, cons
             return 0;          // no need to process children
 
         if (s == NULL)
-            associate(ts, c, addElement(r, retainerSetOfc));
+            associate(c, addElement(r, retainerSetOfc));
         else {
             // s is not NULL and cp is not a retainer. This means that
             // each time *cp is visited, so is *c. Thus, if s has
             // exactly one more element in its retainer set than c, s
             // is also the new retainer set for *c.
             if (s->num == retainerSetOfc->num + 1) {
-                associate(ts, c, s);
+                associate(c, s);
             }
             // Otherwise, just add R_r to the current retainer set of *c.
             else {
-                associate(ts, c, addElement(r, retainerSetOfc));
+                associate(c, addElement(r, retainerSetOfc));
             }
         }
 
@@ -353,7 +352,6 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     c = UNTAG_CLOSURE(*tl);
-    traverseMaybeInitClosureData(ts, c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
         traversePushRoot(ts, c, c, (stackData)getRetainerFrom(c));
     } else {
@@ -373,8 +371,6 @@ computeRetainerSet( traverseState *ts )
 {
     StgWeak *weak;
     uint32_t g, n;
-
-    traverseInvalidateAllClosureData(ts);
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 

@@ -182,14 +182,14 @@ closureIdentity( const StgClosure *p )
     case HEAP_BY_RETAINER:
         // AFAIK, the only closures in the heap which might not have a
         // valid retainer set are DEAD_WEAK closures.
-        if (isRetainerSetValid(&hp_traverseState, p)) {
-            return retainerSetOf(&hp_traverseState, p);
+        if (isRetainerSetValid(p)) {
+            return retainerSetOf(p);
         } else {
             return NULL;
         }
     case HEAP_BY_ROOT:
-        if(rootProfileWasClosureVisited(&hp_traverseState, p)) {
-            return rootProfileGetClosureIdentity(&hp_traverseState, p);
+        if(rootProfileWasClosureVisited(p)) {
+            return rootProfileGetClosureIdentity(p);
         } else {
             return NULL;
         }
@@ -608,8 +608,6 @@ endHeapProfiling(void)
     restore_locale();
 }
 
-
-
 #if defined(PROFILING)
 static size_t
 buf_append(char *p, const char *q, char *end)
@@ -708,7 +706,7 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING )
        return false;
    }
 
-   if (RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(&hp_traverseState, p)) {
+   if (RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
        return false;
    }
    if (RtsFlags.ProfFlags.descrSelector) {
@@ -728,8 +726,8 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING )
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
        // these aren't reached by the retainer profiler's traversal.
-       if (isRetainerSetValid(&hp_traverseState, (StgClosure *)p)) {
-           rs = retainerSetOf(&hp_traverseState, (StgClosure *)p);
+       if (isRetainerSetValid((StgClosure *)p)) {
+           rs = retainerSetOf((StgClosure *)p);
            if (rs != NULL) {
                for (i = 0; i < rs->num; i++) {
                    b = strMatchesSelector( rs->element[i]->cc->label,
@@ -1113,6 +1111,13 @@ heapProfObject(Census *census, StgClosure *p, size_t size,
                     }
                 }
             }
+
+#if defined(PROFILING)
+            if(doingTraversal()) {
+               // Reset heap profiling header for next iteration
+               p->header.prof.hp = (union StgProfHeapHeader){};
+            }
+#endif
 }
 
 // Compact objects require special handling code because they
