@@ -45,7 +45,7 @@ import           Data.Version
 import           Control.Applicative
 import           Distribution.Verbosity
 import           GHC.Data.FastString
-import           GHC ( DynFlags, Module, moduleUnitId )
+import           GHC ( DynFlags, Module, moduleUnit )
 import           Haddock.Types
 import           Haddock.Utils
 import           GHC.Driver.Packages
@@ -382,4 +382,4 @@ modulePackageInfo dflags flags (Just modu) =
   , optPackageVersion flags <|> fmap unitPackageVersion pkgDb
   )
   where
-    pkgDb = lookupUnit dflags (moduleUnitId modu)
+    pkgDb = lookupUnit dflags (moduleUnit modu)

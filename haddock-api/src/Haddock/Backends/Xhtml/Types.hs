@@ -23,7 +23,7 @@ import GHC
 
 
 -- the base, module and entity URLs for the source code and wiki links.
-type SourceURLs = (Maybe FilePath, Maybe FilePath, Map UnitId FilePath, Map UnitId FilePath)
+type SourceURLs = (Maybe FilePath, Maybe FilePath, Map Unit FilePath, Map Unit FilePath)
 type WikiURLs = (Maybe FilePath, Maybe FilePath, Maybe FilePath)
 
 

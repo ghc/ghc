@@ -221,7 +221,7 @@ mkAliasMap dflags mRenamedSource =
              -- them to the user.  We should reuse that information;
              -- or at least reuse the renamed imports, which know what
              -- they import!
-             (fmap Module.fsToUnitId $
+             (fmap Module.fsToUnit $
               fmap sl_fs $ ideclPkgQual impDecl)
              (case ideclName impDecl of SrcLoc.L _ name -> name),
            alias))
@@ -265,7 +265,7 @@ unrestrictedModuleImports idecls =
 -- Similar to GHC.lookupModule
 -- ezyang: Not really...
 lookupModuleDyn ::
-  DynFlags -> Maybe UnitId -> ModuleName -> Module
+  DynFlags -> Maybe Unit -> ModuleName -> Module
 lookupModuleDyn _ (Just pkgId) mdlName =
   Module.mkModule pkgId mdlName
 lookupModuleDyn dflags Nothing mdlName =
@@ -839,7 +839,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                     Just decl -> return ([decl], (noDocForDecl, availNoDocs avail))
               | otherwise ->
                 return ([], (noDocForDecl, availNoDocs avail))
-      | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap
+      | Just iface <- M.lookup (semToIdMod (moduleUnit thisMod) m) modMap
       , Just ds <- M.lookup n (ifaceDeclMap iface) =
           return (ds, lookupDocs avail warnings
                             (ifaceDocMap iface)
@@ -885,10 +885,10 @@ availNoDocs avail =
 
 -- | Given a 'Module' from a 'Name', convert it into a 'Module' that
 -- we can actually find in the 'IfaceMap'.
-semToIdMod :: UnitId -> Module -> Module
+semToIdMod :: Unit -> Module -> Module
 semToIdMod this_uid m
     | Module.isHoleModule m = mkModule this_uid (moduleName m)
-    | otherwise      = m
+    | otherwise             = m
 
 hiDecl :: DynFlags -> Name -> ErrMsgGhc (Maybe (LHsDecl GhcRn))
 hiDecl dflags t = do
@@ -967,7 +967,7 @@ moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
             return []
   where
     m = mkModule unitId expMod -- Identity module!
-    unitId = moduleUnitId thisMod
+    unitId = moduleUnit thisMod
 
 -- Note [1]:
 ------------

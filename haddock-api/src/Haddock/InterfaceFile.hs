@@ -58,11 +58,11 @@ ifModule if_ =
     [] -> error "empty InterfaceFile"
     iface:_ -> instMod iface
 
-ifUnitId :: InterfaceFile -> UnitId
+ifUnitId :: InterfaceFile -> Unit
 ifUnitId if_ =
   case ifInstalledIfaces if_ of
     [] -> error "empty InterfaceFile"
-    iface:_ -> moduleUnitId $ instMod iface
+    iface:_ -> moduleUnit $ instMod iface
 
 
 binaryInterfaceMagic :: Word32
@@ -319,7 +319,7 @@ getSymbolTable bh namecache = do
   return (namecache', arr)
 
 
-type OnDiskName = (UnitId, ModuleName, OccName)
+type OnDiskName = (Unit, ModuleName, OccName)
 
 
 fromOnDiskName
@@ -349,7 +349,7 @@ fromOnDiskName _ nc (pid, mod_name, occ) =
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
   let modu = nameModule name
-  put_ bh (moduleUnitId modu, moduleName modu, nameOccName name)
+  put_ bh (moduleUnit modu, moduleName modu, nameOccName name)
 
 
 -------------------------------------------------------------------------------
