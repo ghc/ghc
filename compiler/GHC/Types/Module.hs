@@ -31,7 +31,6 @@ module GHC.Types.Module
         -- * The Unit type
         Indefinite(..),
         IndefUnitId,
-        UnitPprInfo(..),
         GenUnit(..),
         mapGenUnit,
         Unit,
@@ -151,12 +150,12 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Module.Name
 import GHC.Types.Module.Location
 import GHC.Types.Unit.Id
+import GHC.Types.Unit.Ppr
 import FastString
 import Binary
 import Util
 import Data.List (sortBy, sort)
 import Data.Ord
-import Data.Version
 import Fingerprint
 
 import qualified Data.ByteString as BS
@@ -495,28 +494,6 @@ instance Eq unit => Eq (Indefinite unit) where
 
 instance Ord unit => Ord (Indefinite unit) where
    compare a b = compare (indefUnit a) (indefUnit b)
-
--- | Subset of UnitInfo: just enough to pretty-print a unit-id
---
--- Instead of printing the unit-id which may contain a hash, we print:
---    package-version:componentname
---
-data UnitPprInfo = UnitPprInfo
-   { unitPprPackageName    :: String       -- ^ Source package name
-   , unitPprPackageVersion :: Version      -- ^ Source package version
-   , unitPprComponentName  :: Maybe String -- ^ Component name
-   }
-
-instance Outputable UnitPprInfo where
-  ppr pprinfo = text $ mconcat
-      [ unitPprPackageName pprinfo
-      , case unitPprPackageVersion pprinfo of
-         Version [] [] -> ""
-         version       -> "-" ++ showVersion version
-      , case unitPprComponentName pprinfo of
-         Nothing    -> ""
-         Just cname -> ":" ++ cname
-      ]
 
 
 instance Uniquable unit => Uniquable (Indefinite unit) where
