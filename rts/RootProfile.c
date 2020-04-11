@@ -24,7 +24,7 @@
 
 #include "RootProfile.h"
 
-#define MAX_ROOTS ((StgInt)(sizeof(StgWord) * 8 - 2))
+#define MAX_ROOTS ((StgInt)(sizeof(StgWord) * 8 - 1))
 
 #if defined(DEBUG)
 int g_rootProfileDebugLevel = 0;
@@ -122,7 +122,7 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
 const void *rootProfileGetClosureIdentity(const StgClosure *c)
 {
     ASSERT(traverseIsClosureDataValid(c));
-    return (void*)(traverseGetClosureData(c)>>2);
+    return (void*)(traverseGetClosureData(c)>>1);
 }
 
 static bool
@@ -139,16 +139,16 @@ rootVisit(StgClosure *c, const StgClosure *cp,
 
     if(first_visit) {
         debug(2, "  bin %s\n", i2b(1ul<<current_root));
-        traverseSetClosureData(c, (1ul<<current_root)<<2);
+        traverseSetClosureData(c, (1ul<<current_root)<<1);
         return true;
     } else {
-        StgWord bin_idx = traverseGetClosureData(c)>>2;
+        StgWord bin_idx = traverseGetClosureData(c)>>1;
         if((bin_idx & (1ul<<current_root))) {
             return false;
         } else {
             StgWord new_bin = (1ul<<current_root) | bin_idx;
             debug(2, "  bin %s |= %s\n", i2b(bin_idx), i2b((1ul<<current_root)));
-            traverseSetClosureData(c, new_bin<<2);
+            traverseSetClosureData(c, new_bin<<1);
             return true; // have to update the children's bin_idx too
         }
     }
