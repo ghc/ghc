@@ -176,6 +176,7 @@ typedef struct traverseState_ {
  * once you can simply return 'first_visit'.
  */
 typedef bool (*visitClosure_cb) (
+    traverseState *ts,
     StgClosure *c,
     const StgClosure *cp,
     const stackData data,

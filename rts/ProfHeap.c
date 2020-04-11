@@ -19,6 +19,7 @@
 #include "Hash.h"
 #include "RetainerProfile.h"
 #include "RootProfile.h"
+#include "rts/TraverseHeap.h"
 #include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
@@ -36,6 +37,10 @@
 
 FILE *hp_file;
 static char *hp_filename; /* heap profile (hp2ps style) log file */
+
+#if defined(PROFILING)
+traverseState hp_traverseState;
+#endif
 
 /* ------------------------------------------------------------------------
  * Locales
@@ -177,10 +182,17 @@ closureIdentity( const StgClosure *p )
     case HEAP_BY_RETAINER:
         // AFAIK, the only closures in the heap which might not have a
         // valid retainer set are DEAD_WEAK closures.
-        if (isRetainerSetValid(p))
-            return retainerSetOf(p);
-        else
+        if (isRetainerSetValid(&hp_traverseState, p)) {
+            return retainerSetOf(&hp_traverseState, p);
+        } else {
             return NULL;
+        }
+    case HEAP_BY_ROOT:
+        if(rootProfileWasClosureVisited(&hp_traverseState, p)) {
+            return rootProfileGetClosureIdentity(&hp_traverseState, p);
+        } else {
+            return NULL;
+        }
 #endif
 
     case HEAP_BY_CLOSURE_TYPE:
@@ -244,6 +256,14 @@ doingRootProfiling( void )
 {
     return RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT
         || RtsFlags.ProfFlags.rootSelector;
+}
+
+STATIC_INLINE bool
+doingTraversal( void )
+{
+    return doingRetainerProfiling()
+        || doingRootProfiling()
+        ;
 }
 #endif /* PROFILING */
 
@@ -674,7 +694,7 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
    if (RtsFlags.ProfFlags.includeTSOs && (type == TSO || type == STACK)) {
        return false;
    }
-   if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
+   if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(&hp_traverseState, p)) {
        return false;
    }
 
@@ -695,8 +715,8 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
        // these aren't reached by the retainer profiler's traversal.
-       if (isRetainerSetValid((StgClosure *)p)) {
-           rs = retainerSetOf((StgClosure *)p);
+       if (isRetainerSetValid(&hp_traverseState, (StgClosure *)p)) {
+           rs = retainerSetOf(&hp_traverseState, (StgClosure *)p);
            if (rs != NULL) {
                for (i = 0; i < rs->num; i++) {
                    b = strMatchesSelector( rs->element[i]->cc->label,
@@ -1247,14 +1267,15 @@ Census* performHeapCensus(Time t)
   set_prof_locale();
 
 #if defined(PROFILING)
-  // calculate retainer sets if necessary
-  if (doingRetainerProfiling()) {
-      retainerProfile();
-  }
+  if(doingTraversal())
+      initializeTraverseStack(&hp_traverseState);
 
-  if(doingRootProfiling()) {
-      rootProfile( t, census );
-  }
+  // calculate retainer sets if necessary
+  if (doingRetainerProfiling())
+      retainerProfile(&hp_traverseState);
+
+  if(doingRootProfiling())
+      rootProfile(&hp_traverseState, t, census);
 #endif
 
 #if defined(PROFILING)
@@ -1283,9 +1304,11 @@ Census* performHeapCensus(Time t)
   }
 
 #if defined(PROFILING)
-  // reset visited bits
   if(doingRootProfiling())
-      endRootProfiling();
+      endRootProfiling(&hp_traverseState);
+
+  if(doingTraversal())
+      closeTraverseStack(&hp_traverseState);
 #endif
 
   // dump out the census info

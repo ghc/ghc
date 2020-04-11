@@ -16,18 +16,15 @@
 
 #include "BeginPrivate.h"
 
-void endRootProfiling(void);
+void rootProfile(traverseState *ts, Time t, Census *census);
 
-void rootProfile(Time t, Census *census);
+void endRootProfiling(traverseState *ts);
 
-bool rootProfileWasClosureVisited(const StgClosure *c);
+bool rootProfileWasClosureVisited(traverseState *ts, const StgClosure *c);
 
-const void *rootProfileGetClosureIdentity(const StgClosure *c);
+const void *rootProfileGetClosureIdentity(traverseState *ts, const StgClosure *c);
 
 const char *rootProfileMkClosureLabel(Arena *arena, const void *key);
-
-// For GC.c
-extern traverseState g_rootTraverseState;
 
 #include "EndPrivate.h"
 
