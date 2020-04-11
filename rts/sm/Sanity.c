@@ -27,7 +27,6 @@
 #include "Apply.h"
 #include "Printer.h"
 #include "Arena.h"
-#include "RetainerProfile.h"
 #include "CNF.h"
 #include "sm/NonMoving.h"
 #include "sm/NonMovingMark.h"
@@ -1185,7 +1184,7 @@ memInventory (bool show)
 {
   uint32_t g, i;
   W_ gen_blocks[RtsFlags.GcFlags.generations];
-  W_ nursery_blocks = 0, free_pinned_blocks = 0, retainer_blocks = 0,
+  W_ nursery_blocks = 0, free_pinned_blocks = 0,
       arena_blocks = 0, exec_blocks = 0, gc_free_blocks = 0,
       upd_rem_set_blocks = 0;
   W_ live_blocks = 0, free_blocks = 0;
@@ -1226,12 +1225,6 @@ memInventory (bool show)
       free_pinned_blocks += countBlocks(capabilities[i]->pinned_object_empty);
   }
 
-#if defined(PROFILING)
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-      retainer_blocks = retainerStackBlocks();
-  }
-#endif
-
   // count the blocks allocated by the arena allocator
   arena_blocks = arenaBlocks();
 
@@ -1252,7 +1245,7 @@ memInventory (bool show)
       live_blocks += gen_blocks[g];
   }
   live_blocks += nursery_blocks +
-               + retainer_blocks + arena_blocks + exec_blocks + gc_free_blocks
+               + arena_blocks + exec_blocks + gc_free_blocks
                + upd_rem_set_blocks + free_pinned_blocks;
 
 #define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
@@ -1274,8 +1267,6 @@ memInventory (bool show)
                  nursery_blocks, MB(nursery_blocks));
       debugBelch("  empty pinned : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  free_pinned_blocks, MB(free_pinned_blocks));
-      debugBelch("  retainer     : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 retainer_blocks, MB(retainer_blocks));
       debugBelch("  arena blocks : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  arena_blocks, MB(arena_blocks));
       debugBelch("  exec         : %5" FMT_Word " blocks (%6.1lf MB)\n",

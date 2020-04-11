@@ -116,10 +116,11 @@ testReturn(StgClosure *c, const stackAccum acc,
 }
 
 static bool
-testVisit(StgClosure *c, const StgClosure *cp,
+testVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
           const stackData data, const bool first_visit,
           stackAccum *acc, stackData *child_data)
 {
+    (void) ts;
     (void) cp;
     (void) data;
     (void) acc;
