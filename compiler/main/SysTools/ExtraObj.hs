@@ -16,11 +16,11 @@ module SysTools.ExtraObj (
 import AsmUtils
 import ErrUtils
 import GHC.Driver.Session
-import GHC.Driver.Packages
+import GHC.Unit.State
 import GHC.Platform
 import Outputable
 import GHC.Types.SrcLoc ( noSrcSpan )
-import GHC.Types.Module
+import GHC.Unit
 import Elf
 import Util
 import GhcPrelude
