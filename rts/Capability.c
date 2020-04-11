@@ -23,6 +23,7 @@
 #include "Schedule.h"
 #include "Sparks.h"
 #include "Trace.h"
+#include "eventlog/EventLog.h" // for flushLocalEventsBuf
 #include "sm/GC.h" // for gcWorkerThread()
 #include "STM.h"
 #include "RtsUtils.h"
@@ -883,6 +884,10 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
             case SYNC_FLUSH_UPD_REM_SET:
                 debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
+                break;
+
+            case SYNC_FLUSH_EVENT_LOG:
+                flushLocalEventsBuf(cap);
                 break;
 
             default:
