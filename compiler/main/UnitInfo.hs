@@ -14,6 +14,7 @@ module UnitInfo
    , UnitKeyInfo
    , mkUnitKeyInfo
    , mapUnitInfo
+   , mkUnitPprInfo
 
    , mkUnit
    , expandedUnitInfoId
@@ -40,6 +41,7 @@ import FastString
 import Outputable
 import GHC.Types.Module as Module
 import GHC.Types.Unique
+import GHC.Types.Unit.Ppr
 
 -- | Information about an installed unit
 --
@@ -119,12 +121,12 @@ instance Outputable PackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
-unitPackageIdString :: UnitInfo -> String
+unitPackageIdString :: GenUnitInfo u -> String
 unitPackageIdString pkg = unpackFS str
   where
     PackageId str = unitPackageId pkg
 
-unitPackageNameString :: UnitInfo -> String
+unitPackageNameString :: GenUnitInfo u -> String
 unitPackageNameString pkg = unpackFS str
   where
     PackageName str = unitPackageName pkg
@@ -173,3 +175,10 @@ definiteUnitInfoId p =
     case mkUnit p of
         RealUnit def_uid -> Just def_uid
         _               -> Nothing
+
+-- | Create a UnitPprInfo from a UnitInfo
+mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
+mkUnitPprInfo i = UnitPprInfo
+   (unitPackageNameString i)
+   (unitPackageVersion i)
+   ((unpackFS . unPackageName) <$> unitComponentName i)
