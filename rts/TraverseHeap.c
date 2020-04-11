@@ -13,6 +13,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "sm/Storage.h"
+#include "sm/HeapAlloc.h"
 
 #include "rts/TraverseHeap.h"
 
@@ -100,6 +101,9 @@ initializeTraverseStack( traverseState *ts )
     ts->stackSize = 0;
     ts->maxStackSize = 0;
 
+    ts->firstStaticObjects = NULL;
+    ts->staticObjects = NULL;
+
     newStackBlock(ts, ts->firstStack);
 }
 
@@ -115,6 +119,12 @@ closeTraverseStack( traverseState *ts )
     ASSERT(ts->firstStack != NULL);
     freeChain(ts->firstStack);
     ts->firstStack = NULL;
+
+    if(ts->firstStaticObjects) {
+        freeChain(ts->firstStaticObjects);
+    }
+    ts->firstStaticObjects = NULL;
+    ts->staticObjects = NULL;
 }
 
 /**
@@ -145,6 +155,9 @@ traverseWorkStackBlocks(traverseState *ts)
     W_ res = 0;
 
     for (bd = ts->firstStack; bd != NULL; bd = bd->link)
+      res += bd->blocks;
+
+    for (bd = ts->firstStaticObjects; bd != NULL; bd = bd->link)
       res += bd->blocks;
 
     return res;
@@ -1101,6 +1114,26 @@ resetMutableObjects(traverseState* ts)
     }
 }
 
+static void
+appendStaticObject(traverseState *ts, StgClosure *p)
+{
+    bdescr *bd = ts->staticObjects;
+    bdescr *nbd;
+    if(!bd || bd->free >= bd->start + bd->blocks * BLOCK_SIZE_W)
+    {
+        nbd = allocGroup(1);
+        nbd->link = NULL;
+        if(ts->staticObjects) {
+            ts->staticObjects->link = nbd;
+        } else {
+            ts->firstStaticObjects = nbd;
+        }
+        ts->staticObjects = nbd;
+    }
+
+    *ts->staticObjects->free++ = (StgWord)p;
+}
+
 void
 traverseWorkStack(traverseState *ts,
                   visitClosure_cb visit_cb,
@@ -1206,6 +1239,16 @@ inner_loop:
     if(visit_cb)
         traverse_children = visit_cb(ts, c, cp, data, first_visit,
                                      &accum, &child_data);
+
+    if(first_visit && !HEAP_ALLOCED(c)) {
+        // So in principle the GC already produces the scavenged_static_objects
+        // which we can use, but it doesn't put absolutely all static objects on
+        // it. Only certain ones that actually participate in GC. Thus we have
+        // to keep our own list of objects in order to reset their heap
+        // profiling header.
+        appendStaticObject(ts, c);
+    }
+
     if(!traverse_children)
         goto loop;
 
