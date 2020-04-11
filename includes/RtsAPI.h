@@ -18,8 +18,6 @@ extern "C" {
 #include "HsFFI.h"
 #include "rts/Time.h"
 #include "rts/Types.h"
-#include "rts/EventLogWriter.h"
-
 
 /*
  * Running the scheduler
@@ -59,6 +57,9 @@ typedef struct CapabilityPublic_ {
     StgFunTable f;
     StgRegTable r;
 } CapabilityPublic;
+
+/* N.B. this needs the Capability declaration above. */
+#include "rts/EventLogWriter.h"
 
 /* ----------------------------------------------------------------------------
    RTS configuration settings, for passing to hs_init_ghc()
