@@ -91,9 +91,7 @@ returnToOldStack( traverseState *ts, bdescr *bd )
 void
 initializeTraverseStack( traverseState *ts )
 {
-    if (ts->firstStack != NULL) {
-        freeChain(ts->firstStack);
-    }
+    ASSERT(ts->firstStack == NULL);
 
     ts->firstStack = allocGroup(BLOCKS_IN_STACK);
     ts->firstStack->link = NULL;
@@ -114,6 +112,7 @@ initializeTraverseStack( traverseState *ts )
 void
 closeTraverseStack( traverseState *ts )
 {
+    ASSERT(ts->firstStack != NULL);
     freeChain(ts->firstStack);
     ts->firstStack = NULL;
 }
@@ -1204,7 +1203,7 @@ inner_loop:
     bool first_visit = traverseMaybeInitClosureData(ts, c);
     bool traverse_children = first_visit;
     if(visit_cb)
-        traverse_children = visit_cb(c, cp, data, first_visit,
+        traverse_children = visit_cb(ts, c, cp, data, first_visit,
                                      &accum, &child_data);
     if(!traverse_children)
         goto loop;
