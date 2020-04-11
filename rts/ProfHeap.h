@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "rts/TraverseHeap.h"
+
 #include "BeginPrivate.h"
 
 typedef struct _Census Census;
@@ -21,6 +23,10 @@ bool        strMatchesSelector (const char* str, const char* sel);
 #if defined(PROFILING)
 // doingRetainerProfiling: `-hr` or `-hr<cc> -h<x>`
 bool doingRetainerProfiling(void);
+
+// For GC.c
+extern traverseState hp_traverseState;
+
 #endif
 
 #include "EndPrivate.h"
