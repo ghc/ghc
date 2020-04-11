@@ -2077,10 +2077,7 @@ mkIndefUnitId pkgstate raw =
     let uid = UnitId raw
     in case lookupInstalledPackage pkgstate uid of
          Nothing -> Indefinite uid Nothing -- we didn't find the unit at all
-         Just c  -> Indefinite uid $ Just $ UnitPprInfo
-                                             (unitPackageNameString c)
-                                             (unitPackageVersion c)
-                                             ((unpackFS . unPackageName) <$> unitComponentName c)
+         Just c  -> Indefinite uid $ Just $ mkUnitPprInfo c
 
 -- | Update component ID details from the database
 updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
