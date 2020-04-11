@@ -39,7 +39,7 @@ import Text.XHtml hiding ( name, title, p, quote )
 import qualified Text.XHtml as XHtml
 
 import GHC              ( SrcSpan(..), srcSpanStartLine, Name )
-import GHC.Types.Module ( Module, ModuleName, moduleName, moduleNameString )
+import GHC.Unit.Module ( Module, ModuleName, moduleName, moduleNameString )
 import GHC.Types.Name   ( getOccString, nameOccName, isValOcc )
 
 

@@ -48,7 +48,7 @@ import           GHC.Data.FastString
 import           GHC ( DynFlags, Module, moduleUnit )
 import           Haddock.Types
 import           Haddock.Utils
-import           GHC.Driver.Packages
+import           GHC.Unit.State
 import           System.Console.GetOpt
 import qualified Text.ParserCombinators.ReadP as RP
 

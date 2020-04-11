@@ -15,9 +15,9 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 import Haddock.Types ( MDoc )
 
 import GHC                 ( Name )
-import GHC.Types.Module    ( Module, moduleNameString, moduleName, moduleUnit, unitString )
+import GHC.Unit.Module    ( Module, moduleNameString, moduleName, moduleUnit, unitString )
 import GHC.Driver.Session  ( DynFlags )
-import GHC.Driver.Packages ( lookupUnit, unitPackageIdString )
+import GHC.Unit.State ( lookupUnit, unitPackageIdString )
 
 import qualified Control.Applicative as A
 

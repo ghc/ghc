@@ -40,7 +40,7 @@ import Data.Traversable
 
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail  as Avail
-import qualified GHC.Types.Module as Module
+import qualified GHC.Unit.Module as Module
 import qualified GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.ConLike (ConLike(..))
 import GHC
@@ -48,7 +48,7 @@ import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
+import GHC.Unit.State   ( lookupModuleInAllPackages, PackageName(..) )
 import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Tc.Types

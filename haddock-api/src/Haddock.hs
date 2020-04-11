@@ -68,9 +68,8 @@ import GHC hiding (verbosity)
 import Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
 import GHC.Utils.Error
-import GHC.Driver.Packages
+import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
-import GHC.Types.Module
 import GHC.Data.FastString
 import qualified GHC.Runtime.Loader
 

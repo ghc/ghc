@@ -34,7 +34,7 @@ import GHC.Utils.Error
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
-import GHC.Types.Module ( ModuleSet, moduleSetElts )
+import GHC.Unit.Module.Env ( ModuleSet, moduleSetElts )
 import GHC.Utils.Monad (liftIO)
 import GHC.Types.Name
 import GHC.Types.Name.Env
