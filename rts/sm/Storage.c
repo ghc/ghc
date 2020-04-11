@@ -1120,10 +1120,10 @@ allocateMightFail (Capability *cap, W_ n)
  * See Note [skipping slop in the heap profiler]
  */
 #if defined(PROFILING)
-#define MEMSET_IF_PROFILING_W(p, val, len) memset(p, val, (len) * sizeof(W_))
+#define MEMSET_IF_PROFILING_W(p, val, len_w) memset(p, val, (len_w) * sizeof(W_))
 #else
-#define MEMSET_IF_PROFILING_W(p, val, len) \
-    do { (void)(p); (void)(val); (void)(len); } while(0)
+#define MEMSET_IF_PROFILING_W(p, val, len_w) \
+    do { (void)(p); (void)(val); (void)(len_w); } while(0)
 #endif
 
 /* ---------------------------------------------------------------------------
@@ -1151,7 +1151,7 @@ allocateMightFail (Capability *cap, W_ n)
    ------------------------------------------------------------------------- */
 
 StgPtr
-allocatePinned (Capability *cap, W_ n, W_ alignment, W_ align_off)
+allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ align_off /*bytes*/)
 {
     StgPtr p;
     bdescr *bd;
@@ -1160,8 +1160,9 @@ allocatePinned (Capability *cap, W_ n, W_ alignment, W_ align_off)
     ASSERT(alignment && !(alignment & (alignment - 1)));
     ASSERT(alignment >= sizeof(W_));
 
-    ASSERT(align_off && !(align_off & (align_off - 1)));
-    ASSERT(align_off >= sizeof(W_));
+    ASSERT(!(align_off & (align_off - 1)));
+
+    const StgWord alignment_w = alignment / sizeof(W_);
 
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
@@ -1170,29 +1171,29 @@ allocatePinned (Capability *cap, W_ n, W_ alignment, W_ align_off)
         // allocated for alignment reasons. Here we just allocate the maximum
         // number of extra words we could possibly need to satisfy the alignment
         // constraint.
-        p = allocateMightFail(cap, n + ROUNDUP_BYTES_TO_WDS(alignment)-1);
+        p = allocateMightFail(cap, n + alignment_w - 1);
         if (p == NULL) {
             return NULL;
         } else {
             Bdescr(p)->flags |= BF_PINNED;
-            W_ off = ALIGN_WITH_OFF_W(p, alignment, align_off);
-            MEMSET_IF_PROFILING_W(p, 0, off);
-            p += off;
-            MEMSET_IF_PROFILING_W(p + n, 0, alignment - off - 1);
+            W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
+            MEMSET_IF_PROFILING_W(p, 0, off_w);
+            p += off_w;
+            MEMSET_IF_PROFILING_W(p + n, 0, alignment_w - off_w - 1);
             return p;
         }
     }
 
     bd = cap->pinned_object_block;
 
-    W_ off = 0;
+    W_ off_w = 0;
 
     if(bd)
-        off = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+        off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
 
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, get a new one.
-    if (bd == NULL || (bd->free + off + n) > (bd->start + BLOCK_SIZE_W)) {
+    if (bd == NULL || (bd->free + off_w + n) > (bd->start + BLOCK_SIZE_W)) {
 
         // stash the old block on cap->pinned_object_blocks.  On the
         // next GC cycle these objects will be moved to
@@ -1245,18 +1246,20 @@ allocatePinned (Capability *cap, W_ n, W_ alignment, W_ align_off)
         // block will be promoted as usual (if anything in it is
         // live).
 
-        off = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+        off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
     }
 
     p = bd->free;
 
-    MEMSET_IF_PROFILING_W(p, 0, off);
+    MEMSET_IF_PROFILING_W(p, 0, off_w);
 
-    n += off;
-    accountAllocation(cap, n);
+    n += off_w;
+    p += off_w;
     bd->free += n;
 
-    return p + off;
+    accountAllocation(cap, n);
+
+    return p;
 }
 
 /* -----------------------------------------------------------------------------
