@@ -49,7 +49,7 @@ import GHC.Core.Coercion
 import GHC.Builtin.Types
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.Rules

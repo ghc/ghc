@@ -95,7 +95,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
 import GHC.Utils.Error
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 

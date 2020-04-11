@@ -30,7 +30,7 @@ import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Avail
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
 import GHC.Iface.Type

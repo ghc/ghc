@@ -25,14 +25,13 @@ import GHC.Driver.Backpack.Syntax
 
 import GHC.Parser.Annotation
 import GHC hiding (Failed, Succeeded)
-import GHC.Driver.Packages hiding (packageNameMap)
 import GHC.Parser
 import GHC.Parser.Lexer
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Module
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Driver.Types
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
@@ -88,7 +87,7 @@ doBackpack [src_filename] = do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
             let pkgstate = pkgState dflags
-            let bkp = renameHsUnits pkgstate (packageNameMap pkgstate pkgname_bkp) pkgname_bkp
+            let bkp = renameHsUnits pkgstate (bkpPackageNameMap pkgstate pkgname_bkp) pkgname_bkp
             initBkpM src_filename bkp $
                 forM_ (zip [1..] bkp) $ \(i, lunit) -> do
                     let comp_name = unLoc (hsunitName (unLoc lunit))
@@ -192,7 +191,7 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnit dflags (improveUnit (getUnitInfoMap dflags) $ renameHoleUnit dflags (listToUFM insts) uid0)
+          let uid = unwireUnit dflags (improveUnit (unitInfoMap (pkgState dflags)) $ renameHoleUnit (pkgState dflags) (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -260,7 +259,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit dflags hsubst) raw_deps
+        deps0 = map (renameHoleUnit (pkgState dflags) hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -273,7 +272,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnit (getUnitInfoMap dflags)) deps0
+    let deps = map (improveUnit (unitInfoMap (pkgState dflags))) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -562,8 +561,8 @@ unitDefines :: PackageState -> LHsUnit PackageName -> (PackageName, HsComponentI
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
     = (pn, HsComponentId pn (mkIndefUnitId pkgstate fs))
 
-packageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
-packageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
+bkpPackageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
+bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
 
 renameHsUnits :: PackageState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
 renameHsUnits pkgstate m units = map (fmap renameHsUnit) units

@@ -71,7 +71,7 @@ import GHC.Cmm.CLabel           ( mkForeignLabel )
 
 
 import GHC.Types.Basic
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import GHC.Utils.Outputable
 

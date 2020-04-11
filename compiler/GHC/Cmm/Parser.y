@@ -236,7 +236,7 @@ import GHC.Parser.Lexer
 
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Platform
 import GHC.Types.Literal
 import GHC.Types.Unique

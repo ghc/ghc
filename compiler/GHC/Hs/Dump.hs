@@ -27,7 +27,7 @@ import GHC.Core.DataCon
 import GHC.Types.SrcLoc
 import GHC.Hs
 import GHC.Types.Var
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Outputable
 
 import qualified Data.ByteString as B

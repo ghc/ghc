@@ -57,7 +57,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Error
-import GHC.Types.Module ( moduleName, pprModuleName )
+import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 
 
