@@ -1,8 +1,8 @@
 module GHC.Types.Module where
 
 import GhcPrelude
+import {-# SOURCE #-} GHC.Types.Module.Name
 
-data ModuleName
 data UnitId
 data GenModule a
 data GenUnit a

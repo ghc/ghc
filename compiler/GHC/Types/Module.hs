@@ -20,17 +20,7 @@ the keys.
 module GHC.Types.Module
     (
         -- * The ModuleName type
-        ModuleName,
-        pprModuleName,
-        moduleNameFS,
-        moduleNameString,
-        moduleNameSlashes, moduleNameColons,
-        moduleStableString,
-        moduleFreeHoles,
-        moduleIsDefinite,
-        mkModuleName,
-        mkModuleNameFS,
-        stableModuleNameCmp,
+        module GHC.Types.Module.Name,
 
         -- * The Unit type
         Indefinite(..),
@@ -105,6 +95,9 @@ module GHC.Types.Module
         mkModule,
         mkHoleModule,
         stableModuleCmp,
+        moduleStableString,
+        moduleFreeHoles,
+        moduleIsDefinite,
         HasModule(..),
         ContainsModule(..),
 
@@ -156,6 +149,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
+import GHC.Types.Module.Name
 import FastString
 import Binary
 import Util
@@ -181,7 +175,6 @@ import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified FiniteMap as Map
-import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, displayUnitId, getPackageState, PackageState, unitInfoMap)
@@ -447,83 +440,6 @@ addBootSuffixLocnOut locn
          , ml_obj_file = addBootSuffix (ml_obj_file locn)
          , ml_hie_file = addBootSuffix (ml_hie_file locn) }
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{The name of a module}
-*                                                                      *
-************************************************************************
--}
-
--- | A ModuleName is essentially a simple string, e.g. @Data.List@.
-newtype ModuleName = ModuleName FastString
-
-instance Uniquable ModuleName where
-  getUnique (ModuleName nm) = getUnique nm
-
-instance Eq ModuleName where
-  nm1 == nm2 = getUnique nm1 == getUnique nm2
-
-instance Ord ModuleName where
-  nm1 `compare` nm2 = stableModuleNameCmp nm1 nm2
-
-instance Outputable ModuleName where
-  ppr = pprModuleName
-
-instance Binary ModuleName where
-  put_ bh (ModuleName fs) = put_ bh fs
-  get bh = do fs <- get bh; return (ModuleName fs)
-
-instance Data ModuleName where
-  -- don't traverse?
-  toConstr _   = abstractConstr "ModuleName"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "ModuleName"
-
-instance NFData ModuleName where
-  rnf x = x `seq` ()
-
-stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
--- ^ Compares module names lexically, rather than by their 'Unique's
-stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
-
-pprModuleName :: ModuleName -> SDoc
-pprModuleName (ModuleName nm) =
-    getPprStyle $ \ sty ->
-    if codeStyle sty
-        then ztext (zEncodeFS nm)
-        else ftext nm
-
-moduleNameFS :: ModuleName -> FastString
-moduleNameFS (ModuleName mod) = mod
-
-moduleNameString :: ModuleName -> String
-moduleNameString (ModuleName mod) = unpackFS mod
-
--- | Get a string representation of a 'Module' that's unique and stable
--- across recompilations.
--- eg. "$aeson_70dylHtv1FFGeai1IoxcQr$Data.Aeson.Types.Internal"
-moduleStableString :: Module -> String
-moduleStableString Module{..} =
-  "$" ++ unitString moduleUnit ++ "$" ++ moduleNameString moduleName
-
-mkModuleName :: String -> ModuleName
-mkModuleName s = ModuleName (mkFastString s)
-
-mkModuleNameFS :: FastString -> ModuleName
-mkModuleNameFS s = ModuleName s
-
--- |Returns the string version of the module name, with dots replaced by slashes.
---
-moduleNameSlashes :: ModuleName -> String
-moduleNameSlashes = dots_to_slashes . moduleNameString
-  where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
-
--- |Returns the string version of the module name, with dots replaced by colons.
---
-moduleNameColons :: ModuleName -> String
-moduleNameColons = dots_to_colons . moduleNameString
-  where dots_to_colons = map (\c -> if c == '.' then ':' else c)
 
 {-
 ************************************************************************
@@ -566,6 +482,14 @@ moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 -- | A 'Module' is definite if it has no free holes.
 moduleIsDefinite :: Module -> Bool
 moduleIsDefinite = isEmptyUniqDSet . moduleFreeHoles
+
+-- | Get a string representation of a 'Module' that's unique and stable
+-- across recompilations.
+-- eg. "$aeson_70dylHtv1FFGeai1IoxcQr$Data.Aeson.Types.Internal"
+moduleStableString :: Module -> String
+moduleStableString Module{..} =
+  "$" ++ unitString moduleUnit ++ "$" ++ moduleNameString moduleName
+
 
 instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitFS p `appendFS` moduleNameFS n)
