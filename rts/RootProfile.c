@@ -220,23 +220,6 @@ rootProfile(traverseState *ts, Time t, Census *census)
     if(ps->n_roots == 0)
         return;
 
-    /* The following double traversal is pretty inefficient. However it's the
-     * simplest way to get this working for now.
-     *
-     * Essentially the problem is this: Say currently flip=1, if we traverse a
-     * subset of the heap now then the visited bit of all reachable closures
-     * will get set to one and the unreachable ones remain at zero. After the
-     * traversal the flip bit is flipped, so now it's flip=0.
-     *
-     * If the user changes the set of roots before the next traversal we now
-     * have some nodes in our set of reachable closures with visited=1 and
-     * visited=0, the ones with '0' would be interpteted as "currently valid" so
-     * their heap profiling header is not reset, giving us stale data.
-     *
-     * We solve this here by traversing twice. This always resets the visited
-     * bit back to zero in the end.
-     */
-
     debug(2, "\n=== root profile ===\n");
 
     rootProfileVisitRoots(ts, &rootVisit, NULL);
