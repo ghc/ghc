@@ -690,10 +690,9 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
    if (RtsFlags.ProfFlags.includeTSOs && (type == TSO || type == STACK)) {
        return false;
    }
-   if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(&hp_traverseState, p)) {
+   if (RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(&hp_traverseState, p)) {
        return false;
    }
-
    if (RtsFlags.ProfFlags.descrSelector) {
        b = strMatchesSelector( (GET_PROF_DESC(get_itbl((StgClosure *)p))),
                                  RtsFlags.ProfFlags.descrSelector );
@@ -836,6 +835,8 @@ aggregateCensusInfo( void )
 }
 #endif
 
+static size_t dumpCounter(Arena *arena, FILE *fp, counter *ctr);
+
 /* -----------------------------------------------------------------------------
  * Print out the results of a heap census.
  * -------------------------------------------------------------------------- */
@@ -843,7 +844,6 @@ static void
 dumpCensus( Census *census )
 {
     counter *ctr;
-    ssize_t count;
 
     printSample(true, census->time);
 
@@ -900,9 +900,22 @@ dumpCensus( Census *census )
         if(ctr->identity == NULL)
             continue;
 
+        if(dumpCounter(census->arena, hp_file, ctr) == 0)
+            continue;
+    }
+
+    traceHeapProfSampleEnd(era);
+    printSample(false, census->time);
+}
+
+static size_t
+dumpCounter(Arena *arena, FILE *fp, counter *ctr)
+{
+        (void) arena;
+
+        ssize_t count = 0;
 #if defined(PROFILING)
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
-            count = 0;
             if (strMatchesSelector("lag", RtsFlags.ProfFlags.bioSelector))
                 count += ctr->c.ldv.not_used - ctr->c.ldv.void_total;
             if (strMatchesSelector("drag", RtsFlags.ProfFlags.bioSelector))
@@ -919,28 +932,26 @@ dumpCensus( Census *census )
 
         ASSERT( count >= 0 );
 
-        if (count == 0) continue;
+        if (count == 0)
+            return 0;
 
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CLOSURE_TYPE:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
-            traceHeapProfSampleString(0, (char *)ctr->identity,
-                                      count * sizeof(W_));
+            fprintf(fp, "%s", (char *)ctr->identity);
+            traceHeapProfSampleString(0, (char *)ctr->identity, count * sizeof(W_));
             break;
 #if defined(PROFILING)
         case HEAP_BY_CCS:
-            fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
+            fprint_ccs(fp, (CostCentreStack *)ctr->identity,
                        RtsFlags.ProfFlags.ccsLength);
-            traceHeapProfSampleCostCentre(0, (CostCentreStack *)ctr->identity,
-                                          count * sizeof(W_));
+            traceHeapProfSampleCostCentre(
+                0, (CostCentreStack *)ctr->identity, count * sizeof(W_));
             break;
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:
         case HEAP_BY_TYPE:
-        case HEAP_BY_ROOT:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
-            traceHeapProfSampleString(0, (char *)ctr->identity,
-                                      count * sizeof(W_));
+            fprintf(fp, "%s", (char *)ctr->identity);
+            traceHeapProfSampleString(0, (char *)ctr->identity, count * sizeof(W_));
             break;
         case HEAP_BY_RETAINER:
         {
@@ -948,7 +959,7 @@ dumpCensus( Census *census )
 
             // it might be the distinguished retainer set rs_MANY:
             if (rs == &rs_MANY) {
-                fprintf(hp_file, "MANY");
+                fprintf(fp, "MANY");
                 break;
             }
 
@@ -962,8 +973,15 @@ dumpCensus( Census *census )
                 rs->id = -(rs->id);
 
             // report in the unit of bytes: * sizeof(StgWord)
-            printRetainerSetShort(hp_file, rs, (W_)count * sizeof(W_)
-                                             , RtsFlags.ProfFlags.ccsLength);
+            printRetainerSetShort(
+                fp, rs, (W_)count * sizeof(W_), RtsFlags.ProfFlags.ccsLength);
+            break;
+        }
+        case HEAP_BY_ROOT:
+        {
+            const char *label = rootProfileMkClosureLabel(arena, ctr->identity);
+            fprintf(fp, "%s", label);
+            traceHeapProfSampleString(0, label, count * sizeof(W_));
             break;
         }
 #endif
@@ -971,13 +989,39 @@ dumpCensus( Census *census )
             barf("dumpCensus; doHeapProfile");
         }
 
-        fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
-    }
+        fprintf(fp, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
 
-    traceHeapProfSampleEnd(era);
-    printSample(false, census->time);
-
+        return count;
 }
+
+#if defined(DEBUG)
+FILE *hp_debug_file = 0;
+
+static int cmpStgWord(const void *a, const void *b)
+{
+    return *((const StgWord*)a) - *((const StgWord*)b);
+}
+
+static void
+dumpSortedCensus(FILE *fp, Census *census)
+{
+    int kc = keyCountHashTable(census->hash);
+    StgWord *keys = arenaAlloc(census->arena, kc * sizeof(StgWord));
+    kc = keysHashTable(census->hash, keys, kc);
+
+    qsort(keys, kc, sizeof(StgWord), cmpStgWord);
+
+    for(int i=0; i < kc; i++) {
+        counter *ctr = lookupHashTable(census->hash, keys[i]);
+        if(!ctr)
+            continue;
+
+        dumpCounter(census->arena, fp, ctr);
+    }
+    fprintf(fp, "\n");
+    fflush(fp);
+}
+#endif
 
 counter*
 heapInsertNewCounter(Census *census, const void *identity)
@@ -1277,30 +1321,62 @@ Census* performHeapCensus(Time t)
   stat_startHeapCensus();
 #endif
 
-#if defined(PROFILING)
-  if(RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_ROOT)
-#endif
-  {
-      // Traverse the heap, collecting the census info
-      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-          heapCensusChain( census, generations[g].blocks );
-          // Are we interested in large objects?  might be
-          // confusing to include the stack in a heap profile.
-          heapCensusChain( census, generations[g].large_objects );
-          heapCensusCompactList ( census, generations[g].compact_objects );
+  // Traverse the heap, collecting the census info
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      heapCensusChain( census, generations[g].blocks );
+      // Are we interested in large objects?  might be
+      // confusing to include the stack in a heap profile.
+      heapCensusChain( census, generations[g].large_objects );
+      heapCensusCompactList ( census, generations[g].compact_objects );
 
-          for (n = 0; n < n_capabilities; n++) {
-              ws = &gc_threads[n]->gens[g];
-              heapCensusChain(census, ws->todo_bd);
-              heapCensusChain(census, ws->part_list);
-              heapCensusChain(census, ws->scavd_list);
-          }
+      for (n = 0; n < n_capabilities; n++) {
+          ws = &gc_threads[n]->gens[g];
+          heapCensusChain(census, ws->todo_bd);
+          heapCensusChain(census, ws->part_list);
+          heapCensusChain(census, ws->scavd_list);
       }
   }
 
 #if defined(PROFILING)
-  if(doingRootProfiling())
-      endRootProfiling(&hp_traverseState);
+  if(doingRootProfiling()) {
+      /* When doing a root profile we also want to pick up static closures. This
+       * is so we can maintain the behaviour from before we integrated the root
+       * profiler into ProfHeap's counter infrastructure.
+       *
+       * For the purposes of root profiling it shouldn't matter if closures are
+       * reachable only via static closures, we want to see the accounted sizes
+       * in the heap profile nontheless.
+       *
+       * Really we should generalise this for all heap profile modes. Let the GC
+       * collect the list of all live static closures, then always account them
+       * here. Note that the scavanged_static_objects is insufficient for this
+       * purpose as it only contains closures that can have outgoing pointers.
+       *
+       * If we do that we probably need to have a new filter for static/dynamic
+       * closures to allow uses to get back to the old behaviour since it is
+       * still quite reasonable to want to ignore static closures for space
+       * usage purposes.
+       *
+       * The retainer profiler will also likely neeed some light fixing, I tried
+       * using this with it and it gives some weird, though not entirely
+       * nonsensical results. Specifically we get retainers such as
+       * "CAF,CAF,CAF,CAF,CAF" and "CAF,CAF,CAF,SYSTEM".
+       *
+       * See Note [STATIC OBJECT LIST].
+       */
+      bdescr *bd = hp_traverseState.firstStaticObjects;
+      while(bd) {
+          StgClosure **p = (StgClosure**)bd->start;
+          while(p < (StgClosure**)bd->free) {
+              heapProfObject(census, *p, get_itbl(*p)->type, closure_sizeW(*p),
+                             /*prim=*/false);
+              /* We're doing a traversal profile here so LDV can't be active.
+                 Thus 'prim' doesn't matter here */
+              p++;
+          }
+          bd = bd->link;
+      }
+  }
 
   if(doingTraversal())
       closeTraverseStack(&hp_traverseState);
@@ -1314,6 +1390,11 @@ Census* performHeapCensus(Time t)
         dumpCensus( census );
 #else
     dumpCensus( census );
+#endif
+
+#if defined(DEBUG)
+    if(hp_debug_file)
+        dumpSortedCensus(hp_debug_file, census);
 #endif
 
     restore_locale();

@@ -134,7 +134,7 @@ config.way_rts_flags = {
     'prof_hd'      : ['-hd'],
     'prof_hy'      : ['-hy'],
     'prof_hr'      : ['-hr'],
-    'prof_ho'      : ['-ho', '-i0'],
+    'prof_ho'      : ['-ho', '-hO', '-i0'],
     'dyn'          : [],
     'static'       : [],
     'debug'        : [],
