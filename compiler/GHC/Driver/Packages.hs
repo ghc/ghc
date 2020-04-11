@@ -252,9 +252,9 @@ data UnitInfoMap = UnitInfoMap
    , preloadClosure :: UniqSet UnitId
      -- ^ The set of transitively reachable units according
      -- to the explicitly provided command line arguments.
-     -- A fully instantiated InstUnit may only be replaced by a DefUnit from
+     -- A fully instantiated VirtUnit may only be replaced by a RealUnit from
      -- this set.
-     -- See Note [InstUnit to DefUnit improvement]
+     -- See Note [VirtUnit to RealUnit improvement]
    }
 
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
@@ -400,8 +400,8 @@ lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
 lookupUnit' False (UnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
 lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
    HoleUnit   -> error "Hole unit"
-   DefUnit {} -> lookupUDFM pkg_map uid
-   InstUnit i -> fmap (renamePackage m (instUnitInsts i))
+   RealUnit _ -> lookupUDFM pkg_map uid
+   VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
 
 {-
@@ -725,8 +725,8 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
 
            collectHoles uid = case uid of
              HoleUnit       -> Map.empty
-             DefUnit {}     -> Map.empty -- definite units don't have holes
-             InstUnit indef ->
+             RealUnit {}    -> Map.empty -- definite units don't have holes
+             VirtUnit indef ->
                   let local = [ Map.singleton
                                   (moduleName mod)
                                   (Set.singleton $ Module indef mod_name)
@@ -799,10 +799,10 @@ findPackages prec_map pkg_db arg pkgs unusable
           else Nothing
     finder (UnitIdArg uid) p
       = case uid of
-          DefUnit (Definite iuid)
+          RealUnit (Definite iuid)
             | iuid == unitId p
             -> Just p
-          InstUnit inst
+          VirtUnit inst
             | indefUnit (instUnitInstanceOf inst) == unitId p
             -> Just (renamePackage pkg_db (instUnitInsts inst) p)
           _ -> Nothing
@@ -844,7 +844,7 @@ matchingId uid p = uid == unitId p
 
 matching :: PackageArg -> UnitInfo -> Bool
 matching (PackageArg str) = matchingStr str
-matching (UnitIdArg (DefUnit (Definite uid)))  = matchingId uid
+matching (UnitIdArg (RealUnit (Definite uid))) = matchingId uid
 matching (UnitIdArg _)  = \_ -> False -- TODO: warn in this case
 
 -- | This sorts a list of packages, putting "preferred" packages first.
@@ -1079,9 +1079,9 @@ upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap
 upd_wired_in_uid :: WiredPackagesMap -> Unit -> Unit
 upd_wired_in_uid wiredInMap u = case u of
    HoleUnit           -> HoleUnit
-   DefUnit def_uid    -> DefUnit (upd_wired_in wiredInMap def_uid)
-   InstUnit indef_uid ->
-      InstUnit $ mkInstantiatedUnit
+   RealUnit def_uid   -> RealUnit (upd_wired_in wiredInMap def_uid)
+   VirtUnit indef_uid ->
+      VirtUnit $ mkInstantiatedUnit
         (instUnitInstanceOf indef_uid)
         (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 
@@ -1092,10 +1092,10 @@ upd_wired_in wiredInMap key
 
 updateVisibilityMap :: WiredPackagesMap -> VisibilityMap -> VisibilityMap
 updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
-  where f vm (from, to) = case Map.lookup (DefUnit from) vis_map of
+  where f vm (from, to) = case Map.lookup (RealUnit from) vis_map of
                     Nothing -> vm
-                    Just r -> Map.insert (DefUnit to) r
-                                (Map.delete (DefUnit from) vm)
+                    Just r -> Map.insert (RealUnit to) r
+                                (Map.delete (RealUnit from) vm)
 
 
 -- ----------------------------------------------------------------------------
@@ -1596,8 +1596,8 @@ mkPackageState dflags dbs preload0 = do
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
 unwireUnit :: DynFlags -> Unit-> Unit
-unwireUnit dflags uid@(DefUnit def_uid) =
-    maybe uid DefUnit (Map.lookup def_uid (unwireMap (pkgState dflags)))
+unwireUnit dflags uid@(RealUnit def_uid) =
+    maybe uid RealUnit (Map.lookup def_uid (unwireMap (pkgState dflags)))
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -2163,9 +2163,9 @@ fsPackageName info = fs
       PackageName fs = unitPackageName info
 
 -- | Given a fully instantiated 'InstnatiatedUnit', improve it into a
--- 'DefUnit' if we can find it in the package database.
+-- 'RealUnit' if we can find it in the package database.
 improveUnit :: UnitInfoMap -> Unit -> Unit
-improveUnit _ uid@(DefUnit _) = uid -- short circuit
+improveUnit _ uid@(RealUnit _) = uid -- short circuit
 improveUnit pkg_map uid =
     -- Do NOT lookup indefinite ones, they won't be useful!
     case lookupUnit' False pkg_map uid of
@@ -2173,7 +2173,7 @@ improveUnit pkg_map uid =
         Just pkg ->
             -- Do NOT improve if the indefinite unit id is not
             -- part of the closure unique set.  See
-            -- Note [InstUnit to DefUnit improvement]
+            -- Note [VirtUnit to RealUnit improvement]
             if unitId pkg `elementOfUniqSet` preloadClosure pkg_map
                 then mkUnit pkg
                 else uid

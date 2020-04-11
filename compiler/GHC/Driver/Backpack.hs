@@ -223,7 +223,7 @@ typecheckUnit cid insts = do
 compileUnit :: IndefUnitId -> [(ModuleName, Module)] -> BkpM ()
 compileUnit cid insts = do
     -- Let everyone know we're building this unit
-    msgUnitId (mkInstUnit cid insts)
+    msgUnitId (mkVirtUnit cid insts)
     lunit <- getSource cid
     buildUnit CompSession cid insts lunit
 
@@ -399,8 +399,8 @@ compileInclude n (i, uid) = do
     -- Check if we've compiled it already
     case uid of
       HoleUnit   -> return ()
-      DefUnit {} -> return ()
-      InstUnit i -> case lookupUnit dflags uid of
+      RealUnit _ -> return ()
+      VirtUnit i -> case lookupUnit dflags uid of
         Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
         Just _  -> return ()
 
@@ -608,7 +608,7 @@ renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
 
 convertHsComponentId :: HsUnitId HsComponentId -> Unit
 convertHsComponentId (HsUnitId (L _ hscid) subst)
-    = mkInstUnit (hsComponentId hscid) (map (convertHsModuleSubst . unLoc) subst)
+    = mkVirtUnit (hsComponentId hscid) (map (convertHsModuleSubst . unLoc) subst)
 
 convertHsModuleSubst :: HsModuleSubst HsComponentId -> (ModuleName, Module)
 convertHsModuleSubst (L _ modname, L _ m) = (modname, convertHsModuleId m)

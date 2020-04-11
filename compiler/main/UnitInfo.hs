@@ -80,11 +80,11 @@ mkUnitKeyInfo = mapGenericUnitInfo
      mkUnitKey'           = UnitKey        . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS . mkFastStringByteString
      mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid) Nothing
-     mkInstUnitKey' i = case i of
-      DbInstUnitId cid insts -> mkGenInstUnit unitKeyFS (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
-      DbUnitId uid           -> DefUnit (Definite (mkUnitKey' uid))
+     mkVirtUnitKey' i = case i of
+      DbInstUnitId cid insts -> mkGenVirtUnit unitKeyFS (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbUnitId uid           -> RealUnit (Definite (mkUnitKey' uid))
      mkModule' m = case m of
-       DbModule uid n -> mkModule (mkInstUnitKey' uid) (mkModuleName' n)
+       DbModule uid n -> mkModule (mkVirtUnitKey' uid) (mkModuleName' n)
        DbModuleVar  n -> mkHoleModule (mkModuleName' n)
 
 -- | Map over the unit parameter
@@ -161,15 +161,15 @@ pprUnitInfo GenericUnitInfo {..} =
 mkUnit :: UnitInfo -> Unit
 mkUnit p =
     if unitIsIndefinite p
-        then mkInstUnit (unitInstanceOf p) (unitInstantiations p)
-        else DefUnit (Definite (unitId p))
+        then mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
+        else RealUnit (Definite (unitId p))
 
 expandedUnitInfoId :: UnitInfo -> Unit
 expandedUnitInfoId p =
-    mkInstUnit (unitInstanceOf p) (unitInstantiations p)
+    mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
     case mkUnit p of
-        DefUnit def_uid -> Just def_uid
+        RealUnit def_uid -> Just def_uid
         _               -> Nothing
