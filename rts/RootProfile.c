@@ -119,15 +119,14 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
     return identity;
 }
 
-const void *rootProfileGetClosureIdentity(traverseState *ts, const StgClosure *c)
+const void *rootProfileGetClosureIdentity(const StgClosure *c)
 {
-    (void) ts;
-    ASSERT(traverseIsClosureDataValid(ts, c));
+    ASSERT(traverseIsClosureDataValid(c));
     return (void*)(traverseGetClosureData(c)>>2);
 }
 
 static bool
-rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
+rootVisit(StgClosure *c, const StgClosure *cp,
           const stackData data, const bool first_visit,
           stackAccum *acc, stackData *child_data)
 {
@@ -140,7 +139,7 @@ rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
 
     if(first_visit) {
         debug(2, "  bin %s\n", i2b(1ul<<current_root));
-        traverseSetClosureData(ts, c, (1ul<<current_root)<<2);
+        traverseSetClosureData(c, (1ul<<current_root)<<2);
         return true;
     } else {
         StgWord bin_idx = traverseGetClosureData(c)>>2;
@@ -149,7 +148,7 @@ rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
         } else {
             StgWord new_bin = (1ul<<current_root) | bin_idx;
             debug(2, "  bin %s |= %s\n", i2b(bin_idx), i2b((1ul<<current_root)));
-            traverseSetClosureData(ts, c, new_bin<<2);
+            traverseSetClosureData(c, new_bin<<2);
             return true; // have to update the children's bin_idx too
         }
     }
@@ -188,7 +187,6 @@ rootProfileVisitRoots(traverseState *ts, visitClosure_cb visit_cb, returnClosure
 {
     struct rootProfState *ps = &g_rootProfState;
 
-    traverseInvalidateAllClosureData(ts);
     for(StgWord i = 0; i < ps->n_roots; i++) {
         StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
         debug(2, "\npush %s, root=%lu, %p\n", ps->descs[i], i, c);
@@ -199,9 +197,9 @@ rootProfileVisitRoots(traverseState *ts, visitClosure_cb visit_cb, returnClosure
     }
 }
 
-bool rootProfileWasClosureVisited(traverseState *ts, const StgClosure *c)
+bool rootProfileWasClosureVisited(const StgClosure *c)
 {
-    return traverseIsClosureDataValid(ts, c);
+    return traverseIsClosureDataValid(c);
 }
 
 /**
@@ -241,11 +239,6 @@ rootProfile(traverseState *ts, Time t, Census *census)
 
     debug(2, "\n=== root profile ===\n");
 
-    rootProfileVisitRoots(ts, &rootVisit, NULL);
-}
-
-void endRootProfiling(traverseState *ts)
-{
     rootProfileVisitRoots(ts, &rootVisit, NULL);
 }
 

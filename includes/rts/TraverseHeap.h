@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2019
+ * (c) The GHC Team, 2019,2020
  * Author: Daniel Gröber
  *
  * Generalised profiling heap traversal.
@@ -92,27 +92,6 @@ typedef struct stackElement_ {
 } stackElement;
 
 typedef struct traverseState_ {
-    /** Note [Profiling heap traversal visited bit]
-     *
-     * In the profiling way each closure has a StgProfHeader which we use to
-     * store per-closure data. The generic heap traversal code reserves the two
-     * least significant bits of the heap profiling word to decide whether we've
-     * already visited a given closure in the current pass or not. The rest of
-     * the field is free to be used by the calling profiler.
-     *
-     * Since we don't want to have to scan the entire heap a second time just to
-     * reset the per-closure visitied bit after the real traversal we make the
-     * interpretation of these bits depend on the value of a global variable,
-     * 'flip' and "flip" this variable when we want to invalidate all closures
-     * at once instead of iterating over all closures.
-     *
-     * There are some complications with this approach, namely: static objects
-     * and mutable data. There we do just go over all existing objects to reset
-     * the bit manually. See 'resetStaticObjectForProfiling' and
-     * 'resetMutableObjects'.
-     */
-    StgWord flip;
-
     /**
      * Invariants:
      *
@@ -169,16 +148,13 @@ typedef struct traverseState_ {
  * Callback called when heap traversal visits a closure.
  *
  * The callback can assume that the closure's profiling data has been
- * initialized to zero if this is the first visit during a pass.
- *
- * See Note [Profiling heap traversal visited bit].
+ * initialized to zero if this is the first visit during this pass.
  *
  * Returning 'false' will instruct the heap traversal code to skip processing
  * this closure's children. If you don't need to traverse any closure more than
  * once you can simply return 'first_visit'.
  */
 typedef bool (*visitClosure_cb) (
-    traverseState *ts,
     StgClosure *c,
     const StgClosure *cp,
     const stackData data,
@@ -204,60 +180,42 @@ typedef bool (*visitClosure_cb) (
 typedef void (*returnClosure_cb) (
     StgClosure *c,
     const stackAccum acc,
-    StgClosure *c_parent, \
+    StgClosure *c_parent,
     stackAccum *acc_parent);
 
 /**
- * Get data stored in closure header. The two lowest bits are always returned as
+ * Get data stored in closure header. The lowest bit is always returned as
  * zero. The closure must have been visited, i.e. traverseIsClosureDataValid
- * must return true otherwise this is an error. Note that the closure data is
+ * must return true otherwise this is undefined. Note that the closure data is
  * reset to zero on the first visit in this pass by 'traverseWorkStack'.
  */
 StgWord traverseGetClosureData(const StgClosure *c);
 
 /**
  * Set the data in the closure header and mark the closure as visited. The
- * lowest two bits are reserved for the generic heap traversal code and will be
- * ignored if set.
- *
- * See Note [Profiling heap traversal visited bit]
+ * lowest bit is reserved for the generic heap traversal code and must not be
+ * set.
  */
-void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w);
+void traverseSetClosureData(StgClosure *c, StgWord w);
 
 /**
  * Check if closure was visited in the current pass, i.e. if the data in the
  * closure header is valid. All newly-allocated closures start out as
  * "unvisited". Setting the closure data with traverseSetClosureData makes them
- * "visited". Calling 'traverseInvalidateClosureData' inverts the meaning of the
- * visited bit, making all "visited" closures which ever had their closure data
- * set after allocation "unvisited" and vice-versa.
+ * "visited".
  *
- * See Note [Profiling heap traversal visited bit]
+ * Resetting of the closures to the "unvisited" state is a coordinated effort
+ * between closeTraverseStack() and the heap profiler (ProfHeap.c), which resets
+ * all HEAP_ALLOCED closure's headers while closeTraverseStack() handles all
+ * static closures.
  */
-bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c);
-
-/**
- * Ensure the closure's profiling data is initialized to zero if has not been
- * visited yet. If the closure was already visited this function has no
- * effect. True is returned if the closure was originally unvisited, False
- * otherwise.
- *
- * See Note [Profiling heap traversal visited bit].
- */
-bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
-
-/**
- * Flip the interpretation of visited/unvisited in all closure's profiling
- * headers. See 'traverseIsClosureDataValid' for details.
- */
-void traverseInvalidateAllClosureData(traverseState* ts);
+bool traverseIsClosureDataValid(const StgClosure *c);
 
 /**
  * Traverse all closures on the traversal work-stack as well as their children,
  * calling 'visit_cb' each time a closure is visited. See 'visitClosure_cb' for
- * details. When a all of a closures children have been processed and
- * 'return_cb' is non-NULL 'return_cb' is called. See 'returnClosure_cb' for
- * details.
+ * details. When all of a closures children have been processed and 'return_cb'
+ * is non-NULL 'return_cb' is called. See 'returnClosure_cb' for details.
  */
 void traverseWorkStack(
     traverseState *ts,
@@ -267,16 +225,14 @@ void traverseWorkStack(
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackElement *sep, stackData data);
 
-
 /**
- * Allocate and reset the traversal stack. Note that this will not reset the
- * interpretation of the closure data visited bit, see
- * 'traverseIsClosureDataValid'.
+ * Allocate and reset the traversal work-stack.
  */
 void initializeTraverseStack(traverseState *ts);
 
 /**
- * Free the traversal stack.
+ * Free the traversal work-stack and associated data and reset the closure data
+ * for all static objects that were visited during the traversal.
  */
 void closeTraverseStack(traverseState *ts);
 
@@ -285,6 +241,5 @@ int getTraverseStackMaxSize(traverseState *ts);
 
 // for GC.c
 W_ traverseWorkStackBlocks(traverseState *ts);
-void resetStaticObjectForProfiling(const traverseState *ts, StgClosure *static_objects);
 
 #endif /* PROFILING */

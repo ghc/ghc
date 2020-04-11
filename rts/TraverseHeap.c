@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001,2019
+ * (c) The GHC Team, 2001,2019,2020
  * Author: Sungwoo Park, Daniel Gröber
  *
  * Generalised profiling heap traversal.
@@ -21,19 +21,19 @@ const stackData nullStackData;
 
 StgWord traverseGetClosureData(const StgClosure *c)
 {
-    const StgWord hp_hdr = c->header.prof.hp.trav;
-    return hp_hdr & (STG_WORD_MAX ^ 0b11);
+    const StgWord hdr = c->header.prof.hp.trav;
+    return hdr & (STG_WORD_MAX ^ 1);
 }
 
-void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w)
+void traverseSetClosureData(StgClosure *c, StgWord w)
 {
-    ASSERT((w & 0b11) == 0);
-    c->header.prof.hp.trav = (w & ~0b11) | 0b10 | ts->flip;
+    ASSERT((w & 1) == 0);
+    c->header.prof.hp.trav = w | 1;
 }
 
-bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c)
+bool traverseIsClosureDataValid(const StgClosure *c)
 {
-    return (c->header.prof.hp.trav & 0b11) == (0b10 | ts->flip);
+    return (c->header.prof.hp.trav & 1) == 1;
 }
 
 #if defined(DEBUG)
@@ -86,6 +86,12 @@ returnToOldStack( traverseState *ts, bdescr *bd )
     bd->free = (StgPtr)ts->stackLimit;
 }
 
+/**
+ * Given the list of static objects found during traversal invalidate thier heap
+ * profiling header. This ensures that when doing the actual traversal no static
+ * closures will seem to have been visited already because they were visited in
+ * the last pass.
+ */
 static void
 resetStaticObjects(traverseState *ts)
 {
@@ -123,12 +129,6 @@ initializeTraverseStack( traverseState *ts )
     newStackBlock(ts, ts->firstStack);
 }
 
-/**
- * Frees all the block groups in the traversal works-stack.
- *
- * Invariants:
- *   firstStack != NULL
- */
 void
 closeTraverseStack( traverseState *ts )
 {
@@ -137,6 +137,7 @@ closeTraverseStack( traverseState *ts )
     ts->firstStack = NULL;
 
     if(ts->firstStaticObjects) {
+        resetStaticObjects(ts);
         freeChain(ts->firstStaticObjects);
     }
     ts->firstStaticObjects = NULL;
@@ -648,8 +649,7 @@ callReturnAndPopStackElement(traverseState *ts, returnClosure_cb return_cb)
 }
 
 /**
- *  Finds the next object to be considered for retainer profiling and store
- *  its pointer to *c.
+ *  Finds the next object on the stack and store its pointer in *c.
  *
  *  If the unprocessed object was stored in the stack (posTypeFresh), the
  *  this object is returned as-is. Otherwise Test if the topmost stack
@@ -887,11 +887,11 @@ out:
 
 }
 
-bool
-traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c)
+static bool
+traverseMaybeInitClosureData(StgClosure *c)
 {
-    if (!traverseIsClosureDataValid(ts, c)) {
-        traverseSetClosureData(ts, c, 0);
+    if (!traverseIsClosureDataValid(c)) {
+        traverseSetClosureData(c, 0);
         return true;
     }
     return false;
@@ -1105,32 +1105,6 @@ traversePAP (traverseState *ts,
 }
 
 static void
-resetMutableObjects(traverseState* ts)
-{
-    uint32_t g, n;
-    bdescr *bd;
-    StgPtr ml;
-
-    // The following code resets the 'trav' field of each unvisited mutable
-    // object.
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        // NOT true: even G0 has a block on its mutable list
-        // ASSERT(g != 0 || (generations[g].mut_list == NULL));
-
-        // Traversing through mut_list is necessary
-        // because we can find MUT_VAR objects which have not been
-        // visited during heap traversal.
-        for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
-                ((StgClosure *)*ml)->header.prof.hp = (union StgProfHeapHeader){};
-            }
-          }
-        }
-    }
-}
-
-static void
 appendStaticObject(traverseState *ts, StgClosure *p)
 {
     bdescr *bd = ts->staticObjects;
@@ -1225,10 +1199,9 @@ inner_loop:
             //
             // But what about CONSTR?  Surely these may be able
             // to appear, and they don't have SRTs, so we can't
-            // check.  So for now, we're calling
-            // resetStaticObjectForProfiling() from the
-            // garbage collector to reset the retainer sets in all the
-            // reachable static objects.
+            // check.  So for now, we're using resetStaticObjects()
+            // to reset the traversal data in all the reachable static
+            // objects.
             goto loop;
         }
         /* fall-thru */
@@ -1250,10 +1223,10 @@ inner_loop:
     memset(&accum, 0, sizeof(accum));
 
     // If this is the first visit to c, initialize its data.
-    bool first_visit = traverseMaybeInitClosureData(ts, c);
+    bool first_visit = traverseMaybeInitClosureData(c);
     bool traverse_children = first_visit;
     if(visit_cb)
-        traverse_children = visit_cb(ts, c, cp, data, first_visit,
+        traverse_children = visit_cb(c, cp, data, first_visit,
                                      &accum, &child_data);
 
     if(first_visit && !HEAP_ALLOCED(c)) {
@@ -1382,87 +1355,6 @@ inner_loop:
     cp = c;
     c = first_child;
     goto inner_loop;
-}
-
-/**
- * This function flips the 'flip' bit and hence every closure's profiling data
- * will be reset to zero upon visiting. See Note [Profiling heap traversal
- * visited bit].
- */
-void
-traverseInvalidateAllClosureData(traverseState* ts)
-{
-    // First make sure any unvisited mutable objects are valid so they're
-    // invalidated by the flip below
-    resetMutableObjects(ts);
-
-    resetStaticObjects(ts);
-
-    // Then flip the flip bit, invalidating all closures.
-    ts->flip = ts->flip ^ 1;
-}
-
-/**
- * Traverse all static objects and invalidate thier traversal-data. This ensures
- * that when doing the actual traversal no static closures will seem to have
- * been visited already because they weren't visited in the last run.
- *
- * This function must be called before zeroing all objects reachable from
- * scavenged_static_objects in the case of major garbage collections. See
- * GarbageCollect() in GC.c.
- *
- * Note:
- *
- *   The mut_once_list of the oldest generation must also be traversed?
- *
- *   Why? Because if the evacuation of an object pointed to by a static
- *   indirection object fails, it is put back to the mut_once_list of the oldest
- *   generation.
- *
- *   However, this is not necessary because any static indirection objects are
- *   just traversed through to reach dynamic objects. In other words, they are
- *   never visited during traversal.
- */
-void
-resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objects )
-{
-    (void) ts;
-    uint32_t count = 0;
-    StgClosure *p;
-
-    p = static_objects;
-    while (p != END_OF_STATIC_OBJECT_LIST) {
-        p = UNTAG_STATIC_LIST_PTR(p);
-        count++;
-
-        switch (get_itbl(p)->type) {
-        case IND_STATIC:
-            // Since we do not compute the retainer set of any
-            // IND_STATIC object, we don't have to reset its retainer
-            // field.
-            p = (StgClosure*)*IND_STATIC_LINK(p);
-            break;
-        case THUNK_STATIC:
-            p->header.prof.hp = (union StgProfHeapHeader){};
-            p = (StgClosure*)*THUNK_STATIC_LINK(p);
-            break;
-        case FUN_STATIC:
-        case CONSTR:
-        case CONSTR_1_0:
-        case CONSTR_2_0:
-        case CONSTR_1_1:
-        case CONSTR_NOCAF:
-            p->header.prof.hp = (union StgProfHeapHeader){};
-            p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
-            break;
-        default:
-            barf("resetStaticObjectForProfiling: %p (%lu)",
-                 p, (unsigned long)get_itbl(p)->type);
-            break;
-        }
-    }
-
-    debug("count in scavenged_static_objects = %d\n", count);
 }
 
 #endif /* PROFILING */
