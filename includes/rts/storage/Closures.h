@@ -19,7 +19,7 @@
 
 typedef struct {
   CostCentreStack *ccs;
-  union {
+  union StgProfHeapHeader {
     StgWord trav;             /* Heap traversal */
     StgWord ldvw;             /* Lag/Drag/Void Word */
   } hp;

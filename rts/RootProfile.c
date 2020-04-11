@@ -24,8 +24,7 @@
 
 #include "RootProfile.h"
 
-#define  MAX_ROOTS 20
-#define  MAX_BINS  0x100000 // 2^20 // makes 'sizes' array about 8 MiB
+#define MAX_ROOTS ((StgInt)(sizeof(StgWord) * 8 - 2))
 
 #if defined(DEBUG)
 int g_rootProfileDebugLevel = 0;
@@ -48,7 +47,7 @@ static const char *i2b(StgWord bin_idx)
 
     StgWord i;
     for(i=0; i < MAX_ROOTS; i++) {
-        if(bin_idx & (1<<i))
+        if(bin_idx & (1ul<<i))
             str[MAX_ROOTS-i-1] = '1';
         else
             str[MAX_ROOTS-i-1] = '0';
@@ -67,7 +66,6 @@ static struct rootProfState {
     StgStablePtr roots[MAX_ROOTS];
     const char* descs[MAX_ROOTS];
     stackElement ses[MAX_ROOTS];
-    StgWord sizes[MAX_BINS];
 } g_rootProfState;
 
 static StgWord current_root;
@@ -99,6 +97,11 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
     /*                               (intercalate ",") -^      ^-null byte */
     char *identity = arenaAlloc(arena, len);
     char *ptr = identity;
+
+    if(key == NULL) {
+        strcpy(identity, "NOROOT");
+        return identity;
+    }
 
     StgWord i;
     for(i = 0; i < n_roots; i++) {
@@ -133,14 +136,10 @@ rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
     (void) acc;
     (void) child_data;
 
-    struct rootProfState *ps = &g_rootProfState;
     debug(2, "visit %p <- %p %s\n", c, cp, info_type(c));
 
     if(first_visit) {
-        StgWord sizeW = (StgWord)closure_sizeW(c) - sizeofW(StgProfHeader);
-        debug(2, "  bin %s (%lu) += %lu\n",
-              i2b(1ul<<current_root), ps->sizes[1ul<<current_root], sizeW);
-        ps->sizes[1ul<<current_root] += sizeW;
+        debug(2, "  bin %s\n", i2b(1ul<<current_root));
         traverseSetClosureData(ts, c, (1ul<<current_root)<<2);
         return true;
     } else {
@@ -148,14 +147,8 @@ rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
         if((bin_idx & (1ul<<current_root))) {
             return false;
         } else {
-            StgWord sizeW = (StgWord)closure_sizeW(c) - sizeofW(StgProfHeader);
             StgWord new_bin = (1ul<<current_root) | bin_idx;
-            debug(2, "  bin %s (%lu) -= %lu\n",
-                  i2b(bin_idx), ps->sizes[bin_idx], sizeW);
-            debug(2, "  bin %s (%lu) += %lu\n",
-                  i2b(new_bin), ps->sizes[new_bin], sizeW);
-            ps->sizes[bin_idx] -= sizeW;
-            ps->sizes[new_bin] += sizeW;
+            debug(2, "  bin %s |= %s\n", i2b(bin_idx), i2b((1ul<<current_root)));
             traverseSetClosureData(ts, c, new_bin<<2);
             return true; // have to update the children's bin_idx too
         }
@@ -222,15 +215,12 @@ void
 rootProfile(traverseState *ts, Time t, Census *census)
 {
     (void) t;
+    (void) census;
+
     struct rootProfState *ps = &g_rootProfState;
 
     if(ps->n_roots == 0)
         return;
-
-    const StgWord n_roots = ps->n_roots;
-    const StgWord n_bins = (1<<n_roots) - 1;
-
-    memset(ps->sizes, 0, sizeof(ps->sizes));
 
     /* The following double traversal is pretty inefficient. However it's the
      * simplest way to get this working for now.
@@ -252,28 +242,6 @@ rootProfile(traverseState *ts, Time t, Census *census)
     debug(2, "\n=== root profile ===\n");
 
     rootProfileVisitRoots(ts, &rootVisit, NULL);
-
-    debug(2, "\n\n\n=== result ===\n");
-
-    for(StgWord i = 1; i <= n_bins; i++) {
-        if(ps->sizes[i] == 0)
-            continue;
-
-        const char* identity =
-            rootProfileMkClosureLabel(census->arena, (void*)i);
-
-        debug(1, "bin %s = %lu\n", identity, ps->sizes[i]);
-
-        if(RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
-            counter *ctr = lookupHashTable(census->hash, i);
-            if(!ctr) {
-                ctr = heapInsertNewCounter(census, (void*)i);
-                ctr->identity = identity;
-            }
-
-            ctr->c.resid = ps->sizes[i];
-        }
-    }
 }
 
 void endRootProfiling(traverseState *ts)
