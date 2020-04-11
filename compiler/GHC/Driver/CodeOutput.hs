@@ -25,7 +25,7 @@ import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import GHC.Driver.Finder    ( mkStubPaths )
 import GHC.CmmToC           ( writeC )
 import GHC.Cmm.Lint         ( cmmLint )
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 import GHC.Driver.Types

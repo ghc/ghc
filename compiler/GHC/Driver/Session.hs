@@ -247,7 +247,7 @@ import GHC.Types.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Types.Unit.State (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways

@@ -26,7 +26,7 @@ module GHC.Plugins
    , module GHC.Core.Rules
    , module GHC.Types.Annotations
    , module GHC.Driver.Session
-   , module GHC.Driver.Packages
+   , module GHC.Types.Unit.State
    , module GHC.Types.Module
    , module GHC.Core.Type
    , module GHC.Core.TyCon
@@ -81,7 +81,7 @@ import GHC.Types.Annotations
 
 -- Pipeline-related stuff
 import GHC.Driver.Session
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 
 -- Important GHC types
 import GHC.Types.Module

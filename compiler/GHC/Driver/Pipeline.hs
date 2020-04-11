@@ -39,7 +39,7 @@ module GHC.Driver.Pipeline (
 import GhcPrelude
 
 import GHC.Driver.Pipeline.Monad
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Driver.Ways
 import HeaderInfo
 import GHC.Driver.Phases

@@ -177,7 +177,7 @@ import qualified Data.Set as Set
 import qualified FiniteMap as Map
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfoMap, PackageState, unitInfoMap)
+import {-# SOURCE #-} GHC.Types.Unit.State (improveUnit, UnitInfoMap, getUnitInfoMap, PackageState, unitInfoMap)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

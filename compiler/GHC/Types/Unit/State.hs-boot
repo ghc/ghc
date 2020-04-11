@@ -1,4 +1,4 @@
-module GHC.Driver.Packages where
+module GHC.Types.Unit.State where
 import GhcPrelude
 import FastString
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
