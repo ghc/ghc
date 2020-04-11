@@ -161,6 +161,8 @@ typedef struct traverseState_ {
      *   some value no greater than the actual depth of the graph.
      */
     int stackSize, maxStackSize;
+
+    bdescr *firstStaticObjects, *staticObjects;
 } traverseState;
 
 /**
