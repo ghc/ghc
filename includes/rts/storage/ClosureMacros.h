@@ -116,17 +116,9 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 
 #if defined(PROFILING)
 /*
-  The following macro works for both retainer profiling and LDV profiling. For
- retainer profiling, 'era' remains 0, so by setting the 'ldvw' field we also set
- 'rs' to zero.
-
- Note that we don't have to bother handling the 'flip' bit properly[1] since the
- retainer profiling code will just set 'rs' to NULL upon visiting a closure with
- an invalid 'flip' bit anyways.
-
- See Note [Profiling heap traversal visited bit] for details.
-
- [1]: Technically we should set 'rs' to `NULL | flip`.
+ The following macro works for both heap traversal profilers and LDV
+ profiling. For traversal, 'era' remains 0, so by setting the 'ldvw'
+ field we also set the 'trav' field in the 'hp' union to zero.
  */
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
@@ -484,6 +476,9 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
     - full-heap sanity checks (DEBUG, and +RTS -DS),
 
     - LDV profiling (PROFILING, and +RTS -hb) and
+
+    - regular heap profiling (PROFILING, and +RTS -h). Only mutable closures
+      need zeroing here though. See Note [skipping slop in the heap profiler].
 
    However we can get into trouble if we're zeroing slop for ordinarily
    immutable closures when using multiple threads, since there is nothing
