@@ -1,12 +1,7 @@
 {-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
 
--- |
--- Package configuration information: essentially the interface to Cabal, with
--- some utilities
---
--- (c) The University of Glasgow, 2004
---
-module UnitInfo
+-- | Info about installed units (compiled libraries)
+module GHC.Types.Unit.Info
    ( GenericUnitInfo (..)
    , GenUnitInfo
    , UnitInfo
