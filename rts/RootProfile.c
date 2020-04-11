@@ -70,8 +70,6 @@ static struct rootProfState {
     StgWord sizes[MAX_BINS];
 } g_rootProfState;
 
-traverseState g_rootTraverseState;
-
 static StgWord current_root;
 
 static StgWord
@@ -118,14 +116,15 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
     return identity;
 }
 
-const void *rootProfileGetClosureIdentity(const StgClosure *c)
+const void *rootProfileGetClosureIdentity(traverseState *ts, const StgClosure *c)
 {
-    ASSERT(traverseIsClosureDataValid(&g_rootTraverseState, c));
+    (void) ts;
+    ASSERT(traverseIsClosureDataValid(ts, c));
     return (void*)(traverseGetClosureData(c)>>2);
 }
 
 static bool
-rootVisit(StgClosure *c, const StgClosure *cp,
+rootVisit(traverseState *ts, StgClosure *c, const StgClosure *cp,
           const stackData data, const bool first_visit,
           stackAccum *acc, stackData *child_data)
 {
@@ -134,9 +133,7 @@ rootVisit(StgClosure *c, const StgClosure *cp,
     (void) acc;
     (void) child_data;
 
-    traverseState *ts = &g_rootTraverseState;
     struct rootProfState *ps = &g_rootProfState;
-
     debug(2, "visit %p <- %p %s\n", c, cp, info_type(c));
 
     if(first_visit) {
@@ -194,9 +191,8 @@ StgInt setRootProfPtrs(StgInt n, HsStablePtr *sps, const char** descs)
 }
 
 static void
-rootProfileVisitRoots(visitClosure_cb visit_cb, returnClosure_cb return_cb)
+rootProfileVisitRoots(traverseState *ts, visitClosure_cb visit_cb, returnClosure_cb return_cb)
 {
-    traverseState *ts = &g_rootTraverseState;
     struct rootProfState *ps = &g_rootProfState;
 
     traverseInvalidateAllClosureData(ts);
@@ -210,9 +206,8 @@ rootProfileVisitRoots(visitClosure_cb visit_cb, returnClosure_cb return_cb)
     }
 }
 
-bool rootProfileWasClosureVisited(const StgClosure *c)
+bool rootProfileWasClosureVisited(traverseState *ts, const StgClosure *c)
 {
-    traverseState *ts = &g_rootTraverseState;
     return traverseIsClosureDataValid(ts, c);
 }
 
@@ -224,11 +219,10 @@ bool rootProfileWasClosureVisited(const StgClosure *c)
  *   collection.
  **/
 void
-rootProfile(Time t, Census *census)
+rootProfile(traverseState *ts, Time t, Census *census)
 {
     (void) t;
     struct rootProfState *ps = &g_rootProfState;
-    initializeTraverseStack(&g_rootTraverseState);
 
     if(ps->n_roots == 0)
         return;
@@ -257,7 +251,7 @@ rootProfile(Time t, Census *census)
 
     debug(2, "\n=== root profile ===\n");
 
-    rootProfileVisitRoots(&rootVisit, NULL);
+    rootProfileVisitRoots(ts, &rootVisit, NULL);
 
     debug(2, "\n\n\n=== result ===\n");
 
@@ -282,10 +276,9 @@ rootProfile(Time t, Census *census)
     }
 }
 
-void endRootProfiling(void)
+void endRootProfiling(traverseState *ts)
 {
-    rootProfileVisitRoots(NULL, NULL);
-    closeTraverseStack(&g_rootTraverseState);
+    rootProfileVisitRoots(ts, &rootVisit, NULL);
 }
 
 #endif /* PROFILING */
