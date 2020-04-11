@@ -70,7 +70,7 @@ where
 
 import GhcPrelude
 
-import GHC.PackageDb
+import GHC.Types.Unit.Database
 import GHC.Types.Unit.Info
 import GHC.Driver.Session
 import GHC.Driver.Ways
