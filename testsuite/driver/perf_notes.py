@@ -52,10 +52,10 @@ def is_worktree_dirty() -> bool:
 NoteNamespace = NewType("NoteNamespace", str)
 
 # The git notes namespace for local results.
-LocalNamespace = NoteNamespace("perf")
+LOCAL_NAMESPACE = NoteNamespace("perf")
 
 # The git notes namespace for ci results.
-CiNamespace = NoteNamespace("ci/" + LocalNamespace)
+CI_NAMESPACE = NoteNamespace("notes/ci/perf")
 
 
 # The metrics (a.k.a stats) are named tuples, PerfStat, in this form:
@@ -119,7 +119,7 @@ def parse_perf_stat(stat_str: str) -> PerfStat:
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
 def get_perf_stats(commit: Union[GitRef, GitHash]=GitRef('HEAD'),
-                   namespace: NoteNamespace = LocalNamespace
+                   namespace: NoteNamespace = LOCAL_NAMESPACE
                    ) -> List[PerfStat]:
     try:
         log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
@@ -290,7 +290,7 @@ def format_perf_stat(stats: Union[PerfStat, List[PerfStat]], delimitor: str = "\
 # Returns True if the note was successfully appended.
 def append_perf_stat(stats: List[PerfStat],
                      commit: GitRef = GitRef('HEAD'),
-                     namespace: NoteNamespace = LocalNamespace,
+                     namespace: NoteNamespace = LOCAL_NAMESPACE,
                      max_tries: int=5
                      ) -> bool:
     # Append to git note
@@ -433,9 +433,9 @@ def baseline_metric(commit: GitHash,
     # Test environment to use when comparing against CI namespace
     ci_test_env = best_fit_ci_test_env()
 
-    baseline = find_baseline(LocalNamespace, test_env) # type: Optional[Baseline]
+    baseline = find_baseline(LOCAL_NAMESPACE, test_env) # type: Optional[Baseline]
     if baseline is None and ci_test_env is not None:
-        baseline = find_baseline(CiNamespace, ci_test_env)
+        baseline = find_baseline(CI_NAMESPACE, ci_test_env)
 
     return baseline
 
@@ -588,7 +588,7 @@ def main() -> None:
     group = parser.add_argument_group(title='Filtering', description="Select which subset of performance metrics to dump")
     group.add_argument("--test-env",
                        help="The given test environment to be compared. Use 'local' for locally run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
-    group.add_argument("--test-name",
+    group.add_argument("--test-name", type=str,
                        help="Filters for tests matching the given regular expression.")
     group.add_argument("--metric",
                        help="Test metric (one of " + str(testing_metrics()) + ").")
@@ -618,7 +618,7 @@ def main() -> None:
 
     ref = NoteNamespace('perf')
     if args.ci:
-        ref = NoteNamespace('ci/perf')
+        ref = CI_NAMESPACE
 
     commits = args.commits
     if args.commits:
