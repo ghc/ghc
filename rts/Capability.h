@@ -27,6 +27,7 @@
 
 #include "BeginPrivate.h"
 
+/* N.B. This must be consistent with CapabilityPublic in RtsAPI.h */
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
     // code.  During STG execution, the BaseReg register always points
@@ -267,7 +268,8 @@ typedef enum {
     SYNC_OTHER,
     SYNC_GC_SEQ,
     SYNC_GC_PAR,
-    SYNC_FLUSH_UPD_REM_SET
+    SYNC_FLUSH_UPD_REM_SET,
+    SYNC_FLUSH_EVENT_LOG
 } SyncType;
 
 //
