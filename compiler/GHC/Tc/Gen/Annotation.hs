@@ -13,7 +13,7 @@ module GHC.Tc.Gen.Annotation ( tcAnnotations, annCtxt ) where
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( runAnnotation )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Session
 import Control.Monad ( when )
 

@@ -11,7 +11,7 @@ module Main(main) where
 -- need exists to produce ASTs and nothing more.
 
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
@@ -30,7 +30,7 @@ main = do
   let num = sizeUniqSet modules
 --  print num
 --  print (map moduleNameString $ nonDetEltsUniqSet modules)
-  unless (num < 190) $ exitWith (ExitFailure num)
+  unless (num < 195) $ exitWith (ExitFailure num)
 
 parserDeps :: FilePath -> IO (UniqSet ModuleName)
 parserDeps libdir =

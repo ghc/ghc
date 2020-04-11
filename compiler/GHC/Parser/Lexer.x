@@ -105,7 +105,7 @@ import GHC.Driver.Session as DynFlags
 
 -- compiler/basicTypes
 import GHC.Types.SrcLoc
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
                          IntegralLit(..), FractionalLit(..),
                          SourceText(..) )

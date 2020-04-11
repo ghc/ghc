@@ -210,7 +210,15 @@ Library
         GHC.CmmToLlvm.Regs
         GHC.CmmToLlvm.Mangler
         GHC.Types.Id.Make
-        GHC.Types.Module
+        GHC.Unit
+        GHC.Unit.Parser
+        GHC.Unit.Ppr
+        GHC.Unit.Subst
+        GHC.Unit.Types
+        GHC.Unit.Module
+        GHC.Unit.Module.Name
+        GHC.Unit.Module.Location
+        GHC.Unit.Module.Env
         GHC.Types.Name
         GHC.Types.Name.Env
         GHC.Types.Name.Set
@@ -372,7 +380,7 @@ Library
         GHC.Runtime.Eval.Types
         GHC.Runtime.Loader
         GHC.Unit.Info
-        GHC.Driver.Packages
+        GHC.Unit.State
         GHC.Driver.Plugins
         GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing

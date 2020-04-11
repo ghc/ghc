@@ -101,8 +101,8 @@ import GHC.Utils.Panic
 import GHC.Core.ConLike
 
 import GHC.Parser.Annotation
-import GHC.Types.Module
-import GHC.Driver.Packages
+import GHC.Unit.Module
+import GHC.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump

@@ -32,7 +32,7 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 import GHC.Data.FastString
 import GHC.Hs
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Builtin.Names
 import GHC.Data.StringBuffer
 import GHC.Types.SrcLoc
