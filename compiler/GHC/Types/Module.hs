@@ -72,7 +72,6 @@ module GHC.Types.Module
         uninstantiateInstantiatedModule,
 
         -- * Parsers
-        parseModuleName,
         parseUnit,
         parseIndefUnitId,
         parseHoleyModule,
@@ -951,10 +950,6 @@ uninstantiateInstantiatedUnit u =
 -- | Remove instantiations of the given module instantiated unit
 uninstantiateInstantiatedModule :: InstantiatedModule -> InstantiatedModule
 uninstantiateInstantiatedModule (Module uid n) = Module (uninstantiateInstantiatedUnit uid) n
-
-parseModuleName :: ReadP ModuleName
-parseModuleName = fmap mkModuleName
-                $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
 
 parseUnit :: ReadP Unit
 parseUnit = parseVirtUnitId <++ parseDefUnitId
