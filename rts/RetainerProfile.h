@@ -20,8 +20,8 @@ void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
 void retainerProfile       ( traverseState *ts );
 
-bool isRetainerSetValid( traverseState *ts, const StgClosure *c );
-RetainerSet* retainerSetOf( traverseState *ts, const StgClosure *c );
+bool isRetainerSetValid( const StgClosure *c );
+RetainerSet* retainerSetOf( const StgClosure *c );
 
 #include "EndPrivate.h"
 

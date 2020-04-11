@@ -44,8 +44,6 @@
 #include "RtsSignals.h"
 #include "STM.h"
 #include "Trace.h"
-#include "RetainerProfile.h"
-#include "RootProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
 #include "StableName.h"
@@ -922,14 +920,6 @@ GarbageCollect (uint32_t collect_gen,
   if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       checkUnload();
   }
-
-#if defined(PROFILING)
-  // resetStaticObjectForProfiling() must be called before
-  // zeroing below.
-
-  // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForProfiling(&hp_traverseState, gct->scavenged_static_objects);
-#endif
 
   // Start any pending finalizers.  Must be after
   // updateStableTables() and stableUnlock() (see #4221).
