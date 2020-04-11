@@ -378,6 +378,8 @@ evacuate_large(StgPtr p)
 
    evacuate_static_object (link_field, q)
      - link_field must be STATIC_LINK(q)
+
+   See also Note [STATIC OBJECT LIST]
    ------------------------------------------------------------------------- */
 
 STATIC_INLINE void
