@@ -1,11 +1,6 @@
 {-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
 
--- |
--- Package configuration information: essentially the interface to Cabal, with
--- some utilities
---
--- (c) The University of Glasgow, 2004
---
+-- | Info about installed units (compiled libraries)
 module GHC.Unit.Info
    ( GenericUnitInfo (..)
    , GenUnitInfo
@@ -14,6 +9,7 @@ module GHC.Unit.Info
    , UnitKeyInfo
    , mkUnitKeyInfo
    , mapUnitInfo
+   , mkUnitPprInfo
 
    , mkUnit
    , expandedUnitInfoId
@@ -32,14 +28,15 @@ where
 
 import GHC.Prelude
 
-import GHC.PackageDb
+import GHC.Unit.Database
 import Data.Version
 import Data.Bifunctor
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Types.Module as Module
+import GHC.Unit.Module as Module
 import GHC.Types.Unique
+import GHC.Unit.Ppr
 
 -- | Information about an installed unit
 --
@@ -47,8 +44,8 @@ import GHC.Types.Unique
 --    * UnitKey: identifier used in the database (cf 'UnitKeyInfo')
 --    * UnitId: identifier used to generate code (cf 'UnitInfo')
 --
--- These two identifiers are different for wired-in packages. See Note [The
--- identifier lexicon] in GHC.Types.Module
+-- These two identifiers are different for wired-in packages. See Note [About
+-- Units] in GHC.Unit
 type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
 -- | A unit key in the database
@@ -119,12 +116,12 @@ instance Outputable PackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
-unitPackageIdString :: UnitInfo -> String
+unitPackageIdString :: GenUnitInfo u -> String
 unitPackageIdString pkg = unpackFS str
   where
     PackageId str = unitPackageId pkg
 
-unitPackageNameString :: UnitInfo -> String
+unitPackageNameString :: GenUnitInfo u -> String
 unitPackageNameString pkg = unpackFS str
   where
     PackageName str = unitPackageName pkg
@@ -173,3 +170,10 @@ definiteUnitInfoId p =
     case mkUnit p of
         RealUnit def_uid -> Just def_uid
         _               -> Nothing
+
+-- | Create a UnitPprInfo from a UnitInfo
+mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
+mkUnitPprInfo i = UnitPprInfo
+   (unitPackageNameString i)
+   (unitPackageVersion i)
+   ((unpackFS . unPackageName) <$> unitComponentName i)

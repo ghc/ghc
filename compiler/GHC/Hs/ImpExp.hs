@@ -18,7 +18,7 @@ module GHC.Hs.ImpExp where
 
 import GHC.Prelude
 
-import GHC.Types.Module       ( ModuleName )
+import GHC.Unit.Module       ( ModuleName )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )

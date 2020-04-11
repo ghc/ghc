@@ -21,14 +21,14 @@ T11770.$trModule1 :: GHC.Types.TrName
 T11770.$trModule1 = GHC.Types.TrNameS "T11770"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
-T11770.$trModule :: GHC.Types.Module
+T11770.$trModule :: GHC.Unit.Module
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T11770.$trModule =
-  GHC.Types.Module T11770.$trModule2 T11770.$trModule1
+  GHC.Unit.Module T11770.$trModule2 T11770.$trModule1
 
 Rec {
 -- RHS size: {terms: 32, types: 11, coercions: 0}

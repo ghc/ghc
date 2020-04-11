@@ -63,7 +63,7 @@ import GHC.Core.FamInstEnv
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Driver.Finder

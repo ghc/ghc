@@ -312,7 +312,7 @@ import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Tc.Types
 import GHC.Core.Predicate
-import GHC.Driver.Packages
+import GHC.Unit.State
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs
@@ -341,7 +341,7 @@ import GHC.Driver.Ways
 import GHC.SysTools
 import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Data.Bag        ( listToBag )

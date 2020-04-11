@@ -35,7 +35,7 @@ import GHC.Hs
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.InstEnv
 import GHC.Iface.Load   (loadInterfaceForName)
-import GHC.Types.Module (getModule)
+import GHC.Unit.Module (getModule)
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Builtin.Names
