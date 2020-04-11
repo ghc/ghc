@@ -16,6 +16,7 @@
 #include "RtsUtils.h"
 #include "Stats.h"
 #include "EventLog.h"
+#include "Schedule.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -271,7 +272,7 @@ stopEventLogWriter(void)
 }
 
 void
-flushEventLog(void)
+flushEventLogWriter(void)
 {
     if (event_log_writer != NULL &&
             event_log_writer->flushEventLog != NULL) {
@@ -1565,6 +1566,40 @@ void postEventType(EventsBuf *eb, EventType *et)
     postInt32(eb, EVENT_ET_END);
 }
 
+void flushLocalEventsBuf(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    printAndClearEventBuf(eb);
+}
+
+// Flush all capabilities' event buffers when we already hold all capabilities.
+// Used during forkProcess.
+void flushAllCapsEventsBufs()
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    printAndClearEventBuf(&eventBuf);
+    RELEASE_LOCK(&eventBufMutex);
+
+    for (int i=0; i < n_capabilities; i++) {
+        flushLocalEventsBuf(capabilities[i]);
+    }
+    flushEventLogWriter();
+}
+
+void flushEventLog(Capability **cap USED_IF_THREADS)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    printAndClearEventBuf(&eventBuf);
+    RELEASE_LOCK(&eventBufMutex);
+
+#if defined(THREADED_RTS)
+    Task *task = getTask();
+    stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
+    releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
+#endif
+    flushEventLogWriter();
+}
+
 #else
 
 enum EventLogStatus eventLogStatus(void)
@@ -1577,5 +1612,7 @@ bool startEventLogging(const EventLogWriter *writer STG_UNUSED) {
 }
 
 void endEventLogging(void) {}
+
+void flushEventLog(Capability **cap STG_UNUSED) {}
 
 #endif /* TRACING */

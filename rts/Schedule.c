@@ -2035,7 +2035,7 @@ forkProcess(HsStablePtr *entry
     stopTimer(); // See #4074
 
 #if defined(TRACING)
-    flushEventLog(); // so that child won't inherit dirty file buffers
+    flushAllCapsEventsBufs(); // so that child won't inherit dirty file buffers
 #endif
 
     pid = fork();

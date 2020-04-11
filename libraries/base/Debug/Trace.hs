@@ -37,6 +37,7 @@ module Debug.Trace (
         -- $eventlog_tracing
         traceEvent,
         traceEventIO,
+        flushEventLog,
 
         -- * Execution phase markers
         -- $markers
@@ -319,3 +320,11 @@ traceMarkerIO :: String -> IO ()
 traceMarkerIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
     case traceMarker# p s of s' -> (# s', () #)
+
+-- | Immediately flush the event log, if enabled.
+--
+-- @since 4.15.0.0
+flushEventLog :: IO ()
+flushEventLog = c_flushEventLog nullPtr
+
+foreign import ccall "flushEventLog" c_flushEventLog :: Ptr () -> IO ()
