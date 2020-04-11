@@ -46,6 +46,7 @@ import GHC.Driver.Monad
 import HeaderInfo
 import GHC.Driver.Types
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.IfaceToCore  ( typecheckIface )
 import GHC.Tc.Utils.Monad     ( initIfaceCheck )
 import GHC.Driver.Main

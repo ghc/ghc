@@ -244,6 +244,7 @@ import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
