@@ -46,7 +46,7 @@ import GHC.Types.Var ( TyVar, tyVarKind )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
-import GHC.Types.Module( getModule )
+import GHC.Unit.Module( getModule )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable

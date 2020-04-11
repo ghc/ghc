@@ -32,7 +32,7 @@ import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.CostCentre
 import GHC.Types.Var.Env
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
 import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )

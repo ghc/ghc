@@ -16,7 +16,7 @@ import GHC.Platform
 import GHC.Cmm.Graph
 import GHC.Cmm.Expr
 import GHC.Cmm.CLabel
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Cmm.Utils
 import GHC.StgToCmm.Utils
 import GHC.Driver.Types

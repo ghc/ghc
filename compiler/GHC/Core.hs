@@ -112,7 +112,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

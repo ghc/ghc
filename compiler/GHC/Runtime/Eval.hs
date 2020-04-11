@@ -83,7 +83,7 @@ import GHC.LanguageExtensions
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
 import GHC.Builtin.Types ( isCTupleTyConName )
 import GHC.Utils.Panic

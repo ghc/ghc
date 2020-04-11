@@ -21,7 +21,7 @@ import GHC.ByteCode.Types
 import GHC.Stack.CCS
 import GHC.Core.Type
 import GHC.Hs
-import GHC.Types.Module as Module
+import GHC.Unit
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
 import GHC.Core.ConLike
@@ -1334,7 +1334,7 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
     tickboxes = ppr (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (moduleNameFS (Module.moduleName this_mod)))
+                         bytesFS (moduleNameFS (moduleName this_mod)))
     package_name = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (unitFS  (moduleUnit this_mod)))
     full_name_str

@@ -110,7 +110,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Error
@@ -553,7 +553,7 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in GHC.Driver.Types
-        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Types.Module
+        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Unit.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
         tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module

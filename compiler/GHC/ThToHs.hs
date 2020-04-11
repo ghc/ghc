@@ -30,7 +30,7 @@ import GHC.Hs as Hs
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Parser.PostProcess
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc

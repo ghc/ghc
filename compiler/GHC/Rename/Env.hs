@@ -59,7 +59,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon

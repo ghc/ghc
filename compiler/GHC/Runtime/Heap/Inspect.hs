@@ -48,7 +48,7 @@ import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Iface.Env
 import GHC.Utils.Misc
 import GHC.Types.Var.Set

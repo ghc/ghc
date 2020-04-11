@@ -52,7 +52,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic hiding ( SuccessFlag(..) )

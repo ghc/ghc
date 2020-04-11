@@ -22,7 +22,7 @@ import GHC.Prelude
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Iface.Syntax
@@ -164,7 +164,7 @@ rnDepModules sel deps = do
         -- not to do it in this case either...)
         --
         -- This mistake was bug #15594.
-        let mod' = renameHoleModule dflags hmap mod
+        let mod' = renameHoleModule (pkgState dflags) hmap mod
         if isHoleModule mod
           then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
                                   $ loadSysInterface (text "rnDepModule") mod'
@@ -186,7 +186,7 @@ initRnIface hsc_env iface insts nsubst do_this = do
     errs_var <- newIORef emptyBag
     let dflags = hsc_dflags hsc_env
         hsubst = listToUFM insts
-        rn_mod = renameHoleModule dflags hsubst
+        rn_mod = renameHoleModule (pkgState dflags) hsubst
         env = ShIfEnv {
             sh_if_module = rn_mod (mi_module iface),
             sh_if_semantic_module = rn_mod (mi_semantic_module iface),
@@ -233,7 +233,7 @@ rnModule :: Rename Module
 rnModule mod = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
-    return (renameHoleModule dflags hmap mod)
+    return (renameHoleModule (pkgState dflags) hmap mod)
 
 rnAvailInfo :: Rename AvailInfo
 rnAvailInfo (Avail n) = Avail <$> rnIfaceGlobal n
@@ -302,7 +302,7 @@ rnIfaceGlobal n = do
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst
     let m = nameModule n
-        m' = renameHoleModule dflags hmap m
+        m' = renameHoleModule (pkgState dflags) hmap m
     case () of
        -- Did we encounter {A.T} while renaming p[A=<B>]:A? If so,
        -- do NOT assume B.hi is available.
@@ -363,7 +363,7 @@ rnIfaceNeverExported name = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
-    let m = renameHoleModule dflags hmap $ nameModule name
+    let m = renameHoleModule (pkgState dflags) hmap $ nameModule name
     -- Doublecheck that this DFun/coercion axiom was, indeed, locally defined.
     MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
     setNameModule (Just m) name

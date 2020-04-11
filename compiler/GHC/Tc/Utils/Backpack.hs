@@ -21,7 +21,7 @@ module GHC.Tc.Utils.Backpack (
 import GHC.Prelude
 
 import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
-import GHC.Driver.Packages
+import GHC.Unit.State
 import GHC.Tc.Gen.Export
 import GHC.Driver.Session
 import GHC.Hs
@@ -41,7 +41,7 @@ import GHC.Iface.Load
 import GHC.Rename.Names
 import GHC.Utils.Error
 import GHC.Types.Id
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

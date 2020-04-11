@@ -30,7 +30,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import GHC.Tc.Instance.Family
-import GHC.Types.Module ( moduleName, moduleNameFS
+import GHC.Unit.Module ( moduleName, moduleNameFS
                         , moduleUnit, unitFS, getModule )
 import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )

@@ -33,7 +33,7 @@ import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBind
 import GHC.Hs
 import GHC.Tc.Utils.Env ( isBrackStage )
 import GHC.Tc.Utils.Monad
-import GHC.Types.Module ( getModule )
+import GHC.Unit.Module ( getModule )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames

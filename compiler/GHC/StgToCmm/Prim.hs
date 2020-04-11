@@ -42,7 +42,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
-import GHC.Types.Module ( rtsUnitId )
+import GHC.Unit         ( rtsUnitId )
 import GHC.Core.Type    ( Type, tyConAppTyCon )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel

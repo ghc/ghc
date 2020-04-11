@@ -34,12 +34,12 @@ Unlifted.$trModule1 :: GHC.Types.TrName
 Unlifted.$trModule1 = GHC.Types.TrNameS Unlifted.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-Unlifted.$trModule :: GHC.Types.Module
+Unlifted.$trModule :: GHC.Unit.Module
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-Unlifted.$trModule = GHC.Types.Module Unlifted.$trModule3 Unlifted.$trModule1
+Unlifted.$trModule = GHC.Unit.Module Unlifted.$trModule3 Unlifted.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep_r2Xd :: GHC.Types.KindRep

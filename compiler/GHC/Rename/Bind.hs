@@ -45,7 +45,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV )
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

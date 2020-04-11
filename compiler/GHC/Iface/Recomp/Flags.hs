@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Driver.Session
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary

@@ -35,7 +35,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Utils.Exception
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,

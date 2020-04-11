@@ -44,7 +44,7 @@ import GHC.Cmm.Utils
 import GHC.Types.CostCentre
 import GHC.Types.Id.Info( CafInfo(..), mayHaveCafRefs )
 import GHC.Types.Id ( Id )
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Data.FastString( mkFastString, fsLit )

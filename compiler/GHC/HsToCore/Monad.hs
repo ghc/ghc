@@ -75,7 +75,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.HsToCore.PmCheck.Types
 import GHC.Types.Id
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Core.Type

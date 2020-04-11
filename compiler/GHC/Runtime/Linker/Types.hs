@@ -19,7 +19,7 @@ import GHC.Prelude             ( FilePath, String, show )
 import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
-import GHC.Types.Module        ( UnitId, Module )
+import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
 import GHC.Utils.Outputable
 import GHC.Types.Var           ( Id )

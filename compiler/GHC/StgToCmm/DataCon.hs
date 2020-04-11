@@ -35,7 +35,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
 import GHC.Runtime.Heap.Layout
 import GHC.Types.CostCentre
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Core.DataCon
 import GHC.Driver.Session
 import GHC.Data.FastString

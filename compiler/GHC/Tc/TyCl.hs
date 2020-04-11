@@ -60,7 +60,7 @@ import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env

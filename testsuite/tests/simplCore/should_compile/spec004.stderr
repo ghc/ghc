@@ -67,11 +67,11 @@ $trModule :: GHC.Types.TrName
 $trModule = GHC.Types.TrNameS $trModule
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-ShouldCompile.$trModule :: GHC.Types.Module
+ShouldCompile.$trModule :: GHC.Unit.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-ShouldCompile.$trModule = GHC.Types.Module $trModule $trModule
+ShouldCompile.$trModule = GHC.Unit.Module $trModule $trModule
 
 -- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
 bar :: String

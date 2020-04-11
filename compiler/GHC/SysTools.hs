@@ -42,8 +42,7 @@ import GHC.Prelude
 
 import GHC.Settings.Utils
 
-import GHC.Types.Module
-import GHC.Driver.Packages
+import GHC.Unit
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Platform

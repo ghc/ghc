@@ -70,7 +70,7 @@ import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Data.OrdList

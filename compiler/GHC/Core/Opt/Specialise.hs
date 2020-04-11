@@ -19,7 +19,7 @@ import GHC.Types.Id
 import GHC.Tc.Utils.TcType hiding( substTy )
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
 import GHC.Core.Predicate
-import GHC.Types.Module( Module, HasModule(..) )
+import GHC.Unit.Module( Module, HasModule(..) )
 import GHC.Core.Coercion( Coercion )
 import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core

@@ -15,7 +15,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.PackageDb
+-- Module      :  GHC.Unit.Database
 -- Copyright   :  (c) The University of Glasgow 2009, Duncan Coutts 2014
 --
 -- Maintainer  :  ghc-devs@haskell.org
@@ -47,7 +47,7 @@
 -- is kept in the file but here we treat it as an opaque blob of data. That way
 -- this library avoids depending on Cabal.
 --
-module GHC.PackageDb
+module GHC.Unit.Database
    ( GenericUnitInfo(..)
    , type DbUnitInfo
    , DbModule (..)
@@ -495,7 +495,7 @@ decodeFromFile file mode decoder = case mode of
       where
         err = mkIOError InappropriateType loc Nothing (Just file)
               `ioeSetErrorString` msg
-        loc = "GHC.PackageDb.readPackageDb"
+        loc = "GHC.Unit.Database.readPackageDb"
 
 -- Copied from Cabal's Distribution.Simple.Utils.
 writeFileAtomic :: FilePath -> BS.Lazy.ByteString -> IO ()

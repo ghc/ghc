@@ -52,6 +52,6 @@ test('T3372',
       unless(config.have_RTS_linker, skip),
       # Concurrent GHC sessions is fragile on Windows since we must lock the
       # package database even for read-only access.
-      # See Note [Locking package database on Windows] in GHC.PackageDb
+      # See Note [Locking package database on Windows] in GHC.Unit.Database
       when(opsys('mingw32'), fragile(16773))],
      compile_and_run, ['-package ghc'])

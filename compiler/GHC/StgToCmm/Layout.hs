@@ -54,7 +54,7 @@ import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import GHC.Types.Basic   ( RepArity )
 import GHC.Driver.Session
 import GHC.Platform
-import GHC.Types.Module
+import GHC.Unit
 
 import GHC.Utils.Misc
 import Data.List

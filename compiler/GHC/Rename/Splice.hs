@@ -29,7 +29,7 @@ import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
 import GHC.Utils.Outputable
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Rename.HsType ( rnLHsType )
 

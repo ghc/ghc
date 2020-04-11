@@ -30,8 +30,8 @@
 
 module Main (main) where
 
-import qualified GHC.PackageDb as GhcPkg
-import GHC.PackageDb
+import qualified GHC.Unit.Database as GhcPkg
+import GHC.Unit.Database
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings.Platform (getTargetPlatform)
@@ -976,7 +976,7 @@ mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
 mungePackagePaths :: FilePath -> FilePath
                   -> InstalledPackageInfo -> InstalledPackageInfo
 mungePackagePaths top_dir pkgroot pkg =
-   -- TODO: similar code is duplicated in GHC.PackageDb
+   -- TODO: similar code is duplicated in GHC.Unit.Database
     pkg {
       importDirs  = munge_paths (importDirs pkg),
       includeDirs = munge_paths (includeDirs pkg),

@@ -119,8 +119,8 @@ import GHC.Prelude
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
-import GHC.Driver.Packages
-import GHC.Types.Module
+import GHC.Unit.State
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Builtin.PrimOps

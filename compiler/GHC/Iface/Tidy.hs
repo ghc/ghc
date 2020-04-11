@@ -52,7 +52,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Types
 import GHC.Data.Maybe
 import GHC.Types.Unique.Supply

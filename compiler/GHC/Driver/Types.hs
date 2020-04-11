@@ -170,7 +170,7 @@ import GHC.Types.Unique.FM
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Types.Avail
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Core.InstEnv ( InstEnv, ClsInst, identicalClsInstHead )
 import GHC.Core.FamInstEnv
 import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
@@ -192,7 +192,6 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
-import GHC.Driver.Packages hiding  ( Version(..) )
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )

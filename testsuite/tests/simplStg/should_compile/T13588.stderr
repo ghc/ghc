@@ -40,9 +40,9 @@ T13588.$trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
     NO_CCS GHC.Types.TrNameS! [T13588.$trModule2];
 
-T13588.$trModule :: GHC.Types.Module
+T13588.$trModule :: GHC.Unit.Module
 [GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
-    NO_CCS GHC.Types.Module! [T13588.$trModule3 T13588.$trModule1];
+    NO_CCS GHC.Unit.Module! [T13588.$trModule3 T13588.$trModule1];
 
 $krep_rWb :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =
@@ -137,9 +137,9 @@ T13588.$trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
     NO_CCS GHC.Types.TrNameS! [T13588.$trModule2];
 
-T13588.$trModule :: GHC.Types.Module
+T13588.$trModule :: GHC.Unit.Module
 [GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
-    NO_CCS GHC.Types.Module! [T13588.$trModule3 T13588.$trModule1];
+    NO_CCS GHC.Unit.Module! [T13588.$trModule3 T13588.$trModule1];
 
 $krep_rWb :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =

@@ -143,7 +143,7 @@ import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
-import GHC.Types.Module ( Module )
+import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon

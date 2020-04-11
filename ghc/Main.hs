@@ -39,7 +39,7 @@ import GHC.Driver.Plugins
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif
-import GHC.Types.Module     ( ModuleName, mkModuleName )
+import GHC.Unit.Module     ( ModuleName, mkModuleName )
 
 
 -- Various other random stuff that we need
@@ -49,7 +49,7 @@ import GHC.Platform.Host
 import Config
 import GHC.Settings.Constants
 import GHC.Driver.Types
-import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
+import GHC.Unit.State ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
 import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))

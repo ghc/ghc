@@ -27,7 +27,7 @@ import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
 import GHC.Core.Coercion.Axiom
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Name.Reader

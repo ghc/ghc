@@ -26,8 +26,8 @@ module GHC.Plugins
    , module GHC.Core.Rules
    , module GHC.Types.Annotations
    , module GHC.Driver.Session
-   , module GHC.Driver.Packages
-   , module GHC.Types.Module
+   , module GHC.Unit.State
+   , module GHC.Unit.Module
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
@@ -81,10 +81,10 @@ import GHC.Types.Annotations
 
 -- Pipeline-related stuff
 import GHC.Driver.Session
-import GHC.Driver.Packages
+import GHC.Unit.State
 
 -- Important GHC types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}

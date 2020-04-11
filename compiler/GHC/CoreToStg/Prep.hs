@@ -46,7 +46,7 @@ import GHC.Types.Id.Info
 import GHC.Builtin.Types
 import GHC.Core.DataCon
 import GHC.Types.Basic
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Data.OrdList

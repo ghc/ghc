@@ -167,7 +167,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Misc
 import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import GHC.Types.Unique.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import qualified Data.Data as Data
 

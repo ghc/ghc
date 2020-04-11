@@ -242,11 +242,13 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
-import GHC.Types.Module
+import GHC.Unit.Types
+import GHC.Unit.Parser
+import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Driver.Packages (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -630,7 +632,7 @@ data DynFlags = DynFlags {
         -- ^ Stack of package databases for the target platform.
         --
         -- A "package database" is a misleading name as it is really a Unit
-        -- database (cf Note [The identifier lexicon]).
+        -- database (cf Note [About Units]).
         --
         -- This field is populated by `initPackages`.
         --

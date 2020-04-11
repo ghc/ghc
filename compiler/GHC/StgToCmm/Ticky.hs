@@ -120,7 +120,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic

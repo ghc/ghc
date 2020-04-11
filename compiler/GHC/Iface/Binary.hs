@@ -39,7 +39,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
 import GHC.Types.Unique.FM

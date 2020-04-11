@@ -73,7 +73,7 @@ import GHC.Runtime.Eval.Types(BreakInfo(..))
 import GHC.Utils.Outputable(brackets, ppr, showSDocUnqual)
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.ByteCode.Types
 import GHC.Types.Unique
 

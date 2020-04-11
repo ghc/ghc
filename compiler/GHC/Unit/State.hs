@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 
 -- | Package manipulation
-module GHC.Driver.Packages (
+module GHC.Unit.State (
         module GHC.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
@@ -45,8 +45,6 @@ module GHC.Driver.Packages (
         getPackageExtraCcOpts,
         getPackageFrameworkPath,
         getPackageFrameworks,
-        getUnitInfoMap,
-        getPackageState,
         getPreloadPackagesAnd,
 
         collectArchives,
@@ -70,15 +68,17 @@ where
 
 import GHC.Prelude
 
-import GHC.PackageDb
+import GHC.Unit.Database
 import GHC.Unit.Info
+import GHC.Unit.Types
+import GHC.Unit.Module
+import GHC.Unit.Subst
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.Name       ( Name, nameModule_maybe )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
-import GHC.Types.Module
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Platform
@@ -941,9 +941,9 @@ pprTrustFlag flag = case flag of
     DistrustPackage p -> text "-distrust " <> text p
 
 -- -----------------------------------------------------------------------------
--- Wired-in packages
+-- Wired-in units
 --
--- See Note [Wired-in packages] in GHC.Types.Module
+-- See Note [Wired-in units] in GHC.Unit.Module
 
 type WiredInUnitId = String
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
@@ -963,7 +963,7 @@ findWiredInPackages
 findWiredInPackages dflags prec_map pkgs vis_map = do
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
-  -- in Note [Wired-in packages] in GHC.Types.Module
+  -- in Note [Wired-in units] in GHC.Unit.Module
   let
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
@@ -1050,7 +1050,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
                   = let fs = unitIdFS (unDefinite wiredInUnitId)
                     in pkg {
-                      unitId = fsToUnitId fs,
+                      unitId = UnitId fs,
                       unitInstanceOf = mkIndefUnitId pkgstate fs
                     }
                   | otherwise
@@ -1068,7 +1068,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
 -- Helper functions for rewiring Module and Unit.  These
 -- rewrite Units of modules in wired-in packages to the form known to the
--- compiler, as described in Note [Wired-in packages] in GHC.Types.Module.
+-- compiler, as described in Note [Wired-in units] in GHC.Unit.Module.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in GHC.Builtin.Names.
@@ -2077,10 +2077,7 @@ mkIndefUnitId pkgstate raw =
     let uid = UnitId raw
     in case lookupInstalledPackage pkgstate uid of
          Nothing -> Indefinite uid Nothing -- we didn't find the unit at all
-         Just c  -> Indefinite uid $ Just $ UnitPprInfo
-                                             (unitPackageNameString c)
-                                             (unitPackageVersion c)
-                                             ((unpackFS . unPackageName) <$> unitComponentName c)
+         Just c  -> Indefinite uid $ Just $ mkUnitPprInfo c
 
 -- | Update component ID details from the database
 updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
@@ -2161,7 +2158,7 @@ fsPackageName info = fs
    where
       PackageName fs = unitPackageName info
 
--- | Given a fully instantiated 'InstnatiatedUnit', improve it into a
+-- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
 improveUnit :: UnitInfoMap -> Unit -> Unit
 improveUnit _ uid@(RealUnit _) = uid -- short circuit
@@ -2176,13 +2173,3 @@ improveUnit pkg_map uid =
             if unitId pkg `elementOfUniqSet` preloadClosure pkg_map
                 then mkUnit pkg
                 else uid
-
--- | Retrieve the 'UnitInfoMap' from 'DynFlags'; used
--- in the @hs-boot@ loop-breaker.
-getUnitInfoMap :: DynFlags -> UnitInfoMap
-getUnitInfoMap = unitInfoMap . pkgState
-
--- | Retrieve the 'PackageState' from 'DynFlags'; used
--- in the @hs-boot@ loop-breaker.
-getPackageState :: DynFlags -> PackageState
-getPackageState = pkgState

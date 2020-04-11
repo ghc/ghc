@@ -45,7 +45,7 @@ import GHC.Core.TyCo.Ppr ( pprTyThingCategory )
 import GHC.Core.TyCon    ( TyCon )
 import GHC.Types.Name    ( Name, nameModule_maybe )
 import GHC.Types.Id      ( idType )
-import GHC.Types.Module  ( Module, ModuleName )
+import GHC.Unit.Module   ( Module, ModuleName )
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Error

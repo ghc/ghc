@@ -42,7 +42,7 @@ import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.List.SetOps
 import GHC.Utils.Misc
 import GHC.Types.Var.Set

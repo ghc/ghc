@@ -70,7 +70,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
 import GHC.Core.DataCon          ( DataCon, dataConName )
 import GHC.Types.SrcLoc
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 

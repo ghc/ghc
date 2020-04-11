@@ -53,7 +53,7 @@ import GHC.Hs.Instances () -- For Data instances
 -- others:
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import GHC.Types.Module ( ModuleName )
+import GHC.Unit.Module ( ModuleName )
 
 -- libraries:
 import Data.Data hiding ( Fixity )

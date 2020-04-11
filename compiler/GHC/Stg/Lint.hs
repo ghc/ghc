@@ -55,7 +55,7 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
-import GHC.Types.Module           ( Module )
+import GHC.Unit.Module            ( Module )
 import qualified GHC.Utils.Error as Err
 import Control.Applicative ((<|>))
 import Control.Monad

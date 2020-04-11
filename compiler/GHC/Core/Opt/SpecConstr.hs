@@ -60,7 +60,7 @@ import GHC.Utils.Monad
 import Control.Monad    ( zipWithM )
 import Data.List
 import GHC.Builtin.Names ( specTyConName )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )

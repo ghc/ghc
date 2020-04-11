@@ -142,7 +142,7 @@ import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall

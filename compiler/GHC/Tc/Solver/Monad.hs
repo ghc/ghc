@@ -155,7 +155,7 @@ import GHC.Core.TyCon
 import GHC.Tc.Errors   ( solverDepthErrorTcS )
 
 import GHC.Types.Name
-import GHC.Types.Module ( HasModule, getModule )
+import GHC.Unit.Module ( HasModule, getModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var

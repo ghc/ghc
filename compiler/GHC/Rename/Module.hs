@@ -42,7 +42,7 @@ import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Types ( Warnings(..), plusWarns )
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName

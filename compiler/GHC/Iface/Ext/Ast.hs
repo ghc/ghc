@@ -30,7 +30,7 @@ import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Driver.Types
-import GHC.Types.Module           ( ModuleName, ml_hs_file )
+import GHC.Unit.Module            ( ModuleName, ml_hs_file )
 import GHC.Utils.Monad            ( concatMapM, liftIO )
 import GHC.Types.Name             ( Name, nameSrcSpan, setNameLoc )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
