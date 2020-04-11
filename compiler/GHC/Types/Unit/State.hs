@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 
 -- | Package manipulation
-module GHC.Driver.Packages (
+module GHC.Types.Unit.State (
         module GHC.Types.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args

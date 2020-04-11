@@ -38,7 +38,7 @@ import GhcPrelude
 
 import GHC.Types.Module
 import GHC.Driver.Types
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import FastString
 import Util
 import PrelNames        ( gHC_PRIM )
