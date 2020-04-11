@@ -833,16 +833,8 @@ GarbageCollect (uint32_t collect_gen,
   // resetStaticObjectForProfiling() must be called before
   // zeroing below.
 
-  traverseState *ts = NULL;
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-      ts = &g_retainerTraverseState;
-  } else if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
-      ts = &g_rootTraverseState;
-  }
-
   // ToDo: fix the gct->scavenged_static_objects below
-  if(ts)
-      resetStaticObjectForProfiling(ts, gct->scavenged_static_objects);
+  resetStaticObjectForProfiling(&hp_traverseState, gct->scavenged_static_objects);
 #endif
 
   // Start any pending finalizers.  Must be after
@@ -891,11 +883,6 @@ GarbageCollect (uint32_t collect_gen,
       need_prealloc += RtsFlags.GcFlags.largeAllocLim;
       need_prealloc += countAllocdBlocks(exec_block);
       need_prealloc += arenaBlocks();
-#if defined(PROFILING)
-      if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-          need_prealloc += retainerStackBlocks();
-      }
-#endif
 
       /* If the amount of data remains constant, next major GC we'll
        * require (F+1)*live + prealloc. We leave (F+2)*live + prealloc
