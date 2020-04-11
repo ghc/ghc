@@ -117,10 +117,10 @@ void resetTracing (void)
     restartEventLogging();
 }
 
-void flushTrace (void)
+void flushTrace ()
 {
     if (eventlog_enabled) {
-        flushEventLog();
+        flushEventLog(NULL);
     }
 }
 
