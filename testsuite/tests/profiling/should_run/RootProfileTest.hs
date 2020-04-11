@@ -14,16 +14,17 @@ import System.Mem
 import GHC.Profiling
 import GHC.Exts
 
-foreign import ccall "&g_rootProfileDebugLevel" g_rootProfileDebugLevel
-  :: Ptr CInt
+foreign import ccall "&stdout" c_stdout :: Ptr (Ptr CFile)
+foreign import ccall "&hp_debug_file" c_hp_debug_file :: Ptr (Ptr CFile)
 
 main :: IO ()
 main = do
-  poke g_rootProfileDebugLevel 1
+  debug_file <- peek c_hp_debug_file
+  poke c_hp_debug_file =<< peek c_stdout
   hSetBuffering stdout NoBuffering
   putStrLn "= simple =" >> simple
   putStrLn "\n\n\n\n= sharing =" >> sharing
-  poke g_rootProfileDebugLevel 0
+  poke c_hp_debug_file debug_file
 
 go :: Int# -> [Int]
 go x = I# x : go (x +# 1#)
