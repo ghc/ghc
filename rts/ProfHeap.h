@@ -24,9 +24,6 @@ bool        strMatchesSelector (const char* str, const char* sel);
 // doingRetainerProfiling: `-hr` or `-hr<cc> -h<x>`
 bool doingRetainerProfiling(void);
 
-// For GC.c
-extern traverseState hp_traverseState;
-
 #endif
 
 #include "EndPrivate.h"
