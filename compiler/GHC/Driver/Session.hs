@@ -1978,11 +1978,11 @@ thisPackage dflags =
         Nothing -> default_uid
         Just insts
           | all (\(x,y) -> mkHoleModule x == y) insts
-          -> mkInstUnit (thisComponentId dflags) insts
+          -> mkVirtUnit (thisComponentId dflags) insts
           | otherwise
           -> default_uid
   where
-    default_uid = DefUnit (Definite (thisUnitId dflags))
+    default_uid = RealUnit (Definite (thisUnitId dflags))
 
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of

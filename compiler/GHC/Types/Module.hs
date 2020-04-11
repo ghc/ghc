@@ -55,8 +55,8 @@ module GHC.Types.Module
         unitString,
         unitFreeModuleHoles,
 
-        mkGenInstUnit,
-        mkInstUnit,
+        mkGenVirtUnit,
+        mkVirtUnit,
         mkGenInstantiatedUnit,
         mkInstantiatedUnit,
         mkGenInstantiatedUnitHash,
@@ -327,8 +327,8 @@ import {-# SOURCE #-} GHC.Driver.Packages (improveUnit, UnitInfoMap, getUnitInfo
 -- indefinite) and so on. The 'Unit' datatype represents a unit which may have
 -- been instantiated:
 --    
---    data Unit = DefUnit  DefUnitId
---              | InstUnit InstantiatedUnit
+--    data Unit = RealUnit DefUnitId
+--              | VirtUnit InstantiatedUnit
 --
 -- 'InstantiatedUnit' has two interesting fields:
 --
@@ -692,10 +692,10 @@ instance Outputable unit => Outputable (Indefinite unit) where
 --
 -- There are two possible forms for a 'Unit':
 --
--- 1) It can be a 'DefUnit', in which case we just have a 'DefUnitId' that
+-- 1) It can be a 'RealUnit', in which case we just have a 'DefUnitId' that
 -- uniquely identifies some fully compiled, installed library we have on disk.
 --
--- 2) It can be an 'InstUnit'. When we are typechecking a library with missing
+-- 2) It can be an 'VirtUnit'. When we are typechecking a library with missing
 -- holes, we may need to instantiate a library on the fly (in which case we
 -- don't have any on-disk representation.)  In that case, you have an
 -- 'InstantiatedUnit', which explicitly records the instantiation, so that we
@@ -703,12 +703,12 @@ instance Outputable unit => Outputable (Indefinite unit) where
 type Unit = GenUnit UnitId
 
 data GenUnit unit
-    = DefUnit  !(Definite unit)
+    = RealUnit !(Definite unit)
       -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
 
-    | InstUnit !(GenInstantiatedUnit unit)
-      -- ^ Instantiated indefinite unit (may be definite if all the holes are
-      -- instantiated)
+    | VirtUnit !(GenInstantiatedUnit unit)
+      -- ^ Virtual unit instantiated on-the-fly. It may be definite if all the
+      -- holes are instantiated but we don't have code objects for it.
 
     | HoleUnit
       -- ^ Fake hole unit
@@ -719,9 +719,9 @@ mapGenUnit f gunitFS = go
    where
       go gu = case gu of
                HoleUnit   -> HoleUnit
-               DefUnit d  -> DefUnit (fmap f d)
-               InstUnit i ->
-                  InstUnit $ mkGenInstantiatedUnit gunitFS
+               RealUnit d -> RealUnit (fmap f d)
+               VirtUnit i ->
+                  VirtUnit $ mkGenInstantiatedUnit gunitFS
                      (fmap f (instUnitInstanceOf i))
                      (fmap (second (fmap go)) (instUnitInsts i))
 
@@ -735,14 +735,14 @@ holeUnique :: Unique
 holeUnique = getUnique holeFS
 
 genUnitFS :: (unit -> FastString) -> GenUnit unit -> FastString
-genUnitFS _gunitFS (InstUnit x)           = instUnitFS x
-genUnitFS gunitFS  (DefUnit (Definite x)) = gunitFS x
-genUnitFS _gunitFS HoleUnit               = holeFS
+genUnitFS _gunitFS (VirtUnit x)            = instUnitFS x
+genUnitFS gunitFS  (RealUnit (Definite x)) = gunitFS x
+genUnitFS _gunitFS HoleUnit                = holeFS
 
 unitKey :: Unit -> Unique
-unitKey (InstUnit x)           = instUnitKey x
-unitKey (DefUnit (Definite x)) = unitIdKey x
-unitKey HoleUnit               = holeUnique
+unitKey (VirtUnit x)            = instUnitKey x
+unitKey (RealUnit (Definite x)) = unitIdKey x
+unitKey HoleUnit                = holeUnique
 
 -- | A dynamically instantiated unit.
 --
@@ -753,7 +753,7 @@ unitKey HoleUnit               = holeUnique
 -- case, it hasn't been compiled and installed (yet). Nevertheless, we have a
 -- mechanism called "improvement" to try to match a fully instantiated unit
 -- (i.e. definite, without any remaining hole) with existing compiled and
--- installed units: see Note [InstUnit to DefUnit improvement].
+-- installed units: see Note [VirtUnit to RealUnit improvement].
 --
 -- An indefinite unit identifier pretty-prints to something like
 -- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'IndefUnitId', and the
@@ -825,17 +825,17 @@ mkInstantiatedUnit = mkGenInstantiatedUnit unitIdFS
 -- Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged or
 -- references a matching installed unit.
 --
--- See Note [InstUnit to DefUnit improvement]
+-- See Note [VirtUnit to RealUnit improvement]
 instUnitToUnit :: PackageState -> InstantiatedUnit -> Unit
 instUnitToUnit pkgstate iuid =
     -- NB: suppose that we want to compare the indefinite
     -- unit id p[H=impl:H] against p+abcd (where p+abcd
     -- happens to be the existing, installed version of
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
-    -- InstUnit, they won't compare equal; only
+    -- VirtUnit, they won't compare equal; only
     -- after improvement will the equality hold.
     improveUnit (unitInfoMap pkgstate) $
-        InstUnit iuid
+        VirtUnit iuid
 
 -- | Injects an 'InstantiatedModule' to 'Module' (see also
 -- 'instUnitToUnit'.
@@ -887,9 +887,9 @@ unitIdKey = getUnique . unitIdFS
 -- | Return the UnitId of the Unit. For instantiated units, return the
 -- UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
-toUnitId (DefUnit (Definite iuid)) = iuid
-toUnitId (InstUnit indef)          = indefUnit (instUnitInstanceOf indef)
-toUnitId HoleUnit                  = error "Hole unit"
+toUnitId (RealUnit (Definite iuid)) = iuid
+toUnitId (VirtUnit indef)           = indefUnit (instUnitInstanceOf indef)
+toUnitId HoleUnit                   = error "Hole unit"
 
 unitIdString :: UnitId -> String
 unitIdString = unpackFS . unitIdFS
@@ -961,21 +961,22 @@ filterInstalledModuleEnv f (InstalledModuleEnv e) =
 delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
 delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
--- Note [InstUnit to DefUnit improvement]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Just because a UnitId is definite (has no holes) doesn't
--- mean it's necessarily a UnitId; it could just be
--- that over the course of renaming UnitIds on the fly
--- while typechecking an indefinite library, we
--- ended up with a fully instantiated unit id with no hash,
--- since we haven't built it yet.  This is fine.
+-- Note [VirtUnit to RealUnit improvement]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- However, if there is a hashed unit id for this instantiation
--- in the package database, we *better use it*, because
--- that hashed unit id may be lurking in another interface,
--- and chaos will ensue if we attempt to compare the two
--- (the unitFS for a UnitId never corresponds to a Cabal-provided
--- hash of a compiled instantiated library).
+-- Over the course of instantiating VirtUnits on the fly while typechecking an
+-- indefinite library, we may end up with a fully instantiated VirtUnit. I.e.
+-- one that could be compiled and installed in the database. During
+-- type-checking we generate a virtual UnitId for it, say "abc".
+--
+-- Now the question is: do we have a matching installed unit in the database?
+-- Suppose we have one with UnitId "xyz" (provided by Cabal so we don't know how
+-- to generate it). The trouble is that if both units end up being used in the
+-- same type-checking session, their names won't match (e.g. "abc:M.X" vs
+-- "xyz:M.X").
+--
+-- As we want them to match we just replace the virtual unit with the installed
+-- one: for some reason this is called "improvement".
 --
 -- There is one last niggle: improvement based on the package database means
 -- that we might end up developing on a package that is not transitively
@@ -987,9 +988,9 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 
 -- | Retrieve the set of free module holes of a 'Unit'.
 unitFreeModuleHoles :: GenUnit u -> UniqDSet ModuleName
-unitFreeModuleHoles (InstUnit x) = instUnitHoles x
+unitFreeModuleHoles (VirtUnit x) = instUnitHoles x
 -- Hashed unit ids are always fully instantiated
-unitFreeModuleHoles (DefUnit _)  = emptyUniqDSet
+unitFreeModuleHoles (RealUnit _)  = emptyUniqDSet
 unitFreeModuleHoles HoleUnit     = emptyUniqDSet
 
 instance Show Unit where
@@ -1035,17 +1036,17 @@ fingerprintUnitId prefix (Fingerprint a b)
       , BS.Char8.pack (toBase62Padded b) ]
 
 -- | Smart constructor for instantiated GenUnit
-mkGenInstUnit :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> GenUnit unit
-mkGenInstUnit _gunitFS uid []    = DefUnit  $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
-mkGenInstUnit gunitFS  uid insts = InstUnit $ mkGenInstantiatedUnit gunitFS uid insts
+mkGenVirtUnit :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> GenUnit unit
+mkGenVirtUnit _gunitFS uid []    = RealUnit $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
+mkGenVirtUnit gunitFS  uid insts = VirtUnit $ mkGenInstantiatedUnit gunitFS uid insts
 
--- | Smart constructor for InstUnit
-mkInstUnit :: IndefUnitId -> Instantiations -> Unit
-mkInstUnit = mkGenInstUnit unitIdFS
+-- | Smart constructor for VirtUnit
+mkVirtUnit :: IndefUnitId -> Instantiations -> Unit
+mkVirtUnit = mkGenVirtUnit unitIdFS
 
 pprUnit :: Unit -> SDoc
-pprUnit (DefUnit uid)  = ppr uid
-pprUnit (InstUnit uid) = ppr uid
+pprUnit (RealUnit uid)  = ppr uid
+pprUnit (VirtUnit uid) = ppr uid
 pprUnit HoleUnit       = ftext holeFS
 
 instance Eq Unit where
@@ -1075,18 +1076,18 @@ instance Outputable Unit where
 
 -- Performance: would prefer to have a NameCache like thing
 instance Binary Unit where
-  put_ bh (DefUnit def_uid) = do
+  put_ bh (RealUnit def_uid) = do
     putByte bh 0
     put_ bh def_uid
-  put_ bh (InstUnit indef_uid) = do
+  put_ bh (VirtUnit indef_uid) = do
     putByte bh 1
     put_ bh indef_uid
   put_ bh HoleUnit = do
     putByte bh 2
   get bh = do b <- getByte bh
               case b of
-                0 -> fmap DefUnit  (get bh)
-                1 -> fmap InstUnit (get bh)
+                0 -> fmap RealUnit (get bh)
+                1 -> fmap VirtUnit (get bh)
                 _ -> pure HoleUnit
 
 instance Binary unit => Binary (Indefinite unit) where
@@ -1096,7 +1097,7 @@ instance Binary unit => Binary (Indefinite unit) where
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnit :: FastString -> Unit
-fsToUnit = DefUnit . Definite . UnitId
+fsToUnit = RealUnit . Definite . UnitId
 
 stringToUnit :: String -> Unit
 stringToUnit = fsToUnit . mkFastString
@@ -1146,7 +1147,7 @@ renameHoleModule' pkg_map env m
 renameHoleUnit' :: UnitInfoMap -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit' pkg_map env uid =
     case uid of
-      (InstUnit
+      (VirtUnit
         InstantiatedUnit{ instUnitInstanceOf = cid
                         , instUnitInsts      = insts
                         , instUnitHoles      = fh })
@@ -1155,9 +1156,9 @@ renameHoleUnit' pkg_map env uid =
                 -- Functorially apply the substitution to the instantiation,
                 -- then check the 'UnitInfoMap' to see if there is
                 -- a compiled version of this 'InstantiatedUnit' we can improve to.
-                -- See Note [InstUnit to DefUnit improvement]
+                -- See Note [VirtUnit to RealUnit improvement]
                 else improveUnit pkg_map $
-                        mkInstUnit cid
+                        mkVirtUnit cid
                             (map (\(k,v) -> (k, renameHoleModule' pkg_map env v)) insts)
       _ -> uid
 
@@ -1173,8 +1174,8 @@ getModuleInstantiation m =
 
 -- | Return the unit-id this unit is an instance of and the module instantiations (if any).
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
-getUnitInstantiations (InstUnit iuid)          = (indefUnit (instUnitInstanceOf iuid), Just iuid)
-getUnitInstantiations (DefUnit (Definite uid)) = (uid, Nothing)
+getUnitInstantiations (VirtUnit iuid)          = (indefUnit (instUnitInstanceOf iuid), Just iuid)
+getUnitInstantiations (RealUnit (Definite uid)) = (uid, Nothing)
 getUnitInstantiations HoleUnit                 = error "Hole unit"
 
 -- | Remove instantiations of the given instantiated unit
@@ -1193,15 +1194,15 @@ parseModuleName = fmap mkModuleName
                 $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
 
 parseUnit :: ReadP Unit
-parseUnit = parseInstUnitId <++ parseDefUnitId
+parseUnit = parseVirtUnitId <++ parseDefUnitId
   where
-    parseInstUnitId = do
+    parseVirtUnitId = do
         uid   <- parseIndefUnitId
         insts <- parseModSubst
-        return (mkInstUnit uid insts)
+        return (mkVirtUnit uid insts)
     parseDefUnitId = do
         s <- parseUnitId
-        return (DefUnit (Definite s))
+        return (RealUnit (Definite s))
 
 parseUnitId :: ReadP UnitId
 parseUnitId = do

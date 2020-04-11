@@ -355,7 +355,7 @@ warnUnusedPackages = do
         realUnit :: DynFlags -> UnitInfo -> Unit
         realUnit dflags
           = unwireUnit dflags
-          . DefUnit
+          . RealUnit
           . Definite
           . unitId
 
@@ -1526,8 +1526,8 @@ instantiatedUnitsToCheck dflags =
   nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
  where
   goUnit HoleUnit         = []
-  goUnit (DefUnit _)      = []
-  goUnit uid@(InstUnit i) = uid : concatMap (goUnit . moduleUnit . snd) (instUnitInsts i)
+  goUnit (RealUnit _)     = []
+  goUnit uid@(VirtUnit i) = uid : concatMap (goUnit . moduleUnit . snd) (instUnitInsts i)
 
 maybeGetIfaceDate :: DynFlags -> ModLocation -> IO (Maybe UTCTime)
 maybeGetIfaceDate dflags location

@@ -272,7 +272,7 @@ findExtraSigImports' hsc_env HsigFile modname =
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
-                (mkModule (InstUnit iuid) mod_name)))
+                (mkModule (VirtUnit iuid) mod_name)))
   where
     pkgstate = pkgState (hsc_dflags hsc_env)
     reqs = requirementMerges pkgstate modname
@@ -320,8 +320,8 @@ implicitRequirements' hsc_env normal_imports
 -- that don't actually fulfill the requirements.
 checkUnit :: Unit -> TcM ()
 checkUnit HoleUnit         = return ()
-checkUnit (DefUnit _)      = return () -- if it's definite, must be well-typed
-checkUnit (InstUnit indef) = do
+checkUnit (RealUnit _)     = return () -- if it's already compiled, must be well-typed
+checkUnit (VirtUnit indef) = do
    let insts = instUnitInsts indef
    forM_ insts $ \(mod_name, mod) ->
        -- NB: direct hole instantiations are well-typed by construction
@@ -545,7 +545,7 @@ mergeSignatures
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(Module iuid mod_name) ->
-        let m = mkModule (InstUnit iuid) mod_name
+        let m = mkModule (VirtUnit iuid) mod_name
             im = fst (getModuleInstantiation m)
         in fmap fst
          . withException
@@ -951,7 +951,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
     -- the ORIGINAL signature.  We are going to eventually rename it,
     -- but we must proceed slowly, because it is NOT known if the
     -- instantiation is correct.
-    let sig_mod = mkModule (InstUnit uid) mod_name
+    let sig_mod = mkModule (VirtUnit uid) mod_name
         isig_mod = fst (getModuleInstantiation sig_mod)
     mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod False
     isig_iface <- case mb_isig_iface of
