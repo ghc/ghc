@@ -1,7 +1,7 @@
 module Main where
 
 import GHC
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Driver.Monad
 import Outputable
 import System.Environment

@@ -185,7 +185,7 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import TysWiredIn
-import GHC.Driver.Packages hiding  ( Version(..) )
+import GHC.Types.Unit.State hiding  ( Version(..) )
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )

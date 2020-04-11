@@ -16,7 +16,7 @@ module SysTools.ExtraObj (
 import AsmUtils
 import ErrUtils
 import GHC.Driver.Session
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Platform
 import Outputable
 import GHC.Types.SrcLoc ( noSrcSpan )

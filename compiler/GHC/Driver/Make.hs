@@ -65,7 +65,7 @@ import StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Tc.Utils.Backpack
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Types.Unique.Set
 import Util
 import qualified GHC.LanguageExtensions as LangExt

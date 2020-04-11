@@ -102,7 +102,7 @@ import GHC.Core.ConLike
 
 import ApiAnnotation
 import GHC.Types.Module
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump

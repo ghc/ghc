@@ -43,7 +43,7 @@ import GhcPrelude
 import GHC.Settings
 
 import GHC.Types.Module
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import Outputable
 import ErrUtils
 import GHC.Platform

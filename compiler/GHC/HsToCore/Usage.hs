@@ -26,7 +26,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import Fingerprint
 import Maybes
-import GHC.Driver.Packages
+import GHC.Types.Unit.State
 import GHC.Driver.Finder
 
 import Control.Monad (filterM)

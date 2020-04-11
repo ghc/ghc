@@ -57,7 +57,7 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
                   hsc_dynLinker, hsc_interp )
 import GHC.Types.Module
 import GHC.Types.Name
-import GHC.Driver.Packages ( unitIsTrusted, unsafeGetUnitInfo, getInstalledPackageDetails,
+import GHC.Types.Unit.State ( unitIsTrusted, unsafeGetUnitInfo, getInstalledPackageDetails,
                              listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing

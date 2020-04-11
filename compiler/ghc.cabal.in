@@ -384,7 +384,7 @@ Library
         GHC.Runtime.Eval.Types
         GHC.Runtime.Loader
         GHC.Types.Unit.Info
-        GHC.Driver.Packages
+        GHC.Types.Unit.State
         PlatformConstants
         GHC.Driver.Plugins
         GHC.Tc.Plugin
