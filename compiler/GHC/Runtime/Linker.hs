@@ -47,6 +47,7 @@ import GHC.Driver.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import ListSetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import GHC.Driver.Session

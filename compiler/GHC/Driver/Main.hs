@@ -102,6 +102,7 @@ import GHC.Core.ConLike
 
 import ApiAnnotation
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Types.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Hs

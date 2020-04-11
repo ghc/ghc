@@ -37,6 +37,7 @@ import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import GHC.Types.Module
+import GHC.Types.Module.Env
 import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Types.Var.Set
