@@ -4,7 +4,7 @@
 
 -- | Package manipulation
 module GHC.Driver.Packages (
-        module UnitInfo,
+        module GHC.Types.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
@@ -71,7 +71,7 @@ where
 import GhcPrelude
 
 import GHC.PackageDb
-import UnitInfo
+import GHC.Types.Unit.Info
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.Name       ( Name, nameModule_maybe )
