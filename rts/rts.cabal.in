@@ -144,6 +144,7 @@ library
                       rts/OSThreads.h
                       rts/Parallel.h
                       rts/PrimFloat.h
+                      rts/ProfHeap.h
                       rts/Profiling.h
                       rts/RootProfile.h
                       rts/Signals.h
