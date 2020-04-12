@@ -1027,9 +1027,9 @@ accountAllocation(Capability *cap, W_ n)
  * alignment), we take care to only zero such slop when heap profiling or DEBUG
  * are enabled.
  *
- * When performing LDV profiling or using a (single threaded) debug RTS we zero
- * slop even when overwriting immutable closures, see Note [zeroing slop when
- * overwriting closures].
+ * When performing LDV profiling or using a (single threaded) debug RTS we
+ * additionally zero slop when overwriting certain types of closures, see Note
+ * [zeroing slop when overwriting closures].
  */
 
 /* -----------------------------------------------------------------------------
