@@ -270,6 +270,7 @@ classify tok =
     ITtilde                -> TkGlyph
     ITdarrow            {} -> TkGlyph
     ITminus                -> TkGlyph
+    ITprefixminus          -> TkGlyph
     ITbang                 -> TkGlyph
     ITdot                  -> TkOperator
     ITstar              {} -> TkOperator
