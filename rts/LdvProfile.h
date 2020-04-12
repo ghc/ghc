@@ -19,9 +19,11 @@ RTS_PRIVATE void LdvCensusKillAll ( void );
 // Creates a 0-filled slop of size 'howManyBackwards' backwards from the
 // address 'from'.
 //
-// Invoked when:
-//   1) Hp is incremented and exceeds HpLim (in Updates.cmm).
-//   2) copypart() is called (in GC.c).
+// Invoked from:
+//   - copyPart() is called (in GC.c).
+//
+// TODO: This should probably be part of the OVERWRITING_CLOSURE machinery
+// instead.
 #define LDV_FILL_SLOP(from, howMany)    \
   if (era > 0) {                                \
     int i;                                      \
