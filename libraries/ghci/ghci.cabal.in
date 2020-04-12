@@ -81,7 +81,7 @@ library
         ghc-boot         == @ProjectVersionMunged@,
         ghc-boot-th      == @ProjectVersionMunged@,
         ghc-heap         == @ProjectVersionMunged@,
-        template-haskell == 2.16.*,
+        template-haskell == 2.17.*,
         transformers     == 0.5.*
 
     if !os(windows)
