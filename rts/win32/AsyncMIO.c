@@ -74,8 +74,8 @@ onIOComplete(unsigned int reqID,
     default:
         /* Not likely */
         fprintf(stderr,
-                "onIOComplete: failed to grab table semaphore, "
-                "dropping request 0x%x\n", reqID);
+                "onIOComplete: failed to grab table semaphore (res=%d, err=%ld), "
+                "dropping request 0x%lx\n", reqID, dwRes, GetLastError());
         fflush(stderr);
         return;
     }
