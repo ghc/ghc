@@ -502,6 +502,9 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
       they don't run right after GC when there is no slop.
       See Note [heap sanity checking with SMP].
 
+   Note this isn't the only place we zero slop when overwriting unfortunately,
+   there's also LDV_FILL_SLOP().
+
    -------------------------------------------------------------------------- */
 
 #if defined(PROFILING) || defined(DEBUG)
