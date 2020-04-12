@@ -948,12 +948,15 @@ accountAllocation(Capability *cap, W_ n)
  * of closures. This trick is used by the sanity checking code and the heap
  * profiler, see Note [skipping slop in the heap profiler].
  *
- * When profiling we zero:
- *  - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned.
- *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
+ * When profiling we always zero:
  *
- * When performing LDV profiling or using a (single threaded) debug RTS we zero
- * slop even when overwriting immutable closures, see Note [zeroing slop when
+ * - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned
+ *   and
+ *
+ * - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
+ *
+ * When performing LDV profiling or using a (single threaded) debug RTS we
+ * additionally zero slop when overwriting closures, see Note [zeroing slop when
  * overwriting closures].
  */
 
