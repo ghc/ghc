@@ -532,6 +532,7 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
 #if defined(PROFILING)
 void LDV_recordDead (const StgClosure *c, uint32_t size);
+RTS_PRIVATE bool isInherentlyUsed ( StgHalfWord closure_type );
 #endif
 
 EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
@@ -559,6 +560,9 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
+#if defined(PROFILING)
+    ASSERT(!isInherentlyUsed(get_itbl(p)->type));
+#endif
     overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p),
                         /*inherently_used=*/false);
 }
@@ -589,5 +593,8 @@ EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
+#if defined(PROFILING)
+    ASSERT(!isInherentlyUsed(get_itbl(p)->type));
+#endif
     overwritingClosure_(p, sizeofW(StgThunkHeader), size, /*inherently_used=*/false);
 }

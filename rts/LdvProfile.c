@@ -18,6 +18,37 @@
 #include "RtsUtils.h"
 #include "Schedule.h"
 
+bool isInherentlyUsed( StgHalfWord closure_type )
+{
+    switch(closure_type) {
+    case TSO:
+    case STACK:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    case ARR_WORDS:
+    case WEAK:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case BCO:
+    case PRIM:
+    case MUT_PRIM:
+    case TREC_CHUNK:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 /* --------------------------------------------------------------------------
  * This function is called eventually on every object destroyed during
  * a garbage collection, whether it is a major garbage collection or
@@ -55,33 +86,13 @@ processHeapClosureForDead( const StgClosure *c )
 
     size = closure_sizeW(c);
 
-    switch (info->type) {
-        /*
+    /*
           'inherently used' cases: do nothing.
-        */
-    case TSO:
-    case STACK:
-    case MVAR_CLEAN:
-    case MVAR_DIRTY:
-    case TVAR:
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_PTRS_FROZEN_CLEAN:
-    case MUT_ARR_PTRS_FROZEN_DIRTY:
-    case SMALL_MUT_ARR_PTRS_CLEAN:
-    case SMALL_MUT_ARR_PTRS_DIRTY:
-    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
-    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-    case ARR_WORDS:
-    case WEAK:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
-    case BCO:
-    case PRIM:
-    case MUT_PRIM:
-    case TREC_CHUNK:
+    */
+    if(isInherentlyUsed(info->type))
         return size;
 
+    switch (info->type) {
         /*
           ordinary cases: call LDV_recordDead().
         */
