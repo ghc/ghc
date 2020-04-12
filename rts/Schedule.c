@@ -24,7 +24,7 @@
 #include "ThreadLabels.h"
 #include "Updates.h"
 #include "Proftimer.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "Weak.h"
 #include "sm/GC.h" // waitForGcThreads, releaseGCThreads, N
 #include "sm/GCThread.h"
