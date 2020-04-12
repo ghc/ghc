@@ -13,7 +13,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Profiling.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "ProfHeapInternal.h"
 #include "Stats.h"
 #include "Hash.h"

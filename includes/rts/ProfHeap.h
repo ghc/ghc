@@ -8,13 +8,12 @@
 
 #pragma once
 
-#include "rts/TraverseHeap.h"
-
-#include "BeginPrivate.h"
+#include <rts/TraverseHeap.h>
 
 typedef struct _Census Census;
 
 void        heapCensus         (Time t);
+
 void        initHeapProfiling  (void);
 void        endHeapProfiling   (void);
 void        freeHeapProfiling  (void);
@@ -25,5 +24,3 @@ bool        strMatchesSelector (const char* str, const char* sel);
 bool doingRetainerProfiling(void);
 
 #endif
-
-#include "EndPrivate.h"

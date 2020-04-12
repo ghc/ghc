@@ -11,7 +11,7 @@
 
 #if defined(PROFILING)
 
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 
 RTS_PRIVATE void LdvCensusForDead ( uint32_t );
 RTS_PRIVATE void LdvCensusKillAll ( void );

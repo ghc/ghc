@@ -14,7 +14,7 @@
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "Proftimer.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "ProfilerReport.h"
