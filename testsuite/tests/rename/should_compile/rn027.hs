@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
+
 -- !!! Checking that an imported module may still have
 -- !!! a local alias without having used 'qualified'.
 module ShouldCompile where

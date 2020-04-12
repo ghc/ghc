@@ -11,22 +11,22 @@ GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 
 module GHC.Hs.ImpExp where
 
 import GhcPrelude
 
-import Module           ( ModuleName )
-import GHC.Hs.Doc       ( HsDocString )
-import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
-import BasicTypes       ( SourceText(..), StringLiteral(..), pprWithSourceText )
-import FieldLabel       ( FieldLbl(..) )
+import GHC.Types.Module       ( ModuleName )
+import GHC.Hs.Doc             ( HsDocString )
+import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
+import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
 import Outputable
 import FastString
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Hs.Extension
 
 import Data.Data
@@ -80,7 +80,7 @@ data ImportDecl pass
   = ImportDecl {
       ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
-                                 -- Note [Pragma source text] in BasicTypes
+                                 -- Note [Pragma source text] in GHC.Types.Basic
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
@@ -91,7 +91,7 @@ data ImportDecl pass
       ideclHiding    :: Maybe (Bool, Located [LIE pass])
                                        -- ^ (True => hiding, names)
     }
-  | XImportDecl (XXImportDecl pass)
+  | XImportDecl !(XXImportDecl pass)
      -- ^
      --  'ApiAnnotation.AnnKeywordId's
      --
@@ -167,7 +167,6 @@ instance OutputableBndrId p
 
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
-    ppr (XImportDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -253,7 +252,7 @@ data IE pass
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
   | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
-  | XIE (XXIE pass)
+  | XIE !(XXIE pass)
 
 type instance XIEVar             (GhcPass _) = NoExtField
 type instance XIEThingAbs        (GhcPass _) = NoExtField
@@ -282,7 +281,7 @@ gives rise to
     IEThingWith T [MkT] [FieldLabel "x" False x)]           (without DuplicateRecordFields)
     IEThingWith T [MkT] [FieldLabel "x" True $sel:x:MkT)]   (with    DuplicateRecordFields)
 
-See Note [Representing fields in AvailInfo] in Avail for more details.
+See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details.
 -}
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
@@ -302,7 +301,6 @@ ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
-ieNames (XIE nec) = noExtCon nec
 
 ieWrappedName :: IEWrappedName name -> name
 ieWrappedName (IEName    (L _ n)) = n
@@ -344,7 +342,6 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
-    ppr (XIE x) = ppr x
 
 instance (HasOccName name) => HasOccName (IEWrappedName name) where
   occName w = occName (ieWrappedName w)

@@ -26,33 +26,36 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 
-import Cmm
-import CmmUtils
-import CLabel
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
-import DynFlags
+import GHC.Driver.Session
 import ErrUtils
 
-import HscTypes
-import CostCentre
-import Id
-import IdInfo
+import GHC.Driver.Types
+import GHC.Types.CostCentre
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.RepType
-import DataCon
-import TyCon
-import Module
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Types.Module
 import Outputable
 import Stream
-import BasicTypes
-import VarSet ( isEmptyDVarSet )
+import GHC.Types.Basic
+import GHC.Types.Var.Set ( isEmptyDVarSet )
+import FileCleanup
 
 import OrdList
-import MkGraph
+import GHC.Cmm.Graph
 
 import Data.IORef
 import Control.Monad (when,void)
 import Util
+import System.IO.Unsafe
+import qualified Data.ByteString as BS
 
 codeGen :: DynFlags
         -> Module
@@ -134,12 +137,24 @@ cgTopBinding dflags (StgTopLifted (StgRec pairs))
         ; sequence_ fcodes
         }
 
-cgTopBinding dflags (StgTopStringLit id str)
-  = do  { let label = mkBytesLabel (idName id)
-        ; let (lit, decl) = mkByteStringCLit label str
-        ; emitDecl decl
-        ; addBindC (litIdInfo dflags id mkLFStringLit lit)
-        }
+cgTopBinding dflags (StgTopStringLit id str) = do
+  let label = mkBytesLabel (idName id)
+  -- emit either a CmmString literal or dump the string in a file and emit a
+  -- CmmFileEmbed literal.
+  -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
+  let isNCG    = platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+      isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
+      asString = binBlobThreshold dflags == 0 || isSmall
+
+      (lit,decl) = if not isNCG || asString
+        then mkByteStringCLit label str
+        else mkFileEmbedLit label $ unsafePerformIO $ do
+               bFile <- newTempName dflags TFL_CurrentModule ".dat"
+               BS.writeFile bFile str
+               return bFile
+  emitDecl decl
+  addBindC (litIdInfo dflags id mkLFStringLit lit)
+
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
@@ -189,6 +204,7 @@ cgDataCon :: DataCon -> FCode ()
 -- the static closure, for a constructor.
 cgDataCon data_con
   = do  { dflags <- getDynFlags
+        ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds) --  #ptr_wds
@@ -217,7 +233,7 @@ cgDataCon data_con
             do { tickyEnterDynCon
                ; ldvEnter (CmmReg nodeReg)
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg) (tagForCon dflags data_con)]
+               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon dflags data_con)]
                }
                     -- The case continuation code expects a tagged pointer
         }

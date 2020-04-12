@@ -2,7 +2,7 @@
 module T5342 (increaseAreas) where
 
 import Control.Monad
-import Data.List
+import Data.List (sort)
 
 nubSorted :: Eq a => [a] -> [a]
 nubSorted = undefined

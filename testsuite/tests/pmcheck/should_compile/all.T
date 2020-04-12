@@ -106,6 +106,18 @@ test('T17357', expect_broken(17357), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17376', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17465', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17646', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17703', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17783', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17977', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17977b', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
@@ -141,6 +153,8 @@ test('CaseOfKnownCon', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('TooManyDeltas', [], compile,
      ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('LongDistanceInfo', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Series (inspired) by Luke Maranget
 

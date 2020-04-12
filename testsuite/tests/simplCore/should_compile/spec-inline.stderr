@@ -6,7 +6,6 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Roman.$trModule4 = "main"#
@@ -14,8 +13,7 @@ Roman.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
@@ -23,7 +21,6 @@ Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 Roman.$trModule2 = "Roman"#
@@ -31,8 +28,7 @@ Roman.$trModule2 = "Roman"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
@@ -40,8 +36,7 @@ Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Roman.$trModule
@@ -49,12 +44,12 @@ Roman.$trModule
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl :: GHC.Prim.Addr#
-[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+[GblId, Unf=OtherCon []]
 lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
 Roman.foo3 :: Int
-[GblId, Str=b]
+[GblId, Str=b, Cpr=b]
 Roman.foo3
   = Control.Exception.Base.patError @'GHC.Types.LiftedRep @Int lvl
 
@@ -62,7 +57,7 @@ Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<L,A><L,U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<L,A><L,U>, Unf=OtherCon []]
 Roman.foo_$s$wgo
   = \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
       case GHC.Prim.<=# sc1 0# of {
@@ -121,7 +116,8 @@ Roman.foo_go [InlPrag=NOUSERINLINE[2]]
   :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
- Str=<S,1*U><S,1*U>m,
+ Str=<S,1*U><S,1*U>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
@@ -136,8 +132,7 @@ Roman.foo_go
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.foo2 :: Int
 [GblId,
- Caf=NoCafRefs,
- Str=m,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = GHC.Types.I# 6#
@@ -145,8 +140,7 @@ Roman.foo2 = GHC.Types.I# 6#
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
 [GblId,
- Caf=NoCafRefs,
- Str=m2,
+ Cpr=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
@@ -155,8 +149,8 @@ Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
 foo :: Int -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
- Str=<S,1*U(U)>m,
+ Str=<S,1*U(U)>,
+ Cpr=m1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

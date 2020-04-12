@@ -21,7 +21,10 @@
 #include <ctype.h>
 #endif
 
+#include <errno.h>
+
 #include <string.h>
+#include <stdlib.h>
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
@@ -98,6 +101,9 @@ static int  openStatsFile (
 
 static StgWord64 decodeSize (
     const char *flag, uint32_t offset, StgWord64 min, StgWord64 max);
+
+static double parseDouble (
+    const char *arg, bool *error);
 
 static void bad_option (const char *s);
 
@@ -335,7 +341,7 @@ usage_text[] = {
 "  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
 "",
 "",
-"  -Z         Don't squeeze out update frames on stack overflow",
+"  -Z         Don't squeeze out update frames on context switch",
 "  -B         Sound the bell at the start of each garbage collection",
 #if defined(PROFILING)
 "",
@@ -1379,8 +1385,13 @@ error = true;
                 if (rts_argv[arg][2] == '\0') {
                   /* use default */
                 } else {
+                    double intervalSeconds = parseDouble(rts_argv[arg]+2, &error);
+
+                    if (error) {
+                        errorBelch("bad value for -i");
+                    }
                     RtsFlags.ProfFlags.heapProfileInterval =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
@@ -1390,8 +1401,13 @@ error = true;
                 if (rts_argv[arg][2] == '\0')
                     RtsFlags.ConcFlags.ctxtSwitchTime = 0;
                 else {
+                    double intervalSeconds = parseDouble(rts_argv[arg]+2, &error);
+
+                    if (error) {
+                        errorBelch("bad value for -C");
+                    }
                     RtsFlags.ConcFlags.ctxtSwitchTime =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
@@ -1401,8 +1417,13 @@ error = true;
                     // turns off ticks completely
                     RtsFlags.MiscFlags.tickInterval = 0;
                 } else {
+                    double intervalSeconds = parseDouble(rts_argv[arg]+2, &error);
+
+                    if (error) {
+                        errorBelch("bad value for -V");
+                    }
                     RtsFlags.MiscFlags.tickInterval =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
@@ -1963,6 +1984,35 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     }
 
     return val;
+}
+
+/* ----------------------------------------------------------------------------------
+ * parseDouble: parse a double from a string, setting a flag in case of an error
+-------------------------------------------------------------------------------- */
+
+static double
+parseDouble(const char *arg, bool *error)
+{
+    char *endptr;
+    double out;
+    errno = 0;
+
+    out = strtod(arg, &endptr);
+
+    if (errno != 0 || endptr == arg) {
+        *error = true;
+        return out;
+    }
+
+    while (isspace((unsigned char)*endptr)) {
+        ++endptr;
+    }
+
+    if (*endptr != 0) {
+        *error = true;
+    }
+
+    return out;
 }
 
 #if defined(DEBUG)

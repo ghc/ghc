@@ -30,7 +30,7 @@ module GHC.Rename.Env (
         lookupGreAvailRn,
 
         -- Rebindable Syntax
-        lookupSyntaxName, lookupSyntaxName', lookupSyntaxNames,
+        lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
         lookupIfThenElse,
 
         -- Constructing usage information
@@ -49,29 +49,29 @@ import GhcPrelude
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
-import RdrName
-import HscTypes
-import TcEnv
-import TcRnMonad
+import GHC.Types.Name.Reader
+import GHC.Driver.Types
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
 import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
-import Name
-import NameSet
-import NameEnv
-import Avail
-import Module
-import ConLike
-import DataCon
-import TyCon
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Avail
+import GHC.Types.Module
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCon
 import ErrUtils         ( MsgDoc )
 import PrelNames        ( rOOT_MAIN )
-import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..))
-import SrcLoc
+import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
-import UniqSet          ( uniqSetAny )
+import GHC.Types.Unique.Set ( uniqSetAny )
 import Util
 import Maybes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Control.Monad
 import ListSetOps       ( minusList )
@@ -80,7 +80,9 @@ import GHC.Rename.Unbound
 import GHC.Rename.Utils
 import qualified Data.Semigroup as Semi
 import Data.Either      ( partitionEithers )
-import Data.List        (find)
+import Data.List        ( find, sortBy )
+import Control.Arrow    ( first )
+import Data.Function
 
 {-
 *********************************************************
@@ -297,8 +299,13 @@ lookupExactOcc_either name
                     ATyCon tc                 -> Just tc
                     AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
                     _                         -> Nothing
-  , isTupleTyCon tycon
-  = do { checkTupSize (tyConArity tycon)
+  , Just tupleSort <- tyConTuple_maybe tycon
+  = do { let tupArity = case tupleSort of
+               -- Unboxed tuples have twice as many arguments because of the
+               -- 'RuntimeRep's (#17837)
+               UnboxedTuple -> tyConArity tycon `div` 2
+               _ -> tyConArity tycon
+       ; checkTupSize tupArity
        ; return (Right name) }
 
   | isExternalName name
@@ -343,7 +350,7 @@ sameNameErr gres@(_ : _)
   = hang (text "Same exact name in multiple name-spaces:")
        2 (vcat (map pp_one sorted_names) $$ th_hint)
   where
-    sorted_names = sortWith nameSrcLoc (map gre_name gres)
+    sorted_names = sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan) (map gre_name gres)
     pp_one name
       = hang (pprNameSpace (occNameSpace (getOccName name))
               <+> quotes (ppr name) <> comma)
@@ -393,7 +400,7 @@ lookupFamInstName :: Maybe Name -> Located RdrName
                   -> RnM (Located Name)
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
-lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Binds.rnMethodBind
+lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
   = wrapLocM (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRn tc_rdr
@@ -905,7 +912,7 @@ lookupOccRn rdr_name
            Nothing   -> reportUnboundName rdr_name }
 
 -- Only used in one place, to rename pattern synonym binders.
--- See Note [Renaming pattern synonym variables] in GHC.Rename.Binds
+-- See Note [Renaming pattern synonym variables] in GHC.Rename.Bind
 lookupLocalOccRn :: RdrName -> RnM Name
 lookupLocalOccRn rdr_name
   = do { mb_name <- lookupLocalOccRn_maybe rdr_name
@@ -1056,6 +1063,9 @@ lookupInfoOccRn :: RdrName -> RnM [Name]
 -- It finds all the GREs that RdrName could mean, not complaining
 -- about ambiguity, but rather returning them all
 -- C.f. #9881
+-- lookupInfoOccRn is also used in situations where we check for
+-- at least one definition of the RdrName, not complaining about
+-- multiple definitions. (See #17832)
 lookupInfoOccRn rdr_name =
   lookupExactOrOrig rdr_name (:[]) $
     do { rdr_env <- getGlobalRdrEnv
@@ -1625,45 +1635,46 @@ We store the relevant Name in the HsSyn tree, in
   * HsDo
 respectively.  Initially, we just store the "standard" name (PrelNames.fromIntegralName,
 fromRationalName etc), but the renamer changes this to the appropriate user
-name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
+name if Opt_NoImplicitPrelude is on.  That is what lookupSyntax does.
 
 We treat the original (standard) names as free-vars too, because the type checker
 checks the type of the user thing against the type of the standard thing.
 -}
 
-lookupIfThenElse :: RnM (Maybe (SyntaxExpr GhcRn), FreeVars)
--- Different to lookupSyntaxName because in the non-rebindable
+lookupIfThenElse :: Bool  -- False <=> don't use rebindable syntax under any conditions
+                 -> RnM (SyntaxExpr GhcRn, FreeVars)
+-- Different to lookupSyntax because in the non-rebindable
 -- case we desugar directly rather than calling an existing function
 -- Hence the (Maybe (SyntaxExpr GhcRn)) return type
-lookupIfThenElse
+lookupIfThenElse maybe_use_rs
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if not rebindable_on
-         then return (Nothing, emptyFVs)
+       ; if not (rebindable_on && maybe_use_rs)
+         then return (NoSyntaxExprRn, emptyFVs)
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
-                 ; return ( Just (mkRnSyntaxExpr ite)
+                 ; return ( mkRnSyntaxExpr ite
                           , unitFV ite ) } }
 
-lookupSyntaxName' :: Name          -- ^ The standard name
-                  -> RnM Name      -- ^ Possibly a non-standard name
-lookupSyntaxName' std_name
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if not rebindable_on then
-           return std_name
-         else
-            -- Get the similarly named thing from the local environment
-           lookupOccRn (mkRdrUnqual (nameOccName std_name)) }
-
-lookupSyntaxName :: Name                             -- The standard name
-                 -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
-                                                     -- name
+lookupSyntaxName :: Name                      -- ^ The standard name
+                 -> RnM (Name, FreeVars)      -- ^ Possibly a non-standard name
 lookupSyntaxName std_name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-           return (mkRnSyntaxExpr std_name, emptyFVs)
+           return (std_name, emptyFVs)
          else
             -- Get the similarly named thing from the local environment
            do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
-              ; return (mkRnSyntaxExpr usr_name, unitFV usr_name) } }
+              ; return (usr_name, unitFV usr_name) } }
+
+lookupSyntaxExpr :: Name                          -- ^ The standard name
+                 -> RnM (HsExpr GhcRn, FreeVars)  -- ^ Possibly a non-standard name
+lookupSyntaxExpr std_name
+  = fmap (first nl_HsVar) $ lookupSyntaxName std_name
+
+lookupSyntax :: Name                             -- The standard name
+             -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
+                                                 -- name
+lookupSyntax std_name
+  = fmap (first mkSyntaxExpr) $ lookupSyntaxExpr std_name
 
 lookupSyntaxNames :: [Name]                         -- Standard names
      -> RnM ([HsExpr GhcRn], FreeVars) -- See comments with HsExpr.ReboundNames

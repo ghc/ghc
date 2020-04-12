@@ -35,8 +35,7 @@
  ListComprehensions.hs:(25,16)-(27,22), ListComprehensions.hs:26:16,
  ListComprehensions.hs:26:16-23,
  ListComprehensions.hs:(26,16)-(27,22),
- ListComprehensions.hs:26:21-23, ListComprehensions.hs:27:21-22,
- <no location info>}
+ ListComprehensions.hs:26:21-23, ListComprehensions.hs:27:21-22}
 --------------------------------
 [
 (AK ListComprehensions.hs:1:1 AnnModule = [ListComprehensions.hs:6:1-6])
@@ -156,7 +155,6 @@
 (AK ListComprehensions.hs:26:16-23 AnnLarrow = [ListComprehensions.hs:26:18-19])
 
 (AK ListComprehensions.hs:(26,16)-(27,22) AnnThen = [ListComprehensions.hs:27:16-19])
-
-(AK <no location info> AnnEofPos = [ListComprehensions.hs:29:1])
 ]
 
+EOF: Just SrcSpanPoint "./ListComprehensions.hs" 29 1

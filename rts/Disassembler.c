@@ -324,7 +324,7 @@ disInstr ( StgBCO *bco, int pc )
 /* Something of a kludge .. how do we know where the end of the insn
    array is, since it isn't recorded anywhere?  Answer: the first
    short is the number of bytecodes which follow it.
-   See ByteCodeGen.linkBCO.insns_arr for construction ...
+   See GHC.CoreToByteCode.linkBCO.insns_arr for construction ...
 */
 void disassemble( StgBCO *bco )
 {

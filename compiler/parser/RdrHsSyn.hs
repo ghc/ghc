@@ -56,7 +56,7 @@ module   RdrHsSyn (
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
         checkPattern_msg,
-        checkMonadComp,       -- P (HsStmtContext RdrName)
+        checkMonadComp,       -- P (HsStmtContext GhcPs)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
@@ -104,25 +104,24 @@ module   RdrHsSyn (
 
 import GhcPrelude
 import GHC.Hs           -- Lots of it
-import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import DataCon          ( DataCon, dataConTyCon )
-import ConLike          ( ConLike(..) )
-import CoAxiom          ( Role, fsFromRole )
-import RdrName
-import Name
-import BasicTypes
-import TcEvidence       ( idHsWrapper )
+import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
+import GHC.Core.DataCon        ( DataCon, dataConTyCon )
+import GHC.Core.ConLike        ( ConLike(..) )
+import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
+import GHC.Types.Name.Reader
+import GHC.Types.Name
+import GHC.Types.Basic
 import Lexer
-import Lexeme           ( isLexCon )
-import Type             ( TyThing(..), funTyCon )
+import GHC.Utils.Lexeme ( isLexCon )
+import GHC.Core.Type    ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
                           tupleTyConName, cTupleTyConNameArity_maybe )
-import ForeignCall
+import GHC.Types.ForeignCall
 import PrelNames        ( allNameStrings )
-import SrcLoc
-import Unique           ( hasKey )
+import GHC.Types.SrcLoc
+import GHC.Types.Unique ( hasKey )
 import OrdList          ( OrdList, fromOL )
 import Bag              ( emptyBag, consBag )
 import Outputable
@@ -131,7 +130,7 @@ import Maybes
 import Util
 import ApiAnnotation
 import Data.List
-import DynFlags ( WarningFlag(..), DynFlags )
+import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import ErrUtils ( Messages )
 
 import Control.Monad
@@ -139,6 +138,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
+import Data.Kind       ( Type )
 
 #include "HsVersions.h"
 
@@ -495,7 +495,6 @@ has_args (L _ (Match { m_pats = args }) : _) = not (null args)
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
         -- than pattern bindings (tests/rename/should_fail/rnfail002).
-has_args (L _ (XMatch nec) : _) = noExtCon nec
 
 {- **********************************************************************
 
@@ -1194,7 +1193,6 @@ makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
               fun_matches = mkMatchGroup FromSource ms,
-              fun_co_fn = idHsWrapper,
               fun_tick = [] }
 
 -- See Note [FunBind vs PatBind]
@@ -1675,7 +1673,7 @@ mergeDataCon all_xs =
 -- If the flag MonadComprehensions is set, return a 'MonadComp' context,
 -- otherwise use the usual 'ListComp' context
 
-checkMonadComp :: PV (HsStmtContext Name)
+checkMonadComp :: PV (HsStmtContext GhcRn)
 checkMonadComp = do
     monadComprehensions <- getBit MonadComprehensionsBit
     return $ if monadComprehensions
@@ -1735,7 +1733,7 @@ instance DisambInfixOp RdrName where
 -- See Note [Ambiguous syntactic categories]
 class b ~ (Body b) GhcPs => DisambECP b where
   -- | See Note [Body in DisambECP]
-  type Body b :: * -> *
+  type Body b :: Type -> Type
   -- | Return a command without ambiguity, or fail in a non-command context.
   ecpFromCmd' :: LHsCmd GhcPs -> PV (Located b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
@@ -1845,7 +1843,7 @@ even when -XUndecidableSuperClasses are not required.
 {- Note [Body in DisambECP]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are helper functions (mkBodyStmt, mkBindStmt, unguardedRHS, etc) that
-require their argument to take a form of (body GhcPs) for some (body :: * ->
+require their argument to take a form of (body GhcPs) for some (body :: Type ->
 *). To satisfy this requirement, we say that (b ~ Body b GhcPs) in the
 superclass constraints of DisambECP.
 
@@ -2275,7 +2273,7 @@ data Frame
     -- ^ If-expression: if p then x else y
   | FrameCase LFrame [LFrameMatch]
     -- ^ Case-expression: case x of { p1 -> e1; p2 -> e2 }
-  | FrameDo (HsStmtContext Name) [LFrameStmt]
+  | FrameDo (HsStmtContext GhcRn) [LFrameStmt]
     -- ^ Do-expression: do { s1; a <- s2; s3 }
   ...
   | FrameExpr (HsExpr GhcPs)   -- unambiguously an expression
@@ -2541,15 +2539,13 @@ mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
 mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
   = HsRecField (L loc (Unambiguous noExtField rdr)) arg pun
-mk_rec_upd_field (HsRecField (L _ (XFieldOcc nec)) _ _)
-  = noExtCon nec
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- Note [Pragma source text] in BasicTypes
+  = InlinePragma { inl_src = src -- Note [Pragma source text] in GHC.Types.Basic
                  , inl_inline = inl
                  , inl_sat    = Nothing
                  , inl_act    = act
@@ -2852,9 +2848,9 @@ data PV_Context =
 data PV_Accum =
   PV_Accum
     { pv_messages :: DynFlags -> Messages
-    , pv_annotations :: [(ApiAnnKey,[SrcSpan])]
-    , pv_comment_q :: [Located AnnotationComment]
-    , pv_annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
+    , pv_annotations :: [(ApiAnnKey,[RealSrcSpan])]
+    , pv_comment_q :: [RealLocated AnnotationComment]
+    , pv_annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
     }
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
@@ -2919,7 +2915,7 @@ instance MonadP PV where
     PV $ \ctx acc ->
       let b = ext `xtest` pExtsBitmap (pv_options ctx) in
       PV_Ok acc $! b
-  addAnnotation l a v =
+  addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) =
     PV $ \_ acc ->
       let
         (comment_q', new_ann_comments) = allocateComments l (pv_comment_q acc)
@@ -2931,6 +2927,7 @@ instance MonadP PV where
           , pv_annotations_comments = annotations_comments' }
       in
         PV_Ok acc' ()
+  addAnnotation _ _ _ = return ()
 
 {- Note [Parser-Validator]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

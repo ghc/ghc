@@ -20,25 +20,26 @@ import GHC              ( -- DynFlags(..), HscTarget(..),
                           -- GhcMode(..), GhcLink(..),
                           Ghc, GhcMonad(..),
                           LoadHowMuch(..) )
-import CmdLineParser
+import GHC.Driver.CmdLine
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import GHC.Iface.Load   ( showIface )
-import HscMain          ( newHscEnv )
-import DriverPipeline   ( oneShot, compileFile )
-import DriverMkDepend   ( doMkDependHS )
-import DriverBkp   ( doBackpack )
+import GHC.Iface.Load       ( showIface )
+import GHC.Driver.Main      ( newHscEnv )
+import GHC.Driver.Pipeline  ( oneShot, compileFile )
+import GHC.Driver.MakeFile  ( doMkDependHS )
+import GHC.Driver.Backpack  ( doBackpack )
+import GHC.Driver.Ways
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-import DynamicLoading   ( loadFrontendPlugin )
-import Plugins
+import GHC.Runtime.Loader   ( loadFrontendPlugin )
+import GHC.Driver.Plugins
 #if defined(HAVE_INTERNAL_INTERPRETER)
-import DynamicLoading   ( initializePlugins )
+import GHC.Runtime.Loader   ( initializePlugins )
 #endif
-import Module           ( ModuleName )
+import GHC.Types.Module     ( ModuleName, mkModuleName )
 
 
 -- Various other random stuff that we need
@@ -47,27 +48,26 @@ import GHC.Platform
 import GHC.Platform.Host
 import Config
 import Constants
-import HscTypes
-import Packages         ( pprPackages, pprPackagesSimple )
-import DriverPhases
-import BasicTypes       ( failed )
-import DynFlags hiding (WarnReason(..))
+import GHC.Driver.Types
+import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
+import GHC.Driver.Phases
+import GHC.Types.Basic     ( failed )
+import GHC.Driver.Session hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
 import SysTools.BaseDir
 import SysTools.Settings
-import SrcLoc
+import GHC.Types.SrcLoc
 import Util
 import Panic
-import UniqSupply
+import GHC.Types.Unique.Supply
 import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
-import GHC.Iface.Load           ( loadUserInterface )
-import Module              ( mkModuleName )
-import Finder              ( findImportedModule, cannotFindModule )
-import TcRnMonad           ( initIfaceCheck )
+import GHC.Iface.Load      ( loadUserInterface )
+import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
+import GHC.Tc.Utils.Monad        ( initIfaceCheck )
 import Binary              ( openBinMem, put_ )
 import BinFingerprint      ( fingerprintBinMem )
 
@@ -80,7 +80,8 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
-import Data.List
+import Data.List ( isPrefixOf, partition, intercalate )
+import qualified Data.Set as Set
 import Data.Maybe
 import Prelude
 
@@ -197,13 +198,13 @@ main' postLoadMode dflags0 args flagWarnings = do
   let dflags4 = case lang of
                 HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
-                        dflags3a = updateWays $ dflags3 { ways = interpWays }
+                        dflags3a = updateWays $ dflags3 { ways = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
                                  $ concatMap (wayGeneralFlags platform)
-                                             interpWays
+                                             hostFullWays
                         dflags3c = foldl gopt_unset dflags3b
                                  $ concatMap (wayUnsetGeneralFlags platform)
-                                             interpWays
+                                             hostFullWays
                     in dflags3c
                 _ ->
                     dflags3
@@ -348,12 +349,12 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (notNull (filter wayRTSOnly (ways dflags))
+   when (not (Set.null (Set.filter wayRTSOnly (ways dflags)))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
+   when ((Set.filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
@@ -864,9 +865,9 @@ dumpFastStringStats dflags = do
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
-showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
-dumpPackages       dflags = putMsg dflags (pprPackages dflags)
-dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
+showPackages       dflags = putStrLn (showSDoc dflags (pprPackages (pkgState dflags)))
+dumpPackages       dflags = putMsg dflags (pprPackages (pkgState dflags))
+dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple (pkgState dflags))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support

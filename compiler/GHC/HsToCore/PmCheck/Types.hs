@@ -8,7 +8,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE TupleSections #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
--- to be imported from "TcRnTypes". The exposed API is that of
+-- to be imported from "GHC.Tc.Types". The exposed API is that of
 -- "GHC.HsToCore.PmCheck.Oracle" and "GHC.HsToCore.PmCheck".
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
@@ -24,12 +24,17 @@ module GHC.HsToCore.PmCheck.Types (
         -- * Caching partially matched COMPLETE sets
         ConLikeSet, PossibleMatches(..),
 
+        -- * PmAltConSet
+        PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
+        extendPmAltConSet, pmAltConSetElems,
+
         -- * A 'DIdEnv' where entries may be shared
         Shared(..), SharedDIdEnv(..), emptySDIE, lookupSDIE, sameRepresentativeSDIE,
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta
+        VarInfo(..), TmState(..), TyState(..), Delta(..),
+        Deltas(..), initDeltas, liftDeltasM
     ) where
 
 #include "HsVersions.h"
@@ -39,31 +44,33 @@ import GhcPrelude
 import Util
 import Bag
 import FastString
-import Var (EvVar)
-import Id
-import VarEnv
-import UniqDSet
-import UniqDFM
-import Name
-import DataCon
-import ConLike
+import GHC.Types.Var (EvVar)
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique.DFM
+import GHC.Types.Name
+import GHC.Core.DataCon
+import GHC.Core.ConLike
 import Outputable
+import ListSetOps (unionLists)
 import Maybes
-import Type
-import TyCon
-import Literal
-import CoreSyn
-import CoreMap
-import CoreUtils (exprType)
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Types.Literal
+import GHC.Core
+import GHC.Core.Map
+import GHC.Core.Utils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
-import TcType (evVarPred)
+import GHC.Tc.Utils.TcType (evVarPred)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
+import qualified Data.Semigroup as Semi
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -146,9 +153,36 @@ eqConLike (PatSynCon psc1)  (PatSynCon psc2)
 eqConLike _                 _                 = PossiblyOverlap
 
 -- | Represents the head of a match against a 'ConLike' or literal.
--- Really similar to 'CoreSyn.AltCon'.
+-- Really similar to 'GHC.Core.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
+
+data PmAltConSet = PACS !ConLikeSet ![PmLit]
+
+emptyPmAltConSet :: PmAltConSet
+emptyPmAltConSet = PACS emptyUniqDSet []
+
+isEmptyPmAltConSet :: PmAltConSet -> Bool
+isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
+
+-- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
+-- the given 'PmAltCon' according to 'eqPmAltCon'.
+elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
+elemPmAltConSet (PmAltConLike cl) (PACS cls _   ) = elementOfUniqDSet cl cls
+elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = elem lit lits
+
+extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
+extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
+  = PACS (addOneToUniqDSet cls cl) lits
+extendPmAltConSet (PACS cls lits) (PmAltLit lit)
+  = PACS cls (unionLists lits [lit])
+
+pmAltConSetElems :: PmAltConSet -> [PmAltCon]
+pmAltConSetElems (PACS cls lits)
+  = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
+
+instance Outputable PmAltConSet where
+  ppr = ppr . pmAltConSetElems
 
 -- | We can't in general decide whether two 'PmAltCon's match the same set of
 -- values. In addition to the reasons in 'eqPmLit' and 'eqConLike', a
@@ -465,7 +499,7 @@ data VarInfo
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
 
-  , vi_pos :: ![(PmAltCon, [Id])]
+  , vi_pos :: ![(PmAltCon, [TyVar], [Id])]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
   -- pattern matches involving pattern synonym
@@ -473,7 +507,7 @@ data VarInfo
   -- However, no more than one RealDataCon in the list, otherwise contradiction
   -- because of generativity.
 
-  , vi_neg :: ![PmAltCon]
+  , vi_neg :: !PmAltConSet
   -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
   -- Example, assuming
   --
@@ -487,6 +521,9 @@ data VarInfo
   -- between 'vi_pos' and 'vi_neg'.
 
   -- See Note [Why record both positive and negative info?]
+  -- It's worth having an actual set rather than a simple association list,
+  -- because files like Cabal's `LicenseId` define relatively huge enums
+  -- that lead to quadratic or worse behavior.
 
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
@@ -508,7 +545,7 @@ instance Outputable VarInfo where
 initTmState :: TmState
 initTmState = TmSt emptySDIE emptyCoreMap
 
--- | The type oracle state. A poor man's 'TcSMonad.InsertSet': The invariant is
+-- | The type oracle state. A poor man's 'GHC.Tc.Solver.Monad.InsertSet': The invariant is
 -- that all constraints in there are mutually compatible.
 newtype TyState = TySt (Bag EvVar)
 
@@ -520,8 +557,7 @@ instance Outputable TyState where
 initTyState :: TyState
 initTyState = TySt emptyBag
 
--- | Term and type constraints to accompany each value vector abstraction.
--- For efficiency, we store the term oracle state instead of the term
+-- | An inert set of canonical (i.e. mutually compatible) term and type
 -- constraints.
 data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
                      , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
@@ -531,9 +567,24 @@ initDelta :: Delta
 initDelta = MkDelta initTyState initTmState
 
 instance Outputable Delta where
-  ppr delta = vcat [
+  ppr delta = hang (text "Delta") 2 $ vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
       ppr (delta_tm_st delta),
       ppr (delta_ty_st delta)
     ]
+
+-- | A disjunctive bag of 'Delta's, representing a refinement type.
+newtype Deltas = MkDeltas (Bag Delta)
+
+initDeltas :: Deltas
+initDeltas = MkDeltas (unitBag initDelta)
+
+instance Outputable Deltas where
+  ppr (MkDeltas deltas) = ppr deltas
+
+instance Semigroup Deltas where
+  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
+
+liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
+liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)

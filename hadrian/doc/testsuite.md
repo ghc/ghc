@@ -6,7 +6,7 @@ The simplest way to run the testsuite is
 
 ``` sh
 # assuming 'build' is the build script you're using
-# (hadrian/build.sh, hadrian/build.bat, ...)
+# (hadrian/build, hadrian/build.bat, ...)
 build test
 ```
 
@@ -112,6 +112,9 @@ build test --only-perf
 build test --skip-perf
 ```
 
+The testsuite driver will produce a summary of the observed performance metrics
+if `hadrian` is passed the `--summary-metrics=<file>` flag.
+
 ## Test speed
 
 You can run the tests in `slow`, `normal` (default) or `fast`
@@ -127,6 +130,16 @@ build test --test-speed=normal
 # equivalent to: make fasttest
 build test --test-speed=fast
 ```
+
+## Considering tests to be broken
+
+Sometimes it is necessary to mark tests as broken in a particular test
+environment (e.g. a particular Linux distribution). While usually one would
+want to declare this in the test definition using the `expect_broken` modifier,
+this is sometimes not possible.
+
+For these cases one can use Hadrian's `--broken-test` flag to tell the
+testsuite driver to consider a test to be broken during the testsuite run.
 
 ## Test ways
 

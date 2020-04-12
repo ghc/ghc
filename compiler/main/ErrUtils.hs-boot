@@ -4,9 +4,9 @@ module ErrUtils where
 
 import GhcPrelude
 import Outputable (SDoc, PprStyle )
-import SrcLoc (SrcSpan)
+import GHC.Types.SrcLoc (SrcSpan)
 import Json
-import {-# SOURCE #-} DynFlags ( DynFlags )
+import {-# SOURCE #-} GHC.Driver.Session ( DynFlags )
 
 type DumpAction = DynFlags -> PprStyle -> DumpOptions -> String
                   -> DumpFormat -> SDoc -> IO ()

@@ -130,7 +130,7 @@ when invoked:
 
     import GHC
     import GHC.Paths ( libdir )
-    import DynFlags ( defaultFatalMessager, defaultFlushOut )
+    import GHC.Driver.Session ( defaultFatalMessager, defaultFlushOut )
 
     main =
         defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -324,13 +324,13 @@ Writing compiler plugins
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Plugins are modules that export at least a single identifier,
-``plugin``, of type ``GhcPlugins.Plugin``. All plugins should
-``import GhcPlugins`` as it defines the interface to the compilation
+``plugin``, of type ``GHC.Plugins.Plugin``. All plugins should
+``import GHC.Plugins`` as it defines the interface to the compilation
 pipeline.
 
 A ``Plugin`` effectively holds a function which installs a compilation
 pass into the compiler pipeline. By default there is the empty plugin
-which does nothing, ``GhcPlugins.defaultPlugin``, which you should
+which does nothing, ``GHC.Plugins.defaultPlugin``, which you should
 override with record syntax to specify your installation function. Since
 the exact fields of the ``Plugin`` type are open to change, this is the
 best way to ensure your plugins will continue to work in the future with
@@ -350,7 +350,7 @@ just returns the original compilation pipeline, unmodified, and says
 ::
 
     module DoNothing.Plugin (plugin) where
-    import GhcPlugins
+    import GHC.Plugins
 
     plugin :: Plugin
     plugin = defaultPlugin {
@@ -447,7 +447,7 @@ in a module it compiles:
 ::
 
     module SayNames.Plugin (plugin) where
-    import GhcPlugins
+    import GHC.Plugins
 
     plugin :: Plugin
     plugin = defaultPlugin {
@@ -492,7 +492,7 @@ will print out the name of any top-level non-recursive binding with the
 
     {-# LANGUAGE DeriveDataTypeable #-}
     module SayAnnNames.Plugin (plugin, SomeAnn(..)) where
-    import GhcPlugins
+    import GHC.Plugins
     import Control.Monad (unless)
     import Data.Data
 
@@ -765,10 +765,10 @@ displayed.
     module SourcePlugin where
 
     import Control.Monad.IO.Class
-    import DynFlags (getDynFlags)
-    import Plugins
-    import HscTypes
-    import TcRnTypes
+    import GHC.Driver.Session (getDynFlags)
+    import GHC.Driver.Plugins
+    import GHC.Driver.Types
+    import GHC.Tc.Types
     import GHC.Hs.Extension
     import GHC.Hs.Decls
     import GHC.Hs.Expr
@@ -957,15 +957,15 @@ spent on searching for valid hole fits, after which new searches are aborted.
     {-# LANGUAGE TypeApplications, RecordWildCards #-}
     module HolePlugin where
 
-    import GhcPlugins hiding ((<>))
+    import GHC.Plugins hiding ((<>))
 
     import TcHoleErrors
 
     import Data.List (stripPrefix, sortOn)
 
-    import TcRnTypes
+    import GHC.Tc.Types
 
-    import TcRnMonad
+    import GHC.Tc.Utils.Monad
 
     import Data.Time (UTCTime, NominalDiffTime)
     import qualified Data.Time as Time
@@ -1251,7 +1251,7 @@ we just invoke GHC with the :ghc-flag:`--frontend ⟨module⟩` flag as follows:
 Frontend plugins, like compiler plugins, are exported by registered plugins.
 However, unlike compiler modules, frontend plugins are modules that export
 at least a single identifier ``frontendPlugin`` of type
-``GhcPlugins.FrontendPlugin``.
+``GHC.Plugins.FrontendPlugin``.
 
 ``FrontendPlugin`` exports a field ``frontend``, which is a function
 ``[String] -> [(String, Maybe Phase)] -> Ghc ()``.  The first argument
@@ -1267,7 +1267,7 @@ were passed to it, and then exits.
 ::
 
     module DoNothing.FrontendPlugin (frontendPlugin) where
-    import GhcPlugins
+    import GHC.Plugins
 
     frontendPlugin :: FrontendPlugin
     frontendPlugin = defaultFrontendPlugin {
@@ -1310,12 +1310,12 @@ this idea can be seen below:
     module DynFlagsPlugin (plugin) where
 
     import BasicTypes
-    import GhcPlugins
+    import GHC.Plugins
     import GHC.Hs.Expr
     import GHC.Hs.Extension
     import GHC.Hs.Lit
     import Hooks
-    import TcRnMonad
+    import GHC.Tc.Utils.Monad
 
     plugin :: Plugin
     plugin = defaultPlugin { dynflagsPlugin = hooksP }

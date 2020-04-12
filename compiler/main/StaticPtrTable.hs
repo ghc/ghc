@@ -28,7 +28,7 @@
 --
 -- The linker must find the definitions matching the @extern StgPtr <name>@
 -- declarations. For this to work, the identifiers of static pointers need to be
--- exported. This is done in SetLevels.newLvlVar.
+-- exported. This is done in GHC.Core.Op.SetLevels.newLvlVar.
 --
 -- There is also a finalization function for the time when the module is
 -- unloaded.
@@ -65,7 +65,7 @@ Here is a running example:
 
 * The typechecker verifies that all free variables occurring in the
   static form are floatable to top level (see Note [Meaning of
-  IdBindingInfo] in TcRnTypes).  In our example, 'k' is floatable.
+  IdBindingInfo] in GHC.Tc.Types).  In our example, 'k' is floatable.
   Even though it is bound in a nested let, we are fine.
 
 * The desugarer replaces the static form with an application of the
@@ -119,26 +119,26 @@ Here is a running example:
 * If we are compiling for the byte-code interpreter, we instead explicitly add
   the SPT entries (recorded in CgGuts' cg_spt_entries field) to the interpreter
   process' SPT table using the addSptEntry interpreter message. This happens
-  in upsweep after we have compiled the module (see GhcMake.upsweep').
+  in upsweep after we have compiled the module (see GHC.Driver.Make.upsweep').
 -}
 
 import GhcPrelude
 
-import CLabel
-import CoreSyn
-import CoreUtils (collectMakeStaticArgs)
-import DataCon
-import DynFlags
-import HscTypes
-import Id
-import MkCore (mkStringExprFSWith)
-import Module
-import Name
+import GHC.Cmm.CLabel
+import GHC.Core
+import GHC.Core.Utils (collectMakeStaticArgs)
+import GHC.Core.DataCon
+import GHC.Driver.Session
+import GHC.Driver.Types
+import GHC.Types.Id
+import GHC.Core.Make (mkStringExprFSWith)
+import GHC.Types.Module
+import GHC.Types.Name
 import Outputable
 import GHC.Platform
 import PrelNames
-import TcEnv (lookupGlobal)
-import Type
+import GHC.Tc.Utils.Env (lookupGlobal)
+import GHC.Core.Type
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State
@@ -178,6 +178,7 @@ sptCreateStaticBinds hsc_env this_mod binds
         go (reverse fps' ++ fps) (bnd' : bs) xs'
 
     dflags = hsc_dflags hsc_env
+    platform = targetPlatform dflags
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
     --
@@ -219,8 +220,8 @@ sptCreateStaticBinds hsc_env this_mod binds
       staticPtrDataCon <- lift $ lookupDataConHscEnv staticPtrDataConName
       return (fp, mkConApp staticPtrDataCon
                                [ Type t
-                               , mkWord64LitWordRep dflags w0
-                               , mkWord64LitWordRep dflags w1
+                               , mkWord64LitWordRep platform w0
+                               , mkWord64LitWordRep platform w1
                                , info
                                , e ])
 
@@ -233,10 +234,10 @@ sptCreateStaticBinds hsc_env this_mod binds
 
     -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
     -- 'Fingerprint' data constructor.
-    mkWord64LitWordRep dflags =
-      case platformWordSize (targetPlatform dflags) of
+    mkWord64LitWordRep platform =
+      case platformWordSize platform of
         PW4 -> mkWord64LitWord64
-        PW8 -> mkWordLit dflags . toInteger
+        PW8 -> mkWordLit platform . toInteger
 
     lookupIdHscEnv :: Name -> IO Id
     lookupIdHscEnv n = lookupTypeHscEnv hsc_env n >>=

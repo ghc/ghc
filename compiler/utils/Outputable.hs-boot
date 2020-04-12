@@ -4,6 +4,8 @@ import GhcPrelude
 import GHC.Stack( HasCallStack )
 
 data SDoc
+data PprStyle
+data SDocContext
 
 showSDocUnsafe :: SDoc -> String
 

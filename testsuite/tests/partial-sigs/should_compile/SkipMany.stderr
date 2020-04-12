@@ -1,6 +1,6 @@
 TYPE SIGNATURES
   skipMany ::
-    forall tok st a. GenParser tok st a -> GenParser tok st ()
+    forall {tok} {st} {a}. GenParser tok st a -> GenParser tok st ()
   skipMany' ::
     forall tok st a. GenParser tok st a -> GenParser tok st ()
 TYPE CONSTRUCTORS

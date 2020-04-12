@@ -42,16 +42,16 @@ import Data.Char
 import Data.Maybe       ( maybeToList )
 import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
+import qualified Prelude
 
--- compiler/hsSyn
+-- compiler
 import GHC.Hs
 
--- compiler/main
-import DriverPhases     ( HscSource(..) )
-import HscTypes         ( IsBootInterface, WarningTxt(..) )
-import DynFlags
-import BkpSyn
-import PackageConfig
+import GHC.Driver.Phases  ( HscSource(..) )
+import GHC.Driver.Types   ( IsBootInterface, WarningTxt(..) )
+import GHC.Driver.Session
+import GHC.Driver.Backpack.Syntax
+import UnitInfo
 
 -- compiler/utils
 import OrdList
@@ -59,18 +59,20 @@ import BooleanFormula   ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
 import FastString
 import Maybes           ( isJust, orElse )
 import Outputable
+import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
+import GhcPrelude
 
 -- compiler/basicTypes
-import RdrName
-import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
-import DataCon          ( DataCon, dataConName )
-import SrcLoc
-import Module
-import BasicTypes
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+import GHC.Core.DataCon          ( DataCon, dataConName )
+import GHC.Types.SrcLoc
+import GHC.Types.Module
+import GHC.Types.Basic
+import GHC.Types.ForeignCall
 
--- compiler/types
-import Type             ( funTyCon )
-import Class            ( FunDep )
+import GHC.Core.Type    ( funTyCon )
+import GHC.Core.Class   ( FunDep )
 
 -- compiler/parser
 import RdrHsSyn
@@ -78,19 +80,13 @@ import Lexer
 import HaddockUtils
 import ApiAnnotation
 
--- compiler/typecheck
-import TcEvidence       ( emptyTcEvBinds )
+import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
 -- compiler/prelude
-import ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
-
--- compiler/utils
-import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
-import GhcPrelude
 }
 
 %expect 232 -- shift/reduce conflicts
@@ -141,7 +137,7 @@ state 61 contains 47 shift/reduce conflicts.
     *** btype -> tyapps .
         tyapps -> tyapps . tyapp
 
-    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '[:' '(' '(#' '`' TYPEAPP
+    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '(' '(#' '`' TYPEAPP
       SIMPLEQUOTE VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
       STRING INTEGER TH_ID_SPLICE '$(' TH_QUASIQUOTE TH_QQUASIQUOTE
       and all the special ids.
@@ -560,8 +556,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  vccurly        { L _ ITvccurly } -- virtual close curly (from layout)
  '['            { L _ ITobrack }
  ']'            { L _ ITcbrack }
- '[:'           { L _ ITopabrack }
- ':]'           { L _ ITcpabrack }
  '('            { L _ IToparen }
  ')'            { L _ ITcparen }
  '(#'           { L _ IToubxparen }
@@ -2189,8 +2183,8 @@ When the user write Zero instead of 'Zero in types, we parse it a
 HsTyVar ("Zero", TcClsName) instead of HsTyVar ("Zero", DataName). We
 deal with this in the renamer. If a HsTyVar ("Zero", TcClsName) is not
 bounded in the type level, then we look for it in the term level (we
-change its namespace to DataName, see Note [Demotion] in OccName). And
-both become a HsTyVar ("Zero", DataName) after the renamer.
+change its namespace to DataName, see Note [Demotion] in GHC.Types.Names.OccName).
+And both become a HsTyVar ("Zero", DataName) after the renamer.
 
 -}
 
@@ -2439,7 +2433,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                         case r of {
-                                          (FunBind _ n _ _ _) ->
+                                          (FunBind _ n _ _) ->
                                                 amsL l (mj AnnFunId n:(fst $2)) >> return () ;
                                           (PatBind _ (L lh _lhs) _rhs _) ->
                                                 amsL lh (fst $2) >> return () } ;
@@ -2566,11 +2560,11 @@ quasiquote :: { Located (HsSplice GhcPs) }
         : TH_QUASIQUOTE   { let { loc = getLoc $1
                                 ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkUnqual varName quoter }
-                            in sL1 $1 (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
+                            in sL1 $1 (mkHsQuasiQuote quoterId (mkSrcSpanPs quoteSpan) quote) }
         | TH_QQUASIQUOTE  { let { loc = getLoc $1
                                 ; ITqQuasiQuote (qual, quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkQual varName (qual, quoter) }
-                            in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
+                            in sL (getLoc $1) (mkHsQuasiQuote quoterId (mkSrcSpanPs quoteSpan) quote) }
 
 exp   :: { ECP }
         : infixexp '::' sigtype

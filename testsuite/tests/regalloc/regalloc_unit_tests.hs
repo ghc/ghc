@@ -20,27 +20,27 @@ module Main where
 -- Also note: "on x86" means "as if we were compiling for x86"--this test
 -- doesn't actually have to run on any particular architecture.
 
-import qualified RegAlloc.Graph.Stats as Color
-import qualified RegAlloc.Linear.Base as Linear
-import qualified X86.Instr
-import HscMain
+import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
+import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
+import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
+import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
-import AsmCodeGen
-import CmmBuildInfoTables
-import CmmPipeline
-import CmmParse
-import CmmInfo
-import Cmm
-import Module
-import Debug
+import GHC.CmmToAsm
+import GHC.Cmm.Info.Build
+import GHC.Cmm.Pipeline
+import GHC.Cmm.Parser
+import GHC.Cmm.Info
+import GHC.Cmm
+import GHC.Types.Module
+import GHC.Cmm.DebugBlock
 import GHC
-import GhcMonad
-import UniqFM
-import UniqSupply
-import DynFlags
+import GHC.Driver.Monad
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
+import GHC.Driver.Session
 import ErrUtils
 import Outputable
-import BasicTypes
+import GHC.Types.Basic
 
 import Stream (collect, yield)
 
@@ -98,9 +98,9 @@ compileCmmForRegAllocStats ::
     DynFlags ->
     FilePath ->
     (DynFlags ->
-        NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
+        NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
     UniqSupply ->
-    IO [( Maybe [Color.RegAllocStats (Alignment, CmmStatics) X86.Instr.Instr]
+    IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF dflags
@@ -200,7 +200,7 @@ testGraphNoSpills dflags' path us = do
           -- discard irrelevant stats
           extractSRMs x = case x of
                                 Color.RegAllocStatsColored _ _ _ _ _ _ _ _
-                                    rSrms -> Just rSrms
+                                    rSrms _ -> Just rSrms
                                 _ -> Nothing
 
           matchesExpected (a, b, c) = a == 0 && b == 0

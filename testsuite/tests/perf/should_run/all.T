@@ -198,6 +198,13 @@ test('T7436',
      compile_and_run,
      ['-O'])
 
+test('T7436b',
+     [collect_stats('max_bytes_used',4),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
 test('T7797',
       [collect_stats('bytes allocated',5),
       extra_clean(['T7797a.hi', 'T7797a.o']),
@@ -266,7 +273,7 @@ test('T9339',
       only_ways(['normal'])],
      compile_and_run,
      ['-O2 -fspec-constr-keen'])
-     # For the -fspec-constr-keen see Note [Making SpecConstr keener] in SpecConstr
+     # For the -fspec-constr-keen see Note [Making SpecConstr keener] in GHC.Core.Op.SpecConstr
 
 
 test('T8472',

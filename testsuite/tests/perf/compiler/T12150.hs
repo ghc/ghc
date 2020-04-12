@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+
 module T12150 where
 
 data Result a = Success a | Error String

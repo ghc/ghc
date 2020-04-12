@@ -64,7 +64,10 @@ main = do
 
                 -- Ignore access to autom4te.cache directories.
                 -- They are managed externally by auto tools.
-                , "**/autom4te.cache/**"
+                , "//autom4te.cache/**"
+
+                -- Ignore in-tree GMP objects
+                , buildRoot -/- "**/gmp/objs/**"
                 ]
             }
 
@@ -82,7 +85,7 @@ main = do
             Rules.toolArgsTarget
 
     shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
-        let targets' = removeKVs targets
+        let targets' = filter (not . null) $ removeKVs targets
         Environment.setupEnvironment
         return . Just $ if null targets'
                         then rules

@@ -3,10 +3,10 @@ tc168.hs:17:1: error:
     • Could not deduce (C a (a1, b0))
       from the context: C a (a1, b)
         bound by the inferred type for ‘g’:
-                   forall a a1 b. C a (a1, b) => a -> a1
+                   forall {a} {a1} {b}. C a (a1, b) => a -> a1
         at tc168.hs:17:1-16
       The type variable ‘b0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘g’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        g :: forall a1 a2 b. C a1 (a2, b) => a1 -> a2
+        g :: forall {a1} {a2} {b}. C a1 (a2, b) => a1 -> a2

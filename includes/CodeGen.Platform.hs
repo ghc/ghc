@@ -1,10 +1,10 @@
 
-import CmmExpr
+import GHC.Cmm.Expr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
 import PlainPanic
 #endif
-import Reg
+import GHC.Platform.Reg
 
 #include "stg/MachRegs.h"
 

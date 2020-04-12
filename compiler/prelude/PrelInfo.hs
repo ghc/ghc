@@ -49,26 +49,26 @@ module PrelInfo (
 import GhcPrelude
 
 import KnownUniques
-import Unique           ( isValidKnownKeyUnique )
+import GHC.Types.Unique ( isValidKnownKeyUnique )
 
-import ConLike          ( ConLike(..) )
+import GHC.Core.ConLike ( ConLike(..) )
 import THNames          ( templateHaskellNames )
 import PrelNames
-import PrelRules
-import Avail
+import GHC.Core.Op.ConstantFold
+import GHC.Types.Avail
 import PrimOp
-import DataCon
-import Id
-import Name
-import NameEnv
-import MkId
+import GHC.Core.DataCon
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Id.Make
 import Outputable
 import TysPrim
 import TysWiredIn
-import HscTypes
-import Class
-import TyCon
-import UniqFM
+import GHC.Driver.Types
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Types.Unique.FM
 import Util
 import TcTypeNats ( typeNatTyCons )
 
@@ -89,18 +89,18 @@ Note [About wired-in things]
 * Wired-in things are Ids\/TyCons that are completely known to the compiler.
   They are global values in GHC, (e.g.  listTyCon :: TyCon).
 
-* A wired in Name contains the thing itself inside the Name:
+* A wired-in Name contains the thing itself inside the Name:
         see Name.wiredInNameTyThing_maybe
   (E.g. listTyConName contains listTyCon.
 
 * The name cache is initialised with (the names of) all wired-in things
-  (except tuples and sums; see Note [Known-])
+  (except tuples and sums; see Note [Infinite families of known-key names])
 
 * The type environment itself contains no wired in things. The type
   checker sees if the Name is wired in before looking up the name in
   the type environment.
 
-* GHC.Iface.Utils prunes out wired-in things before putting them in an interface file.
+* GHC.Iface.Make prunes out wired-in things before putting them in an interface file.
   So interface files never contain wired-in things.
 -}
 

@@ -236,6 +236,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
 	@echo ',("target word size", "$(TargetWordSize)")' >> $@
+	@echo ',("target word big endian", "$(TargetWordBigEndian)")' >> $@
 	@echo ',("target has GNU nonexec stack", "$(TargetHasGnuNonexecStack)")' >> $@
 	@echo ',("target has .ident directive", "$(TargetHasIdentDirective)")' >> $@
 	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@

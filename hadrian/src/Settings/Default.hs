@@ -67,6 +67,7 @@ stage0Packages = do
              , ghcHeap
              , ghci
              , ghcPkg
+             , haddock
              , hsc2hs
              , hpc
              , mtl
@@ -74,8 +75,10 @@ stage0Packages = do
              , templateHaskell
              , text
              , transformers
-             , unlit                         ]
+             , unlit
+             ]
           ++ [ terminfo | not windowsHost, not cross ]
+          ++ [ timeout  | windowsHost                ]
           ++ [ touchy   | windowsHost                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
@@ -111,8 +114,8 @@ stage1Packages = do
              ]
           ++ [ haddock  | not cross                  ]
           ++ [ hpcBin   | not cross                  ]
-          ++ [ iserv    | not windowsHost, not cross ]
-          ++ [ libiserv | not windowsHost, not cross ]
+          ++ [ iserv    | not cross ]
+          ++ [ libiserv | not cross ]
           ++ [ runGhc   | not cross                  ]
           ++ [ touchy   | windowsHost                ]
           ++ [ unix     | not windowsHost            ]
@@ -124,18 +127,7 @@ stage2Packages = stage1Packages
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
-testsuitePackages = do
-    return $ [ checkApiAnnotations
-             , checkPpr
-             , ghci
-             , ghcCompact
-             , ghcPkg
-             , hpcBin
-             , hsc2hs
-             , iserv
-             , runGhc
-             , unlit                 ] ++
-             [ timeout | windowsHost ]
+testsuitePackages = return [ timeout | windowsHost ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
@@ -215,6 +207,7 @@ defaultFlavour = Flavour
     , ghciWithDebugger   = False
     , ghcProfiled        = False
     , ghcDebugged        = False
+    , ghcThreaded        = True
     , ghcDocs            = cmdDocsArgs }
 
 -- | Default logic for determining whether to build

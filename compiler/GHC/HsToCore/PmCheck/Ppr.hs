@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Provides factilities for pretty-printing 'Delta's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.PmCheck.Ppr (
@@ -10,12 +12,12 @@ module GHC.HsToCore.PmCheck.Ppr (
 
 import GhcPrelude
 
-import BasicTypes
-import Id
-import VarEnv
-import UniqDFM
-import ConLike
-import DataCon
+import GHC.Types.Basic
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Unique.DFM
+import GHC.Core.ConLike
+import GHC.Core.DataCon
 import TysWiredIn
 import Outputable
 import Control.Monad.Trans.RWS.CPS
@@ -143,7 +145,7 @@ pprPmVar :: PprPrec -> Id -> PmPprM SDoc
 pprPmVar prec x = do
   delta <- ask
   case lookupSolution delta x of
-    Just (alt, args) -> pprPmAltCon prec alt args
+    Just (alt, _tvs, args) -> pprPmAltCon prec alt args
     Nothing          -> fromMaybe typed_wildcard <$> checkRefuts x
       where
         -- if we have no info about the parameter and would just print a
@@ -203,7 +205,7 @@ pmExprAsList :: Delta -> PmAltCon -> [Id] -> Maybe PmExprList
 pmExprAsList delta = go_con []
   where
     go_var rev_pref x
-      | Just (alt, args) <- lookupSolution delta x
+      | Just (alt, _tvs, args) <- lookupSolution delta x
       = go_con rev_pref alt args
     go_var rev_pref x
       | Just pref <- nonEmpty (reverse rev_pref)

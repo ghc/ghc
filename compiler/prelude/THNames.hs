@@ -9,11 +9,11 @@ module THNames where
 import GhcPrelude ()
 
 import PrelNames( mk_known_key_name )
-import Module( Module, mkModuleNameFS, mkModule, thUnitId )
-import Name( Name )
-import OccName( tcName, clsName, dataName, varName )
-import RdrName( RdrName, nameRdrName )
-import Unique
+import GHC.Types.Module( Module, mkModuleNameFS, mkModule, thUnitId )
+import GHC.Types.Name( Name )
+import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
+import GHC.Types.Name.Reader( RdrName, nameRdrName )
+import GHC.Types.Unique
 import FastString
 
 -- To add a name, do three things
@@ -24,7 +24,7 @@ import FastString
 
 templateHaskellNames :: [Name]
 -- The names that are implicitly mentioned by ``bracket''
--- Should stay in sync with the import list of DsMeta
+-- Should stay in sync with the import list of GHC.HsToCore.Quote
 
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
@@ -108,7 +108,6 @@ templateHaskellNames = [
     -- Role
     nominalRName, representationalRName, phantomRName, inferRName,
     -- Kind
-    varKName, conKName, tupleKName, arrowKName, listKName, appKName,
     starKName, constraintKName,
     -- FamilyResultSig
     noSigName, kindSigName, tyVarSigName,
@@ -171,13 +170,13 @@ mkTHModule :: FastString -> Module
 mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
-libFun = mk_known_key_name OccName.varName  thLib
-libTc  = mk_known_key_name OccName.tcName   thLib
-thFun  = mk_known_key_name OccName.varName  thSyn
-thTc   = mk_known_key_name OccName.tcName   thSyn
-thCls  = mk_known_key_name OccName.clsName  thSyn
-thCon  = mk_known_key_name OccName.dataName thSyn
-qqFun  = mk_known_key_name OccName.varName  qqLib
+libFun = mk_known_key_name varName  thLib
+libTc  = mk_known_key_name tcName   thLib
+thFun  = mk_known_key_name varName  thSyn
+thTc   = mk_known_key_name tcName   thSyn
+thCls  = mk_known_key_name clsName  thSyn
+thCon  = mk_known_key_name dataName thSyn
+qqFun  = mk_known_key_name varName  qqLib
 
 -------------------- TH.Syntax -----------------------
 liftClassName :: Name
@@ -480,14 +479,7 @@ phantomRName          = libFun (fsLit "phantomR")          phantomRIdKey
 inferRName            = libFun (fsLit "inferR")            inferRIdKey
 
 -- data Kind = ...
-varKName, conKName, tupleKName, arrowKName, listKName, appKName,
-  starKName, constraintKName :: Name
-varKName        = libFun (fsLit "varK")         varKIdKey
-conKName        = libFun (fsLit "conK")         conKIdKey
-tupleKName      = libFun (fsLit "tupleK")       tupleKIdKey
-arrowKName      = libFun (fsLit "arrowK")       arrowKIdKey
-listKName       = libFun (fsLit "listK")        listKIdKey
-appKName        = libFun (fsLit "appK")         appKIdKey
+starKName, constraintKName :: Name
 starKName       = libFun (fsLit "starK")        starKIdKey
 constraintKName = libFun (fsLit "constraintK")  constraintKIdKey
 
@@ -562,7 +554,7 @@ decsQTyConName          = libTc (fsLit "DecsQ")          decsQTyConKey  -- Q [De
 typeQTyConName          = libTc (fsLit "TypeQ")          typeQTyConKey
 patQTyConName           = libTc (fsLit "PatQ")           patQTyConKey
 
--- These are used in DsMeta but always wrapped in a type variable
+-- These are used in GHC.HsToCore.Quote but always wrapped in a type variable
 stmtTyConName           = thTc (fsLit "Stmt")            stmtTyConKey
 conTyConName            = thTc (fsLit "Con")             conTyConKey
 bangTypeTyConName       = thTc (fsLit "BangType")      bangTypeTyConKey
@@ -1001,14 +993,7 @@ phantomRIdKey          = mkPreludeMiscIdUnique 417
 inferRIdKey            = mkPreludeMiscIdUnique 418
 
 -- data Kind = ...
-varKIdKey, conKIdKey, tupleKIdKey, arrowKIdKey, listKIdKey, appKIdKey,
-  starKIdKey, constraintKIdKey :: Unique
-varKIdKey         = mkPreludeMiscIdUnique 419
-conKIdKey         = mkPreludeMiscIdUnique 420
-tupleKIdKey       = mkPreludeMiscIdUnique 421
-arrowKIdKey       = mkPreludeMiscIdUnique 422
-listKIdKey        = mkPreludeMiscIdUnique 423
-appKIdKey         = mkPreludeMiscIdUnique 424
+starKIdKey, constraintKIdKey :: Unique
 starKIdKey        = mkPreludeMiscIdUnique 425
 constraintKIdKey  = mkPreludeMiscIdUnique 426
 

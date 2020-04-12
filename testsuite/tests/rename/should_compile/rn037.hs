@@ -1,4 +1,4 @@
 {-# OPTIONS -fwarn-unused-imports #-}
 -- !!! test unused import warning
-import Data.List
+import Data.Tuple
 main = return () :: IO ()

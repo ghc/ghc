@@ -72,7 +72,7 @@ RTS_RET(stg_restore_cccs_eval);
 // RTS_FUN(stg_interp_constr6_entry);
 // RTS_FUN(stg_interp_constr7_entry);
 //
-// This is referenced using the FFI in the compiler (ByteCodeItbls),
+// This is referenced using the FFI in the compiler (GHC.ByteCode.InfoTable),
 // so we can't give it the correct type here because the prototypes
 // would clash (FFI references are always declared with type StgWord[]
 // in the generated C code).
@@ -90,7 +90,6 @@ RTS_RET(stg_ctoi_V);
 RTS_RET(stg_apply_interp);
 
 RTS_ENTRY(stg_IND);
-RTS_ENTRY(stg_IND_direct);
 RTS_ENTRY(stg_IND_STATIC);
 RTS_ENTRY(stg_BLACKHOLE);
 RTS_ENTRY(stg_CAF_BLACKHOLE);
@@ -179,7 +178,7 @@ RTS_CLOSURE(stg_END_STM_WATCH_QUEUE_closure);
 RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
-RTS_ENTRY(stg_NO_FINALIZER_entry);
+RTS_ENTRY(stg_NO_FINALIZER);
 
 #if IN_STG_CODE
 extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;
@@ -419,6 +418,9 @@ RTS_FUN_DECL(stg_asyncDoProczh);
 
 RTS_FUN_DECL(stg_catchzh);
 RTS_FUN_DECL(stg_raisezh);
+RTS_FUN_DECL(stg_raiseDivZZerozh);
+RTS_FUN_DECL(stg_raiseUnderflowzh);
+RTS_FUN_DECL(stg_raiseOverflowzh);
 RTS_FUN_DECL(stg_raiseIOzh);
 
 RTS_FUN_DECL(stg_makeStableNamezh);

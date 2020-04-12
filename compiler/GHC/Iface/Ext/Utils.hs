@@ -6,19 +6,19 @@ module GHC.Iface.Ext.Utils where
 
 import GhcPrelude
 
-import CoreMap
-import DynFlags                   ( DynFlags )
+import GHC.Core.Map
+import GHC.Driver.Session         ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import GHC.Iface.Type
-import Name hiding (varName)
-import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
-import SrcLoc
+import GHC.Types.Name hiding (varName)
+import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
+import GHC.Types.SrcLoc
 import GHC.CoreToIface
-import TyCon
-import TyCoRep
-import Type
-import Var
-import VarEnv
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
+import GHC.Types.Var
+import GHC.Types.Var.Env
 
 import GHC.Iface.Ext.Types
 
@@ -44,7 +44,7 @@ generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
         this = fmap (pure . (nodeSpan ast,)) $ nodeIdentifiers $ nodeInfo ast
 
 renderHieType :: DynFlags -> HieTypeFix -> String
-renderHieType df ht = renderWithStyle df (ppr $ hieTypeToIface ht) sty
+renderHieType df ht = renderWithStyle (initSDocContext df sty) (ppr $ hieTypeToIface ht)
   where sty = defaultUserStyle df
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
@@ -227,7 +227,7 @@ getNameScopeAndBinding
   -> M.Map FastString (HieAST a)
   -> Maybe ([Scope], Maybe Span)
 getNameScopeAndBinding n asts = case nameSrcSpan n of
-  RealSrcSpan sp -> do -- @Maybe
+  RealSrcSpan sp _ -> do -- @Maybe
     ast <- M.lookup (srcSpanFile sp) asts
     defNode <- selectLargestContainedBy sp ast
     getFirst $ foldMap First $ do -- @[]
@@ -290,7 +290,7 @@ selectSmallestContaining sp node
 
 definedInAsts :: M.Map FastString (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of
-  RealSrcSpan sp -> srcSpanFile sp `elem` M.keys asts
+  RealSrcSpan sp _ -> srcSpanFile sp `elem` M.keys asts
   _ -> False
 
 isOccurrence :: ContextInfo -> Bool
@@ -406,13 +406,13 @@ simpleNodeInfo :: FastString -> FastString -> NodeInfo a
 simpleNodeInfo cons typ = NodeInfo (S.singleton (cons, typ)) [] M.empty
 
 locOnly :: SrcSpan -> [HieAST a]
-locOnly (RealSrcSpan span) =
+locOnly (RealSrcSpan span _) =
   [Node e span []]
     where e = NodeInfo S.empty [] M.empty
 locOnly _ = []
 
 mkScope :: SrcSpan -> Scope
-mkScope (RealSrcSpan sp) = LocalScope sp
+mkScope (RealSrcSpan sp _) = LocalScope sp
 mkScope _ = NoScope
 
 mkLScope :: Located a -> Scope
@@ -424,7 +424,7 @@ combineScopes _ ModuleScope = ModuleScope
 combineScopes NoScope x = x
 combineScopes x NoScope = x
 combineScopes (LocalScope a) (LocalScope b) =
-  mkScope $ combineSrcSpans (RealSrcSpan a) (RealSrcSpan b)
+  mkScope $ combineSrcSpans (RealSrcSpan a Nothing) (RealSrcSpan b Nothing)
 
 {-# INLINEABLE makeNode #-}
 makeNode
@@ -433,7 +433,7 @@ makeNode
   -> SrcSpan                 -- ^ return an empty list if this is unhelpful
   -> m [HieAST b]
 makeNode x spn = pure $ case spn of
-  RealSrcSpan span -> [Node (simpleNodeInfo cons typ) span []]
+  RealSrcSpan span _ -> [Node (simpleNodeInfo cons typ) span []]
   _ -> []
   where
     cons = mkFastString . show . toConstr $ x
@@ -447,7 +447,7 @@ makeTypeNode
   -> Type                    -- ^ type to associate with the node
   -> m [HieAST Type]
 makeTypeNode x spn etyp = pure $ case spn of
-  RealSrcSpan span ->
+  RealSrcSpan span _ ->
     [Node (NodeInfo (S.singleton (cons,typ)) [etyp] M.empty) span []]
   _ -> []
   where

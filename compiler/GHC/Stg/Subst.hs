@@ -6,14 +6,14 @@ module GHC.Stg.Subst where
 
 import GhcPrelude
 
-import Id
-import VarEnv
+import GHC.Types.Id
+import GHC.Types.Var.Env
 import Control.Monad.Trans.State.Strict
 import Outputable
 import Util
 
 -- | A renaming substitution from 'Id's to 'Id's. Like 'RnEnv2', but not
--- maintaining pairs of substitutions. Like @"CoreSubst".'CoreSubst.Subst'@, but
+-- maintaining pairs of substitutions. Like 'GHC.Core.Subst.Subst', but
 -- with the domain being 'Id's instead of entire 'CoreExpr'.
 data Subst = Subst InScopeSet IdSubstEnv
 

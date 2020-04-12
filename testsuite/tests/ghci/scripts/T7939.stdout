@@ -1,6 +1,6 @@
-type Foo :: forall k. k -> Constraint
+type Foo :: forall {k}. k -> Constraint
 class Foo a where
-  type Bar :: forall k. k -> * -> *
+  type Bar :: forall {k}. k -> * -> *
   type family Bar a b
   	-- Defined at T7939.hs:6:4
 Bar :: k -> * -> *
@@ -19,13 +19,13 @@ type family H a where
     H 'False = 'True
   	-- Defined at T7939.hs:14:1
 H :: Bool -> Bool
-type J :: forall k. [k] -> Bool
+type J :: forall {k}. [k] -> Bool
 type family J a where
     J '[] = 'False
   forall k (h :: k) (t :: [k]). J (h : t) = 'True
   	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
-type K :: forall a. [a] -> Maybe a
+type K :: forall {a}. [a] -> Maybe a
 type family K a1 where
     K '[] = 'Nothing
   forall a (h :: a) (t :: [a]). K (h : t) = 'Just h

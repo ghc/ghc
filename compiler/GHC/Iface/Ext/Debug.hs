@@ -9,49 +9,20 @@ module GHC.Iface.Ext.Debug where
 
 import GhcPrelude
 
-import SrcLoc
-import Module
+import GHC.Types.SrcLoc
+import GHC.Types.Module
 import FastString
 import Outputable
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Utils
-import Name
+import GHC.Types.Name
 
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Function    ( on )
 import Data.List        ( sortOn )
-import Data.Foldable    ( toList )
-
-ppHies :: Outputable a => (HieASTs a) -> SDoc
-ppHies (HieASTs asts) = M.foldrWithKey go "" asts
-  where
-    go k a rest = vcat $
-      [ "File: " <> ppr k
-      , ppHie a
-      , rest
-      ]
-
-ppHie :: Outputable a => HieAST a -> SDoc
-ppHie = go 0
-  where
-    go n (Node inf sp children) = hang header n rest
-      where
-        rest = vcat $ map (go (n+2)) children
-        header = hsep
-          [ "Node"
-          , ppr sp
-          , ppInfo inf
-          ]
-
-ppInfo :: Outputable a => NodeInfo a -> SDoc
-ppInfo ni = hsep
-  [ ppr $ toList $ nodeAnnotations ni
-  , ppr $ nodeType ni
-  , ppr $ M.toList $ nodeIdentifiers ni
-  ]
 
 type Diff a = a -> a -> [SDoc]
 

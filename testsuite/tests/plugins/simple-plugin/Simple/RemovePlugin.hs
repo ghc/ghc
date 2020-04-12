@@ -3,20 +3,20 @@ module Simple.RemovePlugin where
 
 import Control.Monad.IO.Class
 import Data.List (intercalate)
-import Plugins
+import GHC.Driver.Plugins
 import Bag
-import HscTypes
-import TcRnTypes
+import GHC.Driver.Types
+import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Hs.Expr
 import Outputable
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC.Hs
 import GHC.Hs.Binds
-import OccName
-import RdrName
-import Name
-import Avail
+import GHC.Types.Name.Occurrence
+import GHC.Types.Name.Reader
+import GHC.Types.Name
+import GHC.Types.Avail
 import GHC.Hs.Dump
 
 plugin :: Plugin
@@ -53,9 +53,9 @@ typecheckPlugin [name, "typecheck"] _ tc
 typecheckPlugin _ _ tc = return tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
-metaPlugin' [name, "meta"] (L l (HsWrap ne w (HsPar x (L _ (HsApp noExt (L _ (HsVar _ (L _ id))) e)))))
+metaPlugin' [name, "meta"] (L l (HsPar x (L _ (XExpr (HsWrap w (HsApp noExt (L _ (HsVar _ (L _ id))) e))))))
   | occNameString (getOccName id) == name
-  = return (L l (HsWrap ne w (unLoc e)))
+  = return (L l (XExpr (HsWrap w (unLoc e))))
 -- The test should always match this first case. If the desugaring changes
 -- again in the future then the panic is more useful than the previous
 -- inscrutable failure.

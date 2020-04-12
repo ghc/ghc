@@ -31,7 +31,7 @@ import GhcPrelude
 
 import GHC.Stg.Syntax
 
-import Id (Id)
+import GHC.Types.Id (Id)
 import Panic
 
 import Data.Map (Map)
@@ -78,7 +78,7 @@ showStgStats :: [StgTopBinding] -> String
 
 showStgStats prog
   = "STG Statistics:\n\n"
-    ++ concat (map showc (Map.toList (gatherStgStats prog)))
+    ++ concatMap showc (Map.toList (gatherStgStats prog))
   where
     showc (x,n) = (showString (s x) . shows n) "\n"
 

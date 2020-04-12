@@ -10,19 +10,18 @@ module Main(main) where
 -- provided with as small a number of modules as possible for when the
 -- need exists to produce ASTs and nothing more.
 
-import HscTypes
-import Module
-import DynFlags
-import HscMain
+import GHC.Driver.Types
+import GHC.Types.Module
+import GHC.Driver.Session
+import GHC.Driver.Main
 import GHC
 import Util
 import Data.Maybe
-import Data.List
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import System.Exit
-import UniqSet
+import GHC.Types.Unique.Set
 
 main :: IO ()
 main = do

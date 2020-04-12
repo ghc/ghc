@@ -1,7 +1,7 @@
 
 T11459.hs:9:20: error:
     • A newtype constructor cannot have existential type variables
-      Parser :: forall a k.
+      Parser :: forall a {k}.
                 (forall (f :: k -> *) (r :: k).
                  Failure f r -> Success a f r -> f r)
                 -> Parser a

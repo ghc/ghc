@@ -30,23 +30,23 @@ import GhcPrelude
 import TysPrim
 import TysWiredIn
 
-import CmmType
-import Demand
-import Id               ( Id, mkVanillaGlobalWithInfo )
-import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
-import Name
-import PrelNames        ( gHC_PRIMOPWRAPPERS )
-import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
-import Type
-import GHC.Types.RepType          ( typePrimRep1, tyConPrimRep1 )
-import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
-                          SourceText(..) )
-import SrcLoc           ( wiredInSrcSpan )
-import ForeignCall      ( CLabelString )
-import Unique           ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+import GHC.Cmm.Type
+import GHC.Types.Demand
+import GHC.Types.Id      ( Id, mkVanillaGlobalWithInfo )
+import GHC.Types.Id.Info ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
+import GHC.Types.Name
+import PrelNames         ( gHC_PRIMOPWRAPPERS )
+import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
+import GHC.Core.Type
+import GHC.Types.RepType ( typePrimRep1, tyConPrimRep1 )
+import GHC.Types.Basic   ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
+                           SourceText(..) )
+import GHC.Types.SrcLoc  ( wiredInSrcSpan )
+import GHC.Types.ForeignCall ( CLabelString )
+import GHC.Types.Unique  ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+import GHC.Types.Module  ( UnitId )
 import Outputable
 import FastString
-import Module           ( UnitId )
 
 {-
 ************************************************************************
@@ -323,7 +323,7 @@ Note [Checking versus non-checking primops]
 
   It is important that a non-checking primop never be transformed in a way that
   would cause it to bottom. Doing so would violate Core's let/app invariant
-  (see Note [CoreSyn let/app invariant] in CoreSyn) which is critical to
+  (see Note [Core let/app invariant] in GHC.Core) which is critical to
   the simplifier's ability to float without fear of changing program meaning.
 
 
@@ -483,7 +483,7 @@ primOpCanFail :: PrimOp -> Bool
 
 primOpOkForSpeculation :: PrimOp -> Bool
   -- See Note [PrimOp can_fail and has_side_effects]
-  -- See comments with CoreUtils.exprOkForSpeculation
+  -- See comments with GHC.Core.Utils.exprOkForSpeculation
   -- primOpOkForSpeculation => primOpOkForSideEffects
 primOpOkForSpeculation op
   =  primOpOkForSideEffects op
@@ -498,7 +498,8 @@ primOpOkForSideEffects op
 {-
 Note [primOpIsCheap]
 ~~~~~~~~~~~~~~~~~~~~
-@primOpIsCheap@, as used in \tr{SimplUtils.hs}.  For now (HACK
+
+@primOpIsCheap@, as used in GHC.Core.Op.Simplify.Utils.  For now (HACK
 WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.  "Cheap" means willing to call it more
 than once, and/or push it inside a lambda.  The latter could change the
@@ -535,7 +536,7 @@ primOpIsCheap op = primOpOkForSpeculation op
 primOpCodeSize
 ~~~~~~~~~~~~~~
 Gives an indication of the code size of a primop, for the purposes of
-calculating unfolding sizes; see CoreUnfold.sizeExpr.
+calculating unfolding sizes; see GHC.Core.Unfold.sizeExpr.
 -}
 
 primOpCodeSize :: PrimOp -> Int
@@ -543,7 +544,7 @@ primOpCodeSize :: PrimOp -> Int
 
 primOpCodeSizeDefault :: Int
 primOpCodeSizeDefault = 1
-  -- CoreUnfold.primOpSize already takes into account primOpOutOfLine
+  -- GHC.Core.Unfold.primOpSize already takes into account primOpOutOfLine
   -- and adds some further costs for the args in that case.
 
 primOpCodeSizeForeignCall :: Int

@@ -9,6 +9,8 @@ Type checking of type signatures in interface files
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.IfaceToCore (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
@@ -28,50 +30,49 @@ import TcTypeNats(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
-import BuildTyCl
-import TcRnMonad
-import TcType
-import Type
-import Coercion
-import CoAxiom
-import TyCoRep    -- needs to build types & coercions in a knot
-import TyCoSubst ( substTyCoVars )
-import HscTypes
-import Annotations
-import InstEnv
-import FamInstEnv
-import CoreSyn
-import CoreUtils
-import CoreUnfold
-import CoreLint
-import MkCore
-import Id
-import MkId
-import IdInfo
-import Class
-import TyCon
-import ConLike
-import DataCon
+import GHC.Tc.TyCl.Build
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcType
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom
+import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
+import GHC.Core.TyCo.Subst ( substTyCoVars )
+import GHC.Driver.Types
+import GHC.Types.Annotations
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.Unfold
+import GHC.Core.Lint
+import GHC.Core.Make
+import GHC.Types.Id
+import GHC.Types.Id.Make
+import GHC.Types.Id.Info
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
 import PrelNames
 import TysWiredIn
-import Literal
-import Var
-import VarSet
-import Name
-import NameEnv
-import NameSet
-import OccurAnal        ( occurAnalyseExpr )
-import Demand
-import Module
-import UniqFM
-import UniqSupply
+import GHC.Types.Literal
+import GHC.Types.Var as Var
+import GHC.Types.Var.Set
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply
 import Outputable
 import Maybes
-import SrcLoc
-import DynFlags
+import GHC.Types.SrcLoc
+import GHC.Driver.Session
 import Util
 import FastString
-import BasicTypes hiding ( SuccessFlag(..) )
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
@@ -126,14 +127,14 @@ a Name for another entity defined in A.hi.  How do we get the
     internal TyCons to MATCH the ones that we just constructed
     during typechecking: the knot is thus tied through if_rec_types.
 
-    2) retypecheckLoop in GhcMake: We are retypechecking a
+    2) retypecheckLoop in GHC.Driver.Make: We are retypechecking a
     mutually recursive cluster of hi files, in order to ensure
     that all of the references refer to each other correctly.
     In this case, the knot is tied through the HPT passed in,
     which contains all of the interfaces we are in the process
     of typechecking.
 
-    3) genModDetails in HscMain: We are typechecking an
+    3) genModDetails in GHC.Driver.Main: We are typechecking an
     old interface to generate the ModDetails.  In this case,
     we do the same thing as (2) and pass in an HPT with
     the HomeModInfo being generated to tie knots.
@@ -865,7 +866,7 @@ tc_ax_branch prev_branches
                             , ifaxbRoles = roles, ifaxbIncomps = incomps })
   = bindIfaceTyConBinders_AT
       (map (\b -> Bndr (IfaceTvBndr b) (NamedTCB Inferred)) tv_bndrs) $ \ tvs ->
-         -- The _AT variant is needed here; see Note [CoAxBranch type variables] in CoAxiom
+         -- The _AT variant is needed here; see Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom
     bindIfaceIds cv_bndrs $ \ cvs -> do
     { tc_lhs   <- tcIfaceAppArgs lhs
     ; tc_rhs   <- tcIfaceType rhs
@@ -961,7 +962,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                        -- decisions) to buildDataCon; it'll use
                        -- these to guide the construction of a
                        -- worker.
-                       -- See Note [Bangs on imported data constructors] in MkId
+                       -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
                        lbl_names
                        univ_tvs ex_tvs user_tv_bndrs
                        eq_spec theta
@@ -1174,7 +1175,7 @@ tcIfaceTupleTy sort is_promoted args
                         kind_args = map typeKind args'
                   ; return (mkTyConApp tc (kind_args ++ args')) } }
 
--- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+-- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
 tcTupleTyCon :: Bool    -- True <=> typechecking a *type* (vs. an expr)
              -> TupleSort
              -> Arity   -- the number of args. *not* the tuple arity.
@@ -1247,7 +1248,6 @@ tcIfaceCo = go
     go_var = tcIfaceLclId
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
-tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
@@ -1383,13 +1383,13 @@ tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
 tcIfaceLit :: Literal -> IfL Literal
 -- Integer literals deserialise to (LitInteger i <error thunk>)
 -- so tcIfaceLit just fills in the type.
--- See Note [Integer literals] in Literal
+-- See Note [Integer literals] in GHC.Types.Literal
 tcIfaceLit (LitNumber LitNumInteger i _)
   = do t <- tcIfaceTyConByName integerTyConName
        return (mkLitInteger i (mkTyConTy t))
 -- Natural literals deserialise to (LitNatural i <error thunk>)
 -- so tcIfaceLit just fills in the type.
--- See Note [Natural literals] in Literal
+-- See Note [Natural literals] in GHC.Types.Literal
 tcIfaceLit (LitNumber LitNumNatural i _)
   = do t <- tcIfaceTyConByName naturalTyConName
        return (mkLitNatural i (mkTyConTy t))
@@ -1463,16 +1463,26 @@ tcIdInfo ignore_prags toplvl name ty info = do
     -- we start; default assumption is that it has CAFs
     let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                   | otherwise       = vanillaIdInfo
-    if ignore_prags
-        then return init_info
-        else case info of
-                NoInfo -> return init_info
-                HasInfo info -> foldlM tcPrag init_info info
+
+    let needed = needed_prags info
+    foldlM tcPrag init_info needed
   where
+    needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
+    needed_prags items
+      | not ignore_prags = items
+      | otherwise        = filter need_prag items
+
+    need_prag :: IfaceInfoItem -> Bool
+      -- Always read in compulsory unfoldings
+      -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
+    need_prag (HsUnfold _ (IfCompulsory {})) = True
+    need_prag _                              = False
+
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
     tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` str)
+    tcPrag info (HsCpr cpr)        = return (info `setCprInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
     tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
 
@@ -1490,27 +1500,25 @@ tcJoinInfo IfaceNotJoinPoint   = Nothing
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
-        ; mb_expr <- tcPragExpr toplvl name if_expr
+        ; mb_expr <- tcPragExpr False toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
             Nothing -> NoUnfolding
-            Just expr -> mkUnfolding dflags unf_src
-                           True {- Top level -}
-                           (isBottomingSig strict_sig)
-                           expr
+            Just expr -> mkFinalUnfolding dflags unf_src strict_sig expr
         }
   where
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
+
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
-  = do  { mb_expr <- tcPragExpr toplvl name if_expr
+  = do  { mb_expr <- tcPragExpr True toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCompulsoryUnfolding expr) }
 
 tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { mb_expr <- tcPragExpr toplvl name if_expr
+  = do  { mb_expr <- tcPragExpr False toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
@@ -1532,17 +1540,20 @@ For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 -}
 
-tcPragExpr :: TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
-tcPragExpr toplvl name expr
+tcPragExpr :: Bool  -- Is this unfolding compulsory?
+                    -- See Note [Checking for levity polymorphism] in GHC.Core.Lint
+           -> TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
+tcPragExpr is_compulsory toplvl name expr
   = forkM_maybe doc $ do
     core_expr' <- tcIfaceExpr expr
 
     -- Check for type consistency in the unfolding
     -- See Note [Linting Unfoldings from Interfaces]
-    when (isTopLevel toplvl) $ whenGOptM Opt_DoCoreLinting $ do
+    when (isTopLevel toplvl) $
+      whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
-        case lintUnfolding dflags noSrcLoc in_scope core_expr' of
+        case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
           Nothing       -> return ()
           Just fail_msg -> do { mod <- getIfModule
                               ; pprPanic "Iface Lint failure"
@@ -1552,7 +1563,8 @@ tcPragExpr toplvl name expr
                                         , text "Iface expr =" <+> ppr expr ]) }
     return core_expr'
   where
-    doc = text "Unfolding of" <+> ppr name
+    doc = ppWhen is_compulsory (text "Compulsory") <+>
+          text "Unfolding of" <+> ppr name
 
     get_in_scope :: IfL VarSet -- Totally disgusting; but just for linting
     get_in_scope
@@ -1683,7 +1695,7 @@ tcIfaceTyCon (IfaceTyCon name info)
   = do { thing <- tcIfaceGlobal name
        ; return $ case ifaceTyConIsPromoted info of
            NotPromoted -> tyThingTyCon thing
-           IsPromoted    -> promoteDataCon $ tyThingDataCon thing }
+           IsPromoted  -> promoteDataCon $ tyThingDataCon thing }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name

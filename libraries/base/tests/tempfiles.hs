@@ -1,6 +1,6 @@
 
 import Control.Exception
-import Data.List
+import Data.List (isPrefixOf, isSuffixOf)
 import System.FilePath
 import System.Directory
 import System.IO

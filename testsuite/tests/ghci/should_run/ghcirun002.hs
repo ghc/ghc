@@ -1,5 +1,5 @@
 import Data.Maybe
-import Data.List
+import Data.List (intersperse)
 
 data Dir = R | D | L | U deriving (Show, Eq, Enum)
 type Spiral = ([[Int]], Int, Dir) -- (rows, current row, next direction)

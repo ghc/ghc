@@ -5,7 +5,6 @@ import Foreign.Concurrent as Conc
 import Foreign
 import GHC.TopHandler
 import Control.Concurrent
-import Data.List
 import System.Mem
 
 -- This finalizer calls back into Haskell, so we can't use

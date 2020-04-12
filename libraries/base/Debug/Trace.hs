@@ -53,7 +53,7 @@ import GHC.IO.Encoding
 import GHC.Ptr
 import GHC.Show
 import GHC.Stack
-import Data.List
+import Data.List (null, partition)
 
 -- $setup
 -- >>> import Prelude

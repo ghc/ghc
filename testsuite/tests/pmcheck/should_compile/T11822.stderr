@@ -1,6 +1,6 @@
 
 T11822.hs:33:1: warning:
-    Pattern match checker ran into -fmax-pmcheck-models=100 limit, so
+    Pattern match checker ran into -fmax-pmcheck-models=30 limit, so
       • Redundant clauses might not be reported at all
       • Redundant clauses might be reported as inaccessible
       • Patterns reported as unmatched might actually be matched
@@ -11,15 +11,11 @@ T11822.hs:33:1: warning: [-Wincomplete-patterns (in -Wextra)]
     In an equation for ‘mkTreeNode’:
         Patterns not matched:
             _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT)
-            (Data.Set.Internal.Bin _ _ _ _) p
-                where p is not one of {0}
+            (Data.Set.Internal.Bin _ _ _ _) (Depth _)
             _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT)
-            Data.Set.Internal.Tip p
-                where p is not one of {0}
+            Data.Set.Internal.Tip (Depth _)
             _ (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Single _))
-            (Data.Set.Internal.Bin _ _ _ _) p
-                where p is not one of {0}
+            (Data.Set.Internal.Bin _ _ _ _) (Depth _)
             _ (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Single _))
-            Data.Set.Internal.Tip p
-                where p is not one of {0}
+            Data.Set.Internal.Tip (Depth _)
             ...

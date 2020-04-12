@@ -25,14 +25,14 @@ module GHC.Types.RepType
 
 import GhcPrelude
 
-import BasicTypes (Arity, RepArity)
-import DataCon
+import GHC.Types.Basic (Arity, RepArity)
+import GHC.Core.DataCon
 import Outputable
 import PrelNames
-import Coercion
-import TyCon
-import TyCoRep
-import Type
+import GHC.Core.Coercion
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
 import Util
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind )

@@ -1,3 +1,4 @@
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -11,12 +12,15 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Hs.Pat (
         Pat(..), InPat, OutPat, LPat,
@@ -31,6 +35,7 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
+        isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
         patNeedsParens, parenthesizePat,
@@ -50,21 +55,21 @@ import GHC.Hs.Binds
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Types
-import TcEvidence
-import BasicTypes
+import GHC.Tc.Types.Evidence
+import GHC.Types.Basic
 -- others:
-import PprCore          ( {- instance OutputableBndr TyVar -} )
+import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
+import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import TysWiredIn
-import Var
-import RdrName ( RdrName )
-import ConLike
-import DataCon
-import TyCon
+import GHC.Types.Var
+import GHC.Types.Name.Reader ( RdrName )
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCon
 import Outputable
-import Type
-import SrcLoc
+import GHC.Core.Type
+import GHC.Types.SrcLoc
 import Bag -- collect ev vars from pats
-import DynFlags( gopt, GeneralFlag(..) )
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
@@ -155,9 +160,7 @@ data Pat p
     --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
     --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
-  | SumPat      (XSumPat p)        -- GHC.Hs.PlaceHolder before typechecker, filled in
-                                   -- afterwards with the types of the
-                                   -- alternative
+  | SumPat      (XSumPat p)        -- after typechecker, types of the alternative
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 Arity              -- Arity (INVARIANT: ≥ 2)
@@ -240,12 +243,12 @@ data Pat p
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
                     (Located (IdP p))        -- n+k pattern
                     (Located (HsOverLit p))  -- It'll always be an HsIntegral
-                    (HsOverLit p)       -- See Note [NPlusK patterns] in TcPat
+                    (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
                      -- NB: This could be (PostTc ...), but that induced a
                      -- a new hs-boot file. Not worth it.
 
                     (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
-                    (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntaxName)
+                    (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntax)
   -- ^ n+k pattern
 
         ------------ Pattern type signatures ---------------
@@ -272,7 +275,8 @@ data Pat p
 
   -- | Trees that Grow extension point for new constructors
   | XPat
-      (XXPat p)
+      !(XXPat p)
+
 
 -- ---------------------------------------------------------------------
 
@@ -423,7 +427,7 @@ data HsRecField' id arg = HsRecField {
 --
 -- The renamer produces an Unambiguous result if it can, rather than
 -- just doing the lookup in the typechecker, so that completely
--- unambiguous updates can be represented by 'DsMeta.repUpdFields'.
+-- unambiguous updates can be represented by 'GHC.HsToCore.Quote.repUpdFields'.
 --
 -- For example, suppose we have:
 --
@@ -445,7 +449,7 @@ data HsRecField' id arg = HsRecField {
 --
 --     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 --
--- See also Note [Disambiguating record fields] in TcExpr.
+-- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
 
 hsRecFields :: HsRecFields p arg -> [XCFieldOcc p]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
@@ -496,20 +500,20 @@ pprParendLPat p = pprParendPat p . unLoc
 
 pprParendPat :: (OutputableBndrId p)
              => PprPrec -> Pat (GhcPass p) -> SDoc
-pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
-                     if need_parens dflags pat
+pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \print_tc_elab ->
+                     if need_parens print_tc_elab pat
                      then parens (pprPat pat)
                      else  pprPat pat
   where
-    need_parens dflags pat
-      | CoPat {} <- pat = gopt Opt_PrintTypecheckerElaboration dflags
+    need_parens print_tc_elab pat
+      | CoPat {} <- pat = print_tc_elab
       | otherwise       = patNeedsParens p pat
       -- For a CoPat we need parens if we are going to show it, which
       -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -523,11 +527,17 @@ pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
-                                            -> if parens
-                                                 then pprParendPat appPrec pat
-                                                 else pprPat pat
-pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
+pprPat (CoPat _ co pat _)       = pprIfTc @p $
+                                  sdocWithDynFlags $ \ dflags ->
+                                  if gopt Opt_PrintTypecheckerElaboration dflags
+                                  then hang (text "CoPat" <+> parens (ppr co))
+                                          2 (pprParendPat appPrec pat)
+                                  else pprPat pat
+pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
+  where ppr_ty = case ghcPass @p of
+                   GhcPs -> ppr ty
+                   GhcRn -> ppr ty
+                   GhcTc -> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
@@ -544,17 +554,15 @@ pprPat (ConPatOut { pat_con = con
                   , pat_dicts = dicts
                   , pat_binds = binds
                   , pat_args = details })
-  = sdocWithDynFlags $ \dflags ->
-       -- Tiresome; in TcBinds.tcRhs we print out a
-       -- typechecked Pat in an error message,
-       -- and we want to make sure it prints nicely
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-        ppr con
-          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                         , ppr binds])
-          <+> pprConArgs details
-    else pprUserCon (unLoc con) details
-pprPat (XPat n)                 = noExtCon n
+  = sdocOption sdocPrintTypecheckerElaboration $ \case
+      False -> pprUserCon (unLoc con) details
+      True  -> -- Tiresome; in GHC.Tc.Gen.Bind.tcRhs we print out a
+               -- typechecked Pat in an error message,
+               -- and we want to make sure it prints nicely
+               ppr con
+                  <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+                                 , pprIfTc @p $ ppr binds ])
+                  <+> pprConArgs details
 
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
@@ -728,7 +736,22 @@ isIrrefutableHsPat
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
 
-    go (XPat {})           = False
+-- | Is the pattern any of combination of:
+--
+-- - (pat)
+-- - pat :: Type
+-- - ~pat
+-- - !pat
+-- - x (variable)
+isSimplePat :: LPat (GhcPass x) -> Maybe (IdP (GhcPass x))
+isSimplePat p = case unLoc p of
+  ParPat _ x -> isSimplePat x
+  SigPat _ x _ -> isSimplePat x
+  LazyPat _ x -> isSimplePat x
+  BangPat _ x -> isSimplePat x
+  VarPat _ x -> Just (unLoc x)
+  _ -> Nothing
+
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

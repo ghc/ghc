@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
@@ -110,16 +111,16 @@ import {-# SOURCE #-} TysWiredIn
   , doubleElemRepDataConTy
   , mkPromotedListTy )
 
-import Var              ( TyVar, mkTyVar )
-import Name
-import TyCon
-import SrcLoc
-import Unique
+import GHC.Types.Var    ( TyVar, mkTyVar )
+import GHC.Types.Name
+import GHC.Core.TyCon
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import PrelNames
 import FastString
 import Outputable
-import TyCoRep   -- Doesn't need special access, but this is easier to avoid
-                 -- import loops which show up if you import Type instead
+import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
+                         -- import loops which show up if you import Type instead
 
 import Data.Char
 
@@ -378,6 +379,8 @@ runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 
 openAlphaTyVar, openBetaTyVar :: TyVar
+-- alpha :: TYPE r1
+-- beta  :: TYPE r2
 [openAlphaTyVar,openBetaTyVar]
   = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
 
@@ -461,7 +464,7 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 * error :: forall (rr:RuntimeRep) (a:TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
-* unsafeCoerce#, defined in MkId.unsafeCoerceId:
+* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePair:
   Always inlined to be a no-op
      unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                              (a :: TYPE r1) (b :: TYPE r2).
@@ -475,14 +478,14 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 
 Note [PrimRep and kindPrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As part of its source code, in TyCon, GHC has
+As part of its source code, in GHC.Core.TyCon, GHC has
   data PrimRep = LiftedRep | UnliftedRep | IntRep | FloatRep | ...etc...
 
 Notice that
  * RuntimeRep is part of the syntax tree of the program being compiled
      (defined in a library: ghc-prim:GHC.Types)
  * PrimRep is part of GHC's source code.
-     (defined in TyCon)
+     (defined in GHC.Core.TyCon)
 
 We need to get from one to the other; that is what kindPrimRep does.
 Suppose we have a value
@@ -511,7 +514,7 @@ tYPETyCon = mkKindTyCon tYPETyConName
 -- ... and now their names
 
 -- If you edit these, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+-- See Note [GHC Formalism] in GHC.Core.Lint
 tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey tYPETyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
@@ -707,8 +710,8 @@ It responds "yes" to Type.isEqPrimPred and classifies as an EqPred in
 Type.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.
-(See Note [Coercion holes] in TyCoRep.) But see also
-Note [Deferred errors for coercion holes] in TcErrors to see how
+(See Note [Coercion holes] in GHC.Core.TyCo.Rep.) But see also
+Note [Deferred errors for coercion holes] in GHC.Tc.Errors to see how
 equality constraints are deferred.
 
 Within GHC, ~# is called eqPrimTyCon, and it is defined in TysPrim.
@@ -732,7 +735,7 @@ Here's what's unusual about it:
    solve a goal of type (a ~~ b) even if there is, say (Int ~~ c) in the
    context. (Normally, it waits to learn more, just in case the given
    influences what happens next.) See Note [Naturally coherent classes]
-   in TcInteract.
+   in GHC.Tc.Solver.Interact.
 
  * It always terminates. That is, in the UndecidableInstances checks, we
    don't worry if a (~~) constraint is too big, as we know that solving
@@ -741,7 +744,7 @@ Here's what's unusual about it:
 On the other hand, this behaves just like any class w.r.t. eager superclass
 unpacking in the solver. So a lifted equality given quickly becomes an unlifted
 equality given. This is good, because the solver knows all about unlifted
-equalities. There is some special-casing in TcInteract.matchClassInst to
+equalities. There is some special-casing in GHC.Tc.Solver.Interact.matchClassInst to
 pretend that there is an instance of this class, as we can't write the instance
 in Haskell.
 

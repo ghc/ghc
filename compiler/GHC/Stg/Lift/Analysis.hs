@@ -21,19 +21,20 @@ module GHC.Stg.Lift.Analysis (
   ) where
 
 import GhcPrelude
+import GHC.Platform
 
-import BasicTypes
-import Demand
-import DynFlags
-import Id
-import SMRep ( WordOff )
+import GHC.Types.Basic
+import GHC.Types.Demand
+import GHC.Driver.Session
+import GHC.Types.Id
+import GHC.Runtime.Heap.Layout ( WordOff )
 import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import Outputable
 import Util
-import VarSet
+import GHC.Types.Var.Set
 
 import Data.Maybe ( mapMaybe )
 
@@ -374,6 +375,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
   , ("args spill on stack", args_spill_on_stack)
   , ("increases allocation", inc_allocs)
   ] where
+      platform = targetPlatform dflags
       decide deciders
         | not (fancy_or deciders)
         = llTrace "stgLiftLams:lifting"
@@ -475,7 +477,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
         . expander
         . flip dVarSetMinusVarSet bndrs_set
         $ freeVarsOfRhs rhs
-      clo_growth = closureGrowth expander (idClosureFootprint dflags) bndrs_set abs_ids scope
+      clo_growth = closureGrowth expander (idClosureFootprint platform) bndrs_set abs_ids scope
 
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []
@@ -499,9 +501,9 @@ closureSize dflags ids = words + sTD_HDR_SIZE dflags
 -- Note that this can't handle unboxed tuples (which may still be present in
 -- let-no-escapes, even after Unarise), in which case
 -- @'GHC.StgToCmm.Closure.idPrimRep'@ will crash.
-idClosureFootprint:: DynFlags -> Id -> WordOff
-idClosureFootprint dflags
-  = StgToCmm.ArgRep.argRepSizeW dflags
+idClosureFootprint:: Platform -> Id -> WordOff
+idClosureFootprint platform
+  = StgToCmm.ArgRep.argRepSizeW platform
   . StgToCmm.ArgRep.idArgRep
 
 -- | @closureGrowth expander sizer f fvs@ computes the closure growth in words

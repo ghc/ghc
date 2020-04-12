@@ -1,0 +1,15 @@
+
+T17773.hs:16:22: error:
+    • Found hole: _Refl :: Mzero x y :~: (x <|> y)
+      Where: ‘x’, ‘f’, ‘k’, ‘a’, ‘y’ are rigid type variables bound by
+               the type signature for:
+                 monadPlusMplus :: forall {k} (f :: k -> *) (a :: k) (x :: f a)
+                                          (y :: f a).
+                                   Proxy x -> Proxy y -> Mzero x y :~: (x <|> y)
+               at T17773.hs:(13,1)-(15,41)
+      Or perhaps ‘_Refl’ is mis-spelled, or not in scope
+    • In the expression: _Refl
+      In an equation for ‘monadPlusMplus’: monadPlusMplus _ _ = _Refl
+    • Relevant bindings include
+        monadPlusMplus :: Proxy x -> Proxy y -> Mzero x y :~: (x <|> y)
+          (bound at T17773.hs:16:1)

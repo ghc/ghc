@@ -3,6 +3,8 @@
 --      the node keys, nodes and colors.
 --
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GraphColor (
         module GraphBase,
         module GraphOps,
@@ -18,9 +20,9 @@ import GraphBase
 import GraphOps
 import GraphPpr
 
-import Unique
-import UniqFM
-import UniqSet
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import Outputable
 
 import Data.Maybe
@@ -322,7 +324,7 @@ selectColor colors graph u
         -- the prefs of our neighbors
         colors_neighbor_prefs
                         = mkUniqSet
-                        $ concat $ map nodePreference nsConflicts
+                        $ concatMap nodePreference nsConflicts
 
         -- colors that are still valid for us
         colors_ok_ex    = minusUniqSet colors_avail (nodeExclusions node)

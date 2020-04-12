@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude, RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Event.IntTable
     (

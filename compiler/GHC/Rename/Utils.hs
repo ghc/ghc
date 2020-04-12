@@ -7,6 +7,8 @@ This module contains miscellaneous functions related to renaming.
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.Rename.Utils (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
@@ -34,20 +36,20 @@ where
 import GhcPrelude
 
 import GHC.Hs
-import RdrName
-import HscTypes
-import TcEnv
-import TcRnMonad
-import Name
-import NameSet
-import NameEnv
-import DataCon
-import SrcLoc
+import GHC.Types.Name.Reader
+import GHC.Driver.Types
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Core.DataCon
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
 import Util
-import BasicTypes       ( TopLevelFlag(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..) )
 import ListSetOps       ( removeDups )
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Control.Monad
 import Data.List
@@ -424,7 +426,7 @@ dupNamesErr get_loc names
   where
     locs      = map get_loc (NE.toList names)
     big_loc   = foldr1 combineSrcSpans locs
-    locations = text "Bound at:" <+> vcat (map ppr (sort locs))
+    locations = text "Bound at:" <+> vcat (map ppr (sortBy SrcLoc.leftmost_smallest locs))
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
@@ -504,7 +506,7 @@ pprHsDocContext TypBrCtx              = text "a Template-Haskell quoted type"
 pprHsDocContext HsTypeCtx             = text "a type argument"
 pprHsDocContext GHCiCtx               = text "GHCi input"
 pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
-pprHsDocContext ClassInstanceCtx      = text "TcSplice.reifyInstances"
+pprHsDocContext ClassInstanceCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
 
 pprHsDocContext (ForeignDeclCtx name)
    = text "the foreign declaration for" <+> quotes (ppr name)

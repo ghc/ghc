@@ -1,9 +1,9 @@
 module Main where
 
-import DynFlags
+import GHC.Driver.Session
 
 import Control.Monad
-import Data.List
+import Data.List (isPrefixOf)
 
 -- Verify bogus flags aren't printed on flagsForCompletion and
 -- allNonDeprecatedFlags:

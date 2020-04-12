@@ -8,7 +8,7 @@ module Main (main) where
 
 import           Control.Monad
 import           Control.Monad.ST
-import           Data.List
+import           Data.List        (sort, intercalate)
 import           GHC.Exts         (Int (..))
 import           GHC.Prim
 import           GHC.ST           (ST (ST))

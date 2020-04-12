@@ -1,4 +1,8 @@
-UnliftedNewtypesLevityBinder.hs:16:7:
+
+UnliftedNewtypesLevityBinder.hs:16:7: error:
     Cannot use function with levity-polymorphic arguments:
-      UnliftedNewtypesLevityBinder.IdentC :: a -> Ident a
+      IdentC :: a -> Ident a
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
     Levity-polymorphic arguments: a :: TYPE r

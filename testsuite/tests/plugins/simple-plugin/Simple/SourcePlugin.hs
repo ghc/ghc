@@ -3,11 +3,11 @@ module Simple.SourcePlugin where
 import Control.Monad.IO.Class
 import Data.List (intercalate)
 import Data.Maybe (isJust)
-import Plugins
-import HscTypes
-import TcRnTypes
+import GHC.Driver.Plugins
+import GHC.Driver.Types
+import GHC.Tc.Types
 import GHC.Hs.Extension
-import Avail
+import GHC.Types.Avail
 import GHC.Hs.Expr
 import Outputable
 import GHC.Hs.ImpExp

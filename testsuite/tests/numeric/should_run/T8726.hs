@@ -1,6 +1,6 @@
 import Control.Monad
 import Data.Bits
-import Data.List
+import Data.List (sortBy)
 import Data.Ord
 
 -- | test-values to use as numerator/denominator

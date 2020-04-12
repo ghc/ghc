@@ -8,8 +8,8 @@ import Data.Data
 import Data.List
 import System.IO
 import GHC
-import BasicTypes
-import DynFlags
+import GHC.Types.Basic
+import GHC.Driver.Session
 import MonadUtils
 import Outputable
 import ApiAnnotation

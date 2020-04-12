@@ -19,12 +19,12 @@ module GHC.StgToCmm.CgUtils (
 import GhcPrelude
 
 import GHC.Platform.Regs
-import Cmm
-import Hoopl.Block
-import Hoopl.Graph
-import CmmUtils
-import CLabel
-import DynFlags
+import GHC.Cmm
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
+import GHC.Driver.Session
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
           | reg == MachSp -> stmt
           | otherwise ->
             let baseAddr = get_GlobalReg_addr dflags reg
-            in case reg `elem` activeStgRegs (targetPlatform dflags) of
+            in case reg `elem` activeStgRegs platform of
                 True  -> CmmAssign (CmmGlobal reg) src
                 False -> CmmStore baseAddr src
         other_stmt -> other_stmt
@@ -170,7 +170,7 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
                     let baseAddr = get_GlobalReg_addr dflags reg
                     in case reg of
                         BaseReg -> baseAddr
-                        _other  -> CmmLoad baseAddr (globalRegType dflags reg)
+                        _other  -> CmmLoad baseAddr (globalRegType platform reg)
 
         CmmRegOff (CmmGlobal reg) offset ->
             -- RegOf leaves are just a shorthand form. If the reg maps
@@ -178,9 +178,9 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
             -- expand it and defer to the above code.
             case reg `elem` activeStgRegs platform of
                 True  -> expr
-                False -> CmmMachOp (MO_Add (wordWidth dflags)) [
+                False -> CmmMachOp (MO_Add (wordWidth platform)) [
                                     fixExpr (CmmReg (CmmGlobal reg)),
                                     CmmLit (CmmInt (fromIntegral offset)
-                                                   (wordWidth dflags))]
+                                                   (wordWidth platform))]
 
         other_expr -> other_expr

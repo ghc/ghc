@@ -41,12 +41,12 @@
 -- Alex "Haskell code fragment top"
 
 {
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Lexer (
    Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),
@@ -56,7 +56,7 @@ module Lexer (
    allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState, withThisPackage,
-   failLocMsgP, srcParseFail,
+   failMsgP, failLocMsgP, srcParseFail,
    getErrorMessages, getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
@@ -73,7 +73,6 @@ import GhcPrelude
 
 -- base
 import Control.Monad
-import Control.Monad.Fail as MonadFail
 import Data.Bits
 import Data.Char
 import Data.List
@@ -98,19 +97,19 @@ import Bag
 import Outputable
 import StringBuffer
 import FastString
-import UniqFM
+import GHC.Types.Unique.FM
 import Util             ( readRational, readHexRational )
 
 -- compiler/main
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session as DynFlags
 
 -- compiler/basicTypes
-import SrcLoc
-import Module
-import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..),
-                        IntegralLit(..), FractionalLit(..),
-                        SourceText(..) )
+import GHC.Types.SrcLoc
+import GHC.Types.Module
+import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
+                         IntegralLit(..), FractionalLit(..),
+                         SourceText(..) )
 
 -- compiler/parser
 import Ctype
@@ -823,11 +822,11 @@ data Token
   | ITdollar                            --  prefix $
   | ITdollardollar                      --  prefix $$
   | ITtyQuote                           --  ''
-  | ITquasiQuote (FastString,FastString,RealSrcSpan)
+  | ITquasiQuote (FastString,FastString,PsSpan)
     -- ITquasiQuote(quoter, quote, loc)
     -- represents a quasi-quote of the form
     -- [quoter| quote |]
-  | ITqQuasiQuote (FastString,FastString,FastString,RealSrcSpan)
+  | ITqQuasiQuote (FastString,FastString,FastString,PsSpan)
     -- ITqQuasiQuote(Qual, quoter, quote, loc)
     -- represents a qualified quasi-quote of the form
     -- [Qual.quoter| quote |]
@@ -941,7 +940,7 @@ One might think that we wish to treat 'family' and 'role' as regular old
 varids whenever -XTypeFamilies and -XRoleAnnotations are off, respectively.
 But, there is no need to do so. These pseudo-keywords are not stolen syntax:
 they are only used after the keyword 'type' at the top-level, where varids are
-not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
+not allowed. Furthermore, checks further downstream (GHC.Tc.TyCl) ensure that
 type families and role annotations are never declared without their extensions
 on. In fact, by unconditionally lexing these pseudo-keywords as special, we
 can get better error messages.
@@ -996,7 +995,7 @@ reservedSymsFM = listToUFM $
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = RealSrcSpan -> StringBuffer -> Int -> P (RealLocated Token)
+type Action = PsSpan -> StringBuffer -> Int -> P (PsLocated Token)
 
 special :: Token -> Action
 special tok span _buf _len = return (L span tok)
@@ -1046,13 +1045,13 @@ hopefully_open_brace span buf len
  = do relaxed <- getBit RelaxedLayoutBit
       ctx <- getContext
       (AI l _) <- getInput
-      let offset = srcLocCol l
+      let offset = srcLocCol (psRealLoc l)
           isOK = relaxed ||
                  case ctx of
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError (RealSrcSpan span) (text "Missing block")
+              else addFatalError (mkSrcSpanPs span) (text "Missing block")
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -1187,7 +1186,7 @@ lineCommentToken span buf len = do
   nested comments require traversing by hand, they can't be parsed
   using regular expressions.
 -}
-nested_comment :: P (RealLocated Token) -> Action
+nested_comment :: P (PsLocated Token) -> Action
 nested_comment cont span buf len = do
   input <- getInput
   go (reverse $ lexemeToString buf len) (1::Int) input
@@ -1199,18 +1198,18 @@ nested_comment cont span buf len = do
         then docCommentEnd input commentAcc ITblockComment buf span
         else cont
     go commentAcc n input = case alexGetChar' input of
-      Nothing -> errBrace input span
+      Nothing -> errBrace input (psRealSpan span)
       Just ('-',input) -> case alexGetChar' input of
-        Nothing  -> errBrace input span
+        Nothing  -> errBrace input (psRealSpan span)
         Just ('\125',input) -> go ('\125':'-':commentAcc) (n-1) input -- '}'
         Just (_,_)          -> go ('-':commentAcc) n input
       Just ('\123',input) -> case alexGetChar' input of  -- '{' char
-        Nothing  -> errBrace input span
+        Nothing  -> errBrace input (psRealSpan span)
         Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
         Just (_,_)       -> go ('\123':commentAcc) n input
       -- See Note [Nested comment line pragmas]
       Just ('\n',input) -> case alexGetChar' input of
-        Nothing  -> errBrace input span
+        Nothing  -> errBrace input (psRealSpan span)
         Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
                            go (parsedAcc ++ '\n':commentAcc) n input
         Just (_,_)   -> go ('\n':commentAcc) n input
@@ -1220,14 +1219,14 @@ nested_doc_comment :: Action
 nested_doc_comment span buf _len = withLexedDocType (go "")
   where
     go commentAcc input docType _ = case alexGetChar' input of
-      Nothing -> errBrace input span
+      Nothing -> errBrace input (psRealSpan span)
       Just ('-',input) -> case alexGetChar' input of
-        Nothing -> errBrace input span
+        Nothing -> errBrace input (psRealSpan span)
         Just ('\125',input) ->
           docCommentEnd input commentAcc docType buf span
         Just (_,_) -> go ('-':commentAcc) input docType False
       Just ('\123', input) -> case alexGetChar' input of
-        Nothing  -> errBrace input span
+        Nothing  -> errBrace input (psRealSpan span)
         Just ('-',input) -> do
           setInput input
           let cont = do input <- getInput; go commentAcc input docType False
@@ -1235,7 +1234,7 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
         Just (_,_) -> go ('\123':commentAcc) input docType False
       -- See Note [Nested comment line pragmas]
       Just ('\n',input) -> case alexGetChar' input of
-        Nothing  -> errBrace input span
+        Nothing  -> errBrace input (psRealSpan span)
         Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
                            go (parsedAcc ++ '\n':commentAcc) input docType False
         Just (_,_)   -> go ('\n':commentAcc) input docType False
@@ -1253,7 +1252,7 @@ parseNestedPragma input@(AI _ buf) = do
   setExts (.&. complement (xbit InNestedCommentBit))
   postInput@(AI _ postBuf) <- getInput
   setInput origInput
-  case unRealSrcSpan lt of
+  case unLoc lt of
     ITcomment_line_prag -> do
       let bytes = byteDiff buf postBuf
           diff  = lexemeToString buf bytes
@@ -1287,8 +1286,8 @@ return control to parseNestedPragma by returning the ITcomment_line_prag token.
 See #314 for more background on the bug this fixes.
 -}
 
-withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (RealLocated Token))
-                 -> P (RealLocated Token)
+withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (PsLocated Token))
+                 -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
   case prevChar buf ' ' of
@@ -1348,19 +1347,19 @@ endPrag span _buf _len = do
 -- called afterwards, so it can just update the state.
 
 docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
-                 RealSrcSpan -> P (RealLocated Token)
+                 PsSpan -> P (PsLocated Token)
 docCommentEnd input commentAcc docType buf span = do
   setInput input
   let (AI loc nextBuf) = input
       comment = reverse commentAcc
-      span' = mkRealSrcSpan (realSrcSpanStart span) loc
+      span' = mkPsSpan (psSpanStart span) loc
       last_len = byteDiff buf nextBuf
 
   span `seq` setLastToken span' last_len
   return (L span' (docType comment))
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
-errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) end "unterminated `{-'"
+errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) "unterminated `{-'"
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do
@@ -1415,7 +1414,7 @@ varid span buf len =
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
-            addError (RealSrcSpan (last_loc pState)) $ text
+            addError (mkSrcSpanPs (last_loc pState)) $ text
                      "Illegal lambda-case (use LambdaCase)"
           return ITlcase
         _ -> return ITcase
@@ -1449,9 +1448,9 @@ varsym_prefix :: Action
 varsym_prefix = sym $ \exts s ->
   if | TypeApplicationsBit `xtest` exts, s == fsLit "@"
      -> return ITtypeApp
-     | ThBit `xtest` exts, s == fsLit "$"
+     | ThQuotesBit `xtest` exts, s == fsLit "$"
      -> return ITdollar
-     | ThBit `xtest` exts, s == fsLit "$$"
+     | ThQuotesBit `xtest` exts, s == fsLit "$$"
      -> return ITdollardollar
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
@@ -1514,7 +1513,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (RealSrcSpan (last_loc pState)) $ text
+    addError (mkSrcSpanPs (last_loc pState)) $ text
              "Use NumericUnderscores to allow underscores in integer literals"
   return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
@@ -1556,7 +1555,7 @@ tok_frac drop f span buf len = do
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (RealSrcSpan (last_loc pState)) $ text
+    addError (mkSrcSpanPs (last_loc pState)) $ text
              "Use NumericUnderscores to allow underscores in floating literals"
   return (L span $! (f $! src))
 
@@ -1637,7 +1636,7 @@ new_layout_context :: Bool -> Bool -> Token -> Action
 new_layout_context strict gen_semic tok span _buf len = do
     _ <- popLexState
     (AI l _) <- getInput
-    let offset = srcLocCol l - len
+    let offset = srcLocCol (psRealLoc l) - len
     ctx <- getContext
     nondecreasing <- getBit NondecreasingIndentationBit
     let strict' = strict || not nondecreasing
@@ -1662,7 +1661,7 @@ do_layout_left span _buf _len = do
 -- LINE pragmas
 
 setLineAndFile :: Int -> Action
-setLineAndFile code span buf len = do
+setLineAndFile code (PsSpan span _) buf len = do
   let src = lexemeToString buf (len - 1)  -- drop trailing quotation mark
       linenumLen = length $ head $ words src
       linenum = parseUnsignedInteger buf linenumLen 10 octDecDigit
@@ -1680,7 +1679,7 @@ setLineAndFile code span buf len = do
               -- System.FilePath.normalise before printing out
               -- filenames and it does not remove duplicate
               -- backslashes after the drive letter (should it?).
-  setAlrLastLoc $ alrInitialLoc file
+  resetAlrLastLoc file
   setSrcLoc (mkRealSrcLoc file (fromIntegral linenum - 1) (srcSpanEndCol span))
       -- subtract one: the line number refers to the *following* line
   addSrcFile file
@@ -1689,7 +1688,7 @@ setLineAndFile code span buf len = do
   lexToken
 
 setColumn :: Action
-setColumn span buf len = do
+setColumn (PsSpan span _) buf len = do
   let column =
         case reads (lexemeToString buf len) of
           [(column, _)] -> column
@@ -1711,10 +1710,10 @@ alrInitialLoc file = mkRealSrcSpan loc loc
 lex_string_prag :: (String -> Token) -> Action
 lex_string_prag mkTok span _buf _len
     = do input <- getInput
-         start <- getRealSrcLoc
+         start <- getParsedLoc
          tok <- go [] input
-         end <- getRealSrcLoc
-         return (L (mkRealSrcSpan start end) tok)
+         end <- getParsedLoc
+         return (L (mkPsSpan start end) tok)
     where go acc input
               = if isString input "#-}"
                    then do setInput input
@@ -1727,7 +1726,7 @@ lex_string_prag mkTok span _buf _len
               = case alexGetChar i of
                   Just (c,i') | c == x    -> isString i' xs
                   _other -> False
-          err (AI end _) = failLocMsgP (realSrcSpanStart span) end "unterminated options pragma"
+          err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) "unterminated options pragma"
 
 
 -- -----------------------------------------------------------------------------
@@ -1745,7 +1744,7 @@ lex_string_tok span buf _len = do
             ITstring _ s -> ITstring (SourceText src) s
             _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
+  return (L (mkPsSpan (psSpanStart span) end) tok')
 
 lex_string :: String -> P Token
 lex_string s = do
@@ -1765,7 +1764,7 @@ lex_string s = do
                 setInput i
                 when (any (> '\xFF') s') $ do
                   pState <- getPState
-                  addError (RealSrcSpan (last_loc pState)) $ text
+                  addError (mkSrcSpanPs (last_loc pState)) $ text
                      "primitive string literal must contain only characters <= \'\\xFF\'"
                 return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
@@ -1807,13 +1806,13 @@ lex_char_tok :: Action
 -- see if there's a trailing quote
 lex_char_tok span buf _len = do        -- We've seen '
    i1 <- getInput       -- Look ahead to first character
-   let loc = realSrcSpanStart span
+   let loc = psSpanStart span
    case alexGetChar' i1 of
         Nothing -> lit_error  i1
 
         Just ('\'', i2@(AI end2 _)) -> do       -- We've seen ''
                    setInput i2
-                   return (L (mkRealSrcSpan loc end2)  ITtyQuote)
+                   return (L (mkPsSpan loc end2)  ITtyQuote)
 
         Just ('\\', i2@(AI _end2 _)) -> do      -- We've seen 'backslash
                   setInput i2
@@ -1837,9 +1836,9 @@ lex_char_tok span buf _len = do        -- We've seen '
                                         -- (including the possibility of EOF)
                                         -- Just parse the quote only
                         let (AI end _) = i1
-                        return (L (mkRealSrcSpan loc end) ITsimpleQuote)
+                        return (L (mkPsSpan loc end) ITsimpleQuote)
 
-finish_char_tok :: StringBuffer -> RealSrcLoc -> Char -> P (RealLocated Token)
+finish_char_tok :: StringBuffer -> PsLoc -> Char -> P (PsLocated Token)
 finish_char_tok buf loc ch  -- We've already seen the closing quote
                         -- Just need to check for trailing #
   = do  magicHash <- getBit MagicHashBit
@@ -1849,13 +1848,13 @@ finish_char_tok buf loc ch  -- We've already seen the closing quote
             case alexGetChar' i of
               Just ('#',i@(AI end _)) -> do
                 setInput i
-                return (L (mkRealSrcSpan loc end)
+                return (L (mkPsSpan loc end)
                           (ITprimchar (SourceText src) ch))
               _other ->
-                return (L (mkRealSrcSpan loc end)
+                return (L (mkPsSpan loc end)
                           (ITchar (SourceText src) ch))
             else do
-              return (L (mkRealSrcSpan loc end) (ITchar (SourceText src) ch))
+              return (L (mkPsSpan loc end) (ITchar (SourceText src) ch))
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
@@ -1985,27 +1984,27 @@ getCharOrFail i =  do
 lex_qquasiquote_tok :: Action
 lex_qquasiquote_tok span buf len = do
   let (qual, quoter) = splitQualName (stepOn buf) (len - 2) False
-  quoteStart <- getRealSrcLoc
-  quote <- lex_quasiquote quoteStart ""
-  end <- getRealSrcLoc
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end)
+  quoteStart <- getParsedLoc
+  quote <- lex_quasiquote (psRealLoc quoteStart) ""
+  end <- getParsedLoc
+  return (L (mkPsSpan (psSpanStart span) end)
            (ITqQuasiQuote (qual,
                            quoter,
                            mkFastString (reverse quote),
-                           mkRealSrcSpan quoteStart end)))
+                           mkPsSpan quoteStart end)))
 
 lex_quasiquote_tok :: Action
 lex_quasiquote_tok span buf len = do
   let quoter = tail (lexemeToString buf (len - 1))
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
-  quoteStart <- getRealSrcLoc
-  quote <- lex_quasiquote quoteStart ""
-  end <- getRealSrcLoc
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end)
+  quoteStart <- getParsedLoc
+  quote <- lex_quasiquote (psRealLoc quoteStart) ""
+  end <- getParsedLoc
+  return (L (mkPsSpan (psSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
-                          mkRealSrcSpan quoteStart end)))
+                          mkPsSpan quoteStart end)))
 
 lex_quasiquote :: RealSrcLoc -> String -> P String
 lex_quasiquote start s = do
@@ -2027,19 +2026,19 @@ lex_quasiquote start s = do
 quasiquote_error :: RealSrcLoc -> P a
 quasiquote_error start = do
   (AI end buf) <- getInput
-  reportLexError start end buf "unterminated quasiquotation"
+  reportLexError start (psRealLoc end) buf "unterminated quasiquotation"
 
 -- -----------------------------------------------------------------------------
 -- Warnings
 
 warnTab :: Action
 warnTab srcspan _buf _len = do
-    addTabWarning srcspan
+    addTabWarning (psRealSpan srcspan)
     lexToken
 
 warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
-    addWarning option (RealSrcSpan srcspan) warning
+    addWarning option (RealSrcSpan (psRealSpan srcspan) Nothing) warning
     action srcspan buf len
 
 -- -----------------------------------------------------------------------------
@@ -2094,22 +2093,22 @@ data PState = PState {
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
         last_tk    :: Maybe Token,
-        last_loc   :: RealSrcSpan, -- pos of previous token
+        last_loc   :: PsSpan,      -- pos of previous token
         last_len   :: !Int,        -- len of previous token
-        loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
+        loc        :: PsLoc,       -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
         srcfiles   :: [FastString],
         -- Used in the alternative layout rule:
         -- These tokens are the next ones to be sent out. They are
         -- just blindly emitted, without the rule looking at them again:
-        alr_pending_implicit_tokens :: [RealLocated Token],
+        alr_pending_implicit_tokens :: [PsLocated Token],
         -- This is the next token to be considered or, if it is Nothing,
         -- we need to get the next token from the input stream:
-        alr_next_token :: Maybe (RealLocated Token),
+        alr_next_token :: Maybe (PsLocated Token),
         -- This is what we consider to be the location of the last token
         -- emitted:
-        alr_last_loc :: RealSrcSpan,
+        alr_last_loc :: PsSpan,
         -- The stack of layout contexts:
         alr_context :: [ALRContext],
         -- Are we expecting a '{'? If it's Just, then the ALRLayout tells
@@ -2123,9 +2122,10 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in ApiAnnotation.hs
-        annotations :: [(ApiAnnKey,[SrcSpan])],
-        comment_q :: [Located AnnotationComment],
-        annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
+        annotations :: [(ApiAnnKey,[RealSrcSpan])],
+        eof_pos :: Maybe RealSrcSpan,
+        comment_q :: [RealLocated AnnotationComment],
+        annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2153,12 +2153,6 @@ instance Applicative P where
 
 instance Monad P where
   (>>=) = thenP
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
-
-instance MonadFail.MonadFail P where
-  fail = failMsgP
 
 returnP :: a -> P a
 returnP a = a `seq` (P $ \s -> POk s a)
@@ -2172,11 +2166,11 @@ thenP :: P a -> (a -> P b) -> P b
 failMsgP :: String -> P a
 failMsgP msg = do
   pState <- getPState
-  addFatalError (RealSrcSpan (last_loc pState)) (text msg)
+  addFatalError (mkSrcSpanPs (last_loc pState)) (text msg)
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
 failLocMsgP loc1 loc2 str =
-  addFatalError (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
+  addFatalError (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing) (text str)
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2195,15 +2189,23 @@ setExts f = P $ \s -> POk s {
   } ()
 
 setSrcLoc :: RealSrcLoc -> P ()
-setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
+setSrcLoc new_loc =
+  P $ \s@(PState{ loc = PsLoc _ buf_loc }) ->
+  POk s{ loc = PsLoc new_loc buf_loc } ()
 
 getRealSrcLoc :: P RealSrcLoc
-getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
+getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s (psRealLoc loc)
+
+getParsedLoc :: P PsLoc
+getParsedLoc  = P $ \s@(PState{ loc=loc }) -> POk s loc
 
 addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 
-setLastToken :: RealSrcSpan -> Int -> P ()
+setEofPos :: RealSrcSpan -> P ()
+setEofPos span = P $ \s -> POk s{ eof_pos = Just span } ()
+
+setLastToken :: PsSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
   last_loc=loc,
   last_len=len
@@ -2215,7 +2217,7 @@ setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
-data AlexInput = AI RealSrcLoc StringBuffer
+data AlexInput = AI PsLoc StringBuffer
 
 {-
 Note [Unicode in Alex]
@@ -2308,7 +2310,7 @@ alexGetByte (AI loc s)
                 --trace (show (ord c)) $
                 Just (byte, (AI loc' s'))
   where (c,s') = nextChar s
-        loc'   = advanceSrcLoc loc c
+        loc'   = advancePsLoc loc c
         byte   = adjustChar c
 
 -- This version does not squash unicode characters, it is used when
@@ -2320,7 +2322,7 @@ alexGetChar' (AI loc s)
                 --trace (show (ord c)) $
                 Just (c, (AI loc' s'))
   where (c,s') = nextChar s
-        loc'   = advanceSrcLoc loc c
+        loc'   = advancePsLoc loc c
 
 getInput :: P AlexInput
 getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (AI l b)
@@ -2342,7 +2344,7 @@ popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state=l } ls
 getLexState :: P Int
 getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 
-popNextToken :: P (Maybe (RealLocated Token))
+popNextToken :: P (Maybe (PsLocated Token))
 popNextToken
     = P $ \s@PState{ alr_next_token = m } ->
               POk (s {alr_next_token = Nothing}) m
@@ -2356,10 +2358,15 @@ activeContext = do
     ([],Nothing) -> return impt
     _other       -> return True
 
-setAlrLastLoc :: RealSrcSpan -> P ()
+resetAlrLastLoc :: FastString -> P ()
+resetAlrLastLoc file =
+  P $ \s@(PState {alr_last_loc = PsSpan _ buf_span}) ->
+  POk s{ alr_last_loc = PsSpan (alrInitialLoc file) buf_span } ()
+
+setAlrLastLoc :: PsSpan -> P ()
 setAlrLastLoc l = P $ \s -> POk (s {alr_last_loc = l}) ()
 
-getAlrLastLoc :: P RealSrcSpan
+getAlrLastLoc :: P PsSpan
 getAlrLastLoc = P $ \s@(PState {alr_last_loc = l}) -> POk s l
 
 getALRContext :: P [ALRContext]
@@ -2376,7 +2383,7 @@ setJustClosedExplicitLetBlock :: Bool -> P ()
 setJustClosedExplicitLetBlock b
  = P $ \s -> POk (s {alr_justClosedExplicitLetBlock = b}) ()
 
-setNextToken :: RealLocated Token -> P ()
+setNextToken :: PsLocated Token -> P ()
 setNextToken t = P $ \s -> POk (s {alr_next_token = Just t}) ()
 
 implicitTokenPending :: P Bool
@@ -2386,14 +2393,14 @@ implicitTokenPending
               [] -> POk s False
               _  -> POk s True
 
-popPendingImplicitToken :: P (Maybe (RealLocated Token))
+popPendingImplicitToken :: P (Maybe (PsLocated Token))
 popPendingImplicitToken
     = P $ \s@PState{ alr_pending_implicit_tokens = ts } ->
               case ts of
               [] -> POk s Nothing
               (t : ts') -> POk (s {alr_pending_implicit_tokens = ts'}) (Just t)
 
-setPendingImplicitTokens :: [RealLocated Token] -> P ()
+setPendingImplicitTokens :: [PsLocated Token] -> P ()
 setPendingImplicitTokens ts = P $ \s -> POk (s {alr_pending_implicit_tokens = ts}) ()
 
 getAlrExpectingOCurly :: P (Maybe ALRLayout)
@@ -2585,22 +2592,24 @@ mkPStatePure options buf loc =
       tab_first     = Nothing,
       tab_count     = 0,
       last_tk       = Nothing,
-      last_loc      = mkRealSrcSpan loc loc,
+      last_loc      = mkPsSpan init_loc init_loc,
       last_len      = 0,
-      loc           = loc,
+      loc           = init_loc,
       context       = [],
       lex_state     = [bol, 0],
       srcfiles      = [],
       alr_pending_implicit_tokens = [],
       alr_next_token = Nothing,
-      alr_last_loc = alrInitialLoc (fsLit "<no file>"),
+      alr_last_loc = PsSpan (alrInitialLoc (fsLit "<no file>")) (BufSpan (BufPos 0) (BufPos 0)),
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
       annotations = [],
+      eof_pos = Nothing,
       comment_q = [],
       annotations_comments = []
     }
+  where init_loc = PsLoc loc (BufPos 0)
 
 -- | An mtl-style class for monads that support parsing-related operations.
 -- For example, sometimes we make a second pass over the parsing results to validate,
@@ -2677,9 +2686,10 @@ instance MonadP P where
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnotation l a v = do
+  addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) = do
     addAnnotationOnly l a v
     allocateCommentsP l
+  addAnnotation _ _ _ = return ()
 
 addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
 addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
@@ -2704,7 +2714,7 @@ mkTabWarning PState{tab_first=tf, tab_count=tc} d =
                 <> text "."
                 $+$ text "Please use spaces instead."
   in fmap (\s -> makeIntoWarning (Reason Opt_WarnTabs) $
-                 mkWarnMsg d (RealSrcSpan s) alwaysQualify message) tf
+                 mkWarnMsg d (RealSrcSpan s Nothing) alwaysQualify message) tf
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
@@ -2734,12 +2744,12 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError (RealSrcSpan last_loc) (srcParseErr o buf len)) s
+          unP (addFatalError (mkSrcSpanPs last_loc) (srcParseErr o buf len)) s
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
 pushCurrentContext gen_semic = P $ \ s@PState{ last_loc=loc, context=ctx } ->
-    POk s{context = Layout (srcSpanStartCol loc) gen_semic : ctx} ()
+    POk s{context = Layout (srcSpanStartCol (psRealSpan loc)) gen_semic : ctx} ()
 
 -- This is only used at the outer level of a module when the 'module' keyword is
 -- missing.
@@ -2748,7 +2758,7 @@ pushModuleContext = pushCurrentContext generateSemic
 
 getOffside :: P (Ordering, Bool)
 getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
-                let offs = srcSpanStartCol loc in
+                let offs = srcSpanStartCol (psRealSpan loc) in
                 let ord = case stk of
                             Layout n gen_semic : _ ->
                               --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $
@@ -2785,7 +2795,7 @@ srcParseErr options buf len
         last100 = decodePrevNChars 100 buf
         doInLast100 = "do" `isInfixOf` last100
         mdoInLast100 = "mdo" `isInfixOf` last100
-        th_enabled = ThBit `xtest` pExtsBitmap options
+        th_enabled = ThQuotesBit `xtest` pExtsBitmap options
         ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
 
 -- Report a parse failure, giving the span of the previous token as
@@ -2794,7 +2804,7 @@ srcParseErr options buf len
 srcParseFail :: P a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError (RealSrcSpan last_loc) (srcParseErr o buf len)) s
+    unP (addFatalError (mkSrcSpanPs last_loc) (srcParseErr o buf len)) s
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -2802,7 +2812,7 @@ lexError :: String -> P a
 lexError str = do
   loc <- getRealSrcLoc
   (AI end buf) <- getInput
-  reportLexError loc end buf str
+  reportLexError loc (psRealLoc end) buf str
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -2816,24 +2826,20 @@ lexer queueComments cont = do
   (L span tok) <- lexTokenFun
   --trace ("token: " ++ show tok) $ do
 
-  case tok of
-    ITeof -> addAnnotationOnly noSrcSpan AnnEofPos (RealSrcSpan span)
-    _ -> return ()
-
   if (queueComments && isDocComment tok)
-    then queueComment (L (RealSrcSpan span) tok)
+    then queueComment (L (psRealSpan span) tok)
     else return ()
 
   if (queueComments && isComment tok)
-    then queueComment (L (RealSrcSpan span) tok) >> lexer queueComments cont
-    else cont (L (RealSrcSpan span) tok)
+    then queueComment (L (psRealSpan span) tok) >> lexer queueComments cont
+    else cont (L (mkSrcSpanPs span) tok)
 
 -- Use this instead of 'lexer' in Parser.y to dump the tokens for debugging.
 lexerDbg queueComments cont = lexer queueComments contDbg
   where
     contDbg tok = trace ("token: " ++ show (unLoc tok)) (cont tok)
 
-lexTokenAlr :: P (RealLocated Token)
+lexTokenAlr :: P (PsLocated Token)
 lexTokenAlr = do mPending <- popPendingImplicitToken
                  t <- case mPending of
                       Nothing ->
@@ -2844,8 +2850,8 @@ lexTokenAlr = do mPending <- popPendingImplicitToken
                              alternativeLayoutRuleToken t
                       Just t ->
                           return t
-                 setAlrLastLoc (getRealSrcSpan t)
-                 case unRealSrcSpan t of
+                 setAlrLastLoc (getLoc t)
+                 case unLoc t of
                      ITwhere -> setAlrExpectingOCurly (Just ALRLayoutWhere)
                      ITlet   -> setAlrExpectingOCurly (Just ALRLayoutLet)
                      ITof    -> setAlrExpectingOCurly (Just ALRLayoutOf)
@@ -2856,7 +2862,7 @@ lexTokenAlr = do mPending <- popPendingImplicitToken
                      _       -> return ()
                  return t
 
-alternativeLayoutRuleToken :: RealLocated Token -> P (RealLocated Token)
+alternativeLayoutRuleToken :: PsLocated Token -> P (PsLocated Token)
 alternativeLayoutRuleToken t
     = do context <- getALRContext
          lastLoc <- getAlrLastLoc
@@ -2864,10 +2870,10 @@ alternativeLayoutRuleToken t
          transitional <- getBit ALRTransitionalBit
          justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
          setJustClosedExplicitLetBlock False
-         let thisLoc = getRealSrcSpan t
-             thisCol = srcSpanStartCol thisLoc
-             newLine = srcSpanStartLine thisLoc > srcSpanEndLine lastLoc
-         case (unRealSrcSpan t, context, mExpectingOCurly) of
+         let thisLoc = getLoc t
+             thisCol = srcSpanStartCol (psRealSpan thisLoc)
+             newLine = srcSpanStartLine (psRealSpan thisLoc) > srcSpanEndLine (psRealSpan lastLoc)
+         case (unLoc t, context, mExpectingOCurly) of
              -- This case handles a GHC extension to the original H98
              -- layout rule...
              (ITocurly, _, Just alrLayout) ->
@@ -2926,7 +2932,7 @@ alternativeLayoutRuleToken t
              (ITwhere, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (RealSrcSpan thisLoc)
+                               (mkSrcSpanPs thisLoc)
                                (transitionalAlternativeLayoutWarning
                                     "`where' clause at the same depth as implicit layout block")
                     setALRContext ls
@@ -2938,7 +2944,7 @@ alternativeLayoutRuleToken t
              (ITvbar, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (RealSrcSpan thisLoc)
+                               (mkSrcSpanPs thisLoc)
                                (transitionalAlternativeLayoutWarning
                                     "`|' at the same depth as implicit layout block")
                     setALRContext ls
@@ -2949,8 +2955,8 @@ alternativeLayoutRuleToken t
              (_, ALRLayout _ col : ls, _)
               | newLine && thisCol == col ->
                  do setNextToken t
-                    let loc = realSrcSpanStart thisLoc
-                        zeroWidthLoc = mkRealSrcSpan loc loc
+                    let loc = psSpanStart thisLoc
+                        zeroWidthLoc = mkPsSpan loc loc
                     return (L zeroWidthLoc ITsemi)
               | newLine && thisCol < col ->
                  do setALRContext ls
@@ -3054,28 +3060,29 @@ topNoLayoutContainsCommas [] = False
 topNoLayoutContainsCommas (ALRLayout _ _ : ls) = topNoLayoutContainsCommas ls
 topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 
-lexToken :: P (RealLocated Token)
+lexToken :: P (PsLocated Token)
 lexToken = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   exts <- getExts
   case alexScanUser exts inp sc of
     AlexEOF -> do
-        let span = mkRealSrcSpan loc1 loc1
+        let span = mkPsSpan loc1 loc1
+        setEofPos (psRealSpan span)
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
-        reportLexError loc1 loc2 buf "lexical error"
+        reportLexError (psRealLoc loc1) (psRealLoc loc2) buf "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
     AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
-        let span = mkRealSrcSpan loc1 end
+        let span = mkPsSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        let lt' = unRealSrcSpan lt
+        let lt' = unLoc lt
         unless (isComment lt') (setLastTk lt')
         return lt
 
@@ -3210,7 +3217,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --   function, and then it can be discharged using the 'ams' function.
 data AddAnn = AddAnn AnnKeywordId SrcSpan
 
-addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
   annotations = ((l,a), [v]) : annotations s
   } ()
@@ -3220,24 +3227,24 @@ addAnnotationOnly l a v = P $ \s -> POk s {
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
+mkParensApiAnn (RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
     el = srcSpanEndLine ss
     ec = srcSpanEndCol ss
-    lo = mkSrcSpan (srcSpanStart s)         (mkSrcLoc f sl (sc+1))
-    lc = mkSrcSpan (mkSrcLoc f el (ec - 1)) (srcSpanEnd s)
+    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Nothing
+    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Nothing
 
-queueComment :: Located Token -> P()
+queueComment :: RealLocated Token -> P()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
 
 -- | Go through the @comment_q@ in @PState@ and remove all comments
 -- that belong within the given span
-allocateCommentsP :: SrcSpan -> P ()
+allocateCommentsP :: RealSrcSpan -> P ()
 allocateCommentsP ss = P $ \s ->
   let (comment_q', newAnns) = allocateComments ss (comment_q s) in
     POk s {
@@ -3246,13 +3253,13 @@ allocateCommentsP ss = P $ \s ->
      } ()
 
 allocateComments
-  :: SrcSpan
-  -> [Located AnnotationComment]
-  -> ([Located AnnotationComment], [(SrcSpan,[Located AnnotationComment])])
+  :: RealSrcSpan
+  -> [RealLocated AnnotationComment]
+  -> ([RealLocated AnnotationComment], [(RealSrcSpan,[RealLocated AnnotationComment])])
 allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) comment_q
-    (middle,after) = break (\(L l _) -> not (isSubspanOf l ss)) rest
+    (before,rest)  = break (\(L l _) -> isRealSubspanOf l ss) comment_q
+    (middle,after) = break (\(L l _) -> not (isRealSubspanOf l ss)) rest
     comment_q' = before ++ after
     newAnns = if null middle then []
                              else [(ss,middle)]
@@ -3260,7 +3267,7 @@ allocateComments ss comment_q =
     (comment_q', newAnns)
 
 
-commentToAnnotation :: Located Token -> Located AnnotationComment
+commentToAnnotation :: RealLocated Token -> RealLocated AnnotationComment
 commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)
 commentToAnnotation (L l (ITdocCommentPrev s))  = L l (AnnDocCommentPrev s)
 commentToAnnotation (L l (ITdocCommentNamed s)) = L l (AnnDocCommentNamed s)

@@ -77,7 +77,8 @@
 ((Test13163.hs:14:20-22,AnnOpenS), [Test13163.hs:14:20]),
 ((Test13163.hs:16:1-13,AnnEqual), [Test13163.hs:16:3]),
 ((Test13163.hs:16:1-13,AnnFunId), [Test13163.hs:16:1]),
-((Test13163.hs:16:1-13,AnnSemi), [Test13163.hs:17:1]),
-((<no location info>,AnnEofPos), [Test13163.hs:17:1])
+((Test13163.hs:16:1-13,AnnSemi), [Test13163.hs:17:1])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test13163.hs" 17 1

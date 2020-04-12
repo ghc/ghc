@@ -2,6 +2,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MagicHash                 #-}
 {-# LANGUAGE UnboxedTuples             #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StaticPtr

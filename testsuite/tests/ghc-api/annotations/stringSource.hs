@@ -8,13 +8,13 @@ module Main where
 
 -- import Data.Generics
 import Data.Data
-import Data.List
+import Data.List (intercalate)
 import System.IO
 import GHC
-import BasicTypes
-import DynFlags
+import GHC.Types.Basic
+import GHC.Driver.Session
 import FastString
-import ForeignCall
+import GHC.Types.ForeignCall
 import MonadUtils
 import Outputable
 import GHC.Hs.Decls
@@ -30,7 +30,7 @@ main = do
         testOneFile libdir fileName
 
 testOneFile libdir fileName = do
-       ((anns,cs),p) <- runGhc (Just libdir) $ do
+       p <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName fileName
@@ -40,7 +40,7 @@ testOneFile libdir fileName = do
                         load LoadAllTargets
                         modSum <- getModSummary mn
                         p <- parseModule modSum
-                        return (pm_annotations p,p)
+                        return p
 
        let tupArgs = gq (pm_parsed_source p)
 
@@ -87,7 +87,6 @@ testOneFile libdir fileName = do
      doPragE (HsPragCore _ src ss) = [("co",[conv (noLoc ss)])]
      doPragE (HsPragSCC  _ src ss) = [("sc",[conv (noLoc ss)])]
      doPragE (HsPragTick _ src (ss,_,_) _ss2) = [("tp",[conv (noLoc ss)])]
-     doPragE (XHsPragE x) = noExtCon x
 
      conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)
 

@@ -17,40 +17,42 @@ module GHC.CoreToStg ( coreToStg ) where
 
 import GhcPrelude
 
-import CoreSyn
-import CoreUtils        ( exprType, findDefault, isJoinBind
+import GHC.Core
+import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
-import CoreArity        ( manifestArity )
+import GHC.Core.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 
-import Type
+import GHC.Core.Type
 import GHC.Types.RepType
-import TyCon
-import MkId             ( coercionTokenId )
-import Id
-import IdInfo
-import DataCon
-import CostCentre
-import VarEnv
-import Module
-import Name             ( isExternalName, nameOccName, nameModule_maybe )
-import OccName          ( occNameFS )
-import BasicTypes       ( Arity )
+import GHC.Core.TyCon
+import GHC.Types.Id.Make ( coercionTokenId )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Core.DataCon
+import GHC.Types.CostCentre
+import GHC.Types.Var.Env
+import GHC.Types.Module
+import GHC.Types.Name   ( isExternalName, nameModule_maybe )
+import GHC.Types.Basic  ( Arity )
 import TysWiredIn       ( unboxedUnitDataCon, unitDataConId )
-import Literal
+import GHC.Types.Literal
 import Outputable
 import MonadUtils
 import FastString
 import Util
-import DynFlags
-import ForeignCall
-import Demand           ( isUsedOnce )
+import GHC.Driver.Session
+import GHC.Driver.Ways
+import GHC.Types.ForeignCall
+import GHC.Types.Demand ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
-import SrcLoc           ( mkGeneralSrcSpan )
+import GHC.Types.SrcLoc ( mkGeneralSrcSpan )
+import PrelNames        ( unsafeEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
 import Control.Monad (ap)
+import qualified Data.Set as Set
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -198,6 +200,26 @@ import Control.Monad (ap)
 --                 do we set CCCS from it; so we just slam in
 --                 dontCareCostCentre.
 
+-- Note [Coercion tokens]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- In coreToStgArgs, we drop type arguments completely, but we replace
+-- coercions with a special coercionToken# placeholder. Why? Consider:
+--
+--   f :: forall a. Int ~# Bool -> a
+--   f = /\a. \(co :: Int ~# Bool) -> error "impossible"
+--
+-- If we erased the coercion argument completely, we’d end up with just
+-- f = error "impossible", but then f `seq` () would be ⊥!
+--
+-- This is an artificial example, but back in the day we *did* treat
+-- coercion lambdas like type lambdas, and we had bug reports as a
+-- result. So now we treat coercion lambdas like value lambdas, but we
+-- treat coercions themselves as zero-width arguments — coercionToken#
+-- has representation VoidRep — which gets the best of both worlds.
+--
+-- (For the gory details, see also the (unpublished) paper, “Practical
+-- aspects of evidence-based compilation in System FC.”)
+
 -- --------------------------------------------------------------
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
@@ -210,7 +232,7 @@ coreToStg dflags this_mod pgm
     (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
 
-    prof = WayProf `elem` ways dflags
+    prof = WayProf `Set.member` ways dflags
 
     final_ccs
       | prof && gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -251,7 +273,7 @@ coreTopBindToStg
 coreTopBindToStg _ _ env ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
-  -- See Note [CoreSyn top-level string literals] in CoreSyn
+  -- See Note [Core top-level string literals] in GHC.Core
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
@@ -268,7 +290,6 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    assertConsistentCafInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,33 +317,7 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    assertConsistentCafInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
-
--- | CAF consistency issues will generally result in segfaults and are quite
--- difficult to debug (see #16846). We enable checking of the
--- 'consistentCafInfo' invariant with @-dstg-lint@ to increase the chance that
--- we catch these issues.
-assertConsistentCafInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
-assertConsistentCafInfo dflags id bind err_doc result
-  | gopt Opt_DoStgLinting dflags || debugIsOn
-  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCafInfo" err_doc
-  | otherwise = result
-
--- Assertion helper: this checks that the CafInfo on the Id matches
--- what CoreToStg has figured out about the binding's SRT.  The
--- CafInfo will be exact in all cases except when CorePrep has
--- floated out a binding, in which case it will be approximate.
-consistentCafInfo :: Id -> StgTopBinding -> Bool
-consistentCafInfo id bind
-  = WARN( not (exact || is_sat_thing) , ppr id <+> ppr id_marked_caffy <+> ppr binding_is_caffy )
-    safe
-  where
-    safe  = id_marked_caffy || not binding_is_caffy
-    exact = id_marked_caffy == binding_is_caffy
-    id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
-    binding_is_caffy = topStgBindHasCafRefs bind
-    is_sat_thing = occNameFS (nameOccName (idName id)) == fsLit "sat"
 
 coreToTopStgRhs
         :: DynFlags
@@ -384,8 +379,10 @@ coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
   -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
   -- a STG to Cmm pass.
   = coreToStgExpr (Var unitDataConId)
-coreToStgExpr (Var v)      = coreToStgApp v               [] []
-coreToStgExpr (Coercion _) = coreToStgApp coercionTokenId [] []
+coreToStgExpr (Var v) = coreToStgApp v [] []
+coreToStgExpr (Coercion _)
+  -- See Note [Coercion tokens]
+  = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
   = coreToStgApp f args ticks
@@ -422,7 +419,7 @@ coreToStgExpr (Cast expr _)
 
 coreToStgExpr (Case scrut _ _ [])
   = coreToStgExpr scrut
-    -- See Note [Empty case alternatives] in CoreSyn If the case
+    -- See Note [Empty case alternatives] in GHC.Core If the case
     -- alternatives are empty, the scrutinee must diverge or raise an
     -- exception, so we can just dive into it.
     --
@@ -432,15 +429,27 @@ coreToStgExpr (Case scrut _ _ [])
     -- runtime system error function.
 
 
-coreToStgExpr (Case scrut bndr _ alts) = do
+coreToStgExpr e0@(Case scrut bndr _ alts) = do
     alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
     scrut2 <- coreToStgExpr scrut
-    return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2)
+    let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
+    -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+    case scrut2 of
+      StgApp id [] | idName id == unsafeEqualityProofName ->
+        case alts2 of
+          [(_, [_co], rhs)] ->
+            return rhs
+          _ ->
+            pprPanic "coreToStgExpr" $
+              text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
+              text "STG:" $$ ppr stg
+      _ -> return stg
   where
+    vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
-        -- See Note [Nullary unboxed tuple] in Type.hs
+        -- See Note [Nullary unboxed tuple] in GHC.Core.Type
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { rhs2 <- coreToStgExpr rhs
@@ -569,7 +578,7 @@ coreToStgArgs (Type _ : args) = do     -- Type argument
     (args', ts) <- coreToStgArgs args
     return (args', ts)
 
-coreToStgArgs (Coercion _ : args)  -- Coercion argument; replace with place holder
+coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion tokens]
   = do { (args', ts) <- coreToStgArgs args
        ; return (StgVarArg coercionTokenId : args', ts) }
 
@@ -599,11 +608,11 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
 
-    dflags <- getDynFlags
+    platform <- targetPlatform <$> getDynFlags
     let
         arg_rep = typePrimRep (exprType arg)
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
-        bad_args = not (primRepsCompatible dflags arg_rep stg_arg_rep)
+        bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, ticks ++ aticks)

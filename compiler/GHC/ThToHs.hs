@@ -12,6 +12,9 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module GHC.ThToHs
    ( convertToHsExpr
    , convertToPat
@@ -25,21 +28,21 @@ import GhcPrelude
 
 import GHC.Hs as Hs
 import PrelNames
-import RdrName
-import qualified Name
-import Module
+import GHC.Types.Name.Reader
+import qualified GHC.Types.Name as Name
+import GHC.Types.Module
 import RdrHsSyn
-import OccName
-import SrcLoc
-import Type
-import qualified Coercion ( Role(..) )
+import GHC.Types.Name.Occurrence as OccName
+import GHC.Types.SrcLoc
+import GHC.Core.Type
+import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import TysWiredIn
-import BasicTypes as Hs
-import ForeignCall
-import Unique
+import GHC.Types.Basic as Hs
+import GHC.Types.ForeignCall
+import GHC.Types.Unique
 import ErrUtils
 import Bag
-import Lexeme
+import GHC.Utils.Lexeme
 import Util
 import FastString
 import Outputable
@@ -602,8 +605,6 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = hsQTvExplicit tvs' ++ ex_tvs
 
-    add_forall _ _ (XConDecl nec) = noExtCon nec
-
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")
 
@@ -850,7 +851,7 @@ cvtLocalDecs doc ds
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
-cvtClause :: HsMatchContext RdrName
+cvtClause :: HsMatchContext GhcPs
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
@@ -921,7 +922,7 @@ cvtl e = wrapL (cvt e)
                                        ; return $ ExplicitSum noExtField
                                                                    alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
-                            ; return $ HsIf noExtField (Just noSyntaxExpr) x' y' z' }
+                            ; return $ mkHsIf x' y' z' }
     cvt (MultiIfE alts)
       | null alts      = failWith (text "Multi-way if-expression with no alternatives")
       | otherwise      = do { alts' <- mapM cvtpair alts
@@ -1074,7 +1075,7 @@ the trees to reflect the fixities of the underlying operators:
   UInfixE x * (UInfixE y + z) ---> (x * y) + z
 
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
-@mkHsOpTyRn@ in GHC.Rename.Types), which expects that the input will be completely
+@mkHsOpTyRn@ in GHC.Rename.HsType), which expects that the input will be completely
 right-biased for types and left-biased for everything else. So we left-bias the
 trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
 
@@ -1123,7 +1124,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1156,7 +1157,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                     ; return (ParStmtBlock noExtField ds' undefined noSyntaxExpr) }
 cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnL (mkRecStmt ss') }
 
-cvtMatch :: HsMatchContext RdrName
+cvtMatch :: HsMatchContext GhcPs
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
@@ -1591,8 +1592,9 @@ The hsSyn representation of parsed source explicitly contains all the original
 parens, as written in the source.
 
 When a Template Haskell (TH) splice is evaluated, the original splice is first
-renamed and type checked and then finally converted to core in DsMeta. This core
-is then run in the TH engine, and the result comes back as a TH AST.
+renamed and type checked and then finally converted to core in
+GHC.HsToCore.Quote. This core is then run in the TH engine, and the result
+comes back as a TH AST.
 
 In the process, all parens are stripped out, as they are not needed.
 
@@ -1993,11 +1995,11 @@ with the following parts:
 
 Due to the two forall quantifiers and constraint contexts (either of
 which might be empty), pattern synonym type signatures are treated
-specially in `deSugar/DsMeta.hs`, `hsSyn/Convert.hs`, and
-`typecheck/TcSplice.hs`:
+specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
+`typecheck/GHC.Tc.Gen.Splice.hs`:
 
    (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
-       `deSugar/DsMeta.hs`, we represent its *full* type signature in TH, i.e.:
+       `GHC.HsToCore.Quote`, we represent its *full* type signature in TH, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)
               (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)
@@ -2011,7 +2013,7 @@ specially in `deSugar/DsMeta.hs`, `hsSyn/Convert.hs`, and
        where initial empty `univs` type variables or an empty `reqs`
        constraint context are represented *explicitly* as `() =>`.
 
-   (c) When reifying a pattern synonym in `typecheck/TcSplice.hs`, we always
+   (c) When reifying a pattern synonym in `typecheck/GHC.Tc.Gen.Splice.hs`, we always
        return its *full* type, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)

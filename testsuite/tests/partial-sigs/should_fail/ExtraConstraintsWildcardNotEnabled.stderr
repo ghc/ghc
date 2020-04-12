@@ -3,6 +3,6 @@ ExtraConstraintsWildcardNotEnabled.hs:4:10: error:
     • Found type wildcard ‘_’ standing for ‘Show a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of show' :: Show a => a -> String
-               at ExtraConstraintsWildcardNotEnabled.hs:5:1-16
+               at ExtraConstraintsWildcardNotEnabled.hs:4:1-25
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: show' :: _ => a -> String

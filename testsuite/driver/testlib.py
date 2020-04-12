@@ -116,6 +116,12 @@ def expect_fail( name, opts ):
     # future.
     opts.expect = 'fail';
 
+def no_lint( name, opts ):
+   """Disable Core, STG and Cmm lints. Useful when testing compiler perf."""
+   opts.compiler_always_flags = \
+       [opt for opt in opts.compiler_always_flags \
+            if opt not in ['-dcore-lint', '-dstg-lint', '-dcmm-lint']]
+
 def reqlib( lib ):
     return lambda name, opts, l=lib: _reqlib (name, opts, l )
 
@@ -393,7 +399,7 @@ def extra_run_opts( val ):
     return lambda name, opts, v=val: _extra_run_opts(name, opts, v);
 
 def _extra_run_opts( name, opts, v ):
-    opts.extra_run_opts = v
+    opts.extra_run_opts += " " + v
 
 # -----
 
@@ -401,7 +407,7 @@ def extra_hc_opts( val ):
     return lambda name, opts, v=val: _extra_hc_opts(name, opts, v);
 
 def _extra_hc_opts( name, opts, v ):
-    opts.extra_hc_opts = v
+    opts.extra_hc_opts += " " + v
 
 # -----
 
@@ -501,7 +507,18 @@ def fast() -> bool:
 def platform( plat: str ) -> bool:
     return config.platform == plat
 
+KNOWN_OPERATING_SYSTEMS = set([
+    'mingw32',
+    'freebsd',
+    'openbsd',
+    'aix',
+    'linux',
+    'darwin',
+    'solaris2',
+])
+
 def opsys( os: str ) -> bool:
+    assert os in KNOWN_OPERATING_SYSTEMS
     return config.os == os
 
 def arch( arch: str ) -> bool:
@@ -567,13 +584,15 @@ def llvm_build ( ) -> bool:
 # appears to change (up or down) when the underlying profile hasn't
 # really changed. To further minimize this effect we run with a single
 # generation (meaning we get a residency sample on every GC) with a small
-# allocation area (as suggested in #17387).
+# allocation area (as suggested in #17387). That's what +RTS -h -i0 will do.
+# If you find that a test is flaky, sampling frequency can be adjusted by
+# shrinking the allocation area (+RTS -A64k, for example).
 #
 # However, please don't just ignore changes in residency.  If you see
 # a change in one of these figures, please check whether it is real or
 # not as follows:
 #
-#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#  * Run the test with old and new compilers, adding +RTS -h -i0.001
 #    (you don't need to compile anything for profiling or enable profiling
 #    libraries to get a heap profile).
 #  * view the heap profiles, read off the maximum residency.  If it has
@@ -855,6 +874,9 @@ def test(name: TestName,
 
     executeSetups([thisdir_settings, setup], name, myTestOpts)
 
+    if name in config.broken_tests:
+        myTestOpts.expect = 'fail'
+
     thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
     if myTestOpts.alone:
         aloneTests.append(thisTest)
@@ -975,8 +997,8 @@ def test_common_work(watcher: testutil.Watcher,
             except KeyboardInterrupt:
                 stopNow()
             except Exception as e:
-                framework_fail(name, way, str(e))
                 traceback.print_exc()
+                framework_fail(name, way, traceback.format_exc())
 
         t.n_tests_skipped += len(set(all_ways) - set(do_ways))
 
@@ -1768,10 +1790,10 @@ def read_stdout( name: TestName ) -> str:
     return in_testdir(name, 'run.stdout').read_text(encoding='UTF-8')
 
 def dump_stdout( name: TestName ) -> None:
-    str = read_stdout(name).strip()
-    if str:
+    s = read_stdout(name).strip()
+    if s:
         print("Stdout (", name, "):")
-        print(str)
+        safe_print(s)
 
 def stderr_ok(name: TestName, way: WayName) -> bool:
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1786,10 +1808,10 @@ def read_stderr( name: TestName ) -> str:
     return in_testdir(name, 'run.stderr').read_text(encoding='UTF-8')
 
 def dump_stderr( name: TestName ) -> None:
-    str = read_stderr(name).strip()
-    if str:
+    s = read_stderr(name).strip()
+    if s:
         print("Stderr (", name, "):")
-        print(str)
+        safe_print(s)
 
 def read_no_crs(f: Path) -> str:
     s = ''
@@ -2207,14 +2229,18 @@ def normalise_asm( s: str ) -> str:
           out.append(ins[0])
     return '\n'.join(out)
 
+def safe_print(s: str) -> None:
+    s2 = s.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
+    print(s2)
+
 def if_verbose( n: int, s: str ) -> None:
     if config.verbose >= n:
-        print(s)
+        safe_print(s)
 
 def dump_file(f: Path):
     try:
         with f.open() as file:
-            print(file.read())
+            safe_print(file.read())
     except Exception:
         print('')
 

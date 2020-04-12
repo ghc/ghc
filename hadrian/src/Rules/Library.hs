@@ -7,7 +7,7 @@ import qualified Text.Parsec      as Parsec
 
 import Base
 import Context
-import Expression hiding (way, package)
+import Expression hiding (way, package, stage)
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
@@ -134,13 +134,13 @@ cObjects context = do
 -- 'Context' is @integer-gmp@.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == integerGmp = gmpObjects
+    | package context == integerGmp = gmpObjects (stage context)
     | otherwise                     = return []
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.
 libraryObjects :: Context -> Action [FilePath]
-libraryObjects context@Context{..} = do
+libraryObjects context = do
     hsObjs   <- hsObjects    context
     noHsObjs <- nonHsObjects context
     need $ noHsObjs ++ hsObjs

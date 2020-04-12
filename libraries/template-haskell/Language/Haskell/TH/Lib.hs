@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+
 -- |
 -- Language.Haskell.TH.Lib contains lots of useful helper functions for
 -- generating and manipulating Template Haskell terms

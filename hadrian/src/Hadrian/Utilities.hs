@@ -38,8 +38,8 @@ import Control.Applicative
 import Control.Monad.Extra
 import Data.Char
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
+import Data.Functor
 import Data.HashMap.Strict (HashMap)
-import Data.List (isPrefixOf)
 import Data.List.Extra
 import Data.Maybe
 import Data.Typeable (TypeRep, typeOf)
@@ -282,17 +282,6 @@ buildRootRules :: Rules FilePath
 buildRootRules = do
     BuildRoot path <- userSettingRules (BuildRoot "")
     return path
-
--- | A version of 'fmap' with flipped arguments. Useful for manipulating values
--- in context, e.g. 'buildRoot', as in the example below.
---
--- @
--- buildRoot <&> (-/- "dir") == fmap (-/- "dir") buildRoot
--- @
-(<&>) :: Functor f => f a -> (a -> b) -> f b
-(<&>) = flip fmap
-
-infixl 1 <&>
 
 -- | Given a 'FilePath' to a source file, return 'True' if it is generated.
 -- The current implementation simply assumes that a file is generated if it

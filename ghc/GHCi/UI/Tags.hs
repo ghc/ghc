@@ -20,9 +20,9 @@ import Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
-import Name (nameOccName)
-import OccName (pprOccName)
-import ConLike
+import GHC.Types.Name (nameOccName)
+import GHC.Types.Name.Occurrence (pprOccName)
+import GHC.Core.ConLike
 import MonadUtils
 
 import Control.Monad
@@ -30,7 +30,7 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Ord
-import DriverPhases
+import GHC.Driver.Phases
 import Panic
 import Prelude
 import System.Directory
@@ -103,7 +103,7 @@ listModuleTags m = do
                      , let exported = GHC.modInfoIsExportedName mInfo name
                      , let kind = tyThing2TagKind tyThing
                      , let loc = srcSpanStart (nameSrcSpan name)
-                     , RealSrcLoc realLoc <- [loc]
+                     , RealSrcLoc realLoc _ <- [loc]
                      ]
 
   where

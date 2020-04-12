@@ -6,6 +6,8 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
    ) where
@@ -14,49 +16,46 @@ module GHC.Iface.Tidy (
 
 import GhcPrelude
 
-import TcRnTypes
-import DynFlags
-import CoreSyn
-import CoreUnfold
-import CoreFVs
-import CoreTidy
-import CoreMonad
-import GHC.CoreToStg.Prep
-import CoreUtils        (rhsIsStatic)
-import CoreStats        (coreBindsStats, CoreStats(..))
-import CoreSeq          (seqBinds)
-import CoreLint
-import Literal
-import Rules
-import PatSyn
-import ConLike
-import CoreArity        ( exprArity, exprBotStrictness_maybe )
+import GHC.Tc.Types
+import GHC.Driver.Session
+import GHC.Core
+import GHC.Core.Unfold
+import GHC.Core.FVs
+import GHC.Core.Op.Tidy
+import GHC.Core.Op.Monad
+import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
+import GHC.Core.Seq     (seqBinds)
+import GHC.Core.Lint
+import GHC.Core.Rules
+import GHC.Core.PatSyn
+import GHC.Core.ConLike
+import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
 import StaticPtrTable
-import VarEnv
-import VarSet
-import Var
-import Id
-import MkId             ( mkDictSelRhs )
-import IdInfo
-import InstEnv
-import Type             ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig )
-import BasicTypes
-import Name hiding (varName)
-import NameSet
-import NameCache
-import Avail
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Var
+import GHC.Types.Id
+import GHC.Types.Id.Make ( mkDictSelRhs )
+import GHC.Types.Id.Info
+import GHC.Core.InstEnv
+import GHC.Core.Type     ( tidyTopType )
+import GHC.Types.Demand  ( appIsBottom, isTopSig, isBottomingSig )
+import GHC.Types.Cpr     ( mkCprSig, botCpr )
+import GHC.Types.Basic
+import GHC.Types.Name hiding (varName)
+import GHC.Types.Name.Set
+import GHC.Types.Name.Cache
+import GHC.Types.Avail
 import GHC.Iface.Env
-import TcEnv
-import TcRnMonad
-import DataCon
-import TyCon
-import Class
-import Module
-import Packages( isDllName )
-import HscTypes
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Class
+import GHC.Types.Module
+import GHC.Driver.Types
 import Maybes
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Outputable
 import Util( filterOut )
 import qualified ErrUtils as Err
@@ -117,7 +116,7 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 
 * Drop rules altogether
 
-* Tidy the bindings, to ensure that the Caf and Arity
+* Tidy the bindings, to ensure that the Arity
   information is correct for each top-level binder; the
   code generator needs it. And to ensure that local names have
   distinct OccNames in case of object-file splitting
@@ -215,7 +214,7 @@ globaliseAndTidyBootId :: Id -> Id
 -- makes it into a GlobalId
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
---     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
+--     * VanillaIdInfo (makes a conservative assumption about arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in GHC.CoreToIface)
 globaliseAndTidyBootId id
   = globaliseId id `setIdType`      tidyTopType (idType id)
@@ -314,12 +313,32 @@ binder
 
         * its arity, computed from the number of visible lambdas
 
-        * its CAF info, computed from what is free in its RHS
-
 
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
+
+Note [Always expose compulsory unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must make absolutely sure that unsafeCoerce# is inlined. You might
+think that giving it a compulsory unfolding is enough. However,
+unsafeCoerce# is put in an interface file just like any other definition.
+So, unless we take special precuations
+- If we compiled Unsafe.Coerce with -O0, we might not put the unfolding
+  into the interface file.
+- If we compile a module M, that imports Unsafe.Coerce, with -O0 we might
+  not read the unfolding out of the interface file.
+
+So we need to take care, to ensure that Compulsory unfoldings are written
+and read.  That makes sense: they are compulsory, after all. There are
+three places this is actioned:
+
+* GHC.Iface.Tidy.addExternal.  Export end: expose compulsory
+  unfoldings, even with -O0.
+
+* GHC.IfaceToCore.tcIdInfo.  Import end: when reading in from
+  interface file, even with -O0 (fignore-interface-pragmas.)  we must
+  load a compulsory unfolding
 -}
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
@@ -357,7 +376,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
+                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env trimmed_binds
 
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
@@ -382,7 +401,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               -- exported Ids and things needed from them, which saves space
               --
               -- See Note [Don't attempt to trim data types]
-              ; final_ids  = [ if omit_prags then trimId id else id
+              ; final_ids  = [ trimId omit_prags id
                              | id <- bindersOfBinds tidy_binds
                              , isExternalName (idName id)
                              , not (isWiredIn id)
@@ -453,11 +472,20 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
     dflags = hsc_dflags hsc_env
 
 --------------------------
-trimId :: Id -> Id
-trimId id
-  | not (isImplicitId id)
-  = id `setIdInfo` vanillaIdInfo
-  | otherwise
+trimId :: Bool -> Id -> Id
+-- With -O0 we now trim off the arity, one-shot-ness, strictness
+-- etc which tidyTopIdInfo retains for the benefit of the code generator
+-- but which we don't want in the interface file or ModIface for
+-- downstream compilations
+trimId omit_prags id
+  | omit_prags, not (isImplicitId id)
+  = id `setIdInfo`      vanillaIdInfo
+       `setIdUnfolding` idUnfolding id
+       -- We respect the final unfolding chosen by tidyTopIdInfo.
+       -- We have already trimmed it if we don't want it for -O0;
+       -- see also Note [Always expose compulsory unfoldings]
+
+  | otherwise   -- No trimming
   = id
 
 {- Note [Drop wired-in things]
@@ -501,14 +529,14 @@ of exceptions, and finally I gave up the battle:
 
 Note [Injecting implicit bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We inject the implicit bindings right at the end, in CoreTidy.
+We inject the implicit bindings right at the end, in GHC.Core.Op.Tidy.
 Some of these bindings, notably record selectors, are not
 constructed in an optimised form.  E.g. record selector for
         data T = MkT { x :: {-# UNPACK #-} !Int }
 Then the unfolding looks like
         x = \t. case t of MkT x1 -> let x = I# x1 in x
 This generates bad code unless it's first simplified a bit.  That is
-why CoreUnfold.mkImplicitUnfolding uses simpleOptExpr to do a bit of
+why GHC.Core.Unfold.mkImplicitUnfolding uses simpleOptExpr to do a bit of
 optimisation first.  (Only matters when the selector is used curried;
 eg map x ys.)  See #2070.
 
@@ -553,7 +581,7 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in MkId
+  | isNewTyCon tc = []  -- See Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
   | otherwise     = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
@@ -659,9 +687,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
     | otherwise = do
       (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
       let
-          (new_ids, show_unfold)
-                | omit_prags = ([], False)
-                | otherwise  = addExternal expose_all refined_id
+          (new_ids, show_unfold) = addExternal omit_prags expose_all refined_id
 
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
@@ -683,12 +709,21 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: Bool -> Id -> ([Id], Bool)
-addExternal expose_all id = (new_needed_ids, show_unfold)
+addExternal :: Bool -> Bool -> Id -> ([Id], Bool)
+addExternal omit_prags expose_all id
+  | omit_prags
+  , not (isCompulsoryUnfolding unfolding)
+  = ([], False)  -- See Note [Always expose compulsory unfoldings]
+                 -- in GHC.HsToCore
+
+  | otherwise
+  = (new_needed_ids, show_unfold)
+
   where
     new_needed_ids = bndrFvsInOrder show_unfold id
     idinfo         = idInfo id
-    show_unfold    = show_unfolding (unfoldingInfo idinfo)
+    unfolding      = unfoldingInfo idinfo
+    show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
@@ -861,7 +896,7 @@ Now that RULE *might* be useful to an importing module, but that is
 purely speculative, and meanwhile the code is taking up space and
 codegen time.  I found that binary sizes jumped by 6-10% when I
 started to specialise INLINE functions (again, Note [Inline
-specialisations] in Specialise).
+specialisations] in GHC.Core.Op.Specialise).
 
 So it seems better to drop the binding for f_spec, and the rule
 itself, if the auto-generated rule is the *only* reason that it is
@@ -869,8 +904,8 @@ being kept alive.
 
 (The RULE still might have been useful in the past; that is, it was
 the right thing to have generated it in the first place.  See Note
-[Inline specialisations] in Specialise.  But now it has served its
-purpose, and can be discarded.)
+[Inline specialisations] in GHC.Core.Op.Specialise. But now it has
+served its purpose, and can be discarded.)
 
 So findExternalRules does this:
   * Remove all bindings that are kept alive *only* by isAutoRule rules
@@ -1068,22 +1103,13 @@ tidyTopName mod nc_var maybe_ref occ_env id
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
 tidyTopBinds :: HscEnv
-             -> Module
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
-  = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-       mkNaturalId <- lookupMkNaturalName dflags hsc_env
-       integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-       naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
-       let cvt_literal nt i = case nt of
-             LitNumInteger -> Just (cvtLitInteger dflags mkIntegerId integerSDataCon i)
-             LitNumNatural -> Just (cvtLitNatural dflags mkNaturalId naturalSDataCon i)
-             _             -> Nothing
-           result      = tidy cvt_literal init_env binds
+tidyTopBinds hsc_env unfold_env init_occ_env binds
+  = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
@@ -1091,35 +1117,28 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy cvt_literal = mapAccumL (tidyTopBind dflags this_mod cvt_literal unfold_env)
+    tidy = mapAccumL (tidyTopBind dflags unfold_env)
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> Module
-             -> (LitNumType -> Integer -> Maybe CoreExpr)
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_mod cvt_literal unfold_env
+tidyTopBind dflags unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_mod
-                               (subst1, cvt_literal)
-                               (idArity bndr) rhs
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name'
-                                (bndr, rhs)
+    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_mod cvt_literal unfold_env
-            (occ_env, subst1) (Rec prs)
+tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
+    prs' = [ tidyTopPair dflags show_unfold tidy_env2 name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1130,21 +1149,11 @@ tidyTopBind dflags this_mod cvt_literal unfold_env
 
     bndrs = map fst prs
 
-        -- the CafInfo for a recursive group says whether *any* rhs in
-        -- the group may refer indirectly to a CAF (because then, they all do).
-    caf_info
-        | or [ mayHaveCafRefs (hasCafRefs dflags this_mod
-                                          (subst1, cvt_literal)
-                                          (idArity bndr) rhs)
-             | (bndr,rhs) <- prs ] = MayHaveCafRefs
-        | otherwise                = NoCafRefs
-
 -----------------------------------------------------------
 tidyTopPair :: DynFlags
             -> Bool  -- show unfolding
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
-            -> CafInfo
             -> Name             -- New name
             -> (Id, CoreExpr)   -- Binder and RHS before tidying
             -> (Id, CoreExpr)
@@ -1154,7 +1163,7 @@ tidyTopPair :: DynFlags
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
+tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
@@ -1162,38 +1171,33 @@ tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
     idinfo'  = tidyTopIdInfo dflags rhs_tidy_env name' rhs rhs1 (idInfo bndr)
-                             show_unfold caf_info
+                             show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
--- binders.  There are two delicate pieces:
+-- binders.  The delicate piece:
 --
 --  * Arity.  After CoreTidy, this arity must not change any more.
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
---  * CAF info.  This must also remain valid through to code generation.
---      We add the info here so that it propagates to all
---      occurrences of the binders in RHSs, and hence to occurrences in
---      unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
---      CoreToStg makes use of this when constructing SRTs.
 tidyTopIdInfo :: DynFlags -> TidyEnv -> Name -> CoreExpr -> CoreExpr
-              -> IdInfo -> Bool -> CafInfo -> IdInfo
-tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
+              -> IdInfo -> Bool -> IdInfo
+tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
-                        --      c.f. CoreTidy.tidyLetBndr
-        `setCafInfo`        caf_info
+                        --      c.f. GHC.Core.Op.Tidy.tidyLetBndr
         `setArityInfo`      arity
         `setStrictnessInfo` final_sig
+        `setCprInfo`        final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
-                                                 -- in CoreTidy
+                                                 -- in GHC.Core.Op.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-        `setCafInfo`           caf_info
         `setArityInfo`         arity
         `setStrictnessInfo`    final_sig
+        `setCprInfo`           final_cpr
         `setOccInfo`           robust_occ_info
         `setInlinePragInfo`    (inlinePragInfo idinfo)
         `setUnfoldingInfo`     unfold_info
@@ -1217,17 +1221,25 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
               | Just (_, nsig) <- mb_bot_str = nsig
               | otherwise                    = sig
 
+    cpr = cprInfo idinfo
+    final_cpr | Just _ <- mb_bot_str
+              = mkCprSig arity botCpr
+              | otherwise
+              = cpr
+
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False
                                   Just (arity, _) -> not (appIsBottom id_sig arity)
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
-                | otherwise   = minimal_unfold_info
+    unfold_info
+      | isCompulsoryUnfolding unf_info || show_unfold
+      = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
+      | otherwise
+      = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
-    unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = isBottomingSig final_sig
+    unf_from_rhs = mkFinalUnfolding dflags InlineRhs final_sig tidy_rhs
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that
@@ -1240,7 +1252,8 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.hs
+    -- split (see Note [Worker-wrapper for bottoming functions] in
+    -- GHC.Core.Op.WorkWrap)
 
 
     --------- Arity ------------
@@ -1251,137 +1264,6 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- it to the top level. So it seems more robust just to
     -- fix it here.
     arity = exprArity orig_rhs
-
-{-
-************************************************************************
-*                                                                      *
-           Figuring out CafInfo for an expression
-*                                                                      *
-************************************************************************
-
-hasCafRefs decides whether a top-level closure can point into the dynamic heap.
-We mark such things as `MayHaveCafRefs' because this information is
-used to decide whether a particular closure needs to be referenced
-in an SRT or not.
-
-There are two reasons for setting MayHaveCafRefs:
-        a) The RHS is a CAF: a top-level updatable thunk.
-        b) The RHS refers to something that MayHaveCafRefs
-
-Possible improvement: In an effort to keep the number of CAFs (and
-hence the size of the SRTs) down, we could also look at the expression and
-decide whether it requires a small bounded amount of heap, so we can ignore
-it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.
-
-Note [Disgusting computation of CafRefs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We compute hasCafRefs here, because IdInfo is supposed to be finalised
-after tidying. But CorePrep does some transformations that affect CAF-hood.
-So we have to *predict* the result here, which is revolting.
-
-In particular CorePrep expands Integer and Natural literals. So in the
-prediction code here we resort to applying the same expansion (cvt_literal).
-There are also numerous other ways in which we can introduce inconsistencies
-between CorePrep and GHC.Iface.Tidy. See Note [CAFfyness inconsistencies due to
-eta expansion in TidyPgm] for one such example.
-
-Ugh! What ugliness we hath wrought.
-
-
-Note [CAFfyness inconsistencies due to eta expansion in TidyPgm]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Eta expansion during CorePrep can have non-obvious negative consequences on
-the CAFfyness computation done by tidying (see Note [Disgusting computation of
-CafRefs] in GHC.Iface.Tidy). This late expansion happens/happened for a few
-reasons:
-
- * CorePrep previously eta expanded unsaturated primop applications, as
-   described in Note [Primop wrappers]).
-
- * CorePrep still does eta expand unsaturated data constructor applications.
-
-In particular, consider the program:
-
-    data Ty = Ty (RealWorld# -> (# RealWorld#, Int #))
-
-    -- Is this CAFfy?
-    x :: STM Int
-    x = Ty (retry# @Int)
-
-Consider whether x is CAFfy. One might be tempted to answer "no".
-Afterall, f obviously has no CAF references and the application (retry#
-@Int) is essentially just a variable reference at runtime.
-
-However, when CorePrep expanded the unsaturated application of 'retry#'
-it would rewrite this to
-
-    x = \u []
-       let sat = retry# @Int
-       in Ty sat
-
-This is now a CAF. Failing to handle this properly was the cause of
-#16846. We fixed this by eliminating the need to eta expand primops, as
-described in Note [Primop wrappers]), However we have not yet done the same for
-data constructor applications.
-
--}
-
-type CafRefEnv = (VarEnv Id, LitNumType -> Integer -> Maybe CoreExpr)
-  -- The env finds the Caf-ness of the Id
-  -- The LitNumType -> Integer -> CoreExpr is the desugaring functions for
-  -- Integer and Natural literals
-  -- See Note [Disgusting computation of CafRefs]
-
-hasCafRefs :: DynFlags -> Module
-           -> CafRefEnv -> Arity -> CoreExpr
-           -> CafInfo
-hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
-  | is_caf || mentions_cafs = MayHaveCafRefs
-  | otherwise               = NoCafRefs
- where
-  mentions_cafs   = cafRefsE expr
-  is_dynamic_name = isDllName dflags this_mod
-  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name
-                                         cvt_literal expr)
-
-  -- NB. we pass in the arity of the expression, which is expected
-  -- to be calculated by exprArity.  This is because exprArity
-  -- knows how much eta expansion is going to be done by
-  -- CorePrep later on, and we don't want to duplicate that
-  -- knowledge in rhsIsStatic below.
-
-  cafRefsE :: Expr a -> Bool
-  cafRefsE (Var id)            = cafRefsV id
-  cafRefsE (Lit lit)           = cafRefsL lit
-  cafRefsE (App f a)           = cafRefsE f || cafRefsE a
-  cafRefsE (Lam _ e)           = cafRefsE e
-  cafRefsE (Let b e)           = cafRefsEs (rhssOfBind b) || cafRefsE e
-  cafRefsE (Case e _ _ alts)   = cafRefsE e || cafRefsEs (rhssOfAlts alts)
-  cafRefsE (Tick _n e)         = cafRefsE e
-  cafRefsE (Cast e _co)        = cafRefsE e
-  cafRefsE (Type _)            = False
-  cafRefsE (Coercion _)        = False
-
-  cafRefsEs :: [Expr a] -> Bool
-  cafRefsEs []     = False
-  cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
-
-  cafRefsL :: Literal -> Bool
-  -- Don't forget that mk_integer id might have Caf refs!
-  -- We first need to convert the Integer into its final form, to
-  -- see whether mkInteger is used. Same for LitNatural.
-  cafRefsL (LitNumber nt i _) = case cvt_literal nt i of
-    Just e  -> cafRefsE e
-    Nothing -> False
-  cafRefsL _                = False
-
-  cafRefsV :: Id -> Bool
-  cafRefsV id
-    | not (isLocalId id)                = mayHaveCafRefs (idCafInfo id)
-    | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
-    | otherwise                         = False
-
 
 {-
 ************************************************************************
@@ -1467,7 +1349,7 @@ mustExposeTyCon no_trim_types exports tc
 
   | null data_cons              -- Ditto if there are no data constructors
   = True                        -- (NB: empty data types do not count as enumerations
-                                -- see Note [Enumeration types] in TyCon
+                                -- see Note [Enumeration types] in GHC.Core.TyCon
 
   | any exported_con data_cons  -- Expose rep if any datacon or field is exported
   = True

@@ -24,6 +24,23 @@ Language
   would have accepted ``x``, but its type would have involved the mysterious ``Any``
   internal type family. Now, GHC rejects, explaining the situation.
 
+* GHC now more faithfully implements the instance-lookup scheme described with
+  :extension:`QuantifiedConstraints`. Previous bugs meant that programs like this
+  were accepted::
+
+    data T (c :: Type -> Constraint)
+    instance (forall h. c h => Functor h) => Functor (T c)
+    instance (forall h. c h => Applicative h) => Applicative (T c)
+
+  Note that in the instance declaration for ``Applicative (T c)``, we cannot prove
+  ``Functor (T c)``, because the quantified constraint shadows the global instance.
+  There is an easy workaround, though: just include ``Functor (T c)`` as an assumption. ::
+
+    instance (forall h. c h => Applicative h, Functor (T c)) => Applicative (T c)
+
+  There is a chance we will tweak the lookup scheme in the future, to make this
+  workaround unnecessary.
+  
 Compiler
 ~~~~~~~~
 
@@ -42,6 +59,13 @@ Template Haskell
    forms have now been generalised in terms of a minimal interface necessary for the
    implementation rather than the overapproximation of the ``Q`` monad.
 
+ - Template Haskell quotes now handle fixity declarations in ``let`` and
+   ``where`` bindings properly. Previously, such fixity declarations would
+   be dropped when quoted due to a Template Haskell bug.
+
+ - The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
+   splices do not lead directly to compile-time evaluation. (!2288)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -56,6 +80,20 @@ Template Haskell
                      => ([Word8] -> a) -> ModGuts
                      -> CoreM (ModuleEnv [a], NameEnv [a])
 
+ - The meaning of the ``hs_fixds`` field of ``HsGroup`` has changed slightly.
+   It now only contains fixity signatures defined for top-level declarations
+   and class methods defined *outside* of the class itself. Previously,
+   ``hs_fixds`` would also contain fixity signatures for class methods defined
+   *inside* the class, such as the fixity signature for ``m`` in the following
+   example: ::
+
+     class C a where
+       infixl 4 `m`
+       m :: a -> a -> a
+
+   If you wish to attain the previous behavior of ``hs_fixds``, use the new
+   ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
+   signatures, including those for class methods defined inside classes.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -80,6 +118,7 @@ for further change information.
     libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
     libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``haskeline`` library
     libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
     compiler/ghc.cabal:                      The compiler itself
     libraries/ghci/ghci.cabal:               The REPL interface

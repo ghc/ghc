@@ -58,8 +58,8 @@ import qualified Data.Set as Set
 import qualified Data.Graph as G
 import Data.Graph hiding (Graph, Edge, transposeG, reachable)
 import Data.Tree
-import Unique
-import UniqFM
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
 
 {-
 ************************************************************************
@@ -422,7 +422,7 @@ type IntGraph = G.Graph
 
 -- Data.Tree has flatten for Tree, but nothing for Forest
 preorderF           :: Forest a -> [a]
-preorderF ts         = concat (map flatten ts)
+preorderF ts         = concatMap flatten ts
 
 {-
 ------------------------------------------------------------

@@ -15,7 +15,6 @@ import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Packages
-import Rules.Gmp
 import Rules.Libffi
 import Settings
 import Settings.Builders.DeriveConstants (deriveConstantsPairs)
@@ -53,11 +52,11 @@ compilerDependencies = do
     stage   <- getStage
     isGmp   <- (== integerGmp) <$> getIntegerPackage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpPath <- expr gmpBuildPath
+    gmpPath <- expr $ buildPath (vanillaContext stage integerGmp)
     rtsPath <- expr (rtsBuildPath stage)
     libDir <- expr $ stageLibPath stage
     mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
-            , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
+            , notStage0 ? isGmp ? return [gmpPath -/- "include/ghc-gmp.h"]
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
@@ -99,7 +98,7 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) = do
     root <- buildRootRules
     let dir         = buildDir context
-        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("**/autogen/*" ?== f)
+        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f)
         go gen file = generate file context gen
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
@@ -302,6 +301,7 @@ generateSettings = do
         , ("target os", getSetting TargetOsHaskell)
         , ("target arch", getSetting TargetArchHaskell)
         , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
+        , ("target word big endian", expr $ lookupValueOrError configFile "target-word-big-endian")
         , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "target-has-gnu-nonexec-stack")
         , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
@@ -320,7 +320,7 @@ generateSettings = do
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
-        , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
+        , ("Use Threads", expr $ yesNo . ghcThreaded <$> flavour)
         , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
         , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
         ]

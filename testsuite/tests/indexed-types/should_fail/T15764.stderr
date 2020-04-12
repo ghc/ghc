@@ -1,7 +1,7 @@
 
 T15764.hs:14:2: error:
     • The kind of ‘T6’ is ill-scoped
-        Inferred kind: T6 :: forall (a :: k) k (b :: Proxy a).
+        Inferred kind: T6 :: forall {a :: k} k (b :: Proxy a).
                              Proxy '(k, b) -> *
       NB: Inferred variables
         (namely: (a :: k)) always come first

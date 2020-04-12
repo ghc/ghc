@@ -1,6 +1,5 @@
 import Control.Concurrent
 import Control.Exception
-import Data.List
 import System.Mem
 
 -- !!! test that a child thread waiting on its own MVar will get killed by

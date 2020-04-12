@@ -18,6 +18,8 @@ import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
 #endif
 
+import System.IO.Unsafe
+
 #if defined(mingw32_HOST_OS) && !defined(WINAPI)
 # if defined(i386_HOST_ARCH)
 #  define WINAPI stdcall
@@ -28,24 +30,23 @@ import qualified System.Win32 as Win32
 # endif
 #endif
 
+-- | Does the controlling terminal support ANSI color sequences?
+-- This memoized to avoid thread-safety issues in ncurses (see #17922).
+stderrSupportsAnsiColors :: Bool
+stderrSupportsAnsiColors = unsafePerformIO stderrSupportsAnsiColors'
+{-# NOINLINE stderrSupportsAnsiColors #-}
+
 -- | Check if ANSI escape sequences can be used to control color in stderr.
-stderrSupportsAnsiColors :: IO Bool
-stderrSupportsAnsiColors = do
+stderrSupportsAnsiColors' :: IO Bool
+stderrSupportsAnsiColors' = do
 #if defined(MIN_VERSION_terminfo)
-  queryTerminal stdError `andM` do
-    (termSupportsColors <$> setupTermFromEnv)
-      `catch` \ (_ :: SetupTermError) ->
-        pure False
-
+    stderr_available <- queryTerminal stdError
+    if stderr_available then
+      fmap termSupportsColors setupTermFromEnv
+        `catch` \ (_ :: SetupTermError) -> pure False
+    else
+      pure False
   where
-
-    andM :: Monad m => m Bool -> m Bool -> m Bool
-    andM mx my = do
-      x <- mx
-      if x
-        then my
-        else pure x
-
     termSupportsColors :: Terminal -> Bool
     termSupportsColors term = fromMaybe 0 (getCapability term termColors) > 0
 

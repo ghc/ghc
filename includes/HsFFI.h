@@ -9,6 +9,10 @@
  *
  * ---------------------------------------------------------------------------*/
 
+/* N.B. Only use C-style multi-line comments in this file to avoid upsetting
+ * dtrace on SmartOS, which doesn't support C++-style single-line comments.
+ */
+
 #pragma once
 
 #if defined(__cplusplus)
@@ -101,26 +105,28 @@ extern void hs_thread_done (void);
 
 extern void hs_perform_gc (void);
 
-// Lock the stable pointer table. The table must be unlocked
-// again before calling any Haskell functions, even if those
-// functions do not manipulate stable pointers. The Haskell
-// garbage collector will not be able to run until this lock
-// is released! It is also forbidden to call hs_free_fun_ptr
-// or any stable pointer-related FFI functions other than
-// hs_free_stable_ptr_unsafe while the table is locked.
+/* Lock the stable pointer table. The table must be unlocked
+ * again before calling any Haskell functions, even if those
+ * functions do not manipulate stable pointers. The Haskell
+ * garbage collector will not be able to run until this lock
+ * is released! It is also forbidden to call hs_free_fun_ptr
+ * or any stable pointer-related FFI functions other than
+ * hs_free_stable_ptr_unsafe while the table is locked.
+ */
 extern void hs_lock_stable_ptr_table (void);
 
-// A deprecated synonym.
+/* A deprecated synonym. */
 extern void hs_lock_stable_tables (void);
 
-// Unlock the stable pointer table.
+/* Unlock the stable pointer table. */
 extern void hs_unlock_stable_ptr_table (void);
 
-// A deprecated synonym.
+/* A deprecated synonym. */
 extern void hs_unlock_stable_tables (void);
 
-// Free a stable pointer assuming that the stable pointer
-// table is already locked.
+/* Free a stable pointer assuming that the stable pointer
+ * table is already locked.
+ */
 extern void hs_free_stable_ptr_unsafe (HsStablePtr sp);
 
 extern void hs_free_stable_ptr (HsStablePtr sp);

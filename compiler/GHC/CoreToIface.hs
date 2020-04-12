@@ -48,29 +48,30 @@ module GHC.CoreToIface
 import GhcPrelude
 
 import GHC.Iface.Syntax
-import DataCon
-import Id
-import IdInfo
-import CoreSyn
-import TyCon hiding ( pprPromotionQuote )
-import CoAxiom
+import GHC.Core.DataCon
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Core
+import GHC.Core.TyCon hiding ( pprPromotionQuote )
+import GHC.Core.Coercion.Axiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
 import TysWiredIn ( heqTyCon )
-import MkId ( noinlineIdName )
+import GHC.Types.Id.Make ( noinlineIdName )
 import PrelNames
-import Name
-import BasicTypes
-import Type
-import PatSyn
+import GHC.Types.Name
+import GHC.Types.Basic
+import GHC.Core.Type
+import GHC.Core.PatSyn
 import Outputable
 import FastString
 import Util
-import Var
-import VarEnv
-import VarSet
-import TyCoRep
-import TyCoTidy ( tidyCo )
-import Demand ( isTopSig )
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy ( tidyCo )
+import GHC.Types.Demand ( isTopSig )
+import GHC.Types.Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
 
@@ -300,7 +301,6 @@ toIfaceCoercionX fr co
                             fr' = fr `delVarSet` tv
 
     go_prov :: UnivCoProvenance -> IfaceUnivCoProv
-    go_prov UnsafeCoerceProv    = IfaceUnsafeCoerceProv
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
@@ -345,12 +345,12 @@ toIfaceAppArgsX fr kind ty_args
                  VisArg   -> Required
                  InvisArg -> Inferred
                    -- It's rare for a kind to have a constraint argument, but
-                   -- it can happen. See Note [AnonTCB InvisArg] in TyCon.
+                   -- it can happen. See Note [AnonTCB InvisArg] in GHC.Core.TyCon.
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
       = go (zapTCvSubst env) (substTy env ty) ts
-        -- See Note [Care with kind instantiation] in Type.hs
+        -- See Note [Care with kind instantiation] in GHC.Core.Type
 
       | otherwise
       = -- There's a kind error in the type we are trying to print
@@ -422,7 +422,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
                                (toIfaceIdInfo (idInfo id))
                                (toIfaceJoinInfo (isJoinId_maybe id))
-  -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
+  -- Put into the interface file any IdInfo that GHC.Core.Op.Tidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
@@ -442,10 +442,8 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
-  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo,
-                    inline_hsinfo,  unfold_hsinfo, levity_hsinfo] of
-       []    -> NoInfo
-       infos -> HasInfo infos
+  = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
+               inline_hsinfo,  unfold_hsinfo, levity_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
@@ -466,6 +464,10 @@ toIfaceIdInfo id_info
     strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
                   | otherwise               = Nothing
 
+    ------------  CPR --------------
+    cpr_info = cprInfo id_info
+    cpr_hsinfo | cpr_info /= topCprSig = Just (HsCpr cpr_info)
+               | otherwise             = Nothing
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)
     loop_breaker  = isStrongLoopBreaker (occInfo id_info)

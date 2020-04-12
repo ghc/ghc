@@ -141,5 +141,22 @@ instance Alternative ZipList where
 -- extra functions
 
 -- | One or none.
+--
+-- It is useful for modelling any computation that is allowed to fail.
+--
+-- ==== __Examples__
+--
+-- Using the 'Alternative' instance of `Control.Monad.Except`, the following functions:
+--
+-- >>> canFail = throwError "it failed" :: Except String Int
+-- >>> final = return 42                :: Except String Int
+--
+-- Can be combined by allowing the first function to fail:
+--
+-- >>> runExcept $ canFail *> final
+-- Left "it failed"
+-- >>> runExcept $ optional canFail *> final
+-- Right 42
+
 optional :: Alternative f => f a -> f (Maybe a)
 optional v = Just <$> v <|> pure Nothing

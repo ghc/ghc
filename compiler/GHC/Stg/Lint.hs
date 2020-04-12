@@ -6,7 +6,7 @@ A lint pass to check basic STG invariants:
 - Variables should be defined before used.
 
 - Let bindings should not have unboxed types (unboxed bindings should only
-  appear in case), except when they're join points (see Note [CoreSyn let/app
+  appear in case), except when they're join points (see Note [Core let/app
   invariant] and #14117).
 
 - If linting after unarisation, invariants listed in Note [Post-unarisation
@@ -41,21 +41,21 @@ import GhcPrelude
 
 import GHC.Stg.Syntax
 
-import DynFlags
-import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
-import BasicTypes       ( TopLevelFlag(..), isTopLevel )
-import CostCentre       ( isCurrentCCS )
-import Id               ( Id, idType, isJoinId, idName )
-import VarSet
-import DataCon
-import CoreSyn          ( AltCon(..) )
-import Name             ( getSrcLoc, nameIsLocalOrFrom )
-import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
-import Type
+import GHC.Driver.Session
+import Bag                  ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
+import GHC.Types.CostCentre ( isCurrentCCS )
+import GHC.Types.Id         ( Id, idType, isJoinId, idName )
+import GHC.Types.Var.Set
+import GHC.Core.DataCon
+import GHC.Core             ( AltCon(..) )
+import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
+import ErrUtils             ( MsgDoc, Severity(..), mkLocMessage )
+import GHC.Core.Type
 import GHC.Types.RepType
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import Module           ( Module )
+import GHC.Types.Module           ( Module )
 import qualified ErrUtils as Err
 import Control.Applicative ((<|>))
 import Control.Monad
@@ -223,25 +223,6 @@ lintAlt (LitAlt _, _, rhs) =
 lintAlt (DataAlt _, bndrs, rhs) = do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
-
-{-
-************************************************************************
-*                                                                      *
-Utilities
-*                                                                      *
-************************************************************************
--}
-
-bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
-bindersOf (StgNonRec binder _) = [binder]
-bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
-
-bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
-bindersOfTop (StgTopLifted bind) = bindersOf bind
-bindersOfTop (StgTopStringLit binder _) = [binder]
-
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************

@@ -2,7 +2,7 @@ module Main where
 
 import qualified Data.Set as Set
 import Control.Monad
-import Data.List
+import Data.List (sort, partition)
 
 ---
 ---

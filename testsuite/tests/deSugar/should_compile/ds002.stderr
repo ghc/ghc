@@ -7,6 +7,22 @@ ds002.hs:9:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f z = ...
 
-ds002.hs:14:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+ds002.hs:12:11: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
-    In an equation for ‘g’: g x y z = ...
+    In an equation for ‘g’: g x y z | True = ...
+
+ds002.hs:13:11: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g x y z | True = ...
+
+ds002.hs:14:11: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g x y z | True = ...
+
+ds002.hs:15:11: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g x y z | True = ...
+
+ds002.hs:16:11: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g x y z | True = ...

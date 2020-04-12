@@ -6,12 +6,13 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Highly random utility functions
 --
 module Util (
         -- * Flags dependent on the compiler build
         ghciSupported, debugIsOn,
-        ghciTablesNextToCode,
         isWindowsHost, isDarwinHost,
 
         -- * Miscellaneous higher-order functions
@@ -78,7 +79,7 @@ module Util (
         transitiveClosure,
 
         -- * Strictness
-        seqList,
+        seqList, strictMap,
 
         -- * Module names
         looksLikeModuleName,
@@ -201,13 +202,6 @@ debugIsOn = True
 debugIsOn = False
 #endif
 
-ghciTablesNextToCode :: Bool
-#if defined(GHCI_TABLES_NEXT_TO_CODE)
-ghciTablesNextToCode = True
-#else
-ghciTablesNextToCode = False
-#endif
-
 isWindowsHost :: Bool
 #if defined(mingw32_HOST_OS)
 isWindowsHost = True
@@ -323,21 +317,21 @@ zipWith4Equal _ = zipWith4
 #else
 zipEqual _   []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg _      _      = panic ("zipEqual: unequal lists:"++msg)
+zipEqual msg _      _      = panic ("zipEqual: unequal lists: "++msg)
 
 zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
 zipWithEqual _   _ [] []        =  []
-zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists:"++msg)
+zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists: "++msg)
 
 zipWith3Equal msg z (a:as) (b:bs) (c:cs)
                                 =  z a b c : zipWith3Equal msg z as bs cs
 zipWith3Equal _   _ [] []  []   =  []
-zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists:"++msg)
+zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists: "++msg)
 
 zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
                                 =  z a b c d : zipWith4Equal msg z as bs cs ds
 zipWith4Equal _   _ [] [] [] [] =  []
-zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
+zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists: "++msg)
 #endif
 
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
@@ -575,13 +569,13 @@ only _ = panic "Util: only"
 
 -- Debugging/specialising versions of \tr{elem} and \tr{notElem}
 
-isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
-
 # if !defined(DEBUG)
+isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 isIn    _msg x ys = x `elem` ys
 isn'tIn _msg x ys = x `notElem` ys
 
 # else /* DEBUG */
+isIn, isn'tIn :: (HasDebugCallStack, Eq a) => String -> a -> [a] -> Bool
 isIn msg x ys
   = elem100 0 x ys
   where
@@ -1006,6 +1000,14 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
+strictMap :: (a -> b) -> [a] -> [b]
+strictMap _ [] = []
+strictMap f (x : xs) =
+  let
+    !x' = f x
+    !xs' = strictMap f xs
+  in
+    x' : xs'
 
 {-
 ************************************************************************
@@ -1281,8 +1283,7 @@ modificationTimeIfExists f = do
 -- also results in a skip.
 
 withAtomicRename :: (MonadIO m) => FilePath -> (FilePath -> m a) -> m a
-withAtomicRename targetFile f
-  | enableAtomicRename = do
+withAtomicRename targetFile f = do
   -- The temp file must be on the same file system (mount) as the target file
   -- to result in an atomic move on most platforms.
   -- The standard way to ensure that is to place it into the same directory.
@@ -1292,17 +1293,6 @@ withAtomicRename targetFile f
   res <- f temp
   liftIO $ renameFile temp targetFile
   return res
-
-  | otherwise = f targetFile
-  where
-    -- As described in #16450, enabling this causes spurious build failures due
-    -- to apparently missing files.
-    enableAtomicRename :: Bool
-#if defined(mingw32_BUILD_OS)
-    enableAtomicRename = False
-#else
-    enableAtomicRename = True
-#endif
 
 -- --------------------------------------------------------------
 -- split a string at the last character where 'pred' is True,

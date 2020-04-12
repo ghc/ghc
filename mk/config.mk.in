@@ -494,6 +494,7 @@ HaskellHostArch = @HaskellHostArch@
 HaskellTargetOs = @HaskellTargetOs@
 HaskellTargetArch = @HaskellTargetArch@
 TargetWordSize = @TargetWordSize@
+TargetWordBigEndian = @TargetWordBigEndian@
 TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
 TargetHasIdentDirective = @TargetHasIdentDirective@
 TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
@@ -761,7 +762,7 @@ LdIsGNULd		= @LdIsGNULd@
 LdHasBuildId	        = @LdHasBuildId@
 
 # Set to YES if ld has the --no_compact_unwind flag. See #5019
-# and compiler/main/DriverPipeline.hs.
+# and GHC.Driver.Pipeline.
 LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
 
 # On MSYS, building with SplitObjs=YES fails with

@@ -42,12 +42,13 @@ import GhcPrelude
 
 import GHC.Settings
 
-import Module
-import Packages
+import GHC.Types.Module
+import GHC.Driver.Packages
 import Outputable
 import ErrUtils
 import GHC.Platform
-import DynFlags
+import GHC.Driver.Session
+import GHC.Driver.Ways
 
 import Control.Monad.Trans.Except (runExceptT)
 import System.FilePath
@@ -58,6 +59,7 @@ import SysTools.Info
 import SysTools.Tasks
 import SysTools.BaseDir
 import SysTools.Settings
+import qualified Data.Set as Set
 
 {-
 Note [How GHC finds toolchain utilities]
@@ -254,7 +256,7 @@ linkDynLib dflags0 o_files dep_packages
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `elem` ways dflags
+           WayDyn `Set.member` ways dflags
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]

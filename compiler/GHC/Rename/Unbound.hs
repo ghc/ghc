@@ -19,21 +19,21 @@ where
 
 import GhcPrelude
 
-import RdrName
-import HscTypes
-import TcRnMonad
-import Name
-import Module
-import SrcLoc
+import GHC.Types.Name.Reader
+import GHC.Driver.Types
+import GHC.Tc.Utils.Monad
+import GHC.Types.Name
+import GHC.Types.Module
+import GHC.Types.SrcLoc as SrcLoc
 import Outputable
 import PrelNames ( mkUnboundName, isUnboundName, getUnique)
 import Util
 import Maybes
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Data.List
 import Data.Function ( on )
-import UniqDFM (udfmToList)
+import GHC.Types.Unique.DFM (udfmToList)
 
 {-
 ************************************************************************
@@ -90,7 +90,7 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Right ispec =>  imported as specified by ispec
 
 
--- | Called from the typechecker (TcErrors) when we find an unbound variable
+-- | Called from the typechecker (GHC.Tc.Errors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
@@ -133,7 +133,7 @@ similarNameSuggestions where_look dflags global_env
     pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of
                      UnhelpfulSpan l -> parens (ppr l)
-                     RealSrcSpan l -> parens (text "line" <+> int (srcSpanStartLine l))
+                     RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
     pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
                               parens (text "imported from" <+> ppr (is_mod is))
 
@@ -310,10 +310,13 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- We want to keep only one for each original module; preferably one with an
   -- explicit import list (for no particularly good reason)
   pick :: [ImportedModsVal] -> Maybe ImportedModsVal
-  pick = listToMaybe . sortBy (compare `on` prefer) . filter select
+  pick = listToMaybe . sortBy cmp . filter select
     where select imv = case mod_name of Just name -> imv_name imv == name
                                         Nothing   -> not (imv_qualified imv)
-          prefer imv = (imv_is_hiding imv, imv_span imv)
+          cmp a b =
+            (compare `on` imv_is_hiding) a b
+              `thenCmp`
+            (SrcLoc.leftmost_smallest `on` imv_span) a b
 
   -- Which of these would export a 'foo'
   -- (all of these are restricted imports, because if they were not, we

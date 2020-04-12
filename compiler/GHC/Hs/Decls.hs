@@ -8,10 +8,14 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -81,10 +85,11 @@ module GHC.Hs.Decls (
   RoleAnnotDecl(..), LRoleAnnotDecl, roleAnnotDeclName,
   -- ** Injective type families
   FamilyResultSig(..), LFamilyResultSig, InjectivityAnn(..), LInjectivityAnn,
-  resultVariableName,
+  resultVariableName, familyDeclLName, familyDeclName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
+  hsGroupTopLevelFixitySigs,
 
     ) where
 
@@ -98,19 +103,19 @@ import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
 import GHC.Hs.Binds
 import GHC.Hs.Types
 import GHC.Hs.Doc
-import TyCon
-import BasicTypes
-import Coercion
-import ForeignCall
+import GHC.Core.TyCon
+import GHC.Types.Basic
+import GHC.Core.Coercion
+import GHC.Types.ForeignCall
 import GHC.Hs.Extension
-import NameSet
+import GHC.Types.Name.Set
 
 -- others:
-import Class
+import GHC.Core.Class
 import Outputable
 import Util
-import SrcLoc
-import Type
+import GHC.Types.SrcLoc
+import GHC.Core.Type
 
 import Bag
 import Maybes
@@ -149,7 +154,7 @@ data HsDecl p
                                                  -- (Includes quasi-quotes)
   | DocD       (XDocD p)       (DocDecl)  -- ^ Documentation comment declaration
   | RoleAnnotD (XRoleAnnotD p) (RoleAnnotDecl p) -- ^Role annotation declaration
-  | XHsDecl    (XXHsDecl p)
+  | XHsDecl    !(XXHsDecl p)
 
 type instance XTyClD      (GhcPass _) = NoExtField
 type instance XInstD      (GhcPass _) = NoExtField
@@ -167,18 +172,49 @@ type instance XDocD       (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
 type instance XXHsDecl    (GhcPass _) = NoExtCon
 
--- NB: all top-level fixity decls are contained EITHER
--- EITHER SigDs
--- OR     in the ClassDecls in TyClDs
---
--- The former covers
---      a) data constructors
---      b) class methods (but they can be also done in the
---              signatures of class decls)
---      c) imported functions (that have an IfacSig)
---      d) top level decls
---
--- The latter is for class methods only
+{-
+Note [Top-level fixity signatures in an HsGroup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An `HsGroup p` stores every top-level fixity declarations in one of two places:
+
+1. hs_fixds :: [LFixitySig p]
+
+   This stores fixity signatures for top-level declarations (e.g., functions,
+   data constructors, classes, type families, etc.) as well as fixity
+   signatures for class methods written outside of the class, as in this
+   example:
+
+     infixl 4 `m1`
+     class C1 a where
+       m1 :: a -> a -> a
+
+2. hs_tyclds :: [TyClGroup p]
+
+   Each type class can be found in a TyClDecl inside a TyClGroup, and that
+   TyClDecl stores the fixity signatures for its methods written inside of the
+   class, as in this example:
+
+     class C2 a where
+       infixl 4 `m2`
+       m2 :: a -> a -> a
+
+The story for fixity signatures for class methods is made slightly complicated
+by the fact that they can appear both inside and outside of the class itself,
+and both forms of fixity signatures are considered top-level. This matters
+in `GHC.Rename.Module.rnSrcDecls`, which must create a fixity environment out
+of all top-level fixity signatures before doing anything else. Therefore,
+`rnSrcDecls` must be aware of both (1) and (2) above. The
+`hsGroupTopLevelFixitySigs` function is responsible for collecting this
+information from an `HsGroup`.
+
+One might wonder why we even bother separating top-level fixity signatures
+into two places at all. That is, why not just take the fixity signatures
+from `hs_tyclds` and put them into `hs_fixds` so that they are all in one
+location? This ends up causing problems for `GHC.HsToCore.Quote.repTopDs`,
+which translates each fixity signature in `hs_fixds` and `hs_tyclds` into a
+Template Haskell `Dec`. If there are any duplicate signatures between the two
+fields, this will result in an error (#17608).
+-}
 
 -- | Haskell Group
 --
@@ -199,8 +235,10 @@ data HsGroup p
         hs_derivds :: [LDerivDecl p],
 
         hs_fixds  :: [LFixitySig p],
-                -- Snaffled out of both top-level fixity signatures,
-                -- and those in class declarations
+                -- A list of fixity signatures defined for top-level
+                -- declarations and class methods (defined outside of the class
+                -- itself).
+                -- See Note [Top-level fixity signatures in an HsGroup]
 
         hs_defds  :: [LDefaultDecl p],
         hs_fords  :: [LForeignDecl p],
@@ -210,7 +248,7 @@ data HsGroup p
 
         hs_docs   :: [LDocDecl]
     }
-  | XHsGroup (XXHsGroup p)
+  | XHsGroup !(XXHsGroup p)
 
 type instance XCHsGroup (GhcPass _) = NoExtField
 type instance XXHsGroup (GhcPass _) = NoExtCon
@@ -231,6 +269,18 @@ emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_splcds = [],
                        hs_docs = [] }
+
+-- | The fixity signatures for each top-level declaration and class method
+-- in an 'HsGroup'.
+-- See Note [Top-level fixity signatures in an HsGroup]
+hsGroupTopLevelFixitySigs :: HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
+hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
+    fixds ++ cls_fixds
+  where
+    cls_fixds = [ L loc sig
+                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
+                , L loc (FixSig _ sig) <- sigs
+                ]
 
 appendGroups :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
              -> HsGroup (GhcPass p)
@@ -273,7 +323,6 @@ appendGroups
         hs_warnds = warnds1 ++ warnds2,
         hs_ruleds = rulds1 ++ rulds2,
         hs_docs   = docs1  ++ docs2 }
-appendGroups _ _ = panic "appendGroups"
 
 instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
     ppr (TyClD _ dcl)             = ppr dcl
@@ -290,7 +339,6 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
     ppr (SpliceD _ dd)            = ppr dd
     ppr (DocD _ doc)              = ppr doc
     ppr (RoleAnnotD _ ra)         = ppr ra
-    ppr (XHsDecl x)               = ppr x
 
 instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
@@ -325,7 +373,6 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
           vcat_mb _    []             = empty
           vcat_mb gap (Nothing : ds) = vcat_mb gap ds
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
-    ppr (XHsGroup x) = ppr x
 
 -- | Located Splice Declaration
 type LSpliceDecl pass = Located (SpliceDecl pass)
@@ -336,7 +383,7 @@ data SpliceDecl p
         (XSpliceDecl p)
         (Located (HsSplice p))
         SpliceExplicitFlag
-  | XSpliceDecl (XXSpliceDecl p)
+  | XSpliceDecl !(XXSpliceDecl p)
 
 type instance XSpliceDecl      (GhcPass _) = NoExtField
 type instance XXSpliceDecl     (GhcPass _) = NoExtCon
@@ -344,7 +391,6 @@ type instance XXSpliceDecl     (GhcPass _) = NoExtCon
 instance OutputableBndrId p
        => Outputable (SpliceDecl (GhcPass p)) where
    ppr (SpliceDecl _ (L _ e) f) = pprSpliceDecl e f
-   ppr (XSpliceDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -387,7 +433,7 @@ Plan of attack:
    to ensure correct module and provenance is set
 
 These are the two places that we have to conjure up the magic derived
-names.  (The actual magic is in OccName.mkWorkerOcc, etc.)
+names.  (The actual magic is in GHC.Types.Name.Occurrence.mkWorkerOcc, etc.)
 
 Default methods
 ~~~~~~~~~~~~~~~
@@ -396,7 +442,7 @@ Default methods
 
  - If there is a default method name at all, it's recorded in
    the ClassOpSig (in GHC.Hs.Binds), in the DefMethInfo field.
-   (DefMethInfo is defined in Class.hs)
+   (DefMethInfo is defined in GHC.Core.Class)
 
 Source-code class decls and interface-code class decls are treated subtly
 differently, which has given me a great deal of confusion over the years.
@@ -441,7 +487,7 @@ Each instance declaration gives rise to one dictionary function binding.
 
 The type checker makes up new source-code instance declarations
 (e.g. from 'deriving' or generic default methods --- see
-TcInstDcls.tcInstDecls1).  So we can't generate the names for
+GHC.Tc.TyCl.Instance.tcInstDecls1).  So we can't generate the names for
 dictionary functions in advance (we don't know how many we need).
 
 On the other hand for interface-file instance declarations, the decl
@@ -553,7 +599,7 @@ data TyClDecl pass
         --                          'ApiAnnotation.AnnRarrow'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | XTyClDecl (XXTyClDecl pass)
+  | XTyClDecl !(XXTyClDecl pass)
 
 type LHsFunDep pass = Located (FunDep (Located (IdP pass)))
 
@@ -580,7 +626,7 @@ The idea is that the associated type is really a top-level decl in its
 own right.  However we are careful to use the same name 'a', so that
 we can match things up.
 
-c.f. Note [Associated type tyvar names] in Class.hs
+c.f. Note [Associated type tyvar names] in GHC.Core.Class
      Note [Family instance declaration binders]
 -}
 
@@ -656,16 +702,14 @@ tyFamInstDeclLName :: TyFamInstDecl (GhcPass p) -> Located (IdP (GhcPass p))
 tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
                      (HsIB { hsib_body = FamEqn { feqn_tycon = ln }}) })
   = ln
-tyFamInstDeclLName (TyFamInstDecl (HsIB _ (XFamEqn nec)))
-  = noExtCon nec
-tyFamInstDeclLName (TyFamInstDecl (XHsImplicitBndrs nec))
-  = noExtCon nec
 
-tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
-tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
-tyClDeclLName decl = tcdLName decl
+tyClDeclLName :: TyClDecl (GhcPass p) -> Located (IdP (GhcPass p))
+tyClDeclLName (FamDecl { tcdFam = fd })     = familyDeclLName fd
+tyClDeclLName (SynDecl { tcdLName = ln })   = ln
+tyClDeclLName (DataDecl { tcdLName = ln })  = ln
+tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
 
-tcdName :: TyClDecl pass -> IdP pass
+tcdName :: TyClDecl (GhcPass p) -> IdP (GhcPass p)
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
@@ -702,8 +746,6 @@ hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
   = hsTvbAllKinded tyvars && isJust (hsTyKindSig rhs)
 hsDeclHasCusk (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
 hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
-hsDeclHasCusk (FamDecl { tcdFam = XFamilyDecl nec }) = noExtCon nec
-hsDeclHasCusk (XTyClDecl nec) = noExtCon nec
 
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -739,8 +781,6 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                     <+> pp_vanilla_decl_head lclas tyvars fixity context
                     <+> pprFundeps (map unLoc fds)
 
-    ppr (XTyClDecl x) = ppr x
-
 instance OutputableBndrId p
        => Outputable (TyClGroup (GhcPass p)) where
   ppr (TyClGroup { group_tyclds = tyclds
@@ -754,7 +794,6 @@ instance OutputableBndrId p
       ppr tyclds $$
       ppr roles $$
       ppr instds
-  ppr (XTyClGroup x) = ppr x
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => Located (IdP (GhcPass p))
@@ -776,20 +815,14 @@ pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
                   , hsep (map (ppr.unLoc) (varl:varsr))]
     pp_tyvars [] = pprPrefixOcc (unLoc thing)
-pp_vanilla_decl_head _ (XLHsQTyVars x) _ _ = ppr x
 
 pprTyClDeclFlavour :: TyClDecl (GhcPass p) -> SDoc
 pprTyClDeclFlavour (ClassDecl {})   = text "class"
 pprTyClDeclFlavour (SynDecl {})     = text "type"
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info <+> text "family"
-pprTyClDeclFlavour (FamDecl { tcdFam = XFamilyDecl nec })
-  = noExtCon nec
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
-pprTyClDeclFlavour (DataDecl { tcdDataDefn = XHsDataDefn x })
-  = ppr x
-pprTyClDeclFlavour (XTyClDecl x) = ppr x
 
 
 {- Note [CUSKs: complete user-supplied kind signatures]
@@ -844,9 +877,9 @@ NOTE THAT
 
   * The CUSK completely fixes the kind of the type constructor, forever.
 
-  * The precise rules, for each declaration form, for whethher a declaration
+  * The precise rules, for each declaration form, for whether a declaration
     has a CUSK are given in the user manual section "Complete user-supplied
-    kind signatures and polymorphic recursion".  BUt they simply implement
+    kind signatures and polymorphic recursion".  But they simply implement
     PRINCIPLE above.
 
   * Open type families are interesting:
@@ -908,7 +941,7 @@ Invariants
    ones.
 
 See Note [Dependency analysis of type, class, and instance decls]
-in GHC.Rename.Source for more info.
+in GHC.Rename.Module for more info.
 -}
 
 -- | Type or Class Group
@@ -918,7 +951,7 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
               , group_roles  :: [LRoleAnnotDecl pass]
               , group_kisigs :: [LStandaloneKindSig pass]
               , group_instds :: [LInstDecl pass] }
-  | XTyClGroup (XXTyClGroup pass)
+  | XTyClGroup !(XXTyClGroup pass)
 
 type instance XCTyClGroup (GhcPass _) = NoExtField
 type instance XXTyClGroup (GhcPass _) = NoExtCon
@@ -1003,7 +1036,7 @@ other argument:
 Here injectivity annotation would consist of two comma-separated injectivity
 conditions.
 
-See also Note [Injective type families] in TyCon
+See also Note [Injective type families] in GHC.Core.TyCon
 -}
 
 -- | Located type Family Result Signature
@@ -1027,7 +1060,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
   --             'ApiAnnotation.AnnCloseP', 'ApiAnnotation.AnnEqual'
-  | XFamilyResultSig (XXFamilyResultSig pass)
+  | XFamilyResultSig !(XXFamilyResultSig pass)
 
   -- For details on above see note [Api annotations] in ApiAnnotation
 
@@ -1052,7 +1085,7 @@ data FamilyDecl pass = FamilyDecl
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn pass) -- optional injectivity ann
   }
-  | XFamilyDecl (XXFamilyDecl pass)
+  | XFamilyDecl !(XXFamilyDecl pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
   --             'ApiAnnotation.AnnData', 'ApiAnnotation.AnnFamily',
   --             'ApiAnnotation.AnnWhere', 'ApiAnnotation.AnnOpenP',
@@ -1091,6 +1124,15 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
+
+------------- Functions over FamilyDecls -----------
+
+familyDeclLName :: FamilyDecl (GhcPass p) -> Located (IdP (GhcPass p))
+familyDeclLName (FamilyDecl { fdLName = n }) = n
+
+familyDeclName :: FamilyDecl (GhcPass p) -> IdP (GhcPass p)
+familyDeclName = unLoc . familyDeclLName
+
 famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass p))
 famResultKindSignature (NoSig _) = Nothing
 famResultKindSignature (KindSig _ ki) = Just ki
@@ -1098,13 +1140,13 @@ famResultKindSignature (TyVarSig _ bndr) =
   case unLoc bndr of
     UserTyVar _ _ -> Nothing
     KindedTyVar _ _ ki -> Just ki
-    XTyVarBndr nec -> noExtCon nec
-famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 
 -- | Maybe return name of the result type variable
 resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))
 resultVariableName (TyVarSig _ sig) = Just $ hsLTyVarName sig
 resultVariableName _                = Nothing
+
+------------- Pretty printing FamilyDecls -----------
 
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
@@ -1130,7 +1172,6 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                 NoSig    _         -> empty
                 KindSig  _ kind    -> dcolon <+> ppr kind
                 TyVarSig _ tv_bndr -> text "=" <+> ppr tv_bndr
-                XFamilyResultSig nec -> noExtCon nec
     pp_inj = case mb_inj of
                Just (L _ (InjectivityAnn lhs rhs)) ->
                  hsep [ vbar, ppr lhs, text "->", hsep (map ppr rhs) ]
@@ -1142,7 +1183,6 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
             Nothing   -> text ".."
             Just eqns -> vcat $ map (ppr_fam_inst_eqn . unLoc) eqns )
       _ -> (empty, empty)
-pprFamilyDecl _ (XFamilyDecl nec) = noExtCon nec
 
 pprFlavour :: FamilyInfo pass -> SDoc
 pprFlavour DataFamily            = text "data"
@@ -1193,7 +1233,7 @@ data HsDataDefn pass   -- The payload of a data type defn
 
              -- For details on above see note [Api annotations] in ApiAnnotation
    }
-  | XHsDataDefn (XXHsDataDefn pass)
+  | XHsDataDefn !(XXHsDataDefn pass)
 
 type instance XCHsDataDefn    (GhcPass _) = NoExtField
 
@@ -1218,7 +1258,7 @@ type LHsDerivingClause pass = Located (HsDerivingClause pass)
 --       'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
 --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 data HsDerivingClause pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = HsDerivingClause
     { deriv_clause_ext :: XCHsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
@@ -1234,7 +1274,7 @@ data HsDerivingClause pass
       --
       -- should produce a derived instance for @C [a] (T b)@.
     }
-  | XHsDerivingClause (XXHsDerivingClause pass)
+  | XHsDerivingClause !(XXHsDerivingClause pass)
 
 type instance XCHsDerivingClause    (GhcPass _) = NoExtField
 type instance XXHsDerivingClause    (GhcPass _) = NoExtCon
@@ -1261,7 +1301,6 @@ instance OutputableBndrId p
           case dcs of
             Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
             _                            -> (ppDerivStrategy dcs, empty)
-  ppr (XHsDerivingClause x) = ppr x
 
 -- | Located Standalone Kind Signature
 type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
@@ -1270,14 +1309,13 @@ data StandaloneKindSig pass
   = StandaloneKindSig (XStandaloneKindSig pass)
       (Located (IdP pass))  -- Why a single binder? See #16754
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
-  | XStandaloneKindSig (XXStandaloneKindSig pass)
+  | XStandaloneKindSig !(XXStandaloneKindSig pass)
 
 type instance XStandaloneKindSig (GhcPass p) = NoExtField
 type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
 
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
-standaloneKindSigName (XStandaloneKindSig nec) = noExtCon nec
 
 {- Note [Wildcards in standalone kind signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1376,7 +1414,7 @@ data ConDecl pass
       , con_doc       :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
       }
-  | XConDecl (XXConDecl pass)
+  | XConDecl !(XXConDecl pass)
 
 type instance XConDeclGADT (GhcPass _) = NoExtField
 type instance XConDeclH98  (GhcPass _) = NoExtField
@@ -1412,7 +1450,7 @@ There's a wrinkle in ConDeclGADT
             con_args   = PrefixCon []
             con_res_ty = a :*: (b -> (a :*: (b -> (a :+: b))))
 
-       - In the renamer (GHC.Rename.Source.rnConDecl), we unravel it after
+       - In the renamer (GHC.Rename.Module.rnConDecl), we unravel it after
          operator fixities are sorted. So we generate. So we end
          up with
             con_args   = PrefixCon [ a :*: b, a :*: b ]
@@ -1426,7 +1464,6 @@ type HsConDeclDetails pass
 getConNames :: ConDecl (GhcPass p) -> [Located (IdP (GhcPass p))]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
-getConNames (XConDecl nec) = noExtCon nec
 
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
@@ -1463,7 +1500,6 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
     pp_derivings (L _ ds) = vcat (map ppr ds)
-pp_data_defn _ (XHsDataDefn x) = ppr x
 
 instance OutputableBndrId p
        => Outputable (HsDataDefn (GhcPass p)) where
@@ -1473,7 +1509,6 @@ instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
   ppr (StandaloneKindSig _ v ki)
     = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
-  ppr (XStandaloneKindSig nec) = noExtCon nec
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
@@ -1518,8 +1553,6 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
-
-pprConDecl (XConDecl x) = ppr x
 
 ppr_con_names :: (OutputableBndr a) => [Located a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
@@ -1665,7 +1698,7 @@ data FamEqn pass rhs
        }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
-  | XFamEqn (XXFamEqn pass rhs)
+  | XFamEqn !(XXFamEqn pass rhs)
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
@@ -1700,7 +1733,7 @@ data ClsInstDecl pass
     --           'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  | XClsInstDecl (XXClsInstDecl pass)
+  | XClsInstDecl !(XXClsInstDecl pass)
 
 type instance XCClsInstDecl    (GhcPass _) = NoExtField
 type instance XXClsInstDecl    (GhcPass _) = NoExtCon
@@ -1721,7 +1754,7 @@ data InstDecl pass  -- Both class and family instances
   | TyFamInstD              -- type family instance
       { tfid_ext  :: XTyFamInstD pass
       , tfid_inst :: TyFamInstDecl pass }
-  | XInstDecl (XXInstDecl pass)
+  | XInstDecl !(XXInstDecl pass)
 
 type instance XClsInstD     (GhcPass _) = NoExtField
 type instance XDataFamInstD (GhcPass _) = NoExtField
@@ -1753,8 +1786,6 @@ ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = L _ tycon
                                             , feqn_fixity = fixity
                                             , feqn_rhs    = rhs }})
     = pprHsFamInstLHS tycon bndrs pats fixity noLHsContext <+> equals <+> ppr rhs
-ppr_fam_inst_eqn (HsIB { hsib_body = XFamEqn x }) = ppr x
-ppr_fam_inst_eqn (XHsImplicitBndrs x) = ppr x
 
 instance OutputableBndrId p
        => Outputable (DataFamInstDecl (GhcPass p)) where
@@ -1774,22 +1805,10 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
               <+> pprHsFamInstLHS tycon bndrs pats fixity ctxt
                   -- pp_data_defn pretty-prints the kind sig. See #14817.
 
-pprDataFamInstDecl _ (DataFamInstDecl (HsIB _ (XFamEqn x)))
-  = ppr x
-pprDataFamInstDecl _ (DataFamInstDecl (XHsImplicitBndrs x))
-  = ppr x
-
 pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                         FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }}}})
   = ppr nd
-pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                        FamEqn { feqn_rhs = XHsDataDefn x}}})
-  = ppr x
-pprDataFamInstFlavour (DataFamInstDecl (HsIB _ (XFamEqn x)))
-  = ppr x
-pprDataFamInstFlavour (DataFamInstDecl (XHsImplicitBndrs x))
-  = ppr x
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
@@ -1831,7 +1850,6 @@ instance OutputableBndrId p
       where
         top_matter = text "instance" <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
-    ppr (XClsInstDecl x) = ppr x
 
 ppDerivStrategy :: OutputableBndrId p
                 => Maybe (LDerivStrategy (GhcPass p)) -> SDoc
@@ -1858,7 +1876,6 @@ instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
-    ppr (XInstDecl x) = ppr x
 
 -- Extract the declarations of associated data types from an instance
 
@@ -1866,12 +1883,11 @@ instDeclDataFamInsts :: [LInstDecl (GhcPass p)] -> [DataFamInstDecl (GhcPass p)]
 instDeclDataFamInsts inst_decls
   = concatMap do_one inst_decls
   where
+    do_one :: LInstDecl (GhcPass p) -> [DataFamInstDecl (GhcPass p)]
     do_one (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam_insts } }))
       = map unLoc fam_insts
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
-    do_one (L _ (ClsInstD _ (XClsInstDecl nec))) = noExtCon nec
-    do_one (L _ (XInstDecl nec))                 = noExtCon nec
 
 {-
 ************************************************************************
@@ -1897,7 +1913,7 @@ data DerivDecl pass = DerivDecl
           --
           -- Which signifies that the context should be inferred.
 
-          -- See Note [Inferring the instance context] in TcDerivInfer.
+          -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
@@ -1908,7 +1924,7 @@ data DerivDecl pass = DerivDecl
 
   -- For details on above see note [Api annotations] in ApiAnnotation
         }
-  | XDerivDecl (XXDerivDecl pass)
+  | XDerivDecl !(XXDerivDecl pass)
 
 type instance XCDerivDecl    (GhcPass _) = NoExtField
 type instance XXDerivDecl    (GhcPass _) = NoExtCon
@@ -1923,7 +1939,6 @@ instance OutputableBndrId p
                , text "instance"
                , ppOverlapPragma o
                , ppr ty ]
-    ppr (XDerivDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -1938,7 +1953,7 @@ type LDerivStrategy pass = Located (DerivStrategy pass)
 
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
-  -- See Note [Deriving strategies] in TcDeriv
+  -- See Note [Deriving strategies] in GHC.Tc.Deriv
   = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
                      --   custom instance for the data type. This only works
                      --   for certain types that GHC knows about (e.g., 'Eq',
@@ -1958,7 +1973,10 @@ instance OutputableBndrId p
     ppr StockStrategy    = text "stock"
     ppr AnyclassStrategy = text "anyclass"
     ppr NewtypeStrategy  = text "newtype"
-    ppr (ViaStrategy ty) = text "via" <+> ppr ty
+    ppr (ViaStrategy ty) = text "via" <+> case ghcPass @p of
+                                            GhcPs -> ppr ty
+                                            GhcRn -> ppr ty
+                                            GhcTc -> ppr ty
 
 -- | A short description of a @DerivStrategy'@.
 derivStrategyName :: DerivStrategy a -> SDoc
@@ -2006,7 +2024,7 @@ data DefaultDecl pass
         --          'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | XDefaultDecl (XXDefaultDecl pass)
+  | XDefaultDecl !(XXDefaultDecl pass)
 
 type instance XCDefaultDecl    (GhcPass _) = NoExtField
 type instance XXDefaultDecl    (GhcPass _) = NoExtCon
@@ -2015,7 +2033,6 @@ instance OutputableBndrId p
        => Outputable (DefaultDecl (GhcPass p)) where
     ppr (DefaultDecl _ tys)
       = text "default" <+> parens (interpp'SP tys)
-    ppr (XDefaultDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -2053,7 +2070,7 @@ data ForeignDecl pass
         --           'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | XForeignDecl (XXForeignDecl pass)
+  | XForeignDecl !(XXForeignDecl pass)
 
 {-
     In both ForeignImport and ForeignExport:
@@ -2127,7 +2144,6 @@ instance OutputableBndrId p
   ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport }) =
     hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
-  ppr (XForeignDecl x) = ppr x
 
 instance Outputable ForeignImport where
   ppr (CImport  cconv safety mHeader spec (L _ srcText)) =
@@ -2172,12 +2188,12 @@ instance Outputable ForeignExport where
 -- | Located Rule Declarations
 type LRuleDecls pass = Located (RuleDecls pass)
 
-  -- Note [Pragma source text] in BasicTypes
+  -- Note [Pragma source text] in GHC.Types.Basic
 -- | Rule Declarations
 data RuleDecls pass = HsRules { rds_ext   :: XCRuleDecls pass
                               , rds_src   :: SourceText
                               , rds_rules :: [LRuleDecl pass] }
-  | XRuleDecls (XXRuleDecls pass)
+  | XRuleDecls !(XXRuleDecls pass)
 
 type instance XCRuleDecls    (GhcPass _) = NoExtField
 type instance XXRuleDecls    (GhcPass _) = NoExtCon
@@ -2191,7 +2207,7 @@ data RuleDecl pass
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: Located (SourceText,RuleName)
-           -- ^ Note [Pragma source text] in BasicTypes
+           -- ^ Note [Pragma source text] in GHC.Types.Basic
        , rd_act  :: Activation
        , rd_tyvs :: Maybe [LHsTyVarBndr (NoGhcTc pass)]
            -- ^ Forall'd type vars
@@ -2208,7 +2224,7 @@ data RuleDecl pass
     --           'ApiAnnotation.AnnClose',
     --           'ApiAnnotation.AnnForall','ApiAnnotation.AnnDot',
     --           'ApiAnnotation.AnnEqual',
-  | XRuleDecl (XXRuleDecl pass)
+  | XRuleDecl !(XXRuleDecl pass)
 
 data HsRuleRn = HsRuleRn NameSet NameSet -- Free-vars from the LHS and RHS
   deriving Data
@@ -2229,7 +2245,7 @@ type LRuleBndr pass = Located (RuleBndr pass)
 data RuleBndr pass
   = RuleBndr (XCRuleBndr pass)  (Located (IdP pass))
   | RuleBndrSig (XRuleBndrSig pass) (Located (IdP pass)) (LHsSigWcType pass)
-  | XRuleBndr (XXRuleBndr pass)
+  | XRuleBndr !(XXRuleBndr pass)
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
@@ -2251,7 +2267,6 @@ instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where
                , rds_rules = rules })
     = pprWithSourceText st (text "{-# RULES")
           <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
-  ppr (XRuleDecls x) = ppr x
 
 instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
   ppr (HsRule { rd_name = name
@@ -2269,12 +2284,10 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
           pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
           pp_forall_tm Nothing | null tms = empty
           pp_forall_tm _ = forAllLit <+> fsep (map ppr tms) <> dot
-  ppr (XRuleDecl x) = ppr x
 
 instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
    ppr (RuleBndr _ name) = ppr name
    ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
-   ppr (XRuleBndr x) = ppr x
 
 {-
 ************************************************************************
@@ -2318,13 +2331,13 @@ We use exported entities for things to deprecate.
 -- | Located Warning Declarations
 type LWarnDecls pass = Located (WarnDecls pass)
 
- -- Note [Pragma source text] in BasicTypes
+ -- Note [Pragma source text] in GHC.Types.Basic
 -- | Warning pragma Declarations
 data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
                                , wd_src      :: SourceText
                                , wd_warnings :: [LWarnDecl pass]
                                }
-  | XWarnDecls (XXWarnDecls pass)
+  | XWarnDecls !(XXWarnDecls pass)
 
 type instance XWarnings      (GhcPass _) = NoExtField
 type instance XXWarnDecls    (GhcPass _) = NoExtCon
@@ -2334,7 +2347,7 @@ type LWarnDecl pass = Located (WarnDecl pass)
 
 -- | Warning pragma Declaration
 data WarnDecl pass = Warning (XWarning pass) [Located (IdP pass)] WarningTxt
-                   | XWarnDecl (XXWarnDecl pass)
+                   | XWarnDecl !(XXWarnDecl pass)
 
 type instance XWarning      (GhcPass _) = NoExtField
 type instance XXWarnDecl    (GhcPass _) = NoExtCon
@@ -2345,14 +2358,12 @@ instance OutputableBndr (IdP (GhcPass p))
     ppr (Warnings _ (SourceText src) decls)
       = text src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
     ppr (Warnings _ NoSourceText _decls) = panic "WarnDecls"
-    ppr (XWarnDecls x) = ppr x
 
 instance OutputableBndr (IdP (GhcPass p))
        => Outputable (WarnDecl (GhcPass p)) where
     ppr (Warning _ thing txt)
       = hsep ( punctuate comma (map ppr thing))
               <+> ppr txt
-    ppr (XWarnDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -2368,7 +2379,7 @@ type LAnnDecl pass = Located (AnnDecl pass)
 -- | Annotation Declaration
 data AnnDecl pass = HsAnnotation
                       (XHsAnnotation pass)
-                      SourceText -- Note [Pragma source text] in BasicTypes
+                      SourceText -- Note [Pragma source text] in GHC.Types.Basic
                       (AnnProvenance (IdP pass)) (Located (HsExpr pass))
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
       --           'ApiAnnotation.AnnType'
@@ -2376,7 +2387,7 @@ data AnnDecl pass = HsAnnotation
       --           'ApiAnnotation.AnnClose'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | XAnnDecl (XXAnnDecl pass)
+  | XAnnDecl !(XXAnnDecl pass)
 
 type instance XHsAnnotation (GhcPass _) = NoExtField
 type instance XXAnnDecl     (GhcPass _) = NoExtCon
@@ -2384,7 +2395,6 @@ type instance XXAnnDecl     (GhcPass _) = NoExtCon
 instance (OutputableBndrId p) => Outputable (AnnDecl (GhcPass p)) where
     ppr (HsAnnotation _ _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
-    ppr (XAnnDecl x) = ppr x
 
 -- | Annotation Provenance
 data AnnProvenance name = ValueAnnProvenance (Located name)
@@ -2429,7 +2439,7 @@ data RoleAnnotDecl pass
       --           'ApiAnnotation.AnnRole'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | XRoleAnnotDecl (XXRoleAnnotDecl pass)
+  | XRoleAnnotDecl !(XXRoleAnnotDecl pass)
 
 type instance XCRoleAnnotDecl (GhcPass _) = NoExtField
 type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
@@ -2442,8 +2452,6 @@ instance OutputableBndr (IdP (GhcPass p))
     where
       pp_role Nothing  = underscore
       pp_role (Just r) = ppr r
-  ppr (XRoleAnnotDecl x) = ppr x
 
 roleAnnotDeclName :: RoleAnnotDecl (GhcPass p) -> IdP (GhcPass p)
 roleAnnotDeclName (RoleAnnotDecl _ (L _ name) _) = name
-roleAnnotDeclName (XRoleAnnotDecl nec) = noExtCon nec

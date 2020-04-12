@@ -220,7 +220,7 @@ semantics of the program, in accordance with `GHC Proposal #176
 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0176-scc-parsing.rst>`__.
 
 SCC stands for "Set Cost Centre". The double quotes can be omitted if ``name``
-is a Haskell identifier, for example: ::
+is a Haskell identifier starting with a lowercase letter, for example: ::
 
     {-# SCC id #-} <expression>
 

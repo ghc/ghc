@@ -1,8 +1,12 @@
+Generating GHC's Unicode table
+==============================
 
 WCsubst.c is generated with:
 
-    sh ubconfc < UnicodeData.txt > WCsubst.c
+    sh ubconfc 12.0.0 < UnicodeData.txt > WCsubst.c
 
 where UnicodeData.txt came from
 
-    https://www.unicode.org/Public/12.0.0/ucd/UnicodeData-12.0.0d4.txt
+    https://www.unicode.org/Public/12.0.0/ucd/UnicodeData.txt
+
+Don't forget to mention the update in the User's Guide.

@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -- Tests top-level ambiguity resolution
--- This made a post-6.4 GHC fall over in TcSimplify
+-- This made a post-6.4 GHC fall over in GHC.Tc.Solver
 
 module ShouldFail where 
 

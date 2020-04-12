@@ -8,6 +8,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 module ErrUtils (
         -- * Basic types
@@ -70,8 +71,8 @@ import Exception
 import Outputable
 import Panic
 import qualified PprColour as Col
-import SrcLoc
-import DynFlags
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Driver.Session
 import FastString (unpackFS)
 import StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import Json
@@ -83,7 +84,7 @@ import Data.List
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Maybe       ( fromMaybe )
-import Data.Ord
+import Data.Function
 import Data.Time
 import Debug.Trace
 import Control.Monad
@@ -209,12 +210,12 @@ mkLocMessageAnn
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
 mkLocMessageAnn ann severity locn msg
-    = sdocWithDynFlags $ \dflags ->
-      let locn' = if gopt Opt_ErrorSpans dflags
-                  then ppr locn
-                  else ppr (srcSpanStart locn)
+    = sdocOption sdocColScheme $ \col_scheme ->
+      let locn' = sdocOption sdocErrorSpans $ \case
+                     True  -> ppr locn
+                     False -> ppr (srcSpanStart locn)
 
-          sevColour = getSeverityColour severity (colScheme dflags)
+          sevColour = getSeverityColour severity col_scheme
 
           -- Add optional information
           optAnn = case ann of
@@ -226,8 +227,8 @@ mkLocMessageAnn ann severity locn msg
           header = locn' <> colon <+>
                    coloured sevColour sevText <> optAnn
 
-      in coloured (Col.sMessage (colScheme dflags))
-                  (hang (coloured (Col.sHeader (colScheme dflags)) header) 4
+      in coloured (Col.sMessage col_scheme)
+                  (hang (coloured (Col.sHeader col_scheme) header) 4
                         msg)
 
   where
@@ -246,7 +247,7 @@ getSeverityColour _          = const mempty
 
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic severity (RealSrcSpan span) = do
+getCaretDiagnostic severity (RealSrcSpan span _) = do
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
 
   where
@@ -279,9 +280,9 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
 
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
-      sdocWithDynFlags $ \ dflags ->
-      let sevColour = getSeverityColour severity (colScheme dflags)
-          marginColour = Col.sMargin (colScheme dflags)
+      sdocOption sdocColScheme$ \col_scheme ->
+      let sevColour = getSeverityColour severity col_scheme
+          marginColour = Col.sMargin col_scheme
       in
       coloured marginColour (text marginSpace) <>
       text ("\n") <>
@@ -377,7 +378,8 @@ warningsToMessages dflags =
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle dflags unqual
-                in putLogMsg dflags reason sev s style (formatErrDoc dflags doc)
+                    ctx   = initSDocContext dflags style
+                in putLogMsg dflags reason sev s style (formatErrDoc ctx doc)
               | ErrMsg { errMsgSpan      = s,
                          errMsgDoc       = doc,
                          errMsgSeverity  = sev,
@@ -385,13 +387,13 @@ printBagOfErrors dflags bag_of_errors
                          errMsgContext   = unqual } <- sortMsgBag (Just dflags)
                                                                   bag_of_errors ]
 
-formatErrDoc :: DynFlags -> ErrDoc -> SDoc
-formatErrDoc dflags (ErrDoc important context supplementary)
+formatErrDoc :: SDocContext -> ErrDoc -> SDoc
+formatErrDoc ctx (ErrDoc important context supplementary)
   = case msgs of
         [msg] -> vcat msg
         _ -> vcat $ map starred msgs
     where
-    msgs = filter (not . null) $ map (filter (not . Outputable.isEmpty dflags))
+    msgs = filter (not . null) $ map (filter (not . Outputable.isEmpty ctx))
         [important, context, supplementary]
     starred = (bullet<+>) . vcat
 
@@ -403,17 +405,14 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
                      , errMsgDoc       = doc
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
-  = sdocWithDynFlags $ \dflags ->
-    withPprStyle (mkErrStyle dflags unqual) $
-    mkLocMessage sev s (formatErrDoc dflags doc)
+  = sdocWithContext $ \ctx ->
+    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx doc)
 
 sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
-sortMsgBag dflags = maybeLimit . sortBy (maybeFlip cmp) . bagToList
-  where maybeFlip :: (a -> a -> b) -> (a -> a -> b)
-        maybeFlip
-          | fromMaybe False (fmap reverseErrors dflags) = flip
-          | otherwise                                   = id
-        cmp = comparing errMsgSpan
+sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
+  where cmp
+          | fromMaybe False (fmap reverseErrors dflags) = SrcLoc.rightmost_smallest
+          | otherwise                                   = SrcLoc.leftmost_smallest
         maybeLimit = case join (fmap maxErrors dflags) of
           Nothing        -> id
           Just err_limit -> take err_limit
@@ -551,7 +550,7 @@ chooseDumpFile dflags dumpOpt
                  --      by the --ddump-file-prefix flag.
                | Just prefix <- dumpPrefixForce dflags
                   = Just prefix
-                 -- dump file location chosen by DriverPipeline.runPipeline
+                 -- dump file location chosen by GHC.Driver.Pipeline.runPipeline
                | Just prefix <- dumpPrefix dflags
                   = Just prefix
                  -- we haven't got a place to put a dump file.
@@ -765,7 +764,7 @@ withTiming' dflags what force_result prtimings action
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
           eventBegins dflags w = do
             whenPrintTimings $ traceMarkerIO (eventBeginsDoc dflags w)
-            liftIO $ traceEventIO (eventEndsDoc dflags w)
+            liftIO $ traceEventIO (eventBeginsDoc dflags w)
           eventEnds dflags w = do
             whenPrintTimings $ traceMarkerIO (eventEndsDoc dflags w)
             liftIO $ traceEventIO (eventEndsDoc dflags w)
@@ -903,7 +902,7 @@ Producing an eventlog for GHC
 To actually produce the eventlog, you need an eventlog-capable GHC build:
 
   With Hadrian:
-  $ hadrian/build.sh -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
+  $ hadrian/build -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
 
   With Make:
   $ make -j GhcStage2HcOpts+=-eventlog

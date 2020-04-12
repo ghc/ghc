@@ -42,17 +42,17 @@ import GhcPrelude
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Monad (FCode, newUnique)
 
-import Cmm
-import CLabel
-import MkGraph
+import GHC.Cmm
+import GHC.Cmm.CLabel
+import GHC.Cmm.Graph
 
-import BlockId
-import DynFlags
+import GHC.Cmm.BlockId
+import GHC.Driver.Session
 import FastString
-import Module
-import UniqFM
-import Unique
-import UniqSupply
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
 

@@ -3,9 +3,9 @@ T2204.hs:6:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
-            ('0':'1':_:_)
-            ['0', p] where p is not one of {'1'}
-            ('0':p:_:_) where p is not one of {'1'}
+            []
+            [p] where p is not one of {'0'}
+            (p:_:_) where p is not one of {'0'}
             ['0']
             ...
 

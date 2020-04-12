@@ -8,7 +8,7 @@
 -- Module      :  Control.Monad.ST.Lazy.Imp
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
@@ -44,12 +44,11 @@ import qualified Control.Monad.ST.Unsafe as ST
 
 import qualified GHC.ST as GHC.ST
 import GHC.Base
-import qualified Control.Monad.Fail as Fail
 
--- | The lazy @'ST' monad.
--- The ST monad allows for destructive updates, but is escapable (unlike IO).
+-- | The lazy @'ST'@ monad.
+-- The ST monad allows for destructive updates, but is escapable (unlike @IO@).
 -- A computation of type @'ST' s a@ returns a value of type @a@, and
--- execute in "thread" @s@. The @s@ parameter is either
+-- executes in "thread" @s@. The @s@ parameter is either
 --
 -- * an uninstantiated type variable (inside invocations of 'runST'), or
 --
@@ -192,7 +191,7 @@ instance Monad (ST s) where
          unST (k r) new_s
 
 -- | @since 4.10
-instance Fail.MonadFail (ST s) where
+instance MonadFail (ST s) where
     fail s = errorWithoutStackTrace s
 
 -- | Return the value computed by an 'ST' computation.
@@ -205,8 +204,8 @@ runST (ST st) = runRW# (\s -> case st (S# s) of (r, _) -> r)
 -- inside the computation.
 -- Note that if @f@ is strict, @'fixST' f = _|_@.
 fixST :: (a -> ST s a) -> ST s a
-fixST m = ST (\ s -> 
-                let 
+fixST m = ST (\ s ->
+                let
                    q@(r,_s') = unST (m r) s
                 in q)
 -- Why don't we need unsafePerformIO in fixST? We create a thunk, q,
@@ -233,7 +232,7 @@ strictToLazyST (GHC.ST.ST m) = ST $ \(S# s) ->
     (# s', a #) -> (a, S# s')
 -- See Note [Lazy ST: not producing lazy pairs]
 
-{-| 
+{-|
 Convert a lazy 'ST' computation into a strict one.
 -}
 lazyToStrictST :: ST s a -> ST.ST s a

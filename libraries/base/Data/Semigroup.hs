@@ -125,6 +125,21 @@ cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
 -- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
+--
+-- === __Example:__
+-- >>> let hello = diff "Hello, "
+-- >>> appEndo hello "World!"
+-- "Hello, World!"
+-- >>> appEndo (hello <> mempty) "World!"
+-- "Hello, World!"
+-- >>> appEndo (mempty <> hello) "World!"
+-- "Hello, World!"
+-- >>> let world = diff "World"
+-- >>> let excl = diff "!"
+-- >>> appEndo (hello <> (world <> excl)) mempty
+-- "Hello, World!"
+-- >>> appEndo ((hello <> world) <> excl) mempty
+-- "Hello, World!"
 diff :: Semigroup m => m -> Endo m
 diff = Endo . (<>)
 
@@ -271,7 +286,15 @@ instance Num a => Num (Max a) where
 
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
 -- placed inside 'Min' and 'Max' to compute an arg min or arg max.
-data Arg a b = Arg a b deriving
+--
+-- >>> minimum [ Arg (x * x) x | x <- [-10 .. 10] ]
+-- Arg 0 0
+data Arg a b = Arg
+  a
+  -- ^ The argument used for comparisons in 'Eq' and 'Ord'.
+  b
+  -- ^ The "value" exposed via the 'Functor', 'Foldable' etc. instances.
+  deriving
   ( Show     -- ^ @since 4.9.0.0
   , Read     -- ^ @since 4.9.0.0
   , Data     -- ^ @since 4.9.0.0

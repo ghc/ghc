@@ -35,6 +35,8 @@ data Flavour = Flavour {
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
     ghcDebugged :: Bool
+    -- | Build the GHC executable against the threaded runtime system.
+    ghcThreaded :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets }
@@ -104,7 +106,7 @@ userArgs = mconcat
 You can match any combination of the `builder`, `stage`, `package`, `way`, `input`
 and `output` predicates when specifying custom command line arguments. File
 patterns such as `"**/Prelude.*"` can be used when matching input and output files,
-where `**` matches an arbitrary number of path components, but not absolute path 
+where `**` matches an arbitrary number of path components, but not absolute path
 prefixes, and `*` matches an entire path component, excluding any separators.
 
 #### Enabling -Werror
@@ -366,7 +368,7 @@ the stage.
 We could equivalently specify those settings on the command-line:
 
 ``` sh
-$ hadrian/build.sh "stage1.ghc-bin.ghc.link.opts += -eventlog" \
+$ hadrian/build "stage1.ghc-bin.ghc.link.opts += -eventlog" \
                    "*.base.ghc.*.opts += -v3"
 ```
 
@@ -385,25 +387,27 @@ the right names for them:
   only when building the given package, or that the said options should be used
   when building all known packages, if the Hadrian command ever gets them to be
   built;
-- the third slot is the builder, `ghc` or `cc`, to refer to GHC commands or
-  C compiler commands;
-- the final slot is the builder mode, `{c, hs, link, deps, toolargs}`:
+- the remaining slots specify the builder and how it was invoked,
 
-    * `c` for commands that build C files with GHC
-	* `hs` for commands that compile Haskell modules with GHC
-	* `link` for GHC linking command
-	* `deps` for commands that figure out dependencies between Haskell modules
-	  (with `ghc -M`)
-	* `toolargs` for GHC commands that are used to generate the right ghci
-	  argument for `hadrian/ghci.sh` to work
+  * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
 
-  for GHC and `{c, deps}`:
+    * `c.opts` for commands that build C files with GHC
+	  * `hs.opts` for commands that compile Haskell modules with GHC
+	  * `link.opts` for GHC linking command
+	  * `deps.opts` for commands that figure out dependencies between Haskell modules
+	    (with `ghc -M`)
+	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
+	    argument for `hadrian/ghci` to work
 
-    * `c` for commands that call the C compiler on some C files
-	* `deps` for commands that call the C compiler for figuring out
-	  dependencies between C files
+  * `cc` refers to C compiler commands
 
-  for the C compiler;
+    * `c.opts` for commands that call the C compiler on some C files
+	  * `deps.opts` for commands that call the C compiler for figuring out
+	    dependencies between C files
+
+  * `cabal.configure.opts` refers to Cabal configure command line. Note that
+    package flags can be given by adding `--flags=...` arguments.
+
 - using a wildcard (`*`) ranges over all possible values for a given "slot";
 - `=` entirely overrides the arguments for a given builder in a given context,
   with the value specified on the right hand side of `=`, while `+=` merely
@@ -422,15 +426,15 @@ that takes an (optional) argument, `--complete-setting=<some string>`, and
 prints on stdout all the setting keys that have the given string as a prefix.
 
 There is a `hadrian/completion.sh` script that makes use of this rule to
-install Bash completions for `hadrian/build.sh` and `hadrian/build.cabal.sh`.
+install Bash completions for `hadrian/build` and `hadrian/build-cabal`.
 You can try it out by doing:
 
 ``` sh
 $ source hadrian/completion.sh
-$ hadrian/build.sh <TAB>
-$ hadrian/build.sh stage1.ba<TAB>
-$ hadrian/build.sh "stage1.base.ghc.<TAB>
-$ hadrian/build.sh "*.*.ghc.*.opts += -v3" "stage0.ghc-bin.ghc.lin<TAB>
+$ hadrian/build <TAB>
+$ hadrian/build stage1.ba<TAB>
+$ hadrian/build "stage1.base.ghc.<TAB>
+$ hadrian/build "*.*.ghc.*.opts += -v3" "stage0.ghc-bin.ghc.lin<TAB>
 ```
 
 [split-sections]: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#ghc-flag--split-sections

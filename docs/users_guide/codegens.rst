@@ -35,7 +35,7 @@ LLVM Code Generator (``-fllvm``)
    single: LLVM code generator
 
 This is an alternative backend that uses the `LLVM <http://llvm.org>`__
-compiler to produce executable code. It generally produces code as with
+compiler to produce executable code. It generally produces code with
 performance as good as the native code generator but for some cases can
 produce much faster code. This is especially true for numeric, array
 heavy code using packages like vector. The penalty is a significant

@@ -1,7 +1,7 @@
 
 module Main (main) where
 
-import Data.List
+import Data.List (genericLength)
 
 main :: IO ()
 main = do print (genericLength [1..10000000] :: Int)

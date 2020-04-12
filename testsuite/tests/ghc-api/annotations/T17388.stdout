@@ -28,6 +28,8 @@
 ((Test17388.hs:9:1-50,AnnOpen), [Test17388.hs:9:8-17]),
 ((Test17388.hs:9:1-50,AnnPackageName), [Test17388.hs:9:34-39]),
 ((Test17388.hs:9:1-50,AnnQualified), [Test17388.hs:9:23-31]),
-((Test17388.hs:9:1-50,AnnSemi), [Test17388.hs:10:1]),
-((<no location info>,AnnEofPos), [Test17388.hs:10:1])
+((Test17388.hs:9:1-50,AnnSemi), [Test17388.hs:10:1])
 ]
+
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test17388.hs" 10 1

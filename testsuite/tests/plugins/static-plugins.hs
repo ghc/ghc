@@ -1,8 +1,8 @@
 module Main where
 
-import Avail
+import GHC.Types.Avail
 import Control.Monad.IO.Class
-import DynFlags
+import GHC.Driver.Session
   (getDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)
 import GHC
 import GHC.Fingerprint.Type
@@ -11,11 +11,11 @@ import GHC.Hs.Doc
 import GHC.Hs.Expr
 import GHC.Hs.Extension
 import GHC.Hs.ImpExp
-import HscTypes
+import GHC.Driver.Types
 import Outputable
-import Plugins
+import GHC.Driver.Plugins
 import System.Environment
-import TcRnTypes
+import GHC.Tc.Types
 
 import Simple.SourcePlugin (plugin)
 

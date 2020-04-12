@@ -67,25 +67,25 @@ module GHC.StgToCmm.Closure (
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import SMRep
-import Cmm
-import PprCmmExpr() -- For Outputable instances
+import GHC.Runtime.Heap.Layout
+import GHC.Cmm
+import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 
-import CostCentre
-import BlockId
-import CLabel
-import Id
-import IdInfo
-import DataCon
-import Name
-import Type
-import TyCoRep
-import TcType
-import TyCon
+import GHC.Types.CostCentre
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Core.DataCon
+import GHC.Types.Name
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Tc.Utils.TcType
+import GHC.Core.TyCon
 import GHC.Types.RepType
-import BasicTypes
+import GHC.Types.Basic
 import Outputable
-import DynFlags
+import GHC.Driver.Session
 import Util
 
 import Data.Coerce (coerce)
@@ -487,7 +487,7 @@ avoid a space leak, deliberately recomputing a thunk.  Also (and this
 really does happen occasionally) let-floating may make a function f smaller
 so it can be inlined, so now (f True) may generate a local no-fv closure.
 This actually happened during bootstrapping GHC itself, with f=mkRdrFunBind
-in TcGenDeriv.) -}
+in GHC.Tc.Deriv.Generate.) -}
 
 -----------------------------------------------------------------------------
 --                getCallMethod

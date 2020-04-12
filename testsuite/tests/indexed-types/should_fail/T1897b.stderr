@@ -8,6 +8,6 @@ T1897b.hs:16:1: error:
     • In the ambiguity check for the inferred type for ‘isValid’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        isValid :: forall (t :: * -> *) a.
+        isValid :: forall {t :: * -> *} {a}.
                    (Foldable t, Bug a) =>
                    t (Depend a) -> Bool

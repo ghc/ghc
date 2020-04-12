@@ -4,8 +4,8 @@
 -- kinds of parse errors occur in modules.
 
 import GHC
-import GhcMake
-import DynFlags
+import GHC.Driver.Make
+import GHC.Driver.Session
 import Outputable
 import Exception (ExceptionMonad, ghandle)
 import Bag
@@ -14,7 +14,7 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception
 import Data.IORef
-import Data.List
+import Data.List (sort, find, stripPrefix, isPrefixOf, isSuffixOf)
 import Data.Either
 
 import System.Environment

@@ -10,6 +10,9 @@ Extracting imported and top-level names in scope
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordSelector,
         extendGlobalRdrEnvRn,
@@ -31,35 +34,35 @@ module GHC.Rename.Names (
 
 import GhcPrelude
 
-import DynFlags
-import TyCoPpr
+import GHC.Driver.Session
+import GHC.Core.TyCo.Ppr
 import GHC.Hs
-import TcEnv
+import GHC.Tc.Utils.Env
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
-import TcRnMonad
+import GHC.Tc.Utils.Monad
 import PrelNames
-import Module
-import Name
-import NameEnv
-import NameSet
-import Avail
-import FieldLabel
-import HscTypes
-import RdrName
+import GHC.Types.Module
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.FieldLabel
+import GHC.Driver.Types
+import GHC.Types.Name.Reader
 import RdrHsSyn        ( setRdrNameSpace )
 import Outputable
 import Maybes
-import SrcLoc
-import BasicTypes      ( TopLevelFlag(..), StringLiteral(..) )
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
 import Util
 import FastString
 import FastStringEnv
-import Id
-import Type
-import PatSyn
+import GHC.Types.Id
+import GHC.Core.Type
+import GHC.Core.PatSyn
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -68,6 +71,7 @@ import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
+import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
 
@@ -83,7 +87,7 @@ import System.IO
 Note [Tracking Trust Transitively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we import a package as well as checking that the direct imports are safe
-according to the rules outlined in the Note [HscMain . Safe Haskell Trust Check]
+according to the rules outlined in the Note [Safe Haskell Trust Check] in GHC.Driver.Main
 we must also check that these rules hold transitively for all dependent modules
 and packages. Doing this without caching any trust information would be very
 slow as we would need to touch all packages and interface files a module depends
@@ -108,7 +112,7 @@ the plusImportAvails function that is a union operation for the ImportAvails
 type. This gives us in an ImportAvails structure all packages required to be
 trusted for the module we are currently compiling. Checking that these packages
 are still trusted (and that direct imports are trusted) is done in
-HscMain.checkSafeImports.
+GHC.Driver.Main.checkSafeImports.
 
 See the note below, [Trust Own Package] for a corner case in this method and
 how its handled.
@@ -377,11 +381,13 @@ rnImportDecl this_mod
           _           -> return ()
      )
 
+    -- Complain about -Wcompat-unqualified-imports violations.
+    warnUnqualifiedImport decl iface
+
     let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
-rnImportDecl _ (L _ (XImportDecl nec)) = noExtCon nec
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -484,6 +490,40 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
      }
 
 
+-- | Issue a warning if the user imports Data.List without either an import
+-- list or `qualified`. This is part of the migration plan for the
+-- `Data.List.singleton` proposal. See #17244.
+warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
+warnUnqualifiedImport decl iface =
+    whenWOptM Opt_WarnCompatUnqualifiedImports
+    $ when bad_import
+    $ addWarnAt (Reason Opt_WarnCompatUnqualifiedImports) loc warning
+  where
+    mod = mi_module iface
+    loc = getLoc $ ideclName decl
+
+    is_qual = isImportDeclQualified (ideclQualified decl)
+    has_import_list =
+      -- We treat a `hiding` clause as not having an import list although
+      -- it's not entirely clear this is the right choice.
+      case ideclHiding decl of
+        Just (False, _) -> True
+        _               -> False
+    bad_import =
+      mod `elemModuleSet` qualifiedMods
+      && not is_qual
+      && not has_import_list
+
+    warning = vcat
+      [ text "To ensure compatibility with future core libraries changes"
+      , text "imports to" <+> ppr (ideclName decl) <+> text "should be"
+      , text "either qualified or have an explicit import list."
+      ]
+
+    -- Modules for which we warn if we see unqualified imports
+    qualifiedMods = mkModuleSet [ dATA_LIST ]
+
+
 warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
   = text "Unnecessary {-# SOURCE #-} in the import of module"
@@ -503,7 +543,7 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also: Note [Interactively-bound Ids in GHCi] in HscTypes
+See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
           Note [Looking up Exact RdrNames] in GHC.Rename.Env
 
 Consider a Template Haskell declaration quotation like this:
@@ -724,7 +764,6 @@ getLocalNonValBinders fixity_env
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
-        find_con_decl_fld (L _ (XFieldOcc nec)) = noExtCon nec
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -760,8 +799,6 @@ getLocalNonValBinders fixity_env
                (avails, fldss)
                  <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
                pure (avails, concat fldss)
-    new_assoc _ (L _ (ClsInstD _ (XClsInstDecl nec))) = noExtCon nec
-    new_assoc _ (L _ (XInstDecl nec))                 = noExtCon nec
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
@@ -775,16 +812,13 @@ getLocalNonValBinders fixity_env
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
-    new_di _ _ (DataFamInstDecl (XHsImplicitBndrs nec)) = noExtCon nec
 
     new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
-getLocalNonValBinders _ (XHsGroup nec) = noExtCon nec
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector _ _ (L _ (XFieldOcc nec)) = noExtCon nec
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
@@ -1024,7 +1058,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
            -- Look up the children in the sub-names of the parent
            let subnames = case ns of   -- The tc is first in ns,
                             [] -> []   -- if it is there at all
-                                       -- See the AvailTC Invariant in Avail.hs
+                                       -- See the AvailTC Invariant in
+                                       -- GHC.Types.Avail
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
            case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
@@ -1309,7 +1344,7 @@ This code finds which import declarations are unused.  The
 specification and implementation notes are here:
   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/unused-imports
 
-See also Note [Choosing the best import declaration] in RdrName
+See also Note [Choosing the best import declaration] in GHC.Types.Name.Reader
 -}
 
 type ImportDeclUsage
@@ -1355,7 +1390,7 @@ findImportUsage imports used_gres
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
-        used_gres = Map.lookup (srcSpanEnd loc) import_usage
+        used_gres = lookupSrcLoc (srcSpanEnd loc) import_usage
                                -- srcSpanEnd: see Note [The ImportMap]
                     `orElse` []
 
@@ -1396,7 +1431,6 @@ findImportUsage imports used_gres
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
-    unused_decl (L _ (XImportDecl nec)) = noExtCon nec
 
 
 {- Note [The ImportMap]
@@ -1419,7 +1453,7 @@ It's just a cheap hack; we could equally well use the Span too.
 The [GlobalRdrElt] are the things imported from that decl.
 -}
 
-type ImportMap = Map SrcLoc [GlobalRdrElt]  -- See [The ImportMap]
+type ImportMap = Map RealSrcLoc [GlobalRdrElt]  -- See [The ImportMap]
      -- If loc :-> gres, then
      --   'loc' = the end loc of the bestImport of each GRE in 'gres'
 
@@ -1430,12 +1464,13 @@ mkImportMap :: [GlobalRdrElt] -> ImportMap
 mkImportMap gres
   = foldr add_one Map.empty gres
   where
-    add_one gre@(GRE { gre_imp = imp_specs }) imp_map
-       = Map.insertWith add decl_loc [gre] imp_map
+    add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
+      case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
+                              -- For srcSpanEnd see Note [The ImportMap]
+       RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
+       UnhelpfulLoc _ -> imp_map
        where
           best_imp_spec = bestImport imp_specs
-          decl_loc      = srcSpanEnd (is_dloc (is_decl best_imp_spec))
-                        -- For srcSpanEnd see Note [The ImportMap]
           add _ gres = gre : gres
 
 warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Name)
@@ -1740,7 +1775,9 @@ addDupDeclErr gres@(gre : _)
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
     name = gre_name gre
-    sorted_names = sortWith nameSrcLoc (map gre_name gres)
+    sorted_names =
+      sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
+             (map gre_name gres)
 
 
 

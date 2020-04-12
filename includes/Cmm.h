@@ -7,7 +7,7 @@
  * making .cmm code a bit less error-prone to write, and a bit easier
  * on the eye for the reader.
  *
- * For the syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ * For the syntax of .cmm files, see the parser in ghc/compiler/GHC/Cmm/Parser.y.
  *
  * Accessing fields of structures defined in the RTS header files is
  * done via automatically-generated macros in DerivedConstants.h.  For
@@ -469,7 +469,7 @@
 // Version of GC_PRIM for use in low-level Cmm.  We can call
 // stg_gc_prim, because it takes one argument and therefore has a
 // platform-independent calling convention (Note [Syntax of .cmm
-// files] in CmmParse.y).
+// files] in GHC.Cmm.Parser).
 #define GC_PRIM_LL(fun)                         \
         R1 = fun;                               \
         jump stg_gc_prim [R1];

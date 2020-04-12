@@ -129,9 +129,12 @@ if test "$EnableNativeIOManager" = "YES"; then
 
 fi
 
-dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
+dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
+dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
+AC_ARG_VAR(LD_STAGE0, [Linker command (bootstrap)])
+AC_ARG_VAR(AR_STAGE0, [Archive command (bootstrap)])
 
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
@@ -147,13 +150,17 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  dnl infer CC_STAGE0 from `ghc --info` unless explicitly set by user
+  dnl infer {CC,LD,AR}_STAGE0 from `ghc --info` unless explicitly set by user
   if test -z "$CC_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   fi
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
-  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  if test -z "$LD_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
+  fi
+  if test -z "$AR_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  fi
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
 fi
@@ -163,8 +170,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.6],
-    [AC_MSG_ERROR([GHC version 8.6 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.8],
+    [AC_MSG_ERROR([GHC version 8.8 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -359,7 +366,7 @@ set_up_tarballs() {
     else
         action="download"
     fi
-    mk/get-win32-tarballs.sh $action $HostArch > missing-win32-tarballs
+    $PYTHON mk/get-win32-tarballs.py $action $mingw_arch > missing-win32-tarballs
     case $? in
         0)
            rm missing-win32-tarballs
@@ -371,7 +378,7 @@ set_up_tarballs() {
            echo
            echo "  * run configure with the --enable-tarballs-autodownload option"
            echo
-           echo "  * run mk/get-win32-tarballs.sh download ${HostArch}"
+           echo "  * run mk/get-win32-tarballs.py download $mingw_arch"
            echo
            echo "  * manually download the files listed in ./missing-win32-tarballs and place"
            echo "    them in the ghc-tarballs directory."
@@ -469,6 +476,12 @@ AC_SUBST([HAVE_GENLIB])
 FP_ICONV
 FP_GMP
 FP_CURSES
+
+dnl On Windows we force in-tree GMP build until we support dynamic linking
+if test "$HostOS" = "mingw32"
+then
+  GMP_FORCE_INTREE="YES"
+fi
 
 XCODE_VERSION()
 
@@ -848,7 +861,7 @@ AC_PATH_PROG(SPHINXBUILD,sphinx-build)
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/.* v\?\([0-9]\.[0-9]\.[0-9]\)/\1/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/.* \([0-9]\.[0-9]\.[0-9]\)/\1/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])
@@ -945,12 +958,16 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 dnl for use in settings file
 TargetWordSize=$ac_cv_sizeof_void_p
-if test "x$TargetWordSize" == 8; then
+if test "x$TargetWordSize" = x8; then
   AC_SUBST([Cabal64bit],[True])
 else
   AC_SUBST([Cabal64bit],[False])
 fi
 AC_SUBST(TargetWordSize)
+
+AC_C_BIGENDIAN([TargetWordBigEndian=YES],[TargetWordBigEndian=NO])
+AC_SUBST(TargetWordBigEndian)
+
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
@@ -1297,6 +1314,28 @@ AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 
 dnl ** Have libnuma?
 dnl --------------------------------------------------------------
+AC_ARG_WITH([libnuma-libraries],
+  [AC_HELP_STRING([--with-libnuma-libraries=ARG],
+    [Find libraries for libnuma in ARG [default=system default]])
+  ],
+  [
+    LibNumaLibDir="$withval"
+    LIBNUMA_LDFLAGS="-L$withval"
+  ])
+
+AC_SUBST(LibNumaLibDir)
+
+AC_ARG_WITH([libnuma-includes],
+  [AC_HELP_STRING([--with-libnuma-includes=ARG],
+    [Find includes for libnuma in ARG [default=system default]])
+  ],
+  [
+    LibNumaIncludeDir="$withval"
+    LIBNUMA_CFLAGS="-I$withval"
+  ])
+
+AC_SUBST(LibNumaIncludeDir)
+
 HaveLibNuma=0
 AC_ARG_ENABLE(numa,
     [AC_HELP_STRING([--enable-numa],
@@ -1304,6 +1343,11 @@ AC_ARG_ENABLE(numa,
          runtime system via numactl's libnuma [default=auto]])])
 
 if test "$enable_numa" != "no" ; then
+  CFLAGS2="$CFLAGS"
+  CFLAGS="$LIBNUMA_CFLAGS $CFLAGS"
+  LDFLAGS2="$LDFLAGS"
+  LDFLAGS="$LIBNUMA_LDFLAGS $LDFLAGS"
+
   AC_CHECK_HEADERS([numa.h numaif.h])
 
   if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
@@ -1312,15 +1356,19 @@ if test "$enable_numa" != "no" ; then
   if test "$enable_numa:$HaveLibNuma" = "yes:0" ; then
       AC_MSG_ERROR([Cannot find system libnuma (required by --enable-numa)])]
   fi
+
+  CFLAGS="$CFLAGS2"
+  LDFLAGS="$LDFLAGS2"
 fi
 
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
 if test $HaveLibNuma = "1" ; then
+  AC_SUBST([UseLibNuma],[YES])
   AC_SUBST([CabalHaveLibNuma],[True])
 else
+  AC_SUBST([UseLibNuma],[NO])
   AC_SUBST([CabalHaveLibNuma],[False])
 fi
-
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
@@ -1351,8 +1399,10 @@ dnl ** Determine library versions
 dnl The packages below should include all packages needed by
 dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
-LIBRARY_VERSION(Cabal, Cabal/Cabal)
-LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(Cabal, Cabal/Cabal/Cabal.cabal)
+dnl template-haskell.cabal is generated later
+dnl but the .in file already has the version
+LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.in)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
@@ -1428,9 +1478,11 @@ echo "\
    Using (for bootstrapping) : $CC_STAGE0
    Using $CompilerName       : $CC
       which is version       : $GccVersion
+      linker options         : $GccUseLdOpt
    Building a cross compiler : $CrossCompiling
    Unregisterised            : $Unregisterised
    TablesNextToCode          : $TablesNextToCode
+   Build GMP in tree         : $GMP_FORCE_INTREE
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd

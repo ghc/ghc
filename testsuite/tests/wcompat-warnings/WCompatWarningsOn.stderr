@@ -13,7 +13,7 @@ Template.hs:16:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
     in the instance declaration for ‘Monoid S’.
     Define as ‘mappend = (<>)’
 
-Template.hs:20:15: warning: [-Wstar-is-type (in -Wcompat)]
+Template.hs:20:15: warning: [-Wstar-is-type (in -Wall, -Wcompat)]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
     relies on the StarIsType extension, which will become
     deprecated in the future.

@@ -139,10 +139,11 @@ this constructor directly (see  CorePrep.lookupIntegerSDataConName)
 When GHC reads the package data base, it (internally only) pretends it has UnitId
 `integer-wired-in` instead of the actual UnitId (which includes the version
 number); just like for `base` and other packages, as described in
-Note [Wired-in packages] in Module. This is done in Packages.findWiredInPackages.
+Note [Wired-in packages] in GHC.Types.Module. This is done in Packages.findWiredInPackages.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
@@ -159,12 +160,12 @@ module PrelNames (
 
 import GhcPrelude
 
-import Module
-import OccName
-import RdrName
-import Unique
-import Name
-import SrcLoc
+import GHC.Types.Module
+import GHC.Types.Name.Occurrence
+import GHC.Types.Name.Reader
+import GHC.Types.Unique
+import GHC.Types.Name
+import GHC.Types.SrcLoc
 import FastString
 
 {-
@@ -462,6 +463,12 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- Unsafe coercion proofs
+        , unsafeEqualityProofName
+        , unsafeEqualityTyConName
+        , unsafeReflDataConName
+        , unsafeCoercePrimName
+        , unsafeCoerceName
     ]
 
 genericTyConNames :: [Name]
@@ -501,7 +508,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE, gHC_INTEGER_TYPE, gHC_NATURAL,
-    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
+    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_LIST, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -510,7 +517,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
-    dATA_COERCE, dEBUG_TRACE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -533,6 +540,7 @@ gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
 dATA_TUPLE      = mkBaseModule (fsLit "Data.Tuple")
 dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
+dATA_LIST       = mkBaseModule (fsLit "Data.List")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
@@ -572,6 +580,7 @@ gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
+uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
 
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
@@ -793,9 +802,6 @@ showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showCommaSpace_RDR      = varQual_RDR gHC_SHOW (fsLit "showCommaSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
-
-undefined_RDR :: RdrName
-undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
 
 error_RDR :: RdrName
 error_RDR = varQual_RDR gHC_ERR (fsLit "error")
@@ -1285,7 +1291,7 @@ mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrF
 typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
 typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
--- See Note [Grand plan for Typeable] in TcTypeable.
+-- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
 
 -- Typeable KindReps for some common cases
@@ -1317,7 +1323,14 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
-
+-- Unsafe coercion proofs
+unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
+  unsafeCoerceName, unsafeReflDataConName :: Name
+unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
+unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
+unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
+unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
+unsafeCoerceName        = varQual uNSAFE_COERCE (fsLit "unsafeCoerce")  unsafeCoerceIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -1489,7 +1502,7 @@ srcLocDataConName
 
 -- plugins
 pLUGINS :: Module
-pLUGINS = mkThisGhcModule (fsLit "Plugins")
+pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
 pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 frontendPluginTyConName :: Name
@@ -1576,17 +1589,8 @@ realFracClassKey        = mkPreludeClassUnique 16
 showClassKey            = mkPreludeClassUnique 17
 ixClassKey              = mkPreludeClassUnique 18
 
-typeableClassKey, typeable1ClassKey, typeable2ClassKey, typeable3ClassKey,
-    typeable4ClassKey, typeable5ClassKey, typeable6ClassKey, typeable7ClassKey
-    :: Unique
+typeableClassKey :: Unique
 typeableClassKey        = mkPreludeClassUnique 20
-typeable1ClassKey       = mkPreludeClassUnique 21
-typeable2ClassKey       = mkPreludeClassUnique 22
-typeable3ClassKey       = mkPreludeClassUnique 23
-typeable4ClassKey       = mkPreludeClassUnique 24
-typeable5ClassKey       = mkPreludeClassUnique 25
-typeable6ClassKey       = mkPreludeClassUnique 26
-typeable7ClassKey       = mkPreludeClassUnique 27
 
 monadFixClassKey :: Unique
 monadFixClassKey        = mkPreludeClassUnique 28
@@ -1616,11 +1620,11 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
--- KnownNat: see Note [KnowNat & KnownSymbol and EvLit] in TcEvidence
+-- KnownNat: see Note [KnowNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
 knownNatClassNameKey :: Unique
 knownNatClassNameKey = mkPreludeClassUnique 42
 
--- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in TcEvidence
+-- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
 knownSymbolClassNameKey :: Unique
 knownSymbolClassNameKey = mkPreludeClassUnique 43
 
@@ -1752,10 +1756,6 @@ ptrTyConKey                             = mkPreludeTyConUnique 77
 funPtrTyConKey                          = mkPreludeTyConUnique 78
 tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
-
--- dotnet interop
-objectTyConKey :: Unique
-objectTyConKey                          = mkPreludeTyConUnique 83
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
@@ -1889,6 +1889,11 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
+
+-- Unsafe equality
+unsafeEqualityTyConKey :: Unique
+unsafeEqualityTyConKey = mkPreludeTyConUnique 191
+
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
@@ -2059,6 +2064,9 @@ typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
+-- Unsafe equality
+unsafeReflDataConKey :: Unique
+unsafeReflDataConKey      = mkPreludeDataConUnique 114
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 200-250
@@ -2110,11 +2118,10 @@ typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
 
-unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
-    returnIOIdKey, newStablePtrIdKey,
+concatIdKey, filterIdKey, zipIdKey,
+    bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
-unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
@@ -2223,18 +2230,6 @@ noinlineIdKey                 = mkPreludeMiscIdUnique 125
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
-
--- dotnet interop
-unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,
-    unmarshalStringIdKey, checkDotnetResNameIdKey :: Unique
-unmarshalObjectIdKey          = mkPreludeMiscIdUnique 150
-marshalObjectIdKey            = mkPreludeMiscIdUnique 151
-marshalStringIdKey            = mkPreludeMiscIdUnique 152
-unmarshalStringIdKey          = mkPreludeMiscIdUnique 153
-checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
-
-undefinedKey :: Unique
-undefinedKey                  = mkPreludeMiscIdUnique 155
 
 magicDictKey :: Unique
 magicDictKey                  = mkPreludeMiscIdUnique 156
@@ -2408,6 +2403,12 @@ mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
+-- Unsafe coercion proofs
+unsafeEqualityProofIdKey, unsafeCoercePrimIdKey, unsafeCoerceIdKey :: Unique
+unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
+unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
+unsafeCoerceIdKey        = mkPreludeMiscIdUnique 572
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2451,7 +2452,7 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
 
 {-
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@TcDeriv@).
+(@GHC.Tc.Deriv@).
 -}
 
 derivableClassKeys :: [Unique]

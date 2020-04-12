@@ -1,0 +1,5 @@
+ RULES: "SPEC $cm @()" [0]
+ RULES: "SPEC f @Bool @() @(Maybe Integer)" [0]
+"SPEC/T17966 $fShowMaybe_$cshow @Integer"
+"SPEC/T17966 $fShowMaybe_$cshowList @Integer"
+"SPEC/T17966 $fShowMaybe @Integer"

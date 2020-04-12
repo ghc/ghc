@@ -255,7 +255,7 @@ fac
       }
 
 -- RHS size: {terms: 32, types: 12, coercions: 0, joins: 1/1}
-Unlifted.$wmutVar [InlPrag=NOINLINE] :: forall s a. Int# -> Int#
+Unlifted.$wmutVar [InlPrag=NOINLINE] :: forall {s} {a}. Int# -> Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
 Unlifted.$wmutVar
   = \ (@ s_s2UR) (@ a_s2US) (ww_s2V0 :: Int#) ->
@@ -296,7 +296,7 @@ mutVar
       }
 
 -- RHS size: {terms: 31, types: 10, coercions: 0, joins: 1/1}
-Unlifted.$warray [InlPrag=NOINLINE] :: forall a. Int# -> Int#
+Unlifted.$warray [InlPrag=NOINLINE] :: forall {a}. Int# -> Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
 Unlifted.$warray
   = \ (@ a_s2V7) (ww_s2Vf :: Int#) ->

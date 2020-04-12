@@ -6,7 +6,7 @@
 module T14561 where
 
 import GHC.Types
-import GHC.Prim
+import Unsafe.Coerce
 
 badId :: forall r (a :: TYPE r). a -> a
 badId = unsafeCoerce#

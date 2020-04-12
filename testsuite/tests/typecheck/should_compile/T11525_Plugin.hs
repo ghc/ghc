@@ -1,7 +1,7 @@
 module T11525_Plugin(plugin) where
 
-import TcRnMonad ( TcPlugin(..), TcPluginResult(..) )
-import Plugins ( defaultPlugin, Plugin(..), CommandLineOption )
+import GHC.Tc.Utils.Monad ( TcPlugin(..), TcPluginResult(..) )
+import GHC.Driver.Plugins ( defaultPlugin, Plugin(..), CommandLineOption )
 
 plugin :: Plugin
 plugin = defaultPlugin { tcPlugin = Just . thePlugin }

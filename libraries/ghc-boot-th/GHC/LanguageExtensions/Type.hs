@@ -8,7 +8,7 @@
 --
 -- A data type defining the language extensions supported by GHC.
 --
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, Safe #-}
 module GHC.LanguageExtensions.Type ( Extension(..) ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -21,7 +21,8 @@ import GHC.Generics
 -- here as this would require adding transitive dependencies to the
 -- @template-haskell@ package, which must have a minimal dependency set.
 data Extension
--- See Note [Updating flag description in the User's Guide] in DynFlags
+-- See Note [Updating flag description in the User's Guide] in
+-- GHC.Driver.Session
    = Cpp
    | OverlappingInstances
    | UndecidableInstances

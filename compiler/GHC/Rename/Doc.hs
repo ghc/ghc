@@ -4,9 +4,9 @@ module GHC.Rename.Doc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
 import GhcPrelude
 
-import TcRnTypes
+import GHC.Tc.Types
 import GHC.Hs
-import SrcLoc
+import GHC.Types.SrcLoc
 
 
 rnMbLHsDoc :: Maybe LHsDocString -> RnM (Maybe LHsDocString)

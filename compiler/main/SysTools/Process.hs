@@ -12,13 +12,13 @@ module SysTools.Process where
 
 import Exception
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import Outputable
 import Panic
 import GhcPrelude
 import Util
-import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
+import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 
 import Control.Concurrent
 import Data.Char
@@ -31,6 +31,15 @@ import System.IO.Error as IO
 import System.Process
 
 import FileCleanup
+
+-- | Enable process jobs support on Windows if it can be expected to work (e.g.
+-- @process >= 1.6.8.0@).
+enableProcessJobs :: CreateProcess -> CreateProcess
+#if defined(MIN_VERSION_process)
+enableProcessJobs opts = opts { use_process_jobs = True }
+#else
+enableProcessJobs opts = opts
+#endif
 
 -- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
 -- inherited from the parent process, and output to stderr is not captured.
@@ -68,7 +77,7 @@ readProcessEnvWithExitCode
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    readCreateProcessWithExitCode (proc prog args) {
+    readCreateProcessWithExitCode (enableProcessJobs $ proc prog args) {
         env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
@@ -220,8 +229,22 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
   -- unless an exception was raised.
   let safely inner = mask $ \restore -> do
         -- acquire
-        (hStdIn, hStdOut, hStdErr, hProcess) <- restore $
-          runInteractiveProcess pgm real_args mb_cwd mb_env
+        -- On Windows due to how exec is emulated the old process will exit and
+        -- a new process will be created. This means waiting for termination of
+        -- the parent process will get you in a race condition as the child may
+        -- not have finished yet.  This caused #16450.  To fix this use a
+        -- process job to track all child processes and wait for each one to
+        -- finish.
+        let procdata =
+              enableProcessJobs
+              $ (proc pgm real_args) { cwd = mb_cwd
+                                     , env = mb_env
+                                     , std_in  = CreatePipe
+                                     , std_out = CreatePipe
+                                     , std_err = CreatePipe
+                                     }
+        (Just hStdIn, Just hStdOut, Just hStdErr, hProcess) <- restore $
+          createProcess_ "builderMainLoop" procdata
         let cleanup_handles = do
               hClose hStdIn
               hClose hStdOut
@@ -317,10 +340,21 @@ parseError s0 = case breakColon s0 of
                     Nothing -> Nothing
                 Nothing -> Nothing
 
+-- | Break a line of an error message into a filename and the rest of the line,
+-- taking care to ignore colons in Windows drive letters (as noted in #17786).
+-- For instance,
+--
+-- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", "ABCD")@
+-- * @"C:\hi.c: ABCD"@ is mapped to @Just ("C:\hi.c", "ABCD")@
 breakColon :: String -> Maybe (String, String)
-breakColon xs = case break (':' ==) xs of
-                    (ys, _:zs) -> Just (ys, zs)
-                    _ -> Nothing
+breakColon = go []
+  where
+    -- Don't break on Windows drive letters (e.g. @C:\@ or @C:/@)
+    go accum  (':':'\\':rest) = go ('\\':':':accum) rest
+    go accum  (':':'/':rest)  = go ('/':':':accum) rest
+    go accum  (':':rest)      = Just (reverse accum, rest)
+    go accum  (c:rest)        = go (c:accum) rest
+    go _accum []              = Nothing
 
 breakIntColon :: String -> Maybe (Int, String)
 breakIntColon xs = case break (':' ==) xs of

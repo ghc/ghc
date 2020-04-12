@@ -29,14 +29,14 @@ module FastStringEnv (
 
 import GhcPrelude
 
-import UniqFM
-import UniqDFM
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import Maybes
 import FastString
 
 
 -- | A non-deterministic set of FastStrings.
--- See Note [Deterministic UniqFM] in UniqDFM for explanation why it's not
+-- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why it's not
 -- deterministic and why it matters. Use DFastStringEnv if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code.
@@ -82,7 +82,7 @@ filterFsEnv x y           = filterUFM x y
 lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
 
 -- Deterministic FastStringEnv
--- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
+-- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why we need
 -- DFastStringEnv.
 
 type DFastStringEnv a = UniqDFM a  -- Domain is FastString

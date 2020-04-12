@@ -10,8 +10,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -22,10 +22,11 @@ module GHC.Hs.Lit where
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
-import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
-                    negateFractionalLit,SourceText(..),pprWithSourceText,
-                    PprPrec(..), topPrec )
-import Type
+import GHC.Types.Basic
+   ( IntegralLit(..), FractionalLit(..), negateIntegralLit
+   , negateFractionalLit, SourceText(..), pprWithSourceText
+   , PprPrec(..), topPrec )
+import GHC.Core.Type
 import Outputable
 import FastString
 import GHC.Hs.Extension
@@ -41,7 +42,7 @@ import Data.Data hiding ( Fixity )
 ************************************************************************
 -}
 
--- Note [Literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
 -- Note [Trees that grow] in GHC.Hs.Extension for the Xxxxx fields in the following
 -- | Haskell Literal
@@ -56,7 +57,7 @@ data HsLit x
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
-      -- @TcGenDeriv@, and from TRANSLATION
+      -- @GHC.Tc.Deriv.Generate@, and from TRANSLATION
   | HsIntPrim (XHsIntPrim x) {- SourceText -} Integer
       -- ^ literal @Int#@
   | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer
@@ -78,7 +79,7 @@ data HsLit x
   | HsDoublePrim (XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
 
-  | XLit (XXLit x)
+  | XLit !(XXLit x)
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
@@ -119,7 +120,7 @@ data HsOverLit p
       ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
 
   | XOverLit
-      (XXOverLit p)
+      !(XXOverLit p)
 
 data OverLitTc
   = OverLitTc {
@@ -133,7 +134,7 @@ type instance XOverLit GhcTc = OverLitTc
 
 type instance XXOverLit (GhcPass _) = NoExtCon
 
--- Note [Literal source text] in BasicTypes for SourceText fields in
+-- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
 -- | Overloaded Literal Value
 data OverLitVal
@@ -149,25 +150,22 @@ negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit (OverLitTc _ ty) _ _) = ty
-overLitType (XOverLit nec) = noExtCon nec
 
--- | Convert a literal from one index type to another, updating the annotations
--- according to the relevant 'Convertable' instance
-convertLit :: (ConvertIdX a b) => HsLit a -> HsLit b
-convertLit (HsChar a x)       = (HsChar (convert a) x)
-convertLit (HsCharPrim a x)   = (HsCharPrim (convert a) x)
-convertLit (HsString a x)     = (HsString (convert a) x)
-convertLit (HsStringPrim a x) = (HsStringPrim (convert a) x)
-convertLit (HsInt a x)        = (HsInt (convert a) x)
-convertLit (HsIntPrim a x)    = (HsIntPrim (convert a) x)
-convertLit (HsWordPrim a x)   = (HsWordPrim (convert a) x)
-convertLit (HsInt64Prim a x)  = (HsInt64Prim (convert a) x)
-convertLit (HsWord64Prim a x) = (HsWord64Prim (convert a) x)
-convertLit (HsInteger a x b)  = (HsInteger (convert a) x b)
-convertLit (HsRat a x b)      = (HsRat (convert a) x b)
-convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
-convertLit (HsDoublePrim a x) = (HsDoublePrim (convert a) x)
-convertLit (XLit a)           = (XLit (convert a))
+-- | Convert a literal from one index type to another
+convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
+convertLit (HsChar a x)       = HsChar a x
+convertLit (HsCharPrim a x)   = HsCharPrim a x
+convertLit (HsString a x)     = HsString a x
+convertLit (HsStringPrim a x) = HsStringPrim a x
+convertLit (HsInt a x)        = HsInt a x
+convertLit (HsIntPrim a x)    = HsIntPrim a x
+convertLit (HsWordPrim a x)   = HsWordPrim a x
+convertLit (HsInt64Prim a x)  = HsInt64Prim a x
+convertLit (HsWord64Prim a x) = HsWord64Prim a x
+convertLit (HsInteger a x b)  = HsInteger a x b
+convertLit (HsRat a x b)      = HsRat a x b
+convertLit (HsFloatPrim a x)  = HsFloatPrim a x
+convertLit (HsDoublePrim a x) = HsDoublePrim a x
 
 {-
 Note [ol_rebindable]
@@ -200,7 +198,7 @@ found to have.
 -}
 
 -- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module MatchLit)
+-- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
   (OverLit _ val1 _) == (OverLit _ val2 _) = val1 == val2
   (XOverLit  val1)   == (XOverLit  val2)   = val1 == val2
@@ -244,7 +242,6 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
     ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
     ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
-    ppr (XLit x) = ppr x
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
 pp_st_suffix NoSourceText         _ doc = doc
@@ -255,7 +252,6 @@ instance OutputableBndrId p
        => Outputable (HsOverLit (GhcPass p)) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
-  ppr (XOverLit x) = ppr x
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
@@ -282,7 +278,6 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
-pmPprHsLit (XLit x)           = ppr x
 
 -- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
 -- to be parenthesized under precedence @p@.

@@ -1,12 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
 
 import GHC
-import GhcMake
-import DynFlags
-import Finder
+import GHC.Driver.Make
+import GHC.Driver.Session
+import GHC.Driver.Finder
 
 import Control.Monad.IO.Class (liftIO)
-import Data.List
+import Data.List (sort, stripPrefix)
 import Data.Either
 
 import System.Environment

@@ -3,11 +3,11 @@ T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘n’ with ‘j’
       ‘n’ is a rigid type variable bound by
         the type signature for:
-          mkRefl :: forall k (n :: k) (j :: k). n :~: j
+          mkRefl :: forall {k} (n :: k) (j :: k). n :~: j
         at T15370.hs:13:1-17
       ‘j’ is a rigid type variable bound by
         the type signature for:
-          mkRefl :: forall k (n :: k) (j :: k). n :~: j
+          mkRefl :: forall {k} (n :: k) (j :: k). n :~: j
         at T15370.hs:13:1-17
       Expected type: n :~: j
         Actual type: n :~: n

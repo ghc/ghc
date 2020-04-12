@@ -30,7 +30,8 @@
 ((BundleExport.hs:8:1-13,AnnSemi), [BundleExport.hs:9:1]),
 ((BundleExport.hs:9:1-13,AnnEqual), [BundleExport.hs:9:11]),
 ((BundleExport.hs:9:1-13,AnnPattern), [BundleExport.hs:9:1-7]),
-((BundleExport.hs:9:1-13,AnnSemi), [BundleExport.hs:10:1]),
-((<no location info>,AnnEofPos), [BundleExport.hs:10:1])
+((BundleExport.hs:9:1-13,AnnSemi), [BundleExport.hs:10:1])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "BundleExport.hs" 10 1

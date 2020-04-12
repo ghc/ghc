@@ -317,7 +317,9 @@ void m32_allocator_free(m32_allocator *alloc)
   /* free partially-filled pages */
   const size_t pgsz = getPageSize();
   for (int i=0; i < M32_MAX_PAGES; i++) {
-    munmapForLinker(alloc->pages[i], pgsz);
+    if (alloc->pages[i]) {
+      munmapForLinker(alloc->pages[i], pgsz);
+    }
   }
 
   stgFree(alloc);

@@ -106,7 +106,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.accept=" ++ show accept
             , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
             , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
-            , arg "-e", arg $ "config.exeext=" ++ quote exe
+            , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
             , arg "-e", arg $ "config.compiler_debugged=" ++
               show debugged
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
@@ -162,12 +162,16 @@ getTestArgs = do
         skipPerfArg  = if testSkipPerf args
                            then Just "--skip-perf-tests"
                            else Nothing
+        brokenTestArgs = concat [ ["--broken-test", t] | t <- brokenTests args ]
         speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg   = case testSummary args of
-                           Just filepath -> Just $ "--summary-file " ++ show filepath
+                           Just filepath -> Just $ "--summary-file=" ++ filepath
                            Nothing -> Just $ "--summary-file=testsuite_summary.txt"
         junitArg     = case testJUnit args of
                            Just filepath -> Just $ "--junit=" ++ filepath
+                           Nothing -> Nothing
+        metricsArg   = case testMetricsFile args of
+                           Just filepath -> Just $ "--metrics-file=" ++ filepath
                            Nothing -> Nothing
         configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
         verbosityArg = case testVerbosity args of
@@ -186,9 +190,10 @@ getTestArgs = do
 
     pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, verbosityArg  ]
+                      , junitArg, metricsArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
+         ++ brokenTestArgs
 
   where areDocsPresent = expr $ do
           root <- buildRoot

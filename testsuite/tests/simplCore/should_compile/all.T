@@ -34,7 +34,7 @@ test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
-test('T3118', normal, compile, [''])
+test('T3118', normal, compile, ['-Wno-overlapping-patterns'])
 test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
@@ -144,7 +144,7 @@ test('T7702',
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
       collect_compiler_stats('peak_megabytes_allocated',70),
-      when(opsys('mingw'), expect_broken_for(16799, ['normal']))
+      when(opsys('mingw32'), fragile_for(16799, ['normal']))
      ],
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
@@ -243,7 +243,7 @@ test('T13410', normal, compile, ['-O2'])
 test('T13468',
      normal,
      makefile_test, ['T13468'])
-test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures'])
+test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures -ddump-cpr-signatures'])
 test('T11272',
      normal,
      makefile_test, ['T11272'])
@@ -312,3 +312,17 @@ test('T17409',
      normal,
      makefile_test, ['T17409'])
 test('T17429', normal, compile, ['-dcore-lint -O2'])
+test('T17590', normal, compile, ['-dcore-lint -O2'])
+test('T17722', normal, multimod_compile, ['T17722B', '-dcore-lint -O2 -v0'])
+test('T17724', normal, compile, ['-dcore-lint -O2'])
+test('T17787',  [ grep_errmsg(r'foo') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T17901',
+     normal,
+     makefile_test, ['T17901'])
+test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques -dsuppress-idinfo'])
+test('spec004', [ grep_errmsg(r'\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques'])
+test('T17966',
+     normal,
+     makefile_test, ['T17966'])
+# NB: T17810: -fspecialise-aggressively
+test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])

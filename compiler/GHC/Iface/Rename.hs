@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 -- | This module implements interface renaming, which is
 -- used to rewrite interface files on the fly when we
 -- are doing indefinite typechecking and need instantiations
@@ -17,32 +19,32 @@ module GHC.Iface.Rename (
 
 import GhcPrelude
 
-import SrcLoc
+import GHC.Types.SrcLoc
 import Outputable
-import HscTypes
-import Module
-import UniqFM
-import Avail
+import GHC.Driver.Types
+import GHC.Types.Module
+import GHC.Types.Unique.FM
+import GHC.Types.Avail
 import GHC.Iface.Syntax
-import FieldLabel
-import Var
+import GHC.Types.FieldLabel
+import GHC.Types.Var
 import ErrUtils
 
-import Name
-import TcRnMonad
+import GHC.Types.Name
+import GHC.Tc.Utils.Monad
 import Util
 import Fingerprint
-import BasicTypes
+import GHC.Types.Basic
 
 -- a bit vexing
 import {-# SOURCE #-} GHC.Iface.Load
-import DynFlags
+import GHC.Driver.Session
 
 import qualified Data.Traversable as T
 
 import Bag
 import Data.IORef
-import NameShape
+import GHC.Types.Name.Shape
 import GHC.Iface.Env
 
 tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a
@@ -590,8 +592,7 @@ rnIfaceAxBranch d = do
              , ifaxbRHS = rhs }
 
 rnIfaceIdInfo :: Rename IfaceIdInfo
-rnIfaceIdInfo NoInfo = pure NoInfo
-rnIfaceIdInfo (HasInfo is) = HasInfo <$> mapM rnIfaceInfoItem is
+rnIfaceIdInfo = mapM rnIfaceInfoItem
 
 rnIfaceInfoItem :: Rename IfaceInfoItem
 rnIfaceInfoItem (HsUnfold lb if_unf)

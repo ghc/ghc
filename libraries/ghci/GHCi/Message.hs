@@ -104,7 +104,8 @@ data Message a where
 
   -- | Create an info table for a constructor
   MkConInfoTable
-   :: Int     -- ptr words
+   :: Bool    -- TABLES_NEXT_TO_CODE
+   -> Int     -- ptr words
    -> Int     -- non-ptr words
    -> Int     -- constr tag
    -> Int     -- pointer tag
@@ -215,7 +216,12 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalResult ())
+    -> Message (EvalStatus ())
+
+  -- | Resume forcing a free variable in a breakpoint (#2950)
+  ResumeSeq
+    :: RemoteRef (ResumeContext ())
+    -> Message (EvalStatus ())
 
 deriving instance Show (Message a)
 
@@ -472,7 +478,7 @@ getMessage = do
       15 -> Msg <$> MallocStrings <$> get
       16 -> Msg <$> (PrepFFI <$> get <*> get <*> get)
       17 -> Msg <$> FreeFFI <$> get
-      18 -> Msg <$> (MkConInfoTable <$> get <*> get <*> get <*> get <*> get)
+      18 -> Msg <$> (MkConInfoTable <$> get <*> get <*> get <*> get <*> get <*> get)
       19 -> Msg <$> (EvalStmt <$> get <*> get)
       20 -> Msg <$> (ResumeStmt <$> get <*> get)
       21 -> Msg <$> (AbandonStmt <$> get)
@@ -492,6 +498,7 @@ getMessage = do
       35 -> Msg <$> (GetClosure <$> get)
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
+      38 -> Msg <$> (ResumeSeq <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -514,7 +521,7 @@ putMessage m = case m of
   MallocStrings bss           -> putWord8 15 >> put bss
   PrepFFI conv args res       -> putWord8 16 >> put conv >> put args >> put res
   FreeFFI p                   -> putWord8 17 >> put p
-  MkConInfoTable p n t pt d   -> putWord8 18 >> put p >> put n >> put t >> put pt >> put d
+  MkConInfoTable tc p n t pt d -> putWord8 18 >> put tc >> put p >> put n >> put t >> put pt >> put d
   EvalStmt opts val           -> putWord8 19 >> put opts >> put val
   ResumeStmt opts val         -> putWord8 20 >> put opts >> put val
   AbandonStmt val             -> putWord8 21 >> put val
@@ -534,6 +541,7 @@ putMessage m = case m of
   GetClosure a                -> putWord8 35 >> put a
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
+  ResumeSeq a                 -> putWord8 38 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

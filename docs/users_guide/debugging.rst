@@ -87,6 +87,7 @@ Dumping out compiler intermediate structures
     :type: dynamic
 
     Show allocation and runtime statistics for various stages of compilation.
+    Allocations are measured in bytes. Timings are measured in milliseconds.
 
 GHC is a large program consisting of a number of stages. You can tell GHC to
 dump information from various stages of compilation using the ``-ddump-⟨pass⟩``
@@ -175,6 +176,12 @@ These flags dump various information from GHC's typechecker and renamer.
     :type: dynamic
 
     Dump typechecker output as a syntax tree
+
+.. ghc-flag:: -ddump-hie
+    :shortdesc: Dump the hie file syntax tree
+    :type: dynamic
+
+    Dump the hie file syntax tree if we are generating extended interface files
 
 .. ghc-flag:: -ddump-splices
     :shortdesc: Dump TH spliced expressions, and what they evaluate to
@@ -337,6 +344,18 @@ subexpression elimination pass.
     :type: dynamic
 
     Dump strictness signatures
+
+.. ghc-flag:: -ddump-cpranal
+    :shortdesc: Dump CPR analysis output
+    :type: dynamic
+
+    Dump Constructed Product Result analysis output
+
+.. ghc-flag:: -ddump-cpr-signatures
+    :shortdesc: Dump CPR signatures
+    :type: dynamic
+
+    Dump Constructed Product Result signatures
 
 .. ghc-flag:: -ddump-cse
     :shortdesc: Dump CSE output
@@ -851,14 +870,21 @@ Checking for consistency
     However forcing larger alignments in general reduces performance.
 
 .. ghc-flag:: -fcatch-bottoms
-    :shortdesc: Insert ``error`` expressions after bottoming expressions; useful
-        when debugging the compiler.
+    :shortdesc: Add a default ``error`` alternative to case expressions without
+        a default alternative.
     :type: dynamic
 
-    Instructs the simplifier to emit ``error`` expressions in the continuation
-    of empty case analyses (which should bottom and consequently not return).
-    This is helpful when debugging demand analysis bugs which can sometimes
-    manifest as segmentation faults.
+    GHC generates case expressions without a default alternative in some cases:
+
+    - When the demand analysis thinks that the scrutinee does not return (i.e. a
+      bottoming expression)
+
+    - When the scrutinee is a GADT and its type rules out some constructors, and
+      others constructors are already handled by the case expression.
+
+    With this flag GHC generates a default alternative with ``error`` in these
+    cases. This is helpful when debugging demand analysis or type checker bugs
+    which can sometimes manifest as segmentation faults.
 
 .. _checking-determinism:
 

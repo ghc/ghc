@@ -1,0 +1,4 @@
+
+ds006.hs:6:5: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘v’: v | False = ...

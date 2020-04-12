@@ -31,10 +31,8 @@ module Binary
 --   closeBin,
 
    seekBin,
-   seekBy,
    tellBin,
    castBin,
-   isEOFBin,
    withBinBuffer,
 
    writeBinMem,
@@ -66,14 +64,14 @@ module Binary
 
 import GhcPrelude
 
-import {-# SOURCE #-} Name (Name)
+import {-# SOURCE #-} GHC.Types.Name (Name)
 import FastString
 import PlainPanic
-import UniqFM
+import GHC.Types.Unique.FM
 import FastMutInt
 import Fingerprint
-import BasicTypes
-import SrcLoc
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
 
 import Foreign
 import Data.Array
@@ -183,21 +181,6 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
-
-seekBy :: BinHandle -> Int -> IO ()
-seekBy h@(BinMem _ ix_r sz_r _) !off = do
-  sz <- readFastMutInt sz_r
-  ix <- readFastMutInt ix_r
-  let ix' = ix + off
-  if (ix' >= sz)
-        then do expandBin h ix'; writeFastMutInt ix_r ix'
-        else writeFastMutInt ix_r ix'
-
-isEOFBin :: BinHandle -> IO Bool
-isEOFBin (BinMem _ ix_r sz_r _) = do
-  ix <- readFastMutInt ix_r
-  sz <- readFastMutInt sz_r
-  return (ix >= sz)
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
@@ -846,12 +829,10 @@ instance Binary RuntimeRep where
     put_ bh AddrRep         = putByte bh 9
     put_ bh FloatRep        = putByte bh 10
     put_ bh DoubleRep       = putByte bh 11
-#if __GLASGOW_HASKELL__ >= 807
     put_ bh Int8Rep         = putByte bh 12
     put_ bh Word8Rep        = putByte bh 13
     put_ bh Int16Rep        = putByte bh 14
     put_ bh Word16Rep       = putByte bh 15
-#endif
 #if __GLASGOW_HASKELL__ >= 809
     put_ bh Int32Rep        = putByte bh 16
     put_ bh Word32Rep       = putByte bh 17
@@ -872,12 +853,10 @@ instance Binary RuntimeRep where
           9  -> pure AddrRep
           10 -> pure FloatRep
           11 -> pure DoubleRep
-#if __GLASGOW_HASKELL__ >= 807
           12 -> pure Int8Rep
           13 -> pure Word8Rep
           14 -> pure Int16Rep
           15 -> pure Word16Rep
-#endif
 #if __GLASGOW_HASKELL__ >= 809
           16 -> pure Int32Rep
           17 -> pure Word32Rep
@@ -1380,10 +1359,24 @@ instance Binary RealSrcSpan where
             return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
                                   (mkRealSrcLoc f el ec))
 
+instance Binary BufPos where
+  put_ bh (BufPos i) = put_ bh i
+  get bh = BufPos <$> get bh
+
+instance Binary BufSpan where
+  put_ bh (BufSpan start end) = do
+    put_ bh start
+    put_ bh end
+  get bh = do
+    start <- get bh
+    end <- get bh
+    return (BufSpan start end)
+
 instance Binary SrcSpan where
-  put_ bh (RealSrcSpan ss) = do
+  put_ bh (RealSrcSpan ss sb) = do
           putByte bh 0
           put_ bh ss
+          put_ bh sb
 
   put_ bh (UnhelpfulSpan s) = do
           putByte bh 1
@@ -1393,7 +1386,8 @@ instance Binary SrcSpan where
           h <- getByte bh
           case h of
             0 -> do ss <- get bh
-                    return (RealSrcSpan ss)
+                    sb <- get bh
+                    return (RealSrcSpan ss sb)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
 

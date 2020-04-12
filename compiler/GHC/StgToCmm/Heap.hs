@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.StgToCmm.Heap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset,
@@ -23,7 +25,7 @@ module GHC.StgToCmm.Heap (
 import GhcPrelude hiding ((<*>))
 
 import GHC.Stg.Syntax
-import CLabel
+import GHC.Cmm.CLabel
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
@@ -32,18 +34,19 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Env
 
-import MkGraph
+import GHC.Cmm.Graph
 
-import Hoopl.Label
-import SMRep
-import BlockId
-import Cmm
-import CmmUtils
-import CostCentre
-import IdInfo( CafInfo(..), mayHaveCafRefs )
-import Id ( Id )
-import Module
-import DynFlags
+import GHC.Cmm.Dataflow.Label
+import GHC.Runtime.Heap.Layout
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Types.CostCentre
+import GHC.Types.Id.Info( CafInfo(..), mayHaveCafRefs )
+import GHC.Types.Id ( Id )
+import GHC.Types.Module
+import GHC.Driver.Session
+import GHC.Platform
 import FastString( mkFastString, fsLit )
 import Panic( sorry )
 
@@ -141,7 +144,8 @@ allocHeapClosure rep info_ptr use_cc payload = do
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs
   = do dflags <- getDynFlags
-       hpStore base (zip (header dflags) [0, wORD_SIZE dflags ..])
+       let platform = targetPlatform dflags
+       hpStore base (zip (header dflags) [0, platformWordSizeInBytes platform ..])
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
@@ -151,9 +155,9 @@ emitSetDynHdr base info_ptr ccs
 -- Store the item (expr,off) in base[off]
 hpStore :: CmmExpr -> [(CmmExpr, ByteOff)] -> FCode ()
 hpStore base vals = do
-  dflags <- getDynFlags
+  platform <- getPlatform
   sequence_ $
-    [ emitStore (cmmOffsetB dflags base off) val | (val,off) <- vals ]
+    [ emitStore (cmmOffsetB platform base off) val | (val,off) <- vals ]
 
 -----------------------------------------------------------
 --              Layout of static closures
@@ -173,6 +177,7 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
   = mkStaticClosure dflags info_lbl ccs payload padding
         static_link_field saved_info_field
   where
+    platform = targetPlatform dflags
     info_lbl = cit_lbl info_tbl
 
     -- CAFs must have consistent layout, regardless of whether they
@@ -190,25 +195,27 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
     is_caf = isThunkRep (cit_rep info_tbl)
 
     padding
-        | is_caf && null payload = [mkIntCLit dflags 0]
+        | is_caf && null payload = [mkIntCLit platform 0]
         | otherwise = []
 
     static_link_field
-        | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
+        | is_caf
+        = [mkIntCLit platform 0]
+        | staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
         = [static_link_value]
         | otherwise
         = []
 
     saved_info_field
-        | is_caf     = [mkIntCLit dflags 0]
+        | is_caf     = [mkIntCLit platform 0]
         | otherwise  = []
 
         -- For a static constructor which has NoCafRefs, we set the
         -- static link field to a non-zero value so the garbage
         -- collector will ignore it.
     static_link_value
-        | mayHaveCafRefs caf_refs  = mkIntCLit dflags 0
-        | otherwise                = mkIntCLit dflags 3  -- No CAF refs
+        | mayHaveCafRefs caf_refs  = mkIntCLit platform 0
+        | otherwise                = mkIntCLit platform 3  -- No CAF refs
                                       -- See Note [STATIC_LINK fields]
                                       -- in rts/sm/Storage.h
 
@@ -337,7 +344,7 @@ entryHeapCheck cl_info nodeSet arity args code
                  Just (_, ArgGen _) -> False
                  _otherwise         -> True
 
--- | lower-level version for CmmParse
+-- | lower-level version for GHC.Cmm.Parser
 entryHeapCheck' :: Bool           -- is a known function pattern
                 -> CmmExpr        -- expression for the closure pointer
                 -> Int            -- Arity -- not same as len args b/c of voids
@@ -398,7 +405,8 @@ altHeapCheck regs code = altOrNoEscapeHeapCheck False regs code
 altOrNoEscapeHeapCheck :: Bool -> [LocalReg] -> FCode a -> FCode a
 altOrNoEscapeHeapCheck checkYield regs code = do
     dflags <- getDynFlags
-    case cannedGCEntryPoint dflags regs of
+    platform <- getPlatform
+    case cannedGCEntryPoint platform regs of
       Nothing -> genericGC checkYield code
       Just gc -> do
         lret <- newBlockId
@@ -411,8 +419,8 @@ altOrNoEscapeHeapCheck checkYield regs code = do
 
 altHeapCheckReturnsTo :: [LocalReg] -> Label -> ByteOff -> FCode a -> FCode a
 altHeapCheckReturnsTo regs lret off code
-  = do dflags <- getDynFlags
-       case cannedGCEntryPoint dflags regs of
+  = do platform <- getPlatform
+       case cannedGCEntryPoint platform regs of
            Nothing -> genericGC False code
            Just gc -> cannedGCReturnsTo False True gc regs lret off code
 
@@ -451,8 +459,8 @@ genericGC checkYield code
        call <- mkCall generic_gc (GC, GC) [] [] updfr_sz []
        heapCheck False checkYield (call <*> mkBranch lretry) code
 
-cannedGCEntryPoint :: DynFlags -> [LocalReg] -> Maybe CmmExpr
-cannedGCEntryPoint dflags regs
+cannedGCEntryPoint :: Platform -> [LocalReg] -> Maybe CmmExpr
+cannedGCEntryPoint platform regs
   = case map localRegType regs of
       []  -> Just (mkGcLabel "stg_gc_noregs")
       [ty]
@@ -462,9 +470,9 @@ cannedGCEntryPoint dflags regs
                                   W64       -> Just (mkGcLabel "stg_gc_d1")
                                   _         -> Nothing
 
-          | width == wordWidth dflags -> Just (mkGcLabel "stg_gc_unbx_r1")
-          | width == W64              -> Just (mkGcLabel "stg_gc_l1")
-          | otherwise                 -> Nothing
+          | width == wordWidth platform -> Just (mkGcLabel "stg_gc_unbx_r1")
+          | width == W64                -> Just (mkGcLabel "stg_gc_l1")
+          | otherwise                   -> Nothing
           where
               width = typeWidth ty
       [ty1,ty2]
@@ -514,6 +522,7 @@ heapCheck checkStack checkYield do_gc code
     -- Emit heap checks, but be sure to do it lazily so
     -- that the conditionals on hpHw don't cause a black hole
     do  { dflags <- getDynFlags
+        ; platform <- getPlatform
         ; let mb_alloc_bytes
                  | hpHw > mBLOCK_SIZE = sorry $ unlines
                     [" Trying to allocate more than "++show mBLOCK_SIZE++" bytes.",
@@ -522,7 +531,7 @@ heapCheck checkStack checkYield do_gc code
                      "See https://gitlab.haskell.org/ghc/ghc/issues/4505 for details.",
                      "Suggestion: read data from a file instead of having large static data",
                      "structures in code."]
-                 | hpHw > 0  = Just (mkIntExpr dflags (hpHw * (wORD_SIZE dflags)))
+                 | hpHw > 0  = Just (mkIntExpr platform (hpHw * (platformWordSizeInBytes platform)))
                  | otherwise = Nothing
                  where mBLOCK_SIZE = bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE_W dflags
               stk_hwm | checkStack = Just (CmmLit CmmHighStackMark)
@@ -594,26 +603,27 @@ do_checks :: Maybe CmmExpr    -- Should we check the stack?
           -> FCode ()
 do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
   dflags <- getDynFlags
+  platform <- getPlatform
   gc_id <- newBlockId
 
   let
     Just alloc_lit = mb_alloc_lit
 
-    bump_hp   = cmmOffsetExprB dflags hpExpr alloc_lit
+    bump_hp   = cmmOffsetExprB platform hpExpr alloc_lit
 
     -- Sp overflow if ((old + 0) - CmmHighStack < SpLim)
     -- At the beginning of a function old + 0 = Sp
     -- See Note [Single stack check]
     sp_oflo sp_hwm =
-         CmmMachOp (mo_wordULt dflags)
-                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType dflags spReg)))
+         CmmMachOp (mo_wordULt platform)
+                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType platform spReg)))
                              [CmmStackSlot Old 0, sp_hwm],
                    CmmReg spLimReg]
 
     -- Hp overflow if (Hp > HpLim)
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp (mo_wordUGt dflags) [hpExpr, hpLimExpr]
+    hp_oflo = CmmMachOp (mo_wordUGt platform) [hpExpr, hpLimExpr]
 
     alloc_n = mkAssign hpAllocReg alloc_lit
 
@@ -639,9 +649,9 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     else do
       when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
-         let yielding = CmmMachOp (mo_wordEq dflags)
+         let yielding = CmmMachOp (mo_wordEq platform)
                                   [CmmReg hpLimReg,
-                                   CmmLit (zeroCLit dflags)]
+                                   CmmLit (zeroCLit platform)]
          emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 
   tscope <- getTickScope

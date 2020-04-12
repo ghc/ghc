@@ -34,7 +34,7 @@ import UserSettings
 -- run, the target prints out the arguments that would be passed to @ghc@
 -- during normal compilation to @stdout@.
 --
--- This target is called by the `ghci.sh` script in order to load all of GHC's
+-- This target is called by the `ghci` script in order to load all of GHC's
 -- modules into GHCi.
 toolArgsTarget :: Rules ()
 toolArgsTarget = do
@@ -54,13 +54,13 @@ toolArgsTarget = do
     need [ root -/- dir -/- "Config.hs" ]
     need [ root -/- dir -/- "Parser.hs" ]
     need [ root -/- dir -/- "Lexer.hs" ]
-    need [ root -/- dir -/- "CmmParse.hs" ]
-    need [ root -/- dir -/- "CmmLex.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
 
     -- Find out the arguments that are needed to load a module into the
     -- session
     arg_list <- interpret fake_target getArgs
-    liftIO $ putStrLn (intercalate " " arg_list)
+    liftIO $ putStrLn (intercalate "\n" arg_list)
 
 allStages :: [Stage]
 allStages = [minBound .. maxBound]

@@ -1,5 +1,5 @@
 
 UnliftedNewtypesConstraintFamily.hs:11:1: error:
-    • Kind signature on data family declaration has non-TYPE
+    • Data family has non-TYPE
       and non-variable return kind ‘Constraint’
     • In the data family declaration for ‘D’

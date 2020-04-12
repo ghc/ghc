@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (
@@ -14,7 +16,7 @@ module TysWiredIn (
         mkWiredInTyConName, -- This is used in TcTypeNats to define the
                             -- built-in functions for evaluation.
 
-        mkWiredInIdName,    -- used in MkId
+        mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
@@ -124,14 +126,13 @@ module TysWiredIn (
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
         doubleElemRepDataConTy
-
     ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
+import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -139,25 +140,24 @@ import TysPrim
 import {-# SOURCE #-} KnownUniques
 
 -- others:
-import CoAxiom
-import Id
+import GHC.Core.Coercion.Axiom
+import GHC.Types.Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
-import Module           ( Module )
-import Type
+import GHC.Types.Module ( Module )
+import GHC.Core.Type
 import GHC.Types.RepType
-import DataCon
-import {-# SOURCE #-} ConLike
-import TyCon
-import Class            ( Class, mkClass )
-import RdrName
-import Name
-import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
-import NameSet          ( NameSet, mkNameSet, elemNameSet )
-import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
-                          SourceText(..) )
-import ForeignCall
-import SrcLoc           ( noSrcSpan )
-import Unique
+import GHC.Core.DataCon
+import {-# SOURCE #-} GHC.Core.ConLike
+import GHC.Core.TyCon
+import GHC.Core.Class     ( Class, mkClass )
+import GHC.Types.Name.Reader
+import GHC.Types.Name as Name
+import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
+import GHC.Types.Name.Set ( NameSet, mkNameSet, elemNameSet )
+import GHC.Types.Basic
+import GHC.Types.ForeignCall
+import GHC.Types.SrcLoc   ( noSrcSpan )
+import GHC.Types.Unique
 import Data.Array
 import FastString
 import Outputable
@@ -563,6 +563,13 @@ pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
                      -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
+--
+-- IMPORTANT NOTE:
+--    if you try to wire-in a /GADT/ data constructor you will
+--    find it hard (we did).  You will need wrapper and worker
+--    Names, a DataConBoxer, DataConRep, EqSpec, etc.
+--    Try hard not to wire-in GADT data types. You will live
+--    to regret doing so (we do).
 
 pcDataConWithFixity' declared_infix dc_name wrk_key rri
                      tyvars ex_tyvars user_tyvars arg_tys tycon
@@ -632,6 +639,7 @@ typeNatKind    = mkTyConTy typeNatKindCon
 typeSymbolKind = mkTyConTy typeSymbolKindCon
 
 constraintKindTyCon :: TyCon
+-- 'TyCon.isConstraintKindCon' assumes that this is an AlgTyCon!
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
@@ -672,7 +680,7 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
          instance (c1,c2) => (c1,c2)
-      See TcInteract.matchCTuple
+      See GHC.Tc.Solver.Interact.matchCTuple
     - Currently just go up to 62; beyond that
       you have to use manual nesting
     - Their OccNames look like (%,,,%), so they can easily be
@@ -700,7 +708,7 @@ Note [One-tuples]
 GHC supports both boxed and unboxed one-tuples:
  - Unboxed one-tuples are sometimes useful when returning a
    single value after CPR analysis
- - A boxed one-tuple is used by DsUtils.mkSelectorBinds, when
+ - A boxed one-tuple is used by GHC.HsToCore.Utils.mkSelectorBinds, when
    there is just one binder
 Basically it keeps everything uniform.
 
@@ -723,11 +731,11 @@ nothing special about one-tuples in Core; in particular, they have no
 custom pretty-printing, just using `Unit`.
 
 Note that there is *not* a unary constraint tuple, unlike for other forms of
-tuples. See [Ignore unary constraint tuples] in TcHsType for more
+tuples. See [Ignore unary constraint tuples] in GHC.Tc.Gen.HsType for more
 details.
 
-See also Note [Flattening one-tuples] in MkCore and
-Note [Don't flatten tuples from HsSyn] in MkCore.
+See also Note [Flattening one-tuples] in GHC.Core.Make and
+Note [Don't flatten tuples from HsSyn] in GHC.Core.Make.
 
 -}
 
@@ -926,7 +934,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
                          UnboxedTuple flavour
 
-    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+    -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
     tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
@@ -1511,12 +1519,7 @@ mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
 listTyCon :: TyCon
-listTyCon =
-  buildAlgTyCon listTyConName alpha_tyvar [Representational]
-                Nothing []
-                (mkDataTyConRhs [nilDataCon, consDataCon])
-                False
-                (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
+listTyCon = pcTyCon listTyConName Nothing [alphaTyVar] [nilDataCon, consDataCon]
 
 -- See also Note [Empty lists] in GHC.Hs.Expr.
 nilDataCon :: DataCon
@@ -1602,7 +1605,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 -- | Make a tuple type. The list of types should /not/ include any
 -- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
 -- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
--- in MkCore
+-- in GHC.Core.Make
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))

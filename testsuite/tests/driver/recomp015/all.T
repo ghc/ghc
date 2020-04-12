@@ -5,6 +5,6 @@ test('recomp015',
        # See ticket:11022#comment:7
        unless(opsys('linux') or opsys('solaris2') or opsys('openbsd'), skip),
        when(arch('arm'), skip),
-       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11323))],
+       when(arch('powerpc64'), expect_broken(11323))],
      makefile_test, [])
 

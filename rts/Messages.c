@@ -92,9 +92,6 @@ loop:
         debugTraceCap(DEBUG_sched, cap, "message: throwTo %ld -> %ld",
                       (W_)t->source->id, (W_)t->target->id);
 
-        ASSERT(t->source->why_blocked == BlockedOnMsgThrowTo);
-        ASSERT(t->source->block_info.closure == (StgClosure *)m);
-
         r = throwToMsg(cap, t);
 
         switch (r) {

@@ -18,6 +18,9 @@ free variables.
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 
@@ -49,8 +52,8 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 #include "HsVersions.h"
 
 import GHC.Hs
-import TcRnMonad
-import TcHsSyn             ( hsOverLitName )
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
@@ -58,19 +61,19 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
-import GHC.Rename.Types
+import GHC.Rename.HsType
 import PrelNames
-import Name
-import NameSet
-import RdrName
-import BasicTypes
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
+import GHC.Types.Basic
 import Util
 import ListSetOps          ( removeDups )
 import Outputable
-import SrcLoc
-import Literal             ( inCharRange )
+import GHC.Types.SrcLoc
+import GHC.Types.Literal   ( inCharRange )
 import TysWiredIn          ( nilDataCon )
-import DataCon
+import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard )
@@ -246,7 +249,7 @@ newPatName (LetMk is_top fix_env) rdr_name
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see GHC.Rename.Source).
+    --       before going on to the RHSes (see GHC.Rename.Module).
 
 {-
 Note [View pattern usage]
@@ -306,7 +309,7 @@ There are various entry points to renaming patterns, depending on
 --   * local namemaker
 --   * unused and duplicate checking
 --   * no fixities
-rnPats :: HsMatchContext Name -- for error messages
+rnPats :: HsMatchContext GhcRn -- for error messages
        -> [LPat GhcPs]
        -> ([LPat GhcRn] -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
@@ -334,7 +337,7 @@ rnPats ctxt pats thing_inside
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
 
-rnPat :: HsMatchContext Name -- for error messages
+rnPat :: HsMatchContext GhcRn -- for error messages
       -> LPat GhcPs
       -> (LPat GhcRn -> RnM (a, FreeVars))
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
@@ -426,7 +429,7 @@ rnPatAndThen mk (LitPat x lit)
 rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
        ; mb_neg' -- See Note [Negative zero]
-           <- let negative = do { (neg, fvs) <- lookupSyntaxName negateName
+           <- let negative = do { (neg, fvs) <- lookupSyntax negateName
                                 ; return (Just neg, fvs) }
                   positive = return (Nothing, emptyFVs)
               in liftCpsFV $ case (mb_neg , mb_neg') of
@@ -434,7 +437,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
                                   (Just _ , Nothing) -> negative
                                   (Nothing, Nothing) -> positive
                                   (Just _ , Just _ ) -> positive
-       ; eq' <- liftCpsFV $ lookupSyntaxName eqName
+       ; eq' <- liftCpsFV $ lookupSyntax eqName
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ )
@@ -443,8 +446,8 @@ rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ )
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
                                                 -- sense in n + k patterns
-       ; minus <- liftCpsFV $ lookupSyntaxName minusName
-       ; ge    <- liftCpsFV $ lookupSyntaxName geName
+       ; minus <- liftCpsFV $ lookupSyntax minusName
+       ; ge    <- liftCpsFV $ lookupSyntax geName
        ; return (NPlusKPat x (L (nameSrcSpan new_name) new_name)
                              (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
@@ -478,7 +481,7 @@ rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
-          True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
+          True -> do { (to_list_name,_) <- liftCps $ lookupSyntax toListName
                      ; return (ListPat (Just to_list_name) pats')}
           False -> return (ListPat Nothing pats') }
 
@@ -635,8 +638,6 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                                           sel (L ll lbl)))
                              , hsRecFieldArg = arg'
                              , hsRecPun      = pun })) }
-    rn_fld _ _ (L _ (HsRecField (L _ (XFieldOcc _)) _ _))
-      = panic "rnHsRecFields"
 
 
     rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in GHC.Hs.Pat
@@ -729,7 +730,7 @@ rnHsRecUpdFields flds
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record fields] in TcExpr
+                      -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
                       if overload_ok
                           then do { mb <- lookupGlobalOccRn_overloaded
                                             overload_ok lbl
@@ -861,16 +862,12 @@ rnOverLit origLit
             | otherwise       = origLit
           }
         ; let std_name = hsOverLitName val
-        ; (SyntaxExpr { syn_expr = from_thing_name }, fvs1)
-            <- lookupSyntaxName std_name
-        ; let rebindable = case from_thing_name of
-                                HsVar _ lv -> (unLoc lv) /= std_name
-                                _          -> panic "rnOverLit"
-        ; let lit' = lit { ol_witness = from_thing_name
+        ; (from_thing_name, fvs1) <- lookupSyntaxName std_name
+        ; let rebindable = from_thing_name /= std_name
+              lit' = lit { ol_witness = nl_HsVar from_thing_name
                          , ol_ext = rebindable }
         ; if isNegativeZeroOverLit lit'
-          then do { (SyntaxExpr { syn_expr = negate_name }, fvs2)
-                      <- lookupSyntaxName negateName
+          then do { (negate_name, fvs2) <- lookupSyntaxExpr negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)
                                   , fvs1 `plusFV` fvs2) }
           else return ((lit', Nothing), fvs1) }

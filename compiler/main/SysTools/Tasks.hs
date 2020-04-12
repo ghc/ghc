@@ -10,8 +10,8 @@ module SysTools.Tasks where
 
 import Exception
 import ErrUtils
-import HscTypes
-import DynFlags
+import GHC.Driver.Types
+import GHC.Driver.Session
 import Outputable
 import GHC.Platform
 import Util
@@ -22,7 +22,7 @@ import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
+import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info

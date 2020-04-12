@@ -3,16 +3,16 @@ module Main where
 
 import System.Environment
 
-import NameCache
-import SrcLoc
-import UniqSupply
-import Name
+import GHC.Types.Name.Cache
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.Supply
+import GHC.Types.Name
 
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
 
-import DynFlags
+import GHC.Driver.Session
 import SysTools
 
 import qualified Data.Map as M

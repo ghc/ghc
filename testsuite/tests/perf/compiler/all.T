@@ -1,15 +1,13 @@
 # Tests that call 'collect_compiler_stats' are skipped when debugging is on.
 # See testsuite/driver/testlib.py.
-
-def no_lint(name, opts):
-   opts.compiler_always_flags = \
-       [opt for opt in opts.compiler_always_flags if opt != '-dcore-lint' and opt != '-dcmm-lint']
-
 setTestOpts(no_lint)
 
 test('T1969',
      [# expect_broken(12437),
       collect_compiler_residency(20),
+      extra_run_opts('+RTS -A64k -RTS'),
+          # The default RESIDENCY_OPTS is 256k and we need higher sampling
+          # frequency. Incurs a slow-down by about 2.
       collect_compiler_stats('bytes allocated', 1),
       only_ways(['normal']),
 
@@ -352,7 +350,7 @@ test ('WWRec',
       ['-v0 -O'])
 
 test('T16190',
-      [req_th, collect_stats()],
+      [req_th, collect_compiler_stats()],
       multimod_compile,
       ['T16190.hs', '-v0'])
 

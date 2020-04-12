@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.Rename.Splice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
@@ -14,40 +16,40 @@ module GHC.Rename.Splice (
 
 import GhcPrelude
 
-import Name
-import NameSet
+import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Hs
-import RdrName
-import TcRnMonad
+import GHC.Types.Name.Reader
+import GHC.Tc.Utils.Monad
 
 import GHC.Rename.Env
 import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
-import GHC.Rename.Source  ( rnSrcDecls, findSplice )
+import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
-import BasicTypes       ( TopLevelFlag, isTopLevel, SourceText(..) )
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
 import Outputable
-import Module
-import SrcLoc
-import GHC.Rename.Types ( rnLHsType )
+import GHC.Types.Module
+import GHC.Types.SrcLoc
+import GHC.Rename.HsType ( rnLHsType )
 
 import Control.Monad    ( unless, when )
 
-import {-# SOURCE #-} GHC.Rename.Expr   ( rnLExpr )
+import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import TcEnv            ( checkWellStaged )
+import GHC.Tc.Utils.Env ( checkWellStaged )
 import THNames          ( liftName )
 
-import DynFlags
+import GHC.Driver.Session
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
-import TcEnv            ( tcMetaTy )
-import Hooks
+import GHC.Tc.Utils.Env ( tcMetaTy )
+import GHC.Driver.Hooks
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
-import {-# SOURCE #-} TcExpr   ( tcPolyExpr )
-import {-# SOURCE #-} TcSplice
+import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcPolyExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Splice
     ( runMetaD
     , runMetaE
     , runMetaP
@@ -55,7 +57,7 @@ import {-# SOURCE #-} TcSplice
     , tcTopSpliceExpr
     )
 
-import TcHsSyn
+import GHC.Tc.Utils.Zonk
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
@@ -89,7 +91,7 @@ rnBracket e br_body
            ; Splice Untyped -> checkTc (not (isTypedBracket br_body))
                                        illegalTypedBracket
            ; RunSplice _    ->
-               -- See Note [RunSplice ThLevel] in "TcRnTypes".
+               -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnBracket: Renaming bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
@@ -180,8 +182,6 @@ rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
 rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
                                ; return (TExpBr x e', fvs) }
 
-rn_bracket _ (XBracket nec) = noExtCon nec
-
 quotationCtxtDoc :: HsBracket GhcPs -> SDoc
 quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
@@ -268,9 +268,10 @@ rnSpliceGen run_splice pend_splice splice
                 ; writeMutVar ps_var (pending_splice : ps)
                 ; return (result, fvs) }
 
-        _ ->  do { (splice', fvs1) <- checkNoErrs $
-                                      setStage (Splice splice_type) $
-                                      rnSplice splice
+        _ ->  do { checkTopSpliceAllowed splice
+                 ; (splice', fvs1) <- checkNoErrs $
+                                         setStage (Splice splice_type) $
+                                         rnSplice splice
                    -- checkNoErrs: don't attempt to run the splice if
                    -- renaming it failed; otherwise we get a cascade of
                    -- errors from e.g. unbound variables
@@ -281,6 +282,22 @@ rnSpliceGen run_splice pend_splice splice
      splice_type = if is_typed_splice
                    then Typed
                    else Untyped
+
+
+-- Nested splices are fine without TemplateHaskell because they
+-- are not executed until the top-level splice is run.
+checkTopSpliceAllowed :: HsSplice GhcPs -> RnM ()
+checkTopSpliceAllowed splice = do
+  let (herald, ext) = spliceExtension splice
+  extEnabled <- xoptM ext
+  unless extEnabled
+    (failWith $ text herald <+> text "are not permitted without" <+> ppr ext)
+  where
+     spliceExtension :: HsSplice GhcPs -> (String, LangExt.Extension)
+     spliceExtension (HsQuasiQuote {}) = ("Quasi-quotes", LangExt.QuasiQuotes)
+     spliceExtension (HsTypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
+     spliceExtension (HsUntypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
+     spliceExtension s@(HsSpliced {}) = pprPanic "spliceExtension" (ppr s)
 
 ------------------
 
@@ -302,8 +319,6 @@ runRnSplice flavour run_meta ppr_res splice
                 HsQuasiQuote _ _ q qs str -> mkQuasiQuoteExpr flavour q qs str
                 HsTypedSplice {}          -> pprPanic "runRnSplice" (ppr splice)
                 HsSpliced {}              -> pprPanic "runRnSplice" (ppr splice)
-                HsSplicedT {}             -> pprPanic "runRnSplice" (ppr splice)
-                XSplice nec               -> noExtCon nec
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -350,10 +365,6 @@ makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSpliced {})
   = pprPanic "makePending" (ppr splice)
-makePending _ splice@(HsSplicedT {})
-  = pprPanic "makePending" (ppr splice)
-makePending _ (XSplice nec)
-  = noExtCon nec
 
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
@@ -403,8 +414,6 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
                                                              , unitFV quoter') }
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
-rnSplice splice@(HsSplicedT {}) = pprPanic "rnSplice" (ppr splice)
-rnSplice        (XSplice nec)   = noExtCon nec
 
 ---------------------
 rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
@@ -524,10 +533,10 @@ References:
 
 [1] https://gitlab.haskell.org/ghc/ghc/wikis/template-haskell/reify
 [2] 'rnSpliceExpr'
-[3] 'TcSplice.qAddModFinalizer'
-[4] 'TcExpr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
-[5] 'TcHsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
-[6] 'TcPat.tc_pat' ('SplicePat' ('HsSpliced' ...))
+[3] 'GHC.Tc.Gen.Splice.qAddModFinalizer'
+[4] 'GHC.Tc.Gen.Expr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
+[5] 'GHC.Tc.Gen.HsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
+[6] 'GHC.Tc.Gen.Pat.tc_pat' ('SplicePat' ('HsSpliced' ...))
 
 -}
 
@@ -584,7 +593,7 @@ are given names during renaming. These names are collected right after
 renaming. The names generated for anonymous wild cards in TH type splices will
 thus be collected as well.
 
-For more details about renaming wild cards, see GHC.Rename.Types.rnHsSigWcType
+For more details about renaming wild cards, see GHC.Rename.HsType.rnHsSigWcType
 
 Note that partial type signatures are fully supported in TH declaration
 splices, e.g.:
@@ -637,12 +646,12 @@ rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
          , SpliceDecl noExtField (L loc rn_splice) flg)
 
     run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (ppr rn_splice)
-rnSpliceDecl (XSpliceDecl nec) = noExtCon nec
 
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls splice
-   = do  { (rn_splice, fvs) <- checkNoErrs $
+   =  do { checkTopSpliceAllowed splice
+         ; (rn_splice, fvs) <- checkNoErrs $
                                setStage (Splice Untyped) $
                                rnSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with
@@ -714,8 +723,6 @@ spliceCtxt splice
              HsTypedSplice   {} -> text "typed splice:"
              HsQuasiQuote    {} -> text "quasi-quotation:"
              HsSpliced       {} -> text "spliced expression:"
-             HsSplicedT      {} -> text "spliced expression:"
-             XSplice         {} -> text "spliced expression:"
 
 -- | The splice data to be logged
 data SpliceInfo
@@ -796,7 +803,7 @@ checkCrossStageLifting :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel
 -- Examples   \x -> [| x |]
 --            [| map |]
 --
--- This code is similar to checkCrossStageLifting in TcExpr, but
+-- This code is similar to checkCrossStageLifting in GHC.Tc.Gen.Expr, but
 -- this is only run on *untyped* brackets.
 
 checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name
@@ -875,7 +882,7 @@ them in the keep-alive set.
 Note [Quoting names]
 ~~~~~~~~~~~~~~~~~~~~
 A quoted name 'n is a bit like a quoted expression [| n |], except that we
-have no cross-stage lifting (c.f. TcExpr.thBrackId).  So, after incrementing
+have no cross-stage lifting (c.f. GHC.Tc.Gen.Expr.thBrackId).  So, after incrementing
 the use-level to account for the brackets, the cases are:
 
         bind > use                      Error

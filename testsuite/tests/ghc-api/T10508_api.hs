@@ -1,6 +1,6 @@
 module Main where
 
-import DynFlags
+import GHC.Driver.Session
 import GHC
 import qualified GHC.LanguageExtensions as LangExt
 

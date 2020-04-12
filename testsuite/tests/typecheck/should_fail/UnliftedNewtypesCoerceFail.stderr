@@ -1,5 +1,8 @@
-UnliftedNewtypesCoerceFail.hs:15:8:
+
+UnliftedNewtypesCoerceFail.hs:15:8: error:
     Cannot use function with levity-polymorphic arguments:
       coerce :: x -> y
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
     Levity-polymorphic arguments: x :: TYPE rep
-

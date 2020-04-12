@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a

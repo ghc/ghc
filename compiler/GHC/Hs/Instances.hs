@@ -242,11 +242,6 @@ deriving instance Data (RoleAnnotDecl GhcTc)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Expr -----------------------------------
 
--- deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
-deriving instance Data (SyntaxExpr GhcPs)
-deriving instance Data (SyntaxExpr GhcRn)
-deriving instance Data (SyntaxExpr GhcTc)
-
 -- deriving instance (DataIdLR p p) => Data (HsPragE p)
 deriving instance Data (HsPragE GhcPs)
 deriving instance Data (HsPragE GhcRn)
@@ -331,10 +326,13 @@ deriving instance Data (ArithSeqInfo GhcPs)
 deriving instance Data (ArithSeqInfo GhcRn)
 deriving instance Data (ArithSeqInfo GhcTc)
 
-deriving instance                   Data RecordConTc
-deriving instance                   Data CmdTopTc
-deriving instance                   Data PendingRnSplice
-deriving instance                   Data PendingTcSplice
+deriving instance Data RecordConTc
+deriving instance Data RecordUpdTc
+deriving instance Data CmdTopTc
+deriving instance Data PendingRnSplice
+deriving instance Data PendingTcSplice
+deriving instance Data SyntaxExprRn
+deriving instance Data SyntaxExprTc
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Lit ------------------------------------

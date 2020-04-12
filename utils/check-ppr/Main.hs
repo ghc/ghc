@@ -1,16 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Data.List
-import SrcLoc
+import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
-import DynFlags
+import GHC.Driver.Session
 import Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
-
-import qualified Data.Map        as Map
 
 usage :: String
 usage = unlines
@@ -93,9 +91,7 @@ getPragmas anns = pragmaStr
     tokComment (L _ (AnnLineComment  s)) = s
     tokComment _ = ""
 
-    comments = case Map.lookup noSrcSpan (snd anns) of
-      Nothing -> []
-      Just cl -> map tokComment $ sortLocated cl
+    comments = map tokComment $ sortRealLocated $ apiAnnRogueComments anns
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
     pragmaStr = intercalate "\n" pragmas
 

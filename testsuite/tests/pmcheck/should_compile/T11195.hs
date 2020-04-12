@@ -2,15 +2,15 @@
 
 module T11195 where
 
-import TyCoRep
-import Coercion
-import Type hiding( substTyVarBndr, substTy, extendTCvSubst )
-import TcType       ( exactTyCoVarsOfType )
-import CoAxiom
-import VarSet
-import VarEnv
+import GHC.Core.TyCo.Rep
+import GHC.Core.Coercion
+import GHC.Core.Type hiding( substTyVarBndr, substTy, extendTCvSubst )
+import GHC.Core.InstEnv
+import GHC.Core.Coercion.Axiom
+import GHC.Tc.Utils.TcType       ( exactTyCoVarsOfType )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import Pair
-import InstEnv
 
 type NormalCo    = Coercion
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity
@@ -79,8 +79,6 @@ opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
   | Just prov' <- opt_trans_prov p1 p2 = undefined
   where
     -- if the provenances are different, opt'ing will be very confusing
-    opt_trans_prov UnsafeCoerceProv UnsafeCoerceProv
-      = Just UnsafeCoerceProv
     opt_trans_prov (PhantomProv kco1) (PhantomProv kco2)
       = Just $ PhantomProv $ opt_trans is kco1 kco2
     opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)

@@ -57,7 +57,8 @@
 ((Test10357.hs:10:27-44,AnnFunId), [Test10357.hs:10:27-28]),
 ((Test10357.hs:11:7-29,AnnLarrow), [Test10357.hs:11:13-14]),
 ((Test10357.hs:11:7-29,AnnVbar), [Test10357.hs:12:5]),
-((Test10357.hs:12:7-24,AnnLarrow), [Test10357.hs:12:13-14]),
-((<no location info>,AnnEofPos), [Test10357.hs:14:1])
+((Test10357.hs:12:7-24,AnnLarrow), [Test10357.hs:12:13-14])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10357.hs" 14 1

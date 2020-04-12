@@ -1,5 +1,5 @@
 module Main (main) where
-import Data.List
+import Data.List (isSuffixOf)
 
 needles = ["","1","2","12","123","1234"]
 haystacks = ["","a","ab","abc","1","2","3","a1","1a",

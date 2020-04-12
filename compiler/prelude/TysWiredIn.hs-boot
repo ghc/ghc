@@ -1,10 +1,10 @@
 module TysWiredIn where
 
-import {-# SOURCE #-} TyCon      ( TyCon )
-import {-# SOURCE #-} TyCoRep    (Type, Kind)
+import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind)
 
-import BasicTypes (Arity, TupleSort)
-import Name (Name)
+import GHC.Types.Basic (Arity, TupleSort)
+import GHC.Types.Name (Name)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
@@ -15,6 +15,8 @@ coercibleTyCon, heqTyCon :: TyCon
 unitTy :: Type
 
 liftedTypeKind :: Kind
+liftedTypeKindTyCon :: TyCon
+
 constraintKind :: Kind
 
 runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon

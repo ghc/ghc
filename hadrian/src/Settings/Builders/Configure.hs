@@ -6,14 +6,15 @@ import Settings.Builders.Common
 
 configureBuilderArgs :: Args
 configureBuilderArgs = do
-    gmpPath    <- expr gmpBuildPath
     stage      <- getStage
+    gmpPath    <- expr (gmpBuildPath stage)
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
-                hostPlatform  <- getSetting HostPlatform
+                targetPlatform <- getSetting TargetPlatform
                 buildPlatform <- getSetting BuildPlatform
                 pure [ "--enable-shared=no"
-                     , "--host=" ++ hostPlatform
+                     , "--with-pic=yes"
+                     , "--host=" ++ targetPlatform    -- GMP's host is our target
                      , "--build=" ++ buildPlatform ]
 
             , builder (Configure libffiPath) ? do

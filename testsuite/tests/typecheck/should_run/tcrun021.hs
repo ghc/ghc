@@ -1,13 +1,13 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              TypeSynonymInstances, FlexibleInstances #-}
 
--- This bizarre program failed because TcSimplify built a loop of
+-- This bizarre program failed because GHC.Tc.Solver built a loop of
 -- dictionaries, due to an obscure bug in the way in which superclasses
 -- were added
 
 module Main where
 
-import Data.List
+import Data.List ()
 import Data.Map
 
 class (Ord oid) => Object o oid | o -> oid where

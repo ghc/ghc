@@ -392,7 +392,7 @@ needs.  Our main plan is to say
         foo :: <type>
         foo = foo
 We have to silence GHC's complaints about unboxed-top-level declarations
-with an ad-hoc fix in TcBinds: see Note [Compiling GHC.Prim] in TcBinds.
+with an ad-hoc fix in GHC.Tc.Gen.Bind: see Note [Compiling GHC.Prim] in GHC.Tc.Gen.Bind.
 
 That works for all the primitive functions except tagToEnum#.
 If we generate the binding
@@ -892,6 +892,7 @@ ppType (TyApp (TyCon "IOPort#") [x,y])   = "mkIOPortPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
 ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
+ppType (TyApp (TyCon "Void#") [])        = "voidPrimTy"
 
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 

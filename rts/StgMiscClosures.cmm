@@ -6,7 +6,7 @@
  *
  * This file is written in a subset of C--, extended with various
  * features specific to GHC.  It is compiled by GHC directly.  For the
- * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ * syntax of .cmm files, see the parser in ghc/compiler/GHC/Cmm/Parser.y.
  *
  * --------------------------------------------------------------------------*/
 
@@ -255,15 +255,6 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     jump %GET_ENTRY(R1) [R1];
 }
 #endif
-
-INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
-    (P_ node)
-{
-    TICK_ENT_DYN_IND(); /* tick */
-    node = StgInd_indirectee(node);
-    TICK_ENT_VIA_NODE();
-    jump %ENTRY_CODE(Sp(0)) (node);
-}
 
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     /* explicit stack */
@@ -695,16 +686,16 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
    compaction is in progress and the hash table needs to be scanned by the GC.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
 { foreign "C" barf("COMPACT_NFDATA_CLEAN object (%p) entered!", R1) never returns; }
 
-INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
-   CHARLIKE and INTLIKE closures.
+   Note [CHARLIKE and INTLIKE closures.]
 
    These are static representations of Chars and small Ints, so that
    we can remove dynamic Chars and Ints during garbage collection and

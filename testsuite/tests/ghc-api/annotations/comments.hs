@@ -6,10 +6,10 @@ module Main where
 
 -- import Data.Generics
 import Data.Data
-import Data.List
+import Data.List (intercalate)
 import System.IO
 import GHC
-import DynFlags
+import GHC.Driver.Session
 import MonadUtils
 import Outputable
 import Bag (filterBag,isEmptyBag)
@@ -49,13 +49,19 @@ testOneFile libdir fileName useHaddock = do
         return (pm_annotations p)
 
     let anns = p
+        ann_comments = apiAnnComments anns
+        ann_rcomments = apiAnnRogueComments anns
+        comments =
+          map (\(s,v) -> (RealSrcSpan s Nothing, v)) (Map.toList ann_comments)
+            ++
+          [(noSrcSpan, ann_rcomments)]
 
-    putStrLn (intercalate "\n" [showAnns anns])
+    putStrLn (intercalate "\n" [showAnns comments])
 
-showAnns (_,anns) = "[\n" ++ (intercalate "\n"
+showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\(s,v)
               -> ("( " ++ pp s ++" =\n[" ++ showToks v ++ "])\n"))
-   $ Map.toList anns)
+   $ anns)
     ++ "]\n"
 
 showToks ts = intercalate ",\n\n"

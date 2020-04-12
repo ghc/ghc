@@ -1,17 +1,5 @@
 {-
 
-NOTA BENE: Do NOT use ($) anywhere in this module! The type of ($) is
-slightly magical (it can return unlifted types), and it is wired in.
-But, it is also *defined* in this module, with a non-magical type.
-GHC gets terribly confused (and *hangs*) if you try to use ($) in this
-module, because it has different types in different scenarios.
-
-This is not a problem in general, because the type ($), being wired in, is not
-written out to the interface file, so importing files don't get confused.
-The problem is only if ($) is used here. So don't!
-
----------------------------------------------
-
 The overall structure of the GHC Prelude is a bit tricky.
 
   a) We want to avoid "orphan modules", i.e. ones with instance
@@ -691,7 +679,7 @@ class Functor f => Applicative f where
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 --
--- | Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
+-- Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
 -- @do@ expression
 --
 --
@@ -1251,8 +1239,7 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 --
 -- >>> map (+1) [1, 2, 3]
---- [2,3,4]
-
+-- [2,3,4]
 map :: (a -> b) -> [a] -> [b]
 {-# NOINLINE [0] map #-}
   -- We want the RULEs "map" and "map/coerce" to fire first.
@@ -1313,6 +1300,7 @@ The rules for map work like this.
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
+-- See Note [Getting the map/coerce RULE to work] in CoreOpt
 
 ----------------------------------------------
 --              append
@@ -1370,7 +1358,7 @@ eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString _        _        = False
 
 {-# RULES "eqString" (==) = eqString #-}
--- eqString also has a BuiltInRule in PrelRules.hs:
+-- eqString also has a BuiltInRule in GHC.Core.Op.ConstantFold:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
 
@@ -1636,7 +1624,7 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
--- There's a built-in rule (in PrelRules.hs) for
+-- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}

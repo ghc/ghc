@@ -39,17 +39,9 @@ clean_gmp:
 	$(call removeTrees,libraries/integer-gmp/gmp/gmpbuild)
 endif
 
-ifeq "$(Windows_Host)" "YES"
-# Apparently building on Windows fails when there is a system gmp
-# available, so we never try to use the system gmp on Windows
-libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
-endif
-
 ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
-
-ifeq "$(phase)" "final"
 
 ifneq "$(CLEANING)" "YES"
 # Hack. The file config.mk doesn't exist yet after running ./configure in
@@ -59,7 +51,7 @@ ifneq "$(CLEANING)" "YES"
 endif
 
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
-gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
+gmp_LD_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
 # Compile GMP only if we don't have it already
 #
@@ -91,20 +83,24 @@ UseIntreeGmp = YES
 endif
 endif
 
-ifeq "$(UseIntreeGmp)" "YES"
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h libraries/integer-gmp/include/ghc-gmp.h
+# wrappers.c includes "ghc-gmp.h"
+libraries/integer-gmp/cbits/wrappers.c: libraries/integer-gmp/include/ghc-gmp.h
 
+ifeq "$(UseIntreeGmp)" "YES"
+
+# Copy header from in-tree build (gmp.h => ghc-gmp.h)
 libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/gmp.h
 	$(CP) $< $@
 
-gmp_CC_OPTS += -Ilibraries/integer-gmp/gmp
-
+# Link in-tree GMP objects
 libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/*.o
-else
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/include/ghc-gmp.h
 
+else
+
+# Copy header from source tree
 libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/ghc-gmp.h
 	$(CP) $< $@
+
 endif
 
 libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
@@ -131,7 +127,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	#       run is the 'target' platform of the compiler we're building.
 	cd libraries/integer-gmp/gmp/gmpbuild; \
 	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
-	          --enable-shared=no \
+	          --enable-shared=no --with-pic=yes \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
@@ -141,4 +137,3 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
 
 endif # CLEANING
-endif # phase

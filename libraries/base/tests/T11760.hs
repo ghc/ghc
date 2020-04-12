@@ -12,7 +12,7 @@ import Control.Exception
 import Data.STRef
 import Data.IORef
 import Control.Concurrent.MVar
-import Data.List
+import Data.List (foldl')
 
 -- evil ST action that tries to synchronize (by busy waiting on the
 -- shared STRef) with a concurrent evaluation

@@ -33,6 +33,7 @@ typedef int64_t Time;
 
 #define SecondsToTime(t) ((Time)(t) * TIME_RESOLUTION)
 #define TimeToSeconds(t) ((t) / TIME_RESOLUTION)
+#define TimeToSecondsDbl(t) ((double)(t) / TIME_RESOLUTION)
 
 // Use instead of SecondsToTime() when we have a floating-point
 // seconds value, to avoid truncating it.

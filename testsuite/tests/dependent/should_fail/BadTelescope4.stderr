@@ -1,7 +1,7 @@
 
 BadTelescope4.hs:9:1: error:
     • The kind of ‘Bad’ is ill-scoped
-        Inferred kind: Bad :: forall k (b :: Proxy a). forall (a :: k) ->
+        Inferred kind: Bad :: forall {k} (b :: Proxy a). forall (a :: k) ->
                               Proxy b -> forall (d :: Proxy a) -> SameKind b d -> *
       NB: Inferred variables
         (namely: k) always come first

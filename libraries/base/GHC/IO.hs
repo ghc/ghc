@@ -47,6 +47,7 @@ import GHC.ST
 import GHC.Exception
 import GHC.Show
 import GHC.IO.Unsafe
+import Unsafe.Coerce ( unsafeCoerce )
 
 import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
 
@@ -99,7 +100,7 @@ ioToST (IO m) = (ST m)
 -- This relies on 'IO' and 'ST' having the same representation modulo the
 -- constraint on the state thread type parameter.
 unsafeIOToST        :: IO a -> ST s a
-unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
+unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce io) s
 
 -- | Convert an 'ST' action to an 'IO' action.
 -- This relies on 'IO' and 'ST' having the same representation modulo the
@@ -108,7 +109,7 @@ unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 -- For an example demonstrating why this is unsafe, see
 -- https://mail.haskell.org/pipermail/haskell-cafe/2009-April/060719.html
 unsafeSTToIO :: ST s a -> IO a
-unsafeSTToIO (ST m) = IO (unsafeCoerce# m)
+unsafeSTToIO (ST m) = IO (unsafeCoerce m)
 
 -- -----------------------------------------------------------------------------
 -- | File and directory names are values of type 'String', whose precise

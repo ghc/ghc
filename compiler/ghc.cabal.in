@@ -156,28 +156,15 @@ Library
     c-sources:
         cbits/cutils.c
         cbits/genSym.c
-        ghci/keepCAFsForGHCi.c
+        cbits/keepCAFsForGHCi.c
 
     hs-source-dirs:
         .
-        backpack
-        basicTypes
-        cmm
-        coreSyn
-        deSugar
-        ghci
         iface
-        llvmGen
         main
-        nativeGen
         parser
         prelude
-        profiling
-        simplCore
-        specialise
-        stranal
         typecheck
-        types
         utils
 
     -- we use an explicit Prelude
@@ -192,90 +179,95 @@ Library
         GHC.Iface.Ext.Ast
         Ar
         FileCleanup
-        DriverBkp
-        BkpSyn
-        NameShape
+        GHC.Driver.Backpack
+        GHC.Driver.Backpack.Syntax
+        GHC.Types.Name.Shape
         GHC.Iface.Rename
-        Avail
+        GHC.Types.Avail
         AsmUtils
-        BasicTypes
-        ConLike
-        DataCon
-        PatSyn
-        Demand
-        Debug
+        GHC.Types.Basic
+        GHC.Core.ConLike
+        GHC.Core.DataCon
+        GHC.Core.PatSyn
+        GHC.Types.Demand
+        GHC.Types.Cpr
+        GHC.Cmm.DebugBlock
         Exception
-        FieldLabel
-        GhcMonad
-        Hooks
-        Id
-        IdInfo
-        Predicate
-        Lexeme
-        Literal
-        Llvm
-        Llvm.AbsSyn
-        Llvm.MetaData
-        Llvm.PpLlvm
-        Llvm.Types
-        LlvmCodeGen
-        LlvmCodeGen.Base
-        LlvmCodeGen.CodeGen
-        LlvmCodeGen.Data
-        LlvmCodeGen.Ppr
-        LlvmCodeGen.Regs
-        LlvmMangler
-        MkId
-        Module
-        Name
-        NameEnv
-        NameSet
-        OccName
-        RdrName
-        NameCache
-        SrcLoc
-        UniqSupply
-        Unique
-        Var
-        VarEnv
-        VarSet
+        GHC.Types.FieldLabel
+        GHC.Driver.Monad
+        GHC.Driver.Hooks
+        GHC.Driver.Flags
+        GHC.Driver.Ways
+        GHC.Types.Id
+        GHC.Types.Id.Info
+        GHC.Core.Predicate
+        GHC.Utils.Lexeme
+        GHC.Types.Literal
+        GHC.Llvm
+        GHC.Llvm.Syntax
+        GHC.Llvm.MetaData
+        GHC.Llvm.Ppr
+        GHC.Llvm.Types
+        GHC.CmmToLlvm
+        GHC.CmmToLlvm.Base
+        GHC.CmmToLlvm.CodeGen
+        GHC.CmmToLlvm.Data
+        GHC.CmmToLlvm.Ppr
+        GHC.CmmToLlvm.Regs
+        GHC.CmmToLlvm.Mangler
+        GHC.Types.Id.Make
+        GHC.Types.Module
+        GHC.Types.Name
+        GHC.Types.Name.Env
+        GHC.Types.Name.Set
+        GHC.Types.Name.Occurrence
+        GHC.Types.Name.Reader
+        GHC.Types.Name.Cache
+        GHC.Types.SrcLoc
+        GHC.Types.Unique.Supply
+        GHC.Types.Unique
+        UpdateCafInfos
+        GHC.Types.Var
+        GHC.Types.Var.Env
+        GHC.Types.Var.Set
         UnVarGraph
-        BlockId
-        CLabel
-        Cmm
-        CmmBuildInfoTables
-        CmmPipeline
-        CmmCallConv
-        CmmCommonBlockElim
-        CmmImplementSwitchPlans
-        CmmContFlowOpt
-        CmmExpr
-        CmmInfo
-        CmmLex
-        CmmLint
-        CmmLive
-        CmmMachOp
-        CmmMonad
-        CmmSwitch
-        CmmNode
-        CmmOpt
-        CmmParse
-        CmmProcPoint
-        CmmSink
-        CmmType
-        CmmUtils
-        CmmLayoutStack
+        GHC.Cmm.BlockId
+        GHC.Cmm.CLabel
+        GHC.Cmm
+        GHC.Cmm.Info.Build
+        GHC.Cmm.Pipeline
+        GHC.Cmm.CallConv
+        GHC.Cmm.CommonBlockElim
+        GHC.Cmm.Switch.Implement
+        GHC.Cmm.ContFlowOpt
+        GHC.Cmm.Expr
+        GHC.Cmm.Info
+        GHC.Cmm.Lexer
+        GHC.Cmm.Lint
+        GHC.Cmm.Liveness
+        GHC.Cmm.MachOp
+        GHC.Cmm.Monad
+        GHC.Cmm.Switch
+        GHC.Cmm.Node
+        GHC.Cmm.Opt
+        GHC.Cmm.Parser
+        GHC.Cmm.ProcPoint
+        GHC.Cmm.Sink
+        GHC.Cmm.Type
+        GHC.Cmm.Utils
+        GHC.Cmm.LayoutStack
         CliOption
         EnumSet
         GhcNameVersion
         FileSettings
-        MkGraph
-        PprBase
-        PprC
-        PprCmm
-        PprCmmDecl
-        PprCmmExpr
-        Bitmap
+        GHC.Cmm.Graph
+        GHC.CmmToAsm.Ppr
+        GHC.CmmToAsm.Config
+        GHC.CmmToC
+        GHC.Cmm.Ppr
+        GHC.Cmm.Ppr.Decl
+        GHC.Cmm.Ppr.Expr
+        GHC.Data.Bitmap
         GHC.Platform.Regs
         GHC.Platform.ARM
         GHC.Platform.ARM64
@@ -303,42 +295,42 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
-        SMRep
-        CoreArity
-        CoreFVs
-        CoreLint
-        CoreSubst
-        CoreOpt
-        CoreSyn
+        GHC.Runtime.Heap.Layout
+        GHC.Core.Arity
+        GHC.Core.FVs
+        GHC.Core.Lint
+        GHC.Core.Subst
+        GHC.Core.SimpleOpt
+        GHC.Core
         TrieMap
-        CoreTidy
-        CoreUnfold
-        CoreUtils
-        CoreMap
-        CoreSeq
-        CoreStats
-        MkCore
-        PprCore
+        GHC.Core.Op.Tidy
+        GHC.Core.Unfold
+        GHC.Core.Utils
+        GHC.Core.Map
+        GHC.Core.Seq
+        GHC.Core.Stats
+        GHC.Core.Make
+        GHC.Core.Ppr
         GHC.HsToCore.PmCheck.Oracle
         GHC.HsToCore.PmCheck.Ppr
         GHC.HsToCore.PmCheck.Types
         GHC.HsToCore.PmCheck
-        Coverage
-        Desugar
-        DsArrows
-        DsBinds
-        DsCCall
-        DsExpr
-        DsForeign
-        DsGRHSs
-        DsListComp
-        DsMonad
-        DsUsage
-        DsUtils
-        ExtractDocs
-        Match
-        MatchCon
-        MatchLit
+        GHC.HsToCore.Coverage
+        GHC.HsToCore
+        GHC.HsToCore.Arrows
+        GHC.HsToCore.Binds
+        GHC.HsToCore.Foreign.Call
+        GHC.HsToCore.Expr
+        GHC.HsToCore.Foreign.Decl
+        GHC.HsToCore.GuardedRHSs
+        GHC.HsToCore.ListComp
+        GHC.HsToCore.Monad
+        GHC.HsToCore.Usage
+        GHC.HsToCore.Utils
+        GHC.HsToCore.Docs
+        GHC.HsToCore.Match
+        GHC.HsToCore.Match.Constructor
+        GHC.HsToCore.Match.Literal
         GHC.Hs
         GHC.Hs.Binds
         GHC.Hs.Decls
@@ -346,7 +338,6 @@ Library
         GHC.Hs.Expr
         GHC.Hs.ImpExp
         GHC.Hs.Lit
-        GHC.Hs.PlaceHolder
         GHC.Hs.Extension
         GHC.Hs.Instances
         GHC.Hs.Pat
@@ -355,44 +346,45 @@ Library
         GHC.Hs.Dump
         GHC.Iface.Binary
         BinFingerprint
-        BuildTyCl
+        GHC.Tc.TyCl.Build
         GHC.Iface.Env
         GHC.Iface.Syntax
         GHC.Iface.Type
         GHC.CoreToIface
         GHC.Iface.Load
-        GHC.Iface.Utils
+        GHC.Iface.Make
+        GHC.Iface.Recomp
         GHC.IfaceToCore
         FlagChecker
-        Annotations
-        CmdLineParser
-        CodeOutput
+        GHC.Types.Annotations
+        GHC.Driver.CmdLine
+        GHC.Driver.CodeOutput
         Config
         Constants
-        DriverMkDepend
-        DriverPhases
-        PipelineMonad
-        DriverPipeline
-        DynFlags
+        GHC.Driver.MakeFile
+        GHC.Driver.Phases
+        GHC.Driver.Pipeline.Monad
+        GHC.Driver.Pipeline
+        GHC.Driver.Session
         ErrUtils
-        Finder
+        GHC.Driver.Finder
         GHC
-        GhcMake
-        GhcPlugins
+        GHC.Driver.Make
+        GHC.Plugins
         GhcPrelude
-        DynamicLoading
         HeaderInfo
-        HscMain
+        GHC.Driver.Main
         HscStats
-        HscTypes
-        InteractiveEval
-        InteractiveEvalTypes
-        PackageConfig
-        Packages
+        GHC.Driver.Types
+        GHC.Runtime.Eval
+        GHC.Runtime.Eval.Types
+        GHC.Runtime.Loader
+        UnitInfo
+        GHC.Driver.Packages
         PlatformConstants
-        Plugins
-        TcPluginM
-        PprTyThing
+        GHC.Driver.Plugins
+        GHC.Tc.Plugin
+        GHC.Core.Ppr.TyThing
         Settings
         StaticPtrTable
         SysTools
@@ -408,47 +400,46 @@ Library
         Ctype
         HaddockUtils
         Lexer
-        OptCoercion
+        GHC.Core.Coercion.Opt
         Parser
         RdrHsSyn
         ApiAnnotation
-        ForeignCall
+        GHC.Types.ForeignCall
         KnownUniques
         PrelInfo
         PrelNames
-        PrelRules
+        GHC.Core.Op.ConstantFold
         PrimOp
         ToolSettings
         TysPrim
         TysWiredIn
-        CostCentre
-        CostCentreState
-        ProfInit
-        GHC.Rename.Binds
+        GHC.Types.CostCentre
+        GHC.Types.CostCentre.State
+        GHC.Rename.Bind
         GHC.Rename.Env
         GHC.Rename.Expr
         GHC.Rename.Doc
         GHC.Rename.Names
         GHC.Rename.Pat
-        GHC.Rename.Source
+        GHC.Rename.Module
         GHC.Rename.Splice
-        GHC.Rename.Types
+        GHC.Rename.HsType
         GHC.Rename.Fixity
         GHC.Rename.Utils
         GHC.Rename.Unbound
-        CoreMonad
-        CSE
-        FloatIn
-        FloatOut
-        LiberateCase
-        OccurAnal
-        SAT
-        SetLevels
-        SimplCore
-        SimplEnv
-        SimplMonad
-        SimplUtils
-        Simplify
+        GHC.Core.Op.Monad
+        GHC.Core.Op.CSE
+        GHC.Core.Op.FloatIn
+        GHC.Core.Op.FloatOut
+        GHC.Core.Op.LiberateCase
+        GHC.Core.Op.OccurAnal
+        GHC.Core.Op.StaticArgs
+        GHC.Core.Op.SetLevels
+        GHC.Core.Op.Simplify.Driver
+        GHC.Core.Op.Simplify.Env
+        GHC.Core.Op.Simplify.Monad
+        GHC.Core.Op.Simplify.Utils
+        GHC.Core.Op.Simplify
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.CSE
@@ -460,84 +451,86 @@ Library
         GHC.Stg.Lint
         GHC.Stg.Syntax
         GHC.Stg.FVs
+        GHC.Stg.DepAnal
         GHC.CoreToStg
         GHC.CoreToStg.Prep
         GHC.Types.RepType
-        Rules
-        SpecConstr
-        Specialise
-        CallArity
-        DmdAnal
-        Exitify
-        WorkWrap
-        WwLib
-        FamInst
-        ClsInst
-        Inst
-        TcAnnotations
-        TcArrows
-        TcBinds
-        TcSigs
-        TcClassDcl
-        TcDefaults
-        TcDeriv
-        TcDerivInfer
-        TcDerivUtils
-        TcEnv
-        TcExpr
-        TcForeign
-        TcGenDeriv
-        TcGenFunctor
-        TcGenGenerics
-        TcHsSyn
-        TcHsType
-        TcInstDcls
-        TcMType
-        TcValidity
-        TcMatches
-        TcPat
-        TcPatSyn
-        TcRnDriver
-        TcBackpack
-        TcRnExports
-        TcRnMonad
-        TcRnTypes
-        Constraint
-        TcOrigin
-        TcRules
-        TcSimplify
-        TcHoleErrors
-        TcHoleFitTypes
-        TcErrors
-        TcTyClsDecls
-        TcTyDecls
-        TcTypeable
-        TcType
-        TcEvidence
-        TcEvTerm
-        TcUnify
-        TcInteract
-        TcCanonical
-        TcFlatten
-        TcSMonad
+        GHC.Core.Rules
+        GHC.Core.Op.SpecConstr
+        GHC.Core.Op.Specialise
+        GHC.Core.Op.CallArity
+        GHC.Core.Op.DmdAnal
+        GHC.Core.Op.CprAnal
+        GHC.Core.Op.Exitify
+        GHC.Core.Op.WorkWrap
+        GHC.Core.Op.WorkWrap.Lib
+        GHC.Tc.Instance.Family
+        GHC.Tc.Instance.Class
+        GHC.Tc.Utils.Instantiate
+        GHC.Tc.Gen.Annotation
+        GHC.Tc.Gen.Arrow
+        GHC.Tc.Gen.Bind
+        GHC.Tc.Gen.Sig
+        GHC.Tc.TyCl.Class
+        GHC.Tc.Gen.Default
+        GHC.Tc.Deriv
+        GHC.Tc.Deriv.Infer
+        GHC.Tc.Deriv.Utils
+        GHC.Tc.Utils.Env
+        GHC.Tc.Gen.Expr
+        GHC.Tc.Gen.Foreign
+        GHC.Tc.Deriv.Generate
+        GHC.Tc.Deriv.Functor
+        GHC.Tc.Deriv.Generics
+        GHC.Tc.Utils.Zonk
+        GHC.Tc.Utils.TcType
+        GHC.Tc.TyCl.Instance
+        GHC.Tc.Utils.TcMType
+        GHC.Tc.Validity
+        GHC.Tc.Gen.Match
+        GHC.Tc.Gen.Pat
+        GHC.Tc.TyCl.PatSyn
+        GHC.Tc.Module
+        GHC.Tc.Utils.Backpack
+        GHC.Tc.Gen.Export
+        GHC.Tc.Utils.Monad
+        GHC.Tc.Types
+        GHC.Tc.Types.Constraint
+        GHC.Tc.Types.Origin
+        GHC.Tc.Gen.Rule
+        GHC.Tc.Errors.Hole
+        GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors
+        GHC.Tc.TyCl
+        GHC.Tc.TyCl.Utils
+        GHC.Tc.Instance.Typeable
+        GHC.Tc.Gen.HsType
+        GHC.Tc.Types.Evidence
+        GHC.Tc.Types.EvTerm
+        GHC.Tc.Utils.Unify
+        GHC.Tc.Solver
+        GHC.Tc.Solver.Interact
+        GHC.Tc.Solver.Canonical
+        GHC.Tc.Solver.Flatten
+        GHC.Tc.Solver.Monad
         TcTypeNats
-        TcSplice
-        Class
-        Coercion
-        DsMeta
+        GHC.Tc.Gen.Splice
+        GHC.Core.Class
+        GHC.Core.Coercion
+        GHC.HsToCore.Quote
         THNames
-        FamInstEnv
-        FunDeps
-        InstEnv
-        TyCon
-        CoAxiom
-        Type
-        TyCoRep
-        TyCoFVs
-        TyCoSubst
-        TyCoPpr
-        TyCoTidy
-        Unify
+        GHC.Core.FamInstEnv
+        GHC.Tc.Instance.FunDeps
+        GHC.Core.InstEnv
+        GHC.Core.TyCon
+        GHC.Core.Coercion.Axiom
+        GHC.Core.Type
+        GHC.Core.TyCo.Rep
+        GHC.Core.TyCo.FVs
+        GHC.Core.TyCo.Subst
+        GHC.Core.TyCo.Ppr
+        GHC.Core.TyCo.Tidy
+        GHC.Core.Unify
         Bag
         Binary
         BooleanFormula
@@ -570,93 +563,93 @@ Library
         State
         Stream
         StringBuffer
-        UniqDFM
-        UniqDSet
-        UniqFM
-        UniqMap
-        UniqSet
+        GHC.Types.Unique.DFM
+        GHC.Types.Unique.DSet
+        GHC.Types.Unique.FM
+        GHC.Types.Unique.Set
         Util
-        Hoopl.Block
-        Hoopl.Collections
-        Hoopl.Dataflow
-        Hoopl.Graph
-        Hoopl.Label
+        GHC.Cmm.Dataflow
+        GHC.Cmm.Dataflow.Block
+        GHC.Cmm.Dataflow.Collections
+        GHC.Cmm.Dataflow.Graph
+        GHC.Cmm.Dataflow.Label
 
     Exposed-Modules:
-            AsmCodeGen
-            TargetReg
-            NCGMonad
-            Instruction
-            BlockLayout
-            CFG
-            Dominators
-            Format
-            Reg
-            RegClass
-            PIC
-            CPrim
-            X86.Regs
-            X86.RegInfo
-            X86.Instr
-            X86.Cond
-            X86.Ppr
-            X86.CodeGen
-            PPC.Regs
-            PPC.RegInfo
-            PPC.Instr
-            PPC.Cond
-            PPC.Ppr
-            PPC.CodeGen
-            SPARC.Base
-            SPARC.Regs
-            SPARC.Imm
-            SPARC.AddrMode
-            SPARC.Cond
-            SPARC.Instr
-            SPARC.Stack
-            SPARC.ShortcutJump
-            SPARC.Ppr
-            SPARC.CodeGen
-            SPARC.CodeGen.Amode
-            SPARC.CodeGen.Base
-            SPARC.CodeGen.CondCode
-            SPARC.CodeGen.Gen32
-            SPARC.CodeGen.Gen64
-            SPARC.CodeGen.Sanity
-            SPARC.CodeGen.Expand
-            RegAlloc.Liveness
-            RegAlloc.Graph.Main
-            RegAlloc.Graph.Stats
-            RegAlloc.Graph.ArchBase
-            RegAlloc.Graph.ArchX86
-            RegAlloc.Graph.Coalesce
-            RegAlloc.Graph.Spill
-            RegAlloc.Graph.SpillClean
-            RegAlloc.Graph.SpillCost
-            RegAlloc.Graph.TrivColorable
-            RegAlloc.Linear.Main
-            RegAlloc.Linear.JoinToTargets
-            RegAlloc.Linear.State
-            RegAlloc.Linear.Stats
-            RegAlloc.Linear.FreeRegs
-            RegAlloc.Linear.StackMap
-            RegAlloc.Linear.Base
-            RegAlloc.Linear.X86.FreeRegs
-            RegAlloc.Linear.X86_64.FreeRegs
-            RegAlloc.Linear.PPC.FreeRegs
-            RegAlloc.Linear.SPARC.FreeRegs
-            Dwarf
-            Dwarf.Types
-            Dwarf.Constants
+            GHC.CmmToAsm
+            GHC.CmmToAsm.Reg.Target
+            GHC.CmmToAsm.Monad
+            GHC.CmmToAsm.Instr
+            GHC.CmmToAsm.BlockLayout
+            GHC.CmmToAsm.CFG
+            GHC.CmmToAsm.CFG.Dominators
+            GHC.CmmToAsm.Format
+            GHC.Platform.Reg
+            GHC.Platform.Reg.Class
+            GHC.CmmToAsm.PIC
+            GHC.CmmToAsm.CPrim
+            GHC.CmmToAsm.X86.Regs
+            GHC.CmmToAsm.X86.RegInfo
+            GHC.CmmToAsm.X86.Instr
+            GHC.CmmToAsm.X86.Cond
+            GHC.CmmToAsm.X86.Ppr
+            GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.PPC.Regs
+            GHC.CmmToAsm.PPC.RegInfo
+            GHC.CmmToAsm.PPC.Instr
+            GHC.CmmToAsm.PPC.Cond
+            GHC.CmmToAsm.PPC.Ppr
+            GHC.CmmToAsm.PPC.CodeGen
+            GHC.CmmToAsm.SPARC.Base
+            GHC.CmmToAsm.SPARC.Regs
+            GHC.CmmToAsm.SPARC.Imm
+            GHC.CmmToAsm.SPARC.AddrMode
+            GHC.CmmToAsm.SPARC.Cond
+            GHC.CmmToAsm.SPARC.Instr
+            GHC.CmmToAsm.SPARC.Stack
+            GHC.CmmToAsm.SPARC.ShortcutJump
+            GHC.CmmToAsm.SPARC.Ppr
+            GHC.CmmToAsm.SPARC.CodeGen
+            GHC.CmmToAsm.SPARC.CodeGen.Amode
+            GHC.CmmToAsm.SPARC.CodeGen.Base
+            GHC.CmmToAsm.SPARC.CodeGen.CondCode
+            GHC.CmmToAsm.SPARC.CodeGen.Gen32
+            GHC.CmmToAsm.SPARC.CodeGen.Gen64
+            GHC.CmmToAsm.SPARC.CodeGen.Sanity
+            GHC.CmmToAsm.SPARC.CodeGen.Expand
+            GHC.CmmToAsm.Reg.Liveness
+            GHC.CmmToAsm.Reg.Graph
+            GHC.CmmToAsm.Reg.Graph.Stats
+            GHC.CmmToAsm.Reg.Graph.Base
+            GHC.CmmToAsm.Reg.Graph.X86
+            GHC.CmmToAsm.Reg.Graph.Coalesce
+            GHC.CmmToAsm.Reg.Graph.Spill
+            GHC.CmmToAsm.Reg.Graph.SpillClean
+            GHC.CmmToAsm.Reg.Graph.SpillCost
+            GHC.CmmToAsm.Reg.Graph.TrivColorable
+            GHC.CmmToAsm.Reg.Linear
+            GHC.CmmToAsm.Reg.Linear.JoinToTargets
+            GHC.CmmToAsm.Reg.Linear.State
+            GHC.CmmToAsm.Reg.Linear.Stats
+            GHC.CmmToAsm.Reg.Linear.FreeRegs
+            GHC.CmmToAsm.Reg.Linear.StackMap
+            GHC.CmmToAsm.Reg.Linear.Base
+            GHC.CmmToAsm.Reg.Linear.X86
+            GHC.CmmToAsm.Reg.Linear.X86_64
+            GHC.CmmToAsm.Reg.Linear.PPC
+            GHC.CmmToAsm.Reg.Linear.SPARC
+            GHC.CmmToAsm.Dwarf
+            GHC.CmmToAsm.Dwarf.Types
+            GHC.CmmToAsm.Dwarf.Constants
             GHC.ThToHs
-            ByteCodeTypes
-            ByteCodeAsm
-            ByteCodeGen
-            ByteCodeInstr
-            ByteCodeItbls
-            ByteCodeLink
-            Debugger
-            LinkerTypes
-            Linker
-            RtClosureInspect
-            GHCi
+            GHC.ByteCode.Types
+            GHC.ByteCode.Asm
+            GHC.ByteCode.Instr
+            GHC.ByteCode.InfoTable
+            GHC.ByteCode.Linker
+            GHC.CoreToByteCode
+            GHC.Runtime.Debugger
+            GHC.Runtime.Linker.Types
+            GHC.Runtime.Linker
+            GHC.Runtime.Heap.Inspect
+            GHC.Runtime.Interpreter
+            GHC.Runtime.Interpreter.Types

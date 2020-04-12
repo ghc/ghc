@@ -22,7 +22,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface,    -- Used when reading the module's old interface
+        findAndReadIface, readIface, writeIface,
         loadDecls,      -- Should move to GHC.IfaceToCore and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
@@ -40,50 +40,51 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
-import DynFlags
+import GHC.Driver.Session
 import GHC.Iface.Syntax
 import GHC.Iface.Env
-import HscTypes
+import GHC.Driver.Types
 
-import BasicTypes hiding (SuccessFlag(..))
-import TcRnMonad
+import GHC.Types.Basic hiding (SuccessFlag(..))
+import GHC.Tc.Utils.Monad
 
 import Constants
 import PrelNames
 import PrelInfo
 import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
-import MkId     ( seqId )
+import GHC.Types.Id.Make ( seqId )
 import TysPrim  ( funTyConName )
-import Rules
-import TyCon
-import Annotations
-import InstEnv
-import FamInstEnv
-import Name
-import NameEnv
-import Avail
-import Module
+import GHC.Core.Rules
+import GHC.Core.TyCon
+import GHC.Types.Annotations
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Avail
+import GHC.Types.Module
 import Maybes
 import ErrUtils
-import Finder
-import UniqFM
-import SrcLoc
+import GHC.Driver.Finder
+import GHC.Types.Unique.FM
+import GHC.Types.SrcLoc
 import Outputable
 import GHC.Iface.Binary
 import Panic
 import Util
 import FastString
 import Fingerprint
-import Hooks
-import FieldLabel
+import GHC.Driver.Hooks
+import GHC.Types.FieldLabel
 import GHC.Iface.Rename
-import UniqDSet
-import Plugins
+import GHC.Types.Unique.DSet
+import GHC.Driver.Plugins
 
 import Control.Monad
 import Control.Exception
 import Data.IORef
 import System.FilePath
+import System.Directory
 
 {-
 ************************************************************************
@@ -203,7 +204,7 @@ All of this is done by the type checker. The renamer plays no role.
 checkWiredInTyCon :: TyCon -> TcM ()
 -- Ensure that the home module of the TyCon (and hence its instances)
 -- are loaded. See Note [Loading instances for wired-in things]
--- It might not be a wired-in tycon (see the calls in TcUnify),
+-- It might not be a wired-in tycon (see the calls in GHC.Tc.Utils.Unify),
 -- in which case this is a no-op.
 checkWiredInTyCon tc
   | not (isWiredInName tc_name)
@@ -486,7 +487,6 @@ loadInterface doc_str mod from
                             -- Warn warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
-                            -- in GHC.Iface.Utils.
 
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
@@ -525,8 +525,9 @@ loadInterface doc_str mod from
                                                    (length new_eps_insts)
                                                    (length new_eps_rules) }
 
-        ; -- invoke plugins
-          res <- withPlugins dflags interfaceLoadAction final_iface
+        ; -- invoke plugins with *full* interface, not final_iface, to ensure
+          -- that plugins have access to declarations, etc.
+          res <- withPlugins dflags interfaceLoadAction iface
         ; return (Succeeded res)
     }}}}
 
@@ -535,13 +536,13 @@ loadInterface doc_str mod from
 Generally speaking, when compiling module M, we should not
 load M.hi boot into the EPS.  After all, we are very shortly
 going to have full information about M.  Moreover, see
-Note [Do not update EPS with your own hi-boot] in GHC.Iface.Utils.
+Note [Do not update EPS with your own hi-boot] in GHC.Iface.Recomp.
 
 But there is a HORRIBLE HACK here.
 
 * At the end of tcRnImports, we call checkFamInstConsistency to
   check consistency of imported type-family instances
-  See Note [The type family instance consistency story] in FamInst
+  See Note [The type family instance consistency story] in GHC.Tc.Instance.Family
 
 * Alas, those instances may refer to data types defined in M,
   if there is a M.hs-boot.
@@ -751,9 +752,7 @@ loadDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
 loadDecls ignore_prags ver_decls
-   = do { thingss <- mapM (loadDecl ignore_prags) ver_decls
-        ; return (concat thingss)
-        }
+   = concatMapM (loadDecl ignore_prags) ver_decls
 
 loadDecl :: Bool                    -- Don't load pragmas into the decl pool
           -> (Fingerprint, IfaceDecl)
@@ -865,7 +864,7 @@ Note [Home module load error]
 If the sought-for interface is in the current package (as determined
 by -package-name flag) then it jolly well should already be in the HPT
 because we process home-package modules in dependency order.  (Except
-in one-shot mode; see notes with hsc_HPT decl in HscTypes).
+in one-shot mode; see notes with hsc_HPT decl in GHC.Driver.Types).
 
 It is possible (though hard) to get this error through user behaviour.
   * Suppose package P (modules P1, P2) depends on package Q (modules Q1,
@@ -975,8 +974,13 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                              liftIO $ writeIORef ref False
           checkBuildDynamicToo _ = return ()
 
--- @readIface@ tries just the one file.
+-- | Write interface file
+writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
+writeIface dflags hi_file_path new_iface
+    = do createDirectoryIfMissing True (takeDirectory hi_file_path)
+         writeBinIface dflags hi_file_path new_iface
 
+-- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
           -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible

@@ -7,6 +7,8 @@ Core pass to saturate constructors and PrimOps
 
 {-# LANGUAGE BangPatterns, CPP, MultiWayIf #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.CoreToStg.Prep (
       corePrepPgm, corePrepExpr, cvtLitInteger, cvtLitNatural,
       lookupMkIntegerName, lookupIntegerSDataConName,
@@ -16,51 +18,50 @@ module GHC.CoreToStg.Prep (
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform
 
-import OccurAnal
+import GHC.Core.Op.OccurAnal
 
-import HscTypes
+import GHC.Driver.Types
 import PrelNames
-import MkId             ( realWorldPrimId )
-import CoreUtils
-import CoreArity
-import CoreFVs
-import CoreMonad        ( CoreToDo(..) )
-import CoreLint         ( endPassIO )
-import CoreSyn
-import CoreSubst
-import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
-import Type
-import Literal
-import Coercion
-import TcEnv
-import TyCon
-import Demand
-import Var
-import VarSet
-import VarEnv
-import Id
-import IdInfo
+import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Core.Utils
+import GHC.Core.Arity
+import GHC.Core.FVs
+import GHC.Core.Op.Monad ( CoreToDo(..) )
+import GHC.Core.Lint    ( endPassIO )
+import GHC.Core
+import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
+import GHC.Core.Type
+import GHC.Types.Literal
+import GHC.Core.Coercion
+import GHC.Tc.Utils.Env
+import GHC.Core.TyCon
+import GHC.Types.Demand
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import TysWiredIn
-import DataCon
-import BasicTypes
-import Module
-import UniqSupply
+import GHC.Core.DataCon
+import GHC.Types.Basic
+import GHC.Types.Module
+import GHC.Types.Unique.Supply
 import Maybes
 import OrdList
 import ErrUtils
-import DynFlags
+import GHC.Driver.Session
+import GHC.Driver.Ways
 import Util
 import Outputable
-import GHC.Platform
 import FastString
-import Name             ( NamedThing(..), nameSrcSpan )
-import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
+import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
-import Data.List        ( mapAccumL )
 import Control.Monad
-import CostCentre       ( CostCentre, ccFromThisModule )
+import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S
 
 {-
@@ -111,7 +112,7 @@ The goal of this pass is to prepare for code generation.
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 
-9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.hs
+9.  Replace (lazy e) by e.  See Note [lazyId magic] in GHC.Types.Id.Make
     Also replace (noinline e) by e.
 
 10. Convert (LitInteger i t) into the core representation
@@ -184,7 +185,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
     let cost_centres
-          | WayProf `elem` ways dflags
+          | WayProf `S.member` ways dflags
           = collectCostCentres this_mod binds
           | otherwise
           = S.empty
@@ -241,7 +242,7 @@ mkDataConWorkers dflags mod_loc data_tycons
    -- worker. This is useful, especially for heap profiling.
    tick_it name
      | debugLevel dflags == 0                = id
-     | RealSrcSpan span <- nameSrcSpan name  = tick span
+     | RealSrcSpan span _ <- nameSrcSpan name = tick span
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")
      where tick span  = Tick (SourceNote span $ showSDoc dflags (ppr name))
@@ -263,40 +264,6 @@ where x is demanded, in which case we want to finish with
         a = g y
         x* = f a
 And then x will actually end up case-bound
-
-Note [CafInfo and floating]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What happens when we try to float bindings to the top level?  At this
-point all the CafInfo is supposed to be correct, and we must make certain
-that is true of the new top-level bindings.  There are two cases
-to consider
-
-a) The top-level binding is marked asCafRefs.  In that case we are
-   basically fine.  The floated bindings had better all be lazy lets,
-   so they can float to top level, but they'll all have HasCafRefs
-   (the default) which is safe.
-
-b) The top-level binding is marked NoCafRefs.  This really happens
-   Example.  CoreTidy produces
-      $fApplicativeSTM [NoCafRefs] = D:Alternative retry# ...blah...
-   Now CorePrep has to eta-expand to
-      $fApplicativeSTM = let sat = \xy. retry x y
-                         in D:Alternative sat ...blah...
-   So what we *want* is
-      sat [NoCafRefs] = \xy. retry x y
-      $fApplicativeSTM [NoCafRefs] = D:Alternative sat ...blah...
-
-   So, gruesomely, we must set the NoCafRefs flag on the sat bindings,
-   *and* substitute the modified 'sat' into the old RHS.
-
-   It should be the case that 'sat' is itself [NoCafRefs] (a value, no
-   cafs) else the original top-level binding would not itself have been
-   marked [NoCafRefs].  The DEBUG check in CoreToStg for
-   consistentCafInfo will find this.
-
-This is all very gruesome and horrible. It would be better to figure
-out CafInfo later, after CorePrep.  We'll do that in due course.
-Meanwhile this horrible hack works.
 
 Note [Join points and floating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -380,10 +347,7 @@ The way we fix this is to:
  * In cloneBndr, drop all unfoldings/rules
 
  * In deFloatTop, run a simple dead code analyser on each top-level
-   RHS to drop the dead local bindings. For that call to OccAnal, we
-   disable the binder swap, else the occurrence analyser sometimes
-   introduces new let bindings for cased binders, which lead to the bug
-   in #5433.
+   RHS to drop the dead local bindings.
 
 The reason we don't just OccAnal the whole output of CorePrep is that
 the tidier ensures that all top-level binders are GlobalIds, so they
@@ -416,22 +380,24 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                                    -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
   | not (isJoinId bndr)
-  = do { (_, bndr1) <- cpCloneBndr env bndr
+  = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnliftedType (idType bndr)
        ; (floats, rhs1) <- cpePair top_lvl NonRecursive
                                    dmd is_unlifted
                                    env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; if exprIsTrivial rhs1 && isNotTopLevel top_lvl
-            then return (extendCorePrepEnvExpr env bndr rhs1, floats, Nothing)
-            else do {
+       ; let triv_rhs = cpExprIsTrivial rhs1
+             env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
+                     | otherwise = env1
+             floats1 | triv_rhs, isInternalName (idName bndr)
+                     = floats
+                     | otherwise
+                     = addFloat floats new_float
 
-       ; let new_float = mkFloat dmd is_unlifted bndr1 rhs1
+             new_float = mkFloat dmd is_unlifted bndr1 rhs1
 
-       ; return (extendCorePrepEnv env bndr bndr1,
-                 addFloat floats new_float,
-                 Nothing) }}
+       ; return (env2, floats1, Nothing) }
 
   | otherwise -- A join point; see Note [Join points and floating]
   = ASSERT(not (isTopLevel top_lvl)) -- can't have top-level join point
@@ -501,8 +467,6 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
 
        ; return (floats4, rhs4) }
   where
-    platform = targetPlatform (cpe_dynFlags env)
-
     arity = idArity bndr        -- We must match this arity
 
     ---------------------
@@ -518,14 +482,12 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
       | otherwise = dontFloat floats rhs
 
     ---------------------
-    float_top floats rhs        -- Urhgh!  See Note [CafInfo and floating]
-      | mayHaveCafRefs (idCafInfo bndr)
-      , allLazyTop floats
+    float_top floats rhs
+      | allLazyTop floats
       = return (floats, rhs)
 
-      -- So the top-level binding is marked NoCafRefs
-      | Just (floats', rhs') <- canFloatFromNoCaf platform floats rhs
-      = return (floats', rhs')
+      | Just floats <- canFloat floats rhs
+      = return floats
 
       | otherwise
       = dontFloat floats rhs
@@ -559,7 +521,7 @@ it seems good for CorePrep to be robust.
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
             -> UniqSM (JoinId, CpeRhs)
 -- Used for all join bindings
--- No eta-expansion: see Note [Do not eta-expand join points] in SimplUtils
+-- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Op.Simplify.Utils
 cpeJoinPair env bndr rhs
   = ASSERT(isJoinId bndr)
     do { let Just join_arity = isJoinId_maybe bndr
@@ -610,10 +572,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
 cpeRhsE env (Lit (LitNumber LitNumInteger i _))
-    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env)
+    = cpeRhsE env (cvtLitInteger (targetPlatform (cpe_dynFlags env)) (getMkIntegerId env)
                    (cpe_integerSDataCon env) i)
 cpeRhsE env (Lit (LitNumber LitNumNatural i _))
-    = cpeRhsE env (cvtLitNatural (cpe_dynFlags env) (getMkNaturalId env)
+    = cpeRhsE env (cvtLitNatural (targetPlatform (cpe_dynFlags env)) (getMkNaturalId env)
                    (cpe_naturalSDataCon env) i)
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
@@ -652,6 +614,18 @@ cpeRhsE env expr@(Lam {})
         ; return (emptyFloats, mkLams bndrs' body') }
 
 cpeRhsE env (Case scrut bndr ty alts)
+  | isUnsafeEqualityProof scrut
+  , [(con, bs, rhs)] <- alts
+  = do { (floats1, scrut') <- cpeBody env scrut
+       ; (env1, bndr')     <- cpCloneBndr env bndr
+       ; (env2, bs')       <- cpCloneBndrs env1 bs
+       ; (floats2, rhs')   <- cpeBody env2 rhs
+       ; let case_float = FloatCase scrut' bndr' con bs' True
+             floats'    = (floats1 `addFloat` case_float)
+                          `appendFloats` floats2
+       ; return (floats', rhs') }
+
+  | otherwise
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -668,6 +642,7 @@ cpeRhsE env (Case scrut bndr ty alts)
                where err = mkRuntimeErrorApp rUNTIME_ERROR_ID ty
                                              "Bottoming expression returned"
        ; alts'' <- mapM (sat_alt env') alts'
+
        ; return (floats, Case scrut' bndr2 ty alts'') }
   where
     sat_alt env (con, bs, rhs)
@@ -675,17 +650,17 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
+cvtLitInteger :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
 -- representation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
--- See Note [Integer literals] in Literal
-cvtLitInteger dflags _ (Just sdatacon) i
-  | inIntRange dflags i -- Special case for small integers
-    = mkConApp sdatacon [Lit (mkLitInt dflags i)]
+-- See Note [Integer literals] in GHC.Types.Literal
+cvtLitInteger platform _ (Just sdatacon) i
+  | platformInIntRange platform i -- Special case for small integers
+    = mkConApp sdatacon [Lit (mkLitInt platform i)]
 
-cvtLitInteger dflags mk_integer _ i
+cvtLitInteger platform mk_integer _ i
     = mkApps (Var mk_integer) [isNonNegative, ints]
   where isNonNegative = if i < 0 then mkConApp falseDataCon []
                                  else mkConApp trueDataCon  []
@@ -693,25 +668,25 @@ cvtLitInteger dflags mk_integer _ i
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkLitInt dflags low)] : f high
+              in mkConApp intDataCon [Lit (mkLitInt platform low)] : f high
         bits = 31
         mask = 2 ^ bits - 1
 
-cvtLitNatural :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
+cvtLitNatural :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Natural to the low-level
 -- representation.
--- See Note [Natural literals] in Literal
-cvtLitNatural dflags _ (Just sdatacon) i
-  | inWordRange dflags i -- Special case for small naturals
-    = mkConApp sdatacon [Lit (mkLitWord dflags i)]
+-- See Note [Natural literals] in GHC.Types.Literal
+cvtLitNatural platform _ (Just sdatacon) i
+  | platformInWordRange platform i -- Special case for small naturals
+    = mkConApp sdatacon [Lit (mkLitWord platform i)]
 
-cvtLitNatural dflags mk_natural _ i
+cvtLitNatural platform mk_natural _ i
     = mkApps (Var mk_natural) [words]
   where words = mkListExpr wordTy (f i)
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp wordDataCon [Lit (mkLitWord dflags low)] : f high
+              in mkConApp wordDataCon [Lit (mkLitWord platform low)] : f high
         bits = 32
         mask = 2 ^ bits - 1
 
@@ -793,7 +768,7 @@ which happened in #11291, we do /not/ want to turn it into
    (case bot of {}) realWorldPrimId#
 because that gives a panic in CoreToStg.myCollectArgs, which expects
 only variables in function position.  But if we are sure to make
-runRW# strict (which we do in MkId), this can't happen
+runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
 -}
 
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
@@ -921,7 +896,7 @@ cpeApp top_env expr
       CpeApp arg@(Coercion {}) ->
         rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
       CpeApp arg -> do
-        let (ss1, ss_rest)  -- See Note [lazyId magic] in MkId
+        let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
@@ -940,7 +915,7 @@ cpeApp top_env expr
         rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
 
 isLazyExpr :: CoreExpr -> Bool
--- See Note [lazyId magic] in MkId
+-- See Note [lazyId magic] in GHC.Types.Id.Make
 isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
@@ -985,7 +960,7 @@ pragma.  It is levity-polymorphic.
                               -> (# State# RealWorld, o #)
 
 It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in ByteCodeGen).
+in CorePrep (and in GHC.CoreToByteCode).
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg
@@ -1022,7 +997,28 @@ okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
 okCpeArg (Lit _) = False
 -- Do not eta expand a trivial argument
-okCpeArg expr    = not (exprIsTrivial expr)
+okCpeArg expr    = not (cpExprIsTrivial expr)
+
+cpExprIsTrivial :: CoreExpr -> Bool
+cpExprIsTrivial e
+  | Tick t e <- e
+  , not (tickishIsCode t)
+  = cpExprIsTrivial e
+  | Case scrut _ _ alts <- e
+  , isUnsafeEqualityProof scrut
+  , [(_,_,rhs)] <- alts
+  = cpExprIsTrivial rhs
+  | otherwise
+  = exprIsTrivial e
+
+isUnsafeEqualityProof :: CoreExpr -> Bool
+-- See (U3) and (U4) in
+-- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+isUnsafeEqualityProof e
+  | Var v `App` Type _ `App` Type _ `App` Type _ <- e
+  = idName v == unsafeEqualityProofName
+  | otherwise
+  = False
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
@@ -1097,7 +1093,7 @@ maybeSaturate fn expr n_args
 {-
 ************************************************************************
 *                                                                      *
-                Simple CoreSyn operations
+                Simple GHC.Core operations
 *                                                                      *
 ************************************************************************
 -}
@@ -1140,7 +1136,7 @@ After ANFing we get
 and now we do NOT want eta expansion to give
                 f = /\a -> \ y -> (let s = h 3 in g s) y
 
-Instead CoreArity.etaExpand gives
+Instead GHC.Core.Arity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
 
 -}
@@ -1164,7 +1160,7 @@ get to a partial application:
 -}
 
 -- When updating this function, make sure it lines up with
--- CoreUtils.tryEtaReduce!
+-- GHC.Core.Utils.tryEtaReduce!
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f
@@ -1213,8 +1209,11 @@ data FloatingBind
                          -- unlifted ones are done with FloatCase
 
  | FloatCase
-      Id CpeBody
-      Bool              -- The bool indicates "ok-for-speculation"
+      CpeBody         -- Always ok-for-speculation
+      Id              -- Case binder
+      AltCon [Var]    -- Single alternative
+      Bool            -- Ok-for-speculation; False of a strict,
+                      -- but lifted binding
 
  -- | See Note [Floating Ticks in CorePrep]
  | FloatTick (Tickish Id)
@@ -1223,7 +1222,11 @@ data Floats = Floats OkToSpec (OrdList FloatingBind)
 
 instance Outputable FloatingBind where
   ppr (FloatLet b) = ppr b
-  ppr (FloatCase b r ok) = brackets (ppr ok) <+> ppr b <+> equals <+> ppr r
+  ppr (FloatCase r b k bs ok) = text "case" <> braces (ppr ok) <+> ppr r
+                                <+> text "of"<+> ppr b <> text "@"
+                                <> case bs of
+                                   [] -> ppr k
+                                   _  -> parens (ppr k <+> ppr bs)
   ppr (FloatTick t) = ppr t
 
 instance Outputable Floats where
@@ -1246,17 +1249,19 @@ data OkToSpec
 
 mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat dmd is_unlifted bndr rhs
-  | use_case  = FloatCase bndr rhs (exprOkForSpeculation rhs)
+  | is_strict
+  , not is_hnf  = FloatCase rhs bndr DEFAULT [] (exprOkForSpeculation rhs)
+    -- Don't make a case for a HNF binding, even if it's strict
+    -- Otherwise we get  case (\x -> e) of ...!
+
+  | is_unlifted = ASSERT2( exprOkForSpeculation rhs, ppr rhs )
+                  FloatCase rhs bndr DEFAULT [] True
   | is_hnf    = FloatLet (NonRec bndr                       rhs)
   | otherwise = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]
   where
     is_hnf    = exprIsHNF rhs
     is_strict = isStrictDmd dmd
-    use_case  = is_unlifted || is_strict && not is_hnf
-                -- Don't make a case for a value binding,
-                -- even if it's strict.  Otherwise we get
-                --      case (\x -> e) of ...!
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
@@ -1268,19 +1273,19 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase bndr rhs _) body = mkDefaultCase rhs bndr body
-    mk_bind (FloatLet bind)        body = Let bind body
-    mk_bind (FloatTick tickish)    body = mkTick tickish body
+    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [(con,bs,body)]
+    mk_bind (FloatLet bind)               body = Let bind body
+    mk_bind (FloatTick tickish)           body = mkTick tickish body
 
 addFloat :: Floats -> FloatingBind -> Floats
 addFloat (Floats ok_to_spec floats) new_float
   = Floats (combine ok_to_spec (check new_float)) (floats `snocOL` new_float)
   where
-    check (FloatLet _) = OkToSpec
-    check (FloatCase _ _ ok_for_spec)
-        | ok_for_spec  =  IfUnboxedOk
-        | otherwise    =  NotOkToSpec
-    check FloatTick{}  = OkToSpec
+    check (FloatLet {})  = OkToSpec
+    check (FloatCase _ _ _ _ ok_for_spec)
+      | ok_for_spec = IfUnboxedOk
+      | otherwise   = NotOkToSpec
+    check FloatTick{}    = OkToSpec
         -- The ok-for-speculation flag says that it's safe to
         -- float this Case out of a let, and thereby do it more eagerly
         -- We need the top-level flag because it's never ok to float
@@ -1308,68 +1313,37 @@ deFloatTop :: Floats -> [CoreBind]
 deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
-    get (FloatLet b) bs = occurAnalyseRHSs b : bs
-    get (FloatCase var body _) bs  =
-      occurAnalyseRHSs (NonRec var body) : bs
+    get (FloatLet b)               bs = get_bind b                 : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr_NoBinderSwap e)
-    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr_NoBinderSwap e) | (x, e) <- xes]
+    get_bind (NonRec x e) = NonRec x (occurAnalyseExpr e)
+    get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
 
-canFloatFromNoCaf :: Platform -> Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
-       -- Note [CafInfo and floating]
-canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
+canFloat :: Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
+canFloat (Floats ok_to_spec fs) rhs
   | OkToSpec <- ok_to_spec           -- Worth trying
-  , Just (subst, fs') <- go (emptySubst, nilOL) (fromOL fs)
-  = Just (Floats OkToSpec fs', subst_expr subst rhs)
+  , Just fs' <- go nilOL (fromOL fs)
+  = Just (Floats OkToSpec fs', rhs)
   | otherwise
   = Nothing
   where
-    subst_expr = substExpr (text "CorePrep")
+    go :: OrdList FloatingBind -> [FloatingBind]
+       -> Maybe (OrdList FloatingBind)
 
-    go :: (Subst, OrdList FloatingBind) -> [FloatingBind]
-       -> Maybe (Subst, OrdList FloatingBind)
+    go (fbs_out) [] = Just fbs_out
 
-    go (subst, fbs_out) [] = Just (subst, fbs_out)
+    go fbs_out (fb@(FloatLet _) : fbs_in)
+      = go (fbs_out `snocOL` fb) fbs_in
 
-    go (subst, fbs_out) (FloatLet (NonRec b r) : fbs_in)
-      | rhs_ok r
-      = go (subst', fbs_out `snocOL` new_fb) fbs_in
-      where
-        (subst', b') = set_nocaf_bndr subst b
-        new_fb = FloatLet (NonRec b' (subst_expr subst r))
+    go fbs_out (ft@FloatTick{} : fbs_in)
+      = go (fbs_out `snocOL` ft) fbs_in
 
-    go (subst, fbs_out) (FloatLet (Rec prs) : fbs_in)
-      | all rhs_ok rs
-      = go (subst', fbs_out `snocOL` new_fb) fbs_in
-      where
-        (bs,rs) = unzip prs
-        (subst', bs') = mapAccumL set_nocaf_bndr subst bs
-        rs' = map (subst_expr subst') rs
-        new_fb = FloatLet (Rec (bs' `zip` rs'))
+    go _ (FloatCase{} : _) = Nothing
 
-    go (subst, fbs_out) (ft@FloatTick{} : fbs_in)
-      = go (subst, fbs_out `snocOL` ft) fbs_in
-
-    go _ _ = Nothing      -- Encountered a caffy binding
-
-    ------------
-    set_nocaf_bndr subst bndr
-      = (extendIdSubst subst bndr (Var bndr'), bndr')
-      where
-        bndr' = bndr `setIdCafInfo` NoCafRefs
-
-    ------------
-    rhs_ok :: CoreExpr -> Bool
-    -- We can only float to top level from a NoCaf thing if
-    -- the new binding is static. However it can't mention
-    -- any non-static things or it would *already* be Caffy
-    rhs_ok = rhsIsStatic platform (\_ -> False)
-                         (\_nt i -> pprPanic "rhsIsStatic" (integer i))
-                         -- Integer or Natural literals should not show up
 
 wantFloatNested :: RecFlag -> Demand -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec dmd is_unlifted floats rhs
@@ -1403,65 +1377,67 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
--- Note [Inlining in CorePrep]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- There is a subtle but important invariant that must be upheld in the output
--- of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
--- is impermissible:
---
---      let x :: ()
---          x = y
---
--- (where y is a reference to a GLOBAL variable).  Thunks like this are silly:
--- they can always be profitably replaced by inlining x with y. Consequently,
--- the code generator/runtime does not bother implementing this properly
--- (specifically, there is no implementation of stg_ap_0_upd_info, which is the
--- stack frame that would be used to update this thunk.  The "0" means it has
--- zero free variables.)
---
--- In general, the inliner is good at eliminating these let-bindings.  However,
--- there is one case where these trivial updatable thunks can arise: when
--- we are optimizing away 'lazy' (see Note [lazyId magic], and also
--- 'cpeRhsE'.)  Then, we could have started with:
---
---      let x :: ()
---          x = lazy @ () y
---
--- which is a perfectly fine, non-trivial thunk, but then CorePrep will
--- drop 'lazy', giving us 'x = y' which is trivial and impermissible.
--- The solution is CorePrep to have a miniature inlining pass which deals
--- with cases like this.  We can then drop the let-binding altogether.
---
--- Why does the removal of 'lazy' have to occur in CorePrep?
--- The gory details are in Note [lazyId magic] in MkId, but the
--- main reason is that lazy must appear in unfoldings (optimizer
--- output) and it must prevent call-by-value for catch# (which
--- is implemented by CorePrep.)
---
--- An alternate strategy for solving this problem is to have the
--- inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
--- We decided not to adopt this solution to keep the definition
--- of 'exprIsTrivial' simple.
---
--- There is ONE caveat however: for top-level bindings we have
--- to preserve the binding so that we float the (hacky) non-recursive
--- binding for data constructors; see Note [Data constructor workers].
---
--- Note [CorePrep inlines trivial CoreExpr not Id]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
--- IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
--- as per Note [Inlining in CorePrep] always have the form
--- 'lazy @ SomeType gbl_id'.  But this is not true: the following is
--- perfectly reasonable Core:
---
---      let x :: ()
---          x = lazy @ (forall a. a) y @ Bool
---
--- When we inline 'x' after eliminating 'lazy', we need to replace
--- occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
--- this can easily arise with higher-rank types; thus, cpe_env must
--- map to CoreExprs, not Ids.
+{- Note [Inlining in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is a subtle but important invariant that must be upheld in the output
+of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
+is impermissible:
+
+     let x :: ()
+         x = y
+
+(where y is a reference to a GLOBAL variable).  Thunks like this are silly:
+they can always be profitably replaced by inlining x with y. Consequently,
+the code generator/runtime does not bother implementing this properly
+(specifically, there is no implementation of stg_ap_0_upd_info, which is the
+stack frame that would be used to update this thunk.  The "0" means it has
+zero free variables.)
+
+In general, the inliner is good at eliminating these let-bindings.  However,
+there is one case where these trivial updatable thunks can arise: when
+we are optimizing away 'lazy' (see Note [lazyId magic], and also
+'cpeRhsE'.)  Then, we could have started with:
+
+     let x :: ()
+         x = lazy @ () y
+
+which is a perfectly fine, non-trivial thunk, but then CorePrep will
+drop 'lazy', giving us 'x = y' which is trivial and impermissible.
+The solution is CorePrep to have a miniature inlining pass which deals
+with cases like this.  We can then drop the let-binding altogether.
+
+Why does the removal of 'lazy' have to occur in CorePrep?
+The gory details are in Note [lazyId magic] in GHC.Types.Id.Make, but the
+main reason is that lazy must appear in unfoldings (optimizer
+output) and it must prevent call-by-value for catch# (which
+is implemented by CorePrep.)
+
+An alternate strategy for solving this problem is to have the
+inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
+We decided not to adopt this solution to keep the definition
+of 'exprIsTrivial' simple.
+
+There is ONE caveat however: for top-level bindings we have
+to preserve the binding so that we float the (hacky) non-recursive
+binding for data constructors; see Note [Data constructor workers].
+
+Note [CorePrep inlines trivial CoreExpr not Id]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
+IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
+as per Note [Inlining in CorePrep] always have the form
+'lazy @ SomeType gbl_id'.  But this is not true: the following is
+perfectly reasonable Core:
+
+     let x :: ()
+         x = lazy @ (forall a. a) y @ Bool
+
+When we inline 'x' after eliminating 'lazy', we need to replace
+occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
+this can easily arise with higher-rank types; thus, cpe_env must
+map to CoreExprs, not Ids.
+
+-}
 
 data CorePrepEnv
   = CPE { cpe_dynFlags        :: DynFlags
@@ -1586,7 +1562,7 @@ cpCloneBndr env bndr
 
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
-       -- and Note [Preserve evaluatedness] in CoreTidy
+       -- and Note [Preserve evaluatedness] in GHC.Core.Op.Tidy
        ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
@@ -1619,7 +1595,7 @@ We want to drop the unfolding/rules on every Id:
     we'd have to substitute in them
 
 HOWEVER, we want to preserve evaluated-ness;
-see Note [Preserve evaluatedness] in CoreTidy.
+see Note [Preserve evaluatedness] in GHC.Core.Op.Tidy.
 -}
 
 ------------------------------------------------------------------------------
@@ -1691,9 +1667,9 @@ wrapTicks (Floats flag floats0) expr =
         go (floats, ticks) f
           = (foldr wrap f (reverse ticks):floats, ticks)
 
-        wrap t (FloatLet bind)    = FloatLet (wrapBind t bind)
-        wrap t (FloatCase b r ok) = FloatCase b (mkTick t r) ok
-        wrap _ other              = pprPanic "wrapTicks: unexpected float!"
+        wrap t (FloatLet bind)           = FloatLet (wrapBind t bind)
+        wrap t (FloatCase r b con bs ok) = FloatCase (mkTick t r) b con bs ok
+        wrap _ other                     = pprPanic "wrapTicks: unexpected float!"
                                              (ppr other)
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)

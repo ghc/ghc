@@ -250,11 +250,11 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
 
     # Decreasing group.
     if groupDec:
-        msgs.append('Metric Decrease:' + nltab + nltab.join(groupDec))
+        msgs.append('Metric Decrease:' + nltab + nltab.join(sorted(groupDec)))
 
     # Increasing group.
     if groupInc:
-        msgs.append('Metric Increase:' + nltab + nltab.join(groupInc))
+        msgs.append('Metric Increase:' + nltab + nltab.join(sorted(groupInc)))
 
     # Mixed group.
     if groupMix:
@@ -271,7 +271,7 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
         for change_dir in [Dec, Inc]:
             metric_to_tests = dir_to_metric_to_tests[change_dir]
             for metric in sorted(metric_to_tests.keys()):
-                tests = metric_to_tests[metric]
+                tests = sorted(metric_to_tests[metric])
                 msgs.append('Metric ' + change_dir.value + ' \'' + metric + '\':' + nltab + nltab.join(tests))
 
     return '\n\n'.join(msgs)

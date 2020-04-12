@@ -17,7 +17,7 @@ EXPECTED_UNDOCUMENTED_PATH = \
     Path(__file__).parent / 'expected-undocumented-flags.txt'
 
 EXPECTED_UNDOCUMENTED = \
-    {line for line in open(EXPECTED_UNDOCUMENTED_PATH).read().split()}
+    {line for line in EXPECTED_UNDOCUMENTED_PATH.read_text().split()}
 
 def expected_undocumented(flag: str) -> bool:
     if flag in EXPECTED_UNDOCUMENTED:
@@ -48,12 +48,14 @@ def read_documented_flags(doc_flags) -> Set[str]:
             if line != ''}
 
 def read_ghc_flags(ghc_path: str) -> Set[str]:
-    ghc_output = subprocess.check_output([ghc_path, '--show-options'],
-                                         encoding='UTF-8')
+    ghc_output = subprocess.check_output([ghc_path, '--show-options'])
     return {flag
-            for flag in ghc_output.split('\n')
+            for flag in ghc_output.decode('UTF-8').split('\n')
             if not expected_undocumented(flag)
             if flag != ''}
+
+def error(s: str):
+    print(s, file=sys.stderr)
 
 def main() -> None:
     import argparse
@@ -71,16 +73,16 @@ def main() -> None:
 
     undocumented = ghc_flags - doc_flags
     if len(undocumented) > 0:
-        print(f'Found {len(undocumented)} flags not documented in the users guide:')
-        print('\n'.join(f'  {flag}' for flag in sorted(undocumented)))
-        print()
+        error('Found {len_undoc} flags not documented in the users guide:'.format(len_undoc=len(undocumented)), )
+        error('\n'.join('  {}'.format(flag) for flag in sorted(undocumented)))
+        error('')
         failed = True
 
     now_documented = EXPECTED_UNDOCUMENTED.intersection(doc_flags)
     if len(now_documented) > 0:
-        print(f'Found flags that are documented yet listed in {EXPECTED_UNDOCUMENTED_PATH}:')
-        print('\n'.join(f'  {flag}' for flag in sorted(now_documented)))
-        print()
+        error('Found flags that are documented yet listed in {}:'.format(EXPECTED_UNDOCUMENTED_PATH))
+        error('\n'.join('  {}'.format(flag) for flag in sorted(now_documented)))
+        error('')
         failed = True
 
     if failed:

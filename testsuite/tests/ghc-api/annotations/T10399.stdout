@@ -90,7 +90,8 @@
 ((Test10399.hs:22:6-17,AnnCloseP), [Test10399.hs:22:17]),
 ((Test10399.hs:22:6-17,AnnOpenP), [Test10399.hs:22:6]),
 ((Test10399.hs:22:8-15,AnnCloseQ), [Test10399.hs:22:14-15]),
-((Test10399.hs:22:8-15,AnnOpen), [Test10399.hs:22:8-10]),
-((<no location info>,AnnEofPos), [Test10399.hs:23:1])
+((Test10399.hs:22:8-15,AnnOpen), [Test10399.hs:22:8-10])
 ]
 
+---Eof Position (should be Just)-----
+Just SrcSpanPoint "Test10399.hs" 23 1

@@ -1,0 +1,4 @@
+
+GivenCheckSwap.hs:11:9: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g y | False = ...

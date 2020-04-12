@@ -146,6 +146,7 @@ settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 
 target-word-size = @TargetWordSize@
+target-word-big-endian = @TargetWordBigEndian@
 target-has-gnu-nonexec-stack = @TargetHasGnuNonexecStack@
 target-has-ident-directive = @TargetHasIdentDirective@
 target-has-subsections-via-symbols = @TargetHasSubsectionsViaSymbols@
@@ -172,8 +173,12 @@ ffi-lib-dir       = @FFILibDir@
 libdw-include-dir   = @LibdwIncludeDir@
 libdw-lib-dir       = @LibdwLibDir@
 
+libnuma-include-dir   = @LibNumaIncludeDir@
+libnuma-lib-dir       = @LibNumaLibDir@
+
 # Optional Dependencies:
 #=======================
 
 with-libdw = @UseLibdw@
+with-libnuma = @UseLibNuma@
 have-lib-mingw-ex = @HaveLibMingwEx@

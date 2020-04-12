@@ -390,7 +390,10 @@ test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366',
-     [expect_broken_for(13366, ['ghci']), when(opsys('darwin'), expect_broken(16083))],
+     [expect_broken_for(13366, ['ghci']),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739)),
+      when(opsys('darwin'), expect_broken(16083))],
      compile_and_run,
      ['-lstdc++ -v0'])
 test('T13473', normal, multimod_compile_and_run,
@@ -489,11 +492,15 @@ test('T16980a', normal, compile_fail, [''])
 test('T17270a', extra_files(['T17270.hs']), multimod_compile, ['T17270', '-v0'])
 test('T17270b', extra_files(['T17270.hs']), multimod_compile, ['T17270', '-fenable-th-splice-warnings -v0'])
 test('T17296', normal, compile, ['-v0'])
+test('T17305', normal, compile, ['-v0'])
 test('T17380', normal, compile_fail, [''])
 test('T17394', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T17379a', normal, compile_fail, [''])
 test('T17379b', normal, compile_fail, [''])
 test('T17461', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T17511', normal, compile, [''])
+test('T17608', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T17688a', normal, compile, [''])
+test('T17688b', normal, compile, [''])
 test('TH_PprStar', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_StringLift', normal, compile, [''])

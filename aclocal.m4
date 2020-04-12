@@ -647,6 +647,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
 # $5 is the name of the CPP flags variable
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
+    AC_REQUIRE([FP_PROG_LD_IS_GNU])
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-*)
@@ -663,10 +664,20 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -march=i686"
         ;;
     x86_64-unknown-solaris2)
+        # Solaris is a multi-lib platform, providing both 32- and 64-bit
+        # user-land. It appears to default to 32-bit builds but we of course want to
+        # compile for 64-bits on x86-64.
+        #
+        # On OpenSolaris uses gnu ld whereas SmartOS appears to use the Solaris
+        # implementation, which rather uses the -64 flag.
         $2="$$2 -m64"
         $3="$$3 -m64"
-        $4="$$4 -m64"
         $5="$$5 -m64"
+        if test "$fp_cv_gnu_ld" = "yes"; then
+            $4="$$4 -m64"
+        else
+            $4="$$4 -64"
+        fi
         ;;
     alpha-*)
         # For now, to suppress the gcc warning "call-clobbered
@@ -999,7 +1010,7 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs
+if test ! -f compiler/parser/Parser.hs || test ! -f compiler/GHC/Cmm/Parser.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19.10],
       [AC_MSG_ERROR([Happy version 1.19.10 or later is required to compile GHC.])])[]
@@ -2065,11 +2076,14 @@ AC_DEFUN([GHC_CONVERT_OS],[
       linux-*|linux)
         $3="linux"
         ;;
+      netbsd*)
+        $3="netbsd"
+        ;;
       openbsd*)
         $3="openbsd"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       msys)
@@ -2113,14 +2127,14 @@ fi
 AC_SUBST($1)
 ])
 
-# LIBRARY_VERSION(lib, [dir])
+# LIBRARY_VERSION(lib, [cabal_file])
 # --------------------------------
 # Gets the version number of a library.
 # If $1 is ghc-prim, then we define LIBRARY_ghc_prim_VERSION as 1.2.3
 # $2 points to the directory under libraries/
 AC_DEFUN([LIBRARY_VERSION],[
-dir=m4_default([$2],[$1])
-LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/${dir}/$1.cabal | sed "s/.* //"`
+cabal_file=m4_default([$2],[$1/$1.cabal])
+LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/${cabal_file} | sed "s/.* //"`
 AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 ])
 

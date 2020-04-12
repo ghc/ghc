@@ -148,7 +148,7 @@ test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
 # T4437: A test to ensure that Cabal's language extension list remains
 # consistent with those known by GHC.
 #
-# See Note [Adding a language extension] in DynFlags.hs for details.
+# See Note [Adding a language extension] in GHC.Driver.Session for details.
 test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
 test('werror', normal, compile_fail, [''])
@@ -258,7 +258,7 @@ test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 
 test('T12955', normal, makefile_test, [])
 
-test('T12971', ignore_stdout, makefile_test, [])
+test('T12971', [when(opsys('mingw32'), expect_broken(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
 test('T13604', [], makefile_test, [])
@@ -278,3 +278,4 @@ test('T16737',
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
 
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])
+test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])

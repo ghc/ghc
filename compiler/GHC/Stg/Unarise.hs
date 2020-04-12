@@ -194,30 +194,32 @@ STG programs after unarisation have these invariants:
 
 {-# LANGUAGE CPP, TupleSections #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.Stg.Unarise (unarise) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import BasicTypes
-import CoreSyn
-import DataCon
+import GHC.Types.Basic
+import GHC.Core
+import GHC.Core.DataCon
 import FastString (FastString, mkFastString)
-import Id
-import Literal
-import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
-import MkId (voidPrimId, voidArgId)
+import GHC.Types.Id
+import GHC.Types.Literal
+import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
+import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
 import GHC.Types.RepType
 import GHC.Stg.Syntax
-import Type
+import GHC.Core.Type
 import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
 import TysWiredIn
-import UniqSupply
+import GHC.Types.Unique.Supply
 import Util
-import VarEnv
+import GHC.Types.Var.Env
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)
@@ -579,7 +581,7 @@ mkUbxSum dc ty_args args0
 
       slotRubbishArg :: SlotTy -> StgArg
       slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
+                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
       slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)

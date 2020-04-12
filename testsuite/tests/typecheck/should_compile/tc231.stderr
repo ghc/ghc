@@ -1,6 +1,6 @@
 TYPE SIGNATURES
   foo ::
-    forall s b chain.
+    forall {s} {b} {chain}.
     Zork s (Z [Char]) b =>
     Q s (Z [Char]) chain -> ST s ()
   huh :: forall s a b chain. Zork s a b => Q s a chain -> ST s ()
