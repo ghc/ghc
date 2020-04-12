@@ -158,17 +158,15 @@ stg_isMutableByteArrayPinnedzh ( gcptr mba )
     jump stg_isByteArrayPinnedzh(mba);
 }
 
-/* Note [LDV profiling when resizing arrays]
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/* Note [LDV profiling and resizing arrays]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
- * When we resize an array, as far as the LDV profiler is concerned, it dies and
- * then is created anew.
+ * As far as the LDV profiler is concerned arrays are "inherently used" which
+ * means we don't track their time of use and eventual destruction. We just
+ * assume they get used.
  *
- * The OVERWRITING_CLOSURE_OFS macro handles calling LDV_recordDead() to mark it
- * as dead but in the primops below we still have to call LDV_RECORD_CREATE to
- * inform the profiler of the new array.
- *
- * See also overwritingClosureOfs()
+ * Thus it is not necessary to call LDV_RECORD_CREATE when resizing them as we
+ * used to as the LDV profiler will essentially ignore arrays anyways.
  */
 
 // shrink size of MutableByteArray in-place
@@ -180,8 +178,7 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
    OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                  ROUNDUP_BYTES_TO_WDS(new_size)));
    StgArrBytes_bytes(mba) = new_size;
-   // See Note [LDV Profiling when Shrinking Arrays]
-   LDV_RECORD_CREATE(mba);
+   // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
    return ();
 }
@@ -205,8 +202,7 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
       OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                     new_size_wds));
       StgArrBytes_bytes(mba) = new_size;
-      // See Note [LDV profiling when resizing arrays]
-      LDV_RECORD_CREATE(mba);
+      // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
       return (mba);
    } else {
@@ -235,8 +231,7 @@ stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
    OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
                                  new_size));
    StgSmallMutArrPtrs_ptrs(mba) = new_size;
-   // See Note [LDV profiling when resizing arrays]
-   LDV_RECORD_CREATE(mba);
+   // No need to call LDV_RECORD_CREATE. See Note [LDV profiling and resizing arrays]
 
    return ();
 }
