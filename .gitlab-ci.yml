@@ -467,6 +467,36 @@ validate-x86_64-darwin:
       - toolchain
 
 #################################
+# x86_64-freebsd
+#################################
+
+validate-x86_64-freebsd:
+  extends: .validate
+  stage: full-build
+  tags:
+    - x86_64-freebsd
+  variables:
+    GHC_VERSION: 8.6.5
+  before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+
+    - .gitlab/prepare-system.sh
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: "freebsd-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
+
+#################################
 # aarch64-linux-deb9
 #################################
 

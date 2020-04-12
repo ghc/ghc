@@ -110,6 +110,10 @@ function darwin_setup() {
   #brew cask install mactex
 }
 
+function freebsd_setup() {
+  pkg install -y python37 ghc hs-cabal-install
+}
+
 function show_tool() {
   local tool="$1"
   info "$tool = ${!tool}"
@@ -160,6 +164,7 @@ function setup() {
   fi
   case "$(uname)" in
     Darwin) darwin_setup ;;
+    FreeBSD) freebsd_setup ;;
     *) ;;
   esac
 
