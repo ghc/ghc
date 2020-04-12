@@ -37,7 +37,7 @@
 #include "Schedule.h"
 #include "Sanity.h"
 #include "BlockAlloc.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "Weak.h"
 #include "Prelude.h"
 #include "RtsSignals.h"
