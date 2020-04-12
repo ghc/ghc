@@ -2531,7 +2531,7 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = d
     format = intFormat width
 
 genCCall' dflags is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
-    Amode amode addr_code <- getSimpleAmode dflags is32Bit addr
+    Amode amode addr_code <- getSimpleAmode is32Bit addr
     newval <- getNewRegNat format
     newval_code <- getAnyReg value
     let platform = targetPlatform dflags
