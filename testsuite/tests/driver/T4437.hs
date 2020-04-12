@@ -2,7 +2,7 @@
 -- sync with Cabal's own extension list.
 --
 -- If you have ended up here due to a test failure, please see
--- Note [Adding a language extension] in compiler/main/DynFlags.hs.
+-- Note [Adding a language extension] in compiler/GHC/Driver/Session.hs.
 
 module Main (main) where
 
@@ -34,7 +34,7 @@ check title expected got
          showProblems "Unexpected flags" unexpected
          showProblems "Missing flags" missing
 
--- See Note [Adding a language extension] in compiler/main/DynFlags.hs.
+-- See Note [Adding a language extension] in compiler/GHC/Driver/Session.hs.
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
     [ "RelaxedLayout"
