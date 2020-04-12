@@ -280,6 +280,8 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
     uint32_t t;
     counter *ctr;
 
+    ASSERT(!isInherentlyUsed(get_itbl(c)->type));
+
     if (era > 0 && closureSatisfiesConstraints(c)) {
         size -= sizeofW(StgProfHeader);
         ASSERT(LDVW(c) != 0);
