@@ -599,7 +599,9 @@ type instance XLam           (GhcPass _) = NoExtField
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
 
-type instance XAppTypeE      (GhcPass _) = NoExtField
+type instance XAppTypeE      GhcPs = NoExtField
+type instance XAppTypeE      GhcRn = NoExtField
+type instance XAppTypeE      GhcTc = Type
 
 type instance XOpApp         GhcPs = NoExtField
 type instance XOpApp         GhcRn = Fixity
