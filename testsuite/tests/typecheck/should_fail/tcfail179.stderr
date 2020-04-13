@@ -11,7 +11,7 @@ tcfail179.hs:14:41: error:
           run :: forall s. T s -> Int
         at tcfail179.hs:12:1-17
       Expected type: x -> s
-        Actual type: s -> s
+        Actual type: x -> x
     • In the second argument of ‘g’, namely ‘id’
       In the expression: g x id
       In a pattern binding: (x, _, b) = g x id

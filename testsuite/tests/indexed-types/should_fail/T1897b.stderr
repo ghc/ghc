@@ -1,6 +1,6 @@
 
 T1897b.hs:16:1: error:
-    • Couldn't match type ‘Depend a’ with ‘Depend a0’
+    • Couldn't match type ‘Depend a0’ with ‘Depend a’
       Expected type: t (Depend a) -> Bool
         Actual type: t (Depend a0) -> Bool
       NB: ‘Depend’ is a non-injective type family

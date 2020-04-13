@@ -302,13 +302,13 @@ sFoldr1 sF (SCons sX (SCons sWild_1627448474 sWild_1627448476))
             sXs
               = applySing
                   (applySing
-                     (singFun2 (undefined :: Proxy (:$)) SCons) wild_1627448474_afeF)
+                     (singFun2 (undefined :: Proxy (:$)) (\ x y -> SCons x y)) wild_1627448474_afeF)
                   wild_1627448476_afeG
           in
             applySing
               (applySing f_afeD x_afeE)
               (applySing
-                 (applySing (singFun2 (undefined :: Proxy Foldr1Sym0) sFoldr1) f_afeD)
+                 (applySing (singFun2 (undefined :: Proxy Foldr1Sym0) (\x y -> sFoldr1 x y)) f_afeD)
                  sXs)
     in lambda_afeC sF sX sWild_1627448474 sWild_1627448476
 sFoldr1 _ SNil = undefined

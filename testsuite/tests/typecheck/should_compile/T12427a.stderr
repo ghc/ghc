@@ -14,6 +14,15 @@ T12427a.hs:17:29: error:
 T12427a.hs:28:6: error:
     • Cannot instantiate unification variable ‘p0’
       with a type involving polytypes: (forall b. [b] -> [b]) -> Int
-        GHC doesn't yet support impredicative polymorphism
     • In the pattern: T1 _ x1
       In a pattern binding: T1 _ x1 = undefined
+
+T12427a.hs:41:6: error:
+    • Couldn't match type ‘b’ with ‘[b]’
+      ‘b’ is a rigid type variable bound by
+        the type [b] -> [b]
+        at T12427a.hs:41:1-19
+      Expected type: (forall b. [b] -> [b]) -> Int
+        Actual type: (forall a. a -> a) -> Int
+    • In the pattern: T1 _ x3
+      In a pattern binding: T1 _ x3 = undefined

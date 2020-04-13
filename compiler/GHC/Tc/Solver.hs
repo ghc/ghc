@@ -64,7 +64,6 @@ import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Maybes             ( isJust )
 
 {-
 *********************************************************************************
@@ -168,7 +167,8 @@ solveLocalEqualities callsite thing_inside
 
        -- See Note [Fail fast if there are insoluble kind equalities]
        ; when (insolubleWC wanted) $
-           failM
+         do { traceTc "solveLocalEqualities: failing" (ppr wanted)
+            ; failM }
 
        ; return res }
 
@@ -882,7 +882,6 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                              return $ unitBag $
                                       implic1  { ic_tclvl  = rhs_tclvl
                                                , ic_skols  = qtvs
-                                               , ic_telescope = Nothing
                                                , ic_given  = full_theta_vars
                                                , ic_wanted = inner_wanted
                                                , ic_binds  = ev_binds_var
@@ -1800,9 +1799,9 @@ setImplicationStatus implic@(Implic { ic_status     = status
 checkBadTelescope :: Implication -> TcS Bool
 -- True <=> the skolems form a bad telescope
 -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
-checkBadTelescope (Implic { ic_telescope  = m_telescope
-                          , ic_skols      = skols })
-  | isJust m_telescope
+checkBadTelescope (Implic { ic_info  = info
+                          , ic_skols = skols })
+  | ForAllSkol {} <- info
   = do{ skols <- mapM TcS.zonkTyCoVarKind skols
       ; return (go emptyVarSet (reverse skols))}
 

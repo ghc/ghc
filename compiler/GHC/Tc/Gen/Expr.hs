@@ -1546,9 +1546,13 @@ tcArg :: HsExpr GhcRn                   -- The function (for error messages)
       -> TcSigmaType                     -- expected arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTc)           -- Resulting argument
-tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcCheckPolyExprNC arg ty
->>>>>>> Simplify subsumption
+tcArg fun arg ty arg_no
+   = addErrCtxt (funAppCtxt fun arg arg_no) $
+     do { traceTc "tcArg" $
+          vcat [ ppr arg_no <+> text "of" <+> ppr fun
+               , text "arg type:" <+> ppr ty
+               , text "arg:" <+> ppr arg ]
+        ; tcCheckPolyExprNC arg ty }
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]

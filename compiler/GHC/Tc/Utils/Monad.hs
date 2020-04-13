@@ -1114,7 +1114,7 @@ askNoErrs thing_inside
        ; addMessages msgs
 
        ; case mb_res of
-           Nothing  -> do { emitConstraints (insolublesOnly lie)
+           Nothing  -> do { emitConstraints (dropMisleading lie)
                           ; failM }
 
            Just res -> do { emitConstraints lie
@@ -1136,7 +1136,7 @@ tryCaptureConstraints thing_inside
 
        -- See Note [Constraints and errors]
        ; let lie_to_keep = case mb_res of
-                             Nothing -> insolublesOnly lie
+                             Nothing -> dropMisleading lie
                              Just {} -> lie
 
        ; return (mb_res, lie_to_keep) }
