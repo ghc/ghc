@@ -334,10 +334,13 @@ hadrian-ghc-in-ghci:
       - cabal-cache
       - toolchain
 
-# Disabled due to lack of builder capacity
-.validate-x86_64-freebsd:
+# Conditional due to lack of builder capacity
+validate-x86_64-freebsd:
   extends: .build-x86_64-freebsd
   stage: full-build
+  only:
+    variables:
+      - $CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/
 
 nightly-x86_64-freebsd:
   <<: *nightly
