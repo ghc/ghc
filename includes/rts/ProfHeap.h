@@ -13,6 +13,8 @@
 typedef struct _Census Census;
 
 void        heapCensus         (Time t);
+Census*     performHeapCensus  (Time t, W_ n_blocks, bdescr **block_list);
+void        endHeapCensus      (Census *census);
 
 void        initHeapProfiling  (void);
 void        endHeapProfiling   (void);
