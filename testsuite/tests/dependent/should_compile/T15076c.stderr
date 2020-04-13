@@ -1,0 +1,10 @@
+
+T15076c.hs:16:71: error:
+    • Expected kind ‘a’, but ‘y’ has kind ‘b’
+    • In the second argument of ‘SameKind’, namely ‘y’
+      In an expression type signature:
+        forall (x :: a) (y :: b). SameKind x y
+      In the second argument of ‘const’, namely
+        ‘(undefined :: forall (x :: a) (y :: b). SameKind x y)’
+    • Relevant bindings include
+        bar :: Proxy a -> Proxy b -> () (bound at T15076c.hs:16:1)

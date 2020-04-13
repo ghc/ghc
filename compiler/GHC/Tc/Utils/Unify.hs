@@ -70,7 +70,6 @@ import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 
-import Data.Maybe( isNothing )
 import Control.Monad
 import Control.Arrow ( second )
 
@@ -146,7 +145,6 @@ matchExpectedFunTys :: forall a.
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
                     -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
-                          -- must fill in these ExpTypes here
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
@@ -156,11 +154,8 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
-
     -- Skolemise any foralls /before/ the zero-arg case
-    -- so that we guaranteed to return a rho-type
+    -- so that we guarantee to return a rho-type
     go acc_arg_tys n ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
@@ -168,10 +163,14 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                                                go acc_arg_tys n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
-    -- No more args
+    -- No more args; do thisbefore tcView, so
+    -- that we do not unnecessarily unwrap synonyms
     go acc_arg_tys 0 rho_ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType rho_ty)
            ; return (idHsWrapper, result) }
+
+    go acc_arg_tys n ty
+      | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
@@ -500,13 +499,7 @@ tcSubTypeET :: CtOrigin -> UserTypeCtxt
 -- If wrap = tc_sub_type_et t1 t2
 --    => wrap :: t1 ~> t2
 tcSubTypeET inst_orig ctxt (Check ty_actual) ty_expected
-  = tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
-  where
-    -- In patterns, we reverse the acutal/expected in the TypeEqOrigin
-    eq_orig = TypeEqOrigin { uo_actual   = ty_expected
-                           , uo_expected = ty_actual
-                           , uo_thing    = Nothing
-                           , uo_visible  = True }
+  = tc_sub_type unifyTypeET inst_orig ctxt ty_actual ty_expected
 
 tcSubTypeET _ _ (Infer inf_res) ty_expected
   = ASSERT2( not (ir_inst inf_res), ppr inf_res $$ ppr ty_expected )
@@ -537,15 +530,11 @@ tcSubTypeNC :: CtOrigin   -- origin used for instantiation only
             -> TcSigmaType            -- Actual type
             -> ExpRhoType             -- Expected type
             -> TcM HsWrapper
-tcSubTypeNC inst_orig ctxt m_thing ty_actual (Infer inf_res)
-  = fillInferResult inst_orig ty_actual inf_res
-tcSubTypeNC inst_orig ctxt m_thing ty_actual (Check ty_expected)
-  = tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
-  where
-    eq_orig = TypeEqOrigin { uo_actual   = ty_actual
-                           , uo_expected = ty_expected
-                           , uo_thing    = ppr <$> m_thing
-                           , uo_visible  = True }
+tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
+  = case res_ty of
+      Infer inf_res     -> fillInferResult inst_orig ty_actual inf_res
+      Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
+                                       ty_actual ty_expected
 
 ---------------
 tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
@@ -553,7 +542,7 @@ tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
 tcSubTypeSigma ctxt ty_actual ty_expected
-  = tc_sub_type eq_orig eq_orig ctxt ty_actual ty_expected
+  = tc_sub_type (unifyType Nothing) eq_orig ctxt ty_actual ty_expected
   where
     eq_orig = TypeEqOrigin { uo_actual   = ty_actual
                            , uo_expected = ty_expected
@@ -561,7 +550,7 @@ tcSubTypeSigma ctxt ty_actual ty_expected
                            , uo_visible  = True }
 
 ---------------
-tc_sub_type :: CtOrigin       -- Used when calling uType
+tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
             -> CtOrigin       -- Used when instantiating
             -> UserTypeCtxt
             -> TcSigmaType    -- Actual; a sigma-type
@@ -570,14 +559,14 @@ tc_sub_type :: CtOrigin       -- Used when calling uType
 -- Checks that actual_ty is more polymorphic than expected_ty
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
-tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
+tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
   , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_type (drop to equality)" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; mkWpCastN <$>
-         uType TypeLevel eq_orig ty_actual ty_expected }
+         unify ty_actual ty_expected }
 
   | otherwise   -- This is the general case
   = do { traceTc "tc_sub_type (general case)" $
@@ -587,7 +576,7 @@ tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
        ; (sk_wrap, inner_wrap)
            <- tcSkolemise ctxt ty_expected $ \ _ sk_rho ->
               do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
-                 ; cow           <- uType TypeLevel eq_orig rho_a sk_rho
+                 ; cow           <- unify rho_a sk_rho
                  ; return (mkWpCastN cow <.> wrap) }
 
        ; return (sk_wrap <.> inner_wrap) }
@@ -1054,15 +1043,16 @@ checkTvConstraints :: SkolemInfo
 
 checkTvConstraints skol_info skol_tvs thing_inside
   = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
-       ; emitResidualTvConstraint skol_info Nothing skol_tvs tclvl wanted
+       ; emitResidualTvConstraint skol_info skol_tvs tclvl wanted
        ; return result }
 
-emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
+emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
-emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
+emitResidualTvConstraint skol_info skol_tvs tclvl wanted
   | isEmptyWC wanted
-  , isNothing m_telescope || skol_tvs `lengthAtMost` 1
-    -- If m_telescope is (Just d), we must do the bad-telescope check,
+  , case skol_info of { ForAllSkol {} -> False; _ -> True }
+    || skol_tvs `lengthAtMost` 1
+    -- If skol_info is ForAllSkol, we must do the bad-telescope check,
     -- so we must /not/ discard the implication even if there are no
     -- wanted constraints. See Note [Checking telescopes] in GHC.Tc.Types.Constraint.
     -- Lacking this check led to #16247
@@ -1082,7 +1072,6 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
                 , ic_tclvl     = tclvl
                 , ic_skols     = skol_tvs
                 , ic_no_eqs    = True
-                , ic_telescope = m_telescope
                 , ic_wanted    = wanted
                 , ic_binds     = ev_binds
                 , ic_info      = skol_info } }
@@ -1198,21 +1187,35 @@ unifyType :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
           -> TcTauType -> TcTauType -> TcM TcCoercionN
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType TypeLevel origin ty1 ty2
+unifyType thing ty1 ty2
+  = uType TypeLevel origin ty1 ty2
   where
-    origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
-                          , uo_thing  = ppr <$> thing
-                          , uo_visible = True } -- always called from a visible context
+    origin = TypeEqOrigin { uo_actual   = ty1
+                          , uo_expected = ty2
+                          , uo_thing    = ppr <$> thing
+                          , uo_visible  = True }
+
+unifyTypeET :: TcTauType -> TcTauType -> TcM CoercionN
+-- Like unifyType, but swap expected and actual in error messages
+-- This is used when typechecking patterns
+unifyTypeET ty1 ty2
+  = uType TypeLevel origin ty1 ty2
+  where
+    origin = TypeEqOrigin { uo_actual   = ty2   -- NB swapped
+                          , uo_expected = ty1   -- NB swapped
+                          , uo_thing    = Nothing
+                          , uo_visible  = True }
+
 
 unifyKind :: Maybe (HsType GhcRn) -> TcKind -> TcKind -> TcM CoercionN
-unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType KindLevel origin ty1 ty2
-  where origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
-                              , uo_thing  = ppr <$> thing
-                              , uo_visible = True } -- also always from a visible context
+unifyKind thing ty1 ty2
+  = uType KindLevel origin ty1 ty2
+  where
+    origin = TypeEqOrigin { uo_actual   = ty1
+                          , uo_expected = ty2
+                          , uo_thing    = ppr <$> thing
+                          , uo_visible  = True }
 
----------------
 
 {-
 %************************************************************************

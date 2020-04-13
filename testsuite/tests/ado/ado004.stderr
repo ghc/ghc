@@ -22,9 +22,9 @@ TYPE SIGNATURES
     (Functor f, Num t, Num b) =>
     (t -> f b) -> f b
   test2d ::
-    forall {f :: * -> *} {t1} {b} {t2}.
-    (Functor f, Num t1, Num b) =>
-    (t1 -> f t2) -> f b
+    forall {f :: * -> *} {t} {b} {a}.
+    (Functor f, Num t, Num b) =>
+    (t -> f a) -> f b
   test3 ::
     forall {m :: * -> *} {t1} {t2} {a}.
     (Monad m, Num t1) =>
@@ -42,5 +42,5 @@ TYPE SIGNATURES
     (Monad m, Num (m a)) =>
     (m a -> m (m a)) -> p -> m a
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]

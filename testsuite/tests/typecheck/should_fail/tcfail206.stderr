@@ -2,7 +2,7 @@
 tcfail206.hs:5:5: error:
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected type: Bool -> (Int, Bool)
-        Actual type: Int -> (Int, Bool)
+        Actual type: Bool -> (Bool, Bool)
     • In the expression: (, True)
       In an equation for ‘a’: a = (, True)
 
@@ -20,7 +20,7 @@ tcfail206.hs:11:5: error:
           c :: forall a. a -> (a, Bool)
         at tcfail206.hs:10:1-19
       Expected type: a -> (a, Bool)
-        Actual type: Bool -> (a, Bool)
+        Actual type: a -> (a, a)
     • In the expression: (True || False,)
       In an equation for ‘c’: c = (True || False,)
     • Relevant bindings include
@@ -29,7 +29,7 @@ tcfail206.hs:11:5: error:
 tcfail206.hs:14:5: error:
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected type: Bool -> (# Int, Bool #)
-        Actual type: Int -> (# Int, Bool #)
+        Actual type: Bool -> (# Bool, Bool #)
     • In the expression: (# , True #)
       In an equation for ‘d’: d = (# , True #)
 
@@ -48,7 +48,7 @@ tcfail206.hs:20:5: error:
           f :: forall a. a -> (# a, Bool #)
         at tcfail206.hs:19:1-21
       Expected type: a -> (# a, Bool #)
-        Actual type: Bool -> (# a, Bool #)
+        Actual type: a -> (# a, a #)
     • In the expression: (# True || False, #)
       In an equation for ‘f’: f = (# True || False, #)
     • Relevant bindings include

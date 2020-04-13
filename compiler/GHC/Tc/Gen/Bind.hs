@@ -690,48 +690,60 @@ tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id
                          , sig_ctxt  = ctxt
                          , sig_loc   = sig_loc })
-            (L loc (FunBind { fun_id = L nm_loc name
-                            , fun_matches = matches }))
-  = setSrcSpan sig_loc $
-    do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
+            (L bind_loc (FunBind { fun_id = L nm_loc name
+                                 , fun_matches = matches }))
+  = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
-       ; (wrap_gen, (mono_id, (wrap_res, matches')))
-             <- tcSkolemise ctxt (idType poly_id) $ \_ rho_ty ->
+       ; (wrap_gen, (wrap_res, matches'))
+             <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
+                tcSkolemise ctxt (idType poly_id) $ \_ rho_ty ->
+                -- Unwraps multiple layers; e.g
+                --    f :: forall a. Eq a => forall b. Ord b => blah
                 -- NB: tcSkolemise makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
-                do { let mono_id = mkLocalId mono_name rho_ty
-                   ; matches' <- tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
-                                 -- Why mono_id in the BinderStack?
-                                 --    See Note [Relevant bindings and the binder stack]
-                                 tcMatchesFun (L nm_loc mono_name) matches
-                                              (mkCheckExpType rho_ty)
-                   ; return (mono_id, matches') }
+
+                let mono_id = mkLocalId mono_name rho_ty in
+                tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
+                -- Why mono_id in the BinderStack?
+                --    See Note [Relevant bindings and the binder stack]
+
+                setSrcSpan bind_loc $
+                tcMatchesFun (L nm_loc mono_name) matches
+                             (mkCheckExpType rho_ty)
+
+       -- We make a funny AbsBinds, abstracting over nothing,
+       -- just so we haev somewhere to put the SpecPrags.
+       -- Otherwise we could just use the FunBind
+       -- Hence poly_id2 is just a clone of poly_id;
+       -- We re-use mono-name, but we could equally well use a fresh one
 
        ; let prag_sigs = lookupPragEnv prag_fn name
-       ; spec_prags <- tcSpecPrags poly_id prag_sigs
+             poly_id2  = mkLocalId mono_name (idType poly_id)
+       ; spec_prags <- tcSpecPrags    poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; mod <- getModule
-       ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
-       ; let bind' = FunBind { fun_id      = L nm_loc mono_id
+       ; tick <- funBindTicks nm_loc poly_id mod prag_sigs
+
+       ; let bind' = FunBind { fun_id      = L nm_loc poly_id2
                              , fun_matches = matches'
-                             , fun_ext     = wrap_res
+                             , fun_ext     = wrap_gen <.> wrap_res
                              , fun_tick    = tick }
 
              export = ABE { abe_ext   = noExtField
-                          , abe_wrap  = wrap_gen
+                          , abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
-                          , abe_mono  = mono_id
+                          , abe_mono  = poly_id2
                           , abe_prags = SpecPrags spec_prags }
 
-             abs_bind = L loc $
+             abs_bind = L bind_loc $
                         AbsBinds { abs_ext      = noExtField
                                  , abs_tvs      = []
                                  , abs_ev_vars  = []
                                  , abs_ev_binds = []
                                  , abs_exports  = [export]
-                                 , abs_binds    = unitBag (L loc bind')
+                                 , abs_binds    = unitBag (L bind_loc bind')
                                  , abs_sig      = True }
 
        ; return (unitBag abs_bind, [poly_id]) }

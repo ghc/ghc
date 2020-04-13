@@ -11,7 +11,7 @@ T9017.hs:8:7: error:
         a0 :: * -> * -> *
         a :: k2 -> k3 -> *
       Expected type: a b (m b)
-        Actual type: a0 a1 (m0 a1)
+        Actual type: a0 b0 (m0 b0)
     • In the expression: arr return
       In an equation for ‘foo’: foo = arr return
     • Relevant bindings include

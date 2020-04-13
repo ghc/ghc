@@ -1,6 +1,6 @@
 
 mc23.hs:9:29: error:
-    • Couldn't match type ‘[a0]’ with ‘[a] -> m a’
+    • Couldn't match type ‘[a0]’ with ‘a -> b’
       Expected type: (a -> b) -> [a] -> m a
         Actual type: [a0] -> [a0]
     • Possible cause: ‘take’ is applied to too many arguments
