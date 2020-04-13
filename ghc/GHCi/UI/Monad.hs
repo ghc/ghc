@@ -62,7 +62,7 @@ import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
-import Prelude hiding ((<>))
+import Prelude
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import Control.Monad.Catch

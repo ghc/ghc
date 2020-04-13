@@ -3371,7 +3371,7 @@ tcPatSig in_pat_bind sig res_ty
 
 patBindSigErr :: [(Name,TcTyVar)] -> SDoc
 patBindSigErr sig_tvs
-  = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
+  = hang (text "You cannot bind scoped type" <+> plural "variable" sig_tvs
           <+> pprQuotedList (map fst sig_tvs))
        2 (text "in a pattern binding signature")
 

@@ -20,17 +20,15 @@ import FastString                 ( FastString )
 import GHC.Iface.Type
 import GHC.Types.Module           ( ModuleName, Module )
 import GHC.Types.Name             ( Name )
-import Outputable hiding ( (<>) )
+import Outputable
 import GHC.Types.SrcLoc           ( RealSrcSpan )
 import GHC.Types.Avail
-import qualified Outputable as O ( (<>) )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.ByteString            ( ByteString )
 import Data.Data                  ( Typeable, Data )
-import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
 import Control.Applicative        ( (<|>) )
 
@@ -217,7 +215,7 @@ instance Outputable a => Outputable (HieASTs a) where
   ppr (HieASTs asts) = M.foldrWithKey go "" asts
     where
       go k a rest = vcat $
-        [ "File: " O.<> ppr k
+        [ "File: " <> ppr k
         , ppr a
         , rest
         ]
@@ -244,7 +242,7 @@ instance Binary (HieAST TypeIndex) where
 instance Outputable a => Outputable (HieAST a) where
   ppr (Node ni sp ch) = hang header 2 rest
     where
-      header = text "Node@" O.<> ppr sp O.<> ":" <+> ppr ni
+      header = text "Node@" <> ppr sp <> ":" <+> ppr ni
       rest = vcat (map ppr ch)
 
 -- | The information stored in one AST node.
@@ -569,7 +567,7 @@ instance Outputable TyVarScope where
   ppr (ResolvedScopes xs) =
     text "type variable scopes:" <+> hsep (punctuate ", " $ map ppr xs)
   ppr (UnresolvedScope ns sp) =
-    text "unresolved type variable scope for name" O.<> plural ns
+    text "unresolved type variable scope for" <+> plural "name" ns
       <+> pprBindSpan sp
 
 instance Binary TyVarScope where

@@ -408,7 +408,7 @@ addNameClashErrRn rdr_name gres
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs
   = sep [text "This binding for" <+> quotes (ppr occ)
-            <+> text "shadows the existing binding" <> plural shadowed_locs,
+            <+> text "shadows the existing" <+>  plural "binding" shadowed_locs,
          nest 2 (vcat shadowed_locs)]
 
 

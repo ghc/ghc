@@ -700,12 +700,14 @@ unicode unicode plain = sdocOption sdocCanUseUnicode $ \case
    True  -> unicode
    False -> plain
 
+infixr 6 <+>  -- matches that of (Semigroup.<>)
+infixl 5 $$, $+$
+
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount
-(<>) :: SDoc -> SDoc -> SDoc
--- ^ Join two 'SDoc' together horizontally without a gap
 (<+>) :: SDoc -> SDoc -> SDoc
--- ^ Join two 'SDoc' together horizontally with a gap between them
+-- ^ Join two 'SDoc' together horizontally with a gap between them.
+-- Use '(<>)' to join without a gap.
 ($$) :: SDoc -> SDoc -> SDoc
 -- ^ Join two 'SDoc' together vertically; if there is
 -- no vertical overlap it "dovetails" the two onto one line
@@ -713,10 +715,13 @@ nest :: Int -> SDoc -> SDoc
 -- ^ Join two 'SDoc' together vertically
 
 nest n d    = SDoc $ Pretty.nest n . runSDoc d
-(<>) d1 d2  = SDoc $ \sty -> (Pretty.<>)  (runSDoc d1 sty) (runSDoc d2 sty)
 (<+>) d1 d2 = SDoc $ \sty -> (Pretty.<+>) (runSDoc d1 sty) (runSDoc d2 sty)
 ($$) d1 d2  = SDoc $ \sty -> (Pretty.$$)  (runSDoc d1 sty) (runSDoc d2 sty)
 ($+$) d1 d2 = SDoc $ \sty -> (Pretty.$+$) (runSDoc d1 sty) (runSDoc d2 sty)
+
+-- | Join two 'SDoc' together horizontally without a gap
+instance Semigroup SDoc where
+  d1 <> d2 = SDoc $ \sty -> runSDoc d1 sty <> runSDoc d2 sty
 
 hcat :: [SDoc] -> SDoc
 -- ^ Concatenate 'SDoc' horizontally
@@ -790,8 +795,8 @@ coloured col sdoc = sdocOption sdocShouldUseColor $ \case
       ctx@SDC{ sdocLastColour = lastCol, sdocStyle = PprUser _ _ Coloured } ->
          let ctx' = ctx{ sdocLastColour = lastCol `mappend` col } in
          Pretty.zeroWidthText (Col.renderColour col)
-           Pretty.<> runSDoc sdoc ctx'
-           Pretty.<> Pretty.zeroWidthText (Col.renderColourAfresh lastCol)
+           <> runSDoc sdoc ctx'
+           <> Pretty.zeroWidthText (Col.renderColourAfresh lastCol)
       ctx -> runSDoc sdoc ctx
    False -> sdoc
 
@@ -1179,9 +1184,9 @@ speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments
 -- > plural [] = char 's'
 -- > plural ["Hello"] = empty
 -- > plural ["Hello", "World"] = char 's'
-plural :: [a] -> SDoc
-plural [_] = empty  -- a bit frightening, but there you are
-plural _   = char 's'
+plural :: String -> [a] -> SDoc
+plural s [_] = text s  -- a bit frightening, but there you are
+plural s _   = text (s ++ "s")
 
 -- | Determines the form of to be appropriate for the length of a list:
 --

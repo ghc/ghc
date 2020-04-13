@@ -1487,7 +1487,7 @@ pprInline' :: Bool           -- True <=> do not display the inl_inline field
            -> SDoc
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
-    = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info
+    = (pp_inl inline <> pp_act inline activation) <+> pp_sat <+> pp_info
     where
       pp_inl x = if emptyInline then empty else ppr x
 

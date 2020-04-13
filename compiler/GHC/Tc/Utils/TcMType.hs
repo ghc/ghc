@@ -2403,7 +2403,7 @@ naughtyQuantification orig_ty tv escapees
              orig_ty'   = tidyType env orig_ty1
              ppr_tidied = pprTyVars . map (tidyTyCoVarOcc env)
              doc = pprWithExplicitKindsWhen True $
-                   vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees'
+                   vcat [ sep [ text "Cannot generalise type;" <+> plural "skolem" escapees'
                               , quotes $ ppr_tidied escapees'
                               , text "would escape" <+> itsOrTheir escapees' <+> text "scope"
                               ]

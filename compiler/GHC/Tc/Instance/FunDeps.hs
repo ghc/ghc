@@ -414,14 +414,14 @@ checkInstCoverage be_liberal clas theta inst_taus
                             <+> quotes (ppr clas)
                           , nest 2 $ text "for functional dependency:"
                             <+> quotes (pprFunDep fd) ]
-                    , sep [ text "Reason: lhs type"<>plural ls <+> pprQuotedList ls
+                    , sep [ text "Reason: lhs" <+> plural "type" ls <+> pprQuotedList ls
                           , nest 2 $
                             (if isSingleton ls
                              then text "does not"
                              else text "do not jointly")
-                            <+> text "determine rhs type"<>plural rs
+                            <+> text "determine rhs" <+> plural "type" rs
                             <+> pprQuotedList rs ]
-                    , text "Un-determined variable" <> pluralVarSet undet_set <> colon
+                    , text "Un-determined" <+> pluralVarSet "variable" undet_set <> colon
                             <+> pprVarSet undet_set (pprWithCommas ppr)
                     , ppWhen (not be_liberal &&
                               and (isEmptyVarSet <$> liberal_undet_tvs)) $

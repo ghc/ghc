@@ -98,7 +98,7 @@ instance Outputable HoleFit where
   ppr (HoleFit _ cand ty _ _ mtchs _) =
     hang (name <+> holes) 2 (text "where" <+> name <+> dcolon <+> (ppr ty))
     where name = ppr $ getName cand
-          holes = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) mtchs
+          holes = sep $ map (parens . ((text "_" <+> dcolon) <+>) . ppr) mtchs
 
 -- We compare HoleFits by their name instead of their Id, since we don't
 -- want our tests to be affected by the non-determinism of `nonDetCmpVar`,

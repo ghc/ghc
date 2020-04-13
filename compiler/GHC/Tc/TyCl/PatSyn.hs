@@ -228,8 +228,8 @@ dependentArgErr (arg, bad_cos)
          , hang (text "Pattern-bound variable")
               2 (ppr arg <+> dcolon <+> ppr (idType arg))
          , nest 2 $
-           hang (text "has a type that mentions pattern-bound coercion"
-                 <> plural bad_co_list <> colon)
+           hang (text "has a type that mentions pattern-bound"
+                 <+> plural "coercion" bad_co_list <> colon)
               2 (pprWithCommas ppr bad_co_list)
          , text "Hint: use -fprint-explicit-coercions to see the coercions"
          , text "Probable fix: add a pattern signature" ]
@@ -369,7 +369,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; checkTc (null bad_tvs) $
          hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
                    , text "namely" <+> quotes (ppr pat_ty) ])
-            2 (text "mentions existential type variable" <> plural bad_tvs
+            2 (text "mentions existential type" <+> plural "variable" bad_tvs
                <+> pprQuotedList bad_tvs)
 
          -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.Gen.Sig

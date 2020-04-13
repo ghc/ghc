@@ -110,7 +110,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
-import Prelude hiding ((<>))
+import Prelude
 
 import Exception hiding (catch)
 import Foreign hiding (void)

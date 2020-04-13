@@ -1987,7 +1987,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
          ; addErrAt srcSpan $ ( hsep
-                        [ text "Unknown type variable" <> plural errorVars
+                        [ text "Unknown type" <+> plural "variable" errorVars
                         , text "on the RHS of injectivity condition:"
                         , interpp'SP errorVars ] ) }
 

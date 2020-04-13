@@ -2599,8 +2599,8 @@ provided.
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs
-  = hang (text "Record update for insufficiently polymorphic field"
-                         <> plural prs <> colon)
+  = hang (text "Record update for insufficiently polymorphic"
+                         <+> plural "field" prs <> colon)
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
 badFieldsUpd
