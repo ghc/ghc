@@ -2383,7 +2383,7 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
 
    However, because data instances in GADT syntax can have two return kinds (see
    point (2) above), we must check both return kinds. The user-written return
-   kind is checked in tc_kind_sig within tcDataFamInstHeader. Examples:
+   kind is checked by the call to checkDataKindSig in tcDataFamInstHeader. Examples:
 
      data family D (a :: Nat) :: k     -- good (see Point 6)
 

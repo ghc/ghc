@@ -48,7 +48,7 @@ instance Functor (Semantic f) where
   {-# INLINE fmap #-}
 
 instance Applicative (Semantic f) where
-  pure a = Semantic $ const $ pure a
+  pure a = Semantic (\x -> const (pure a) x)
   {-# INLINE pure #-}
   Semantic f <*> Semantic a = Semantic $ \k -> f k <*> a k
   {-# INLINE (<*>) #-}

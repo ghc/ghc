@@ -16,7 +16,7 @@ answer_lambda = (\x -> x) @Int 12
 pair :: forall a. a -> forall b. b -> (a, b)
 pair x = (,) x
 -- Without this eta-expansion, the two have
--- different types under simple subsumption
+-- different types under simple subsumption (#17775)
 
 a = pair 3 @Int @Bool True
 

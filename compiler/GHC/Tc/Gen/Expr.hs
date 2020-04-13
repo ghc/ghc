@@ -286,6 +286,7 @@ tcExpr e@(ExprWithTySig _ expr sig_ty) res_ty
                      tcUserTypeSig loc sig_ty Nothing
        ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; let expr'' = ExprWithTySig noExtField expr' sig_ty
+       ; traceTc "tcExpr:ExprWithTySig" (ppr poly_ty $$ ppr res_ty)
        ; tcWrapResult e expr'' poly_ty res_ty }
 
 {-
@@ -1400,8 +1401,13 @@ tcArg :: LHsExpr GhcRn                   -- The function (for error messages)
       -> TcRhoType                       -- expected arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)           -- Resulting argument
-tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcCheckPolyExprNC arg ty
+tcArg fun arg ty arg_no
+   = addErrCtxt (funAppCtxt fun arg arg_no) $
+     do { traceTc "tcArg" $
+          vcat [ ppr arg_no <+> text "of" <+> ppr fun
+               , text "arg type:" <+> ppr ty
+               , text "arg:" <+> ppr arg ]
+        ; tcCheckPolyExprNC arg ty }
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]

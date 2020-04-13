@@ -1,8 +1,8 @@
-:set -XKindSignatures -XRank2Types -XConstraintKinds -XAllowAmbiguousTypes -XInstanceSigs
+:set -XKindSignatures -XRank2Types -XConstraintKinds -XAllowAmbiguousTypes
 
 import Data.Kind
 
 class Defer (p :: Constraint) where defer :: (p => r) -> r
-instance Defer () where defer :: r -> r; defer = id
+instance Defer () where defer x = x
 
 :i Defer

@@ -105,7 +105,8 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     arity  = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    ctxt   = FunSigCtxt fun_name True
+    ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
+                         -- But that's wrong for f :: Int -> forall a. blah
     what   = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness

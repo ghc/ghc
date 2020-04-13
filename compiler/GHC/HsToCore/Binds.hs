@@ -145,13 +145,13 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = L _ fun
+dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- matchWrapper
-                           (mkPrefixFunRhs (noLoc $ idName fun))
-                           Nothing matches
+ = do   { (args, body) <- addTyCsDs (hsWrapDictBinders co_fn) $
+                          matchWrapper (mkPrefixFunRhs (L loc (idName fun)))
+                                       Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
               rhs   = core_wrap (mkLams args body')
