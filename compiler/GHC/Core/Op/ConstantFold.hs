@@ -36,6 +36,7 @@ import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.SimpleOpt ( exprIsLiteral_maybe, exprIsLambda_maybe
                           , exprIsStrippableLiteral_maybe )
+import GHC.Core.FVs
 import PrimOp             ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
@@ -44,7 +45,7 @@ import GHC.Core.TyCon
    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import GHC.Core.Utils  ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
+import GHC.Core.Utils  ( eqExpr, cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Unfold ( exprIsConApp_maybe )
 import GHC.Core.Type
@@ -69,7 +70,8 @@ import Data.Int
 import Data.Ratio
 import Data.Word
 
-
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 {-
 Note [Constant folding]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1467,11 +1469,20 @@ match_append_lit foldVariant _ id_unf _
                         `App` c2
                         `App` n) <- stripTicksTop tickishFloatable e2
   , unpk `hasKey` foldVariant
-  , cheapEqExpr' tickishFloatable c1 c2
-  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
-  , c2Ticks <- stripTicksTopT tickishFloatable c2
+  , pprTrace "match_append_lit" (ppr         [ Type ty1
+        , lit1
+        , c1
+        , e2
+        ]) True
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
+  , pprTraceIt "eqExpr" $ eqExpr
+      (mkInScopeSet (exprFreeVars c1 `unionVarSet` exprFreeVars c2))
+      c1 c2
+  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
+  , c2Ticks <- stripTicksTopT tickishFloatable c2
+  , pprTrace "areLits?" (ppr c2Ticks) True
+  , pprTrace "Matched!" (ppr . show $ (s1,s2)) True
   = ASSERT( ty1 `eqType` ty2 )
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
@@ -1492,6 +1503,9 @@ match_eq_string _ id_unf _
   | unpk_key1 <- getUnique unpk1
   , unpk_key2 <- getUnique unpk2
   , unpk_key1 == unpk_key2
+  -- For now we insist the literals have to agree in their encoding
+  -- to keep the rule simple. But we could check if the decoded strings
+  -- compare equal in here as well.
   , unpk_key1 `elem` [unpackCStringUtf8IdKey, unpackCStringIdKey]
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
@@ -1506,30 +1520,39 @@ We start of with this userwritten code in haskell
 
     elem x "<knownString>"
 
-which we would like to transform into:
+After optimization we would like the resul
+
+which we would like to transform this into an
+expression semantically equivalent to:
 
     case x of
+        '<' -> True
         'k' -> True
-        'k' -> True
-        '_' -> True
+        'n' -> True
+        'o' -> True
+        ...
+        '>' -> True
 
-For lists this would happen automatically via rules
-associated with elem. However these do not fire for
-string literals as we do not translate string literals
-into actual lists for performance reasons. (At least
-past a certain string size)
+This is then either compiled to a binary search or a lookup table, so at
+worst log(n) in complexity.
 
-For string literals what happens in abensence of any
-built in rules what would happen is:
+For proper lists this happens via rules
+associated with elem (elem/build). However these do not achieve the same
+outcome when operating over string literals because we do not desugar them
+to actual lists. See Note [String literals in GHC] for how strings are
+desugared in general.
+
+For elem on string literals what would happen would be:
 
 1) Start with:
       elem x "<knownString>"
 2) Desugar:
       elem x (unpackCString# "<knownString>"#)
-3) Apply "unpack" RULE in GHC.Base: [Phase 2 and earlier]
+3) Apply "unpack" RULE in GHC.Base: [InitialPhase, Phase 2 and later]:
       elem x (build (unpackFoldrCString# "<knownString>"#))
 3) Apply "build/elem" rule [Phase 2 and later]
-   + inline foldCString# [Phase 0]:
+   + inline foldCString# [Phase 0].
+   Which gives this code:
 
       joinrec {
         unpack_a1ui (nh_ayh :: Int#)
@@ -1547,24 +1570,32 @@ built in rules what would happen is:
       }
 
 Which is not *bad* we do not allocate, but we perform linear search
-on the string.
+on the string which being O(n) is in most cases worse.
 
-So instead we use match_elem to look for applications of elem to known
-strings during all phases and transform them into case expressions
-explicitly. Depending on the content of the string we then end up
-with either a decision trees or lookup tables.
+So what we do is:
+a) Match on elem applications to known strings.
+b) Transform them into a case via a builtin rule.
 
-Userwritten patterns of `elem x "<knownString>"` will all
-be caught during the initial phase since we match on both the
-desugared form and the form after applying the "unpack" rule.
-So it does not matter which rule ends up firing first.
+However we want to match on applications before we hit phase 2 as
+otherwise the "build/elem" rule might fire first and we end up
+with linear search.
 
-Should we get this pattern in a later pass it's a toin coss
-if we get a case statement or linear search. But linear search
-isn't bad enough to loose sleep over this scenario.
+For this reason we match on both, the desugared from and the form
+after the "unpack" rule has been applied. This way it does not
+matter if the unpack rule or the builtin rule fires first and we
+can finish the whole transformation in the InitialPhase during which
+"build/elem" is not yet active.
 
-The only exception is that we disable this rule for overly large
-strings (>= 500 bytes). This avoid code size blow up if we check
+Should the patterns we match on only emerge in later phases because
+of inlining or other optimizations it's a toin coss which rule fires
+first ("build/elem" or the one defined by match_elem) so we either
+get a case statement or linear search.
+But this is relatively rare and linear search isn't bad enough to
+loose sleep over this scenario. Especially since there is no easy
+way to change this.
+
+We do disable this optimiatzion for overly long strings strings
+(>= 500 bytes). This avoids code size blow up if we check
 for many sparse values.
 
 -}
