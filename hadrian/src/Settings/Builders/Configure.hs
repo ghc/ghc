@@ -13,6 +13,7 @@ configureBuilderArgs = do
                 hostPlatform  <- getSetting HostPlatform
                 buildPlatform <- getSetting BuildPlatform
                 pure [ "--enable-shared=no"
+                     , "--with-pic=yes"
                      , "--host=" ++ hostPlatform
                      , "--build=" ++ buildPlatform ]
 

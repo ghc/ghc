@@ -344,6 +344,11 @@ nightly-x86_64-freebsd:
   extends: .build-x86_64-freebsd
   stage: full-build
 
+release-x86_64-freebsd:
+  <<: *release
+  extends: .build-x86_64-freebsd
+  stage: full-build
+
 .build-x86_64-freebsd-hadrian:
   extends: .validate-hadrian
   stage: full-build

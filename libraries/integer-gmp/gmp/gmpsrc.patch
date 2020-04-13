@@ -1,27 +1,6 @@
 diff -Naur gmp-6.1.2/configure gmpbuild/configure
 --- gmp-6.1.2/configure	2016-12-16 10:45:32.000000000 -0500
 +++ gmpbuild/configure	2017-01-29 15:18:01.037775639 -0500
-@@ -4087,8 +4087,8 @@
- #
- cclist="gcc cc"
- 
--gcc_cflags="-O2 -pedantic"
--gcc_64_cflags="-O2 -pedantic"
-+gcc_cflags="-O2 -pedantic -fPIC"
-+gcc_64_cflags="-O2 -pedantic -fPIC"
- cc_cflags="-O"
- cc_64_cflags="-O"
- 
-@@ -27273,6 +27273,9 @@
- 	  case $host in
- 	    *-*-darwin*)
- 
-+echo "define(<PIC_ALWAYS>,<yes>)" >> $gmp_tmpconfigm4
-+
-+
- echo "include_mpn(\`x86_64/darwin.m4')" >> $gmp_tmpconfigm4i
-  ;;
- 	    *-*-mingw* | *-*-cygwin)
 @@ -28181,7 +28181,7 @@
  # FIXME: Upcoming version of autoconf/automake may not like broken lines.
  #        Right now automake isn't accepting the new AC_CONFIG_FILES scheme.
@@ -63,27 +42,3 @@ diff -Naur gmp-6.1.2/Makefile.in gmpbuild/Makefile.in
  
  # The "test -f" support for srcdir!=builddir is similar to the automake .c.o
  # etc rules, but with each foo.c explicitly, since $< is not portable
-diff -Naur gmp-6.1.2/configure.ac gmpbuild/configure.ac
---- gmp-6.1.2/configure.ac	2016-12-16 10:45:27.000000000 -0500
-+++ gmpbuild/configure.ac	2017-01-29 22:47:28.469558006 -0500
-@@ -3698,7 +3698,8 @@
-           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
- 	  case $host in
- 	    *-*-darwin*)
-+	      GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
- 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
- 	    *-*-mingw* | *-*-cygwin)
- 	      GMP_INCLUDE_MPN(x86_64/dos64.m4) ;;
- 	    *-openbsd*)
-diff -Naur gmp-6.1.2/mpn/asm-defs.m4 gmpbuild/mpn/asm-defs.m4
---- gmp-6.1.2/mpn/asm-defs.m4	2016-12-16 10:45:27.000000000 -0500
-+++ gmpbuild/mpn/asm-defs.m4	2017-01-29 22:46:26.025176258 -0500
-@@ -1051,7 +1051,7 @@
- dnl  systems which are always PIC.  PIC_ALWAYS established in config.m4
- dnl  identifies these for us.
- 
--ifelse(`PIC_ALWAYS',`yes',`define(`PIC')')
-+ifelse(PIC_ALWAYS,yes,`define(`PIC')')
- 
- 
- dnl  Various possible defines passed from the Makefile that are to be tested
