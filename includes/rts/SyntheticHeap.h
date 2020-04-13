@@ -18,21 +18,24 @@ typedef struct synthHeap_ {
 
 static inline synthHeap allocSynthHeap(void)
 {
-    return (synthHeap) {
+    synthHeap sh = {
         .heap = allocGroup(1),
         .descr = allocGroup(1),
     };
+    sh.heap->link = NULL;
+    sh.descr->link = NULL;
+    return sh;
 }
 
 static inline void freeSynthHeap(synthHeap sh)
 {
-    freeGroup(sh.heap);
-    freeGroup(sh.descr);
+    freeChain(sh.heap);
+    freeChain(sh.descr);
 }
 
 static inline StgWord synthClosureId(synthHeap *sh, StgClosure *c)
 {
-    return sh->descr->start[ROUNDUP_BYTES_TO_WDS((StgWord)c & (BLOCK_SIZE-1))];
+    return sh->descr->start[ROUNDUP_BYTES_TO_WDS((StgWord)c & BLOCK_MASK)];
 }
 
 static StgInfoTable info_weak     = { .type = WEAK,
@@ -49,30 +52,44 @@ static StgInfoTable info_arrwords = { .type = ARR_WORDS,
 #define INFO(ptr) ((StgInfoTable *)ptr)
 #endif
 
-#define node3(id, a,b,c)                                \
-    StgClosure *n##id = (StgClosure*)p;                 \
-    d[ROUNDUP_BYTES_TO_WDS((StgWord)p & (BLOCK_SIZE-1))] = id; \
-    *(StgWeak*)n##id = (StgWeak){                       \
-        .header = { .info = INFO(&info_weak) },         \
-        .key = n##a,                                    \
-        .value = n##b,                                  \
-        .finalizer = n##c,                              \
-    };                                                  \
-    p += sizeofW(StgWeak);
+static inline StgClosure*
+node3(synthHeap *sh, W_ id, StgClosure *a, StgClosure *b, StgClosure *c)
+{
+    StgWeak *n = (StgWeak*)sh->heap->free;
+    sh->heap->free += sizeofW(*n);
+    sh->descr->start[ROUNDUP_BYTES_TO_WDS((StgWord)n & BLOCK_MASK)] = id;
+    *n = (StgWeak) {
+        .header = { .info = INFO(&info_weak), .prof = { .ccs = CCS_SYSTEM } },
+        .key = a,
+        .value = b,
+        .finalizer = c,
+    };
+    return (StgClosure*)n;
+}
 
-#define node1(id, a)                                    \
-    StgClosure *n##id = (StgClosure*)p;                 \
-    d[ROUNDUP_BYTES_TO_WDS((StgWord)p & (BLOCK_SIZE-1))] = id; \
-    *(StgSelector*)n##id = (StgSelector){               \
-        .header = { .info = INFO(&info_selector) },     \
-        .selectee = n##a,                               \
-    };                                                  \
-    p += sizeofW(StgSelector);
+static inline StgClosure*
+node1(synthHeap *sh, W_ id, StgClosure *a)
+{
+    StgSelector *n = (StgSelector*)sh->heap->free;
+    sh->heap->free += sizeofW(*n);
+    sh->descr->start[ROUNDUP_BYTES_TO_WDS((StgWord)n & BLOCK_MASK)] = id;
+    *n = (StgSelector) {
+        .header = { .info = INFO(&info_selector),
+                    .prof = { .ccs = CCS_SYSTEM } },
+        .selectee = a,
+    };
+    return (StgClosure*)n;
+}
 
-#define node0(id)                                       \
-    StgClosure *n##id = (StgClosure*)p;                 \
-    d[ROUNDUP_BYTES_TO_WDS((StgWord)p & (BLOCK_SIZE-1))] = id; \
-    *(StgArrBytes*)n##id = (StgArrBytes){               \
-        .header = { .info = INFO(&info_arrwords) },     \
-    };                                                  \
-    p += sizeofW(StgArrBytes);
+static inline StgClosure*
+node0(synthHeap *sh, W_ id)
+{
+    StgArrBytes *n = (StgArrBytes*)sh->heap->free;
+    sh->heap->free += sizeofW(*n);
+    sh->descr->start[ROUNDUP_BYTES_TO_WDS((StgWord)n & BLOCK_MASK)] = id;
+    *n = (StgArrBytes) {
+        .header = { .info = INFO(&info_arrwords),
+                    .prof = { .ccs = CCS_SYSTEM } }
+    };
+    return (StgClosure*)n;
+}
