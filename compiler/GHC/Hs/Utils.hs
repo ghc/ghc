@@ -1161,9 +1161,12 @@ collect_pat pat bndrs = case pat of
   (SplicePat _ _)         -> bndrs
   (XPat ext)              -> collectXXPat (Proxy @p) ext bndrs
 
--- This class specifies how to collect variable identifiers from extension patterns in the given pass.
+-- | This class specifies how to collect variable identifiers from extension patterns in the given pass.
 -- Consumers of the GHC API that define their own passes should feel free to implement instances in order
 -- to make use of functions which depend on it.
+--
+-- In particular, Haddock already makes use of this, with an instance for its 'DocNameI' pass so that
+-- it can reuse the code in GHC for collecting binders.
 class (XRec p Pat ~ Located (Pat p)) => CollectPass p where
   collectXXPat :: Proxy p -> XXPat p -> [IdP p] -> [IdP p]
 
