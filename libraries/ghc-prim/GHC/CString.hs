@@ -30,6 +30,64 @@ module GHC.CString (
 import GHC.Types
 import GHC.Prim
 
+{-
+Note [String literals in GHC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+String literals get quite a bit of special handling in GHC.  This Note
+summarises the moving parts.
+
+* Desugaring: see GHC.HsToCore.Match.Literal.dsLit, which in
+  turn calls GHC.Core.Make.mkStringExprFS.
+
+  The desugarer desugars the Haskell literal "foo" into Core
+     GHC.CString.unpackCString# "foo"#
+  where "foo"# is primitive string literal (of type Addr#).
+
+  When the string cannot be encoded as a C string, we use UTF8:
+     GHC.CString.unpackCStringUtf8# "foo"#
+
+* The library module ghc-prim:GHC.CString has a bunch of functions that
+  work over primitive strings, including GHC.CString.unpackCString#
+
+* GHC.Core.Op.ConstantFold has some RULES that optimise treatment of
+  literal strings. These include things like:
+
+    + Special handling of elem over string literals.
+    + Constant folding the desugared form of ("foo" ++ "bar")
+      into ("foobar")
+    + and more
+
+* GHC.Base has a number of regular rules for String literals.
+
+  + a rule "eqString": (==) @String = eqString
+    where GHC.Base.eqString :: String -> String -> Bool
+
+    ConstantFold has a RULE for eqString on literals:
+     eqString (Lit "foo"#) (Lit "bar"#) --> False
+
+    This allows compile time evaluation of things like "foo" == "bar"
+
+  + A bunch of rules to promote fusion:
+
+    "unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
+    "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
+    "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
+
+    And UTF8 variants of these rules.
+
+* We allow primitive (unlifted) literal strings to be top-level
+  bindings, breaking out usual rule.  See GHC.Core
+  Note [Core top-level string literals]
+
+* TODO: There is work on a special code-gen path for top-level boxed strings
+     str :: [Char]
+     str = unpackCString# "foo"#
+  so that they can all share a common code pointer
+
+  There is a WIP MR on gitlab for this: !3012
+
+-}
+
 -----------------------------------------------------------------------------
 -- Unpacking C strings
 -----------------------------------------------------------------------------
