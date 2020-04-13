@@ -1,28 +1,28 @@
 TYPE SIGNATURES
-  !! :: forall {a}. [a] -> Int -> a
-  $ :: forall {a} {b}. (a -> b) -> a -> b
-  $! :: forall {a} {b}. (a -> b) -> a -> b
-  && :: Bool -> Bool -> Bool
-  * :: forall {a}. Num a => a -> a -> a
-  ** :: forall {a}. Floating a => a -> a -> a
-  + :: forall {a}. Num a => a -> a -> a
-  ++ :: forall {a}. [a] -> [a] -> [a]
-  - :: forall {a}. Num a => a -> a -> a
-  . :: forall {b} {c} {a}. (b -> c) -> (a -> b) -> a -> c
-  / :: forall {a}. Fractional a => a -> a -> a
-  /= :: forall {a}. Eq a => a -> a -> Bool
-  < :: forall {a}. Ord a => a -> a -> Bool
-  <= :: forall {a}. Ord a => a -> a -> Bool
-  =<< ::
+  (!!) :: forall {a}. [a] -> Int -> a
+  ($) :: forall {a} {b}. (a -> b) -> a -> b
+  ($!) :: forall {a} {b}. (a -> b) -> a -> b
+  (&&) :: Bool -> Bool -> Bool
+  (*) :: forall {a}. Num a => a -> a -> a
+  (**) :: forall {a}. Floating a => a -> a -> a
+  (+) :: forall {a}. Num a => a -> a -> a
+  (++) :: forall {a}. [a] -> [a] -> [a]
+  (-) :: forall {a}. Num a => a -> a -> a
+  (.) :: forall {b} {c} {a}. (b -> c) -> (a -> b) -> a -> c
+  (/) :: forall {a}. Fractional a => a -> a -> a
+  (/=) :: forall {a}. Eq a => a -> a -> Bool
+  (<) :: forall {a}. Ord a => a -> a -> Bool
+  (<=) :: forall {a}. Ord a => a -> a -> Bool
+  (=<<) ::
     forall {m :: * -> *} {a} {b}. Monad m => (a -> m b) -> m a -> m b
-  == :: forall {a}. Eq a => a -> a -> Bool
-  > :: forall {a}. Ord a => a -> a -> Bool
-  >= :: forall {a}. Ord a => a -> a -> Bool
-  >> :: forall {m :: * -> *} {a} {b}. Monad m => m a -> m b -> m b
-  >>= ::
+  (==) :: forall {a}. Eq a => a -> a -> Bool
+  (>) :: forall {a}. Ord a => a -> a -> Bool
+  (>=) :: forall {a}. Ord a => a -> a -> Bool
+  (>>) :: forall {m :: * -> *} {a} {b}. Monad m => m a -> m b -> m b
+  (>>=) ::
     forall {m :: * -> *} {a} {b}. Monad m => m a -> (a -> m b) -> m b
-  ^ :: forall {b} {a}. (Integral b, Num a) => a -> b -> a
-  ^^ :: forall {a} {b}. (Fractional a, Integral b) => a -> b -> a
+  (^) :: forall {b} {a}. (Integral b, Num a) => a -> b -> a
+  (^^) :: forall {a} {b}. (Fractional a, Integral b) => a -> b -> a
   abs :: forall {a}. Num a => a -> a
   acos :: forall {a}. Floating a => a -> a
   acosh :: forall {a}. Floating a => a -> a
@@ -234,7 +234,7 @@ TYPE SIGNATURES
   zipWith3 ::
     forall {a} {b} {c} {d}.
     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
-  || :: Bool -> Bool -> Bool
+  (||) :: Bool -> Bool -> Bool
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]
