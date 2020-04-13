@@ -28,7 +28,7 @@ where
 
 import GhcPrelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferAppHead )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -116,7 +116,7 @@ tcInferPat :: HsMatchContext GhcRn -> LPat GhcRn
            -> TcM a
            -> TcM ((LPat GhcTcId, a), TcSigmaType)
 tcInferPat ctxt pat thing_inside
-  = tcInferInst $ \ exp_ty ->    -- The ir_inst flag is irrelevant in tcPat
+  = tcInfer $ \ exp_ty ->
     tc_lpat pat exp_ty penv thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
@@ -399,12 +399,17 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  {
-         -- Using tcInferAppHead here, rather than tcMonoExpr, lets us
-         -- have view functions with types like:
-         --    (forall a. blah) -> forall b. burble
-         -- So the overall_pat_ty is (forall a. blah), while the
-         -- inner pattern is checked with (forall b. burble)
-        ; (expr',expr_ty) <- tcInferAppHead expr
+         -- We use tcInferRho here.
+         -- If we have a view function with types like:
+         --    blah -> forall b. burble
+         -- then simple-subsumption means that 'forall b' won't be instantiated
+         -- so we can typecheck the inner pattern with that type
+         -- Until simple subsumption, it'll be deeply instantiated, but
+         -- probably no one will notice.
+         -- An exotic example:
+         --    pair :: forall a. a -> forall b. b -> (a,b)
+         --    f (pair True -> x) = ...here (x :: forall b. b -> (Bool,b))
+        ; (expr',expr_ty) <- tcInferRho expr
 
          -- Expression must be a function
         ; let expr_orig = lexprCtOrigin expr

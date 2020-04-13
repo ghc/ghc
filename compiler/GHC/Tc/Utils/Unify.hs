@@ -26,7 +26,7 @@ module GHC.Tc.Utils.Unify (
 
   --------------------------------
   -- Holes
-  tcInferInst, tcInferNoInst,
+  tcInfer,
   matchExpectedListTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
@@ -199,8 +199,8 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     ------------
     defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
     defer acc_arg_tys n fun_ty
-      = do { more_arg_tys <- replicateM n newInferExpTypeNoInst
-           ; res_ty       <- newInferExpTypeInst
+      = do { more_arg_tys <- replicateM n newInferExpType
+           ; res_ty       <- newInferExpType
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
@@ -231,22 +231,24 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
-matchActualFunTys herald ct_orig mb_thing arity ty
-  = matchActualFunTysPart herald ct_orig mb_thing arity ty [] arity
+matchActualFunTys herald ct_orig mb_thing n_val_args_wanted fun_ty
+  = matchActualFunTysPart herald ct_orig mb_thing fun_ty n_val_args_wanted
+                          n_val_args_wanted fun_ty
 
 -- | Variant of 'matchActualFunTys' that works when supplied only part
 -- (that is, to the right of some arrows) of the full function type
 matchActualFunTysPart :: SDoc -- See Note [Herald for matchExpectedFunTys]
                       -> CtOrigin
                       -> Maybe (HsExpr GhcRn)  -- the thing with type TcSigmaType
-                      -> Arity
-                      -> TcSigmaType
-                      -> [TcSigmaType] -- reversed args. See (*) below.
-                      -> Arity   -- overall arity of the function, for errs
+                      -> TcSigmaType           -- Original function type
+                      -> Arity                 -- And number of args to which it is applied
+                      -> Arity                 -- Number of new value args wanted
+                      -> TcSigmaType           -- Type to analyse
                       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
-                      orig_old_args full_arity
-  = go arity orig_old_args orig_ty
+matchActualFunTysPart herald ct_orig mb_thing
+                      orig_fun_ty n_val_args_in_call
+                      n_val_args_wanted fun_ty
+  = go n_val_args_wanted fun_ty
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
 -- it's important for higher rank: the argument might be of form
@@ -274,36 +276,35 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     --
     -- Refactoring is welcome.
     go :: Arity
-       -> [TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
        -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-    go 0 _ ty = return (idHsWrapper, [], ty)
+    go 0 ty = return (idHsWrapper, [], ty)
 
-    go n acc_args ty
+    go n ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (wrap2, arg_tys, res_ty) <- go n acc_args rho
+           ; (wrap2, arg_tys, res_ty) <- go n rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go n acc_args ty
-      | Just ty' <- tcView ty = go n acc_args ty'
+    go n ty
+      | Just ty' <- tcView ty = go n ty'
 
-    go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
+        do { (wrap_res, tys, ty_r) <- go (n-1) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
                     , arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr orig_ty)
+              quotes (ppr orig_fun_ty)
 
-    go n acc_args ty@(TyVarTy tv)
+    go n ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n acc_args ty'
+               Indirect ty' -> go n ty'
                Flexi        -> defer n ty }
 
        -- In all other cases we bale out into ordinary unification
@@ -321,8 +322,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go n acc_args ty = addErrCtxtM (mk_ctxt (reverse acc_args) ty) $
-                       defer n ty
+    go n ty = addErrCtxtM mk_ctxt (defer n ty)
 
     ------------
     defer n fun_ty
@@ -333,16 +333,16 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
            ; return (mkWpCastN co, arg_tys, res_ty) }
 
     ------------
-    mk_ctxt :: [TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt arg_tys res_ty env
-      = do { let ty = mkVisFunTys arg_tys res_ty
-           ; (env1, zonked) <- zonkTidyTcType env ty
-                   -- zonking might change # of args
-           ; let (zonked_args, _) = tcSplitFunTys zonked
-                 n_actual         = length zonked_args
-                 (env2, unzonked) = tidyOpenType env1 ty
+    mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt env
+      = do { (env1, zonked) <- zonkTidyTcType env orig_fun_ty
+                   -- Zonking might change # of args
+           ; let (zonked_args, _)   = tcSplitPiTys zonked
+                 n_val_args_in_type = count isVisibleBinder zonked_args
+                 (env2, unzonked)   = tidyOpenType env1 orig_fun_ty
            ; return ( env2
-                    , mk_fun_tys_msg unzonked zonked n_actual full_arity herald) }
+                    , mk_fun_tys_msg unzonked zonked n_val_args_in_type
+                                     n_val_args_in_call herald) }
 
 mk_fun_tys_msg :: TcType  -- the full type passed in (unzonked)
                -> TcType  -- the full type passed in (zonked)
@@ -350,15 +350,15 @@ mk_fun_tys_msg :: TcType  -- the full type passed in (unzonked)
                -> Arity   -- the # of args wanted
                -> SDoc    -- overall herald
                -> SDoc
-mk_fun_tys_msg full_ty ty n_args full_arity herald
-  = herald <+> speakNOf full_arity (text "argument") <> comma $$
-    if n_args == full_arity
+mk_fun_tys_msg full_ty ty n_args_in_type n_args_in_call herald
+  = herald <+> speakNOf n_args_in_call (text "argument") <> comma $$
+    if n_args_in_type == n_args_in_call
       then text "its type is" <+> quotes (pprType full_ty) <>
            comma $$
            text "it is specialized to" <+> quotes (pprType ty)
       else sep [text "but its type" <+> quotes (pprType ty),
-                if n_args == 0 then text "has none"
-                else text "has only" <+> speakN n_args]
+                if n_args_in_type == 0 then text "has none"
+                else text "has only" <+> speakN n_args_in_type]
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
@@ -564,8 +564,7 @@ tcSubTypeET orig ctxt (Check ty_actual) ty_expected
 
 tcSubTypeET _ _ (Infer inf_res) ty_expected
   = do { co <- fillInferResult ty_expected inf_res
-               -- In patterns we ignore the ir_inst field
-               -- and never instantatiate
+               -- In patterns we do not instantatiate
 
        ; return (mkWpCastN (mkTcSymCo co)) }
 
@@ -866,16 +865,9 @@ tcWrapResultO orig rn_expr expr actual_ty res_ty
 
 -- | Infer a type using a fresh ExpType
 -- See also Note [ExpType] in GHC.Tc.Utils.TcMType
--- Does not attempt to instantiate the inferred type
-tcInferNoInst :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tcInferNoInst = tcInfer False
-
-tcInferInst :: (ExpRhoType -> TcM a) -> TcM (a, TcRhoType)
-tcInferInst = tcInfer True
-
-tcInfer :: Bool -> (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tcInfer instantiate tc_check
-  = do { res_ty <- newInferExpType instantiate
+tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tcInfer tc_check
+  = do { res_ty <- newInferExpType
        ; result <- tc_check res_ty
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }
@@ -884,15 +876,10 @@ instantiateAndFillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrap
 -- If wrap = instantiateAndFillInferResult t1 t2
 --    => wrap :: t1 ~> t2
 -- See Note [Deep instantiation of InferResult]
-instantiateAndFillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
-  | instantiate_me   -- This is *the* place where ir_inst is consulted
+instantiateAndFillInferResult orig ty inf_res
   = do { (wrap, rho) <- deeplyInstantiate orig ty
        ; co <- fillInferResult rho inf_res
        ; return (mkWpCastN co <.> wrap) }
-
-  | otherwise
-  = do { co <- fillInferResult ty inf_res
-       ; return (mkWpCastN co) }
 
 fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
 -- If wrap = fillInferResult t1 t2
@@ -925,9 +912,8 @@ fillInferResult orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
 
 {- Note [Deep instantiation of InferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In some cases we want to deeply instantiate before filling in
-an InferResult, and in some cases not.  That's why InferReult
-has the ir_inst flag.
+We now alwayd deeply instantiate before filling in InferResult,
+and in some cases not: see #17775
 
 ir_inst = True: deeply instantiate
 ----------------------------------
