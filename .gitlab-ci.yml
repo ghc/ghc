@@ -317,8 +317,8 @@ hadrian-ghc-in-ghci:
     # porting guide [1].
     # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
     CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
-    GHC_VERSION: 8.6.3
-    CABAL_INSTALL_VERSION: 3.0.0.0
+    GHC_VERSION: 8.10.1
+    CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
     TEST_ENV: "x86_64-freebsd"
     BUILD_FLAVOUR: "validate"
