@@ -624,7 +624,7 @@ set_sigtstp_action (bool handle)
 void
 install_vtalrm_handler(int sig, TickProc handle_tick)
 {
-    struct sigaction action;
+    struct sigaction action = {};
 
     action.sa_handler = handle_tick;
 
@@ -666,7 +666,8 @@ install_vtalrm_handler(int sig, TickProc handle_tick)
 void
 initDefaultHandlers(void)
 {
-    struct sigaction action,oact;
+    struct sigaction action = {};
+    struct sigaction oact = {};
 
     // install the SIGINT handler
     action.sa_handler = shutdown_handler;
