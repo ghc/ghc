@@ -1,106 +1,9 @@
 #include <string.h>
 #include "rts/SyntheticHeap.h"
 #include "rts/TraverseHeap.h"
+#include "TestHeap.h"
 
-static StgClosure *c10, *c11, *c20, *c30;
-
-synthHeap sh;
-
-static void initializeTestHeap(void)
-{
-    sh = allocSynthHeap();
-    StgPtr p = sh.heap->free;
-    StgPtr d = sh.descr->start;
-
-/*
-  1.0) Just a simple case to start with.
-
-   1
-  /
-  0---2
-  \
-   3
-*/
-    node0(1003);
-    node0(1002);
-    node0(1001);
-    node3(1000,
-          1001,
-          1002,
-          1003);
-
-    c10 = n1000;
-
-
-/*
-  1.1) Now with a cycle
-
-   1
-  /` \,
-  0--->2
-  \,
-   3
-*/
-    node0(1103);
-    node0(1102);
-    node1(1101,
-          1102);
-    node3(1100,
-          1101,
-          1102,
-          1103);
-
-    c11 = n1100;
-
-
-/*
-  2.0) This tests the chain optimization.
-
-   1     6
-  /     /
-  0-2-4-5-7
-  \     \
-   3     8
-*/
-
-    node0(2006);
-    node0(2007);
-    node0(2008);
-
-    node3(2005,
-          2006,
-          2007,
-          2008);
-
-    node1(2004,
-          2005);
-
-    node0(2003);
-    node1(2002,
-          2004);
-    node0(2001);
-
-    node3(2000,
-          2001,
-          2002,
-          2003);
-
-    c20 = n2000;
-
-
-/*
-  3.0) Some new closures which show up with zeroed prof header but when
-  flip=1. Note: We check that we get the first_visit value right by observing
-  that n3001 gets visited.
- */
-    node0(3001);
-    node1(3000, 3001);
-
-    c30 = n3000;
-
-    sh.heap->free = p;
-}
-
+static synthHeap sh;
 
 static void
 testReturn(StgClosure *c, const stackAccum acc,
@@ -125,7 +28,7 @@ testVisit(StgClosure *c, const StgClosure *cp,
     (void) acc;
     (void) child_data;
 
-    printf("visit  %lu\n", synthClosureId(&sh, c));
+    printf("visit  %lu%s\n", synthClosureId(&sh, c), first_visit ? " f" : "");
 
     return first_visit;
 }
@@ -145,7 +48,7 @@ int main(int argc, char *argv[])
     {
         printf("with return\n");
 
-        initializeTestHeap();
+        sh = initializeTestHeap();
         initializeTraverseStack(ts);
 
         for(size_t i=0; i < (sizeof(tests)/sizeof(*tests)); i++) {
@@ -164,7 +67,7 @@ int main(int argc, char *argv[])
     {
         printf("\n\n\n\njust visit\n");
 
-        initializeTestHeap();
+        sh = initializeTestHeap();
         initializeTraverseStack(ts);
 
         for(size_t i=0; i < (sizeof(tests)/sizeof(*tests)); i++) {
@@ -172,20 +75,6 @@ int main(int argc, char *argv[])
             traversePushClosure(ts, *tests[i], *tests[i], NULL, nullStackData);
             traverseWorkStack(ts, &testVisit, NULL);
         }
-
-        closeTraverseStack(ts);
-        freeSynthHeap(sh);
-    }
-
-    {
-        printf("\n\n\n\nnew closures\n");
-
-        initializeTestHeap();
-        initializeTraverseStack(ts);
-
-        printf("\n\npush   %lu\n", synthClosureId(&sh, c30));
-        traversePushClosure(ts, c30, c30, NULL, nullStackData);
-        traverseWorkStack(ts, &testVisit, NULL);
 
         closeTraverseStack(ts);
         freeSynthHeap(sh);
