@@ -70,7 +70,6 @@ import Numeric (fromRat)
 import Data.Foldable (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
-import qualified Data.Semigroup as Semi
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --

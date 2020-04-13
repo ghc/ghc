@@ -126,7 +126,7 @@ instance Binary DeclDocMap where
 instance Outputable DeclDocMap where
   ppr (DeclDocMap m) = vcat (map pprPair (Map.toAscList m))
     where
-      pprPair (name, doc) = ppr name Outputable.<> colon $$ nest 2 (ppr doc)
+      pprPair (name, doc) = ppr name <> colon $$ nest 2 (ppr doc)
 
 emptyDeclDocMap :: DeclDocMap
 emptyDeclDocMap = DeclDocMap Map.empty
@@ -144,9 +144,9 @@ instance Outputable ArgDocMap where
   ppr (ArgDocMap m) = vcat (map pprPair (Map.toAscList m))
     where
       pprPair (name, int_map) =
-        ppr name Outputable.<> colon $$ nest 2 (pprIntMap int_map)
+        ppr name <> colon $$ nest 2 (pprIntMap int_map)
       pprIntMap im = vcat (map pprIPair (Map.toAscList im))
-      pprIPair (i, doc) = ppr i Outputable.<> colon $$ nest 2 (ppr doc)
+      pprIPair (i, doc) = ppr i <> colon $$ nest 2 (ppr doc)
 
 emptyArgDocMap :: ArgDocMap
 emptyArgDocMap = ArgDocMap Map.empty

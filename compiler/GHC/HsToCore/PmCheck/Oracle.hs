@@ -78,7 +78,6 @@ import Data.Foldable (foldlM, minimumBy, toList)
 import Data.List     (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ord      (comparing)
-import qualified Data.Semigroup as Semigroup
 import Data.Tuple    (swap)
 
 -- Debugging Infrastructure

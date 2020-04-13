@@ -201,8 +201,7 @@ But it doesn't work, for if x=empty, we would have
 -- ---------------------------------------------------------------------------
 -- Operator fixity
 
-infixl 6 <>
-infixl 6 <+>
+infixr 6 <+>  -- matches that of (Semigroup.<>)
 infixl 5 $$, $+$
 
 
@@ -659,14 +658,10 @@ nilAboveNest g k q           | not g && k > 0      -- No newline if no overlap
 -- ---------------------------------------------------------------------------
 -- Horizontal composition @<>@
 
--- We intentionally avoid Data.Monoid.(<>) here due to interactions of
--- Data.Monoid.(<>) and (<+>).  See
--- http://www.haskell.org/pipermail/libraries/2011-November/017066.html
-
 -- | Beside.
 -- '<>' is associative, with identity 'empty'.
-(<>) :: Doc -> Doc -> Doc
-p <>  q = beside_ p False q
+instance Semigroup Doc where
+  p <> q = beside_ p False q
 
 -- | Beside, separated by space, unless one of the arguments is 'empty'.
 -- '<+>' is associative, with identity 'empty'.

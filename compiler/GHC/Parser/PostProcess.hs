@@ -1261,8 +1261,8 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
  | otherwise            = return ()
     where pprOptSemi True  = semi
           pprOptSemi False = empty
-          expr = text "if"   <+> ppr guardExpr <> pprOptSemi semiThen <+>
-                 text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
+          expr = text "if"   <+> (ppr guardExpr <> pprOptSemi semiThen) <+>
+                 text "then" <+> (ppr thenExpr  <> pprOptSemi semiElse) <+>
                  text "else" <+> ppr elseExpr
 
 isFunLhs :: Located (PatBuilder GhcPs)

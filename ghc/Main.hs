@@ -862,7 +862,7 @@ dumpFastStringStats dflags = do
         -- the "z-encoded" total.
   putMsg dflags msg
   where
-   x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
+   x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
 
 showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
 showPackages       dflags = putStrLn (showSDoc dflags (pprPackages (pkgState dflags)))

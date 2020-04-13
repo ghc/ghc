@@ -1165,8 +1165,8 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
     pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
     mr_msg =
-         hang (sep [ text "The Monomorphism Restriction applies to the binding"
-                     <> plural name_taus
+         hang (sep [ text "The Monomorphism Restriction applies to the"
+                     <+> plural "binding" name_taus
                    , text "for" <+> pp_bndrs ])
             2 (hsep [ text "Consider giving"
                     , text (if isSingleton name_taus then "it" else "them")

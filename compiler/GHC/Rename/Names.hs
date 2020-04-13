@@ -1701,8 +1701,8 @@ badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE GhcPs
                         -> SDoc
 badImportItemErrDataCon dataType_occ iface decl_spec ie
   = vcat [ text "In module"
-             <+> quotes (ppr (is_mod decl_spec))
-             <+> source_import <> colon
+             <+> (quotes (ppr (is_mod decl_spec)) <+> source_import)
+             <> colon
          , nest 2 $ quotes datacon
              <+> text "is a data constructor of"
              <+> quotes dataType

@@ -492,7 +492,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
                                Just (_, unfunned) -> unwrapTypeVars unfunned
                                _ -> []
              where (vars, unforalled) = splitForAllVarBndrs t
-       holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
+       holeVs = sep $ map (parens . ((text "_" <+> dcolon) <+>) . ppr) hfMatches
        holeDisp = if sMs then holeVs
                   else sep $ replicate (length hfMatches) $ text "_"
        occDisp = pprPrefixOcc name

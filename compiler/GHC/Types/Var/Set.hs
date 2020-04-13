@@ -196,8 +196,8 @@ seqVarSet s = sizeVarSet s `seq` ()
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
-pluralVarSet :: VarSet -> SDoc
-pluralVarSet = pluralUFM . getUniqSet
+pluralVarSet :: String -> VarSet -> SDoc
+pluralVarSet s = pluralUFM s . getUniqSet
 
 -- | Pretty-print a non-deterministic set.
 -- The order of variables is non-deterministic and for pretty-printing that

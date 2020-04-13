@@ -1424,7 +1424,7 @@ constraintSynErr env kind
 dupPredWarn :: TidyEnv -> [NE.NonEmpty PredType] -> (TidyEnv, SDoc)
 dupPredWarn env dups
   = ( env
-    , text "Duplicate constraint" <> plural primaryDups <> text ":"
+    , text "Duplicate" <+> plural "constraint" primaryDups <> text ":"
       <+> pprWithCommas (ppr_tidy env) primaryDups )
   where
     primaryDups = map NE.head dups
@@ -1955,7 +1955,7 @@ smallerMsg what inst_head
 
 noMoreMsg :: [TcTyVar] -> SDoc -> SDoc -> SDoc
 noMoreMsg tvs what inst_head
-  = vcat [ hang (text "Variable" <> plural tvs1 <+> quotes (pprWithCommas ppr tvs1)
+  = vcat [ hang (plural "Variable" tvs1 <+> quotes (pprWithCommas ppr tvs1)
                 <+> occurs <+> text "more often")
               2 (sep [ text "in the" <+> what
                      , text "than in the instance head" <+> quotes inst_head ])
@@ -2196,7 +2196,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
 
     check_tvs tvs what what2
       = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
-        hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
+        hang (text "Type" <+> plural "variable" tvs <+> pprQuotedList tvs
               <+> isOrAre tvs <+> what <> comma)
            2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
                    , mk_extra tvs ])

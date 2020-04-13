@@ -477,7 +477,7 @@ warnRedundantConstraints ctxt env info ev_vars
  = do { msg <- mkErrorReport ctxt env (important doc)
       ; reportWarning (Reason Opt_WarnRedundantConstraints) msg }
  where
-   doc = text "Redundant constraint" <> plural redundant_evs <> colon
+   doc = text "Redundant" <+> plural "constraint" redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
 
    redundant_evs =
@@ -1249,7 +1249,7 @@ mkIPErr ctxt cts
              givens  = getUserGivens ctxt
              msg | null givens
                  = addArising orig $
-                   sep [ text "Unbound implicit parameter" <> plural cts
+                   sep [ text "Unbound implicit" <+> plural "parameter" cts
                        , nest 2 (pprParendTheta preds) ]
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
@@ -1552,7 +1552,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
   , let esc_skols = filter (`elemVarSet` (tyCoVarsOfType ty2)) skols
   , not (null esc_skols)
   = do { let msg = important $ misMatchMsg ct oriented ty1 ty2
-             esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
+             esc_doc = sep [ text "because" <+> what <+> plural "variable" esc_skols
                              <+> pprQuotedList esc_skols
                            , text "would escape" <+>
                              if isSingleton esc_skols then text "its scope"
@@ -2361,7 +2361,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
           = vcat [ ppWhen lead_with_ambig $
                      text "Probable fix: use a type annotation to specify what"
                      <+> pprQuotedList ambig_tvs <+> text "should be."
-                 , text "These potential instance" <> plural unifiers
+                 , text "These potential" <+>  plural "instance" unifiers
                    <+> text "exist:"]
 
         mb_patsyn_prov :: Maybe SDoc
@@ -2737,8 +2737,8 @@ mkAmbigMsg prepend_msg ct
 
     msg |  any isRuntimeUnkSkol ambig_kvs  -- See Note [Runtime skolems]
         || any isRuntimeUnkSkol ambig_tvs
-        = vcat [ text "Cannot resolve unknown runtime type"
-                 <> plural ambig_tvs <+> pprQuotedList ambig_tvs
+        = vcat [ text "Cannot resolve unknown runtime"
+                 <+> plural "type" ambig_tvs <+> pprQuotedList ambig_tvs
                , text "Use :print or :force to determine these types"]
 
         | not (null ambig_tvs)
@@ -2749,11 +2749,11 @@ mkAmbigMsg prepend_msg ct
 
     pp_ambig what tkvs
       | prepend_msg -- "Ambiguous type variable 't0'"
-      = text "Ambiguous" <+> what <+> text "variable"
-        <> plural tkvs <+> pprQuotedList tkvs
+      = text "Ambiguous" <+> what <+> plural "variable" tkvs
+        <+> pprQuotedList tkvs
 
       | otherwise -- "The type variable 't0' is ambiguous"
-      = text "The" <+> what <+> text "variable" <> plural tkvs
+      = text "The" <+> what <+> plural "variable" tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 
 pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
@@ -2940,7 +2940,7 @@ warnDefaulting wanteds default_ty
              (loc, ppr_wanteds) = pprWithArising tidy_wanteds
              warn_msg =
                 hang (hsep [ text "Defaulting the following"
-                           , text "constraint" <> plural tidy_wanteds
+                           , plural "constraint" tidy_wanteds
                            , text "to type"
                            , quotes (ppr default_ty) ])
                      2

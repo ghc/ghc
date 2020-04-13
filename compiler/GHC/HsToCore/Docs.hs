@@ -26,7 +26,6 @@ import Data.Bifunctor (first)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
-import Data.Semigroup
 
 -- | Extract docs from renamer output.
 extractDocs :: TcGblEnv

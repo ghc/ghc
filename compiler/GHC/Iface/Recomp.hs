@@ -49,10 +49,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
---Qualified import so we can define a Semigroup instance
--- but it doesn't clash with Outputable.<>
-import qualified Data.Semigroup
-
 {-
   -----------------------------------------------
           Recompilation checking

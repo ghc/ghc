@@ -12,11 +12,7 @@
 
 module GhcPrelude (module X) where
 
--- We export the 'Semigroup' class but w/o the (<>) operator to avoid
--- clashing with the (Outputable.<>) operator which is heavily used
--- through GHC's code-base.
-
-import Prelude as X hiding ((<>))
+import Prelude as X
 import Data.Foldable as X (foldl')
 
 {-
