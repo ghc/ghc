@@ -2122,7 +2122,7 @@ tcRnStmt hsc_env rdr_stmt
     }
   where
     bad_unboxed id = addErr (sep [text "GHCi can't bind a variable of unlifted type:",
-                                  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
+                                  nest 2 (pprPrefixOcc id <+> dcolon <+> ppr (idType id))])
 
 {-
 --------------------------------------------------------------------------
@@ -2903,7 +2903,7 @@ ppr_types debug type_env
              -- etc are suppressed (unless -dppr-debug),
              -- because they appear elsewhere
 
-    ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
+    ppr_sig id = hang (pprPrefixOcc id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
 ppr_tycons :: Bool -> [FamInst] -> TypeEnv -> SDoc
 ppr_tycons debug fam_insts type_env
@@ -2921,7 +2921,7 @@ ppr_tycons debug fam_insts type_env
                      | otherwise  = isExternalName (tyConName tycon) &&
                                     not (tycon `elem` fi_tycons)
     ppr_tc tc
-       = vcat [ hang (ppr (tyConFlavour tc) <+> ppr tc
+       = vcat [ hang (ppr (tyConFlavour tc) <+> pprPrefixOcc (tyConName tc)
                       <> braces (ppr (tyConArity tc)) <+> dcolon)
                    2 (ppr (tidyTopType (tyConKind tc)))
               , nest 2 $
@@ -2955,7 +2955,7 @@ ppr_patsyns type_env
   = ppr_things "PATTERN SYNONYMS" ppr_ps
                (typeEnvPatSyns type_env)
   where
-    ppr_ps ps = ppr ps <+> dcolon <+> pprPatSynType ps
+    ppr_ps ps = pprPrefixOcc ps <+> dcolon <+> pprPatSynType ps
 
 ppr_insts :: [ClsInst] -> SDoc
 ppr_insts ispecs
