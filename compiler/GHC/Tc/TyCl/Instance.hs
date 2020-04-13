@@ -797,7 +797,8 @@ tcDataFamInstHeader
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
-  = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, lhs_applied_kind)))
+  = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
+       ; (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
                bindImplicitTKBndrs_Q_Skol imp_vars          $
@@ -822,7 +823,11 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
                         hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
+                    -- We ignore the coercion here, returning lhs_applied_kind
+                    -- The res_kind is just an additional constraint
 
+                  ; traceTc "tcDataFamInstHeader" $
+                    vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind ]
                   ; return ( stupid_theta
                            , lhs_applied_ty
                            , lhs_applied_kind ) }
@@ -838,10 +843,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
-       ; (ze, qtvs)       <- zonkTyBndrs qtvs
-       ; lhs_ty           <- zonkTcTypeToTypeX ze lhs_ty
-       ; stupid_theta     <- zonkTcTypesToTypesX ze stupid_theta
-       ; lhs_applied_kind <- zonkTcTypeToTypeX ze lhs_applied_kind
+       ; (ze, qtvs)   <- zonkTyBndrs qtvs
+       ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
+       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+       ; res_kind     <- zonkTcTypeToTypeX ze res_kind
+
+       ; when (isJust m_ksig) $
+         checkDataKindSig (DataInstanceSort new_or_data) $
+         snd $ tcSplitPiTys res_kind
+         -- See Note [Datatype return kinds], end of point (4)
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of
@@ -849,7 +859,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; pats <- case splitTyConApp_maybe lhs_ty of
            Just (_, pats) -> pure pats
            Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
-       ; return (qtvs, pats, lhs_applied_kind, stupid_theta) }
+
+       ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
@@ -870,11 +881,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
            ; lvl <- getTcLevel
            ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
-           ; let final_kind = substTy subst inner_kind
-           ; checkDataKindSig (DataInstanceSort new_or_data) $
-               snd $ tcSplitPiTys final_kind
-             -- See Note [Datatype return kinds], end of point (4)
-           ; return final_kind }
+           ; return (substTy subst inner_kind) }
 
 {- Note [Result kind signature for a data family instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

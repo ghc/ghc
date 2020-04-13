@@ -62,6 +62,7 @@ import GHC.Driver.Packages ( trusted, getPackageDetails, getInstalledPackageDeta
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import PrelNames
+import TysWiredIn( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
 import qualified Lexer
@@ -1669,7 +1670,7 @@ defineMacro overwrite s = do
       step <- getGhciStepIO
       expr <- GHC.parseExpr definition
       -- > ghciStepIO . definition :: String -> IO String
-      let stringTy = nlHsTyVar stringTy_RDR
+      let stringTy = nlHsTyVar stringTyCon_RDR
           ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
           body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                      `mkHsApp` (nlHsPar expr)
@@ -1737,7 +1738,7 @@ cmdCmd str = handleSourceError GHC.printException $ do
 getGhciStepIO :: GHC.GhcMonad m => m (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
-  let stringTy = nlHsTyVar stringTy_RDR
+  let stringTy = nlHsTyVar stringTyCon_RDR
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)

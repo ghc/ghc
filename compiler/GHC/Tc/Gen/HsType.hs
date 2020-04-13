@@ -216,8 +216,7 @@ kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
               bindImplicitTKBndrs_Skol sig_vars      $
               tc_lhs_type typeLevelMode hs_ty liftedTypeKind
 
-       ; emitResidualTvConstraint skol_info Nothing spec_tkvs
-                                  tc_lvl wanted }
+       ; emitResidualTvConstraint skol_info spec_tkvs tc_lvl wanted }
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
@@ -227,6 +226,7 @@ tcClassSigType skol_info names sig_ty
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
+       --
        -- No need to fail here if the type has an error:
        --   If we're in the kind-checking phase, the solveEqualities
        --     in kcTyClGroup catches the error
@@ -248,12 +248,16 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty
-                                       (expectedKindInCtxt ctxt)
+       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
 
-       ; when insol failM
-       -- See Note [Fail fast if there are insoluble kind equalities] in GHC.Tc.Solver
+       -- See Note [Fail fast if there are insoluble kind equalities]
+       -- in GHC.Tc.Solver
+       -- Any implications are almost skolem-escape bugs, and for
+       -- these we really want to stop now!  Top level constraints
+       -- may relate to outer stuff and can be solved later.
+       ; when insol (do { traceTc "tcHsSigType: failing" empty
+                        ; failM })
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -302,10 +306,38 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; let should_gen = not . (`elemVarSet` constrained)
 
        ; kvs <- kindGeneralizeSome should_gen ty1
-       ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
-                                  tc_lvl wanted
+       ; emitResidualTvConstraint skol_info (kvs ++ spec_tkvs) tc_lvl wanted
 
-       ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
+       ; return (insolubleOrImplicWC wanted, mkInvForAllTys kvs ty1) }
+         -- See Note [Skolem escape in type signatures]
+
+{- Note [Skolem escape in type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The case in tcHsSigType is tricky.  Consider (T11142)
+  foo :: forall b. (forall k (a :: k). SameKind a b) -> ()
+This is ill-kinded becuase of a nested skolem-escape; but
+the offending constraint isn't "obviosuly insoluble" like Int~Bool.
+Somewhat unsatisfyingly, we just look for an unsolved implication
+constraint, relying on the fact that we've just run the solver,
+and the result still isn't solved.
+
+At top level this doesn't arise, because we use solveEqualities, which
+solves /all/ the equalities. But for a nested type signature we might
+have some unsolved top-level constraints on in-scope variables that
+will "later" become soluble.  Tricky.
+
+But in tcClassSigType we must *not* fail fast here, because there
+are skolems from the class decl which are in scope; but its fine
+not to because tcClassDecl1 has a solveEqualities wrapped around
+all the tcClassSigType calls.
+
+In contrast, ordinary tcHsSigType is going back to the world
+of terms, and we really must fail fast.
+
+That's why the fail-test is in tcHsSigType, not tc_hs_sig_type:
+tcClassSigType goes direct to tc_hs_sig_type.
+-}
+
 
 tcTopLHsType :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -729,9 +761,9 @@ tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
                              ForallInvis -> Specified
              bndrs       = mkTyVarBinders argf tvs'
              skol_info   = ForAllSkol (ppr forall)
-             m_telescope = Just (sep (map ppr hs_tvs))
+                                      (sep (map ppr hs_tvs))
 
-       ; emitResidualTvConstraint skol_info m_telescope tvs' tclvl wanted
+       ; emitResidualTvConstraint skol_info tvs' tclvl wanted
 
        ; return (mkForAllTys bndrs ty') }
 
@@ -1800,10 +1832,21 @@ newWildTyVar
   = do { kind <- newMetaKindVar
        ; uniq <- newUnique
        ; details <- newMetaDetails TauTv
-       ; let name  = mkSysTvName uniq (fsLit "_")
+       ; let name  = mkSysTvName uniq (fsLit "w")
+                     -- See Note [Wildcard names]
              tyvar = mkTcTyVar name kind details
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
+
+{- Note [Wildcard names]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We name the unification variable from a wildcard "w", not "_".
+If we use the latter, we get messages like
+     Found type wildcard ‘_’ standing for ‘_1’
+which is a bit confusing.  I prefer
+     Found type wildcard ‘_’ standing for ‘w0’
+-}
+
 
 {- *********************************************************************
 *                                                                      *
@@ -2979,6 +3022,7 @@ data DataSort
 checkDataKindSig :: DataSort -> Kind -> TcM ()
 checkDataKindSig data_sort kind = do
   dflags <- getDynFlags
+  traceTc "checkDataKindSig" (ppr kind)
   checkTc (is_TYPE_or_Type dflags || is_kind_var) (err_msg dflags)
   where
     pp_dec :: SDoc

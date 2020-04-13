@@ -403,7 +403,7 @@ previously suppressed.   (e.g. partial-sigs/should_fail/T14584)
 -}
 
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
-reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
+reportImplic ctxt implic@(Implic { ic_skols = tvs
                                  , ic_given = given
                                  , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
@@ -420,7 +420,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
        ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
          warnRedundantConstraints ctxt' tcl_env info' dead_givens
-       ; when bad_telescope $ reportBadTelescope ctxt tcl_env m_telescope tvs }
+       ; when bad_telescope $ reportBadTelescope ctxt tcl_env info tvs }
   where
     tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status
@@ -492,8 +492,8 @@ warnRedundantConstraints ctxt env info ev_vars
    improving pred -- (transSuperClasses p) does not include p
      = any isImprovementPred (pred : transSuperClasses pred)
 
-reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> Maybe SDoc -> [TcTyVar] -> TcM ()
-reportBadTelescope ctxt env (Just telescope) skols
+reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
+reportBadTelescope ctxt env (ForAllSkol _ telescope) skols
   = do { msg <- mkErrorReport ctxt env (important doc)
        ; reportError msg }
   where
@@ -503,8 +503,8 @@ reportBadTelescope ctxt env (Just telescope) skols
 
     sorted_tvs = scopedSort skols
 
-reportBadTelescope _ _ Nothing skols
-  = pprPanic "reportBadTelescope" (ppr skols)
+reportBadTelescope _ _ skol_info skols
+  = pprPanic "reportBadTelescope" (ppr skol_info $$ ppr skols)
 
 {- Note [Redundant constraints in instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1473,8 +1473,9 @@ reportEqErr :: ReportErrCtxt -> Report
             -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt report ct oriented ty1 ty2
   = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, report, eqInfo])
-  where misMatch = important $ misMatchOrCND ctxt ct oriented ty1 ty2
-        eqInfo = important $ mkEqInfoMsg ct ty1 ty2
+  where
+    misMatch = important $ misMatchOrCND False ctxt ct oriented ty1 ty2
+    eqInfo   = important $ mkEqInfoMsg ct ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
@@ -1485,15 +1486,14 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
 
 mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
-  | not insoluble_occurs_check   -- See Note [Occurs check wins]
-  , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-                            -- be oriented the other way round;
+  | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing
+                            -- would be oriented the other way round;
                             -- see GHC.Tc.Solver.Canonical.canEqTyVarTyVar
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
-     -- the cases below don't really apply to ReprEq (except occurs check)
+     -- The cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
-        [ important $ misMatchOrCND ctxt ct oriented ty1 ty2
+        [ important $ misMatchOrCND insoluble_occurs_check ctxt ct oriented ty1 ty2
         , important $ extraTyVarEqInfo ctxt tv1 ty2
         , report
         ]
@@ -1640,16 +1640,17 @@ isUserSkolem ctxt tv
     is_user_skol_info (InferSkol {}) = False
     is_user_skol_info _ = True
 
-misMatchOrCND :: ReportErrCtxt -> Ct
+misMatchOrCND :: Bool -> ReportErrCtxt -> Ct
               -> Maybe SwapFlag -> TcType -> TcType -> SDoc
 -- If oriented then ty1 is actual, ty2 is expected
-misMatchOrCND ctxt ct oriented ty1 ty2
-  | null givens ||
-    (isRigidTy ty1 && isRigidTy ty2) ||
-    isGivenCt ct
-       -- If the equality is unconditionally insoluble
-       -- or there is no context, don't report the context
-  = misMatchMsg ct oriented ty1 ty2
+misMatchOrCND insoluble_occurs_check ctxt ct oriented ty1 ty2
+  | insoluble_occurs_check  -- See Note [Insoluble occurs check]
+    || (isRigidTy ty1 && isRigidTy ty2)
+    || isGivenCt ct
+    || null givens
+  = -- If the equality is unconditionally insoluble
+    -- or there is no context, don't report the context
+    misMatchMsg ct oriented ty1 ty2
   | otherwise
   = couldNotDeduce givens ([eq_pred], orig)
   where
@@ -1969,8 +1970,8 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
 
 mkExpectedActualMsg _ _ _ _ _ = panic "mkExpectedAcutalMsg"
 
-{- Note [Insoluble occurs check wins]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Insoluble occurs check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider [G] a ~ [a],  [W] a ~ [a] (#13674).  The Given is insoluble
 so we don't use it for rewriting.  The Wanted is also insoluble, and
 we don't solve it from the Given.  It's very confusing to say
@@ -1980,7 +1981,8 @@ And indeed even thinking about the Givens is silly; [W] a ~ [a] is
 just as insoluble as Int ~ Bool.
 
 Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
-then report it first.
+then report it directly, not in the "cannot deduce X from Y" form.
+This is done in misMatchOrCND (via the insoluble_occurs_check arg)
 
 (NB: there are potentially-soluble ones, like (a ~ F a b), and we don't
 want to be as draconian with them.)

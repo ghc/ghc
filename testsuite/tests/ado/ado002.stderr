@@ -43,7 +43,7 @@ ado002.hs:15:13: error:
            return (y, x)
 
 ado002.hs:23:9: error:
-    • Couldn't match expected type ‘Char -> IO t0’
+    • Couldn't match expected type ‘Char -> IO a0’
                   with actual type ‘IO Char’
     • The function ‘getChar’ is applied to one argument,
       but its type ‘IO Char’ has none
