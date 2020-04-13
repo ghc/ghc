@@ -1787,8 +1787,8 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar noExtField (L loc main_name)))
-                             (mkCheckExpType io_ty)
+                  tcLExpr (L loc (HsVar noExtField (L loc main_name)))
+                          (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -2495,8 +2495,7 @@ tcRnExpr hsc_env mode rdr_expr
     ((tclvl, res_ty), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             do { (_tc_expr, expr_ty) <- tc_infer rn_expr
-                ; return expr_ty } ;
+             tc_infer rn_expr ;
 
     -- Generalise
     (qtvs, dicts, _, residual, _)
@@ -2522,8 +2521,10 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    tc_infer | inst      = tcInferRhoNC
-             | otherwise = tcInferAppHead
+    tc_infer expr | inst      = do { (_, ty)    <- tcInferRhoNC expr
+                                   ; return ty }
+                  | otherwise = do { (_, _, ty) <- tcInferApp expr
+                                   ; return ty }
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)

@@ -617,7 +617,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        ; meta_exp_ty <- tcTExpTy m_var res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+                  tcLExpr expr (mkCheckExpType meta_exp_ty)
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp
                         (mkLHsWrap (applyQuoteWrapper q)
@@ -640,7 +640,7 @@ tcTopSplice expr res_ty
        -- Top level splices must still be of type Q (TExp a)
        ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
-                          tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+                          tcLExpr expr (mkCheckExpType meta_exp_ty)
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
@@ -677,7 +677,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
             captureConstraints $
               addErrCtxt (spliceResultDoc zonked_q_expr) $ do
                 { (exp3, _fvs) <- rnLExpr expr2
-                ; tcMonoExpr exp3 (mkCheckExpType zonked_ty)}
+                ; tcLExpr exp3 (mkCheckExpType zonked_ty)}
        ; ev <- simplifyTop wcs
        ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
        }
