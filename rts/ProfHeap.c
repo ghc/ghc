@@ -1306,11 +1306,9 @@ heapCensusChain( Census *census, bdescr *bd )
 
 // Time is process CPU time of beginning of current GC and is used as
 // the mutator CPU time reported as the census timestamp.
-Census* performHeapCensus(Time t)
+Census* performHeapCensus(Time t, W_ n_blocks, bdescr **block_list)
 {
-  uint32_t g, n;
   Census *census;
-  gen_workspace *ws;
 
   census = &censuses[era];
   census->time  = TimeToSecondsDbl(t);
@@ -1335,19 +1333,16 @@ Census* performHeapCensus(Time t)
 #endif
 
   // Traverse the heap, collecting the census info
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      heapCensusChain( census, generations[g].blocks );
-      // Are we interested in large objects?  might be
-      // confusing to include the stack in a heap profile.
-      heapCensusChain( census, generations[g].large_objects );
-      heapCensusCompactList ( census, generations[g].compact_objects );
+  for (size_t i = 0; i < n_blocks; i++) {
+      bdescr *bd = block_list[i];
 
-      for (n = 0; n < n_capabilities; n++) {
-          ws = &gc_threads[n]->gens[g];
-          heapCensusChain(census, ws->todo_bd);
-          heapCensusChain(census, ws->part_list);
-          heapCensusChain(census, ws->scavd_list);
-      }
+      if(!bd)
+          continue;
+
+      if(bd->flags & BF_COMPACT)
+          heapCensusCompactList (census, bd);
+      else
+          heapCensusChain(census, bd);
   }
 
 #if defined(PROFILING)
@@ -1438,5 +1433,31 @@ void endHeapCensus(Census *census)
 
 void heapCensus(Time t)
 {
-    endHeapCensus(performHeapCensus(t));
+    size_t gens = RtsFlags.GcFlags.generations;
+    size_t blocks_per_gen = 3 + n_capabilities * 3;
+    size_t n_blocks = gens * blocks_per_gen;
+    bdescr **block_list
+        = stgMallocBytes(sizeof(bdescr*) * n_blocks, "heapCensus");
+
+    size_t i = 0, g, n;
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        block_list[i++] = generations[g].blocks;
+        block_list[i++] = generations[g].large_objects;
+        block_list[i++] = generations[g].compact_objects;
+        if(generations[g].compact_objects) {
+            ASSERT(generations[g].compact_objects->flags & BF_COMPACT);
+        }
+
+        for (n = 0; n < n_capabilities; n++) {
+            gen_workspace *ws = &gc_threads[n]->gens[g];
+            block_list[i++] = ws->todo_bd;
+            block_list[i++] = ws->part_list;
+            block_list[i++] = ws->scavd_list;
+        }
+    }
+    ASSERT(i <= n_blocks);
+
+    endHeapCensus(performHeapCensus(t, n_blocks, block_list));
+
+    stgFree(block_list);
 }

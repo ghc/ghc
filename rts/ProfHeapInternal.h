@@ -55,9 +55,6 @@ typedef struct _Census {
     ssize_t    drag_total;
 } Census;
 
-Census* performHeapCensus(Time t);
-void endHeapCensus(Census*);
-
 counter* heapInsertNewCounter(Census *census, const void *identity);
 
 #include "EndPrivate.h"
