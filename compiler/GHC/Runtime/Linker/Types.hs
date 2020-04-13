@@ -15,7 +15,7 @@ module GHC.Runtime.Linker.Types (
       SptEntry(..)
     ) where
 
-import GhcPrelude              ( FilePath, String, show, (<>) )
+import GhcPrelude              ( FilePath, String, show )
 import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
