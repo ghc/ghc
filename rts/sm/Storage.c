@@ -908,6 +908,7 @@ accountAllocation(Capability *cap, W_ n)
 }
 
 /* Note [slop on the heap]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
  *
  * We use the term "slop" to refer to allocated memory on the heap which isn't
  * occupied by any closure. Usually closures are packet tightly into the heap

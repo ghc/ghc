@@ -475,6 +475,7 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    overwritten.
 
    Note [zeroing slop when overwriting closures]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
    When we overwrite a closure in the heap with a smaller one, in some scenarios
    we need to write zero words into "slop"; the memory that is left
