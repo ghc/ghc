@@ -123,11 +123,13 @@ ppr_binding ann (val_bdr, expr)
          , pp_bind
          ]
   where
+    pp_val_bdr = pprPrefixOcc val_bdr
+
     pp_bind = case bndrIsJoin_maybe val_bdr of
                 Nothing -> pp_normal_bind
                 Just ar -> pp_join_bind ar
 
-    pp_normal_bind = hang (ppr val_bdr) 2 (equals <+> pprCoreExpr expr)
+    pp_normal_bind = hang pp_val_bdr 2 (equals <+> pprCoreExpr expr)
 
       -- For a join point of join arity n, we want to print j = \x1 ... xn -> e
       -- as "j x1 ... xn = e" to differentiate when a join point returns a
@@ -135,7 +137,7 @@ ppr_binding ann (val_bdr, expr)
       -- an n-argument function).
     pp_join_bind join_arity
       | bndrs `lengthAtLeast` join_arity
-      = hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs))
+      = hang (pp_val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs))
            2 (equals <+> pprCoreExpr rhs)
       | otherwise -- Yikes!  A join-binding with too few lambda
                   -- Lint will complain, but we don't want to crash
@@ -164,8 +166,10 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- an atomic value (e.g. function args)
 
 ppr_expr add_par (Var name)
- | isJoinId name               = add_par ((text "jump") <+> ppr name)
- | otherwise                   = ppr name
+ | isJoinId name               = add_par ((text "jump") <+> pp_name)
+ | otherwise                   = pp_name
+ where
+   pp_name = pprPrefixOcc name
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -429,7 +433,7 @@ pprKindedTyVarBndr tyvar
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
 pprIdBndr :: Id -> SDoc
-pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
+pprIdBndr id = pprPrefixOcc id <+> pprIdBndrInfo (idInfo id)
 
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
