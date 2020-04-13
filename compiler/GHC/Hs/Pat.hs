@@ -307,6 +307,7 @@ type instance XSigPat GhcTc = Type
 type instance XXPat GhcPs = NoExtCon
 type instance XXPat GhcRn = NoExtCon
 type instance XXPat GhcTc = CoPat
+  -- After typechecking, we add one extra constructor: CoPat
 
 type family ConLikeP x
 
@@ -325,6 +326,8 @@ hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
+-- | This is the extension field for ConPat, added after typechecking
+-- It adds quite a few extra fields, to support elaboration of pattern matching.
 data ConPatTc
   = ConPatTc
     { -- | The universal arg types  1-1 with the universal
