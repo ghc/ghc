@@ -1,0 +1,3 @@
+
+<interactive>:1:1: error:
+    GHCi can't bind a variable of unlifted type: (%%%) :: GHC.Prim.Int#
