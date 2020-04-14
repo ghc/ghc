@@ -168,10 +168,20 @@ void postProfSampleCostCentre(Capability *cap,
 void postProfBegin(void);
 #endif /* PROFILING */
 
+#if defined(TICKY_TICKY)
+void postTickyCounterDef(StgEntCounter *p);
+void postTickyCounterSample(StgEntCounter *p);
+#endif /* TICKY_TICKY */
+
 void postConcUpdRemSetFlush(Capability *cap);
 void postConcMarkEnd(StgWord32 marked_obj_count);
 void postNonmovingHeapCensus(int log_blk_size,
                              const struct NonmovingAllocCensus *census);
+
+#if defined(TICKY_TICKY)
+void postTickyCounterDefs(StgEntCounter *p);
+void postTickyCounterSamples(StgEntCounter *p);
+#endif /* TICKY_TICKY */
 
 #else /* !TRACING */
 
