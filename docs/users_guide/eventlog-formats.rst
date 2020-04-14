@@ -755,3 +755,34 @@ intended to provide insight into fragmentation of the non-moving heap.
    :field Word32: number of live blocks.
 
    Describes the occupancy of the *blk_sz* sub-heap.
+
+Ticky counters
+~~~~~~~~~~~~~~
+
+Programs compiled with :ghc-flag:`-ticky` and :ghc-flag:`-eventlog` and invoked
+with ``+RTS -lT`` will emit periodic samples of the ticky entry counters to the
+eventlog.
+
+.. event-type:: TICKY_COUNTER_DEF
+
+   :tag: 210
+   :length: variable
+   :field Word64: counter ID
+   :field Word16: arity/field count
+   :field String: argument kinds. This is the same as the synonymous field in the
+     textual ticky summary.
+   :field String: counter name
+
+   Defines a ticky counter.
+
+.. event-type:: TICKY_COUNTER_SAMPLE
+
+   :tag: 211
+   :length: fixed
+   :field Word64: counter ID
+   :field Word64: number of times closures of this type has been entered.
+   :field Word64: number of allocations (words)
+   :field Word64: number of times this has been allocated (words). Only
+     produced for modules compiled with :ghc-flag:`-ticky-allocd`.
+
+   Records the counter statistics at a moment in time.
