@@ -340,8 +340,8 @@ basicKnownKeyNames
         groupWithName,
 
         -- Strings and lists
-        unpackCStringName,
-        unpackCStringFoldrName, unpackCStringUtf8Name,
+        unpackCStringName, unpackCStringUtf8Name,
+        unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
 
         -- Overloaded lists
         isListClassName,
@@ -352,6 +352,7 @@ basicKnownKeyNames
         -- List operations
         concatName, filterName, mapName,
         zipName, foldrName, buildName, augmentName, appendName,
+        elemName,
 
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName,
@@ -677,9 +678,10 @@ ordClass_RDR            = nameRdrName ordClassName
 enumClass_RDR           = nameRdrName enumClassName
 monadClass_RDR          = nameRdrName monadClassName
 
-map_RDR, append_RDR :: RdrName
+map_RDR, append_RDR, elem_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
 append_RDR              = nameRdrName appendName
+elem_RDR                = nameRdrName elemName
 
 foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
     :: RdrName
@@ -712,11 +714,12 @@ ioDataCon_RDR :: RdrName
 ioDataCon_RDR           = nameRdrName ioDataConName
 
 eqString_RDR, unpackCString_RDR, unpackCStringFoldr_RDR,
-    unpackCStringUtf8_RDR :: RdrName
+    unpackCStringFoldrUtf8_RDR, unpackCStringUtf8_RDR :: RdrName
 eqString_RDR            = nameRdrName eqStringName
 unpackCString_RDR       = nameRdrName unpackCStringName
 unpackCStringFoldr_RDR  = nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR   = nameRdrName unpackCStringUtf8Name
+unpackCStringFoldrUtf8_RDR  = nameRdrName unpackCStringFoldrUtf8Name
 
 newStablePtr_RDR :: RdrName
 newStablePtr_RDR        = nameRdrName newStablePtrName
@@ -1006,11 +1009,12 @@ modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
-    unpackCStringUtf8Name, eqStringName :: Name
+    unpackCStringUtf8Name, unpackCStringFoldrUtf8Name,eqStringName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+unpackCStringFoldrUtf8Name  = varQual gHC_CSTRING (fsLit "unpackFoldrCStringUtf8#") unpackCStringFoldrUtf8IdKey
 
 -- The 'inline' function
 inlineIdName :: Name
@@ -1083,7 +1087,7 @@ groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
 
 -- Random PrelBase functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
-    mapName, appendName, assertName,
+    mapName, appendName, elemName, assertName,
     breakpointName, breakpointCondName,
     opaqueTyConName, dollarName :: Name
 dollarName        = varQual gHC_BASE (fsLit "$")          dollarIdKey
@@ -1097,6 +1101,7 @@ assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
 breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
 opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")     opaqueTyConKey
+elemName          = varQual gHC_LIST (fsLit "elem")       elemIdKey
 fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
 
 -- PrelTup
@@ -2081,13 +2086,15 @@ unsafeReflDataConKey      = mkPreludeDataConUnique 114
 -}
 
 wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
+    elemIdKey,
     buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
-    unpackCStringFoldrIdKey, unpackCStringIdKey,
+    unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey,
+    unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
     absentSumFieldErrorIdKey :: Unique
 
@@ -2095,27 +2102,29 @@ wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard 
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
 appendIdKey                   = mkPreludeMiscIdUnique  3
-buildIdKey                    = mkPreludeMiscIdUnique  4
-errorIdKey                    = mkPreludeMiscIdUnique  5
-foldrIdKey                    = mkPreludeMiscIdUnique  6
-recSelErrorIdKey              = mkPreludeMiscIdUnique  7
-seqIdKey                      = mkPreludeMiscIdUnique  8
-absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique  9
-eqStringIdKey                 = mkPreludeMiscIdUnique 10
-noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
-nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
-runtimeErrorIdKey             = mkPreludeMiscIdUnique 13
-patErrorIdKey                 = mkPreludeMiscIdUnique 14
-realWorldPrimIdKey            = mkPreludeMiscIdUnique 15
-recConErrorIdKey              = mkPreludeMiscIdUnique 16
-unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 17
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 18
-unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
-unpackCStringIdKey            = mkPreludeMiscIdUnique 20
-voidPrimIdKey                 = mkPreludeMiscIdUnique 21
-typeErrorIdKey                = mkPreludeMiscIdUnique 22
-divIntIdKey                   = mkPreludeMiscIdUnique 23
-modIntIdKey                   = mkPreludeMiscIdUnique 24
+elemIdKey                     = mkPreludeMiscIdUnique  4
+buildIdKey                    = mkPreludeMiscIdUnique  5
+errorIdKey                    = mkPreludeMiscIdUnique  6
+foldrIdKey                    = mkPreludeMiscIdUnique  7
+recSelErrorIdKey              = mkPreludeMiscIdUnique  8
+seqIdKey                      = mkPreludeMiscIdUnique  9
+absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique 10
+eqStringIdKey                 = mkPreludeMiscIdUnique 11
+noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 12
+nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 13
+runtimeErrorIdKey             = mkPreludeMiscIdUnique 14
+patErrorIdKey                 = mkPreludeMiscIdUnique 15
+realWorldPrimIdKey            = mkPreludeMiscIdUnique 16
+recConErrorIdKey              = mkPreludeMiscIdUnique 17
+unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 18
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 19
+unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 20
+unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 21
+unpackCStringIdKey            = mkPreludeMiscIdUnique 22
+voidPrimIdKey                 = mkPreludeMiscIdUnique 23
+typeErrorIdKey                = mkPreludeMiscIdUnique 24
+divIntIdKey                   = mkPreludeMiscIdUnique 25
+modIntIdKey                   = mkPreludeMiscIdUnique 26
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,

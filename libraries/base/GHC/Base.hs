@@ -1618,7 +1618,11 @@ iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
                 | otherwise                          = a `uncheckedIShiftRL#` b
 
+------------------------------------------------------------------------
 -- Rules for C strings (the functions themselves are now in GHC.CString)
+------------------------------------------------------------------------
+
+-- Ascii variants
 {-# RULES
 "unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
@@ -1626,5 +1630,16 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 
 -- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
+
+  #-}
+
+-- Utf8 variants
+{-# RULES
+"unpackUtf8"       [~1] forall a   . unpackCStringUtf8# a             = build (unpackFoldrCStringUtf8# a)
+"unpack-listUtf8"  [1]  forall a   . unpackFoldrCStringUtf8# a (:) [] = unpackCStringUtf8# a
+"unpack-appendUtf8"     forall a n . unpackFoldrCStringUtf8# a (:) n  = unpackAppendCStringUtf8# a n
+
+-- There's a built-in rule (in PrelRules.hs) for
+--      unpackFoldrUtf8 "föö" c (unpackFoldrUtf8 "bäz" c n)  =  unpackFoldrUtf8 "fööbäz" c n
 
   #-}
