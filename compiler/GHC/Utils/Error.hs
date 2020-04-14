@@ -438,20 +438,28 @@ doIfSet_dyn dflags flag action | gopt flag dflags = action
 dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
 dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = putLogMsg  dflags
-                            NoReason
-                            SevDump
-                            noSrcSpan
-                            (withPprStyle defaultDumpStyle
-                              (mkDumpDoc hdr doc))
+  | otherwise  = doDump dflags hdr doc
+{-# INLINE dumpIfSet #-}  -- see Note [INLINE conditional tracing utilities]
 
--- | a wrapper around 'dumpAction'.
+-- | This is a helper for 'dumpIfSet' to ensure that it's not duplicated
+-- despite the fact that 'dumpIfSet' has an @INLINE@.
+doDump :: DynFlags -> String -> SDoc -> IO ()
+doDump dflags hdr doc =
+  putLogMsg dflags
+            NoReason
+            SevDump
+            noSrcSpan
+            (withPprStyle defaultDumpStyle
+              (mkDumpDoc hdr doc))
+
+-- | A wrapper around 'dumpAction'.
 -- First check whether the dump flag is set
 -- Do nothing if it is unset
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
 dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
+{-# INLINE dumpIfSet_dyn #-}  -- see Note [INLINE conditional tracing utilities]
 
--- | a wrapper around 'dumpAction'.
+-- | A wrapper around 'dumpAction'.
 -- First check whether the dump flag is set
 -- Do nothing if it is unset
 --
@@ -462,6 +470,7 @@ dumpIfSet_dyn_printer printer dflags flag hdr fmt doc
   = when (dopt flag dflags) $ do
       let sty = mkDumpStyle printer
       dumpAction dflags sty (dumpOptionsFromFlag flag) hdr fmt doc
+{-# INLINE dumpIfSet_dyn_printer #-}  -- see Note [INLINE conditional tracing utilities]
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
@@ -608,6 +617,7 @@ ifVerbose :: DynFlags -> Int -> IO () -> IO ()
 ifVerbose dflags val act
   | verbosity dflags >= val = act
   | otherwise               = return ()
+{-# INLINE ifVerbose #-}  -- see Note [INLINE conditional tracing utilities]
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
@@ -778,6 +788,7 @@ debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg =
    ifVerbose dflags val $
       logInfo dflags (withPprStyle defaultDumpStyle msg)
+{-# INLINE debugTraceMsg #-}  -- see Note [INLINE conditional tracing utilities]
 
 putMsg :: DynFlags -> MsgDoc -> IO ()
 putMsg dflags msg = logInfo dflags (withPprStyle defaultUserStyle msg)

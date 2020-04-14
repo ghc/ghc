@@ -543,6 +543,7 @@ runFlatten mode loc flav eq_rel thing_inside
 
 traceFlat :: String -> SDoc -> FlatM ()
 traceFlat herald doc = liftTcS $ traceTcS herald doc
+{-# INLINE traceFlat #-}  -- see Note [INLINE conditional tracing utilities]
 
 getFlatEnvField :: (FlattenEnv -> a) -> FlatM a
 getFlatEnvField accessor
