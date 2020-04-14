@@ -490,6 +490,7 @@ unsetWOptM flag =
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenDOptM flag thing_inside = do b <- doptM flag
                                  when b thing_inside
+{-# INLINE whenDOptM #-} -- Note [INLINE trace{Tc,Rn}]
 
 whenGOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenGOptM flag thing_inside = do b <- goptM flag
@@ -665,39 +666,52 @@ updTcRef ref fn = liftIO $ do { old <- readIORef ref
 ************************************************************************
 -}
 
+-- Note [INLINE trace{Tc,Rn}]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In general we want to optimise for the case where tracing is not enabled.
+-- To ensure this happens, we ensure that traceTc and friends are inlined; this
+-- ensures that the allocation of the document can be pushed into the tracing
+-- path, keeping the non-traced path free of this extraneous work.
 
 -- Typechecker trace
 traceTc :: String -> SDoc -> TcRn ()
 traceTc =
-  labelledTraceOptTcRn Opt_D_dump_tc_trace
+    labelledTraceOptTcRn Opt_D_dump_tc_trace herald doc
+{-# INLINE traceTc #-} -- Note [INLINE trace{Tc,Rn}]
 
 -- Renamer Trace
 traceRn :: String -> SDoc -> TcRn ()
-traceRn =
-  labelledTraceOptTcRn Opt_D_dump_rn_trace
+traceRn herald doc =
+    labelledTraceOptTcRn Opt_D_dump_rn_trace herald doc
+{-# INLINE traceRn #-} -- Note [INLINE trace{Tc,Rn}]
 
 -- | Trace when a certain flag is enabled. This is like `traceOptTcRn`
 -- but accepts a string as a label and formats the trace message uniformly.
-labelledTraceOptTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
-labelledTraceOptTcRn flag herald doc = do
-   traceOptTcRn flag (formatTraceMsg herald doc)
+labelledOptTraceTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
+labelledOptTraceTcRn flag herald doc =
+  whenDOptM flag $ labelledTraceTcRn herald doc
+{-# INLINE labelledOptTraceTcRn #-} -- Note [INLINE trace{Tc,Rn}]
+
+-- | This is like `traceOptTcRn` but accepts a string as a label and formats
+-- the trace message uniformly.
+labelledTraceTcRn :: String -> SDoc -> TcRn ()
+labelledTraceTcRn herald doc = traceTcRn (formatTraceMsg herald doc)
 
 formatTraceMsg :: String -> SDoc -> SDoc
 formatTraceMsg herald doc = hang (text herald) 2 doc
 
--- | Trace if the given 'DumpFlag' is set.
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc = do
-  dflags <- getDynFlags
-  when (dopt flag dflags) $
+  whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) "" FormatText doc
+{-# INLINE traceOptTcRn #-} -- Note [INLINE trace{Tc,Rn}]
 
 -- | Dump if the given 'DumpFlag' is set.
 dumpOptTcRn :: DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpOptTcRn flag title fmt doc = do
-  dflags <- getDynFlags
-  when (dopt flag dflags) $
+  whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) title fmt doc
+{-# INLINE dumpOptTcRn #-} -- Note [INLINE trace{TcRn}]
 
 -- | Unconditionally dump some trace output
 --
