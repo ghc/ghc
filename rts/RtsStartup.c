@@ -332,6 +332,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     ioManagerStart();
 #endif
 
+#if defined(TICKY_TICKY) && defined(TRACING)
+    /* Dump the ticky counter definitions */
+    if (RtsFlags.TraceFlags.ticky) {
+        startTickySampleTimer();
+    }
+#endif
+
     /* Record initialization times */
     stat_endInit();
 }
@@ -418,6 +425,17 @@ hs_exit_(bool wait_foreign)
      * already freed the capabilities.
      */
     exitTimer(true);
+
+    /*
+     * Dump the ticky counter definitions
+     * We do this at the end of execution since tickers are registered in the
+     * course of program execution.
+     */
+#if defined(TICKY_TICKY) && defined(TRACING)
+    if (RtsFlags.TraceFlags.ticky) {
+        postTickyCounterDefs(ticky_entry_ctrs);
+    }
+#endif
 
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)
