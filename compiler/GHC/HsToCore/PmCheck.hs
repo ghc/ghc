@@ -14,7 +14,7 @@ Pattern Matching Coverage Checking.
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
         checkSingle, checkMatches, checkGuardMatches,
-        needToRunPmCheck, isMatchContextPmChecked,
+        isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
         addTyCsDs, addScrutTmCs
@@ -45,7 +45,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
-import GHC.Tc.Types.Evidence ( HsWrapper(..), isIdHsWrapper )
+import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
@@ -53,6 +53,7 @@ import GHC.HsToCore.Utils (selectMatchVar)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
+import GHC.Data.IOEnv (unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
@@ -1033,20 +1034,30 @@ Functions `addScrutTmCs' is responsible for generating
 these constraints.
 -}
 
+-- | Locally update 'dsl_deltas' with the given action, but defer evaluation
+-- with 'unsafeInterleaveM' in order not to do unnecessary work.
 locallyExtendPmDelta :: (Deltas -> DsM Deltas) -> DsM a -> DsM a
-locallyExtendPmDelta ext k = getPmDeltas >>= ext >>= \deltas -> do
-  inh <- isInhabited deltas
-  -- If adding a constraint would lead to a contradiction, don't add it.
-  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
-  -- for why this is done.
-  if inh
-    then updPmDeltas deltas k
-    else k
+locallyExtendPmDelta ext k = do
+  deltas <- getPmDeltas
+  deltas' <- unsafeInterleaveM $ do
+    deltas' <- ext deltas
+    inh <- isInhabited deltas'
+    -- If adding a constraint would lead to a contradiction, don't add it.
+    -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
+    -- for why this is done.
+    if inh
+      then pure deltas'
+      else pure deltas
+  updPmDeltas deltas' k
 
--- | Add in-scope type constraints
-addTyCsDs :: Bag EvVar -> DsM a -> DsM a
-addTyCsDs ev_vars =
-  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars))
+-- | Add in-scope type constraints if the coverage checker might run and then
+-- run the given action.
+addTyCsDs :: Origin -> Bag EvVar -> DsM a -> DsM a
+addTyCsDs origin ev_vars m = do
+  dflags <- getDynFlags
+  applyWhen (needToRunPmCheck dflags origin)
+            (locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
+            m
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
