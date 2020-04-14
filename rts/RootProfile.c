@@ -105,7 +105,7 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
 
     StgWord i;
     for(i = 0; i < n_roots; i++) {
-        if(bin_idx & (1ul<<i)) {
+        if(bin_idx & (1ul<<(i+1))) {
             strcpy(ptr, descs[i]);
             ptr += strlen(descs[i]);
             strcpy(ptr, ",");
@@ -117,12 +117,6 @@ rootProfileMkClosureLabel(Arena *arena, const void *key)
         ptr[-1] = '\0';
 
     return identity;
-}
-
-const void *rootProfileGetClosureIdentity(const StgClosure *c)
-{
-    ASSERT(traverseIsClosureDataValid(c));
-    return (void*)(traverseGetClosureData(c)>>1);
 }
 
 static bool
@@ -195,11 +189,6 @@ rootProfileVisitRoots(traverseState *ts, visitClosure_cb visit_cb, returnClosure
         traversePushClosure(ts, c, c, NULL, nullStackData);
         traverseWorkStack(ts, visit_cb, return_cb);
     }
-}
-
-bool rootProfileWasClosureVisited(const StgClosure *c)
-{
-    return traverseIsClosureDataValid(c);
 }
 
 /**
