@@ -17,5 +17,6 @@ void stopHeapProfTimer  ( void );
 void startHeapProfTimer ( void );
 
 extern bool performHeapProfile;
+extern bool performTickySample;
 
 #include "EndPrivate.h"

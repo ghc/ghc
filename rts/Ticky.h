@@ -8,4 +8,11 @@
 
 #pragma once
 
-RTS_PRIVATE void PrintTickyInfo(void);
+#include "BeginPrivate.h"
+
+void PrintTickyInfo(void);
+
+void emitTickyCounterSamples(void);
+void emitTickyCounterDefs(void);
+
+#include "EndPrivate.h"

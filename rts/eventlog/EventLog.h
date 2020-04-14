@@ -173,6 +173,11 @@ void postConcMarkEnd(StgWord32 marked_obj_count);
 void postNonmovingHeapCensus(int log_blk_size,
                              const struct NonmovingAllocCensus *census);
 
+#if defined(TICKY_TICKY)
+void postTickyCounterDefs(StgEntCounter *p);
+void postTickyCounterSamples(StgEntCounter *p);
+#endif /* TICKY_TICKY */
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
