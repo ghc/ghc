@@ -419,6 +419,17 @@ hs_exit_(bool wait_foreign)
      */
     exitTimer(true);
 
+    /*
+     * Dump the ticky counter definitions
+     * We do this at the end of execution since tickers are registered in the
+     * course of program execution.
+     */
+#if defined(TICKY_TICKY) && defined(TRACING)
+    if (RtsFlags.TraceFlags.ticky) {
+        emitTickyCounterDefs();
+    }
+#endif
+
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)
     resetTerminalSettings();

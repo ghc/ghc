@@ -194,12 +194,15 @@
 #define EVENT_CONC_UPD_REM_SET_FLUSH       206
 #define EVENT_NONMOVING_HEAP_CENSUS        207
 
+#define EVENT_TICKY_ENTRY_COUNTER_DEF      210
+#define EVENT_TICKY_ENTRY_COUNTER_SAMPLE   211
+
 /*
  * The highest event code +1 that ghc itself emits. Note that some event
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_GHC_EVENT_TAGS        208
+#define NUM_GHC_EVENT_TAGS        212
 
 #if 0  /* DEPRECATED EVENTS: */
 /* we don't actually need to record the thread, it's implicit */
