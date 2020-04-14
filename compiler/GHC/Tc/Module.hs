@@ -2518,10 +2518,10 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    tc_infer expr | inst      = do { (_, ty)    <- tcInferRhoNC expr
+    tc_infer expr | inst      = do { (_, ty) <- tcInferRho expr
                                    ; return ty }
-                  | otherwise = do { (_, _, ty) <- tcInferApp expr
-                                   ; return ty }
+                  | otherwise = tcInferSigma expr
+
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)
