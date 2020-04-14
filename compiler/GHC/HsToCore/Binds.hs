@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
+import GHC.HsToCore.PmCheck ( addTyCsDs, checkGuardMatches )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -145,12 +145,20 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = L _ fun
+dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- matchWrapper
-                           (mkPrefixFunRhs (noLoc $ idName fun))
+ = do   { (args, body) <- addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+                          -- FromSource might not be accurate (we don't have any
+                          -- origin annotations for things in this module), but at
+                          -- worst we do superfluous calls to the pattern match
+                          -- oracle.
+                          -- addTyCsDs: Add type evidence to the refinement type
+                          --            predicate of the coverage checker
+                          -- See Note [Type and Term Equality Propagation] in PmCheck
+                          matchWrapper
+                           (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
@@ -189,15 +197,7 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
-                               -- FromSource might not be accurate, but at worst
-                               -- we do superfluous calls to the pattern match
-                               -- oracle.
-                               -- addTyCsDs: push type constraints deeper
-                               --            for inner pattern match check
-                               -- See Check, Note [Type and Term Equality Propagation]
-                               (addTyCsDs (listToBag dicts))
-                               (dsLHsBinds binds)
+  = do { ds_binds <- addTyCsDs FromSource (listToBag dicts) (dsLHsBinds binds)
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
@@ -205,7 +205,6 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
        ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
-
 
 -----------------------
 dsAbsBinds :: DynFlags
