@@ -1630,11 +1630,46 @@ Using “ticky-ticky” profiling (for implementors)
 
     Enable ticky-ticky profiling.
 
+.. ghc-flag:: -ticky-allocd
+    :shortdesc: Enable ticky-ticky counters for number of thunk allocations.
+    :type: dynamic
+    :category:
+
+    By default ticky reports only the amount of allocation done *by* a closure.
+    With :ghc-flag:`-ticky-allocd`, it also reports on allocation *of* a
+    closure.
+
+.. ghc-flag:: -ticky-LNE
+    :shortdesc: Enable ticky-ticky counters for let-no-escape bindings.
+    :type: dynamic
+    :category:
+
+    Enable ticky-ticky counters for let-no-escape bindings (i.e. join points).
+
+.. ghc-flag:: -ticky-dyn-thunk
+    :shortdesc: Enable ticky-ticky counters on dynamic closures.
+    :type: dynamic
+    :category:
+
+    By default ticky reports counts only for *static* closures. With
+    :ghc-flag:`-ticky-dyn-thunk` it will also report counts for
+    dynamically-allocated thunks. Note that this will significantly
+    increase instrumentation costs.
+
 Because ticky-ticky profiling requires a certain familiarity with GHC
 internals, we have moved the documentation to the GHC developers wiki.
 Take a look at its
 :ghc-wiki:`overview of the profiling options <commentary/profiling>`,
-which includeds a link to the ticky-ticky profiling page.
+which includes a link to the ticky-ticky profiling page.
+
+Note that GHC can also periodically emit samples of ticky counters to
+the :ghc-flag:`eventlog <-eventlog>` by enabling the :rts-flag:`+RTS -lT <-l
+⟨flags⟩>` event flag. The sampling period can be set via :rts-flag:`-i ⟨secs⟩`
+RTS flag. See the :ref:`eventlog formats <ticky-counter-events>` section for
+details on the eventlog representation.
+
+Note that the traditional text output (e.g. :rts-flag:`-r`) and
+the eventlog output are mutually exclusive.
 
 .. [1]
    :ghc-flag:`-fprof-auto` was known as ``-auto-all`` prior to
