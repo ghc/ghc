@@ -1,6 +1,6 @@
 #pragma once
 
-static StgClosure *c10, *c11, *c20;
+static StgClosure *c10, *c11, *c1102, *c20;
 
 static synthHeap initializeTestHeap(void)
 {
@@ -30,11 +30,11 @@ static synthHeap initializeTestHeap(void)
   \,
    4
 */
-    StgClosure *c1102;
+    c1102 = node1(&sh, 1102,
+              node0(&sh, 1103));
     c11 = node3(&sh, 1100,
                 node1(&sh, 1101,
-                      c1102 = node1(&sh, 1102,
-                                    node0(&sh, 1103))),
+                      c1102),
                 c1102,
                 node0(&sh, 1104));
 
