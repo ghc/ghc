@@ -119,7 +119,9 @@ char *EventDesc[] = {
   [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
   [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
   [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
-  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census"
+  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census",
+  [EVENT_TICKY_ENTRY_COUNTER_DEF]    = "Ticky-ticky entry counter definition",
+  [EVENT_TICKY_ENTRY_COUNTER_SAMPLE] = "Ticky-ticky entry counter sample",
 };
 
 // Event type.
@@ -485,6 +487,14 @@ init_event_types(void)
 
         case EVENT_NONMOVING_HEAP_CENSUS: // (cap, blk_size, active_segs, filled_segs, live_blks)
             eventTypes[t].size = 13;
+            break;
+
+        case EVENT_TICKY_ENTRY_COUNTER_DEF: // (counter_id, arity, arg_kinds, name)
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_TICKY_ENTRY_COUNTER_SAMPLE: // (counter_id, entry_count, allocs, allocd)
+            eventTypes[t].size = 8*4;
             break;
 
         default:
@@ -1471,6 +1481,51 @@ void postProfBegin(void)
     RELEASE_LOCK(&eventBufMutex);
 }
 #endif /* PROFILING */
+
+#if defined(TICKY_TICKY)
+static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
+{
+    StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->str)+1;
+    ensureRoomForVariableEvent(eb, len);
+    postPayloadSize(eb, len);
+    postEventHeader(eb, EVENT_TICKY_ENTRY_COUNTER_DEF);
+    postWord64(eb, (uint64_t) p);
+    postWord16(eb, (uint16_t) p->arity);
+    postString(eb, p->arg_kinds);
+    postString(eb, p->str);
+}
+
+void postTickyCounterDefs(StgEntCounter *counters)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    for (StgEntCounter *p = counters; p != NULL; p = p->link) {
+        postTickyCounterDef(&eventBuf, p);
+    }
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
+{
+    ensureRoomForEvent(eb, EVENT_TICKY_ENTRY_COUNTER_SAMPLE);
+    postEventHeader(eb, EVENT_TICKY_ENTRY_COUNTER_SAMPLE);
+    postWord64(eb, (uint64_t) p);
+    postWord64(eb, p->entry_count);
+    postWord64(eb, p->allocs);
+    postWord64(eb, p->allocd);
+    p->entry_count = 0;
+    p->allocs = 0;
+    p->allocd = 0;
+}
+
+void postTickyCounterSamples(StgEntCounter *counters)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    for (StgEntCounter *p = counters; p != NULL; p = p->link) {
+        postTickyCounterSample(&eventBuf, p);
+    }
+    RELEASE_LOCK(&eventBufMutex);
+}
+#endif /* TICKY_TICKY */
 
 void printAndClearEventBuf (EventsBuf *ebuf)
 {
