@@ -52,6 +52,7 @@
 #include "CNF.h"
 #include "RtsFlags.h"
 #include "NonMoving.h"
+#include "eventlog/EventLog.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -857,6 +858,16 @@ GarbageCollect (uint32_t collect_gen,
       heapCensus(mut_time);
       ACQUIRE_SM_LOCK;
   }
+
+#if defined(TICKY_TICKY)
+  // Post ticky counter sample.
+  // We do this at the end of execution since tickers are registered in the
+  // course of program execution.
+  if (performTickySample) {
+      postTickyCounterSamples(ticky_entry_ctrs);
+      performTickySample = false;
+  }
+#endif
 
   // send exceptions to any threads which were about to die
   RELEASE_SM_LOCK;
