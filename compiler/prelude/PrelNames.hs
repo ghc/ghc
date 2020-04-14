@@ -246,7 +246,7 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
         runMainIOName,
         runRWName,
-        withIdName,
+        keepAliveIdName,
 
         -- Type representation types
         trModuleTyConName, trModuleDataConName,
@@ -912,10 +912,10 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName, withIdName :: Name
+runMainIOName, runRWName, keepAliveIdName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
-withIdName    = varQual gHC_MAGIC       (fsLit "with#")     withIdKey
+keepAliveIdName    = varQual gHC_MAGIC  (fsLit "keepAlive#")     keepAliveIdKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
@@ -2201,13 +2201,13 @@ rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
 thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey,
-  withIdKey :: Unique
+  keepAliveIdKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
 oneShotKey                    = mkPreludeMiscIdUnique 106
 runRWKey                      = mkPreludeMiscIdUnique 107
-withIdKey                     = mkPreludeMiscIdUnique 108
+keepAliveIdKey                = mkPreludeMiscIdUnique 108
 
 traceKey :: Unique
 traceKey                      = mkPreludeMiscIdUnique 109

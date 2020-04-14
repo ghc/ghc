@@ -24,7 +24,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, with# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, keepAlive# ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -130,18 +130,18 @@ runRW# m = m realWorld#
 runRW# = runRW#   -- The realWorld# is too much for haddock
 #endif
 
--- | @with# x action@ performs the given action, ensuring that heap object @x@
+-- | @keepAlive# x action@ performs the given action, ensuring that heap object @x@
 -- remains alive for the duration of the execution.
-with# :: forall a (r :: RuntimeRep) (o :: TYPE r).
-         a
-      -> (State# RealWorld -> (# State# RealWorld, o #))
-      -> State# RealWorld -> (# State# RealWorld, o #)
-with# = with#
--- This is morally but inlined by CorePrep. See Note [CorePrep handling of with#].
+keepAlive# :: forall a (r :: RuntimeRep) (o :: TYPE r).
+              a
+           -> (State# RealWorld -> (# State# RealWorld, o #))
+           -> State# RealWorld -> (# State# RealWorld, o #)
+keepAlive# = keepAlive#
+-- This is morally but inlined by CorePrep. See Note [CorePrep handling of keepAlive#].
 --
 --  case action s of
 --    (# s', y #) ->
 --      case touch# x s' of
 --        s'' -> (# s'', y #)
-{-# NOINLINE with# #-}  -- with# is inlined manually in CorePrep, see Note [CorePrep handling of with#]
+{-# NOINLINE keepAlive# #-}  -- keepAlive# is inlined manually in CorePrep, see Note [CorePrep handling of keepAlive#]
 

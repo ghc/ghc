@@ -774,11 +774,11 @@ only variables in function position.  But if we are sure to make
 runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
 
 
-Note [CorePrep handling of with#]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Lower with# applications to touch#. Specifically:
+Note [CorePrep handling of keepAlive#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lower keepAlive# applications to touch#. Specifically:
 
-    with# @a @r @b x k s0
+    keepAlive# @a @r @b x k s0
 
 is lowered to:
 
@@ -850,10 +850,10 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
-    -- See Note [CorePrep handling of with#]
+    -- See Note [CorePrep handling of keepAlive#]
     cpe_app env (Var f) [CpeApp (Type ty), CpeApp (Type runtimeRep), CpeApp (Type resultTy),
                          CpeApp x, CpeApp k, CpeApp s0] 3
-        | f `hasKey` withIdKey
+        | f `hasKey` keepAliveIdKey
         = do { let voidRepTy = primRepToRuntimeRep VoidRep
              ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
                                          [voidRepTy, runtimeRep, realWorldStatePrimTy, resultTy]
