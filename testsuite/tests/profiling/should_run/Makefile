@@ -36,3 +36,13 @@ T15897:
 TraverseHeapTest:
 	"$(TEST_HC)" -prof -no-hs-main -v0 TraverseHeapTest.c -o TraverseHeapTest
 	./TraverseHeapTest
+
+.PHONY: ProfHeapTest
+ProfHeapTest:
+	"$(TEST_HC)" -prof -debug -no-hs-main -v0 $@.c -o $@
+	./$@
+
+.PHONY: RootProfSynthTest
+RootProfSynthTest:
+	"$(TEST_HC)" -prof -debug -no-hs-main -v0 $@.c -o $@
+	./$@
