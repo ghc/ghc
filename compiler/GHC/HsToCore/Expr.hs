@@ -32,7 +32,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.PmCheck ( checkGuardMatches )
+import GHC.HsToCore.PmCheck ( addTyCsDs, checkGuardMatches )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
@@ -280,7 +280,13 @@ dsExpr hswrap@(XExpr (HsWrap co_fn e))
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
                  XExpr (HsWrap _ _) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
-                 _ -> dsExpr e
+                 _ -> -- Uncommenting the following line leads to a 300%
+                      -- compile-time allocation regression in T3064, see
+                      -- !3087. Unless we find a testcase that motivates this
+                      -- change, I'm not willing to think of a complicated
+                      -- work-around.
+                      -- addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+                      dsExpr e
                -- See Note [Detecting forced eta expansion]
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags

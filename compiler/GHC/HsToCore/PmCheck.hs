@@ -14,7 +14,7 @@ Pattern Matching Coverage Checking.
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
         checkSingle, checkMatches, checkGuardMatches,
-        needToRunPmCheck, isMatchContextPmChecked,
+        isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
         addTyCsDs, addScrutTmCs
@@ -1041,10 +1041,14 @@ locallyExtendPmDelta ext k = getPmDeltas >>= ext >>= \deltas -> do
     then updPmDeltas deltas k
     else k
 
--- | Add in-scope type constraints
-addTyCsDs :: Bag EvVar -> DsM a -> DsM a
-addTyCsDs ev_vars =
-  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars))
+-- | Add in-scope type constraints if the coverage checker might run and then
+-- run the given action.
+addTyCsDs :: Origin -> Bag EvVar -> DsM a -> DsM a
+addTyCsDs origin ev_vars m = do
+  dflags <- getDynFlags
+  applyWhen (needToRunPmCheck dflags origin)
+            (locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
+            m
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
