@@ -18,10 +18,6 @@
 
 void rootProfile(traverseState *ts, Time t, Census *census);
 
-bool rootProfileWasClosureVisited(const StgClosure *c);
-
-const void *rootProfileGetClosureIdentity(const StgClosure *c);
-
 const char *rootProfileMkClosureLabel(Arena *arena, const void *key);
 
 #include "EndPrivate.h"
