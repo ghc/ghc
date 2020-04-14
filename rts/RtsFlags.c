@@ -234,6 +234,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.sparks_sampled= false;
     RtsFlags.TraceFlags.sparks_full   = false;
     RtsFlags.TraceFlags.user          = false;
+    RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
 #endif
 
@@ -385,6 +386,9 @@ usage_text[] = {
 "                p    par spark events (sampled)",
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",
+#if defined(TICKY_TICKY)
+"                T    ticky-ticky counter samples",
+#endif
 "                a    all event classes above",
 #  if defined(DEBUG)
 "                t    add time stamps (only useful with -v)",
@@ -1790,6 +1794,11 @@ static void normaliseRtsOpts (void)
                    "the compacting collector.");
         errorUsage();
     }
+
+    if (RtsFlags.TraceFlags.ticky && RtsFlags.TickyFlags.showTickyStats) {
+        barf("The ticky-ticky eventlog output cannot be used in conjunction with\n"
+             "+RTS -r<file>.");
+    }
 }
 
 static void errorUsage (void)
@@ -2232,6 +2241,15 @@ static void read_trace_flags(const char *arg)
             RtsFlags.TraceFlags.user      = enabled;
             enabled = true;
             break;
+        case 'T':
+#if defined(TICKY_TICKY)
+            RtsFlags.TraceFlags.ticky     = enabled;
+            enabled = true;
+            break;
+#else
+            errorBelch("Program not compiled with ticky-ticky support");
+            break;
+#endif
         default:
             errorBelch("unknown trace option: %c",*c);
             break;
