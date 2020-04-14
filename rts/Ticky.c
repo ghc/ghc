@@ -46,6 +46,10 @@ static void printRegisteredCounterInfo (FILE *); /* fwd decl */
 void
 PrintTickyInfo(void)
 {
+  if (RtsFlags.TraceFlags.ticky) {
+      barf("Ticky eventlog output can't be used with +RTS -r<file>");
+  }
+
   unsigned long i;
 
   unsigned long tot_thk_enters = ENT_STATIC_THK_MANY_ctr + ENT_DYN_THK_MANY_ctr
@@ -374,4 +378,15 @@ printRegisteredCounterInfo (FILE *tf)
 
     }
 }
+
+void emitTickyCounterDefs()
+{
+    postTickyCounterDefs(ticky_entry_ctrs);
+}
+
+void emitTickyCounterSamples()
+{
+    postTickyCounterSamples(ticky_entry_ctrs);
+}
+
 #endif /* TICKY_TICKY */

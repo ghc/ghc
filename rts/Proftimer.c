@@ -20,6 +20,12 @@ static bool do_prof_ticks = false;       // enable profiling ticks
 
 static bool do_heap_prof_ticks = false;  // enable heap profiling ticks
 
+#if defined(TICKY_TICKY)
+static bool do_ticky_sample_ticks = false; // enable dumping of ticky counters to eventlog
+static int ticks_to_ticky_sample = 0;
+bool performTickySample = false;
+#endif
+
 // Number of ticks until next heap census
 static int ticks_to_heap_profile;
 
@@ -58,6 +64,23 @@ startHeapProfTimer( void )
 }
 
 void
+stopTickySampleTimer( void )
+{
+#if defined(PROFILING)
+    do_ticky_sample_ticks = false;
+#endif
+}
+
+void
+startTickySampleTimer( void )
+{
+#if defined(PROFILING)
+    do_ticky_sample_ticks = true;
+#endif
+}
+
+
+void
 initProfTimer( void )
 {
     performHeapProfile = false;
@@ -79,6 +102,16 @@ handleProfTick(void)
         for (n=0; n < n_capabilities; n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
             traceProfSampleCostCentre(capabilities[n], capabilities[n]->r.rCCCS, total_ticks);
+        }
+    }
+#endif
+
+#if defined(TICKY_TICKY) && defined(TRACING)
+    if (do_ticky_sample_ticks) {
+        ticks_to_ticky_sample--;
+        if (ticks_to_ticky_sample <= 0) {
+            ticks_to_ticky_sample = RtsFlags.ProfFlags.heapProfileIntervalTicks;
+            performTickySample = true;
         }
     }
 #endif
