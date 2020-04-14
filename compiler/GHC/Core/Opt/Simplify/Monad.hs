@@ -143,6 +143,7 @@ traceSmpl herald doc
        ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
            FormatText
            (hang (text herald) 2 doc) }
+{-# INLINE traceSmpl #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
 ************************************************************************
