@@ -10,7 +10,7 @@ module GHC.Tc.Types.Evidence (
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
-  pprHsWrapper,
+  pprHsWrapper, hsWrapDictBinders,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -369,6 +369,21 @@ isErasableHsWrapper = go
     go WpTyLam{}               = True
     go WpTyApp{}               = True
     go WpLet{}                 = False
+
+hsWrapDictBinders :: HsWrapper -> Bag DictId
+-- Collects the given dict Ids, bound by the wrapper,
+-- that scope over the "hole" in the wrapper
+hsWrapDictBinders wrap = go wrap
+ where
+   go WpHole              = emptyBag
+   go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
+   go (WpFun _ w _ _)     = go w
+   go (WpCast  {})        = emptyBag
+   go (WpEvLam dict_id)   = unitBag dict_id
+   go (WpEvApp {})        = emptyBag
+   go (WpTyLam {})        = emptyBag
+   go (WpTyApp {})        = emptyBag
+   go (WpLet   {})        = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
