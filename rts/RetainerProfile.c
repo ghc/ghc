@@ -236,15 +236,10 @@ associate( StgClosure *c, RetainerSet *s )
     traverseSetClosureData(c, (StgWord)s);
 }
 
-bool isRetainerSetValid( const StgClosure *c )
-{
-    return traverseIsClosureDataValid(c);
-}
-
 inline RetainerSet*
 retainerSetOf( const StgClosure *c )
 {
-    ASSERT(isRetainerSetValid(c));
+    ASSERT(traverseIsClosureDataValid(c));
     return (RetainerSet*)traverseGetClosureData(c);
 }
 
