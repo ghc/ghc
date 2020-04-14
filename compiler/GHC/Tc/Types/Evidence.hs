@@ -10,7 +10,7 @@ module GHC.Tc.Types.Evidence (
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
-  pprHsWrapper,
+  pprHsWrapper, hsWrapDictBinders,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -369,6 +369,27 @@ isErasableHsWrapper = go
     go WpTyLam{}               = True
     go WpTyApp{}               = True
     go WpLet{}                 = False
+
+hsWrapDictBinders :: HsWrapper -> Bag DictId
+-- ^ Identifies the /lambda-bound/ dictionaries of an 'HsWrapper'. This is used
+-- (only) to allow the pattern-match overlap checker to know what Given
+-- dictionaries are in scope.
+--
+-- We specifically do not collect dictionaries bound in a 'WpLet'. These are
+-- either superclasses of lambda-bound ones, or (extremely numerous) results of
+-- binding Wanted dictionaries.  We definitely don't want all those cluttering
+-- up the Given dictionaries for pattern-match overlap checking!
+hsWrapDictBinders wrap = go wrap
+ where
+   go (WpEvLam dict_id)   = unitBag dict_id
+   go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
+   go (WpFun _ w _ _)     = go w
+   go WpHole              = emptyBag
+   go (WpCast  {})        = emptyBag
+   go (WpEvApp {})        = emptyBag
+   go (WpTyLam {})        = emptyBag
+   go (WpTyApp {})        = emptyBag
+   go (WpLet   {})        = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
