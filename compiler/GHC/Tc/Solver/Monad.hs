@@ -2733,6 +2733,7 @@ panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
+{-# INLINE traceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcPluginTcS :: TcPluginM a -> TcS a
 runTcPluginTcS m = wrapTcS . runTcPluginM m =<< getTcEvBindsVar
@@ -2751,6 +2752,7 @@ bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
   = wrapTcS $ csTraceTcM (return doc)
+{-# INLINE csTraceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 traceFireTcS :: CtEvidence -> SDoc -> TcS ()
 -- Dump a rule-firing trace
@@ -2763,6 +2765,7 @@ traceFireTcS ev doc
                                     text "d:" <> ppr (ctLocDepth (ctEvLoc ev)))
                        <+> doc <> colon)
                      4 (ppr ev)) }
+{-# INLINE traceFireTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 csTraceTcM :: TcM SDoc -> TcM ()
 -- Constraint-solver tracing, -ddump-cs-trace
@@ -2775,6 +2778,7 @@ csTraceTcM mk_doc
                        (dumpOptionsFromFlag Opt_D_dump_cs_trace)
                        "" FormatText
                        msg }) }
+{-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)

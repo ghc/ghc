@@ -1279,7 +1279,10 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
-traceInline dflags inline_id str doc result =
+traceInline dflags inline_id str doc result
+  -- We take care to ensure that doc is used in only one branch, ensuring that
+  -- the simplifier can push its allocation into the branch. See Note [INLINE
+  -- conditional tracing utilities].
   | enable    = traceAction dflags str doc result
   | otherwise = result
   where
@@ -1288,6 +1291,9 @@ traceInline dflags inline_id str doc result =
       = True
       | Just prefix <- inlineCheck dflags
       = prefix `isPrefixOf` occNameString (getOccName inline_id)
+      | otherwise
+      = False
+{-# INLINE traceInline #-} -- see Note [INLINE conditional tracing utilities]
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance

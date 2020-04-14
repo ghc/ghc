@@ -490,22 +490,28 @@ unsetWOptM flag =
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenDOptM flag thing_inside = do b <- doptM flag
                                  when b thing_inside
+{-# INLINE whenDOptM #-} -- see Note [INLINE conditional tracing utilities]
+
 
 whenGOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenGOptM flag thing_inside = do b <- goptM flag
                                  when b thing_inside
+{-# INLINE whenGOptM #-} -- see Note [INLINE conditional tracing utilities]
 
 whenWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenWOptM flag thing_inside = do b <- woptM flag
                                  when b thing_inside
+{-# INLINE whenWOptM #-} -- see Note [INLINE conditional tracing utilities]
 
 whenXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenXOptM flag thing_inside = do b <- xoptM flag
                                  when b thing_inside
+{-# INLINE whenXOptM #-} -- see Note [INLINE conditional tracing utilities]
 
 unlessXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 unlessXOptM flag thing_inside = do b <- xoptM flag
                                    unless b thing_inside
+{-# INLINE unlessXOptM #-} -- see Note [INLINE conditional tracing utilities]
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
@@ -662,39 +668,64 @@ updTcRef ref fn = liftIO $ do { old <- readIORef ref
 ************************************************************************
 -}
 
+-- Note [INLINE conditional tracing utilities]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In general we want to optimise for the case where tracing is not enabled.
+-- To ensure this happens, we ensure that traceTc and friends are inlined; this
+-- ensures that the allocation of the document can be pushed into the tracing
+-- path, keeping the non-traced path free of this extraneous work. For
+-- instance, instead of
+--
+--     let thunk = ...
+--     in if doTracing
+--          then emitTraceMsg thunk
+--          else return ()
+--
+-- where the conditional is buried in a non-inlined utility function (e.g.
+-- traceTc), we would rather have:
+--
+--     if doTracing
+--       then let thunk = ...
+--            in emitTraceMsg thunk
+--       else return ()
+--
+-- See #18168.
+--
 
 -- Typechecker trace
 traceTc :: String -> SDoc -> TcRn ()
-traceTc =
-  labelledTraceOptTcRn Opt_D_dump_tc_trace
+traceTc herald doc =
+    labelledTraceOptTcRn Opt_D_dump_tc_trace herald doc
+{-# INLINE traceTc #-} -- see Note [INLINE conditional tracing utilities]
 
 -- Renamer Trace
 traceRn :: String -> SDoc -> TcRn ()
-traceRn =
-  labelledTraceOptTcRn Opt_D_dump_rn_trace
+traceRn herald doc =
+    labelledTraceOptTcRn Opt_D_dump_rn_trace herald doc
+{-# INLINE traceRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Trace when a certain flag is enabled. This is like `traceOptTcRn`
 -- but accepts a string as a label and formats the trace message uniformly.
 labelledTraceOptTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
-labelledTraceOptTcRn flag herald doc = do
-   traceOptTcRn flag (formatTraceMsg herald doc)
+labelledTraceOptTcRn flag herald doc =
+  traceOptTcRn flag (formatTraceMsg herald doc)
+{-# INLINE labelledTraceOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 formatTraceMsg :: String -> SDoc -> SDoc
 formatTraceMsg herald doc = hang (text herald) 2 doc
 
--- | Trace if the given 'DumpFlag' is set.
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc = do
-  dflags <- getDynFlags
-  when (dopt flag dflags) $
+  whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) "" FormatText doc
+{-# INLINE traceOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Dump if the given 'DumpFlag' is set.
 dumpOptTcRn :: DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpOptTcRn flag title fmt doc = do
-  dflags <- getDynFlags
-  when (dopt flag dflags) $
+  whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) title fmt doc
+{-# INLINE dumpOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Unconditionally dump some trace output
 --
@@ -746,13 +777,16 @@ e.g. are unaffected by -dump-to-file.
 traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
 traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
-
+{-# INLINE traceIf #-}
+{-# INLINE traceHiDiffs #-}
+  -- see Note [INLINE conditional tracing utilities]
 
 traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
 traceOptIf flag doc
   = whenDOptM flag $    -- No RdrEnv available, so qualify everything
     do { dflags <- getDynFlags
        ; liftIO (putMsg dflags doc) }
+{-# INLINE traceOptIf #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
 ************************************************************************
