@@ -2855,8 +2855,8 @@ extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} ms = ModuleGraph
   { mg_mss = ms:mg_mss
   , mg_non_boot = case isBootSummary ms of
-      NotBoot -> mg_non_boot
-      IsBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
+      IsBoot -> mg_non_boot
+      NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
   , mg_boot = case isBootSummary ms of
       NotBoot -> mg_boot
       IsBoot -> extendModuleSet mg_boot (ms_mod ms)

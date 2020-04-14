@@ -536,11 +536,11 @@ tcHiBootIface hsc_src mod
             Nothing -> return NoSelfBoot
             -- error cases
             Just (ModuleNameWithIsBoot _ is_boot) -> case is_boot of
+              IsBoot -> failWithTc (elaborate err)
+              -- The hi-boot file has mysteriously disappeared.
+              NotBoot -> failWithTc moduleLoop
               -- Someone below us imported us!
               -- This is a loop with no hi-boot in the way
-              IsBoot -> failWithTc moduleLoop
-              -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc (elaborate err)
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
