@@ -117,5 +117,3 @@
 -syslib
 -this-component-id
 -ticky-LNE
--ticky-allocd
--ticky-dyn-thunk
