@@ -182,14 +182,9 @@ closureIdentity( const StgClosure *p )
     case HEAP_BY_RETAINER:
         // AFAIK, the only closures in the heap which might not have a
         // valid retainer set are DEAD_WEAK closures.
-        if (isRetainerSetValid(p)) {
-            return retainerSetOf(p);
-        } else {
-            return NULL;
-        }
     case HEAP_BY_ROOT:
-        if(rootProfileWasClosureVisited(p)) {
-            return rootProfileGetClosureIdentity(p);
+        if (traverseIsClosureDataValid(p)) {
+            return (void*)traverseGetClosureData(p);
         } else {
             return NULL;
         }
@@ -691,7 +686,7 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
    if (RtsFlags.ProfFlags.includeTSOs && (type == TSO || type == STACK)) {
        return false;
    }
-   if (RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
+   if (RtsFlags.ProfFlags.rootSelector && !traverseIsClosureDataValid(p)) {
        return false;
    }
    if (RtsFlags.ProfFlags.descrSelector) {
@@ -711,8 +706,8 @@ closureSatisfiesConstraints( const StgClosure* p USED_IF_PROFILING,
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
        // these aren't reached by the retainer profiler's traversal.
-       if (isRetainerSetValid((StgClosure *)p)) {
-           rs = retainerSetOf((StgClosure *)p);
+       if (traverseIsClosureDataValid(p)) {
+           rs = retainerSetOf(p);
            if (rs != NULL) {
                for (i = 0; i < rs->num; i++) {
                    b = strMatchesSelector( rs->element[i]->cc->label,
