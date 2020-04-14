@@ -156,6 +156,15 @@ test('TraverseHeapTest',
      , extra_files(['TestHeap.h'])
      ], makefile_test, ['TraverseHeapTest'])
 
+test('ProfHeapTest',
+     [ only_ways(['prof'])
+     , extra_files(['TestHeap.h'])
+     ], makefile_test, ['ProfHeapTest'])
+
+test('RootProfSynthTest',
+     [ only_ways(['prof'])
+     , extra_files(['TestHeap.h'])
+     ], makefile_test, ['RootProfSynthTest'])
 
 test('RootProfileTest', [ extra_ways(['prof_ho']), only_ways(['prof_ho']) ],
      compile_and_run, ['-debug'])
