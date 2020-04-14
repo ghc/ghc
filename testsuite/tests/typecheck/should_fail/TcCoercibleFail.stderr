@@ -2,7 +2,8 @@
 TcCoercibleFail.hs:11:8: error:
     • Couldn't match representation of type ‘Int’ with that of ‘()’
         arising from a use of ‘coerce’
-    • In the expression: coerce $ one :: ()
+    • In the first argument of ‘($)’, namely ‘coerce’
+      In the expression: coerce $ one :: ()
       In an equation for ‘foo1’: foo1 = coerce $ one :: ()
 
 TcCoercibleFail.hs:14:8: error:
@@ -11,7 +12,8 @@ TcCoercibleFail.hs:14:8: error:
         arising from a use of ‘coerce’
       NB: We cannot know what roles the parameters to ‘m’ have;
         we must assume that the role is nominal
-    • In the expression: coerce $ (return one :: m Int)
+    • In the first argument of ‘($)’, namely ‘coerce’
+      In the expression: coerce $ (return one :: m Int)
       In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
     • Relevant bindings include
         foo2 :: m Age (bound at TcCoercibleFail.hs:14:1)
@@ -19,7 +21,8 @@ TcCoercibleFail.hs:14:8: error:
 TcCoercibleFail.hs:16:8: error:
     • Couldn't match type ‘Int’ with ‘Age’
         arising from a use of ‘coerce’
-    • In the expression: coerce $ Map one () :: Map Age ()
+    • In the first argument of ‘($)’, namely ‘coerce’
+      In the expression: coerce $ Map one () :: Map Age ()
       In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8: error:
@@ -28,7 +31,8 @@ TcCoercibleFail.hs:18:8: error:
         arising from a use of ‘coerce’
       The data constructor ‘Data.Ord.Down’
         of newtype ‘Down’ is not in scope
-    • In the expression: coerce $ one :: Down Int
+    • In the first argument of ‘($)’, namely ‘coerce’
+      In the expression: coerce $ one :: Down Int
       In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
 
 TcCoercibleFail.hs:21:8: error:

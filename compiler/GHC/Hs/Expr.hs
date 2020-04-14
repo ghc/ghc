@@ -1216,8 +1216,12 @@ parenthesizeHsExpr p le@(L loc e)
   | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
 
-stripParensHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-stripParensHsExpr (L _ (HsPar _ e)) = stripParensHsExpr e
+stripParensLHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+stripParensLHsExpr (L _ (HsPar _ e)) = stripParensLHsExpr e
+stripParensLHsExpr e = e
+
+stripParensHsExpr :: HsExpr (GhcPass p) -> HsExpr (GhcPass p)
+stripParensHsExpr (HsPar _ (L _ e)) = stripParensHsExpr e
 stripParensHsExpr e = e
 
 isAtomicHsExpr :: forall p. IsPass p => HsExpr (GhcPass p) -> Bool
@@ -2540,7 +2544,7 @@ instance (OutputableBndrId p) => Outputable (HsSplice (GhcPass p)) where
 
 pprPendingSplice :: (OutputableBndrId p)
                  => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
-pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr (stripParensHsExpr e))
+pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr (stripParensLHsExpr e))
 
 pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc

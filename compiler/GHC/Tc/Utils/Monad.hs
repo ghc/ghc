@@ -1063,7 +1063,7 @@ tcTryM :: TcRn r -> TcRn (Maybe r)
 tcTryM thing_inside
   = do { either_res <- tryM thing_inside
        ; return (case either_res of
-                    Left exn  -> pprTrace "tcTryM" (text (show exn)) Nothing
+                    Left _  -> Nothing
                     Right r -> Just r) }
          -- In the Left case the exception is always the IOEnv
          -- built-in in exception; see IOEnv.failM

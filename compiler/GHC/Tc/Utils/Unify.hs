@@ -193,7 +193,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go acc_arg_tys n ty = addErrCtxtM mk_ctxt $
+    go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
@@ -210,15 +210,12 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; return (result, wrap) }
 
     ------------
-    mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt env = do { (env', ty) <- zonkTidyTcType env orig_tc_ty
-                     ; let (args, _) = tcSplitFunTys ty
-                           n_actual = length args
-                           (env'', orig_ty') = tidyOpenType env' orig_tc_ty
-                     ; return ( env''
-                              , mk_fun_tys_msg orig_ty' ty n_actual arity herald) }
+    mk_ctxt :: [ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt arg_tys res_ty env
+      = do { (env', ty) <- zonkTidyTcType env (mkVisFunTys arg_tys' res_ty)
+           ; return ( env', mk_fun_tys_msg herald ty arity) }
       where
-        orig_tc_ty = checkingExpType "matchExpectedFunTys" orig_ty
+        arg_tys' = map (checkingExpType "matchExpectedFunTys") (reverse arg_tys)
             -- this is safe b/c we're called from "go"
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
@@ -232,23 +229,27 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
 matchActualFunTys herald ct_orig mb_thing n_val_args_wanted fun_ty
-  = matchActualFunTysPart herald ct_orig mb_thing fun_ty n_val_args_wanted
+  = matchActualFunTysPart herald ct_orig mb_thing
+                          n_val_args_wanted []
                           n_val_args_wanted fun_ty
 
 -- | Variant of 'matchActualFunTys' that works when supplied only part
 -- (that is, to the right of some arrows) of the full function type
-matchActualFunTysPart :: SDoc -- See Note [Herald for matchExpectedFunTys]
-                      -> CtOrigin
-                      -> Maybe (HsExpr GhcRn)  -- the thing with type TcSigmaType
-                      -> TcSigmaType           -- Original function type
-                      -> Arity                 -- And number of args to which it is applied
-                      -> Arity                 -- Number of new value args wanted
-                      -> TcSigmaType           -- Type to analyse
-                      -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+matchActualFunTysPart
+  :: SDoc -- See Note [Herald for matchExpectedFunTys]
+  -> CtOrigin
+  -> Maybe (HsExpr GhcRn)  -- The thing with type TcSigmaType
+  -> Arity                 -- Total number of value args in the call
+  -> [TcSigmaType]         -- Types of values args to which function has
+                           --   been applied already (reversed)
+  -> Arity                 -- Number of new value args wanted
+  -> TcSigmaType           -- Type to analyse
+  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+-- See Note [matchActualFunTys error handling] for all these arguments
 matchActualFunTysPart herald ct_orig mb_thing
-                      orig_fun_ty n_val_args_in_call
+                      n_val_args_in_call arg_tys_so_far
                       n_val_args_wanted fun_ty
-  = go n_val_args_wanted fun_ty
+  = go n_val_args_wanted arg_tys_so_far fun_ty
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
 -- it's important for higher rank: the argument might be of form
@@ -276,35 +277,38 @@ matchActualFunTysPart herald ct_orig mb_thing
     --
     -- Refactoring is welcome.
     go :: Arity
+       -> [TcSigmaType] -- Types of value args to which the function has
+                        -- been applied so far (reversed)
+                        -- Used only for error messages
        -> TcSigmaType   -- the remainder of the type as we're processing
        -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-    go 0 ty = return (idHsWrapper, [], ty)
+    go 0 _ ty = return (idHsWrapper, [], ty)
 
-    go n ty
+    go n so_far ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (wrap2, arg_tys, res_ty) <- go n rho
+           ; (wrap2, arg_tys, res_ty) <- go n so_far rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go n ty
-      | Just ty' <- tcView ty = go n ty'
+    go n so_far ty
+      | Just ty' <- tcView ty = go n so_far ty'
 
-    go n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go n so_far (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, tys, ty_r) <- go (n-1) res_ty
+        do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty:so_far) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
                     , arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr orig_fun_ty)
+              quotes (ppr fun_ty)
 
-    go n ty@(TyVarTy tv)
+    go n so_far ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n ty'
+               Indirect ty' -> go n so_far ty'
                Flexi        -> defer n ty }
 
        -- In all other cases we bale out into ordinary unification
@@ -322,7 +326,7 @@ matchActualFunTysPart herald ct_orig mb_thing
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go n ty = addErrCtxtM mk_ctxt (defer n ty)
+    go n so_far ty = addErrCtxtM (mk_ctxt so_far ty) (defer n ty)
 
     ------------
     defer n fun_ty
@@ -333,32 +337,47 @@ matchActualFunTysPart herald ct_orig mb_thing
            ; return (mkWpCastN co, arg_tys, res_ty) }
 
     ------------
-    mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt env
-      = do { (env1, zonked) <- zonkTidyTcType env orig_fun_ty
-                   -- Zonking might change # of args
-           ; let (zonked_args, _)   = tcSplitPiTys zonked
-                 n_val_args_in_type = count isVisibleBinder zonked_args
-                 (env2, unzonked)   = tidyOpenType env1 orig_fun_ty
-           ; return ( env2
-                    , mk_fun_tys_msg unzonked zonked n_val_args_in_type
-                                     n_val_args_in_call herald) }
+    mk_ctxt :: [TcType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt arg_tys res_ty env
+      = do { (env', ty) <- zonkTidyTcType env $
+                           mkVisFunTys (reverse arg_tys) res_ty
+           ; return (env', mk_fun_tys_msg herald ty n_val_args_in_call) }
 
-mk_fun_tys_msg :: TcType  -- the full type passed in (unzonked)
-               -> TcType  -- the full type passed in (zonked)
-               -> Arity   -- the # of args found
-               -> Arity   -- the # of args wanted
-               -> SDoc    -- overall herald
-               -> SDoc
-mk_fun_tys_msg full_ty ty n_args_in_type n_args_in_call herald
-  = herald <+> speakNOf n_args_in_call (text "argument") <> comma $$
-    if n_args_in_type == n_args_in_call
-      then text "its type is" <+> quotes (pprType full_ty) <>
-           comma $$
-           text "it is specialized to" <+> quotes (pprType ty)
-      else sep [text "but its type" <+> quotes (pprType ty),
-                if n_args_in_type == 0 then text "has none"
-                else text "has only" <+> speakN n_args_in_type]
+mk_fun_tys_msg :: SDoc -> TcType -> Arity -> SDoc
+mk_fun_tys_msg herald ty n_args_in_call
+  | n_args_in_call <= n_fun_args  -- Enough args, in the end
+  = text "In the result of a function call"
+  | otherwise
+  = hang (herald <+> speakNOf n_args_in_call (text "value argument") <> comma)
+       2 (sep [ text "but its type" <+> quotes (pprType ty)
+              , if n_fun_args == 0 then text "has none"
+                else text "has only" <+> speakN n_fun_args])
+  where
+    (args, _) = tcSplitFunTys ty
+    n_fun_args = length args
+
+{- Note [matchActualFunTys error handling]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matchActualFunTysPart is made much more complicated by the
+desire to produce good error messages. Consider the application
+    f @Int x y
+In GHC.Tc.Gen.Expr.tcArgs we deal with visible type arguments,
+and then call matchActualFunTysPart for each individual value
+argument. It, in turn, must instantiate any type/dictionary args,
+before looking for an arrow type.
+
+But if it doesn't find an arrow type, it wants to generate a message
+like "f is applied to two arguments but its type only has one".
+To do that, it needs to konw about the args that tcArgs has already
+munched up -- hence passing in n_val_args_in_call and arg_tys_so_far;
+and hence also the accumulating so_far arg to 'go'.
+
+This allows us (in mk_ctxt) to construct f's /instantiated/ type,
+with just the values-arg arrows, which is what we really want
+in the error message.
+
+Ugh!
+-}
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)

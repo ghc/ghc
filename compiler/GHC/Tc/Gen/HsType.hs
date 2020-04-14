@@ -3322,9 +3322,6 @@ tcHsPatSigType ctxt sig_ty
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
            ; return (name, tv) }
 
--- tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
--- tcHsPatSigType _ (XHsWildCardBndrs nec)          = noExtCon nec
-
 {- Note [Pattern signature binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Type variables in the type environment] in GHC.Tc.Utils.
