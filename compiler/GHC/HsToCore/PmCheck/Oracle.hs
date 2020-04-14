@@ -89,6 +89,7 @@ tracePm herald doc = do
   printer <- mkPrintUnqualifiedDs
   liftIO $ dumpIfSet_dyn_printer printer dflags
             Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
+{-# INLINE tracePm #-}  -- see Note [INLINE conditional tracing utilities]
 
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id
