@@ -31,6 +31,7 @@ import Haddock.Interface.LexParseRn
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Map (Map)
 import Data.List (find, foldl', sortBy)
 import Data.Maybe
@@ -165,6 +166,18 @@ createInterface tm flags modMap instIfaceMap = do
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
+  -- Prune the docstring 'Map's to keep only docstrings that are not private.
+  --
+  -- Besides all the names that GHC has told us this module exports, we also
+  -- keep the docs for locally defined class instances. This is more names than
+  -- we need, but figuring out which instances are fully private is tricky.
+  --
+  -- We do this pruning to avoid having to rename, emit warnings, and save
+  -- docstrings which will anyways never be rendered.
+  let !localVisibleNames = S.fromList (localInsts ++ exportedNames)
+      !prunedDocMap = M.restrictKeys docMap localVisibleNames
+      !prunedArgMap = M.restrictKeys argMap localVisibleNames
+
   return $! Interface {
     ifaceMod               = mdl
   , ifaceIsSig             = is_sig
@@ -173,8 +186,8 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceDoc               = Documentation mbDoc modWarn
   , ifaceRnDoc             = Documentation Nothing Nothing
   , ifaceOptions           = opts
-  , ifaceDocMap            = docMap
-  , ifaceArgMap            = argMap
+  , ifaceDocMap            = prunedDocMap
+  , ifaceArgMap            = prunedArgMap
   , ifaceRnDocMap          = M.empty
   , ifaceRnArgMap          = M.empty
   , ifaceExportItems       = prunedExportItems
