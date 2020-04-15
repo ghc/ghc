@@ -158,6 +158,7 @@ ghcPrimIds
     , magicDictId
     , coerceId
     , proxyHashId
+    , keepAliveId
     ]
 
 {-
@@ -1313,7 +1314,8 @@ another gun with which to shoot yourself in the foot.
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName :: Name
+   magicDictName, coerceName, proxyName,
+   keepAliveName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
@@ -1322,6 +1324,7 @@ coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionT
 magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
+keepAliveName     = mkWiredInIdName gHC_PRIM  (fsLit "keepAlive#")     keepAliveIdKey     keepAliveId
 
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
@@ -1379,6 +1382,30 @@ seqId = pcMiscPrelId seqName ty info
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
           Case (Var x) x openBetaTy [(DEFAULT, [], Var y)]
+
+------------------------------------------------
+keepAliveId :: Id
+keepAliveId
+  = pcMiscPrelId keepAliveName ty id_info
+  where
+    -- keepAlive#
+    --   :: forall (rep_a :: RuntimeRep) (a :: TYPE rep_a)
+    --             (rep_r :: RuntimeRep) (r :: TYPE rep_r).
+    --      a
+    --   -> (State# RealWorld -> (# State# RealWorld, r #))
+    --   -> State# RealWorld
+    --   -> (# State# RealWorld, r #)
+    --
+    rep_a = runtimeRep1TyVar
+    a     = openAlphaTyVar
+    rep_r = runtimeRep2TyVar
+    r     = openBetaTyVar
+    ty    = mkInvForAllTys [rep_a, a, rep_r, r]
+            $ mkVisFunTys [mkTyVarTy a, cont_ty, realWorldStatePrimTy] result_ty
+    cont_ty = realWorldStatePrimTy `mkVisFunTy` result_ty
+    -- (# State# RealWorld, r #)
+    result_ty = mkTupleTy Unboxed [realWorldStatePrimTy, mkTyVarTy r]
+    id_info = noCafIdInfo `setStrictnessInfo` mkClosedStrictSig [topDmd, strictApply1Dmd, topDmd] topDiv
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]

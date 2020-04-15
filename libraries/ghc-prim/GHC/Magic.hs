@@ -38,7 +38,7 @@ module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, keepAlive# ) where
 #if !defined(__HADDOCK_VERSION__)
 import GHC.Prim (realWorld#)
 #endif
-import GHC.Prim (State#, RealWorld)
+import GHC.Prim (State#, RealWorld, keepAlive#)
 import GHC.Types (RuntimeRep, TYPE)
 
 -- | The call @inline f@ arranges that @f@ is inlined, regardless of
@@ -132,16 +132,15 @@ runRW# = runRW#   -- The realWorld# is too much for haddock
 
 -- | @keepAlive# x action@ performs the given action, ensuring that heap object @x@
 -- remains alive for the duration of the execution.
-keepAlive# :: forall a (r :: RuntimeRep) (o :: TYPE r).
-              a
-           -> (State# RealWorld -> (# State# RealWorld, o #))
-           -> State# RealWorld -> (# State# RealWorld, o #)
-keepAlive# = keepAlive#
+--keepAlive# :: forall (ra :: RuntimeRep) (a :: TYPE ra) (ro :: RuntimeRep) (o :: TYPE ro).
+--              a
+--           -> (State# RealWorld -> (# State# RealWorld, o #))
+--           -> State# RealWorld -> (# State# RealWorld, o #)
+--keepAlive# = let x = x in x
 -- This is morally but inlined by CorePrep. See Note [CorePrep handling of keepAlive#].
 --
 --  case action s of
 --    (# s', y #) ->
 --      case touch# x s' of
 --        s'' -> (# s'', y #)
-{-# NOINLINE keepAlive# #-}  -- keepAlive# is inlined manually in CorePrep, see Note [CorePrep handling of keepAlive#]
 

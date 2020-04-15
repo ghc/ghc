@@ -49,6 +49,8 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
+import GHC.Types.Unique ( hasKey )
+import PrelNames        ( keepAliveIdKey )
 import MonadUtils       ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
 import Maybes           ( orElse )
@@ -1787,6 +1789,41 @@ completeCall env var cont
   = do { checkedTick (UnfoldingDone var)
        ; dump_inline expr cont
        ; simplExprF (zapSubstEnv env) expr cont }
+
+  -- Push strict contexts into with# continuation
+  --
+  -- That is,
+  --
+  --     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+  --       ~>
+  --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+  | var `hasKey` keepAliveIdKey
+  , ApplyToTy arg_rep hole1 cont1      <- -- cont
+    pprTrace "completeCall(wht)" (ppr var $$ ppr cont) cont
+  , ApplyToTy arg_ty   hole2 cont2     <- cont1
+  , ApplyToTy _res_rep _ cont3         <- cont2
+  , ApplyToTy _res_ty  _ cont4         <- cont3
+  , ApplyToVal dup5 x      env5 cont5 <- cont4
+  , ApplyToVal dup6 f      env6 cont6 <- cont5
+  , ApplyToVal dup7 s0     env7 cont7 <- cont6
+  , not $ contIsStop cont7
+    -- TODO: Eta expand?
+  , Lam f_arg f_rhs                   <- f
+  = do { let out_ty = contResultType cont
+             out_rep = getRuntimeRep out_ty
+       ; (floats1, f') <- rebuild env6 f_rhs cont7
+       ; let cont' =
+                 ApplyToTy arg_rep hole1
+               $ ApplyToTy arg_ty  hole2
+               $ ApplyToTy out_rep undefined
+               $ ApplyToTy out_ty  undefined
+               $ ApplyToVal dup5 x env5
+               $ ApplyToVal dup6 (Lam f_arg f') env6
+               $ ApplyToVal dup7 s0 env7
+               $ mkBoringStop out_ty
+       ; (floats2, result) <- completeCall env var cont'
+       ; pprTrace "rebuilt" (ppr result) $ return (floats1 `addFloats` floats2, result)
+       }
 
   | otherwise
   -- Don't inline; instead rebuild the call
