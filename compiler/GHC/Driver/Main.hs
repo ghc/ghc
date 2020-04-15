@@ -82,6 +82,7 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+    , hscUpdateRoots
     ) where
 
 import GHC.Prelude
@@ -199,7 +200,7 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyDynLinker <- uninitializedLinker
-    return HscEnv {  hsc_dflags       = dflags
+    hscUpdateRoots $ HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
                   ,  hsc_mod_graph    = emptyMG
                   ,  hsc_IC           = emptyInteractiveContext dflags

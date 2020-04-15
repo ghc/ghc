@@ -137,6 +137,8 @@ module GHC.Tc.Utils.Monad(
 
   withException,
 
+  hscUpdateRoots,
+
   -- * Stuff for cost centres.
   ContainsCostCentreState(..), getCCIndexM,
 
@@ -196,6 +198,38 @@ import Control.Monad
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
+
+#if GHC_STAGE >= 2
+import GHC.Profiling
+#endif
+
+hscUpdateRoots :: HscEnv -> IO HscEnv
+#if GHC_STAGE >= 2
+hscUpdateRoots hsc_env@HscEnv{..} = do
+    EPS {..} <- readIORef hsc_EPS
+    when (maximumSupportedRoots /= Nothing) $ setHeapProfilingRoots
+      [ Root "hsc" hsc_env
+      , Root "eps" hsc_EPS
+      , Root "ib"  eps_is_boot
+      , Root "pit" eps_PIT
+      , Root "fh"  eps_free_holes
+      , Root "pte" eps_PTE
+      , Root "env"
+        ( eps_inst_env
+        , eps_fam_inst_env
+        , eps_rule_base
+        , eps_ann_env
+        , eps_mod_fam_inst_env)
+      , Root "mat" eps_complete_matches
+      , Root "sts" eps_stats
+      , Root "nc"  hsc_NC
+      , Root "fc"  hsc_FC
+      ]
+    return hsc_env
+#else
+hscUpdateRoots hsc_env = do
+    return hsc_env
+#endif
 
 {-
 ************************************************************************
@@ -548,7 +582,9 @@ updateEps :: (ExternalPackageState -> (ExternalPackageState, a))
 updateEps upd_fn = do
   traceIf (text "updating EPS")
   eps_var <- getEpsVar
-  atomicUpdMutVar' eps_var upd_fn
+  a <- atomicUpdMutVar' eps_var upd_fn
+  _ <- liftIO . hscUpdateRoots =<< getTopEnv
+  return a
 
 -- | Update the external package state.
 --

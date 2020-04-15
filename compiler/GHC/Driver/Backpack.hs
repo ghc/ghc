@@ -466,6 +466,8 @@ updateEpsGhc_ :: GhcMonad m => (ExternalPackageState -> ExternalPackageState) ->
 updateEpsGhc_ f = do
     hsc_env <- getSession
     liftIO $ atomicModifyIORef' (hsc_EPS hsc_env) (\x -> (f x, ()))
+    _ <- liftIO $ hscUpdateRoots hsc_env
+    return ()
 
 -- | Get the EPS from a 'GhcMonad'.
 getEpsGhc :: GhcMonad m => m ExternalPackageState
