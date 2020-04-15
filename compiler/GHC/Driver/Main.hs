@@ -84,6 +84,7 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+    , hscUpdateRoots
     ) where
 
 import GHC.Prelude
@@ -248,7 +249,7 @@ newHscEnv dflags = do
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
     -- empty stuff or lazy panics. We should have two kinds of HscEnv
     -- (initialized or not) instead and less fields that are mutable over time.
-    return HscEnv {  hsc_dflags         = dflags
+    hscUpdateRoots $ HscEnv {  hsc_dflags         = dflags
                   ,  hsc_logger         = logger
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
