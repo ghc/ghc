@@ -19,23 +19,6 @@
 
 const stackData nullStackData;
 
-StgWord traverseGetClosureData(const StgClosure *c)
-{
-    const StgWord hdr = c->header.prof.hp.trav;
-    return hdr & (STG_WORD_MAX ^ 1);
-}
-
-void traverseSetClosureData(StgClosure *c, StgWord w)
-{
-    ASSERT((w & 1) == 0);
-    c->header.prof.hp.trav = w | 1;
-}
-
-bool traverseIsClosureDataValid(const StgClosure *c)
-{
-    return (c->header.prof.hp.trav & 1) == 1;
-}
-
 #if defined(DEBUG)
 unsigned int g_traversalDebugLevel = 0;
 static void debug(const char *s, ...)
