@@ -552,8 +552,6 @@ initHeapProfiling(void)
 void
 endHeapProfiling(void)
 {
-    StgDouble seconds;
-
     if (! RtsFlags.ProfFlags.doHeapProfile) {
         return;
     }
@@ -596,7 +594,10 @@ endHeapProfiling(void)
 
     stgFree(censuses);
 
-    seconds = mut_user_time();
+    RTSStats stats;
+    getRTSStats(&stats);
+    Time mut_time = stats.mutator_cpu_ns;
+    StgDouble seconds = TimeToSecondsDbl(mut_time);
     printSample(true, seconds);
     printSample(false, seconds);
     fclose(hp_file);
