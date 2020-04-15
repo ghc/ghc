@@ -76,7 +76,7 @@ import GHC.Driver.Session
 import Outputable
 import FastString
 import ListSetOps
-import GHC.Types.Var (VarBndr(Bndr))
+import GHC.Types.Var (VarBndr(Bndr), setIdDetails)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
@@ -1386,7 +1386,7 @@ seqId = pcMiscPrelId seqName ty info
 ------------------------------------------------
 keepAliveId :: Id
 keepAliveId
-  = pcMiscPrelId keepAliveName ty id_info
+  = pcMiscPrelId keepAliveName ty id_info `setIdDetails` NoBindingId
   where
     -- keepAlive#
     --   :: forall (rep_a :: RuntimeRep) (a :: TYPE rep_a)

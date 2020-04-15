@@ -15,6 +15,7 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.Driver.Session
+import GHC.Core.Arity       ( etaExpand )
 import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Op.Simplify.Env
@@ -1799,16 +1800,15 @@ completeCall env var cont
   --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
   | var `hasKey` keepAliveIdKey
   , ApplyToTy arg_rep hole1 cont1      <- -- cont
-    pprTrace "completeCall(wht)" (ppr var $$ ppr cont) cont
-  , ApplyToTy arg_ty   hole2 cont2     <- cont1
-  , ApplyToTy _res_rep _ cont3         <- cont2
-  , ApplyToTy _res_ty  _ cont4         <- cont3
-  , ApplyToVal dup5 x      env5 cont5 <- cont4
-  , ApplyToVal dup6 f      env6 cont6 <- cont5
-  , ApplyToVal dup7 s0     env7 cont7 <- cont6
+    pprTrace "completeCall(keepAlive#)" (ppr var $$ ppr cont) cont
+  , ApplyToTy arg_ty   hole2 cont2 <- cont1
+  , ApplyToTy _res_rep _     cont3 <- cont2
+  , ApplyToTy _res_ty  _     cont4 <- cont3
+  , ApplyToVal dup5 x  env5  cont5 <- cont4
+  , ApplyToVal dup6 f  env6  cont6 <- cont5
+  , ApplyToVal dup7 s0 env7  cont7 <- cont6
   , not $ contIsStop cont7
-    -- TODO: Eta expand?
-  , Lam f_arg f_rhs                   <- f
+  , Lam f_arg f_rhs                   <- etaExpand 1 f
   = do { let out_ty = contResultType cont
              out_rep = getRuntimeRep out_ty
        ; (floats1, f') <- rebuild env6 f_rhs cont7
