@@ -15,7 +15,6 @@ import GhcPrelude
 
 import GHC.Platform
 import GHC.Driver.Session
-import GHC.Core.Arity       ( etaExpand )
 import GHC.Core.Op.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Op.Simplify.Env
@@ -1791,40 +1790,6 @@ completeCall env var cont
        ; dump_inline expr cont
        ; simplExprF (zapSubstEnv env) expr cont }
 
-  -- Push strict contexts into with# continuation
-  --
-  -- That is,
-  --
-  --     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
-  --       ~>
-  --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
-  | var `hasKey` keepAliveIdKey
-  , ApplyToTy arg_rep hole1 cont1      <- -- cont
-    pprTrace "completeCall(keepAlive#)" (ppr var $$ ppr cont) cont
-  , ApplyToTy arg_ty   hole2 cont2 <- cont1
-  , ApplyToTy _res_rep _     cont3 <- cont2
-  , ApplyToTy _res_ty  _     cont4 <- cont3
-  , ApplyToVal dup5 x  env5  cont5 <- cont4
-  , ApplyToVal dup6 f  env6  cont6 <- cont5
-  , ApplyToVal dup7 s0 env7  cont7 <- cont6
-  , not $ contIsStop cont7
-  , Lam f_arg f_rhs                   <- etaExpand 1 f
-  = do { let out_ty = contResultType cont
-             out_rep = getRuntimeRep out_ty
-       ; (floats1, f') <- rebuild env6 f_rhs cont7
-       ; let cont' =
-                 ApplyToTy arg_rep hole1
-               $ ApplyToTy arg_ty  hole2
-               $ ApplyToTy out_rep undefined
-               $ ApplyToTy out_ty  undefined
-               $ ApplyToVal dup5 x env5
-               $ ApplyToVal dup6 (Lam f_arg f') env6
-               $ ApplyToVal dup7 s0 env7
-               $ mkBoringStop out_ty
-       ; (floats2, result) <- completeCall env var cont'
-       ; pprTrace "rebuilt" (ppr result) $ return (floats1 `addFloats` floats2, result)
-       }
-
   | otherwise
   -- Don't inline; instead rebuild the call
   = do { rule_base <- getSimplRules
@@ -1906,6 +1871,37 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToVal {} -> False
                       _             -> True
 
+
+---------- Simplify continuation-passing primops --------------
+-- Push strict contexts into keepAlive# continuation
+--
+-- That is,
+--
+--     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+--       ~>
+--     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` keepAliveIdKey
+  , [ ValArg s0
+    , ValArg (Lam f_arg f_body)
+    , ValArg x
+    , TyArg {}
+    , TyArg {}
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = do { (env', f_arg) <- simplLamBndr (zapSubstEnv env) f_arg
+       ; f_body' <- simplExprC env' f_body cont
+       ; let f' = Lam f_arg f_body'
+             ty' = contResultType cont
+             call' = mkApps (Var fun)
+               [ mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , mkTyArg arg_rep, mkTyArg arg_ty
+               , x
+               , f'
+               , s0
+               ]
+       ; return (emptyFloats env, call') }
 
 ---------- Simplify applications and casts --------------
 rebuildCall env info (CastIt co cont)
