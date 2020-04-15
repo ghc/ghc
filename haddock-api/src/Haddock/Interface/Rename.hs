@@ -31,6 +31,14 @@ import Control.Monad hiding (mapM)
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
 
+-- | Traverse docstrings and ASTs in the Haddock interface, renaming 'Name' to
+-- 'DocName'.
+--
+-- What this really boils down to is: for each 'Name', figure out which of the
+-- modules that export the name is the preferred place to link to.
+--
+-- The renamed output gets written into fields in the Haddock interface record
+-- that were previously left empty.
 renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
 renameInterface dflags renamingEnv warnings iface =
 
@@ -127,6 +135,11 @@ lookupRn name = RnM $ \lkp ->
   case lkp name of
     (False,maps_to) -> (maps_to, (name :))
     (True, maps_to) -> (maps_to, id)
+
+-- | Look up a 'Name' in the renaming environment, but don't warn if you don't
+-- find the name. Prefer to use 'lookupRn' whenever possible.
+lookupRnNoWarn :: Name -> RnM DocName
+lookupRnNoWarn name = RnM $ \lkp -> (snd (lkp name), id)
 
 -- | Run the renamer action using lookup in a 'LinkEnv' as the lookup function.
 -- Returns the renamed value along with a list of `Name`'s that could not be
@@ -532,7 +545,7 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ src (L l s) -> do
-    s' <- traverse renameL s
+    s' <- traverse (traverse lookupRnNoWarn) s
     return $ MinimalSig noExtField src (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
