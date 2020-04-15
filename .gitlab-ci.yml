@@ -26,19 +26,18 @@ stages:
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation
 
-# N.B.Don't run on wip/ branches, instead on run on merge requests.
-.only-default: &only-default
-  only:
-    - master
-    - /ghc-[0-9]+\.[0-9]+/
-    - merge_requests
-    - tags
-    - web
+workflow:
+  # N.B.Don't run on wip/ branches, instead on run on merge requests.
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
 
 .nightly: &nightly
-  only:
-    variables:
-      - $NIGHTLY
+  rules:
+    - if: $NIGHTLY
   artifacts:
     when: always
     expire_in: 8 weeks
@@ -50,9 +49,8 @@ stages:
   artifacts:
     when: always
     expire_in: 1 year
-  only:
-    variables:
-      - $RELEASE == "yes"
+  rules:
+    - if: '$RELEASE == "yes"'
 
 ############################################################
 # Runner Tags
@@ -86,13 +84,11 @@ ghc-linters:
   dependencies: []
   tags:
     - lint
-  only:
-    refs:
-      - merge_requests
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -103,7 +99,6 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
@@ -114,7 +109,6 @@ lint-testsuite:
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -127,7 +121,6 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -140,25 +133,14 @@ typecheck-testsuite:
   tags:
     - lint
 
-lint-submods-marge:
+lint-submods:
   extends: .lint-submods
-  only:
-    refs:
-      - merge_requests
-    variables:
-      - "$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/"
-
-lint-submods-mr:
-  extends: .lint-submods
-  # Allow failure since any necessary submodule patches may not be upstreamed
-  # yet.
-  allow_failure: true
-  only:
-    refs:
-      - merge_requests
-  except:
-    variables:
-      - "$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/"
+  # Allow failure on merge requests since any necessary submodule patches may
+  # not be upstreamed yet.
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+      allow_failure: false
+    - allow_failure: true
 
 lint-submods-branch:
   extends: .lint-submods
@@ -166,13 +148,11 @@ lint-submods-branch:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
     - submodchecker . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
-  only:
-    refs:
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 .lint-changelogs:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
@@ -185,15 +165,13 @@ lint-changelogs:
   extends: .lint-changelogs
   # Allow failure since this isn't a final release.
   allow_failure: true
-  only:
-    refs:
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 lint-release-changelogs:
   extends: .lint-changelogs
-  only:
-    refs:
-      - /ghc-[0-9]+\.[0-9]+\.[0-9]+-.*/
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 
 ############################################################
@@ -201,7 +179,6 @@ lint-release-changelogs:
 ############################################################
 
 .validate-hadrian:
-  <<: *only-default
   variables:
     FLAVOUR: "validate"
   script:
@@ -250,7 +227,6 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
 hadrian-ghc-in-ghci:
-  <<: *only-default
   stage: quick-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
@@ -283,7 +259,6 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .validate:
-  <<: *only-default
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -338,9 +313,8 @@ hadrian-ghc-in-ghci:
 validate-x86_64-freebsd:
   extends: .build-x86_64-freebsd
   stage: full-build
-  only:
-    variables:
-      - $CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/'
 
 nightly-x86_64-freebsd:
   <<: *nightly
@@ -417,7 +391,6 @@ validate-x86_64-darwin:
 
 # Disabled because of OS X CI capacity
 .validate-x86_64-darwin-hadrian:
-  <<: *only-default
   stage: full-build
   tags:
     - x86_64-darwin
@@ -780,7 +753,6 @@ validate-x86_64-linux-fedora27:
 ############################################################
 
 .build-windows:
-  <<: *only-default
   # For the reasons given in #17777 this build isn't reliable.
   allow_failure: true
   before_script:
@@ -954,7 +926,6 @@ nightly-i386-windows:
 
 # See Note [Cleanup after shell executor]
 cleanup-darwin:
-  <<: *only-default
   stage: cleanup
   tags:
     - x86_64-darwin
@@ -976,7 +947,6 @@ cleanup-darwin:
 ############################################################
 
 doc-tarball:
-  <<: *only-default
   stage: packaging
   tags:
     - x86_64-linux
@@ -1016,10 +986,10 @@ source-tarball:
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  when: always
   dependencies: []
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: always
   artifacts:
     paths:
       - ghc-*.tar.xz
@@ -1046,7 +1016,6 @@ source-tarball:
 # pipeline.
 
 .hackage:
-  <<: *only-default
   stage: testing
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
@@ -1063,9 +1032,8 @@ hackage:
 
 hackage-label:
   extends: .hackage
-  only:
-    variables:
-      - $CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
 nightly-hackage:
   <<: *nightly
@@ -1080,11 +1048,10 @@ perf-nofib:
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  only:
-    refs:
-      - merge_requests
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
   tags:
     - x86_64-linux
   script:
@@ -1133,8 +1100,8 @@ pages:
       <meta http-equiv="refresh" content="1; url=doc/">
       EOF
     - cp -f index.html public/doc
-  only:
-    - master
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   artifacts:
     paths:
       - public
