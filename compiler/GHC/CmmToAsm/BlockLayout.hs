@@ -240,7 +240,44 @@ import Control.Monad (foldM)
   Assuming that Lwork is large the chance that the "call" ends up
   in the same cache line is also fairly small.
 
--}
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~~~ Note [Layout relevant edge weights]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  The input to the chain based code layout algorithm is a CFG
+  with edges annotated with their frequency. The frequency
+  of traversal corresponds quite well to the cost of not placing
+  the connected blocks next to each other.
+
+  However even if having the same frequency certain edges are
+  inherently more or less relevant to code layout.
+
+  In particular:
+
+  * Edges which cross an info table are less relevant than others.
+
+    If we place the blocks across this edge next to each other
+    they are still separated by the info table which negates
+    much of the benefit. It makes it less likely both blocks
+    will share a cache line reducing the benefits from locality.
+    But it also prevents us from eliminating jump instructions.
+
+  * Conditional branches and switches are slightly less relevant.
+
+    We can completely remove unconditional jumps by placing them
+    next to each other. This is not true for conditional branch edges.
+    We apply a small modifier to them to ensure edges for which we can
+    eliminate the overhead completely are considered first. See also #18053.
+
+  * Edges constituted by a call are ignored.
+
+    Considering these hardly helped with performance and ignoring
+    them helps quite a bit to improve compiler performance.
+
+  So we perform a preprocessing step where we apply a multiplicator
+  to these kinds of edges.
+
+  -}
 
 
 -- | Look at X number of blocks in two chains to determine
@@ -640,17 +677,31 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
     let directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
           where
+            -- Apply modifiers to turn edge frequencies into useable weights
+            -- for computing code layout.
+            -- See also Note [Layout relevant edge weights]
             relevantWeight :: CfgEdge -> Maybe CfgEdge
             relevantWeight edge@(CfgEdge from to edgeInfo)
                 | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
-                -- Ignore edges across calls
+                -- Ignore edges across calls.
                 = Nothing
                 | mapMember to info
                 , w <- edgeWeight edgeInfo
-                -- The payoff is small if we jump over an info table
+                -- The payoff is quite small if we jump over an info table
                 = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
+                | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
+                , cantEliminate exitNode
+                , w <- edgeWeight edgeInfo
+                -- A small penalty to edge types which
+                -- we can't optimize away by layout.
+                -- w * 0.96875 == w - w/32
+                = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
                 | otherwise
                 = Just edge
+                where
+                  cantEliminate CmmCondBranch {} = True
+                  cantEliminate CmmSwitch {} = True
+                  cantEliminate _ = False
 
         blockMap :: LabelMap (GenBasicBlock i)
         blockMap
