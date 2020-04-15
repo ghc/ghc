@@ -39,6 +39,7 @@ import GHC.Types.Demand ( argOneShots, argsOneShots )
 import Digraph          ( SCC(..), Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq
                         , stronglyConnCompFromEdgedVerticesUniqR )
+import PrelNames( runRWKey )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -1880,8 +1881,12 @@ occAnalApp :: OccEnv
            -> (UsageDetails, Expr CoreBndr)
 -- Naked variables (not applied) end up here too
 occAnalApp env (Var fun, args, ticks)
-  | null ticks = (all_uds, mkApps fun' args')
-  | otherwise  = (all_uds, mkTicks ticks $ mkApps fun' args')
+  | fun `hasKey` runRWKey
+  , [t1, t2, arg]  <- args
+  , let (usage, arg') = occAnalRhs env (Just 1) arg
+  = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+  | otherwise
+  = (all_uds, mkTicks ticks $ mkApps fun' args')
   where
     (fun', fun_id') = lookupVarEnv (occ_bs_env env) fun
                       `orElse` (Var fun, fun)

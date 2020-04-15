@@ -678,22 +678,9 @@ lintRhs :: Id -> CoreExpr -> LintM LintedType
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
     | Just arity <- isJoinId_maybe bndr
-    = lint_join_lams arity arity True rhs
+    = lintJoinLams arity (Just bndr) rhs
     | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
-    = lint_join_lams arity arity False rhs
-  where
-    lint_join_lams 0 _ _ rhs
-      = lintCoreExpr rhs
-
-    lint_join_lams n tot enforce (Lam var expr)
-      = lintLambda var $ lint_join_lams (n-1) tot enforce expr
-
-    lint_join_lams n tot True _other
-      = failWithL $ mkBadJoinArityMsg bndr tot (tot-n) rhs
-    lint_join_lams _ _ False rhs
-      = markAllJoinsBad $ lintCoreExpr rhs
-          -- Future join point, not yet eta-expanded
-          -- Body is not a tail position
+    = lintJoinLams arity Nothing rhs
 
 -- Allow applications of the data constructor @StaticPtr@ at the top
 -- but produce errors otherwise.
@@ -714,6 +701,18 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
         )
         binders0
     go _ = markAllJoinsBad $ lintCoreExpr rhs
+
+lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM LintedType
+lintJoinLams join_arity enforce rhs
+  = go join_arity rhs
+  where
+    go 0 rhs            = lintCoreExpr rhs
+    go n (Lam var expr) = lintLambda var $ go (n-1) expr
+    go n _other | Just bndr <- enforce -- Join point with too few RHS lambdas
+                = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
+                | otherwise -- Future join point, not yet eta-expanded
+                = markAllJoinsBad $ lintCoreExpr rhs
+                  -- Body of lambda is not a tail position
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
@@ -854,6 +853,15 @@ lintCoreExpr e@(Let (Rec pairs) body)
     bndrs = map fst pairs
 
 lintCoreExpr e@(App _ _)
+  | Var fun <- fun
+  , fun `hasKey` runRWKey
+  , [arg_ty1, arg_ty2, arg3] <- args
+  = do { fun_ty1 <- lintCoreArg (idType fun) arg_ty1
+       ; fun_ty2 <- lintCoreArg fun_ty1      arg_ty2
+       ; arg3_ty <- lintJoinLams 1 (Just fun) arg3
+       ; lintValApp arg3 fun_ty2 arg3_ty }
+
+  | otherwise
   = do { fun_ty <- lintCoreFun fun (length args)
        ; lintCoreArgs fun_ty args }
   where
@@ -2751,11 +2759,11 @@ mkInvalidJoinPointMsg var ty
         2 (ppr var <+> dcolon <+> ppr ty)
 
 mkBadJoinArityMsg :: Var -> Int -> Int -> CoreExpr -> SDoc
-mkBadJoinArityMsg var ar nlams rhs
+mkBadJoinArityMsg var ar n rhs
   = vcat [ text "Join point has too few lambdas",
            text "Join var:" <+> ppr var,
            text "Join arity:" <+> ppr ar,
-           text "Number of lambdas:" <+> ppr nlams,
+           text "Number of lambdas:" <+> ppr (ar - n),
            text "Rhs = " <+> ppr rhs
            ]
 
