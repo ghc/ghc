@@ -8,3 +8,4 @@
 #include "Capability.h"
 #include "WSDeque.h"
 #include "SMPClosureOps.h"
+#include "rts/TraverseHeap.h"
