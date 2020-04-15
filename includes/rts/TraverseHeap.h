@@ -189,14 +189,26 @@ typedef void (*returnClosure_cb) (
  * must return true otherwise this is undefined. Note that the closure data is
  * reset to zero on the first visit in this pass by 'traverseWorkStack'.
  */
-StgWord traverseGetClosureData(const StgClosure *c);
+EXTERN_INLINE StgWord traverseGetClosureData(const StgClosure *c);
+EXTERN_INLINE StgWord traverseGetClosureData(const StgClosure *c)
+{
+    const StgWord hdr = c->header.prof.hp.trav;
+    return hdr & (STG_WORD_MAX ^ 1);
+}
+
 
 /**
  * Set the data in the closure header and mark the closure as visited. The
  * lowest bit is reserved for the generic heap traversal code and must not be
  * set.
  */
-void traverseSetClosureData(StgClosure *c, StgWord w);
+EXTERN_INLINE void traverseSetClosureData(StgClosure *c, StgWord w);
+EXTERN_INLINE void traverseSetClosureData(StgClosure *c, StgWord w)
+{
+    ASSERT((w & 1) == 0);
+    c->header.prof.hp.trav = w | 1;
+}
+
 
 /**
  * Check if closure was visited in the current pass, i.e. if the data in the
@@ -209,7 +221,12 @@ void traverseSetClosureData(StgClosure *c, StgWord w);
  * all HEAP_ALLOCED closure's headers while closeTraverseStack() handles all
  * static closures.
  */
-bool traverseIsClosureDataValid(const StgClosure *c);
+EXTERN_INLINE bool traverseIsClosureDataValid(const StgClosure *c);
+EXTERN_INLINE bool traverseIsClosureDataValid(const StgClosure *c)
+{
+    return (c->header.prof.hp.trav & 1) == 1;
+}
+
 
 /**
  * Traverse all closures on the traversal work-stack as well as their children,
