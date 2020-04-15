@@ -2489,7 +2489,7 @@ tcRnExpr hsc_env mode rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((tclvl, res_ty), lie)
+    ((tclvl, (_tc_expr, res_ty)), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
              tc_infer rn_expr ;
@@ -2518,8 +2518,7 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    tc_infer expr | inst      = do { (_, ty) <- tcInferRho expr
-                                   ; return ty }
+    tc_infer expr | inst      = tcInferRho expr
                   | otherwise = tcInferSigma expr
 
     -- See Note [TcRnExprMode]

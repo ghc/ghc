@@ -15,6 +15,8 @@ tcExpr :: HsExpr GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcInferRho, tcInferRhoNC
   :: LHsExpr GhcRn-> TcM (LHsExpr GhcTcId, TcRhoType)
 
+tcInferSigma :: LHsExpr GhcRn-> TcM (LHsExpr GhcTcId, TcSigmaType)
+
 tcSyntaxOp :: CtOrigin
            -> SyntaxExprRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments

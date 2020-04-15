@@ -28,7 +28,7 @@ where
 
 import GhcPrelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -409,7 +409,9 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- An exotic example:
          --    pair :: forall a. a -> forall b. b -> (a,b)
          --    f (pair True -> x) = ...here (x :: forall b. b -> (Bool,b))
-        ; (expr',expr_ty) <- tcInferRho expr
+         --
+         -- TEMPORARY: pending simple subsumption, use tcInferSigma
+        ; (expr',expr_ty) <- tcInferSigma expr
 
          -- Expression must be a function
         ; let expr_orig = lexprCtOrigin expr
