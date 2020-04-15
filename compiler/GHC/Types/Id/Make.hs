@@ -1386,7 +1386,8 @@ seqId = pcMiscPrelId seqName ty info
 ------------------------------------------------
 keepAliveId :: Id
 keepAliveId
-  = pcMiscPrelId keepAliveName ty id_info `setIdDetails` NoBindingId
+  = pcMiscPrelId keepAliveName ty id_info
+    `setIdDetails` NoBindingId
   where
     -- keepAlive#
     --   :: forall (rep_a :: RuntimeRep) (a :: TYPE rep_a)
@@ -1405,7 +1406,9 @@ keepAliveId
     cont_ty = realWorldStatePrimTy `mkVisFunTy` result_ty
     -- (# State# RealWorld, r #)
     result_ty = mkTupleTy Unboxed [realWorldStatePrimTy, mkTyVarTy r]
-    id_info = noCafIdInfo `setStrictnessInfo` mkClosedStrictSig [topDmd, strictApply1Dmd, topDmd] topDiv
+    id_info = noCafIdInfo
+      `setStrictnessInfo` mkClosedStrictSig [topDmd, strictApply1Dmd, topDmd] topDiv
+      `setArityInfo` 3
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]

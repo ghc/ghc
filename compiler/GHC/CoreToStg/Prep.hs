@@ -855,14 +855,16 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+
     -- See Note [CorePrep handling of keepAlive#]
-    cpe_app env (Var f) [CpeApp (Type ty), CpeApp (Type runtimeRep), CpeApp (Type resultTy),
+    cpe_app env (Var f) [CpeApp (Type _arg_rep), CpeApp (Type arg_ty),
+                         CpeApp (Type result_rep), CpeApp (Type result_ty),
                          CpeApp x, CpeApp k, CpeApp s0] 3
         | f `hasKey` keepAliveIdKey
         = do { let voidRepTy = primRepToRuntimeRep VoidRep
              ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
-                                         [voidRepTy, runtimeRep, realWorldStatePrimTy, resultTy]
-             ; y <- newVar resultTy
+                                         [voidRepTy, result_rep, realWorldStatePrimTy, result_ty]
+             ; y <- newVar result_ty
              ; s1 <- newVar realWorldStatePrimTy
              ; s2 <- newVar realWorldStatePrimTy
              ; let touchId = mkPrimOpId TouchOp
@@ -874,7 +876,7 @@ cpeApp top_env expr
                      (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
 
                    expr = Case (App k s0) b0 (varType b0) [stateResultAlt s1 y rhs1]
-                   rhs1 = Case (mkApps (Var touchId) [Type ty, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
+                   rhs1 = Case (mkApps (Var touchId) [Type arg_ty, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
                    rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
              ; cpeBody env expr
              }

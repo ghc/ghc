@@ -412,7 +412,8 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- 'Storable' class.
 withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
   case f (unsafeForeignPtrToPtr fo) of
-    IO action# -> keepAlive# r action# s
+    IO action# -> keepAlive# r (\s' -> action# s') s
+
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
