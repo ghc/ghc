@@ -131,12 +131,12 @@ tc_poly_expr_nc (L loc expr) res_ty
        ; return $ L loc (mkHsWrap wrap expr') }
 
 ---------------
-tcInferSigma :: LHsExpr GhcRn -> TcM TcSigmaType
+tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 -- Used by tcRnExpr to implement GHCi :type
 tcInferSigma le@(L loc expr)
   = addExprCtxt le $ setSrcSpan loc $
-    do { (_, _, ty) <- tcInferApp expr
-       ; return ty }
+    do { (fun, args, ty) <- tcInferApp expr
+       ; return (L loc (wrapHsArgs fun args), ty) }
 
 ---------------
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
