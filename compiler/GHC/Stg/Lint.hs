@@ -54,6 +54,8 @@ import ErrUtils             ( MsgDoc, Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
+import GHC.Types.Unique     ( hasKey )
+import PrelNames            ( keepAliveIdKey )
 import Outputable
 import GHC.Types.Module           ( Module )
 import qualified ErrUtils as Err
