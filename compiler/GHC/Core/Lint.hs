@@ -2030,21 +2030,21 @@ lintCoercion the_co@(LRCo lr co)
 lintCoercion (InstCo co arg)
   = do { co'  <- lintCoercion co
        ; arg' <- lintCoercion arg
-       ; let Pair t1' t2' = coercionKind co'
-             Pair s1  s2  = coercionKind arg
+       ; let Pair t1 t2 = coercionKind co'
+             Pair s1 s2 = coercionKind arg'
 
        ; lintRole arg Nominal (coercionRole arg')
 
-      ; case (splitForAllTy_ty_maybe t1', splitForAllTy_ty_maybe t2') of
+      ; case (splitForAllTy_ty_maybe t1, splitForAllTy_ty_maybe t2) of
          -- forall over tvar
          { (Just (tv1,_), Just (tv2,_))
              | typeKind s1 `eqType` tyVarKind tv1
              , typeKind s2 `eqType` tyVarKind tv2
              -> return (InstCo co' arg')
              | otherwise
-             -> failWithL (text "Kind mis-match in inst coercion")
+             -> failWithL (text "Kind mis-match in inst coercion1" <+> ppr co)
 
-         ; _ -> case (splitForAllTy_co_maybe t1', splitForAllTy_co_maybe t2') of
+         ; _ -> case (splitForAllTy_co_maybe t1, splitForAllTy_co_maybe t2) of
          -- forall over covar
          { (Just (cv1, _), Just (cv2, _))
              | typeKind s1 `eqType` varType cv1
@@ -2053,7 +2053,7 @@ lintCoercion (InstCo co arg)
              , CoercionTy _ <- s2
              -> return (InstCo co' arg')
              | otherwise
-             -> failWithL (text "Kind mis-match in inst coercion")
+             -> failWithL (text "Kind mis-match in inst coercion2" <+> ppr co)
 
          ; _ -> failWithL (text "Bad argument of inst") }}}
 
