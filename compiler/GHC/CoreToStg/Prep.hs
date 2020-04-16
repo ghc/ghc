@@ -857,13 +857,15 @@ cpeApp top_env expr
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
 
     -- See Note [CorePrep handling of keepAlive#]
-    cpe_app env (Var f) [CpeApp (Type _arg_rep), CpeApp (Type arg_ty),
+    cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
                          CpeApp (Type result_rep), CpeApp (Type result_ty),
                          CpeApp x, CpeApp k, CpeApp s0] 3
         | f `hasKey` keepAliveIdKey
         = do { let voidRepTy = primRepToRuntimeRep VoidRep
-             ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
-                                         [voidRepTy, result_rep, realWorldStatePrimTy, result_ty]
+                   -- out_ty ~ (# State# RealWorld, a #)
+                   out_ty = mkTyConApp (tupleTyCon Unboxed 2)
+                                       [voidRepTy, result_rep, realWorldStatePrimTy, result_ty]
+             ; b0 <- newVar out_ty
              ; y <- newVar result_ty
              ; s1 <- newVar realWorldStatePrimTy
              ; s2 <- newVar realWorldStatePrimTy
@@ -875,9 +877,11 @@ cpeApp top_env expr
                    stateResultAlt stateVar resultVar rhs =
                      (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
 
-                   expr = Case (App k s0) b0 (varType b0) [stateResultAlt s1 y rhs1]
-                   rhs1 = Case (mkApps (Var touchId) [Type arg_ty, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
-                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
+                   expr = Case (App k s0) b0 out_ty [stateResultAlt s1 y rhs1]
+                   rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var s1]
+                          in Case scrut s2 out_ty [(DEFAULT, [], rhs2)]
+                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2)
+                            [mkTyArg voidRepTy, mkTyArg result_rep, mkTyArg realWorldStatePrimTy, mkTyArg result_ty, Var s2, Var y]
              ; cpeBody env expr
              }
     cpe_app _env (Var f) args _
