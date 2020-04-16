@@ -217,7 +217,6 @@ Library
         GHC.CmmToLlvm.Mangler
         GHC.Types.Id.Make
         GHC.Unit
-        GHC.Unit.Id
         GHC.Unit.Parser
         GHC.Unit.Ppr
         GHC.Unit.Subst

@@ -74,7 +74,6 @@ import GHC.Unit.Database
 import GHC.Unit.Info
 import GHC.Unit.Types
 import GHC.Unit.Module
-import GHC.Unit.Id
 import GHC.Unit.Subst
 import GHC.Driver.Session
 import GHC.Driver.Ways

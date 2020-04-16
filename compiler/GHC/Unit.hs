@@ -6,7 +6,6 @@
 -- a database
 module GHC.Unit
    ( module GHC.Unit.Types
-   , module GHC.Unit.Id
    , module GHC.Unit.Info
    , module GHC.Unit.Parser
    , module GHC.Unit.State
@@ -16,7 +15,6 @@ module GHC.Unit
 where
 
 import GHC.Unit.Types
-import GHC.Unit.Id
 import GHC.Unit.Info
 import GHC.Unit.Parser
 import GHC.Unit.State
