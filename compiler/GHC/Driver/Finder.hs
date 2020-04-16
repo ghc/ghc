@@ -36,9 +36,8 @@ module GHC.Driver.Finder (
 
 import GhcPrelude
 
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Driver.Types
-import GHC.Types.Unit.State
 import FastString
 import Util
 import PrelNames        ( gHC_PRIM )

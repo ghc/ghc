@@ -22,8 +22,7 @@ import GHC.Driver.Phases
 import GHC.Hs
 import GHC.Types.SrcLoc
 import Outputable
-import GHC.Types.Module
-import GHC.Types.Unit.Info
+import GHC.Unit
 
 {-
 ************************************************************************

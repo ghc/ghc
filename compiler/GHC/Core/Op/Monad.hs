@@ -52,8 +52,8 @@ import GhcPrelude hiding ( read )
 
 import GHC.Core
 import GHC.Driver.Types
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit.Module
+import GHC.Unit.Module.Env
 import GHC.Driver.Session
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Types.Annotations

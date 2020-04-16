@@ -48,7 +48,7 @@ import GHC.Core.TyCon ( tyConArity )
 import TysWiredIn
 import PrelNames
 import GHC.Types.Basic
-import GHC.Types.Module ( Module )
+import GHC.Unit.Module ( Module )
 import ErrUtils
 import GHC.Driver.Session
 import Outputable

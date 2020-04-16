@@ -45,8 +45,8 @@ import GHC.Driver.Finder
 import GHC.Driver.Monad
 import HeaderInfo
 import GHC.Driver.Types
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit.Module
+import GHC.Unit.Module.Env
 import GHC.IfaceToCore  ( typecheckIface )
 import GHC.Tc.Utils.Monad     ( initIfaceCheck )
 import GHC.Driver.Main
@@ -66,7 +66,7 @@ import StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Tc.Utils.Backpack
-import GHC.Types.Unit.State
+import GHC.Unit.State
 import GHC.Types.Unique.Set
 import Util
 import qualified GHC.LanguageExtensions as LangExt

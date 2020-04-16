@@ -19,15 +19,14 @@ import GHC.Driver.Types
 import GHC.Tc.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit
+import GHC.Unit.Module.Env
 import Outputable
 import Util
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import Fingerprint
 import Maybes
-import GHC.Types.Unit.State
 import GHC.Driver.Finder
 
 import Control.Monad (filterM)

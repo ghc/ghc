@@ -35,10 +35,10 @@ Par01.$trModule1 :: GHC.Types.TrName
 Par01.$trModule1 = GHC.Types.TrNameS Par01.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule :: GHC.Types.Module
+Par01.$trModule :: GHC.Unit.Module
 [GblId, Cpr=m1, Unf=OtherCon []]
 Par01.$trModule
-  = GHC.Types.Module Par01.$trModule3 Par01.$trModule1
+  = GHC.Unit.Module Par01.$trModule3 Par01.$trModule1
 
 
 

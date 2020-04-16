@@ -18,7 +18,7 @@ import Config
 import Binary
 import FastString                 ( FastString )
 import GHC.Iface.Type
-import GHC.Types.Module           ( ModuleName, Module )
+import GHC.Unit.Module           ( ModuleName, Module )
 import GHC.Types.Name             ( Name )
 import Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc           ( RealSrcSpan )

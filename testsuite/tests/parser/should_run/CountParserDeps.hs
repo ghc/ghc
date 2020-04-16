@@ -11,7 +11,7 @@ module Main(main) where
 -- need exists to produce ASTs and nothing more.
 
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC

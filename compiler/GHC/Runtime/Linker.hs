@@ -39,15 +39,15 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 import GHC.Tc.Utils.Monad
-import GHC.Types.Unit.State as Packages
+import GHC.Unit.State as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit.Module
+import GHC.Unit.Module.Env
 import ListSetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import GHC.Driver.Session

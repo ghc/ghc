@@ -1,6 +1,6 @@
 
 -- | The ModuleName type
-module GHC.Types.Module.Name
+module GHC.Unit.Module.Name
     ( ModuleName
     , pprModuleName
     , moduleNameFS
