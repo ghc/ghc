@@ -46,7 +46,7 @@ import GHC.Types.Id.Info
 import TysWiredIn
 import GHC.Core.DataCon
 import GHC.Types.Basic
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique.Supply
 import Maybes
 import OrdList

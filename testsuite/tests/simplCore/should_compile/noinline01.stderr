@@ -25,9 +25,9 @@ Noinline01.$trModule1 :: GHC.Types.TrName
 [GblId, Cpr=m1, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
-Noinline01.$trModule :: GHC.Types.Module
+Noinline01.$trModule :: GHC.Unit.Module
 [GblId, Cpr=m1, Unf=OtherCon []] =
-    CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
+    CCS_DONT_CARE GHC.Unit.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
 
 

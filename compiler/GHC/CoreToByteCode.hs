@@ -64,7 +64,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Types.Unique.Supply
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import Control.Exception
 import Data.Array

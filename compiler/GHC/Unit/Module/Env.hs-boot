@@ -1,4 +1,4 @@
-module GHC.Types.Module.Env where
+module GHC.Unit.Module.Env where
 
 import GHC.Types.Unique.FM
 

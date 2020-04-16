@@ -1,5 +1,5 @@
 -- | Module location
-module GHC.Types.Module.Location
+module GHC.Unit.Module.Location
    ( ModLocation(..)
    , addBootSuffix
    , addBootSuffix_maybe

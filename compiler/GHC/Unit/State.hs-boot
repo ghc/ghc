@@ -1,9 +1,8 @@
-module GHC.Types.Unit.State where
+module GHC.Unit.State where
 import GhcPrelude
 import FastString
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
-import {-# SOURCE #-} GHC.Types.Module(IndefUnitId, Unit)
-import {-# SOURCE #-} GHC.Types.Unit.Id(UnitId)
+import {-# SOURCE #-} GHC.Unit.Types(UnitId,Unit,IndefUnitId)
 data PackageState
 data UnitInfoMap
 data PackageDatabase unit

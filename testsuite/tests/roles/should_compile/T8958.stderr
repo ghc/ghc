@@ -75,7 +75,7 @@ $krep [InlPrag=NOUSERINLINE[~]]
       T8958.$tcNominal
       ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
 T8958.$trModule
-  = GHC.Types.Module
+  = GHC.Unit.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational

@@ -216,12 +216,16 @@ Library
         GHC.CmmToLlvm.Regs
         GHC.CmmToLlvm.Mangler
         GHC.Types.Id.Make
-        GHC.Types.Module
-        GHC.Types.Module.Name
-        GHC.Types.Module.Location
-        GHC.Types.Module.Env
-        GHC.Types.Unit.Id
-        GHC.Types.Unit.Ppr
+        GHC.Unit
+        GHC.Unit.Id
+        GHC.Unit.Parser
+        GHC.Unit.Ppr
+        GHC.Unit.Subst
+        GHC.Unit.Types
+        GHC.Unit.Module
+        GHC.Unit.Module.Name
+        GHC.Unit.Module.Location
+        GHC.Unit.Module.Env
         GHC.Types.Name
         GHC.Types.Name.Env
         GHC.Types.Name.Set
@@ -384,8 +388,8 @@ Library
         GHC.Runtime.Eval
         GHC.Runtime.Eval.Types
         GHC.Runtime.Loader
-        GHC.Types.Unit.Info
-        GHC.Types.Unit.State
+        GHC.Unit.Info
+        GHC.Unit.State
         PlatformConstants
         GHC.Driver.Plugins
         GHC.Tc.Plugin

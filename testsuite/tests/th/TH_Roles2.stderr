@@ -19,6 +19,6 @@ $krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepFun $krep GHC.Types.krep$*
 TH_Roles2.$trModule
-  = GHC.Types.Module
+  = GHC.Unit.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "TH_Roles2"#)
 

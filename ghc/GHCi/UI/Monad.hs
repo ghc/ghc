@@ -45,7 +45,7 @@ import GHC.Driver.Session
 import FastString
 import GHC.Driver.Types
 import GHC.Types.SrcLoc
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import PrelNames (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter

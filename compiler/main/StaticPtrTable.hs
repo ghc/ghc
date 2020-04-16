@@ -132,7 +132,7 @@ import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Types.Id
 import GHC.Core.Make (mkStringExprFSWith)
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import Outputable
 import GHC.Platform
