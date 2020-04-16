@@ -191,7 +191,7 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnit dflags (improveUnit (getUnitInfoMap dflags) $ renameHoleUnit dflags (listToUFM insts) uid0)
+          let uid = unwireUnit dflags (improveUnit (unitInfoMap (pkgState dflags)) $ renameHoleUnit (pkgState dflags) (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -259,7 +259,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit dflags hsubst) raw_deps
+        deps0 = map (renameHoleUnit (pkgState dflags) hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -272,7 +272,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnit (getUnitInfoMap dflags)) deps0
+    let deps = map (improveUnit (unitInfoMap (pkgState dflags))) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
