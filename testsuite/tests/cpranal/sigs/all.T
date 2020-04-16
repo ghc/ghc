@@ -7,7 +7,7 @@ setTestOpts(extra_hc_opts('-ddump-cpr-signatures'))
 # running them in various runtimes
 setTestOpts(only_ways(['optasm']))
 
-test('FacState', expect_broken(1600), compile, [''])
+test('FacState', normal, compile, [''])
 test('CaseBinderCPR', normal, compile, [''])
 test('T5075', normal, compile, [''])
 test('T10694', normal, compile, [''])
