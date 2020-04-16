@@ -626,7 +626,7 @@ getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
               _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ name _ lf_info _ _ _ _ = pprPanic "Unknown call method" (ppr name $$ ppr lf_info)
+getCallMethod _ name _ lf_info _ _ _ _ = pprPanic "Unknown call method" (ppr name)
 
 -----------------------------------------------------------------------------
 --              Data types for closure information
