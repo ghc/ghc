@@ -1545,8 +1545,35 @@ getTag x = dataToTag# x
 -- Definitions of the boxed PrimOps; these will be
 -- used in the case of partial applications, etc.
 
+{- Note [Inlining divInt, modInt]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   divInt and modInt are implemented by calling unboxed
+   variants, which themselves are implemented in terms of
+   the quotInt#/remInt# primOps.
+
+   My marking the boxed versions as INLINE[1] we achieve two things:
+
+   * The strength reduction rules which are operating on divInt#/remInt#
+     can already fire in phase 1.
+   * We can inline any constant argument in Phase zero optimizing the
+     general case somewhat.
+
+   This solves #18067 where we observed divInt ending up
+   as a uninlined call to divInt# at times.
+
+   TODO: It might be good to apply the same pattern to
+   quotRemInt and divModInt. But I have not looked at this
+   yet.
+
+-}
+
 {-# INLINE quotInt #-}
 {-# INLINE remInt #-}
+
+-- See Note [Inlining divInt, modInt]
+{-# INLINE[1] divInt #-}
+{-# INLINE[1] modInt #-}
 
 quotInt, remInt, divInt, modInt :: Int -> Int -> Int
 (I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
