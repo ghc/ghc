@@ -64,7 +64,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import Maybes
 import ErrUtils
 import GHC.Driver.Finder

@@ -112,7 +112,6 @@ import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Types.Name.Env

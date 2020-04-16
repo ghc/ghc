@@ -50,7 +50,6 @@ import TysWiredIn
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.Rules

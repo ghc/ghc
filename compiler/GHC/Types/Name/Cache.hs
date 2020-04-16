@@ -13,7 +13,6 @@ module GHC.Types.Name.Cache
 import GhcPrelude
 
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import TysWiredIn
