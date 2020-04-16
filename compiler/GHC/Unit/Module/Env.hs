@@ -27,7 +27,7 @@ import GhcPrelude
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import GHC.Unit.Module
+import GHC.Unit.Types
 import Util
 import Data.List (sortBy, sort)
 import Data.Ord
