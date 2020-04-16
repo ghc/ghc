@@ -1,5 +1,6 @@
 
-==================== Strictness signatures ====================
-FacState.fac: <S,1*U(U)><L,U>dm1(d,tm1(d))
+==================== Cpr signatures ====================
+FacState.$trModule: #1(#, #) 1(1(-), 1(-))
+FacState.fac: *1(*, #) 1(-, 1(-))
 
 
