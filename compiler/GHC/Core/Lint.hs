@@ -2031,7 +2031,7 @@ lintCoercion (InstCo co arg)
   = do { co'  <- lintCoercion co
        ; arg' <- lintCoercion arg
        ; let Pair t1' t2' = coercionKind co'
-             Pair s1  s2  = coercionKind arg
+             Pair s1  s2  = coercionKind arg'
 
        ; lintRole arg Nominal (coercionRole arg')
 
