@@ -545,8 +545,8 @@ not False               =  True
 -- put them
 
 -- These functions have built-in rules.
-{-# NOINLINE [0] divInt# #-}
-{-# NOINLINE [0] modInt# #-}
+{-# INLINE [0] divInt# #-}
+{-# INLINE [0] modInt# #-}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
         -- Be careful NOT to overflow if we do any additional arithmetic
