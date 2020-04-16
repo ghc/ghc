@@ -539,7 +539,7 @@ data CallMethod
 
 getCallMethod :: DynFlags
               -> Name           -- Function being applied
-              -> Id             -- Function Id used to chech if it can refer to
+              -> Id             -- Function Id used to check if it can refer to
                                 -- CAF's and whether the function is tail-calling
                                 -- itself
               -> LambdaFormInfo -- Its info
@@ -626,7 +626,7 @@ getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
               _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod _ name _ lf_info _ _ _ _ = pprPanic "Unknown call method" (ppr name $$ ppr lf_info)
 
 -----------------------------------------------------------------------------
 --              Data types for closure information
