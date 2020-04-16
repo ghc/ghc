@@ -1124,9 +1124,9 @@ lintTyApp fun_ty arg_ty
 -----------------
 lintValApp :: CoreExpr -> LintedType -> LintedType -> LintM LintedType
 lintValApp arg fun_ty arg_ty
-  | Just (arg_ty', _res_ty') <- splitFunTy_maybe fun_ty
+  | Just (arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty err1
-       ; return res }
+       ; return res_ty' }
   | otherwise
   = failWithL err2
   where
