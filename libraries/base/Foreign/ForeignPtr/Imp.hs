@@ -66,6 +66,7 @@ newForeignPtr finalizer p
        addForeignPtrFinalizer finalizer fObj
        return fObj
 
+{-# NOINLINE withForeignPtr #-}
 withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- ^This is a way to look at the pointer living inside a
 -- foreign object.  This function takes a function which is
