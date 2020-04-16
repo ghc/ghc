@@ -45,16 +45,8 @@ module GHC.Unit.Module
         HasModule(..),
         ContainsModule(..),
         instModuleToModule,
-
-        -- * Installed unit ids and modules
-        InstalledModuleEnv,
-        installedModuleEq,
         unitIdEq,
-        emptyInstalledModuleEnv,
-        lookupInstalledModuleEnv,
-        extendInstalledModuleEnv,
-        filterInstalledModuleEnv,
-        delInstalledModuleEnv,
+        installedModuleEq
     ) where
 
 import GhcPrelude
@@ -65,9 +57,6 @@ import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env
 import Util
-
-import Data.Map (Map)
-import qualified Data.Map as Map
 
 import {-# SOURCE #-} GHC.Unit.State (PackageState)
 
@@ -115,25 +104,6 @@ installedModuleEq imod mod =
 -- modulo instantiation.
 unitIdEq :: UnitId -> Unit -> Bool
 unitIdEq iuid uid = toUnitId uid == iuid
-
--- | A map keyed off of 'InstalledModule'
-newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
-
-emptyInstalledModuleEnv :: InstalledModuleEnv a
-emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
-
-lookupInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> Maybe a
-lookupInstalledModuleEnv (InstalledModuleEnv e) m = Map.lookup m e
-
-extendInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> a -> InstalledModuleEnv a
-extendInstalledModuleEnv (InstalledModuleEnv e) m x = InstalledModuleEnv (Map.insert m x e)
-
-filterInstalledModuleEnv :: (InstalledModule -> a -> Bool) -> InstalledModuleEnv a -> InstalledModuleEnv a
-filterInstalledModuleEnv f (InstalledModuleEnv e) =
-  InstalledModuleEnv (Map.filterWithKey f e)
-
-delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
-delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
 {-
 ************************************************************************
