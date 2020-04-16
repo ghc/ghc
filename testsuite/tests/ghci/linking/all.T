@@ -40,7 +40,8 @@ test('ghcilink006',
 test('T3333',
      [unless(doing_ghci, skip),
       unless(opsys('linux') or opsys('darwin') or ghc_dynamic(),
-             expect_broken(3333))],
+             expect_broken(3333)),
+      when(wordsize(32), fragile(16572))],
      makefile_test, ['T3333'])
 
 test('T11531',
