@@ -26,6 +26,9 @@ module GHC.Unit.Module
         -- * The ModLocation type
         module GHC.Unit.Module.Location,
 
+        -- * ModuleEnv
+        module GHC.Unit.Module.Env,
+
 
         -- * Generalization
         getModuleInstantiation,
@@ -60,6 +63,7 @@ import GHC.Types.Unique.DSet
 import GHC.Unit.Types
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
+import GHC.Unit.Module.Env
 import Util
 
 import Data.Map (Map)

@@ -24,7 +24,6 @@ import GHC.Driver.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import GHC.Types.SrcLoc as SrcLoc
 import Outputable
 import PrelNames ( mkUnboundName, isUnboundName, getUnique)

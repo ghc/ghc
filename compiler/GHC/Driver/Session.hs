@@ -247,7 +247,6 @@ import GHC.Unit.Types
 import GHC.Unit.Id
 import GHC.Unit.Parser
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )

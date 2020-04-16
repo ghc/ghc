@@ -109,7 +109,6 @@ import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Unit
-import GHC.Unit.Module.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import ErrUtils

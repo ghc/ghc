@@ -342,7 +342,6 @@ import SysTools
 import SysTools.BaseDir
 import GHC.Types.Annotations
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import Panic
 import GHC.Platform
 import Bag              ( listToBag )

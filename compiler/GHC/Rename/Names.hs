@@ -45,7 +45,6 @@ import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Tc.Utils.Monad
 import PrelNames
 import GHC.Unit.Module
-import GHC.Unit.Module.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
