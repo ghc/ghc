@@ -1885,18 +1885,22 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   , [ ValArg s0
     , ValArg (Lam f_arg f_body)
     , ValArg x
-    , TyArg {}
-    , TyArg {}
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
     , TyArg {as_arg_ty=arg_ty}
     , TyArg {as_arg_ty=arg_rep}
     ] <- rev_args
   = do { (env', f_arg) <- simplLamBndr (zapSubstEnv env) f_arg
        ; f_body' <- simplExprC env' f_body cont
        ; let f' = Lam f_arg f_body'
-             ty' = contResultType cont
-             call' = mkApps (Var fun)
-               [ mkTyArg (getRuntimeRep ty'), mkTyArg ty'
-               , mkTyArg arg_rep, mkTyArg arg_ty
+             -- Extract type of second component of (# State# RealWorld, a #)
+             ty' = case splitTyConApp_maybe (contResultType cont) of
+                     Just (tc, [_, _, _, ty]) -> ty
+                     Nothing -> panic "rebuildCall: Malformed (#,#) type"
+
+       ; let call' = mkApps (Var fun)
+               [ mkTyArg arg_rep, mkTyArg arg_ty
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
                , x
                , f'
                , s0
