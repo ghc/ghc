@@ -44,6 +44,10 @@ module GHC.Unit.Types
    , stableUnitCmp
    , unitIsDefinite
 
+     -- * Unit Ids
+   , unitIdString
+   , stringToUnitId
+
      -- * Utils
    , Definite (..)
    , Indefinite (..)
@@ -511,6 +515,12 @@ instance Outputable UnitId where
 -- it only refers to a definite library; i.e., one we have generated
 -- code for.
 type DefUnitId = Definite UnitId
+
+unitIdString :: UnitId -> String
+unitIdString = unpackFS . unitIdFS
+
+stringToUnitId :: String -> UnitId
+stringToUnitId = UnitId . mkFastString
 
 ---------------------------------------------------------------------
 -- UTILS
