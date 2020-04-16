@@ -86,7 +86,8 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import {-# SOURCE #-} GHC.Unit.State (improveUnit, PackageState, unitInfoMap, displayUnitId, getPackageState)
+import {-# SOURCE #-} GHC.Unit.State (improveUnit, PackageState, unitInfoMap, displayUnitId)
+import {-# SOURCE #-} GHC.Driver.Session (pkgState)
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -507,7 +508,7 @@ instance Outputable UnitId where
     ppr uid@(UnitId fs) =
         getPprStyle $ \sty ->
         sdocWithDynFlags $ \dflags ->
-          case displayUnitId (getPackageState dflags) uid of
+          case displayUnitId (pkgState dflags) uid of
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
 
