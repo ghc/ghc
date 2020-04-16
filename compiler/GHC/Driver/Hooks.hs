@@ -48,7 +48,7 @@ import GHC.Types.SrcLoc
 import GHC.Core.Type
 import System.Process
 import GHC.Types.Basic
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.TyCon
 import GHC.Types.CostCentre
 import GHC.Stg.Syntax

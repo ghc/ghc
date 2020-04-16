@@ -25,7 +25,7 @@ import GhcPrelude
 import Binary
 import GHC.Types.Var
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique
 import Outputable
 import GHC.Types.SrcLoc

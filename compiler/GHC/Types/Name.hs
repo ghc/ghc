@@ -84,7 +84,7 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( TyThing )
 
 import GHC.Types.Name.Occurrence
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import Util

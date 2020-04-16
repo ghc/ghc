@@ -22,7 +22,7 @@ import GhcPrelude
 import GHC.Types.SrcLoc
 import Outputable
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Iface.Syntax

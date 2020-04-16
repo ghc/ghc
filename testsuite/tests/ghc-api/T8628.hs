@@ -4,7 +4,7 @@ import System.IO
 import GHC.Driver.Session
 import GHC
 import Exception
-import GHC.Types.Module
+import GHC.Unit.Module
 import FastString
 import MonadUtils
 import Outputable

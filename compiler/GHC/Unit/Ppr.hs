@@ -1,5 +1,5 @@
 -- | Unit identifier pretty-printing
-module GHC.Types.Unit.Ppr
+module GHC.Unit.Ppr
    ( UnitPprInfo (..)
    )
 where
