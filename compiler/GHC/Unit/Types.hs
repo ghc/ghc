@@ -193,7 +193,7 @@ data GenUnit uid
     = RealUnit !(Definite uid)
       -- ^ Installed definite unit (either a fully instantiated unit or a closed unit)
 
-    | VirtUnit !(GenInstantiatedUnit uid)
+    | VirtUnit {-# UNPACK #-} !(GenInstantiatedUnit uid)
       -- ^ Virtual unit instantiated on-the-fly. It may be definite if all the
       -- holes are instantiated but we don't have code objects for it.
 
@@ -218,9 +218,9 @@ data GenInstantiatedUnit unit
         -- | A private, uniquely identifying representation of
         -- an InstantiatedUnit. This string is completely private to GHC
         -- and is just used to get a unique.
-        instUnitFS :: FastString,
+        instUnitFS :: !FastString,
         -- | Cached unique of 'unitFS'.
-        instUnitKey :: Unique,
+        instUnitKey :: !Unique,
         -- | The indefinite unit being instantiated.
         instUnitInstanceOf :: !(Indefinite unit),
         -- | The sorted (by 'ModuleName') instantiations of this unit.
@@ -544,7 +544,7 @@ instance Binary unit => Binary (Definite unit) where
 type IndefUnitId = Indefinite UnitId
 
 data Indefinite unit = Indefinite
-   { indefUnit        :: unit              -- ^ Unit identifier
+   { indefUnit        :: !unit             -- ^ Unit identifier
    , indefUnitPprInfo :: Maybe UnitPprInfo -- ^ Cache for some unit info retrieved from the DB
    }
    deriving (Functor)
@@ -626,9 +626,11 @@ isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = moduleUnit mod == interactiveUnitId
 
 wiredInUnitIds :: [Unit]
-wiredInUnitIds = [ primUnitId,
-                       integerUnitId,
-                       baseUnitId,
-                       rtsUnitId,
-                       thUnitId,
-                       thisGhcUnitId ]
+wiredInUnitIds =
+   [ primUnitId
+   , integerUnitId
+   , baseUnitId
+   , rtsUnitId
+   , thUnitId
+   , thisGhcUnitId
+   ]

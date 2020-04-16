@@ -18,35 +18,35 @@ the keys.
 {-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Unit.Module
-    ( module GHC.Unit.Types,
+    ( module GHC.Unit.Types
 
-        -- * The ModuleName type
-        module GHC.Unit.Module.Name,
+      -- * The ModuleName type
+    , module GHC.Unit.Module.Name
 
-        -- * The ModLocation type
-        module GHC.Unit.Module.Location,
+      -- * The ModLocation type
+    , module GHC.Unit.Module.Location
 
-        -- * ModuleEnv
-        module GHC.Unit.Module.Env,
+      -- * ModuleEnv
+    , module GHC.Unit.Module.Env
 
 
-        -- * Generalization
-        getModuleInstantiation,
-        getUnitInstantiations,
-        uninstantiateInstantiatedUnit,
-        uninstantiateInstantiatedModule,
+      -- * Generalization
+    , getModuleInstantiation
+    , getUnitInstantiations
+    , uninstantiateInstantiatedUnit
+    , uninstantiateInstantiatedModule
 
-        -- * The Module type
-        mkHoleModule,
-        isHoleModule,
-        stableModuleCmp,
-        moduleStableString,
-        moduleIsDefinite,
-        HasModule(..),
-        ContainsModule(..),
-        instModuleToModule,
-        unitIdEq,
-        installedModuleEq
+      -- * The Module type
+    , mkHoleModule
+    , isHoleModule
+    , stableModuleCmp
+    , moduleStableString
+    , moduleIsDefinite
+    , HasModule(..)
+    , ContainsModule(..)
+    , instModuleToModule
+    , unitIdEq
+    , installedModuleEq
     ) where
 
 import GhcPrelude
