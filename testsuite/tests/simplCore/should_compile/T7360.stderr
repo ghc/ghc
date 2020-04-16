@@ -85,13 +85,13 @@ T7360.$trModule1 :: GHC.Types.TrName
 T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule :: GHC.Unit.Module
+T7360.$trModule :: GHC.Types.Module
 [GblId,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T7360.$trModule
-  = GHC.Unit.Module T7360.$trModule3 T7360.$trModule1
+  = GHC.Types.Module T7360.$trModule3 T7360.$trModule1
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep :: GHC.Types.KindRep
