@@ -19,6 +19,14 @@ module GHC.Unit.Module.Env
    , extendModuleSet, extendModuleSetList, delModuleSet
    , elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet
    , unitModuleSet
+
+     -- * InstalledModuleEnv
+   , InstalledModuleEnv
+   , emptyInstalledModuleEnv
+   , lookupInstalledModuleEnv
+   , extendInstalledModuleEnv
+   , filterInstalledModuleEnv
+   , delInstalledModuleEnv
    )
 where
 
@@ -189,4 +197,28 @@ type ModuleNameEnv elt = UniqFM elt
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
 type DModuleNameEnv elt = UniqDFM elt
+
+
+--------------------------------------------------------------------
+-- InstalledModuleEnv
+--------------------------------------------------------------------
+
+-- | A map keyed off of 'InstalledModule'
+newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
+
+emptyInstalledModuleEnv :: InstalledModuleEnv a
+emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
+
+lookupInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> Maybe a
+lookupInstalledModuleEnv (InstalledModuleEnv e) m = Map.lookup m e
+
+extendInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> a -> InstalledModuleEnv a
+extendInstalledModuleEnv (InstalledModuleEnv e) m x = InstalledModuleEnv (Map.insert m x e)
+
+filterInstalledModuleEnv :: (InstalledModule -> a -> Bool) -> InstalledModuleEnv a -> InstalledModuleEnv a
+filterInstalledModuleEnv f (InstalledModuleEnv e) =
+  InstalledModuleEnv (Map.filterWithKey f e)
+
+delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
+delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
