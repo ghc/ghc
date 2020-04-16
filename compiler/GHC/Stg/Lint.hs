@@ -104,7 +104,9 @@ lintStgArg (StgLitArg _) = return ()
 lintStgArg (StgVarArg v) = lintStgVar v
 
 lintStgVar :: Id -> LintM ()
-lintStgVar id = checkInScope id
+lintStgVar id
+  | id `hasKey` keepAliveIdKey = addErrL (text "keepAlive# not permitted in STG")
+  | otherwise = checkInScope id
 
 lintStgBinds
     :: (OutputablePass a, BinderP a ~ Id)
