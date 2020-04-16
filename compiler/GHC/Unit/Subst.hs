@@ -14,7 +14,6 @@ import {-# SOURCE #-} GHC.Unit.State
 import GHC.Unit.Types
 import GHC.Unit.Module.Env
 import GHC.Unit.Module
-import GHC.Driver.Session
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
@@ -27,15 +26,15 @@ type ShHoleSubst = ModuleNameEnv Module
 -- directly on a 'nameModule', see Note [Representation of module/name variable].
 -- @p[A=<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @<A>@ maps to @q():A@.
-renameHoleModule :: DynFlags -> ShHoleSubst -> Module -> Module
-renameHoleModule dflags = renameHoleModule' (getUnitInfoMap dflags)
+renameHoleModule :: PackageState -> ShHoleSubst -> Module -> Module
+renameHoleModule state = renameHoleModule' (unitInfoMap state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
 -- @p[A=<A>]@ maps to @p[A=<B>]@ with @A=<B>@.
-renameHoleUnit :: DynFlags -> ShHoleSubst -> Unit -> Unit
-renameHoleUnit dflags = renameHoleUnit' (getUnitInfoMap dflags)
+renameHoleUnit :: PackageState -> ShHoleSubst -> Unit -> Unit
+renameHoleUnit state = renameHoleUnit' (unitInfoMap state)
 
 -- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
 -- so it can be used by "Packages".

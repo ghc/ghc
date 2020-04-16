@@ -45,8 +45,6 @@ module GHC.Unit.State (
         getPackageExtraCcOpts,
         getPackageFrameworkPath,
         getPackageFrameworks,
-        getUnitInfoMap,
-        getPackageState,
         getPreloadPackagesAnd,
 
         collectArchives,
@@ -2161,7 +2159,7 @@ fsPackageName info = fs
    where
       PackageName fs = unitPackageName info
 
--- | Given a fully instantiated 'InstnatiatedUnit', improve it into a
+-- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
 improveUnit :: UnitInfoMap -> Unit -> Unit
 improveUnit _ uid@(RealUnit _) = uid -- short circuit
@@ -2176,13 +2174,3 @@ improveUnit pkg_map uid =
             if unitId pkg `elementOfUniqSet` preloadClosure pkg_map
                 then mkUnit pkg
                 else uid
-
--- | Retrieve the 'UnitInfoMap' from 'DynFlags'; used
--- in the @hs-boot@ loop-breaker.
-getUnitInfoMap :: DynFlags -> UnitInfoMap
-getUnitInfoMap = unitInfoMap . pkgState
-
--- | Retrieve the 'PackageState' from 'DynFlags'; used
--- in the @hs-boot@ loop-breaker.
-getPackageState :: DynFlags -> PackageState
-getPackageState = pkgState
