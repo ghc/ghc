@@ -3,8 +3,8 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 
 -- | Package manipulation
-module GHC.Types.Unit.State (
-        module GHC.Types.Unit.Info,
+module GHC.Unit.State (
+        module GHC.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
@@ -70,15 +70,18 @@ where
 
 import GhcPrelude
 
-import GHC.Types.Unit.Database
-import GHC.Types.Unit.Info
+import GHC.Unit.Database
+import GHC.Unit.Info
+import GHC.Unit.Types
+import GHC.Unit.Module
+import GHC.Unit.Id
+import GHC.Unit.Subst
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.Name       ( Name, nameModule_maybe )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
-import GHC.Types.Module
 import Util
 import Panic
 import GHC.Platform
@@ -941,9 +944,9 @@ pprTrustFlag flag = case flag of
     DistrustPackage p -> text "-distrust " <> text p
 
 -- -----------------------------------------------------------------------------
--- Wired-in packages
+-- Wired-in units
 --
--- See Note [Wired-in packages] in GHC.Types.Module
+-- See Note [Wired-in units] in GHC.Unit.Module
 
 type WiredInUnitId = String
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
@@ -963,7 +966,7 @@ findWiredInPackages
 findWiredInPackages dflags prec_map pkgs vis_map = do
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
-  -- in Note [Wired-in packages] in GHC.Types.Module
+  -- in Note [Wired-in units] in GHC.Unit.Module
   let
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
@@ -1050,7 +1053,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
                   = let fs = unitIdFS (unDefinite wiredInUnitId)
                     in pkg {
-                      unitId = fsToUnitId fs,
+                      unitId = UnitId fs,
                       unitInstanceOf = mkIndefUnitId pkgstate fs
                     }
                   | otherwise
@@ -1068,7 +1071,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
 -- Helper functions for rewiring Module and Unit.  These
 -- rewrite Units of modules in wired-in packages to the form known to the
--- compiler, as described in Note [Wired-in packages] in GHC.Types.Module.
+-- compiler, as described in Note [Wired-in units] in GHC.Unit.Module.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in PrelNames.

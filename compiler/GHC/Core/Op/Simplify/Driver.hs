@@ -51,7 +51,7 @@ import GHC.Core.Op.Exitify      ( exitifyProgram )
 import GHC.Core.Op.WorkWrap     ( wwTopBinds )
 import GHC.Types.SrcLoc
 import Util
-import GHC.Types.Module.Env
+import GHC.Unit.Module.Env
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Runtime.Loader -- ( initializePlugins )
 

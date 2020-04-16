@@ -112,8 +112,8 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit.Module
+import GHC.Unit.Module.Env
 import GHC.Types.Basic
 import Outputable
 import Util

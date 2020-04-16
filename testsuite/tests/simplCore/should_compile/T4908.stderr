@@ -40,7 +40,7 @@ T4908.$trModule :: Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T4908.$trModule
-  = GHC.Types.Module T4908.$trModule3 T4908.$trModule1
+  = GHC.Unit.Module T4908.$trModule3 T4908.$trModule1
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}

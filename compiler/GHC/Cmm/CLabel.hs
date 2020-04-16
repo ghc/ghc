@@ -118,8 +118,8 @@ import GhcPrelude
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
-import GHC.Types.Unit.State
-import GHC.Types.Module
+import GHC.Unit.State
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Unique
 import PrimOp

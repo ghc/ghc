@@ -34,13 +34,13 @@ Roman.$trModule1 :: GHC.Types.TrName
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-Roman.$trModule :: GHC.Types.Module
+Roman.$trModule :: GHC.Unit.Module
 [GblId,
  Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Roman.$trModule
-  = GHC.Types.Module Roman.$trModule3 Roman.$trModule1
+  = GHC.Unit.Module Roman.$trModule3 Roman.$trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl :: GHC.Prim.Addr#

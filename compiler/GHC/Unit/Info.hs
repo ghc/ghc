@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
 
 -- | Info about installed units (compiled libraries)
-module GHC.Types.Unit.Info
+module GHC.Unit.Info
    ( GenericUnitInfo (..)
    , GenUnitInfo
    , UnitInfo
@@ -28,15 +28,15 @@ where
 
 import GhcPrelude
 
-import GHC.Types.Unit.Database
+import GHC.Unit.Database
 import Data.Version
 import Data.Bifunctor
 
 import FastString
 import Outputable
-import GHC.Types.Module as Module
+import GHC.Unit.Module
 import GHC.Types.Unique
-import GHC.Types.Unit.Ppr
+import GHC.Unit.Ppr
 
 -- | Information about an installed unit
 --
@@ -44,8 +44,8 @@ import GHC.Types.Unit.Ppr
 --    * UnitKey: identifier used in the database (cf 'UnitKeyInfo')
 --    * UnitId: identifier used to generate code (cf 'UnitInfo')
 --
--- These two identifiers are different for wired-in packages. See Note [The
--- identifier lexicon] in GHC.Types.Module
+-- These two identifiers are different for wired-in packages. See Note [About
+-- Units] in GHC.Unit
 type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
 -- | A unit key in the database

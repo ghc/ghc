@@ -1,12 +1,12 @@
 module Main where
 
 import GHC
-import GHC.Types.Unit.State
+import GHC.Unit.State
 import GHC.Driver.Monad
 import Outputable
 import System.Environment
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 
 main =
   do [libdir] <- getArgs

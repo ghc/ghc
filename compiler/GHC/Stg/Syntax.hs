@@ -74,9 +74,9 @@ import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.Module      ( Module )
+import GHC.Unit.Module      ( Module )
 import Outputable
-import GHC.Types.Unit.State ( isDynLinkName )
+import GHC.Unit.State ( isDynLinkName )
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
 import PrimOp            ( PrimOp, PrimCall )

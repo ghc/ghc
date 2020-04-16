@@ -62,8 +62,8 @@ import GHC.Core.FamInstEnv
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Types.Module
-import GHC.Types.Module.Env
+import GHC.Unit.Module
+import GHC.Unit.Module.Env
 import Maybes
 import ErrUtils
 import GHC.Driver.Finder

@@ -1,5 +1,5 @@
 -- | Module environment
-module GHC.Types.Module.Env
+module GHC.Unit.Module.Env
    ( -- * Module mappings
      ModuleEnv
    , elemModuleEnv, extendModuleEnv, extendModuleEnvList
@@ -27,7 +27,7 @@ import GhcPrelude
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import GHC.Types.Module
+import GHC.Unit.Module
 import Util
 import Data.List (sortBy, sort)
 import Data.Ord

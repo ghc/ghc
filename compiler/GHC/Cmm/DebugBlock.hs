@@ -34,7 +34,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Core
 import FastString      ( nilFS, mkFastString )
-import GHC.Types.Module
+import GHC.Unit.Module
 import Outputable
 import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc

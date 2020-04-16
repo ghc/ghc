@@ -54,6 +54,6 @@ $krep [InlPrag=NOUSERINLINE[~]]
 $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles2.$tcT1 ((:) $krep [])
 Roles2.$trModule
-  = GHC.Types.Module
+  = GHC.Unit.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles2"#)
 

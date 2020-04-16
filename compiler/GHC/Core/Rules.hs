@@ -31,8 +31,8 @@ module GHC.Core.Rules (
 import GhcPrelude
 
 import GHC.Core         -- All of it
-import GHC.Types.Module   ( Module )
-import GHC.Types.Module.Env
+import GHC.Unit.Module   ( Module )
+import GHC.Unit.Module.Env
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
