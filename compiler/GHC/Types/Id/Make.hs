@@ -510,13 +510,14 @@ mkDataConWorkId wkr_name data_con
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
                    `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
-                   `setInlinePragInfo`     dataConWorkerInlinePragma
+                   `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
                    `setLevityInfoWithType` wkr_ty
                      -- NB: unboxed tuples have workers, so we can't use
                      -- setNeverLevPoly
 
+    wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
     ----------- Workers for newtypes --------------
     univ_tvs = dataConUnivTyVars data_con
@@ -764,6 +765,12 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
            ; return (unbox_fn expr) }
 
+
+dataConWrapperInlinePragma :: InlinePragma
+-- See Note [DataCon wrappers are conlike]
+dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
+                                                , inl_inline = Inline }
+
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Activation on a data constructor wrapper allows it to inline only in Phase
@@ -784,6 +791,38 @@ instance, on the order of type argument of that constructors. Therefore changing
 the order of type argument could make previously working RULEs fail.
 
 See also https://gitlab.haskell.org/ghc/ghc/issues/15840 .
+
+Note [DataCon wrappers are conlike]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DataCon workers are clearly ConLike --- they are the “Con” in
+“ConLike”, after all --- but what about DataCon wrappers? Should they
+be marked ConLike, too?
+
+Yes, absolutely! As described in Note [CONLIKE pragma] in
+GHC.Types.Basic, isConLike influences GHC.Core.Utils.exprIsExpandable,
+which is used by both RULE matching and the case-of-known-constructor
+optimization. It’s crucial that both of those things can see
+applications of DataCon wrappers:
+
+  * User-defined RULEs match on wrappers, not workers, so we might
+    need to look through an unfolding built from a DataCon wrapper to
+    determine if a RULE matches.
+
+  * Likewise, if we have something like
+        let x = $WC a b in ... case x of { C y z -> e } ...
+    we still want to apply case-of-known-constructor.
+
+Therefore, it’s important that we consider DataCon wrappers conlike.
+This is especially true now that we don’t inline DataCon wrappers
+until the final simplifier phase; see Note [Activation for data
+constructor wrappers].
+
+For further reading, see:
+  * Note [Conlike is interesting] in GHC.Core.Op.Simplify.Utils
+  * Note [Lone variables] in GHC.Core.Unfold
+  * Note [exprIsConApp_maybe on data constructors with wrappers]
+    in GHC.Core.SimpleOpt
+  * #18012
 
 Note [Bangs on imported data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
