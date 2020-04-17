@@ -1,5 +1,6 @@
 module GHC.Unit.Types where
 
+import GhcPrelude
 import {-# SOURCE #-} Outputable
 import {-# SOURCE #-} GHC.Unit.Module.Name
 
