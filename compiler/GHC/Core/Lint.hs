@@ -702,6 +702,8 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
         binders0
     go _ = markAllJoinsBad $ lintCoreExpr rhs
 
+-- | Lint the RHS of a join point with expected join arity of @n@ (see Note
+-- [Join points] in GHC.Core).
 lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM LintedType
 lintJoinLams join_arity enforce rhs
   = go join_arity rhs
@@ -864,14 +866,9 @@ lintCoreExpr e@(App _ _)
   | Var fun <- fun
   , fun `hasKey` keepAliveIdKey
   , [arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5, arg6, arg7] <- args
-  = do { fun_ty1 <- lintCoreArg (idType fun)  arg_ty1  -- ra :: RuntimeRep
-       ; fun_ty2 <- lintCoreArg fun_ty1       arg_ty2  -- a  :: TYPE ra
-       ; fun_ty3 <- lintCoreArg fun_ty2       arg_ty3  -- ro :: RuntimeRep
-       ; fun_ty4 <- lintCoreArg fun_ty3       arg_ty4  -- o  :: TYPE ro
-       ; fun_ty5 <- lintCoreArg fun_ty4       arg5     -- x  :: a
-       ; arg_ty6 <- lintJoinLams 1 (Just fun) arg6     -- f  :: State# RW -> (# State# RW, o #)
-       ; fun_ty6 <- lintValApp arg6 fun_ty5 arg_ty6
-       ; lintCoreArg fun_ty6 arg7                      -- s0 :: State# RW
+  = do { fun_ty5 <- lintCoreArgs (idType fun) [ arg_ty1, arg_ty2, arg_ty3, arg_ty4 ]
+       ; arg6_ty <- lintJoinLams 1 (Just fun) arg6     -- f  :: State# RW -> (# State# RW, o #)
+       ; lintCoreArgs fun_ty5 [arg5, arg6, arg7]
        }
 
   | otherwise
@@ -1135,6 +1132,10 @@ lintTyApp fun_ty arg_ty
   = failWithL (mkTyAppMsg fun_ty arg_ty)
 
 -----------------
+
+-- | @lintValApp arg fun_ty arg_ty@ lints an application of @fun arg@
+-- where @fun :: fun_ty@ and @arg :: arg_ty@, returning the type of the
+-- application.
 lintValApp :: CoreExpr -> LintedType -> LintedType -> LintM LintedType
 lintValApp arg fun_ty arg_ty
   | Just (arg_ty', res_ty') <- splitFunTy_maybe fun_ty
