@@ -843,7 +843,7 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
                -> UsageDetails -> (UsageDetails, [CoreBind])
 occAnalRecBind env lvl imp_rule_edges pairs body_usage
-  = foldr (occAnalRec env lvl) (body_usage, []) sccs
+  = foldr (occAnalRec rhs_env lvl) (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
         --      * compute strongly-connected components
@@ -856,9 +856,11 @@ occAnalRecBind env lvl imp_rule_edges pairs body_usage
 
     nodes :: [LetrecNode]
     nodes = {-# SCC "occAnalBind.assoc" #-}
-            map (makeNode env imp_rule_edges bndr_set) pairs
+            map (makeNode rhs_env imp_rule_edges bndr_set) pairs
 
-    bndr_set = mkVarSet (map fst pairs)
+    bndrs    = map fst pairs
+    bndr_set = mkVarSet bndrs
+    rhs_env  = env `addInScope` bndrs
 
 {-
 Note [Unfoldings and join points]
