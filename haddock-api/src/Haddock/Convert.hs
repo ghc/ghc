@@ -38,10 +38,10 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
-import TysPrim ( alphaTyVars )
-import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
+import GHC.Builtin.Types.Prim ( alphaTyVars )
+import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
                   , unitTy, promotedNilDataCon, promotedConsDataCon )
-import PrelNames ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
+import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
 import Util ( chkAppend,dropList, filterByList, filterOut )

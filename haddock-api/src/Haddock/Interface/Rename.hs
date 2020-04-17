@@ -24,7 +24,7 @@ import GHC hiding (NoLink)
 import GHC.Types.Name
 import Outputable ( panic )
 import GHC.Types.Name.Reader (RdrName(Exact))
-import TysWiredIn (eqTyCon_RDR)
+import GHC.Builtin.Types (eqTyCon_RDR)
 
 import Control.Applicative
 import Control.Arrow ( first )
