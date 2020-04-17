@@ -19,13 +19,13 @@ import GhcPrelude
 
 import GHC.Cmm.Expr
 
-import Lexer
+import GHC.Parser.Lexer
 import GHC.Cmm.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import StringBuffer
 import FastString
-import Ctype
+import GHC.Parser.CharClass
 import Util
 --import TRACE
 

@@ -137,14 +137,14 @@ import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
 import GHC.Types.RepType
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Core.Class
-import {-# SOURCE #-} PrimOp (PrimOp)
+import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
 import Maybes
 import GHC.Types.SrcLoc
@@ -488,7 +488,7 @@ isDataConId_maybe id = case Var.idDetails id of
                          _                 -> Nothing
 
 isJoinId :: Var -> Bool
--- It is convenient in GHC.Core.Op.SetLevels.lvlMFE to apply isJoinId
+-- It is convenient in GHC.Core.Opt.SetLevels.lvlMFE to apply isJoinId
 -- to the free vars of an expression, so it's convenient
 -- if it returns False for type variables
 isJoinId id
@@ -519,7 +519,7 @@ hasNoBinding :: Id -> Bool
 -- they aren't any more.  Instead, we inject a binding for
 -- them at the CorePrep stage.
 --
--- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in PrimOp.hs.
+-- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in GHC.Builtin.PrimOps.
 -- for the history of this.
 --
 -- Note that CorePrep currently eta expands things no-binding things and this
@@ -528,7 +528,7 @@ hasNoBinding :: Id -> Bool
 --
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> False   -- See Note [Primop wrappers] in PrimOp.hs
+                        PrimOpId _       -> False   -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
@@ -894,7 +894,7 @@ Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 This transfer is used in three places:
         FloatOut (long-distance let-floating)
-        GHC.Core.Op.Simplify.Utils.abstractFloats (short-distance let-floating)
+        GHC.Core.Opt.Simplify.Utils.abstractFloats (short-distance let-floating)
         StgLiftLams (selectively lambda-lift local functions to top-level)
 
 Consider the short-distance let-floating:

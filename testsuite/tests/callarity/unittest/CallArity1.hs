@@ -4,13 +4,13 @@ import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.Make
-import GHC.Core.Op.CallArity (callArityRHS)
+import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make
-import SysTools
+import GHC.SysTools
 import GHC.Driver.Session
 import ErrUtils
 import Outputable
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Literal
 import GHC
 import Control.Monad

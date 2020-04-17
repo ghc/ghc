@@ -44,7 +44,7 @@ import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
-import PrelInfo
+import GHC.Builtin.Utils
 import Outputable
 import GHC.Platform
 import Util
