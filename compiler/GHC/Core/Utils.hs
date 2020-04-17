@@ -91,7 +91,7 @@ import GHC.Builtin.Types.Prim
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
-import GHC.Types.Basic     ( Arity, isConLike )
+import GHC.Types.Basic     ( Arity )
 import Util
 import Pair
 import Data.ByteString     ( ByteString )
@@ -1387,15 +1387,14 @@ isExpandableApp fn n_val_args
   | isWorkFreeApp fn n_val_args = True
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
-      RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
-      ClassOpId {}     -> n_val_args == 1
-      PrimOpId {}      -> False
-      _ | isBottomingId fn               -> False
+      RecSelId {}  -> n_val_args == 1  -- See Note [Record selection]
+      ClassOpId {} -> n_val_args == 1
+      PrimOpId {}  -> False
+      _ | isBottomingId fn   -> False
           -- See Note [isExpandableApp: bottoming functions]
-        | isConLike (idRuleMatchInfo fn) -> True
-        | all_args_are_preds             -> True
-        | otherwise                      -> False
+        | isConLikeId fn     -> True
+        | all_args_are_preds -> True
+        | otherwise          -> False
 
   where
      -- See if all the arguments are PredTys (implicit params or classes)
