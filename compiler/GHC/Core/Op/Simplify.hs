@@ -51,7 +51,6 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
-import GHC.Types.Unique ( hasKey )
 import PrelNames        ( keepAliveIdKey )
 import MonadUtils       ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
@@ -1906,14 +1905,11 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
     , TyArg {as_arg_ty=arg_ty}
     , TyArg {as_arg_ty=arg_rep}
     ] <- rev_args
+    -- Extract type of second component of (# State# RealWorld, a #)
+  , Just (_, [_, _, _, ty']) <- splitTyConApp_maybe (contResultType cont)
   = do { (env', f_arg) <- simplLamBndr (zapSubstEnv env) f_arg
        ; f_body' <- simplExprC env' f_body cont
        ; let f' = Lam f_arg f_body'
-             -- Extract type of second component of (# State# RealWorld, a #)
-             ty' = case splitTyConApp_maybe (contResultType cont) of
-                     Just (tc, [_, _, _, ty]) -> ty
-                     Nothing -> panic "rebuildCall: Malformed (#,#) type"
-
        ; let call' = mkApps (Var fun)
                [ mkTyArg arg_rep, mkTyArg arg_ty
                , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
