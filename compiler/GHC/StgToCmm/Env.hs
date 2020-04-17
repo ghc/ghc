@@ -60,7 +60,7 @@ mkCgIdInfo id lf expr
 
 litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
-  = CgIdInfo { cg_id = id, cg_lf = lf
+  = pprTrace "litIdInfo" (ppr id) $ CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc (addDynTag platform (CmmLit lit) tag) }
   where
     tag = lfDynTag dflags lf
@@ -77,7 +77,8 @@ lneIdInfo platform id regs
 
 rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
-  = do platform <- getPlatform
+  = pprTrace "rhsIdInfo" (ppr id) $
+    do platform <- getPlatform
        reg <- newTemp (gcWord platform)
        return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
@@ -177,25 +178,26 @@ getNonVoidArgAmodes (arg:args)
 --        Interface functions for binding and re-binding names
 ------------------------------------------------------------------------
 
-bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
+bindToReg :: HasCallStack => NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do platform <- getPlatform
        let reg = idToReg platform nvid
-       addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
+       pprTrace "bindToReg" (ppr id $$ ppr lf_info $$ callStackDoc)
+         $ addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
-rebindToReg :: NonVoid Id -> FCode LocalReg
+rebindToReg :: HasCallStack => NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
   = do  { info <- getCgIdInfo id
         ; bindToReg nvid (cg_lf info) }
 
-bindArgToReg :: NonVoid Id -> FCode LocalReg
+bindArgToReg :: HasCallStack => NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 
-bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
+bindArgsToRegs :: HasCallStack => [NonVoid Id] -> FCode [LocalReg]
 bindArgsToRegs args = mapM bindArgToReg args
 
 idToReg :: Platform -> NonVoid Id -> LocalReg

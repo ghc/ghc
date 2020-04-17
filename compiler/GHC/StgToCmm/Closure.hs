@@ -232,6 +232,13 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
+instance Outputable LambdaFormInfo where
+  ppr LFReEntrant{} = text "re-entrant"
+  ppr LFThunk{}     = text "thunk"
+  ppr LFCon{}       = text "data-con"
+  ppr LFUnknown{}   = text "unknown"
+  ppr LFUnlifted    = text "unlifted"
+  ppr LFLetNoEscape = text "let-no-escape"
 
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
@@ -626,7 +633,7 @@ getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
               _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ name _ _lf_info _ _ _ _ = pprPanic "Unknown call method" (ppr name)
+getCallMethod _ name _ _lf_info _ _ _loc _ = pprPanic "Unknown call method" (ppr name $$ ppr _lf_info $$ ppr _loc)
 
 -----------------------------------------------------------------------------
 --              Data types for closure information
