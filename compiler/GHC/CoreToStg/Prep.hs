@@ -869,6 +869,10 @@ cpeApp top_env expr
              ; y <- newVar result_ty
              ; s1 <- newVar realWorldStatePrimTy
              ; s2 <- newVar realWorldStatePrimTy
+               -- Beta reduce
+             ; (floats0, k') <- case k of
+                       Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body [] 0
+                       _          -> cpe_app env k [CpeApp s0] 1
              ; let touchId = mkPrimOpId TouchOp
 
                    -- @stateResultAlt s y expr@ is a case alternative of the form,
@@ -877,12 +881,13 @@ cpeApp top_env expr
                    stateResultAlt stateVar resultVar rhs =
                      (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
 
-                   expr = Case (App k s0) b0 out_ty [stateResultAlt s1 y rhs1]
+                   expr = Case k' b0 out_ty [stateResultAlt s1 y rhs1]
                    rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var s1]
                           in Case scrut s2 out_ty [(DEFAULT, [], rhs2)]
                    rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2)
                             [mkTyArg voidRepTy, mkTyArg result_rep, mkTyArg realWorldStatePrimTy, mkTyArg result_ty, Var s2, Var y]
-             ; cpeBody env expr
+             ; (floats1, body) <- pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
+             ; return (floats0 `appendFloats` floats1, body)
              }
     cpe_app _env (Var f) args _
         | f `hasKey` keepAliveIdKey
