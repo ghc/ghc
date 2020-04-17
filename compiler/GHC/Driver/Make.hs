@@ -43,7 +43,7 @@ import GHC.Driver.Session
 import ErrUtils
 import GHC.Driver.Finder
 import GHC.Driver.Monad
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.IfaceToCore  ( typecheckIface )
@@ -70,7 +70,7 @@ import GHC.Types.Unique.Set
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map

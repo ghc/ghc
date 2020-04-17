@@ -215,7 +215,7 @@ T :: 'TyCon_' ::= {{ com Type constructors, \coderef{types/TyCon.hs}{TyCon} }}
   | ' K          ::   :: PromotedDataCon   {{ com \ctor{PromotedDataCon}: Promoted data constructor }}
   | dataConTyCon K :: M :: dataConTyCon    {{ com TyCon extracted from DataCon }}
 
-H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{prelude/TysPrim.hs}{} }}
+H :: 'PrimTyCon_' ::= {{ com Primitive type constructors, \coderef{GHC.Builtin.Types.Prim}{} }}
   | Int#         ::   :: intPrimTyCon           {{ com Unboxed Int (\texttt{intPrimTyCon}) }}
   | ( ~# )       ::   :: eqPrimTyCon            {{ com Unboxed equality (\texttt{eqPrimTyCon}) }}
   | ( ~Rep# )      ::   :: eqReprPrimTyCon        {{ com Unboxed representational equality (\texttt{eqReprPrimTyCon}) }}

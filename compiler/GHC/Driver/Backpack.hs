@@ -23,11 +23,11 @@ import GhcPrelude
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 
-import ApiAnnotation
+import GHC.Parser.Annotation
 import GHC hiding (Failed, Succeeded)
 import GHC.Driver.Packages
-import Parser
-import Lexer
+import GHC.Parser
+import GHC.Parser.Lexer
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
@@ -43,11 +43,11 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import Outputable
 import Maybes
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Iface.Recomp
 import GHC.Driver.Make
 import GHC.Types.Unique.DSet
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Finder
 import Util

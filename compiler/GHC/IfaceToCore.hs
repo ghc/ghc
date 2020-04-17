@@ -26,7 +26,7 @@ module GHC.IfaceToCore (
 
 import GhcPrelude
 
-import TcTypeNats(typeNatCoAxiomRules)
+import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -54,15 +54,15 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import PrelNames
-import TysWiredIn
+import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply

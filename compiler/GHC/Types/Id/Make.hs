@@ -35,16 +35,16 @@ module GHC.Types.Id.Make (
         coerceName,
 
         -- Re-export error Ids
-        module GHC.Core.Op.ConstantFold
+        module GHC.Core.Opt.ConstantFold
     ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import TysPrim
-import TysWiredIn
-import GHC.Core.Op.ConstantFold
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
+import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
@@ -59,7 +59,7 @@ import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Name.Set
 import GHC.Types.Name
-import PrimOp
+import GHC.Builtin.PrimOps
 import GHC.Types.ForeignCall
 import GHC.Core.DataCon
 import GHC.Types.Id
@@ -69,7 +69,7 @@ import GHC.Types.Cpr
 import GHC.Core
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
 import Util
 import GHC.Driver.Session
@@ -1479,7 +1479,7 @@ enough support that you can do this using a rewrite rule:
 
 You write that rule.  When GHC sees a case expression that discards
 its result, it mentally transforms it to a call to 'seq' and looks for
-a RULE.  (This is done in GHC.Core.Op.Simplify.trySeqRules.)  As usual, the
+a RULE.  (This is done in GHC.Core.Opt.Simplify.trySeqRules.)  As usual, the
 correctness of the rule is up to you.
 
 VERY IMPORTANT: to make this work, we give the RULE an arity of 1, not 2.
@@ -1491,10 +1491,10 @@ with rule arity 2, then two bad things would happen:
     for saturated application of 'seq' would turn the LHS into
     a case expression!
 
-  - The code in GHC.Core.Op.Simplify.rebuildCase would need to actually supply
+  - The code in GHC.Core.Opt.Simplify.rebuildCase would need to actually supply
     the value argument, which turns out to be awkward.
 
-See also: Note [User-defined RULES for seq] in GHC.Core.Op.Simplify.
+See also: Note [User-defined RULES for seq] in GHC.Core.Opt.Simplify.
 
 
 Note [lazyId magic]
@@ -1590,7 +1590,7 @@ which is what we want.
 
 It is only effective if the one-shot info survives as long as possible; in
 particular it must make it into the interface in unfoldings. See Note [Preserve
-OneShotInfo] in GHC.Core.Op.Tidy.
+OneShotInfo] in GHC.Core.Tidy.
 
 Also see https://gitlab.haskell.org/ghc/ghc/wikis/one-shot.
 
@@ -1626,7 +1626,7 @@ cannot be instantiated with a forall.  The field of `WrapC` contains
 a `Proxy` parameter which is used to link the type of the constraint,
 `C a`, with the type of the `Wrap` value being made.
 
-Next, we add a built-in Prelude rule (see GHC.Core.Op.ConstantFold),
+Next, we add a built-in Prelude rule (see GHC.Core.Opt.ConstantFold),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 

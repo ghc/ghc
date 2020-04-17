@@ -41,10 +41,10 @@ import GhcPrelude
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Packages
 import GHC.Driver.Ways
-import HeaderInfo
+import GHC.Parser.Header
 import GHC.Driver.Phases
-import SysTools
-import SysTools.ExtraObj
+import GHC.SysTools
+import GHC.SysTools.ExtraObj
 import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
@@ -62,11 +62,11 @@ import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import GHC.Platform
 import GHC.Tc.Types
-import ToolSettings
 import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
-import FileCleanup
-import Ar
+import GHC.SysTools.FileCleanup
+import GHC.SysTools.Ar
+import GHC.Settings
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
 import GHC.Iface.Make   ( mkFullIface )
@@ -955,14 +955,14 @@ runPhase (RealPhase (Unlit sf)) input_fn dflags
 
        let flags = [ -- The -h option passes the file name for unlit to
                      -- put in a #line directive
-                     SysTools.Option     "-h"
+                     GHC.SysTools.Option     "-h"
                      -- See Note [Don't normalise input filenames].
-                   , SysTools.Option $ escape input_fn
-                   , SysTools.FileOption "" input_fn
-                   , SysTools.FileOption "" output_fn
+                   , GHC.SysTools.Option $ escape input_fn
+                   , GHC.SysTools.FileOption "" input_fn
+                   , GHC.SysTools.FileOption "" output_fn
                    ]
 
-       liftIO $ SysTools.runUnlit dflags flags
+       liftIO $ GHC.SysTools.runUnlit dflags flags
 
        return (RealPhase (Cpp sf), output_fn)
   where
@@ -1030,10 +1030,10 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
             PipeEnv{src_basename, src_suffix} <- getPipeEnv
             let orig_fn = src_basename <.> src_suffix
             output_fn <- phaseOutputFilename (Hsc sf)
-            liftIO $ SysTools.runPp dflags
-                           ( [ SysTools.Option     orig_fn
-                             , SysTools.Option     input_fn
-                             , SysTools.FileOption "" output_fn
+            liftIO $ GHC.SysTools.runPp dflags
+                           ( [ GHC.SysTools.Option     orig_fn
+                             , GHC.SysTools.Option     input_fn
+                             , GHC.SysTools.FileOption "" output_fn
                              ]
                            )
 
@@ -1311,12 +1311,12 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         ghcVersionH <- liftIO $ getGhcVersionPathName dflags
 
-        liftIO $ SysTools.runCc (phaseForeignLanguage cc_phase) dflags (
-                        [ SysTools.FileOption "" input_fn
-                        , SysTools.Option "-o"
-                        , SysTools.FileOption "" output_fn
+        liftIO $ GHC.SysTools.runCc (phaseForeignLanguage cc_phase) dflags (
+                        [ GHC.SysTools.FileOption "" input_fn
+                        , GHC.SysTools.Option "-o"
+                        , GHC.SysTools.FileOption "" output_fn
                         ]
-                       ++ map SysTools.Option (
+                       ++ map GHC.SysTools.Option (
                           pic_c_flags
 
                 -- Stub files generated for foreign exports references the runIO_closure
@@ -1370,8 +1370,8 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         -- assembler, so we use clang as the assembler instead. (#5636)
         let as_prog | hscTarget dflags == HscLlvm &&
                       platformOS (targetPlatform dflags) == OSDarwin
-                    = SysTools.runClang
-                    | otherwise = SysTools.runAs
+                    = GHC.SysTools.runClang
+                    | otherwise = GHC.SysTools.runAs
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -1384,9 +1384,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
         ccInfo <- liftIO $ getCompilerInfo dflags
-        let global_includes = [ SysTools.Option ("-I" ++ p)
+        let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
-        let local_includes = [ SysTools.Option ("-iquote" ++ p)
+        let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
                              | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
               = liftIO $ do
@@ -1395,9 +1395,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        dflags
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
-                       ++ map SysTools.Option pic_c_flags
+                       ++ map GHC.SysTools.Option pic_c_flags
                        -- See Note [Produce big objects on Windows]
-                       ++ [ SysTools.Option "-Wa,-mbig-obj"
+                       ++ [ GHC.SysTools.Option "-Wa,-mbig-obj"
                           | platformOS (targetPlatform dflags) == OSMinGW32
                           , not $ target32Bit (targetPlatform dflags)
                           ]
@@ -1410,19 +1410,19 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         --
         -- This is a temporary hack.
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
-                           then [SysTools.Option "-mcpu=v9"]
+                           then [GHC.SysTools.Option "-mcpu=v9"]
                            else [])
                        ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
-                            then [SysTools.Option "-Qunused-arguments"]
+                            then [GHC.SysTools.Option "-Qunused-arguments"]
                             else [])
-                       ++ [ SysTools.Option "-x"
+                       ++ [ GHC.SysTools.Option "-x"
                           , if with_cpp
-                              then SysTools.Option "assembler-with-cpp"
-                              else SysTools.Option "assembler"
-                          , SysTools.Option "-c"
-                          , SysTools.FileOption "" inputFilename
-                          , SysTools.Option "-o"
-                          , SysTools.FileOption "" temp_outputFilename
+                              then GHC.SysTools.Option "assembler-with-cpp"
+                              else GHC.SysTools.Option "assembler"
+                          , GHC.SysTools.Option "-c"
+                          , GHC.SysTools.FileOption "" inputFilename
+                          , GHC.SysTools.Option "-o"
+                          , GHC.SysTools.FileOption "" temp_outputFilename
                           ])
 
         liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
@@ -1437,12 +1437,12 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
   = do
     output_fn <- phaseOutputFilename LlvmLlc
 
-    liftIO $ SysTools.runLlvmOpt dflags
+    liftIO $ GHC.SysTools.runLlvmOpt dflags
                (   optFlag
                 ++ defaultOptions ++
-                [ SysTools.FileOption "" input_fn
-                , SysTools.Option "-o"
-                , SysTools.FileOption "" output_fn]
+                [ GHC.SysTools.FileOption "" input_fn
+                , GHC.SysTools.Option "-o"
+                , GHC.SysTools.FileOption "" output_fn]
                 )
 
     return (RealPhase LlvmLlc, output_fn)
@@ -1461,10 +1461,10 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
         -- passes only, so if the user is passing us extra options we assume
         -- they know what they are doing and don't get in the way.
         optFlag = if null (getOpts dflags opt_lo)
-                  then map SysTools.Option $ words llvmOpts
+                  then map GHC.SysTools.Option $ words llvmOpts
                   else []
 
-        defaultOptions = map SysTools.Option . concat . fmap words . fst
+        defaultOptions = map GHC.SysTools.Option . concat . fmap words . fst
                        $ unzip (llvmOptions dflags)
 
 -----------------------------------------------------------------------------
@@ -1479,12 +1479,12 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
     output_fn <- phaseOutputFilename next_phase
 
-    liftIO $ SysTools.runLlvmLlc dflags
+    liftIO $ GHC.SysTools.runLlvmLlc dflags
                 (  optFlag
                 ++ defaultOptions
-                ++ [ SysTools.FileOption "" input_fn
-                   , SysTools.Option "-o"
-                   , SysTools.FileOption "" output_fn
+                ++ [ GHC.SysTools.FileOption "" input_fn
+                   , GHC.SysTools.Option "-o"
+                   , GHC.SysTools.FileOption "" output_fn
                    ]
                 )
 
@@ -1535,10 +1535,10 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
       _ -> "-O2"
 
     optFlag = if null (getOpts dflags opt_lc)
-              then map SysTools.Option $ words llvmOpts
+              then map GHC.SysTools.Option $ words llvmOpts
               else []
 
-    defaultOptions = map SysTools.Option . concatMap words . snd
+    defaultOptions = map GHC.SysTools.Option . concatMap words . snd
                    $ unzip (llvmOptions dflags)
 
 
@@ -1781,15 +1781,15 @@ linkBinary' staticLink dflags o_files dep_packages = do
     rc_objs <- maybeCreateManifest dflags output_fn
 
     let link = if staticLink
-                   then SysTools.runLibtool
-                   else SysTools.runLink
+                   then GHC.SysTools.runLibtool
+                   else GHC.SysTools.runLink
     link dflags (
-                       map SysTools.Option verbFlags
-                      ++ [ SysTools.Option "-o"
-                         , SysTools.FileOption "" output_fn
+                       map GHC.SysTools.Option verbFlags
+                      ++ [ GHC.SysTools.Option "-o"
+                         , GHC.SysTools.FileOption "" output_fn
                          ]
                       ++ libmLinkOpts
-                      ++ map SysTools.Option (
+                      ++ map GHC.SysTools.Option (
                          []
 
                       -- See Note [No PIE when linking]
@@ -1841,7 +1841,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ o_files
                       ++ lib_path_opts)
                       ++ extra_ld_inputs
-                      ++ map SysTools.Option (
+                      ++ map GHC.SysTools.Option (
                          rc_objs
                       ++ framework_opts
                       ++ pkg_lib_path_opts
@@ -1911,7 +1911,7 @@ maybeCreateManifest dflags exe_filename
                -- show is a bit hackish above, but we need to escape the
                -- backslashes in the path.
 
-         runWindres dflags $ map SysTools.Option $
+         runWindres dflags $ map GHC.SysTools.Option $
                ["--input="++rc_filename,
                 "--output="++rc_obj_filename,
                 "--output-format=coff"]
@@ -1963,7 +1963,7 @@ linkStaticLib dflags o_files dep_packages = do
     else writeBSDAr output_fn $ afilter (not . isBSDSymdef) ar
 
   -- run ranlib over the archive. write*Ar does *not* create the symbol index.
-  runRanlib dflags [SysTools.FileOption "" output_fn]
+  runRanlib dflags [GHC.SysTools.FileOption "" output_fn]
 
 -- -----------------------------------------------------------------------------
 -- Running CPP
@@ -1982,8 +1982,8 @@ doCpp dflags raw input_fn output_fn = do
 
     let verbFlags = getVerbFlags dflags
 
-    let cpp_prog args | raw       = SysTools.runCpp dflags args
-                      | otherwise = SysTools.runCc Nothing dflags (SysTools.Option "-E" : args)
+    let cpp_prog args | raw       = GHC.SysTools.runCpp dflags args
+                      | otherwise = GHC.SysTools.runCc Nothing dflags (GHC.SysTools.Option "-E" : args)
 
     let targetArch = stringEncodeArch $ platformArch $ targetPlatform dflags
         targetOS = stringEncodeOS $ platformOS $ targetPlatform dflags
@@ -2027,26 +2027,26 @@ doCpp dflags raw input_fn output_fn = do
                     -- size of 1000 packages, it takes cpp an estimated 2
                     -- milliseconds to process this file. See #10970
                     -- comment 8.
-                    return [SysTools.FileOption "-include" macro_stub]
+                    return [GHC.SysTools.FileOption "-include" macro_stub]
             else return []
 
-    cpp_prog       (   map SysTools.Option verbFlags
-                    ++ map SysTools.Option include_paths
-                    ++ map SysTools.Option hsSourceCppOpts
-                    ++ map SysTools.Option target_defs
-                    ++ map SysTools.Option backend_defs
-                    ++ map SysTools.Option th_defs
-                    ++ map SysTools.Option hscpp_opts
-                    ++ map SysTools.Option sse_defs
-                    ++ map SysTools.Option avx_defs
+    cpp_prog       (   map GHC.SysTools.Option verbFlags
+                    ++ map GHC.SysTools.Option include_paths
+                    ++ map GHC.SysTools.Option hsSourceCppOpts
+                    ++ map GHC.SysTools.Option target_defs
+                    ++ map GHC.SysTools.Option backend_defs
+                    ++ map GHC.SysTools.Option th_defs
+                    ++ map GHC.SysTools.Option hscpp_opts
+                    ++ map GHC.SysTools.Option sse_defs
+                    ++ map GHC.SysTools.Option avx_defs
                     ++ mb_macro_include
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy
         -- about this.
-                    ++ [ SysTools.Option     "-x"
-                       , SysTools.Option     "assembler-with-cpp"
-                       , SysTools.Option     input_fn
+                    ++ [ GHC.SysTools.Option     "-x"
+                       , GHC.SysTools.Option     "assembler-with-cpp"
+                       , GHC.SysTools.Option     input_fn
         -- We hackily use Option instead of FileOption here, so that the file
         -- name is not back-slashed on Windows.  cpp is capable of
         -- dealing with / in filenames, so it works fine.  Furthermore
@@ -2055,8 +2055,8 @@ doCpp dflags raw input_fn output_fn = do
         -- our error messages get double backslashes in them.
         -- In due course we should arrange that the lexer deals
         -- with these \\ escapes properly.
-                       , SysTools.Option     "-o"
-                       , SysTools.FileOption "" output_fn
+                       , GHC.SysTools.Option     "-o"
+                       , GHC.SysTools.FileOption "" output_fn
                        ])
 
 getBackendDefs :: DynFlags -> IO [String]
@@ -2137,20 +2137,20 @@ joinObjectFiles dflags o_files output_fn = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args cc = SysTools.runLink dflags ([
-                       SysTools.Option "-nostdlib",
-                       SysTools.Option "-Wl,-r"
+      ld_r args cc = GHC.SysTools.runLink dflags ([
+                       GHC.SysTools.Option "-nostdlib",
+                       GHC.SysTools.Option "-Wl,-r"
                      ]
                         -- See Note [No PIE while linking] in GHC.Driver.Session
                      ++ (if toolSettings_ccSupportsNoPie toolSettings'
-                          then [SysTools.Option "-no-pie"]
+                          then [GHC.SysTools.Option "-no-pie"]
                           else [])
 
                      ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
                           then []
-                          else [SysTools.Option "-nodefaultlibs"])
+                          else [GHC.SysTools.Option "-nodefaultlibs"])
                      ++ (if osInfo == OSFreeBSD
-                          then [SysTools.Option "-L/usr/lib"]
+                          then [GHC.SysTools.Option "-L/usr/lib"]
                           else [])
                         -- gcc on sparc sets -Wl,--relax implicitly, but
                         -- -r and --relax are incompatible for ld, so
@@ -2158,16 +2158,16 @@ joinObjectFiles dflags o_files output_fn = do
                      ++ (if platformArch (targetPlatform dflags)
                                 `elem` [ArchSPARC, ArchSPARC64]
                          && ldIsGnuLd
-                            then [SysTools.Option "-Wl,-no-relax"]
+                            then [GHC.SysTools.Option "-Wl,-no-relax"]
                             else [])
                         -- See Note [Produce big objects on Windows]
-                     ++ [ SysTools.Option "-Wl,--oformat,pe-bigobj-x86-64"
+                     ++ [ GHC.SysTools.Option "-Wl,--oformat,pe-bigobj-x86-64"
                         | OSMinGW32 == osInfo
                         , not $ target32Bit (targetPlatform dflags)
                         ]
-                     ++ map SysTools.Option ld_build_id
-                     ++ [ SysTools.Option "-o",
-                          SysTools.FileOption "" output_fn ]
+                     ++ map GHC.SysTools.Option ld_build_id
+                     ++ [ GHC.SysTools.Option "-o",
+                          GHC.SysTools.FileOption "" output_fn ]
                      ++ args)
 
       -- suppress the generation of the .note.gnu.build-id section,
@@ -2183,15 +2183,15 @@ joinObjectFiles dflags o_files output_fn = do
           cwd <- getCurrentDirectory
           let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
-          ld_r [SysTools.FileOption "" script] ccInfo
+          ld_r [GHC.SysTools.FileOption "" script] ccInfo
      else if toolSettings_ldSupportsFilelist toolSettings'
      then do
           filelist <- newTempName dflags TFL_CurrentModule "filelist"
           writeFile filelist $ unlines o_files
-          ld_r [SysTools.Option "-Wl,-filelist",
-                SysTools.FileOption "-Wl," filelist] ccInfo
+          ld_r [GHC.SysTools.Option "-Wl,-filelist",
+                GHC.SysTools.FileOption "-Wl," filelist] ccInfo
      else do
-          ld_r (map (SysTools.FileOption "") o_files) ccInfo
+          ld_r (map (GHC.SysTools.FileOption "") o_files) ccInfo
 
 -- -----------------------------------------------------------------------------
 -- Misc.
@@ -2228,7 +2228,7 @@ hscPostBackendPhase _ hsc_lang =
 touchObjectFile :: DynFlags -> FilePath -> IO ()
 touchObjectFile dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
-  SysTools.touch dflags "Touching object file" path
+  GHC.SysTools.touch dflags "Touching object file" path
 
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath

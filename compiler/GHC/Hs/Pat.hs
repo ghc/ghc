@@ -60,7 +60,7 @@ import GHC.Types.Basic
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Var
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.ConLike
@@ -83,7 +83,7 @@ type LPat p = XRec p Pat
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data Pat p
   =     ------------ Simple patterns ---------------
     WildPat     (XWildPat p)        -- ^ Wildcard Pattern
@@ -99,13 +99,13 @@ data Pat p
                 (LPat p)                -- ^ Lazy Pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
                 (Located (IdP p)) (LPat p)    -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
                 (LPat p)                -- ^ Parenthesised pattern
@@ -113,12 +113,12 @@ data Pat p
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --                                    'ApiAnnotation.AnnClose' @')'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | BangPat     (XBangPat p)
                 (LPat p)                -- ^ Bang pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
@@ -132,7 +132,7 @@ data Pat p
     -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
     --                                    'ApiAnnotation.AnnClose' @']'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | TuplePat    (XTuplePat p)
                   -- after typechecking, holds the types of the tuple components
@@ -170,7 +170,7 @@ data Pat p
     --            'ApiAnnotation.AnnOpen' @'(#'@,
     --            'ApiAnnotation.AnnClose' @'#)'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
         ------------ Constructor patterns ---------------
   | ConPatIn    (Located (IdP p))
@@ -201,7 +201,7 @@ data Pat p
         ------------ View patterns ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ViewPat       (XViewPat p)     -- The overall type of the pattern
                                    -- (= the argument type of the view function)
                                    -- for hsPatType.
@@ -213,7 +213,7 @@ data Pat p
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
   --        'ApiAnnotation.AnnClose' @')'@
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SplicePat       (XSplicePat p)
                     (HsSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
 
@@ -239,7 +239,7 @@ data Pat p
   --
   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
                     (Located (IdP p))        -- n+k pattern
                     (Located (HsOverLit p))  -- It'll always be an HsIntegral
@@ -254,7 +254,7 @@ data Pat p
         ------------ Pattern type signatures ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
                     (LHsSigWcType (NoGhcTc p)) --  Signature can bind both
@@ -389,7 +389,7 @@ type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
 --
--- For details on above see note [Api annotations] in ApiAnnotation
+-- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data HsRecField' id arg = HsRecField {
         hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning

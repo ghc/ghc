@@ -32,7 +32,7 @@ import GHC.Driver.Types
 import GHC.Driver.Session
 import Stream           ( Stream )
 import qualified Stream
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 import ErrUtils
 import Outputable

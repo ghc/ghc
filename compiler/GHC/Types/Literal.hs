@@ -52,15 +52,15 @@ module GHC.Types.Literal
 
 import GhcPrelude
 
-import TysPrim
-import PrelNames
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
 import Outputable
 import FastString
 import GHC.Types.Basic
 import Binary
-import Constants
+import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
 import Util
@@ -675,7 +675,7 @@ literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
--- Rubbish literals are handled in GHC.Core.Op.WorkWrap.Lib, because
+-- Rubbish literals are handled in GHC.Core.Opt.WorkWrap.Utils, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
 absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
@@ -830,7 +830,7 @@ Here are the moving parts:
 
 * It is given its polymorphic type by Literal.literalType
 
-* GHC.Core.Op.WorkWrap.Lib.mk_absent_let introduces a LitRubbish for absent
+* GHC.Core.Opt.WorkWrap.Utils.mk_absent_let introduces a LitRubbish for absent
   arguments of boxed, unlifted type.
 
 * In CoreToSTG we convert (RubishLit @t) to just ().  STG is
