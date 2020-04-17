@@ -573,7 +573,7 @@ methodNamesLStmt = methodNamesStmt . unLoc
 methodNamesStmt :: StmtLR GhcRn GhcRn (LHsCmd GhcRn) -> FreeVars
 methodNamesStmt (LastStmt _ cmd _ _)           = methodNamesLCmd cmd
 methodNamesStmt (BodyStmt _ cmd _ _)           = methodNamesLCmd cmd
-methodNamesStmt (BindStmt _ _ cmd _ _)         = methodNamesLCmd cmd
+methodNamesStmt (BindStmt _ _ cmd)             = methodNamesLCmd cmd
 methodNamesStmt (RecStmt { recS_stmts = stmts }) =
   methodNamesStmts stmts `addOneFV` loopAName
 methodNamesStmt (LetStmt {})                   = emptyFVs
@@ -760,8 +760,11 @@ Many things desugar to HsStmts including monadic things like `do` and `mdo`
 statements, pattern guards, and list comprehensions (see 'HsStmtContext' for an
 exhaustive list). How we deal with pattern match failure is context-dependent.
 
- * In the case of list comprehensions and pattern guards we don't need any 'fail'
-   function; the desugarer ignores the fail function field of 'BindStmt' entirely.
+ * In the case of list comprehensions and pattern guards we don't need any
+   'fail' function; the desugarer ignores the fail function of 'BindStmt'
+   entirely. So, for list comprehensions, the fail function is set to 'Nothing'
+   for clarity.
+
  * In the case of monadic contexts (e.g. monad comprehensions, do, and mdo
    expressions) we want pattern match failure to be desugared to the appropriate
    'fail' function (either that of Monad or MonadFail, depending on whether
@@ -812,7 +815,7 @@ rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
         ; return ( ([(L loc (BodyStmt noExtField body' then_op guard_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
 
-rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
+rnStmt ctxt rnBody (L loc (BindStmt _ pat body)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
@@ -821,8 +824,8 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
-        ; return (( [( L loc (BindStmt noExtField pat' body' bind_op fail_op)
-                     , fv_expr )]
+        ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
+        ; return (( [( L loc (BindStmt xbsrn pat' body'), fv_expr )]
                   , thing),
                   fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
@@ -1077,11 +1080,11 @@ rn_rec_stmt_lhs _ (L loc (BodyStmt _ body a b))
 rn_rec_stmt_lhs _ (L loc (LastStmt _ body noret a))
   = return [(L loc (LastStmt noExtField body noret a), emptyFVs)]
 
-rn_rec_stmt_lhs fix_env (L loc (BindStmt _ pat body a b))
+rn_rec_stmt_lhs fix_env (L loc (BindStmt _ pat body))
   = do
       -- should the ctxt be MDo instead?
       (pat', fv_pat) <- rnBindPat (localRecNameMaker fix_env) pat
-      return [(L loc (BindStmt noExtField pat' body a b), fv_pat)]
+      return [(L loc (BindStmt noExtField pat' body), fv_pat)]
 
 rn_rec_stmt_lhs _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))))
   = failWith (badIpBinds (text "an mdo expression") binds)
@@ -1144,7 +1147,7 @@ rn_rec_stmt rnBody _ (L loc (BodyStmt _ body _ _), _)
        ; return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
                  L loc (BodyStmt noExtField body' then_op noSyntaxExpr))] }
 
-rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
+rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntax bindMName
 
@@ -1152,8 +1155,9 @@ rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
 
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
+       ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-                  L loc (BindStmt noExtField pat' body' bind_op fail_op))] }
+                  L loc (BindStmt xbsrn pat' body'))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt _ (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (text "an mdo expression") binds)
@@ -1645,27 +1649,27 @@ stmtTreeToStmts
 -- In the spec, but we do it here rather than in the desugarer,
 -- because we need the typechecker to typecheck the <$> form rather than
 -- the bind form, which would give rise to a Monad constraint.
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ fail_op), _))
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt xbs pat rhs), _))
                 tail _tail_fvs
   | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail
   -- See Note [ApplicativeDo and strict patterns]
   = mkApplicativeStmt ctxt [ApplicativeArgOne
-                            { xarg_app_arg_one = noExtField
+                            { xarg_app_arg_one = xbsrn_failOp xbs
                             , app_arg_pattern  = pat
                             , arg_expr         = rhs
                             , is_body_stmt     = False
-                            , fail_operator    = fail_op}]
+                            }]
                       False tail'
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
                 tail _tail_fvs
   | (False,tail') <- needJoin monad_names tail
   = mkApplicativeStmt ctxt
       [ApplicativeArgOne
-       { xarg_app_arg_one = noExtField
+       { xarg_app_arg_one = Nothing
        , app_arg_pattern  = nlWildPatName
        , arg_expr         = rhs
        , is_body_stmt     = True
-       , fail_operator    = noSyntaxExpr}] False tail'
+       }] False tail'
 
 stmtTreeToStmts _monad_names _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
   return (s : tail, emptyNameSet)
@@ -1688,21 +1692,19 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
    return (stmts, unionNameSets (fvs:fvss))
  where
-   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt _ pat exp _ fail_op), _))
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt xbs pat exp), _))
      = return (ApplicativeArgOne
-               { xarg_app_arg_one = noExtField
+               { xarg_app_arg_one = xbsrn_failOp xbs
                , app_arg_pattern  = pat
                , arg_expr         = exp
                , is_body_stmt     = False
-               , fail_operator    = fail_op
                }, emptyFVs)
    stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BodyStmt _ exp _ _), _)) =
      return (ApplicativeArgOne
-             { xarg_app_arg_one = noExtField
+             { xarg_app_arg_one = Nothing
              , app_arg_pattern  = nlWildPatName
              , arg_expr         = exp
              , is_body_stmt     = True
-             , fail_operator    = noSyntaxExpr
              }, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
@@ -1779,7 +1781,7 @@ segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
             pvars = mkNameSet (collectStmtBinders (unLoc stmt))
 
     isStrictPatternBind :: ExprLStmt GhcRn -> Bool
-    isStrictPatternBind (L _ (BindStmt _ pat _ _ _)) = isStrictPattern pat
+    isStrictPatternBind (L _ (BindStmt _ pat _)) = isStrictPattern pat
     isStrictPatternBind _ = False
 
 {-
@@ -1880,9 +1882,9 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- strict patterns though; splitSegments expects that if we return Just
   -- then we have actually done some splitting. Otherwise it will go into
   -- an infinite loop (#14163).
-  go lets indep bndrs ((L loc (BindStmt _ pat body bind_op fail_op), fvs): rest)
+  go lets indep bndrs ((L loc (BindStmt xbs pat body), fvs): rest)
     | isEmptyNameSet (bndrs `intersectNameSet` fvs) && not (isStrictPattern pat)
-    = go lets ((L loc (BindStmt noExtField pat body bind_op fail_op), fvs) : indep)
+    = go lets ((L loc (BindStmt xbs pat body), fvs) : indep)
          bndrs' rest
     where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders pat)
   -- If we encounter a LetStmt that doesn't depend on a BindStmt in this
@@ -2127,16 +2129,16 @@ badIpBinds what binds
 
 monadFailOp :: LPat GhcPs
             -> HsStmtContext GhcRn
-            -> RnM (SyntaxExpr GhcRn, FreeVars)
+            -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt
   -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
   -- we should not need to fail.
-  | isIrrefutableHsPat pat = return (noSyntaxExpr, emptyFVs)
+  | isIrrefutableHsPat pat = return (Nothing, emptyFVs)
 
   -- For non-monadic contexts (e.g. guard patterns, list
-  -- comprehensions, etc.) we should not need to fail.  See Note
-  -- [Failing pattern matches in Stmts]
-  | not (isMonadFailStmtContext ctxt) = return (noSyntaxExpr, emptyFVs)
+  -- comprehensions, etc.) we should not need to fail, or failure is handled in
+  -- a different way. See Note [Failing pattern matches in Stmts].
+  | not (isMonadFailStmtContext ctxt) = return (Nothing, emptyFVs)
 
   | otherwise = getMonadFailOp
 
@@ -2164,11 +2166,12 @@ So, in this case, we synthesize the function
 (rather than plain 'fail') for the 'fail' operation. This is done in
 'getMonadFailOp'.
 -}
-getMonadFailOp :: RnM (SyntaxExpr GhcRn, FreeVars) -- Syntax expr fail op
+getMonadFailOp :: RnM (FailOperator GhcRn, FreeVars) -- Syntax expr fail op
 getMonadFailOp
  = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
+      ; (fail, fvs) <- reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
+      ; return (Just fail, fvs)
       }
   where
     reallyGetMonadFailOp rebindableSyntax overloadedStrings

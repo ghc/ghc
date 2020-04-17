@@ -241,7 +241,7 @@ deListComp (stmt@(TransStmt {}) : quals) list = do
     (inner_list_expr, pat) <- dsTransStmt stmt
     deBindComp pat inner_list_expr quals list
 
-deListComp (BindStmt _ pat list1 _ _ : quals) core_list2 = do -- rule A' above
+deListComp (BindStmt _ pat list1 : quals) core_list2 = do -- rule A' above
     core_list1 <- dsLExprNoLP list1
     deBindComp pat core_list1 quals core_list2
 
@@ -349,7 +349,7 @@ dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
     -- Anyway, we bind the newly grouped list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals
 
-dfListComp c_id n_id (BindStmt _ pat list1 _ _ : quals) = do
+dfListComp c_id n_id (BindStmt _ pat list1 : quals) = do
     -- evaluate the two lists
     core_list1 <- dsLExpr list1
 
@@ -495,9 +495,9 @@ dsMcStmt (LetStmt _ binds) stmts
        ; dsLocalBinds binds rest }
 
 --   [ .. | a <- m, stmts ]
-dsMcStmt (BindStmt bind_ty pat rhs bind_op fail_op) stmts
+dsMcStmt (BindStmt xbs pat rhs) stmts
   = do { rhs' <- dsLExpr rhs
-       ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
+       ; dsMcBindStmt pat rhs' (xbstc_bindOp xbs) (xbstc_failOp xbs) (xbstc_boundResultType xbs) stmts }
 
 -- Apply `guard` to the `exp` expression
 --
@@ -585,7 +585,7 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
                                   mkBoxedTupleTy [t1,t2]))
                                exps_w_tys
 
-       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr bind_ty stmts_rest }
+       ; dsMcBindStmt pat rhs bind_op Nothing bind_ty stmts_rest }
   where
     ds_inner :: ParStmtBlock GhcTc GhcTc -> DsM (CoreExpr, Type)
     ds_inner (ParStmtBlock _ stmts bndrs return_op)
@@ -609,7 +609,7 @@ matchTuple ids body
 dsMcBindStmt :: LPat GhcTc
              -> CoreExpr        -- ^ the desugared rhs of the bind statement
              -> SyntaxExpr GhcTc
-             -> SyntaxExpr GhcTc
+             -> Maybe (SyntaxExpr GhcTc)
              -> Type            -- ^ S in (>>=) :: Q -> (R -> S) -> T
              -> [ExprLStmt GhcTc]
              -> DsM CoreExpr

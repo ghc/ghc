@@ -334,6 +334,9 @@ deriving instance Data PendingTcSplice
 deriving instance Data SyntaxExprRn
 deriving instance Data SyntaxExprTc
 
+deriving instance Data XBindStmtRn
+deriving instance Data XBindStmtTc
+
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Lit ------------------------------------
 
