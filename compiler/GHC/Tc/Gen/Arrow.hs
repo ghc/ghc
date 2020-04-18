@@ -81,9 +81,9 @@ Note that
 ************************************************************************
 -}
 
-tcProc :: InPat GhcRn -> LHsCmdTop GhcRn        -- proc pat -> expr
+tcProc :: LPat GhcRn -> LHsCmdTop GhcRn         -- proc pat -> expr
        -> ExpRhoType                            -- Expected type of whole proc expression
-       -> TcM (OutPat GhcTcId, LHsCmdTop GhcTcId, TcCoercion)
+       -> TcM (LPat GhcTc, LHsCmdTop GhcTcId, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
@@ -364,7 +364,7 @@ tcArrDoStmt env _ (BodyStmt _ rhs _ _) res_ty thing_inside
         ; thing          <- thing_inside res_ty
         ; return (BodyStmt elt_ty rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcArrDoStmt env ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
+tcArrDoStmt env ctxt (BindStmt _ pat rhs) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                             thing_inside res_ty

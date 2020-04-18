@@ -709,12 +709,16 @@ addTickStmt _isGuard (LastStmt x e noret ret) = do
                 (addTickLHsExpr e)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickStmt _isGuard (BindStmt x pat e bind fail) = do
-        liftM4 (BindStmt x)
+addTickStmt _isGuard (BindStmt xbs pat e) = do
+        liftM4 (\b f -> BindStmt $ XBindStmtTc
+                    { xbstc_bindOp = b
+                    , xbstc_boundResultType = xbstc_boundResultType xbs
+                    , xbstc_failOp = f
+                    })
+                (addTickSyntaxExpr hpcSrcSpan (xbstc_bindOp xbs))
+                (mapM (addTickSyntaxExpr hpcSrcSpan) (xbstc_failOp xbs))
                 (addTickLPat pat)
                 (addTickLHsExprRHS e)
-                (addTickSyntaxExpr hpcSrcSpan bind)
-                (addTickSyntaxExpr hpcSrcSpan fail)
 addTickStmt isGuard (BodyStmt x e bind' guard') = do
         liftM3 (BodyStmt x)
                 (addTick isGuard e)
@@ -763,12 +767,12 @@ addTickApplicativeArg
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne x pat expr isBody fail) =
-    (ApplicativeArgOne x)
-      <$> addTickLPat pat
+  addTickArg (ApplicativeArgOne m_fail pat expr isBody) =
+    ApplicativeArgOne
+      <$> mapM (addTickSyntaxExpr hpcSrcSpan) m_fail
+      <*> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
-      <*> addTickSyntaxExpr hpcSrcSpan fail
   addTickArg (ApplicativeArgMany x stmts ret pat) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
@@ -938,12 +942,10 @@ addTickLCmdStmts' lstmts res
         binders = collectLStmtsBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
-addTickCmdStmt (BindStmt x pat c bind fail) = do
-        liftM4 (BindStmt x)
+addTickCmdStmt (BindStmt x pat c) = do
+        liftM2 (BindStmt x)
                 (addTickLPat pat)
                 (addTickLHsCmd c)
-                (return bind)
-                (return fail)
 addTickCmdStmt (LastStmt x c noret ret) = do
         liftM3 (LastStmt x)
                 (addTickLHsCmd c)

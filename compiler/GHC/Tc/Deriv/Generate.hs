@@ -532,9 +532,13 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
-nlConWildPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                                   (RecCon (HsRecFields { rec_flds = []
-                                                        , rec_dotdot = Nothing })))
+nlConWildPat con = noLoc $ ConPat
+  { pat_con_ext = noExtField
+  , pat_con = noLoc $ getRdrName con
+  , pat_args = RecCon $ HsRecFields
+      { rec_flds = []
+      , rec_dotdot = Nothing }
+  }
 
 {-
 ************************************************************************
@@ -832,7 +836,7 @@ gen_Ix_binds loc tycon = do
       where
         stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 
-        mk_qual a b c = noLoc $ mkBindStmt (nlVarPat c)
+        mk_qual a b c = noLoc $ mkPsBindStmt (nlVarPat c)
                                  (nlHsApp (nlHsVar range_RDR)
                                           (mkLHsVarTuple [a,b]))
 
@@ -1072,7 +1076,7 @@ gen_Read_binds get_fixity loc tycon
     data_con_str con = occNameString (getOccName con)
 
     read_arg a ty = ASSERT( not (isUnliftedType ty) )
-                    noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
+                    noLoc (mkPsBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
     -- When reading field labels we might encounter
     --      a  = 3
@@ -1081,7 +1085,7 @@ gen_Read_binds get_fixity loc tycon
     -- Note the parens!
     read_field lbl a =
         [noLoc
-          (mkBindStmt
+          (mkPsBindStmt
             (nlVarPat a)
             (nlHsApp
               read_field
