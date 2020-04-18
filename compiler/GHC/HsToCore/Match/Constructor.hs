@@ -141,7 +141,8 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                   do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
                      ; match_result <- match (group_arg_vars ++ vars) ty eqns'
-                     ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
+                     ; return $ foldr1 (.) wraps <$> match_result
+                     }
 
               shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
                                                              pat_binds = bind, pat_args = args

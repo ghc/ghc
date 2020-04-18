@@ -198,8 +198,9 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
         ; match_results <- match_groups grouped
-        ; return (adjustMatchResult (foldr (.) id aux_binds) $
-                  foldr1 combineMatchResults match_results) }
+        ; return $ foldr (.) id aux_binds <$>
+            foldr1 combineMatchResults match_results
+        }
   where
     vars = v :| vs
 
@@ -844,7 +845,8 @@ matchSinglePat (Var var) ctx pat ty match_result
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var           <- selectSimpleMatchVarL pat
        ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
-       ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
+       ; return $ bindNonRec var scrut <$> match_result'
+       }
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> HsMatchContext GhcRn -> LPat GhcTc

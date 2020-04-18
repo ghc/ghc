@@ -515,7 +515,7 @@ matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
         ; match_result <- match vars ty eqns'
         ; return  (mkGuardedMatchResult pred_expr               $
                    mkCoLetMatchResult (NonRec n1 minusk_expr)   $
-                   adjustMatchResult (foldr1 (.) wraps)         $
+                   fmap (foldr1 (.) wraps)                      $
                    match_result) }
   where
     shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
