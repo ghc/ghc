@@ -856,6 +856,10 @@ cpeApp top_env expr
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
 
+    cpe_app env (Var f) args n
+        | f `hasKey` runRWKey
+        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
+
     -- See Note [CorePrep handling of keepAlive#]
     cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
                          CpeApp (Type _result_rep), CpeApp (Type result_ty),
