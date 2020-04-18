@@ -1625,7 +1625,8 @@ primtype MutableByteArray# s
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a new mutable byte array of specified size (in bytes), in
-    the specified state thread.}
+    the specified state thread. The size of the memory underlying the
+    array will be rounded up to the platform's word size.}
    with out_of_line = True
         has_side_effects = True
 
