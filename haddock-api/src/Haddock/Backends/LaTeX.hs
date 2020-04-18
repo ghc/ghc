@@ -390,10 +390,11 @@ ppFamHeader (FamilyDecl { fdLName = L _ name
 
     injAnn = case injectivity of
       Nothing -> empty
-      Just (L _ (InjectivityAnn lhs rhs)) -> hsep ( decltt (text "|")
-                                                  : ppLDocName lhs
-                                                  : arrow unicode
-                                                  : map ppLDocName rhs)
+      Just (L _ (InjectivityAnn _ lhs rhs)) -> hsep ( decltt (text "|")
+                                                    : ppLDocName lhs
+                                                    : arrow unicode
+                                                    : map ppLDocName rhs)
+      Just _ -> empty
 
 
 
@@ -597,8 +598,8 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 -------------------------------------------------------------------------------
 
 
-ppClassHdr :: Bool -> Maybe (Located [LHsType DocNameI]) -> DocName
-           -> LHsQTyVars DocNameI -> [Located ([Located DocName], [Located DocName])]
+ppClassHdr :: Bool -> Maybe (LocatedC [LHsType DocNameI]) -> DocName
+           -> LHsQTyVars DocNameI -> [LHsFunDep DocNameI]
            -> Bool -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
   keyword "class"
@@ -606,14 +607,16 @@ ppClassHdr summ lctxt n tvs fds unicode =
   <+> ppAppDocNameNames summ n (tyvarNames tvs)
   <+> ppFds fds unicode
 
-
-ppFds :: [Located ([Located DocName], [Located DocName])] -> Bool -> LaTeX
+-- ppFds :: [Located ([LocatedA DocName], [LocatedA DocName])] -> Bool -> LaTeX
+ppFds :: [LHsFunDep DocNameI] -> Bool -> LaTeX
 ppFds fds unicode =
   if null fds then empty else
     char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
-    fundep (vars1,vars2) = hsep (map (ppDocName . unLoc) vars1) <+> arrow unicode <+>
+    fundep (FunDep _ vars1 vars2)
+                         = hsep (map (ppDocName . unLoc) vars1) <+> arrow unicode <+>
                            hsep (map (ppDocName . unLoc) vars2)
+    fundep (XFunDep _) = error "ppFds"
 
 
 -- TODO: associated type defaults, docs on default methods
@@ -804,7 +807,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     decl = case con of
       ConDeclH98{ con_args = det
                 , con_ex_tvs = tyVars
-                , con_forall = L _ forall_
+                , con_forall = forall_
                 , con_mb_cxt = cxt
                 } -> let context = fromMaybeContext cxt
                          header_ = ppConstrHdr forall_ tyVars context unicode
@@ -893,7 +896,7 @@ ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
 
 
 -- | Pretty-print a bundled pattern synonym
-ppSideBySidePat :: [Located DocName]    -- ^ pattern name(s)
+ppSideBySidePat :: [LocatedN DocName]   -- ^ pattern name(s)
                 -> LHsSigType DocNameI  -- ^ type of pattern(s)
                 -> DocForDecl DocName   -- ^ doc map
                 -> Bool                 -- ^ unicode
@@ -1036,7 +1039,7 @@ sumParens = ubxparens . hsep . punctuate (text " |")
 -- Stolen from Html and tweaked for LaTeX generation
 -------------------------------------------------------------------------------
 
-ppLType, ppLParendType, ppLFunLhType :: Bool -> Located (HsType DocNameI) -> LaTeX
+ppLType, ppLParendType, ppLFunLhType :: Bool -> LHsType DocNameI -> LaTeX
 ppLType       unicode y = ppType unicode (unLoc y)
 ppLParendType unicode y = ppParendType unicode (unLoc y)
 ppLFunLhType  unicode y = ppFunLhType unicode (unLoc y)
@@ -1104,9 +1107,9 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u
         , arr <+> ppr_mono_lty ty2 u ]
    where arr = case mult of
-                 HsLinearArrow _ -> lollipop u
+                 HsLinearArrow _ _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+                 HsExplicitMult _ _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 
 ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
@@ -1187,7 +1190,7 @@ ppOccName = text . occNameString
 ppDocName :: DocName -> LaTeX
 ppDocName = ppOccName . nameOccName . getName
 
-ppLDocName :: Located DocName -> LaTeX
+ppLDocName :: GenLocated l DocName -> LaTeX
 ppLDocName (L _ d) = ppDocName d
 
 

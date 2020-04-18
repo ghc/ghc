@@ -51,7 +51,7 @@ import Text.XHtml hiding ( name, title, quote )
 import Data.Maybe (fromMaybe)
 
 import GHC.Data.FastString ( unpackFS )
-import GHC
+import GHC hiding (anchor)
 import GHC.Types.Name (nameOccName)
 
 --------------------------------------------------------------------------------

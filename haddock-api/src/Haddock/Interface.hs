@@ -311,7 +311,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
 
     undocumentedExports :: [String]
     undocumentedExports =
-      [ formatName s n
+      [ formatName (locA s) n
       | ExportDecl { expItemDecl = L s n
                    , expItemMbDoc = (Documentation Nothing _, _)
                    } <- ifaceExportItems interface

@@ -31,7 +31,7 @@ import Haddock.Doc (combineDocumentation, emptyMetaDoc,
 import Text.XHtml hiding ( name, p, quote )
 import Data.Maybe (fromMaybe)
 
-import GHC
+import GHC hiding (anchor)
 import GHC.Types.Name
 
 
