@@ -46,7 +46,7 @@ module GHC.HsToCore.Monad (
 
         -- Data types
         DsMatchContext(..),
-        EquationInfo(..), MatchResult'(..), MatchResult, runMatchResult, DsWrapper, idDsWrapper,
+        EquationInfo(..), MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
         -- Levity polymorphism
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
@@ -122,7 +122,7 @@ data EquationInfo
               -- @W# -1## :: Word@, but we shouldn't warn about an overflowed
               -- literal for /both/ of these cases.
 
-            , eqn_rhs  :: MatchResult
+            , eqn_rhs  :: MatchResult CoreExpr
               -- ^ What to do after match
             }
 
@@ -133,14 +133,14 @@ type DsWrapper = CoreExpr -> CoreExpr
 idDsWrapper :: DsWrapper
 idDsWrapper e = e
 
--- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
+-- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult CoreExpr
 --      \fail. wrap (case vs of { pats -> rhs fail })
 -- where vs are not bound by wrap
 
 -- | This is a value of type a with potentially a CoreExpr-shaped hole in it.
 -- This is used to deal with cases where we are potentially handling pattern
 -- match failure, and want to later specify how failure is handled.
-data MatchResult' a
+data MatchResult a
   -- | We represent the case where there is no hole without a function from
   -- 'CoreExpr', like this, because sometimes we have nothing to put in the
   -- hole and so want to be sure there is in fact no hole.
@@ -154,17 +154,14 @@ data MatchResult' a
 -- This is useful for combining a bunch of alternatives together and then
 -- getting the overall falliblity of the entire group. See 'mkDataConCase' for
 -- an example.
-instance Applicative MatchResult' where
+instance Applicative MatchResult where
   pure v = MR_Infallible (pure v)
   MR_Infallible f <*> MR_Infallible x = MR_Infallible (f <*> x)
   f <*> x = MR_Fallible $ \fail -> runMatchResult fail f <*> runMatchResult fail x
 
--- This is a CoreExpr with potentially a CoreExpr hole in it, which is the most common case.
-type MatchResult = MatchResult' CoreExpr
-
--- Given a fail expression to use, and a MatchResult, compute the filled CoreExpr whether
--- the MatchResult was failable or not.
-runMatchResult :: CoreExpr -> MatchResult' a -> DsM a
+-- Given a fail expression to use, and a MatchResult CoreExpr, compute the filled CoreExpr whether
+-- the MatchResult CoreExpr was failable or not.
+runMatchResult :: CoreExpr -> MatchResult a -> DsM a
 runMatchResult fail = \case
   MR_Infallible body -> body
   MR_Fallible body_fn -> body_fn fail

@@ -1014,7 +1014,7 @@ dsDo stmts
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
 
-dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> FailOperator GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
 dsHandleMonadicFailure pat match m_fail_op =
