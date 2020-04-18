@@ -37,6 +37,7 @@ module GHC.ForeignPtr
         mallocPlainForeignPtrAlignedBytes,
         addForeignPtrFinalizer,
         addForeignPtrFinalizerEnv,
+        withForeignPtr,
         touchForeignPtr,
         unsafeForeignPtrToPtr,
         castForeignPtr,
@@ -54,6 +55,7 @@ import GHC.Base
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
+import GHC.Prim         ( keepAlive# )
 
 import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
 
@@ -387,6 +389,31 @@ newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
 newForeignPtr_ (Ptr obj) =  do
   r <- newIORef NoFinalizers
   return (ForeignPtr obj (PlainForeignPtr r))
+
+withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+-- ^This is a way to look at the pointer living inside a
+-- foreign object.  This function takes a function which is
+-- applied to that pointer. The resulting 'IO' action is then
+-- executed. The foreign object is kept alive at least during
+-- the whole action, even if it is not used directly
+-- inside. Note that it is not safe to return the pointer from
+-- the action and use it after the action completes. All uses
+-- of the pointer should be inside the
+-- 'withForeignPtr' bracket.  The reason for
+-- this unsafeness is the same as for
+-- 'unsafeForeignPtrToPtr' below: the finalizer
+-- may run earlier than expected, because the compiler can only
+-- track usage of the 'ForeignPtr' object, not
+-- a 'Ptr' object made from it.
+--
+-- This function is normally used for marshalling data to
+-- or from the object pointed to by the
+-- 'ForeignPtr', using the operations from the
+-- 'Storable' class.
+withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
+  case f (unsafeForeignPtrToPtr fo) of
+    IO action# -> keepAlive# r (action# s)
+
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in

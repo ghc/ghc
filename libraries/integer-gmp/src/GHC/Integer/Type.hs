@@ -2110,7 +2110,7 @@ liftIO (IO m) = m
 
 -- NB: equivalent of GHC.IO.unsafeDupablePerformIO, see notes there
 runS :: S RealWorld a -> a
-runS m = case runRW# m of (# _, a #) -> a
+runS m = case runRW# (\s -> m s) of (# _, a #) -> a
 
 -- stupid hack
 fail :: [Char] -> S s a

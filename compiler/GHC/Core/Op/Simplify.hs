@@ -37,10 +37,12 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Op.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
+import PrelNames        ( runRWKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
+import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Utils
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
@@ -49,6 +51,7 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
+import PrelNames        ( keepAliveIdKey )
 import MonadUtils       ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
 import Maybes           ( orElse )
@@ -1850,6 +1853,20 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` runRWKey
+  , [ ValArg (Lam s body)
+    , TyArg {}, TyArg {} ] <- rev_args
+  = do { (env', s') <- simplLamBndr (zapSubstEnv env) s
+       ; body' <- simplExprC env' body cont
+       ; let arg'  = Lam s' body'
+             ty'   = contResultType cont
+             rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
+
 ---------- Try rewrite RULES --------------
 -- See Note [Trying rewrite rules]
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
@@ -1869,6 +1886,40 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToVal {} -> False
                       _             -> True
 
+
+---------- Simplify continuation-passing primops --------------
+-- Push strict contexts into keepAlive# continuation
+--
+-- That is,
+--
+--     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+--       ~>
+--     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` keepAliveIdKey
+  , [ ValArg y
+    , ValArg x
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = do { let ty' = contResultType cont
+       ; j <- newJoinId [] ty'
+       ; let env' = zapSubstEnv env
+       ; y' <- simplExprC env' y cont
+       ; let bind = NonRec j y'
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
+       ; let call' = mkApps (Var fun)
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , x'
+               , Var j
+               ]
+       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
+         return (emptyFloats env `extendFloats` bind, call') }
 
 ---------- Simplify applications and casts --------------
 rebuildCall env info (CastIt co cont)

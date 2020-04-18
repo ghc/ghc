@@ -3239,6 +3239,10 @@ primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    -- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 
+pseudoop "keepAlive#"
+   o -> p -> p
+   { TODO. }
+
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
    with

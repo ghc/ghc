@@ -232,6 +232,13 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
+instance Outputable LambdaFormInfo where
+  ppr LFReEntrant{} = text "re-entrant"
+  ppr LFThunk{}     = text "thunk"
+  ppr LFCon{}       = text "data-con"
+  ppr LFUnknown{}   = text "unknown"
+  ppr LFUnlifted    = text "unlifted"
+  ppr LFLetNoEscape = text "let-no-escape"
 
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
@@ -539,7 +546,7 @@ data CallMethod
 
 getCallMethod :: DynFlags
               -> Name           -- Function being applied
-              -> Id             -- Function Id used to chech if it can refer to
+              -> Id             -- Function Id used to check if it can refer to
                                 -- CAF's and whether the function is tail-calling
                                 -- itself
               -> LambdaFormInfo -- Its info
@@ -626,7 +633,7 @@ getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
               _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod _ name _ _lf_info _ _ _loc _ = pprPanic "Unknown call method" (ppr name $$ ppr _lf_info $$ ppr _loc)
 
 -----------------------------------------------------------------------------
 --              Data types for closure information

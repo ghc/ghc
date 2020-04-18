@@ -500,7 +500,8 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                     (CmmMachOp (mo_wordSub platform)
                          [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]
                          , mkIntExpr platform (funTag dflags cl_info) ])
-                ; fv_bindings <- mapM bind_fv fv_details
+                ; fv_bindings <- pprTrace "closureBodyBody" (ppr bndr $$ ppr body)
+                    $ mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
@@ -523,7 +524,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 
 -- A function closure pointer may be tagged, so we
 -- must take it into account when accessing the free variables.
-bind_fv :: (NonVoid Id, ByteOff) -> FCode (LocalReg, ByteOff)
+bind_fv :: HasCallStack => (NonVoid Id, ByteOff) -> FCode (LocalReg, ByteOff)
 bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, ByteOff)] -> FCode ()
