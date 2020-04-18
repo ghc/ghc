@@ -34,7 +34,6 @@ module GHC.IOPort (
     ) where
 
 import GHC.Base
-import GHC.IO.Exception
 import GHC.Exception
 import Text.Show
 
