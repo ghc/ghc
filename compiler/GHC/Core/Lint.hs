@@ -864,12 +864,22 @@ lintCoreExpr e@(App _ _)
        ; lintValApp arg3 fun_ty2 arg3_ty }
 
   | Var fun <- fun
+  , fun `hasKey` runRWKey
+  = failWithL (text "Invalid runRW# application")
+
+  | Var fun <- fun
   , fun `hasKey` keepAliveIdKey
   , [arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5, arg6, arg7] <- args
-  = do { fun_ty5 <- lintCoreArgs (idType fun) [ arg_ty1, arg_ty2, arg_ty3, arg_ty4 ]
+  = do { fun_ty6 <- lintCoreArgs (idType fun)
+                      [ arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5 ]
        ; arg6_ty <- lintJoinLams 1 (Just fun) arg6     -- f  :: State# RW -> (# State# RW, o #)
-       ; lintCoreArgs fun_ty5 [arg5, arg6, arg7]
+       ; fun_ty7 <- lintValApp arg6 fun_ty6 arg6_ty
+       ; lintCoreArg fun_ty7 arg7
        }
+
+  | Var fun <- fun
+  , fun `hasKey` keepAliveIdKey
+  = failWithL (text "Invalid keepAlive# application")
 
   | otherwise
   = do { fun_ty <- lintCoreFun fun (length args)
