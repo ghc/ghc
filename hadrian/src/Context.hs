@@ -133,6 +133,6 @@ objectPath context@Context {..} src = do
     let extension = drop 1 $ takeExtension src
         obj       = src -<.> osuf way
         result | isGenerated          = obj
-               | "*hs*" ?== extension = path -/- obj
+               | "*hs*" ?== extension = path -/- "hs" -/- obj
                | otherwise            = path -/- extension -/- obj
     return result
