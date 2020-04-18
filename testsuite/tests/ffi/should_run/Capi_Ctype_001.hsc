@@ -35,7 +35,7 @@ foreign import capi unsafe "capi_ctype_001.h g"
 
 instance Storable Foo where
     sizeOf _ = #size Foo
-    alignment = sizeOf
+    alignment _ = #alignment Foo
     peek p = do i <- (# peek Foo, i) p
                 j <- (# peek Foo, j) p
                 k <- (# peek Foo, k) p
