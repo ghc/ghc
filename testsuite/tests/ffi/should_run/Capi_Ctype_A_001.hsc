@@ -16,7 +16,7 @@ data FooA = FooA {
 
 instance Storable FooA where
     sizeOf _ = #size Foo
-    alignment = sizeOf
+    alignment _ = #alignment Foo
     peek p = do i <- (# peek Foo, i) p
                 j <- (# peek Foo, j) p
                 k <- (# peek Foo, k) p
