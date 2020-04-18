@@ -1631,13 +1631,14 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array that the GC guarantees not to move.}
+   {Like 'newByteArray#' but GC guarantees not to move it.}
    with out_of_line = True
         has_side_effects = True
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
+   {Like 'newPinnedByteArray#' but allow specifying an arbitrary
+    alignment, which must be a power of two.}
    with out_of_line = True
         has_side_effects = True
 

@@ -133,6 +133,14 @@ allocaBytes (I# size) action = IO $ \ s0 ->
      keepAlive# barr# s2 action'
   }}}
 
+-- |@'allocaBytesAligned' size align f@ executes the computation @f@,
+-- passing as argument a pointer to a temporarily allocated block of memory
+-- of @size@ bytes and aligned to @align@ bytes. The value of @align@ must
+-- be a power of two.
+--
+-- The memory is freed when @f@ terminates (either normally or via an
+-- exception), so the pointer passed to @f@ must /not/ be used after this.
+--
 allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
 allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
      case newAlignedPinnedByteArray# size align s0 of { (# s1, mbarr# #) ->
