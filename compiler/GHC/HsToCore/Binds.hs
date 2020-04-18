@@ -149,7 +149,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- addTyCsDs (hsWrapDictBinders co_fn) $
+ = do   { (args, body) <- -- addTyCsDs (hsWrapDictBinders co_fn) $
+                          -- Omitting; part of !3087
                           matchWrapper (mkPrefixFunRhs (L loc (idName fun)))
                                        Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
