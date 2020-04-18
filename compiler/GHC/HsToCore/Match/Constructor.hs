@@ -27,6 +27,7 @@ import GHC.Types.Basic ( Origin(..) )
 import GHC.Tc.Utils.TcType
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
+import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
 import Util
 import GHC.Types.Id
@@ -94,7 +95,7 @@ have-we-used-all-the-constructors? question; the local function
 matchConFamily :: NonEmpty Id
                -> Type
                -> NonEmpty (NonEmpty EquationInfo)
-               -> DsM MatchResult
+               -> DsM (MatchResult CoreExpr)
 -- Each group of eqns is for a single constructor
 matchConFamily (var :| vars) ty groups
   = do alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
@@ -107,7 +108,7 @@ matchConFamily (var :| vars) ty groups
 matchPatSyn :: NonEmpty Id
             -> Type
             -> NonEmpty EquationInfo
-            -> DsM MatchResult
+            -> DsM (MatchResult CoreExpr)
 matchPatSyn (var :| vars) ty eqns
   = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
        return (mkCoSynCaseMatchResult var ty alt)
@@ -134,7 +135,7 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
         -- and returns the types of the *value* args, which is what we want
 
               match_group :: [Id]
-                          -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
+                          -> [(ConArgPats, EquationInfo)] -> DsM (MatchResult CoreExpr)
               -- All members of the group have compatible ConArgPats
               match_group arg_vars arg_eqn_prs
                 = ASSERT( notNull arg_eqn_prs )
