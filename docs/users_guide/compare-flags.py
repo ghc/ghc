@@ -62,7 +62,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--ghc', type=argparse.FileType('r'),
                         help='path of GHC executable')
-    parser.add_argument('--doc-flags', type=argparse.FileType('r'),
+    parser.add_argument('--doc-flags', type=argparse.FileType(mode='r', encoding='UTF-8'),
                         help='path of ghc-flags.txt output from Sphinx')
     args = parser.parse_args()
 
