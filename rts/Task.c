@@ -388,8 +388,7 @@ discardTasksExcept (Task *keep)
 void
 workerTaskStop (Task *task)
 {
-    DEBUG_ONLY( OSThreadId id );
-    DEBUG_ONLY( id = osThreadId() );
+    OSThreadId id = osThreadId();
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
 

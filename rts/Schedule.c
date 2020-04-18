@@ -1736,9 +1736,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
 
     stat_startGCSync(gc_threads[cap->no]);
 
-#if defined(DEBUG)
     unsigned int old_n_capabilities = n_capabilities;
-#endif
 
     interruptAllCapabilities();
 
