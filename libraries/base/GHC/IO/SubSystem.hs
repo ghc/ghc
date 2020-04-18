@@ -52,6 +52,7 @@ conditional posix _       = posix
 #endif
 
 -- | Infix version of `conditional`.
+-- posix <!> windows == conditional posix windows
 (<!>) :: a -> a -> a
 (<!>) = conditional
 
@@ -82,5 +83,6 @@ withIoSubSystem' f = unsafePerformIO inner
 whenIoSubSystem :: IoSubSystem -> IO () -> IO ()
 whenIoSubSystem m f = do sub <- getIoSubSystem
                          when (sub == m) f
+
 
 
