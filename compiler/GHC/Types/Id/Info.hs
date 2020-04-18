@@ -324,7 +324,7 @@ vanillaIdInfo
             inlinePragInfo      = defaultInlinePragma,
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
-            strictnessInfo      = nopSig,
+            strictnessInfo      = topSig,
             cprInfo             = topCprSig,
             callArityInfo       = unknownArity,
             levityInfo          = NoLevityInfo

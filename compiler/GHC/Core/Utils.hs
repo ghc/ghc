@@ -23,7 +23,7 @@ module GHC.Core.Utils (
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType, isExprLevPoly,
-        exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
+        exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsDeadEnd,
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
@@ -1031,21 +1031,21 @@ getIdFromTrivialExpr_maybe e
     go _       = Nothing
 
 {-
-exprIsBottom is a very cheap and cheerful function; it may return
+exprIsDeadEnd is a very cheap and cheerful function; it may return
 False for bottoming expressions, but it never costs much to ask.  See
 also GHC.Core.Arity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
-exprIsBottom :: CoreExpr -> Bool
+exprIsDeadEnd :: CoreExpr -> Bool
 -- See Note [Bottoming expressions]
-exprIsBottom e
+exprIsDeadEnd e
   | isEmptyTy (exprType e)
   = True
   | otherwise
   = go 0 e
   where
-    go n (Var v) = isBottomingId v &&  n >= idArity v
+    go n (Var v)                 = isDeadEndId v &&  n >= idArity v
     go n (App e a) | isTypeArg a = go n e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e
@@ -1059,7 +1059,7 @@ exprIsBottom e
 {- Note [Bottoming expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A bottoming expression is guaranteed to diverge, or raise an
-exception.  We can test for it in two different ways, and exprIsBottom
+exception.  We can test for it in two different ways, and exprIsDeadEnd
 checks for both of these situations:
 
 * Visibly-bottom computations.  For example
@@ -1353,7 +1353,6 @@ type CheapAppFun = Id -> Arity -> Bool
   -- but with minor variations:
   --    isWorkFreeApp
   --    isCheapApp
-  --    isExpandableApp
 
 isWorkFreeApp :: CheapAppFun
 isWorkFreeApp fn n_val_args
@@ -1369,7 +1368,7 @@ isWorkFreeApp fn n_val_args
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
   | isWorkFreeApp fn n_val_args = True
-  | isBottomingId fn            = True  -- See Note [isCheapApp: bottoming functions]
+  | isDeadEndId fn              = True  -- See Note [isCheapApp: bottoming functions]
   | otherwise
   = case idDetails fn of
       DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
@@ -1391,7 +1390,7 @@ isExpandableApp fn n_val_args
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId {}      -> False
-      _ | isBottomingId fn               -> False
+      _ | isDeadEndId fn                 -> False
           -- See Note [isExpandableApp: bottoming functions]
         | isConLike (idRuleMatchInfo fn) -> True
         | all_args_are_preds             -> True
@@ -2137,7 +2136,7 @@ diffExpr top env (Tick n1 e1)   (Tick n2 e2)
  -- generated names, which are allowed to differ.
 diffExpr _   _   (App (App (Var absent) _) _)
                  (App (App (Var absent2) _) _)
-  | isBottomingId absent && isBottomingId absent2 = []
+  | isDeadEndId absent && isDeadEndId absent2 = []
 diffExpr top env (App f1 a1)    (App f2 a2)
   = diffExpr top env f1 f2 ++ diffExpr top env a1 a2
 diffExpr top env (Lam b1 e1)  (Lam b2 e2)
