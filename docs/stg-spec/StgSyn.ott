@@ -28,13 +28,13 @@ indexvar i, j, k, n ::= {{ com Indices to be used in lists }}
 grammar
 
 lit {{ tex \textsf{lit} }} :: 'Literal_' ::=
-  {{ com Literals, \coderef{basicTypes/Literal.hs}{Literal} }}
+  {{ com Literals, \coderef{GHC/Types/Literal.hs}{Literal} }}
 
 op {{ tex \textsf{op} }} :: 'StgOp_' ::=
-  {{ com Primitive operation or foreign call, \coderef{stgSyn/StgSyn.hs}{StgOp} }}
+  {{ com Primitive operation or foreign call, \coderef{GHC/Stg/Syntax.hs}{StgOp} }}
 
 cc {{ tex \textsf{cc} }} :: 'CostCentre_' ::=
-  {{ com Cost-centre, \coderef{profiling/CostCentre.hs}{CostCentre} }}
+  {{ com Cost-centre, \coderef{GHC/Types/CostCentre.hs}{CostCentre} }}
 
 ccs {{ tex \textsf{ccs} }} :: 'CostCentreStack_' ::=
   | CCCS :: :: CurrentCCS {{ com Current cost-centre stack }}
@@ -42,9 +42,9 @@ ccs {{ tex \textsf{ccs} }} :: 'CostCentreStack_' ::=
   | _    :: :: DontCareCCS {{ com Don't care cost-centre stack }}
   | ccs ^ ccs' :: :: EnterFunCCS {{ com Function entry, \coderef{rts/Profiling.c}{enterFunCCS} }}
   | ccs # cc   :: :: PushCC {{ com Push a cost-centre, \coderef{rts/Profiling.c}{pushCostCentre} }}
-  {{ com Cost-centre stack, \coderef{profiling/CostCentre.hs}{CostCentreStack} }}
+  {{ com Cost-centre stack, \coderef{GHC/Types/CostCentre.hs}{CostCentreStack} }}
 
-a, b, c :: 'StgArg_' ::= {{ com Arguments, \coderef{stgSyn/StgSyn.hs}{StgArg} }}
+a, b, c :: 'StgArg_' ::= {{ com Arguments, \coderef{GHC/Stg/Syntax.hs}{StgArg} }}
   | x   ::   :: StgVarArg {{ com Variable }}
   | lit ::   :: StgLitArg {{ com Literal }}
 
@@ -59,7 +59,7 @@ xs :: 'Ids_' ::= {{ com List of variables }}
   | nil :: :: EmptyList
   | xs xs' :: :: Append
 
-e :: 'StgExpr_' ::= {{ com Expressions, \coderef{stgSyn/StgSyn.hs}{StgExpr} }}
+e :: 'StgExpr_' ::= {{ com Expressions, \coderef{GHC/Stg/Syntax.hs}{StgExpr} }}
   | lit                                  ::   :: StgLit {{ com Literal }}
   | x args                               ::   :: StgApp {{ com Function application (or variable) }}
   | K args                               ::   :: StgConApp {{ com Saturated constructor application }}
@@ -75,23 +75,23 @@ subst :: 'Subst_' ::= {{ com List of substitutions }}
   | [ a / x ]         ::   :: Mapping
   | </ substi // i /> ::   :: List
 
-binding :: 'StgBind_' ::= {{ com Let-bindings, \coderef{stgSyn/StgSyn.hs}{StgBind} }}
+binding :: 'StgBind_' ::= {{ com Let-bindings, \coderef{GHC/Stg/Syntax.hs}{StgBind} }}
   | x = rhs                         ::   :: StgNonRec  {{ com Non-recursive binding }}
   | rec </ xi = rhsi // and // i /> ::   :: StgRec     {{ com Recursive binding }}
 
-upd :: 'UpdateFlag_' ::= {{ com Update flag, \coderef{stgSyn/StgSyn.hs}{UpdateFlag} }}
+upd :: 'UpdateFlag_' ::= {{ com Update flag, \coderef{GHC/Stg/Syntax.hs}{UpdateFlag} }}
   | r :: :: ReEntrant {{ com Function (re-entrant closure) }}
   | u :: :: Updatable {{ com Thunk (updatable closure) }}
 
 cl :: 'StgRhsClosure_' ::= {{ com StgRhsClosure }}
   | \ upd ccs xs . e  :: :: StgRhsClosure
 
-rhs :: 'StgRhs_' ::= {{ com Right-hand sides, \coderef{stgSyn/StgSyn.hs}{StgRhs} }}
+rhs :: 'StgRhs_' ::= {{ com Right-hand sides, \coderef{GHC/Stg/Syntax.hs}{StgRhs} }}
   | cl                :: :: StgRhsClosure {{ com Closure }}
   | K ccs args        :: :: StgRhsCon {{ com Constructor }}
   | x                 :: :: StgRhsIndirection {{ com Indirection (runtime only) }}
 
-alt :: 'StgAlt_' ::= {{ com Case alternative, \coderef{stgSyn/StgSyn.hs}{StgAlt} }}
+alt :: 'StgAlt_' ::= {{ com Case alternative, \coderef{GHC/Stg/Syntax.hs}{StgAlt} }}
   | K </ xi // i /> -> e    ::   :: StgAlt  {{ com Constructor applied to fresh names }}
 
 terminals :: 'terminals_' ::=

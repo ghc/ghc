@@ -172,7 +172,7 @@ The implementations of \textsc{App} rules are spread across two
 different calling conventions for functions: slow calls and
 direct calls.  Direct calls handle saturated and over-applied
 cases (\coderef{GHC/StgToCmm/Layout.hs}{slowArgs}), while slow
-calls handle all cases (\textit{utils/genapply/GenApply.hs});
+calls handle all cases (\textit{utils/genapply/Main.hs});
 in particular, these cases ensure that the current cost-center
 reverts to the one originally at the call site.
 \item The \textsc{App} rule demonstrates that modern GHC
