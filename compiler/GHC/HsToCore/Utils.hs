@@ -197,7 +197,7 @@ shiftEqns = fmap $ \eqn -> eqn { eqn_pats = tail (eqn_pats eqn) }
 
 -- Functions on MatchResults
 
-matchCanFail :: MatchResult -> Bool
+matchCanFail :: MatchResult' a -> Bool
 matchCanFail (MR_Fallible {})  = True
 matchCanFail (MR_Infallible {}) = False
 
