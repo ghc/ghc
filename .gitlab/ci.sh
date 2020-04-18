@@ -26,6 +26,9 @@ LT_CYAN="1;36"
 WHITE="1;37"
 LT_GRAY="0;37"
 
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 # GitLab Pipelines log section delimiters
 # https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
 start_section() {
