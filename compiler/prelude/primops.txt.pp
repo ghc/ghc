@@ -3240,7 +3240,7 @@ primop SeqOp "seq#" GenPrimOp
    -- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 
 pseudoop "keepAlive#"
-   o -> (State# RealWorld -> (# State# RealWorld, p #)) -> State# RealWorld -> (# State# RealWorld, p #)
+   o -> p -> p
    { TODO. }
 
 primop GetSparkOp "getSpark#" GenPrimOp

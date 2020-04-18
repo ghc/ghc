@@ -1897,27 +1897,29 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   | fun `hasKey` keepAliveIdKey
-  , [ ValArg s0
-    , ValArg (Lam f_arg f_body)
+  , [ ValArg y
     , ValArg x
     , TyArg {} -- res_ty
     , TyArg {} -- res_rep
     , TyArg {as_arg_ty=arg_ty}
     , TyArg {as_arg_ty=arg_rep}
     ] <- rev_args
-    -- Extract type of second component of (# State# RealWorld, a #)
-  , Just (_, [_, _, _, ty']) <- splitTyConApp_maybe (contResultType cont)
-  = do { (env', f_arg) <- simplLamBndr (zapSubstEnv env) f_arg
-       ; f_body' <- simplExprC env' f_body cont
-       ; let f' = Lam f_arg f_body'
+  = do { let ty' = contResultType cont
+       ; j <- newJoinId [] ty'
+       ; let env' = zapSubstEnv env
+       ; y' <- simplExprC env' y cont
+       ; let bind = NonRec j y'
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
        ; let call' = mkApps (Var fun)
-               [ mkTyArg arg_rep, mkTyArg arg_ty
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
                , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
-               , x
-               , f'
-               , s0
+               , x'
+               , Var j
                ]
-       ; return (emptyFloats env, call') }
+       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
+         return (emptyFloats env `extendFloats` bind, call') }
 
 ---------- Simplify applications and casts --------------
 rebuildCall env info (CastIt co cont)

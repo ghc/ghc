@@ -1392,20 +1392,14 @@ keepAliveId
     -- keepAlive#
     --   :: forall (rep_a :: RuntimeRep) (a :: TYPE rep_a)
     --             (rep_r :: RuntimeRep) (r :: TYPE rep_r).
-    --      a
-    --   -> (State# RealWorld -> (# State# RealWorld, r #))
-    --   -> State# RealWorld
-    --   -> (# State# RealWorld, r #)
+    --      a -> r -> r
     --
     rep_a = runtimeRep1TyVar
     a     = openAlphaTyVar
     rep_r = runtimeRep2TyVar
     r     = openBetaTyVar
     ty    = mkInvForAllTys [rep_a, a, rep_r, r]
-            $ mkVisFunTys [mkTyVarTy a, cont_ty, realWorldStatePrimTy] result_ty
-    cont_ty = realWorldStatePrimTy `mkVisFunTy` result_ty
-    -- (# State# RealWorld, r #)
-    result_ty = mkTupleTy Unboxed [realWorldStatePrimTy, mkTyVarTy r]
+            $ mkVisFunTys [mkTyVarTy a, mkTyVarTy r] (mkTyVarTy r)
     id_info = noCafIdInfo
       `setStrictnessInfo` mkClosedStrictSig [topDmd, strictApply1Dmd, topDmd] topDiv
       `setArityInfo` 3

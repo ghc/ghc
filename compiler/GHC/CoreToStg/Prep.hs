@@ -45,7 +45,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import TysWiredIn
-import TysPrim          ( realWorldStatePrimTy, primRepToRuntimeRep )
+import TysPrim          ( realWorldStatePrimTy )
 import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
@@ -858,40 +858,20 @@ cpeApp top_env expr
 
     -- See Note [CorePrep handling of keepAlive#]
     cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
-                         CpeApp (Type result_rep), CpeApp (Type result_ty),
-                         CpeApp x, CpeApp k, CpeApp s0] 3
+                         CpeApp (Type _result_rep), CpeApp (Type result_ty),
+                         CpeApp x, CpeApp y] 2
         | f `hasKey` keepAliveIdKey
-        = do { let voidRepTy = primRepToRuntimeRep VoidRep
-                   -- out_ty ~ (# State# RealWorld, a #)
-                   out_ty = mkTyConApp (tupleTyCon Unboxed 2)
-                                       [voidRepTy, result_rep, realWorldStatePrimTy, result_ty]
-             ; b0 <- newVar out_ty
-             ; y <- newVar result_ty
-             ; s1 <- newVar realWorldStatePrimTy
+        = do { y' <- newVar result_ty
              ; s2 <- newVar realWorldStatePrimTy
-               -- Beta reduce
-             ; (floats0, k') <- case k of
-                       Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body [] 0
-                       _          -> cpe_app env k [CpeApp s0] 1
              ; let touchId = mkPrimOpId TouchOp
-
-                   -- @stateResultAlt s y expr@ is a case alternative of the form,
-                   --   (# s, y #) -> expr
-                   stateResultAlt :: Var -> Var -> CoreExpr -> CoreAlt
-                   stateResultAlt stateVar resultVar rhs =
-                     (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
-
-                   expr = Case k' b0 out_ty [stateResultAlt s1 y rhs1]
-                   rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var s1]
-                          in Case scrut s2 out_ty [(DEFAULT, [], rhs2)]
-                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2)
-                            [mkTyArg voidRepTy, mkTyArg result_rep, mkTyArg realWorldStatePrimTy, mkTyArg result_ty, Var s2, Var y]
-             ; (floats1, body) <- pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
-             ; return (floats0 `appendFloats` floats1, body)
+                   expr = Case y y' result_ty [(DEFAULT, [], rhs1)]
+                   rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var realWorldPrimId]
+                          in Case scrut s2 result_ty [(DEFAULT, [], Var y')]
+             ; pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
              }
-    cpe_app _env (Var f) args _
+    cpe_app _env (Var f) args n
         | f `hasKey` keepAliveIdKey
-        = pprPanic "cpe_app(keepAlive#)" (ppr args)
+        = pprPanic "cpe_app(keepAlive#)" (ppr args $$ ppr n)
 
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
