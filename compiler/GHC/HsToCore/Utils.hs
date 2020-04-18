@@ -65,14 +65,14 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
-import TysPrim
-import TysWiredIn
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Module
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
 import Outputable
 import GHC.Types.SrcLoc
@@ -578,7 +578,7 @@ There are two cases.
        let { t = case e of Just (Just v) -> Unit v
            ; v = case t of Unit v -> v }
        in t `seq` body
-    The 'Unit' is a one-tuple; see Note [One-tuples] in TysWiredIn
+    The 'Unit' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
     Note that forcing 't' makes the pattern match happen,
     but does not force 'v'.
 
@@ -599,7 +599,7 @@ There are two cases.
      - Forcing 't' will force the pattern to match fully;
        e.g. will diverge if (snd e) is bottom
      - But 'a' itself is not forced; it is wrapped in a one-tuple
-       (see Note [One-tuples] in TysWiredIn)
+       (see Note [One-tuples] in GHC.Builtin.Types)
 
   *   !(Just x) = e
     ==>
@@ -863,7 +863,7 @@ Note [Failure thunks and CPR]
 (This note predates join points as formal entities (hence the quotation marks).
 We can't use actual join points here (see above); if we did, this would also
 solve the CPR problem, since join points don't get CPR'd. See Note [Don't CPR
-join points] in GHC.Core.Op.WorkWrap.)
+join points] in GHC.Core.Opt.WorkWrap.)
 
 When we make a failure point we ensure that it
 does not look like a thunk. Example:

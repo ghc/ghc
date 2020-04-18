@@ -34,7 +34,8 @@ import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
-import GHC.Settings (getTargetPlatform, maybeReadFuzzy)
+import GHC.Settings.Platform (getTargetPlatform)
+import GHC.Settings.Utils (maybeReadFuzzy)
 import GHC.Platform (platformMini)
 import GHC.Platform.Host (cHostPlatformMini)
 import GHC.UniqueSubdir (uniqueSubdir)

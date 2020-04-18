@@ -6,7 +6,7 @@
 -- with saying "import GHC.Plugins".
 --
 -- Particularly interesting modules for plugin writers include
--- "GHC.Core" and "GHC.Core.Op.Monad".
+-- "GHC.Core" and "GHC.Core.Opt.Monad".
 module GHC.Plugins
    ( module GHC.Driver.Plugins
    , module GHC.Types.Name.Reader
@@ -15,7 +15,7 @@ module GHC.Plugins
    , module GHC.Types.Var
    , module GHC.Types.Id
    , module GHC.Types.Id.Info
-   , module GHC.Core.Op.Monad
+   , module GHC.Core.Opt.Monad
    , module GHC.Core
    , module GHC.Types.Literal
    , module GHC.Core.DataCon
@@ -31,7 +31,7 @@ module GHC.Plugins
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
-   , module TysWiredIn
+   , module GHC.Builtin.Types
    , module GHC.Driver.Types
    , module GHC.Types.Basic
    , module GHC.Types.Var.Set
@@ -65,7 +65,7 @@ import GHC.Types.Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExport
 import GHC.Types.Id.Info
 
 -- Core
-import GHC.Core.Op.Monad
+import GHC.Core.Opt.Monad
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon
@@ -90,7 +90,7 @@ import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Driver.Types
 import GHC.Types.Basic hiding ( Version {- conflicts with Packages.Version -} )
 
@@ -123,8 +123,8 @@ import GHC.Tc.Utils.Env ( lookupGlobal )
 
 import qualified Language.Haskell.TH as TH
 
-{- This instance is defined outside GHC.Core.Op.Monad.hs so that
-   GHC.Core.Op.Monad does not depend on GHC.Tc.Utils.Env -}
+{- This instance is defined outside GHC.Core.Opt.Monad.hs so that
+   GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
                           ; liftIO $ lookupGlobal hsc_env name }

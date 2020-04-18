@@ -319,7 +319,7 @@ import GHC.Hs
 import GHC.Core.Type  hiding( typeKind )
 import GHC.Tc.Utils.TcType
 import GHC.Types.Id
-import TysPrim          ( alphaTyVars )
+import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr   ( pprForAll )
 import GHC.Core.Class
@@ -338,8 +338,8 @@ import GHC.Driver.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Ways
-import SysTools
-import SysTools.BaseDir
+import GHC.SysTools
+import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
 import GHC.Types.Module
 import Panic
@@ -352,15 +352,15 @@ import StringBuffer
 import Outputable
 import GHC.Types.Basic
 import FastString
-import qualified Parser
-import Lexer
-import ApiAnnotation
+import qualified GHC.Parser as Parser
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
 import GHC.Tc.Module
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
-import FileCleanup
+import GHC.SysTools.FileCleanup
 
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -857,7 +857,7 @@ data ParsedModule =
                , pm_parsed_source :: ParsedSource
                , pm_extra_src_files :: [FilePath]
                , pm_annotations :: ApiAnns }
-               -- See Note [Api annotations] in ApiAnnotation.hs
+               -- See Note [Api annotations] in GHC.Parser.Annotation
 
 instance ParsedMod ParsedModule where
   modSummary m    = pm_mod_summary m
@@ -951,7 +951,7 @@ parseModule ms = do
    hpm <- liftIO $ hscParse hsc_env_tmp ms
    return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm)
                            (hpm_annotations hpm))
-               -- See Note [Api annotations] in ApiAnnotation.hs
+               -- See Note [Api annotations] in GHC.Parser.Annotation
 
 -- | Typecheck and rename a parsed module.
 --

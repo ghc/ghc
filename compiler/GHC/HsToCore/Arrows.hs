@@ -47,9 +47,9 @@ import GHC.HsToCore.Binds (dsHsWrapper)
 
 import GHC.Types.Id
 import GHC.Core.ConLike
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Basic
-import PrelNames
+import GHC.Builtin.Names
 import Outputable
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc

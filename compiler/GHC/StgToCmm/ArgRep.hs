@@ -25,7 +25,7 @@ import GHC.Runtime.Heap.Layout ( WordOff )
 import GHC.Types.Id            ( Id )
 import GHC.Core.TyCon          ( PrimRep(..), primElemRepSizeB )
 import GHC.Types.Basic         ( RepArity )
-import Constants               ( wORD64_SIZE, dOUBLE_SIZE )
+import GHC.Settings.Constants  ( wORD64_SIZE, dOUBLE_SIZE )
 
 import Outputable
 import FastString

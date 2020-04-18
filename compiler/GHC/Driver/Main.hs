@@ -93,14 +93,14 @@ import GHC.Runtime.Interpreter ( addSptEntry )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
 import GHC.Runtime.Linker
-import GHC.Core.Op.Tidy        ( tidyExpr )
+import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
 import GHC.Types.Var.Env       ( emptyTidyEnv )
 import Panic
 import GHC.Core.ConLike
 
-import ApiAnnotation
+import GHC.Parser.Annotation
 import GHC.Types.Module
 import GHC.Driver.Packages
 import GHC.Types.Name.Reader
@@ -108,16 +108,16 @@ import GHC.Hs
 import GHC.Hs.Dump
 import GHC.Core
 import StringBuffer
-import Parser
-import Lexer
+import GHC.Parser
+import GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
 import GHC.Tc.Module
 import GHC.IfaceToCore  ( typecheckIface )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 import GHC.Types.Name.Cache ( initNameCache )
-import PrelInfo
-import GHC.Core.Op.Simplify.Driver
+import GHC.Builtin.Utils
+import GHC.Core.Opt.Driver
 import GHC.HsToCore
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
 import GHC.Iface.Make
@@ -144,7 +144,7 @@ import GHC.Core.FamInstEnv
 import Fingerprint      ( Fingerprint )
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Env
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
 

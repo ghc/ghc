@@ -89,7 +89,7 @@ import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
 import GHC.Core.Type
-import TysPrim
+import GHC.Builtin.Types.Prim
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -100,10 +100,10 @@ import GHC.Core.Class
 import GHC.Types.Name
 -- import GHC.Types.Name.Set
 import GHC.Types.Var.Env
-import TysWiredIn
+import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import Constants ( mAX_CTUPLE_SIZE )
+import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
 import ErrUtils( MsgDoc )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
@@ -111,7 +111,7 @@ import Util
 import GHC.Types.Unique.Supply
 import Outputable
 import FastString
-import PrelNames hiding ( wildCardName )
+import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1014,7 +1014,7 @@ bigConstraintTuple arity
 Note [Ignore unary constraint tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC provides unary tuples and unboxed tuples (see Note [One-tuples] in
-TysWiredIn) but does *not* provide unary constraint tuples. Why? First,
+GHC.Builtin.Types) but does *not* provide unary constraint tuples. Why? First,
 recall the definition of a unary tuple data type:
 
   data Unit a = Unit a
@@ -3311,7 +3311,7 @@ Consider
 An annoying difficulty happens if there are more than 62 inferred
 constraints. Then we need to fill in the TcTyVar with (say) a 70-tuple.
 Where do we find the TyCon?  For good reasons we only have constraint
-tuples up to 62 (see Note [How tuples work] in TysWiredIn).  So how
+tuples up to 62 (see Note [How tuples work] in GHC.Builtin.Types).  So how
 can we make a 70-tuple?  This was the root cause of #14217.
 
 It's incredibly tiresome, because we only need this type to fill

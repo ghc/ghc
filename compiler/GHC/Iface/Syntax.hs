@@ -45,7 +45,7 @@ module GHC.Iface.Syntax (
 import GhcPrelude
 
 import GHC.Iface.Type
-import BinFingerprint
+import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -70,7 +70,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Utils.Lexeme (isLexSym)
-import TysWiredIn ( constraintKindTyConName )
+import GHC.Builtin.Types ( constraintKindTyConName )
 import Util (seqList)
 
 import Control.Monad
@@ -547,7 +547,7 @@ that came up was a NOINLINE pragma on a let-binding inside an INLINE
 function.  The user (Duncan Coutts) really wanted the NOINLINE control
 to cross the separate compilation boundary.
 
-In general we retain all info that is left by GHC.Core.Op.Tidy.tidyLetBndr, since
+In general we retain all info that is left by GHC.Core.Tidy.tidyLetBndr, since
 that is what is seen by importing module with --make
 
 Note [Displaying axiom incompatibilities]

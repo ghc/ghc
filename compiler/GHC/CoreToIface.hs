@@ -54,10 +54,10 @@ import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
-import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
-import TysWiredIn ( heqTyCon )
+import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.Types ( heqTyCon )
 import GHC.Types.Id.Make ( noinlineIdName )
-import PrelNames
+import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.Type
@@ -422,7 +422,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
                                (toIfaceIdInfo (idInfo id))
                                (toIfaceJoinInfo (isJoinId_maybe id))
-  -- Put into the interface file any IdInfo that GHC.Core.Op.Tidy.tidyLetBndr
+  -- Put into the interface file any IdInfo that GHC.Core.Tidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
