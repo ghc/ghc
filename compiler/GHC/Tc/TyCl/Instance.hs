@@ -77,6 +77,7 @@ import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Tuple
 import Maybes
 import Data.List( mapAccumL )
 
@@ -460,7 +461,7 @@ tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
        ; return ([], [fam_inst], []) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
-  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated (L loc decl)
+  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated emptyVarEnv (L loc decl)
        ; return ([], [fam_inst], maybeToList m_deriv_info) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
@@ -483,6 +484,9 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
         ; (subst, skol_tvs) <- tcInstSkolTyVars tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
+              -- Map from the skolemized Names to the original Names.
+              -- See Note [Associated data family instances and di_scoped_tvs].
+              tv_skol_env = mkVarEnv $ map swap tv_skol_prs
               n_inferred = countWhile ((== Inferred) . binderArgFlag) $
                            fst $ splitForAllVarBndrs dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
@@ -497,7 +501,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                           mb_info    = InClsInst { ai_class = clas
                                                  , ai_tyvars = visible_skol_tvs
                                                  , ai_inst_env = mini_env }
-                    ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info) adts
+                    ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
 
                       -- Check for missing associated types and build them
@@ -634,10 +638,16 @@ For some reason data family instances are a lot more complicated
 than type family instances
 -}
 
-tcDataFamInstDecl :: AssocInstInfo
-                  -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
+tcDataFamInstDecl ::
+     AssocInstInfo
+  -> TyVarEnv Name -- If this is an associated data family instance, maps the
+                   -- parent class's skolemized type variables to their
+                   -- original Names. If this is a non-associated instance,
+                   -- this will be empty.
+                   -- See Note [Associated data family instances and di_scoped_tvs].
+  -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
-tcDataFamInstDecl mb_clsinfo
+tcDataFamInstDecl mb_clsinfo tv_skol_env
     (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext = imp_vars
                                                    , hsib_body =
       FamEqn { feqn_bndrs  = mb_bndrs
@@ -749,11 +759,12 @@ tcDataFamInstDecl mb_clsinfo
        ; checkValidCoAxBranch fam_tc ax_branch
        ; checkValidTyCon rep_tc
 
-       ; let m_deriv_info = case derivs of
+       ; let scoped_tvs = map mk_deriv_info_scoped_tv_pr (tyConTyVars rep_tc)
+             m_deriv_info = case derivs of
                L _ []    -> Nothing
                L _ preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
-                                  , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars rep_tc)
+                                  , di_scoped_tvs = scoped_tvs
                                   , di_clauses = preds
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
@@ -783,6 +794,45 @@ tcDataFamInstDecl mb_clsinfo
       , not (tv `elemVarSet` fvs_to_the_left)
       = go pats (Bndr tv tcb_vis : etad_tvs)
     go pats etad_tvs = (reverse (map fstOf3 pats), etad_tvs)
+
+    -- Create a Name-TyVar mapping to bring into scope when typechecking any
+    -- deriving clauses this data family instance may have.
+    -- See Note [Associated data family instances and di_scoped_tvs].
+    mk_deriv_info_scoped_tv_pr :: TyVar -> (Name, TyVar)
+    mk_deriv_info_scoped_tv_pr tv =
+      let n = lookupWithDefaultVarEnv tv_skol_env (tyVarName tv) tv
+      in (n, tv)
+
+{-
+Note [Associated data family instances and di_scoped_tvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some care is required to implement `deriving` correctly for associated data
+family instances. Consider this example from #18055:
+
+  class C a where
+    data D a
+
+  class X a b
+
+  instance C (Maybe a) where
+    data D (Maybe a) deriving (X a)
+
+When typechecking the `X a` in `deriving (X a)`, we must ensure that the `a`
+from the instance header is brought into scope. This is the role of
+di_scoped_tvs, which maps from the original, renamed `a` to the skolemized,
+typechecked `a`. When typechecking the `deriving` clause, this mapping will be
+consulted when looking up the `a` in `X a`.
+
+A naïve attempt at creating the di_scoped_tvs is to simply reuse the
+tyConTyVars of the representation TyCon for `data D (Maybe a)`. This is only
+half correct, however. We do want the typechecked `a`'s Name in the /range/
+of the mapping, but we do not want it in the /domain/ of the mapping.
+To ensure that the original `a`'s Name ends up in the domain, we consult a
+TyVarEnv (passed as an argument to tcDataFamInstDecl) that maps from the
+typechecked `a`'s Name to the original `a`'s Name. In the even that
+tcDataFamInstDecl is processing a non-associated data family instance, this
+TyVarEnv will simply be empty, and there is nothing to worry about.
+-}
 
 -----------------------
 tcDataFamInstHeader
