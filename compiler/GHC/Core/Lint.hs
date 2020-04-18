@@ -708,8 +708,13 @@ lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM LintedType
 lintJoinLams join_arity enforce rhs
   = go join_arity rhs
   where
-    go 0 rhs            = lintCoreExpr rhs
-    go n (Lam var expr) = lintLambda var $ go (n-1) expr
+    go 0 rhs             = lintCoreExpr rhs
+    go n (Lam var expr)  = lintLambda var $ go (n-1) expr
+    go n (Cast expr co)  = do { _ <- go n expr
+                              ; lintCastExpr expr co
+                              }
+      -- N.B. join points can be cast. e.g. we consider ((\x -> ...) `cast` ...)
+      -- to be a join point at join arity 1.
     go n _other | Just bndr <- enforce -- Join point with too few RHS lambdas
                 = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
                 | otherwise -- Future join point, not yet eta-expanded
@@ -770,6 +775,19 @@ type LintedCoercion = Coercion
 type LintedTyCoVar  = TyCoVar
 type LintedId       = Id
 
+-- | Lint an expression cast through the given coercion, returning the type
+-- resulting from the cast.
+lintCastExpr :: CoreExpr -> Coercion -> LintM LintedType
+lintCastExpr expr co 
+  = do { expr_ty <- markAllJoinsBad $ lintCoreExpr expr
+       ; co' <- lintCoercion co
+       ; let (Pair from_ty to_ty, role) = coercionKindRole co'
+       ; checkValueType to_ty $
+         text "target of cast" <+> quotes (ppr co')
+       ; lintRole co' Representational role
+       ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
+       ; return to_ty }
+
 lintCoreExpr :: CoreExpr -> LintM LintedType
 -- The returned type has the substitution from the monad
 -- already applied to it:
@@ -787,14 +805,7 @@ lintCoreExpr (Lit lit)
   = return (literalType lit)
 
 lintCoreExpr (Cast expr co)
-  = do { expr_ty <- markAllJoinsBad $ lintCoreExpr expr
-       ; co' <- lintCoercion co
-       ; let (Pair from_ty to_ty, role) = coercionKindRole co'
-       ; checkValueType to_ty $
-         text "target of cast" <+> quotes (ppr co')
-       ; lintRole co' Representational role
-       ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
-       ; return to_ty }
+  = markAllJoinsBad $ lintCastExpr expr co
 
 lintCoreExpr (Tick tickish expr)
   = do case tickish of
