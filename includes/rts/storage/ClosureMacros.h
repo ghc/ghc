@@ -477,25 +477,25 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
     - LDV profiling (PROFILING, and +RTS -hb) and
 
-    - regular heap profiling (PROFILING, and +RTS -h). Only mutable closures
-      need zeroing here though. See Note [skipping slop in the heap profiler].
+    - regular heap profiling (PROFILING, and +RTS -h). Only closures that can
+      end up in a pinned block need zeroing here though. See Note [skipping slop
+      in the heap profiler].
 
    However we can get into trouble if we're zeroing slop for ordinarily
    immutable closures when using multiple threads, since there is nothing
    preventing another thread from still being in the process of reading the
    memory we're about to zero.
 
-   Thus, with the THREADED RTS and +RTS -N2 or greater we must not zero
-   immutable closure's slop.
+   Thus, with the THREADED RTS and nCapabilities>1 we must not zero immutable
+   closure's slop. The LDV profiler and sanity checks will be disabled in this
+   case.
 
    Hence, an immutable closure's slop is zeroed when either:
 
-    - PROFILING && era > 0 (LDV is on) or
-    - !THREADED && DEBUG
+    - PROFILING && era > 0 (LDV is on, cannot be enabled if nCapabilities>1) or
+    - DEBUG && nCapabilities==1
 
    Additionally:
-
-    - LDV profiling and +RTS -N2 are incompatible,
 
     - full-heap sanity checks are disabled for the THREADED RTS, at least when
       they don't run right after GC when there is no slop.
@@ -534,7 +534,7 @@ zeroSlop (
 EXTERN_INLINE void
 zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
 {
-    // see Note [zeroing slop when overwriting closures], also #8402
+    // See Note [zeroing slop when overwriting closures] and also #8402.
 
     const bool want_to_zero_immutable_slop = false
         // Sanity checking (-DS) is enabled
