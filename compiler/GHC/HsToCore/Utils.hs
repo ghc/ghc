@@ -22,7 +22,7 @@ module GHC.HsToCore.Utils (
         MatchResult'(..), MatchResult, CaseAlt(..),
         cantFailMatchResult, alwaysFailMatchResult,
         extractMatchResult, combineMatchResults,
-        adjustMatchResult,  adjustMatchResultDs,
+        adjustMatchResultDs,
         shareFailureHandler,
         mkCoLetMatchResult, mkViewMatchResult, mkGuardedMatchResult,
         matchCanFail, mkEvalMatchResult,
@@ -225,9 +225,6 @@ combineMatchResults match_result1 match_result2 =
       -- Before actually failing, try the next match arm.
       body_fn1 =<< runMatchResult fail_expr match_result2
 
-adjustMatchResult :: (a -> b) -> MatchResult' a -> MatchResult' b
-adjustMatchResult = fmap
-
 adjustMatchResultDs :: (a -> DsM b) -> MatchResult' a -> MatchResult' b
 adjustMatchResultDs encl_fn = \case
   MR_Infallible body_fn -> MR_Infallible $
@@ -248,17 +245,16 @@ seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = mkDefaultCase (Var var) var body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
-mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)
+mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 
 -- (mkViewMatchResult var' viewExpr mr) makes the expression
 -- let var' = viewExpr in mr
 mkViewMatchResult :: Id -> CoreExpr -> MatchResult -> MatchResult
-mkViewMatchResult var' viewExpr =
-    adjustMatchResult (mkCoreLet (NonRec var' viewExpr))
+mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
 
 mkEvalMatchResult :: Id -> Type -> MatchResult -> MatchResult
-mkEvalMatchResult var ty
-  = adjustMatchResult (\e -> Case (Var var) var ty [(DEFAULT, [], e)])
+mkEvalMatchResult var ty = fmap $ \e ->
+  Case (Var var) var ty [(DEFAULT, [], e)]
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
 mkGuardedMatchResult pred_expr mr = MR_Fallible $ \fail -> do
