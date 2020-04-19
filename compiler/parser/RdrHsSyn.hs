@@ -51,7 +51,7 @@ module   RdrHsSyn (
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
         checkImportDecl,
-        checkExpBlockArguments,
+        checkExpBlockArguments, checkCmdBlockArguments,
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
