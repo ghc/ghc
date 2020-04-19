@@ -760,7 +760,13 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
-{- Note [runRW arg]
+instance Outputable ArgInfo where
+  ppr (CpeApp arg) = text "app" <+> ppr arg
+  ppr (CpeCast co) = text "cast" <+> ppr co
+  ppr (CpeTick tick) = text "tick" <+> ppr tick
+
+{-
+ Note [runRW arg]
 ~~~~~~~~~~~~~~~~~~~
 If we got, say
    runRW# (case bot of {})
