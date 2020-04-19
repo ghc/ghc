@@ -188,6 +188,7 @@ isWorker (Task *task)
 // Linked list of all tasks.
 //
 extern Task *all_tasks;
+void   freeTask  (Task *task);
 
 // The all_tasks list is protected by the all_tasks_mutex
 #if defined(THREADED_RTS)
@@ -199,29 +200,6 @@ extern Mutex all_tasks_mutex;
 //
 void initTaskManager (void);
 uint32_t  freeTaskManager (void);
-
-// Create a new Task for a bound thread.  This Task must be released
-// by calling boundTaskExiting.  The Task is cached in
-// thread-local storage and will remain even after boundTaskExiting()
-// has been called; to free the memory, see freeMyTask().
-//
-Task* newBoundTask (void);
-
-// Return the current OS thread's Task, which is created if it doesn't already
-// exist.  After you have finished using RTS APIs, you should call freeMyTask()
-// to release this thread's Task.
-Task* getTask (void);
-
-// The current task is a bound task that is exiting.
-//
-void boundTaskExiting (Task *task);
-
-// Free a Task if one was previously allocated by newBoundTask().
-// This is not necessary unless the thread that called newBoundTask()
-// will be exiting, or if this thread has finished calling Haskell
-// functions.
-//
-void freeMyTask(void);
 
 // Notify the task manager that a task has stopped.  This is used
 // mainly for stats-gathering purposes.
