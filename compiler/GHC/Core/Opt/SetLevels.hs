@@ -91,11 +91,13 @@ import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, 
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
+import GHC.Types.Unique       ( hasKey )
 import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
+import GHC.Builtin.Names      ( runRWKey )
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -399,8 +401,14 @@ lvlNonTailExpr env expr
 lvlApp :: LevelEnv
        -> CoreExprWithFVs
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
-        -> LvlM LevelledExpr                   -- Result expression
+       -> LvlM LevelledExpr                    -- Result expression
 lvlApp env orig_expr ((_,AnnVar fn), args)
+  -- Try to ensure that runRW#'s continuation isn't floated out.
+  -- See Note [Simplification of runRW#].
+  | fn `hasKey` runRWKey
+  = do { args' <- mapM (lvlExpr env) args
+       ; return (foldl' App (lookupVar env fn) args') }
+
   | floatOverSat env   -- See Note [Floating over-saturated applications]
   , arity > 0
   , arity < n_val_args
