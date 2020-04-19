@@ -16,7 +16,9 @@ extern "C" {
 #endif
 
 #include "HsFFI.h"
+#include "rts/Types.h"
 #include "rts/Time.h"
+#include "rts/Task.h"
 #include "rts/EventLogWriter.h"
 
 /*
@@ -482,6 +484,24 @@ void rts_evalLazyIO_ (/* inout */ Capability **,
 void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
+
+// Various bits of information that need to be persisted between rts_pause and
+// rts_unpause.
+typedef struct RtsPaused_ {
+    Task *pausing_task;
+    Capability *capabilities;
+} RtsPaused;
+
+RtsPaused rts_pause (void);
+void rts_unpause (RtsPaused paused);
+
+// List all live threads. Must be done while RTS is paused.
+typedef void (*ListThreadsCb)(void *user, StgTSO *);
+void rts_listThreads(ListThreadsCb cb, void *user);
+
+// List all non-thread GC roots. Must be done while RTS is paused.
+typedef void (*ListRootsCb)(void *user, StgClosure *);
+void rts_listMiscRoots(ListRootsCb cb, void *user);
 
 /*
  * The RTS allocates some thread-local data when you make a call into

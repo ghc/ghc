@@ -697,7 +697,7 @@ void printLargeAndPinnedObjects()
     for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
-        debugBelch("Capability %d: Current pinned object block: %p\n", 
+        debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
         for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
             debugBelch("%p\n", (void*)bd);
@@ -852,12 +852,26 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
+// findPtr takes a callback so external tools such as ghc-debug can invoke it
+// and intercept the intermediate results. When findPtr successfully finds
+// a closure containing an address then the callback is called on the address
+// of that closure. The `StgClosure` argument is an untagged closure pointer.
+typedef void (*FindPtrCb)(void *user, StgClosure *);
+
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
+void findPtrCb(FindPtrCb cb, void *, P_ p);  /* keep gcc -Wall happy */
+
+static void
+findPtr_default_callback(void *user STG_UNUSED, StgClosure * closure){
+  debugBelch("%p = ", closure);
+  printClosure((StgClosure *)closure);
+}
+
 
 int searched = 0;
 
 static int
-findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 {
     StgPtr q, r, end;
     for (; bd; bd = bd->link) {
@@ -875,8 +889,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
                         }
                         end = r + closure_sizeW((StgClosure*)r);
                         if (q < end) {
-                            debugBelch("%p = ", r);
-                            printClosure((StgClosure *)r);
+                            cb(user, (StgClosure *) r);
                             arr[i++] = r;
                             break;
                         }
@@ -893,8 +906,8 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
     return i;
 }
 
-void
-findPtr(P_ p, int follow)
+static void
+findPtr_gen(FindPtrCb cb, void *user, P_ p, int follow)
 {
   uint32_t g, n;
   bdescr *bd;
@@ -916,22 +929,33 @@ findPtr(P_ p, int follow)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      i = findPtrBlocks(cb, user,p,bd,arr,arr_size,i);
       bd = generations[g].large_objects;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      i = findPtrBlocks(cb, user, p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
       for (n = 0; n < n_capabilities; n++) {
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
+          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].part_list,
                             arr, arr_size, i);
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
+          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].todo_bd,
                             arr, arr_size, i);
       }
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {
+      ASSERT(cb == &findPtr_default_callback);
       debugBelch("-->\n");
+      // Non-standard callback expects follow=0
       findPtr(arr[0], 1);
   }
+}
+
+void
+findPtr(P_ p, int follow){
+  findPtr_gen(&findPtr_default_callback, NULL, p, follow);
+}
+
+void findPtrCb(FindPtrCb cb, void* user, P_ p){
+  findPtr_gen(cb, user, p, 0);
 }
 
 const char *what_next_strs[] = {
