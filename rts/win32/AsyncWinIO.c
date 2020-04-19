@@ -27,7 +27,7 @@
    can't block on foreign calls without hanging the application.
 
    This file thus serves as a back-end service that continuously reads pending
-   evens from the given I/O completion port and notified the Haskell I/O manager
+   events from the given I/O completion port and notifies the Haskell I/O manager
    of work that has been completed.  This does incur a slight cost in that the
    rts has to actually schedule the Haskell thread to do the work, however this
    shouldn't be a problem for performance.
@@ -46,7 +46,7 @@
 
    2) We block in a non-alertable state whenever
      a) The Completion port handle is yet unknown.
-     b) The RTS requested the I/O manager be shutdown via an event
+     b) The RTS requested the I/O manager be shutdown via an event --TODO: Remove?
      c) We are waiting on the Haskell I/O manager to service a previous
      request as to allow us to re-use the buffer.
 
@@ -78,9 +78,24 @@
                  +------------+process response|
                               +----------------+
 
+   The alertable wait is done by calling into GetQueuedCompletionStatusEx.
+   After we return from the call we notify the haskell side of new events
+   via notifyRtsOfFinishedCall.
+
+   notifyRtsOfFinishedCall schedules execution of the haskell side function
+   processRemoteCompletion, which will process call backs queued to be executed
+   after IO actions finished. It also sets `outstanding_service_requests` to indicate
+   that the C side should wait until all events have been processed before proceeding.
+
+   Until/While processRemoteCompletion runs the C side will block again in the unalertable
+   wait. It will be unblocked by the execution of `servicedIOEntries` from within
+   processRemoteCompletion.
+
+
+
 
    As a design decision to keep this side as light as possible no bookkeeping
-   is done here to track requests.  That is, this file has no wait of knowing
+   is done here to track requests.  That is, this file has no way of knowing
    of the remaining outstanding I/O requests, how many it actually completed
    in the last call as that list may contain spurious events.
 
@@ -89,11 +104,28 @@
 
    Unlike the Threaded version we use a single worker thread to handle
    completions and so it won't scale as well.  But if high scalability is needed
-   then use the threaded runtime.  This could would have to become threadsafe
+   then use the threaded runtime.  This would have to become threadsafe
    in order to use multiple threads, but this is non-trivial as the non-threaded
    rts has no locks around any of the key parts.
 
-   See also Note [WINIO Manager design].  */
+   See also Note [WINIO Manager design].
+
+
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Note [Notifying the RTS/Haskell of completed events]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  notifyRtsOfFinishedCall can't directly create a haskell thread.
+  With the current API of the haskell runtime this would be terrible
+  unsound. In particular the GC assumes no heap objects are generated,
+  and no heap memory is requested while it is running.
+
+  To work around this the scheduler invokes <insertName> which checks
+  if a new thread should be created. Since we only use this code path
+  in the non-threaded runtime this is safe. The scheduler is never
+  running concurrently with the GC or Mutator.
+
+   */
 
 /* The IOCP Handle all I/O requests are associated with for this RTS.  */
 static HANDLE completionPortHandle = INVALID_HANDLE_VALUE;
