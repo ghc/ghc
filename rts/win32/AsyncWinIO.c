@@ -145,7 +145,12 @@ volatile bool outstanding_service_requests = false;
 /* Indicates wether we have hit one case where we serviced as much requests as
    we could because the buffer got full.  In such cases for the next requests
    we expand the buffers so we have room to process requests in bigger
-   batches.  */
+   batches.
+    Set by:
+      runner
+    Read by:
+      servicedIOEntries
+*/
 bool queue_full = false;
 
 /* Timeout to use for the next alertable wait.  INFINITE means never timeout.
@@ -164,8 +169,6 @@ CONDITION_VARIABLE wakeEvent;
 /* Conditional variable to force the system thread to wait for a request to
    complete.  */
 CONDITION_VARIABLE threadIOWait;
-/* The last event that was sent to the I/O manager.  */
-HsWord32 lastEvent = 0;
 
 /* Number of callbacks to reserve slots for in ENTRIES.  This is also the
    total number of concurrent I/O requests we can handle in one go.  */
@@ -384,6 +387,8 @@ void servicedIOEntries (uint64_t remaining)
 
 DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
 {
+  /* The last event that was sent to the I/O manager.  */
+  HsWord32 lastEvent = 0;
   while (running)
     {
       AcquireSRWLockExclusive (&lock);
