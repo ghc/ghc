@@ -38,7 +38,7 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Names( runRWKey, keepAliveIdKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
@@ -1879,6 +1879,42 @@ rebuildCall env info (CastIt co cont)
 
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty) cont
+
+---------- Simplify continuation-passing primops --------------
+-- (Do this after absorbing all arguments)
+--
+-- Push strict contexts into keepAlive# continuation
+--
+-- That is,
+--
+--     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+--       ~>
+--     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` keepAliveIdKey
+  , [ ValArg y
+    , ValArg x
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = do { let ty' = contResultType cont
+       ; j <- newJoinId [] ty'
+       ; let env' = zapSubstEnv env
+       ; y' <- simplExprC env' y cont
+       ; let bind = NonRec j y'
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
+       ; let call' = mkApps (Var fun)
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , x'
+               , Var j
+               ]
+       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
+         return (emptyFloats env `extendFloats` bind, call') }
 
 ---------- The runRW# rule. Do this after absorbing all arguments ------
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o

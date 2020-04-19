@@ -98,7 +98,7 @@ import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import GHC.Builtin.Names      ( runRWKey )
+import GHC.Builtin.Names      ( runRWKey, keepAliveIdKey )
 import Util
 import Outputable
 import FastString
@@ -405,7 +405,7 @@ lvlApp :: LevelEnv
 lvlApp env orig_expr ((_,AnnVar fn), args)
   -- Try to ensure that runRW#'s continuation isn't floated out.
   -- See Note [Simplification of runRW#].
-  | fn `hasKey` runRWKey
+  | fn `hasKey` runRWKey || fn `hasKey` keepAliveIdKey
   = do { args' <- mapM (lvlExpr env) args
        ; return (foldl' App (lookupVar env fn) args') }
 

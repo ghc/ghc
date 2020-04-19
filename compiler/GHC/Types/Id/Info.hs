@@ -168,6 +168,9 @@ data IdDetails
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
        -- Note [Join points] in GHC.Core
 
+  | NoBindingId  -- TODO: Revisit this
+       -- Note [Magic IDs]
+
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending
@@ -214,6 +217,7 @@ pprIdDetails other     = brackets (pp other)
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
    pp (JoinId arity)          = text "JoinId" <> parens (int arity)
+   pp NoBindingId             = text "NoBindingId"
 
 {-
 ************************************************************************

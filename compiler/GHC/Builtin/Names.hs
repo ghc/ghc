@@ -2199,15 +2199,17 @@ rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: Unique
+thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey,
+  keepAliveIdKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
 oneShotKey                    = mkPreludeMiscIdUnique 106
 runRWKey                      = mkPreludeMiscIdUnique 107
+keepAliveIdKey                = mkPreludeMiscIdUnique 108
 
 traceKey :: Unique
-traceKey                      = mkPreludeMiscIdUnique 108
+traceKey                      = mkPreludeMiscIdUnique 109
 
 breakpointIdKey, breakpointCondIdKey :: Unique
 breakpointIdKey               = mkPreludeMiscIdUnique 110
