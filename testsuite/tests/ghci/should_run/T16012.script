@@ -3,4 +3,4 @@
 -- should always return a reasonably low result.
 
 n <- System.Mem.getAllocationCounter
-if (n < 0 && n >= -160000) then putStrLn "Alloction counter in expected range" else (putStrLn $ "Unexpected allocation counter result:" ++ show n)
+if (n < 0 && n >= -200000) then putStrLn "Allocation counter in expected range" else (putStrLn $ "Unexpected allocation counter result:" ++ show n)
