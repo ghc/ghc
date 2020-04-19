@@ -532,10 +532,11 @@ zeroSlop (
     StgClosure *p,
     uint32_t offset, /*< offset to start zeroing at, in words */
     uint32_t size,   /*< total closure size, in words */
+    bool known_mutable /*< is this a closure who's slop we can always zero? */
     );
 
 EXTERN_INLINE void
-zeroSlop (StgClosure *p, uint32_t offset, uint32_t size)
+zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
 {
     // see Note [zeroing slop when overwriting closures], also #8402
 
@@ -555,7 +556,27 @@ zeroSlop (StgClosure *p, uint32_t offset, uint32_t size)
     const bool zero_slop_immutable =
         want_to_zero_immutable_slop && can_zero_immutable_slop;
 
-    if(!zero_slop_immutable)
+    const bool zero_slop_mutable =
+#if defined(PROFILING)
+        // Always zero mutable closure slop when profiling. We do this to cover
+        // the case of shrinking mutable arrays in pinned blocks for the heap
+        // profiler, see Note [skipping slop in the heap profiler]
+        //
+        // TODO: We could make this check more specific and only zero if the
+        // object is in a BF_PINNED bdescr here. Update Note [slop on the heap]
+        // and [zeroing slop when overwriting closures] if you change this.
+        true
+#else
+        zero_slop_immutable
+#endif
+        ;
+
+    const bool zero_slop =
+        // If we're not sure this is a mutable closure treat it like an
+        // immutable one.
+        known_mutable ? zero_slop_mutable : zero_slop_immutable;
+
+    if(!zero_slop)
         return;
 
     for (uint32_t i = offset; i < size; i++) {
@@ -571,7 +592,7 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
     if(era > 0 && !isInherentlyUsed(get_itbl(p)->type))
         LDV_recordDead(p, size);
 #endif
-    zeroSlop(p, sizeofW(StgThunkHeader), size);
+    zeroSlop(p, sizeofW(StgThunkHeader), size, /*known_mutable=*/false);
 }
 
 // Version of 'overwritingClosure' which overwrites only a suffix of a
@@ -595,7 +616,7 @@ overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 #if defined(PROFILING)
     ASSERT(isInherentlyUsed(get_itbl(p)->type) == true);
 #endif
-    zeroSlop(p, offset, closure_sizeW(p));
+    zeroSlop(p, offset, closure_sizeW(p), /*known_mutable=*/true);
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
@@ -609,5 +630,5 @@ EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
     if(era > 0)
         LDV_recordDead(p, size);
 #endif
-    zeroSlop(p, sizeofW(StgThunkHeader), size);
+    zeroSlop(p, sizeofW(StgThunkHeader), size, /*known_mutable=*/false);
 }
