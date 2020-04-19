@@ -134,8 +134,14 @@ uint64_t outstanding_requests = 0;
 /* Boolean controlling if the I/O manager is/should still be running.  */
 bool running = false;
 /* Boolean to indicate whether we have outstanding I/O requests that still need
-   to be processed by the I/O manager on the Haskell side.  */
-bool outstanding_service_requests = false;
+   to be processed by the I/O manager on the Haskell side.
+    Set by:
+      notifyRtsOfFinishedCall (true)
+      servicedIOEntries (false)
+    Read by:
+      runner
+   */
+volatile bool outstanding_service_requests = false;
 /* Indicates wether we have hit one case where we serviced as much requests as
    we could because the buffer got full.  In such cases for the next requests
    we expand the buffers so we have room to process requests in bigger
