@@ -37,10 +37,13 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
+import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
+import GHC.Builtin.Names( runRWKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
+import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Utils
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
@@ -1877,14 +1880,36 @@ rebuildCall env info (CastIt co cont)
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty) cont
 
-rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
+---------- The runRW# rule. Do this after absorbing all arguments ------
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args })
+            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont })
+  | fun `hasKey` runRWKey
+  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
+  , [ TyArg {}, TyArg {} ] <- rev_args
+  = do { s <- newId (fsLit "s") realWorldStatePrimTy
+       ; let env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
+                                , sc_env = env', sc_cont = cont }
+       ; body' <- simplExprC env' arg cont'
+       ; let arg'  = Lam s body'
+             ty'   = contResultType cont
+             rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
+
+rebuildCall env info@(ArgInfo { ai_type = fun_ty, ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_cont = cont })
+
+  -- Argument is already simplified
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
   = rebuildCall env (addValArgTo info' arg) cont
 
-  | str         -- Strict argument
+  -- Strict arguments
+  | str
   , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
@@ -1892,7 +1917,8 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
                           , sc_dup = Simplified, sc_cont = cont })
                 -- Note [Shadowing]
 
-  | otherwise                           -- Lazy argument
+  -- Lazy arguments
+  | otherwise
         -- DO NOT float anything outside, hence simplExprC
         -- There is no benefit (unlike in a let-binding), and we'd
         -- have to be very careful about bogus strictness through
