@@ -150,6 +150,7 @@ library
                       rts/StableName.h
                       rts/StablePtr.h
                       rts/StaticPtrTable.h
+                      rts/Task.h
                       rts/TTY.h
                       rts/Threads.h
                       rts/Ticky.h

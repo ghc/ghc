@@ -1537,7 +1537,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
 void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 {
     uint32_t i;
-
+    ASSERT( task != NULL);
     for (i = 0; i < n; i++) {
         Capability *tmpcap = capabilities[i];
         if (keep_cap != tmpcap) {
