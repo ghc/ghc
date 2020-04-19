@@ -44,7 +44,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import TysWiredIn
-import TysPrim          ( realWorldStatePrimTy )
 import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
@@ -843,7 +842,7 @@ cpeApp top_env expr
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
              -- TODO: What about casts?
 
-    cpe_app env (Var f) args n
+    cpe_app _env (Var f) args n
         | f `hasKey` runRWKey
         = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
 

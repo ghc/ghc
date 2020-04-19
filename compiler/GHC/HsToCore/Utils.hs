@@ -490,7 +490,7 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ty1
-mkCoreAppDs _ e@(Var f `App` Type r `App` Type ty1) arg
+mkCoreAppDs _ e@(Var f `App` Type _rep `App` Type _ty1) arg
   | f `hasKey` runRWKey
   = e `App` etaExpand 1 arg
 
