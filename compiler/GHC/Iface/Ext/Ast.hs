@@ -40,7 +40,7 @@ import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
 import GHC.Core.Type              ( mkVisFunTys, Type )
 import GHC.Core.Predicate
-import TysWiredIn                 ( mkListTy, mkSumTy )
+import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType, varUnique )

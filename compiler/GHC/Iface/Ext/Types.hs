@@ -17,7 +17,7 @@ import GhcPrelude
 import Config
 import Binary
 import Util
-import PrelInfo
+import GHC.Builtin.Utils
 import FastString                 ( FastString )
 import GHC.Iface.Type
 import GHC.Types.Module           ( ModuleName, Module )
