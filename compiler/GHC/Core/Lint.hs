@@ -1179,9 +1179,7 @@ lintCaseExpr scrut var alt_ty alts =
   do { let e = Case scrut var alt_ty alts   -- Just for error messages
 
      -- Check the scrutinee
-     ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
-          -- See Note [Join points are less general than the paper]
-          -- in GHC.Core
+     ; scrut_ty <- lintCoreExpr scrut
 
      ; alt_ty <- addLoc (CaseTy scrut) $
                  lintValueType alt_ty
