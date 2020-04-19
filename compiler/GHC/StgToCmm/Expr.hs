@@ -364,6 +364,7 @@ assignment.
 -}
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
+  , not $ isJoinId v -- TODO: necessary as idInfoToAmode panics on LneLoc
   = -- assignment suffices for unlifted types
     do { platform <- getPlatform
        ; unless (reps_compatible platform) $
