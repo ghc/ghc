@@ -583,6 +583,7 @@ instance ToHie (Context (Located Var)) where
   toHie c = case c of
       C context (L (RealSrcSpan span _) name')
         | varUnique name' == mkBuiltinUnique 1 -> pure []
+          -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
         | otherwise -> do
           m <- gets name_remapping
           let name = case lookupNameEnv m (varName name') of
@@ -605,6 +606,7 @@ instance ToHie (Context (Located Name)) where
   toHie c = case c of
       C context (L (RealSrcSpan span _) name')
         | nameUnique name' == mkBuiltinUnique 1 -> pure []
+          -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
         | otherwise -> do
           m <- gets name_remapping
           let name = case lookupNameEnv m name' of
