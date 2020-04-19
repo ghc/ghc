@@ -74,12 +74,6 @@ mkBlockList buffer = compactGetFirstBlock buffer >>= go
       rest <- go next
       return $ item : rest
 
--- We MUST mark withSerializedCompact as NOINLINE
--- Otherwise the compiler will eliminate the call to touch#
--- causing the Compact# to be potentially GCed too eagerly,
--- before func had a chance to copy everything into its own
--- buffers/sockets/whatever
-
 -- | Serialize the 'Compact', and call the provided function with
 -- with the 'Compact' serialized representation.  It is not safe
 -- to return the pointer from the action and use it after
@@ -89,7 +83,6 @@ mkBlockList buffer = compactGetFirstBlock buffer >>= go
 -- unsound to use 'unsafeInterleaveIO' to lazily construct
 -- a lazy bytestring from the 'Ptr'.
 --
-{-# NOINLINE withSerializedCompact #-}
 withSerializedCompact :: Compact a ->
                          (SerializedCompact a -> IO c) -> IO c
 withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
@@ -97,9 +90,7 @@ withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
                     (# s', rootAddr #) -> (# s', Ptr rootAddr #) )
   blockList <- mkBlockList buffer
   let serialized = SerializedCompact blockList rootPtr
-  r <- func serialized
-  IO (\s -> case touch# buffer s of
-         s' -> (# s', r #) )
+  IO (\s1 -> case func serialized of IO action' -> keepAlive# buffer (action' s1))
 
 fixupPointers :: Addr# -> Addr# -> State# RealWorld ->
                  (# State# RealWorld, Maybe (Compact a) #)
