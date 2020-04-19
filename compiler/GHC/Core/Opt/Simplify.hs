@@ -37,7 +37,7 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Names( runRWKey, keepAliveIdKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
@@ -1885,6 +1885,40 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
                       ApplyToVal {} -> False
                       _             -> True
 
+
+---------- Simplify continuation-passing primops --------------
+-- Push strict contexts into keepAlive# continuation
+--
+-- That is,
+--
+--     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+--       ~>
+--     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` keepAliveIdKey
+  , [ ValArg y
+    , ValArg x
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = do { let ty' = contResultType cont
+       ; j <- newJoinId [] ty'
+       ; let env' = zapSubstEnv env
+       ; y' <- simplExprC env' y cont
+       ; let bind = NonRec j y'
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
+       ; let call' = mkApps (Var fun)
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , x'
+               , Var j
+               ]
+       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
+         return (emptyFloats env `extendFloats` bind, call') }
 
 ---------- Simplify applications and casts --------------
 rebuildCall env info (CastIt co cont)
