@@ -44,6 +44,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import TysWiredIn
+import TysPrim          ( realWorldStatePrimTy )
 import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
@@ -823,14 +824,23 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
-    cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
+        -- N.B. While it may appear that n == 1 in the case of runRW#
+        -- applications, keep in mind that we may have applications that return
+        , n >= 1
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
-            _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
+             -- TODO: What about casts?
+
+    cpe_app env (Var f) args n
+        | f `hasKey` runRWKey
+        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1

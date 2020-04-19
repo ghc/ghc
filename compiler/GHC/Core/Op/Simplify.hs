@@ -37,10 +37,12 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Op.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
+import PrelNames        ( runRWKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
+import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Utils
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
@@ -1849,6 +1851,20 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
   where
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
+
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` runRWKey
+  , [ ValArg (Lam s body)
+    , TyArg {}, TyArg {} ] <- rev_args
+  = do { (env', s') <- simplLamBndr (zapSubstEnv env) s
+       ; body' <- simplExprC env' body cont
+       ; let arg'  = Lam s' body'
+             ty'   = contResultType cont
+             rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
 
 ---------- Try rewrite RULES --------------
 -- See Note [Trying rewrite rules]
