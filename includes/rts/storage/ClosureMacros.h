@@ -532,12 +532,10 @@ zeroSlop (
     StgClosure *p,
     uint32_t offset, /*< offset to start zeroing at, in words */
     uint32_t size,   /*< total closure size, in words */
-    bool inherently_used /*< whether to call LDV_recordDead */
     );
 
 EXTERN_INLINE void
-zeroSlop (StgClosure *p, uint32_t offset, uint32_t size,
-          bool inherently_used USED_IF_PROFILING)
+zeroSlop (StgClosure *p, uint32_t offset, uint32_t size)
 {
     // see Note [zeroing slop when overwriting closures], also #8402
 
@@ -560,12 +558,6 @@ zeroSlop (StgClosure *p, uint32_t offset, uint32_t size,
     if(!zero_slop_immutable)
         return;
 
-    // For LDV profiling, we need to record the closure as dead
-#if defined(PROFILING)
-    if (!inherently_used)
-        LDV_recordDead(p, size);
-#endif
-
     for (uint32_t i = offset; i < size; i++) {
         ((StgWord *)p)[i] = 0;
     }
@@ -574,20 +566,18 @@ zeroSlop (StgClosure *p, uint32_t offset, uint32_t size,
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
+    W_ size = closure_sizeW(p);
 #if defined(PROFILING)
-    ASSERT(!isInherentlyUsed(get_itbl(p)->type));
+    if(era > 0 && !isInherentlyUsed(get_itbl(p)->type))
+        LDV_recordDead(p, size);
 #endif
-    zeroSlop(p, sizeofW(StgThunkHeader), closure_sizeW(p),
-             /*inherently_used=*/false);
+    zeroSlop(p, sizeofW(StgThunkHeader), size);
 }
 
 // Version of 'overwritingClosure' which overwrites only a suffix of a
 // closure.  The offset is expressed in words relative to 'p' and shall
 // be less than or equal to closure_sizeW(p), and usually at least as
 // large as the respective thunk header.
-//
-// Note: As this calls LDV_recordDead() you have to call LDV_RECORD_CREATE()
-//       on the final state of the closure at the call-site
 EXTERN_INLINE void
 overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
 
@@ -600,18 +590,24 @@ overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
     //
     //   - shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
     //
-    // we can safely set inherently_used = true, which means LDV_recordDead
-    // won't be invoked below. Since these closures are inherenlty used we don't
-    // need to track their destruction.
-    zeroSlop(p, offset, closure_sizeW(p), /*inherently_used=*/true);
+    // we can safely omit the Ldv_recordDead call. Since these closures are
+    // considered inherenlty used we don't need to track their destruction.
+#if defined(PROFILING)
+    ASSERT(isInherentlyUsed(get_itbl(p)->type) == true);
+#endif
+    zeroSlop(p, offset, closure_sizeW(p));
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
+    // This function is only called from stg_AP_STACK so we can assume it's not
+    // inherently used.
 #if defined(PROFILING)
-    ASSERT(!isInherentlyUsed(get_itbl(p)->type));
+    ASSERT(isInherentlyUsed(get_itbl(p)->type) == false);
+    if(era > 0)
+        LDV_recordDead(p, size);
 #endif
-    zeroSlop(p, sizeofW(StgThunkHeader), size, /*inherently_used=*/false);
+    zeroSlop(p, sizeofW(StgThunkHeader), size);
 }
