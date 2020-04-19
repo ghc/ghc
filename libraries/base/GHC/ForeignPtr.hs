@@ -526,7 +526,9 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- or from the object pointed to by the
 -- 'ForeignPtr', using the operations from the
 -- 'Storable' class.
-withForeignPtr = unsafeWithForeignPtr
+withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
+  case f (unsafeForeignPtrToPtr fo) of
+    IO action# -> keepAlive# r s action#
 
 -- | This is similar to 'withForeignPtr' but comes with an important caveat:
 -- the user must guarantee that the continuation does not diverge (e.g. loop or
