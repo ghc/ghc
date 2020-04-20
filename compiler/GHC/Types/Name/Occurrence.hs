@@ -101,17 +101,17 @@ module GHC.Types.Name.Occurrence (
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import FastString
-import FastStringEnv
-import Outputable
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
-import Binary
+import GHC.Utils.Binary
 import Control.DeepSeq
 import Data.Char
 import Data.Data

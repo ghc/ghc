@@ -23,7 +23,7 @@ where
 #include "HsVersions.h"
 
 -- NCG stuff:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Regs
 import GHC.CmmToAsm.PPC.Instr
@@ -55,8 +55,8 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 
 -- The rest:
-import OrdList
-import Outputable
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
 import GHC.Driver.Session
 
 import Control.Monad    ( mapAndUnzipM, when )
@@ -64,8 +64,8 @@ import Data.Bits
 import Data.Word
 
 import GHC.Types.Basic
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector

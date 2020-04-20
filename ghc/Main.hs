@@ -53,23 +53,23 @@ import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
 import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))
-import ErrUtils
-import FastString
-import Outputable
+import GHC.Utils.Error
+import GHC.Data.FastString
+import GHC.Utils.Outputable as Outputable
 import GHC.SysTools.BaseDir
 import GHC.Settings.IO
 import GHC.Types.SrcLoc
-import Util
-import Panic
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
-import MonadUtils       ( liftIO )
+import GHC.Utils.Monad       ( liftIO )
 
 -- Imports for --abi-hash
-import GHC.Iface.Load      ( loadUserInterface )
-import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
-import GHC.Tc.Utils.Monad        ( initIfaceCheck )
-import Binary              ( openBinMem, put_ )
-import GHC.Iface.Recomp.Binary      ( fingerprintBinMem )
+import GHC.Iface.Load          ( loadUserInterface )
+import GHC.Driver.Finder       ( findImportedModule, cannotFindModule )
+import GHC.Tc.Utils.Monad      ( initIfaceCheck )
+import GHC.Utils.Binary        ( openBinMem, put_ )
+import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO
@@ -786,7 +786,7 @@ showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
         putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
 
--- TODO use ErrUtils once that is disentangled from all the other GhcMonad stuff?
+-- TODO use GHC.Utils.Error once that is disentangled from all the other GhcMonad stuff?
 showSupportedExtensions :: Maybe String -> IO ()
 showSupportedExtensions m_top_dir = do
   res <- runExceptT $ do

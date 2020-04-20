@@ -37,23 +37,23 @@ module GHC.Core.Map (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import TrieMap
+import GHC.Data.TrieMap
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Types.Var
-import FastString(FastString)
-import Util
+import GHC.Data.FastString(FastString)
+import GHC.Utils.Misc
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import Outputable
+import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 
 {-

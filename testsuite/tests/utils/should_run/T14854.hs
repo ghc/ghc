@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main (main) where
 
-import FastString
+import GHC.Data.FastString
 
 import Control.Concurrent
 import Control.DeepSeq

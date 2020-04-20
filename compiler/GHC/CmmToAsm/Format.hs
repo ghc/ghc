@@ -20,10 +20,10 @@ module GHC.CmmToAsm.Format (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
-import Outputable
+import GHC.Utils.Outputable
 
 -- It looks very like the old MachRep, but it's now of purely local
 -- significance, here in the native code generator.  You can change it

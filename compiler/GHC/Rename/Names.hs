@@ -32,7 +32,7 @@ module GHC.Rename.Names (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core.TyCo.Ppr
@@ -53,13 +53,13 @@ import GHC.Types.FieldLabel
 import GHC.Driver.Types
 import GHC.Types.Name.Reader
 import GHC.Parser.PostProcess ( setRdrNameSpace )
-import Outputable
-import Maybes
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
-import Util
-import FastString
-import FastStringEnv
+import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
 import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.PatSyn

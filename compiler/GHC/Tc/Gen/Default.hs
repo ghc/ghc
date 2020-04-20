@@ -8,7 +8,7 @@
 -- | Typechecking @default@ declarations
 module GHC.Tc.Gen.Default ( tcDefaults ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
@@ -21,8 +21,8 @@ import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 tcDefaults :: [LDefaultDecl GhcRn]

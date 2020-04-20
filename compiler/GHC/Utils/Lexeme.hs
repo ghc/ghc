@@ -27,9 +27,9 @@ module GHC.Utils.Lexeme (
 
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
+import GHC.Data.FastString
 
 import Data.Char
 import qualified Data.Set as Set

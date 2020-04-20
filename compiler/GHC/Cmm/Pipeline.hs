@@ -9,7 +9,7 @@ module GHC.Cmm.Pipeline (
   cmmPipeline
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
 import GHC.Cmm.Lint
@@ -24,10 +24,10 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Types
 import Control.Monad
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import Data.Either (partitionEithers)
 

@@ -21,7 +21,7 @@ module GHC.Cmm.Graph
   )
 where
 
-import GhcPrelude hiding ( (<*>) ) -- avoid importing (<*>)
+import GHC.Prelude hiding ( (<*>) ) -- avoid importing (<*>)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -32,13 +32,13 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import OrdList
+import GHC.Data.OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
 import GHC.Types.Unique.Supply
-import Util
-import Panic
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 
 -----------------------------------------------------------------------------

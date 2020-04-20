@@ -13,7 +13,7 @@ module GHC.Cmm.Monad (
   , failMsgPD
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Control.Monad
 

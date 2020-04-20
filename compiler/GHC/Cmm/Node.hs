@@ -26,15 +26,15 @@ module GHC.Cmm.Node (
      CmmTickScope(..), isTickSubScope, combineTickScopes,
   ) where
 
-import GhcPrelude hiding (succ)
+import GHC.Prelude hiding (succ)
 
 import GHC.Platform.Regs
 import GHC.Cmm.Expr
 import GHC.Cmm.Switch
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Core (Tickish)
 import qualified GHC.Types.Unique as U
@@ -46,7 +46,7 @@ import GHC.Cmm.Dataflow.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
 import GHC.Types.Unique (nonDetCmpUnique)
-import Util
+import GHC.Utils.Misc
 
 
 ------------------------

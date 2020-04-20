@@ -24,7 +24,7 @@ module GHC.ThToHs
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
@@ -40,13 +40,13 @@ import GHC.Builtin.Types
 import GHC.Types.Basic as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
-import ErrUtils
-import Bag
+import GHC.Utils.Error
+import GHC.Data.Bag
 import GHC.Utils.Lexeme
-import Util
-import FastString
-import Outputable
-import MonadUtils ( foldrM )
+import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Monad ( foldrM )
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )

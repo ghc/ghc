@@ -8,16 +8,16 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
-import GraphBase
+import GHC.Data.Graph.Base
 
 import GHC.Types.Unique.Set
 import GHC.Platform
-import Panic
+import GHC.Utils.Panic
 
 -- trivColorable ---------------------------------------------------------------
 

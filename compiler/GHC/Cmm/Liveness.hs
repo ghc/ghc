@@ -12,7 +12,7 @@ module GHC.Cmm.Liveness
     )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Cmm.BlockId
@@ -23,8 +23,8 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Label
 
-import Maybes
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
