@@ -78,7 +78,6 @@
 -fallow-overlapping-instances
 -fallow-undecidable-instances
 -farrows
--fast-llvm
 -fbang-patterns
 -fbuilding-cabal-package
 -fconstraint-solver-iterations
