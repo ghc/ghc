@@ -104,6 +104,21 @@ Template Haskell
  - The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
    splices do not lead directly to compile-time evaluation. (!2288)
 
+Arrow notation
+~~~~~~~~~~~~~~
+
+ - When combined with :extension:`Arrows`, the :extension:`LambdaCase` extension
+   now additionally allows ``\case`` syntax to be used as a command in ``proc``
+   notation.
+
+ - When combined with :extension:`Arrows`, the effects of the
+   :extension:`BlockArguments` extension now also apply to applications of
+   arrow control operators in ``(|`` banana brackets ``|)``: ::
+
+     (| untilA (increment -< x + y) do
+          within 0.5 -< x
+          ... |)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -182,4 +197,3 @@ for further change information.
     libraries/unix/unix.cabal:               Dependency of ``ghc`` library
     libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
     libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
-
