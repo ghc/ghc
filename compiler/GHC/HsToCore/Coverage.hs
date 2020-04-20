@@ -861,6 +861,8 @@ addTickHsCmd (HsCmdCase x e mgs) =
         liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
                 (addTickCmdMatchGroup mgs)
+addTickHsCmd (HsCmdLamCase x mgs) =
+        liftM (HsCmdLamCase x) (addTickCmdMatchGroup mgs)
 addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
         liftM3 (HsCmdIf x cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)

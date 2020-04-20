@@ -1233,6 +1233,9 @@ instance ( a ~ GhcPass p
         [ toHie expr
         , toHie alts
         ]
+      HsCmdLamCase _ alts ->
+        [ toHie alts
+        ]
       HsCmdIf _ _ a b c ->
         [ toHie a
         , toHie b
