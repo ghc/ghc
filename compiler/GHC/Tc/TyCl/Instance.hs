@@ -823,14 +823,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
                         hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
-                    -- We ignore the coercion here, returning lhs_applied_kind
-                    -- The res_kind is just an additional constraint
+                    -- Check that the result kind of the TyCon applied to its args
+                    -- is compatible with the explicit signature (or Type, if there
+                    -- is none)
 
                   ; traceTc "tcDataFamInstHeader" $
                     vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind ]
                   ; return ( stupid_theta
                            , lhs_applied_ty
-                           , lhs_applied_kind ) }
+                           , res_kind ) }
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        -- This code (and the stuff immediately above) is very similar

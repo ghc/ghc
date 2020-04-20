@@ -80,7 +80,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
 
-  zonkEvVar, zonkWC, zonkSimples,
+  zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
   zonkCt, zonkSkolemInfo,
 
@@ -1216,13 +1216,14 @@ instance Outputable CandidatesQTvs where
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
-partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (DTyVarSet, CandidatesQTvs)
+partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (TyVarSet, CandidatesQTvs)
+-- The selected TyVars are returned as a non-deterministic TyVarSet
 partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
   = (extracted, dvs { dv_kvs = rest_kvs, dv_tvs = rest_tvs })
   where
     (extracted_kvs, rest_kvs) = partitionDVarSet pred kvs
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
-    extracted = extracted_kvs `unionDVarSet` extracted_tvs
+    extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
 -- | Gathers free variables to use as quantification candidates (in
 -- 'quantifyTyVars'). This might output the same var

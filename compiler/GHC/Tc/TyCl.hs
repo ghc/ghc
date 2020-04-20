@@ -2352,10 +2352,9 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
 4. Datatype return kind restriction: A data/data-instance return kind must end
    in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By
    "end in", we mean we strip any foralls and function arguments off before
-   checking: this remaining part of the type is returned from
-   etaExpandAlgTyCon. Note that we do *not* do type family reduction here.
-   Examples:
+   checking: this remaining part of the type is returned from etaExpandAlgTyCon.
 
+   Examples:
      data T1 :: Type                          -- good
      data T2 :: Bool -> Type                  -- good
      data T3 :: Bool -> forall k. Type        -- strange, but still accepted
@@ -2363,27 +2362,38 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
      data T5 :: Bool                          -- bad
      data T6 :: Type -> Bool                  -- bad
 
-     type Arrow = (->)
-     data T7 :: Arrow Bool Type               -- good
+   Exactly the same applies to data instance (but not data famlily)
+   declarations.  Examples
+     data instance D1 :: Type                 -- good
+     data instance D2 :: Boool -> Type        -- good
 
+   We can "look through" type synonyms
+     type Star = Type
+     data T7 :: Bool -> Star                  -- good (synonym expansion ok)
+     type Arrow = (->)
+     data T8 :: Arrow Bool Type               -- good (ditto)
+
+   But we specifically do *not* do type family reduction here.
      type family ARROW where
        ARROW = (->)
-     data T8 :: ARROW Bool Type               -- bad
-
-     type Star = Type
-     data T9 :: Bool -> Star                  -- good
+     data T9 :: ARROW Bool Type               -- bad
 
      type family F a where
        F Int  = Bool
        F Bool = Type
      data T10 :: Bool -> F Bool               -- bad
 
+   The /principle/ here is that in the TyCon for a data type or data instance,
+   we must be able to lay out all the type-variable binders, one by one, until
+   we reach (TYPE xx).  There is no place for a cast here.  We could add one,
+   but let's not!
+
    This check is done in checkDataKindSig. For data declarations, this
    call is in tcDataDefn; for data instances, this call is in tcDataFamInstDecl.
 
-   However, because data instances in GADT syntax can have two return kinds (see
-   point (2) above), we must check both return kinds. The user-written return
-   kind is checked by the call to checkDataKindSig in tcDataFamInstHeader. Examples:
+4a  Because data instances in GADT syntax can have two return kinds (see
+    point (2) above), we must check both return kinds. The user-written return
+    kind is checked by the call to checkDataKindSig in tcDataFamInstHeader. Examples:
 
      data family D (a :: Nat) :: k     -- good (see Point 6)
 

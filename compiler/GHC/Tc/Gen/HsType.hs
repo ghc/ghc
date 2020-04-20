@@ -221,7 +221,9 @@ tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    snd <$> tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    do { (implic, ty) <- tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+       ; emitImplication implic
+       ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
@@ -247,16 +249,11 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
+       ; (implic, ty) <- tc_hs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
 
-       -- See Note [Fail fast if there are insoluble kind equalities]
-       -- in GHC.Tc.Solver
-       -- Any implications are almost skolem-escape bugs, and for
-       -- these we really want to stop now!  Top level constraints
-       -- may relate to outer stuff and can be solved later.
-       ; when insol (do { traceTc "tcHsSigType: failing" empty
-                        ; failM })
+       -- Spit out the implication (and perhpas fail fast)
+       ; emitFlatConstraintsImplic implic
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -275,14 +272,13 @@ tcStandaloneKindSig (L _ kisig) = case kisig of
        ; return (name, kind) }
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
-               -> ContextKind -> TcM (Bool, TcType)
+               -> ContextKind -> TcM (Implication, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
--- Returns also a Bool indicating whether the type induced an insoluble constraint;
--- True <=> constraint is insoluble
+-- Returns also an implication for the unsolved constraints
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
@@ -305,10 +301,11 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; let should_gen = not . (`elemVarSet` constrained)
 
        ; kvs <- kindGeneralizeSome should_gen ty1
-       ; emitResidualTvConstraint skol_info (kvs ++ spec_tkvs) tc_lvl wanted
 
-       ; return (insolubleOrImplicWC wanted, mkInvForAllTys kvs ty1) }
-         -- See Note [Skolem escape in type signatures]
+       -- Build an implication for any as-yet-unsolved kind equalities
+       ; implic <- buildTvImplication skol_info (kvs ++ spec_tkvs) tc_lvl wanted
+
+       ; return (implic, mkInvForAllTys kvs ty1) }
 
 {- Note [Skolem escape in type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -762,7 +759,8 @@ tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
              skol_info   = ForAllSkol (ppr forall)
                                       (sep (map ppr hs_tvs))
 
-       ; emitResidualTvConstraint skol_info tvs' tclvl wanted
+       ; implic <- buildTvImplication skol_info tvs' tclvl wanted
+       ; emitImplication implic
          -- See Note [Skolem escape and forall-types]
 
        ; return (mkForAllTys bndrs ty') }
@@ -954,6 +952,8 @@ Note [The wildcard story for types] in GHC.Hs.Types
 
 Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Checking telescopes].
+
 Consider
   f :: forall a. (forall kb (b :: kb). Proxy '[a, b]) -> ()
 
@@ -967,11 +967,19 @@ unification variable, because it would be untouchable inside
 this inner implication.
 
 That's what the pushLevelAndCaptureConstraints, plus subsequent
-emitResidualTvConstraint is all about, when kind-checking
+buildTvImplication/emitImplication is all about, when kind-checking
 HsForAllTy.
 
-Note that we don't need to /simplify/ the constraints here
-because we aren't generalising. We just capture them.
+Note that
+
+* We don't need to /simplify/ the constraints here
+  because we aren't generalising. We just capture them.
+
+* We can't use emitResidualTvConstraint, because that has a fast-path
+  for empty coonstraints.  We can't take that fast path here, because
+  we must do the bad-telescope check even if there are no inner wanted
+  constraints. See Note [Checking telescopes] in
+  GHC.Tc.Types.Constraint.  Lacking this check led to #16247.
 -}
 
 {- *********************************************************************
@@ -2860,15 +2868,14 @@ kindGeneralizeSome should_gen kind_or_type
 
        ; let (to_promote, dvs') = partitionCandidates dvs (not . should_gen)
 
-       ; (_, promoted) <- promoteTyVarSet (dVarSetToVarSet to_promote)
+       ; _ <- promoteTyVarSet to_promote
        ; qkvs <- quantifyTyVars dvs'
 
        ; traceTc "kindGeneralizeSome }" $
          vcat [ text "Kind or type:" <+> ppr kind_or_type
               , text "dvs:" <+> ppr dvs
               , text "dvs':" <+> ppr dvs'
-              , text "to_promote:" <+> pprTyVars (dVarSetElems to_promote)
-              , text "promoted:" <+> pprTyVars (nonDetEltsUniqSet promoted)
+              , text "to_promote:" <+> ppr to_promote
               , text "qkvs:" <+> pprTyVars qkvs ]
 
        ; return qkvs }
@@ -3213,9 +3220,6 @@ tcHsPartialSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
             <- solveLocalEqualities "tcHsPartialSigType"    $
-                 -- This solveLocalEqualiltes fails fast if there are
-                 -- insoluble equalities. See GHC.Tc.Solver
-                 -- Note [Fail fast if there are insoluble kind equalities]
                tcNamedWildCardBinders sig_wcs $ \ wcs ->
                bindImplicitTKBndrs_Tv implicit_hs_tvs       $
                bindExplicitTKBndrs_Tv explicit_hs_tvs       $

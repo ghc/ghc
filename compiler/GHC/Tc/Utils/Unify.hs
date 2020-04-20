@@ -16,7 +16,7 @@ module GHC.Tc.Utils.Unify (
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeHR,
   checkConstraints, checkTvConstraints,
-  buildImplicationFor, emitResidualTvConstraint,
+  buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Various unifications
   unifyType, unifyKind,
@@ -1025,31 +1025,32 @@ emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info skol_tvs tclvl wanted
   | isEmptyWC wanted
-  , case skol_info of { ForAllSkol {} -> False; _ -> True }
-    || skol_tvs `lengthAtMost` 1
-    -- If skol_info is ForAllSkol, we must do the bad-telescope check,
-    -- so we must /not/ discard the implication even if there are no
-    -- wanted constraints. See Note [Checking telescopes] in GHC.Tc.Types.Constraint.
-    -- Lacking this check led to #16247
   = return ()
 
   | otherwise
-  = do { ev_binds <- newNoTcEvBinds
-       ; implic   <- newImplication
-       ; let status | insolubleWC wanted = IC_Insoluble
-                    | otherwise          = IC_Unsolved
-             -- If the inner constraints are insoluble,
-             -- we should mark the outer one similarly,
-             -- so that insolubleWC works on the outer one
+  = do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+       ; emitImplication implic }
 
-       ; emitImplication $
-         implic { ic_status    = status
-                , ic_tclvl     = tclvl
-                , ic_skols     = skol_tvs
-                , ic_no_eqs    = True
-                , ic_wanted    = wanted
-                , ic_binds     = ev_binds
-                , ic_info      = skol_info } }
+buildTvImplication :: SkolemInfo -> [TcTyVar]
+                   -> TcLevel -> WantedConstraints -> TcM Implication
+buildTvImplication skol_info skol_tvs tclvl wanted
+  = do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
+                                     -- are solved by filling in coercion holes, not
+                                     -- by creating a value-level evidence binding
+       ; implic   <- newImplication
+--       ; let status | insolubleWC wanted = IC_Insoluble
+--                    | otherwise          = IC_Unsolved
+--             -- If the inner constraints are insoluble,
+--             -- we should mark the outer one similarly,
+--             -- so that insolubleWC works on the outer one
+
+       ; return (implic { ic_tclvl     = tclvl
+                        , ic_skols     = skol_tvs
+                        , ic_no_eqs    = True
+                        , ic_wanted    = wanted
+                        , ic_binds     = ev_binds
+--                        , ic_status    = status
+                        , ic_info      = skol_info }) }
 
 implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]
