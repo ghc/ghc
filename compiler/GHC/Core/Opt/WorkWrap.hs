@@ -475,7 +475,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div term cpr rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
   | is_thunk                                   -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -491,9 +491,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    (term, cpr)  = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_args cpr_ty `lengthIs` arityInfo fn_info
-                          , ppr fn_id <> colon <+> text "ct_args:" <+> ppr (ct_args cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
-                   (ct_term cpr_ty, ct_cpr cpr_ty)
+    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
+                          , ppr fn_id <> colon <+> text "ct_arty:" <+> ppr (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
+                   ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -577,12 +577,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Termination -> Cpr -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div term cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr term $$ ppr cpr) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_term use_cpr
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -623,7 +623,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div term cpr rhs
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
-                        `setIdCprInfo` mkCprSig work_arity work_term work_cpr
+                        `setIdCprInfo` mkCprSig work_arity work_cpr
 
                         `setIdDemandInfo` worker_demand
 
@@ -665,16 +665,16 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div term cpr rhs
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
-    (use_term, use_cpr)
-      | isJoinId fn_id = (topTerm, topCpr)
-      | otherwise      = (term, cpr)
+    use_cpr
+      | isJoinId fn_id = topCpr
+      | otherwise      = cpr
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
     -- doesn't have the CPR property anymore.
-    (work_term, work_cpr)
-      | isJoinId fn_id = (term, cpr)
-      | otherwise      = (topTerm, topCpr)
+    work_cpr
+      | isJoinId fn_id = cpr
+      | otherwise      = topCpr
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })

@@ -10,7 +10,7 @@
 
 module GHC.Types.Demand (
         StrDmd(..), Str(..), ArgStr, strBot, strTop, UseDmd(..), Count, ArgUse,
-        peelStrCall, mkSCalls, toStrDmd, glbArgStr, seqArgStrList,
+        peelStrCall, mkSCalls, toStrDmd,
 
         Demand, DmdShell, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
@@ -272,21 +272,6 @@ lubStr (SCall s1) (SCall s2) = SCall (s1 `lubStr` s2)
 lubStr (SProd s1) (SProd s2)
     | s1 `equalLength` s2    = mkSProd (zipWith lubArgStr s1 s2)
 lubStr _          _          = HeadStr
-
-glbArgStr :: ArgStr -> ArgStr -> ArgStr
-glbArgStr Lazy     s        = s
-glbArgStr s        Lazy     = s
-glbArgStr (Str s1) (Str s2) = Str (s1 `glbStr` s2)
-
-glbStr :: StrDmd -> StrDmd -> StrDmd
-glbStr HyperStr   _            = HyperStr
-glbStr _          HyperStr     = HyperStr
-glbStr HeadStr    s            = s
-glbStr s          HeadStr      = s
-glbStr (SCall s1) (SCall s2)   = SCall (s1 `glbStr` s2)
-glbStr (SProd s1) (SProd s2)
-    | s1 `equalLength` s2      = mkSProd (zipWith glbArgStr s1 s2)
-glbStr _          _            = HyperStr
 
 bothArgStr :: ArgStr -> ArgStr -> ArgStr
 bothArgStr Lazy     s        = s
