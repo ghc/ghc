@@ -426,7 +426,7 @@ bool queueIOThread()
       StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                                           processRemoteCompletion_closure);
       ASSERT(tso);
-      scheduleThread (cap, tso);
+      scheduleThreadNow (cap, tso);
       result = true;
   }
   ReleaseSRWLockExclusive (&lock);
