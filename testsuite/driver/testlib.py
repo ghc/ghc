@@ -1771,7 +1771,11 @@ def stdout_ok(name: TestName, way: WayName) -> bool:
                           expected_stdout_file, actual_stdout_file)
 
 def read_stdout( name: TestName ) -> str:
-    return in_testdir(name, 'run.stdout').read_text(encoding='UTF-8')
+    path = in_testdir(name, 'run.stdout')
+    if path.exists():
+        return path.read_text(encoding='UTF-8')
+    else:
+        return ''
 
 def dump_stdout( name: TestName ) -> None:
     str = read_stdout(name).strip()
@@ -1789,7 +1793,11 @@ def stderr_ok(name: TestName, way: WayName) -> bool:
                           whitespace_normaliser=normalise_whitespace)
 
 def read_stderr( name: TestName ) -> str:
-    return in_testdir(name, 'run.stderr').read_text(encoding='UTF-8')
+    path = in_testdir(name, 'run.stderr')
+    if path.exists():
+        return path.read_text(encoding='UTF-8')
+    else:
+        return ''
 
 def dump_stderr( name: TestName ) -> None:
     str = read_stderr(name).strip()
