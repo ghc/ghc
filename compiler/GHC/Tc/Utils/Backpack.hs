@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Backpack (
     instantiateSignature,
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
 import GHC.Driver.Packages
@@ -39,7 +39,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Iface.Load
 import GHC.Rename.Names
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.Id
 import GHC.Types.Module
 import GHC.Types.Name
@@ -48,11 +48,11 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.SrcLoc
 import GHC.Driver.Types
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.Type
-import FastString
+import GHC.Data.FastString
 import GHC.Rename.Fixity ( lookupFixityRn )
-import Maybes
+import GHC.Data.Maybe
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Iface.Syntax
@@ -65,7 +65,7 @@ import GHC.Types.Name.Shape
 import GHC.Tc.Errors
 import GHC.Tc.Utils.Unify
 import GHC.Iface.Rename
-import Util
+import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List (find)

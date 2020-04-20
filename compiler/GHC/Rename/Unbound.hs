@@ -17,7 +17,7 @@ module GHC.Rename.Unbound
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
@@ -25,12 +25,12 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Types.SrcLoc as SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
-import Util
-import Maybes
+import GHC.Utils.Misc
+import GHC.Data.Maybe
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import Data.List
 import Data.Function ( on )
 import GHC.Types.Unique.DFM (udfmToList)

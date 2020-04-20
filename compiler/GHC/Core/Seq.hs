@@ -10,7 +10,7 @@ module GHC.Core.Seq (
         megaSeqIdInfo, seqRuleInfo, seqBinds,
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Types.Id.Info

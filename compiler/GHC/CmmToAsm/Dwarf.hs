@@ -2,7 +2,7 @@ module GHC.CmmToAsm.Dwarf (
   dwarfGen
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr    ( GlobalReg(..) )
@@ -11,7 +11,7 @@ import GHC.Core        ( Tickish(..) )
 import GHC.Cmm.DebugBlock
 import GHC.Driver.Session
 import GHC.Types.Module
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply

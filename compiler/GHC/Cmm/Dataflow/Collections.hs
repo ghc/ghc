@@ -12,7 +12,7 @@ module GHC.Cmm.Dataflow.Collections
     , UniqueMap, UniqueSet
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified Data.IntMap.Strict as M
 import qualified Data.IntSet as S

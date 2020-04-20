@@ -34,12 +34,12 @@ import           System.Directory
 import qualified GHC.Core.Utils
 import           GHC.HsToCore
 import           GHC.Driver.Session (HasDynFlags(..))
-import           FastString
+import           GHC.Data.FastString
 import           GHC
 import           GHC.Driver.Monad
 import           GHC.Types.Name
 import           GHC.Types.Name.Set
-import           Outputable
+import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Tc.Utils.Zonk
 import           GHC.Types.Var

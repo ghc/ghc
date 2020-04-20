@@ -28,7 +28,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Utils.Env
@@ -56,15 +56,15 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Basic
-import Bag
-import FastString
-import BooleanFormula
-import Util
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.BooleanFormula
+import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List ( mapAccumL, partition )

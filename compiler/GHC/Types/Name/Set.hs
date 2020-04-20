@@ -33,10 +33,10 @@ module GHC.Types.Name.Set (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Unique.Set
 import Data.List (sortBy)
 

@@ -11,7 +11,7 @@
 module GHC.Hs.Expr where
 
 import GHC.Types.SrcLoc     ( Located )
-import Outputable ( SDoc, Outputable )
+import GHC.Utils.Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import GHC.Types.Basic  ( SpliceExplicitFlag(..))
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )

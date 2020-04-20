@@ -24,26 +24,26 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Driver.Types
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
-import FastString
+import GHC.Data.FastString
 import GHC.Hs
 import GHC.Types.Module
 import GHC.Builtin.Names
-import StringBuffer
+import GHC.Data.StringBuffer
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
-import ErrUtils
-import Util
-import Outputable
-import Maybes
-import Bag              ( emptyBag, listToBag, unitBag )
-import MonadUtils
-import Exception
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.Maybe
+import GHC.Data.Bag         ( emptyBag, listToBag, unitBag )
+import GHC.Utils.Monad
+import GHC.Utils.Exception as Exception
 import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -345,7 +345,7 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            ErrUtils.mkPlainErrMsg dflags flagSpan $
+            GHC.Utils.Error.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
 optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053

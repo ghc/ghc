@@ -38,7 +38,7 @@ module GHC.Core.Opt.Simplify.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..) )
@@ -63,12 +63,12 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
-import Util
-import OrdList          ( isNilOL )
-import MonadUtils
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.OrdList ( isNilOL )
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
 import GHC.Core.Opt.ConstantFold
-import FastString       ( fsLit )
+import GHC.Data.FastString ( fsLit )
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )

@@ -13,13 +13,13 @@ module GHC.Cmm.Opt (
         cmmMachOpFoldM
  ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Utils
 import GHC.Cmm
-import Util
+import GHC.Utils.Misc
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.Bits

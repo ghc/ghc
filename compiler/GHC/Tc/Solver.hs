@@ -26,16 +26,16 @@ module GHC.Tc.Solver(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Core.Class ( Class, classKey, classTyCon )
 import GHC.Driver.Session
 import GHC.Types.Id   ( idType, mkLocalId )
 import GHC.Tc.Utils.Instantiate
-import ListSetOps
+import GHC.Data.List.SetOps
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
 import GHC.Tc.Errors
@@ -52,19 +52,19 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Builtin.Types ( liftedRepTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit )
-import ErrUtils           ( emptyMessages )
+import GHC.Utils.Error    ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Maybes             ( isJust )
+import GHC.Data.Maybe     ( isJust )
 
 {-
 *********************************************************************************

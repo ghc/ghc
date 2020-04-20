@@ -13,7 +13,7 @@ module GHC.StgToCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude as Prelude
+import GHC.Prelude as Prelude
 
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
@@ -32,7 +32,7 @@ import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
 
 import GHC.Driver.Types
 import GHC.Types.CostCentre
@@ -42,18 +42,18 @@ import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Module
-import Outputable
-import Stream
+import GHC.Utils.Outputable
+import GHC.Data.Stream
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.SysTools.FileCleanup
 
-import OrdList
+import GHC.Data.OrdList
 import GHC.Cmm.Graph
 
 import Data.IORef
 import Control.Monad (when,void)
-import Util
+import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 

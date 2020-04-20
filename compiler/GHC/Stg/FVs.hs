@@ -42,14 +42,14 @@ module GHC.Stg.FVs (
     annBindingFreeVars
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Core    ( Tickish(Breakpoint) )
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Data.Maybe ( mapMaybe )
 

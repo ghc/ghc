@@ -106,12 +106,12 @@ module GHC.Types.SrcLoc (
 
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
-import Json
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Json
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 
 import Control.DeepSeq
 import Control.Applicative (liftA2)

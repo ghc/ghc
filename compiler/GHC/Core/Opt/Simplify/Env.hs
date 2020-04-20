@@ -45,7 +45,7 @@ module GHC.Core.Opt.Simplify.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad        ( SimplMode(..) )
@@ -54,7 +54,7 @@ import GHC.Core.Utils
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
@@ -64,9 +64,9 @@ import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvS
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import GHC.Types.Basic
-import MonadUtils
-import Outputable
-import Util
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)

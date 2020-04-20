@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP #-}
 module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Arity  ( manifestArity )
 import GHC.Core
@@ -24,10 +24,10 @@ import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Opt.WorkWrap.Utils
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import GHC.Core.FamInstEnv
-import MonadUtils
+import GHC.Utils.Monad
 
 #include "HsVersions.h"
 

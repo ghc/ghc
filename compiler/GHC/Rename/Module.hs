@@ -19,7 +19,7 @@ module GHC.Rename.Module (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
@@ -53,19 +53,19 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import Outputable
-import Bag
+import GHC.Utils.Outputable
+import GHC.Data.Bag
 import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
-import FastString
+import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( debugIsOn, filterOut, lengthExceeds, partitionWith )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
-import ListSetOps       ( findDupsEq, removeDups, equivClasses )
-import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
-                        , stronglyConnCompFromEdgedVerticesUniq )
+import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
+import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
+                               , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
-import OrdList
+import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1397,7 +1397,7 @@ depAnalTyClDecls rdr_env kisig_fv_env ds_w_fvs
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic
             -- even if the edges are in nondeterministic order as explained
-            -- in Note [Deterministic SCC] in Digraph.
+            -- in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns

@@ -8,12 +8,12 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique
 

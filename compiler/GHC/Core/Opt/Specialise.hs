@@ -13,7 +13,7 @@ module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Id
 import GHC.Tc.Utils.TcType hiding( substTy )
@@ -38,16 +38,16 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Builtin.Types.Prim ( voidPrimTy )
-import Maybes           ( mapMaybe, maybeToList, isJust )
-import MonadUtils       ( foldlM )
+import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
+import GHC.Utils.Monad    ( foldlM )
 import GHC.Types.Basic
 import GHC.Driver.Types
-import Bag
+import GHC.Data.Bag
 import GHC.Driver.Session
-import Util
-import Outputable
-import FastString
-import State
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Monad.State
 import GHC.Types.Unique.DFM
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 

@@ -134,7 +134,7 @@ module GHC.Core.TyCon(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
@@ -149,7 +149,7 @@ import {-# SOURCE #-} GHC.Core.DataCon
    , dataConTyCon, dataConFullSig
    , isUnboxedSumCon )
 
-import Binary
+import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.Class
@@ -159,12 +159,12 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.Coercion.Axiom
 import GHC.Builtin.Names
-import Maybes
-import Outputable
-import FastStringEnv
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
+import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import GHC.Types.Unique.Set
 import GHC.Types.Module

@@ -28,7 +28,7 @@ module GHC.Core.Rules (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core         -- All of it
 import GHC.Types.Module   ( Module, ModuleSet, elemModuleSet )
@@ -60,11 +60,11 @@ import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
 import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform )
 import GHC.Driver.Flags
-import Outputable
-import FastString
-import Maybes
-import Bag
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Data.Bag
+import GHC.Utils.Misc
 import Data.List
 import Data.Ord
 import Control.Monad    ( guard )

@@ -17,12 +17,12 @@ Main functions for .hie file generation
 
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Avail            ( Avails )
-import Bag                        ( Bag, bagToList )
+import GHC.Data.Bag               ( Bag, bagToList )
 import GHC.Types.Basic
-import BooleanFormula
+import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( FunDep )
 import GHC.Core.Utils             ( exprType )
 import GHC.Core.ConLike           ( conLikeName )
@@ -31,7 +31,7 @@ import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Types.Module           ( ModuleName, ml_hs_file )
-import MonadUtils                 ( concatMapM, liftIO )
+import GHC.Utils.Monad            ( concatMapM, liftIO )
 import GHC.Types.Name             ( Name, nameSrcSpan, setNameLoc )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
@@ -41,8 +41,8 @@ import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Types.Var              ( Id, Var, setVarName, varName, varType )
 import GHC.Tc.Types
 import GHC.Iface.Make             ( mkIfaceExports )
-import Panic
-import Maybes
+import GHC.Utils.Panic
+import GHC.Data.Maybe
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils

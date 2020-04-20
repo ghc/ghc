@@ -7,7 +7,7 @@ module GHC.CmmToAsm.SPARC.Cond (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 -- | Branch condition codes.
 data Cond

@@ -69,10 +69,10 @@ module GHC.Settings
   , sGhcRtsWithLibdw
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import CliOption
-import Fingerprint
+import GHC.Utils.CliOption
+import GHC.Utils.Fingerprint
 import GHC.Platform
 
 data Settings = Settings

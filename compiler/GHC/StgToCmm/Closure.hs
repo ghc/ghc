@@ -64,7 +64,7 @@ module GHC.StgToCmm.Closure (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 import GHC.Runtime.Heap.Layout
@@ -84,9 +84,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Types.RepType
 import GHC.Types.Basic
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session
-import Util
+import GHC.Utils.Misc
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8

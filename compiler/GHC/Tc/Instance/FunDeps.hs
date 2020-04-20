@@ -23,7 +23,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.Var
@@ -38,13 +38,13 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
-import FV
-import Outputable
-import ErrUtils( Validity(..), allValid )
+import GHC.Utils.FV
+import GHC.Utils.Outputable
+import GHC.Utils.Error( Validity(..), allValid )
 import GHC.Types.SrcLoc
-import Util
+import GHC.Utils.Misc
 
-import Pair             ( Pair(..) )
+import GHC.Data.Pair             ( Pair(..) )
 import Data.List        ( nubBy )
 import Data.Maybe
 import Data.Foldable    ( fold )

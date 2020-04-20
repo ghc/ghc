@@ -12,7 +12,7 @@ import Foreign.C.String ( withCString, CString )
 import GHC.Exts         ( addrToAny# )
 import GHC.Ptr          ( Ptr(..), nullPtr )
 import System.Info      ( os, arch )
-import Encoding
+import GHC.Utils.Encoding
 
 main = (loadFunction Nothing "Main" "f" :: IO (Maybe String)) >>= print
 

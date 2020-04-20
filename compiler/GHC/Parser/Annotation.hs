@@ -13,10 +13,10 @@ module GHC.Parser.Annotation (
   LRdrName -- Exists for haddocks only
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name.Reader
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import qualified Data.Map as Map
 import Data.Data

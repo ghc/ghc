@@ -94,7 +94,7 @@ module GHC.Hs.Decls (
     ) where
 
 -- friends:
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
                                    pprSpliceDecl )
@@ -112,13 +112,13 @@ import GHC.Types.Name.Set
 
 -- others:
 import GHC.Core.Class
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 import GHC.Core.Type
 
-import Bag
-import Maybes
+import GHC.Data.Bag
+import GHC.Data.Maybe
 import Data.Data        hiding (TyCon,Fixity, Infix)
 
 {-

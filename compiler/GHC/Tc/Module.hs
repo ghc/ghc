@@ -48,7 +48,7 @@ module GHC.Tc.Module (
         getRenamedStuff, RenamedStuff
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
 import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
@@ -78,7 +78,7 @@ import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import qualified BooleanFormula as BF
+import qualified GHC.Data.BooleanFormula as BF
 import GHC.Core.Ppr.TyThing ( pprTyThingInContext )
 import GHC.Core.FVs         ( orphNamesOfFamInst )
 import GHC.Tc.Instance.Family
@@ -106,7 +106,7 @@ import GHC.Iface.Load
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Module
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
 import GHC.Types.Var.Env
@@ -119,8 +119,8 @@ import GHC.Types.Avail
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Driver.Types
-import ListSetOps
-import Outputable
+import GHC.Data.List.SetOps
+import GHC.Utils.Outputable as Outputable
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
@@ -130,10 +130,10 @@ import GHC.Core.Coercion.Axiom
 import GHC.Types.Annotations
 import Data.List ( find, sortBy, sort )
 import Data.Ord
-import FastString
-import Maybes
-import Util
-import Bag
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Utils.Misc
+import GHC.Data.Bag
 import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data ( Data )

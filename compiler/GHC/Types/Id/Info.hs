@@ -84,7 +84,7 @@ module GHC.Types.Id.Info (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core hiding( hasCoreUnfolding )
 import GHC.Core( hasCoreUnfolding )
@@ -99,11 +99,11 @@ import GHC.Core.TyCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Types.ForeignCall
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import Util
+import GHC.Utils.Misc
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,

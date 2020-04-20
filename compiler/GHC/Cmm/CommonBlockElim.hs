@@ -6,7 +6,7 @@ module GHC.Cmm.CommonBlockElim
 where
 
 
-import GhcPrelude hiding (iterate, succ, unzip, zip)
+import GHC.Prelude hiding (iterate, succ, unzip, zip)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -23,8 +23,8 @@ import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
-import Outputable
-import qualified TrieMap as TM
+import GHC.Utils.Outputable
+import qualified GHC.Data.TrieMap as TM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Control.Arrow (first, second)

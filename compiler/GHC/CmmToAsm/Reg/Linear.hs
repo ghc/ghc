@@ -104,7 +104,7 @@ module GHC.CmmToAsm.Reg.Linear (
 #include "HsVersions.h"
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State
 import GHC.CmmToAsm.Reg.Linear.Base
@@ -126,12 +126,12 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm hiding (RegSet)
 
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.Maybe

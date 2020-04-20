@@ -22,7 +22,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Regs
 import GHC.CmmToAsm.X86.Instr
@@ -43,8 +43,8 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Types.Unique ( pprUniqueAlways )
 import GHC.Platform
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 
 import Data.Word
 import Data.Bits

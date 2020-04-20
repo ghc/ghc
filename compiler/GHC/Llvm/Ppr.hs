@@ -25,7 +25,7 @@ module GHC.Llvm.Ppr (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm.Syntax
 import GHC.Llvm.MetaData
@@ -33,9 +33,9 @@ import GHC.Llvm.Types
 import GHC.Platform
 
 import Data.List ( intersperse )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
-import FastString ( sLit )
+import GHC.Data.FastString ( sLit )
 
 --------------------------------------------------------------------------------
 -- * Top Level Print functions

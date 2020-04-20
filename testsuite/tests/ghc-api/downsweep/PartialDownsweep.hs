@@ -6,9 +6,9 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import Outputable
-import Exception (ExceptionMonad, ghandle)
-import Bag
+import GHC.Utils.Outputable
+import GHC.Utils.Exception (ExceptionMonad, ghandle)
+import GHC.Data.Bag
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)

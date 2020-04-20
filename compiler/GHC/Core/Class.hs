@@ -23,7 +23,7 @@ module GHC.Core.Class (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
@@ -32,10 +32,10 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc
-import Outputable
-import BooleanFormula (BooleanFormula, mkTrue)
+import GHC.Utils.Outputable
+import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)
 
 import qualified Data.Data as Data
 

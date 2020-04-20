@@ -19,7 +19,7 @@ module GHC.Tc.Deriv.Generics
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Type
@@ -42,14 +42,14 @@ import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Driver.Types
-import ErrUtils( Validity(..), andValid )
+import GHC.Utils.Error( Validity(..), andValid )
 import GHC.Types.SrcLoc
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)

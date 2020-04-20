@@ -10,7 +10,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Tc.Utils.TcType       ( exactTyCoVarsOfType )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Pair
+import GHC.Data.Pair
 
 type NormalCo    = Coercion
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity

@@ -17,7 +17,7 @@ module GHC.Tc.TyCl.Build (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Env
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
@@ -41,8 +41,8 @@ import GHC.Types.SrcLoc( SrcSpan, noSrcSpan )
 import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
 import GHC.Types.Unique.Supply
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs

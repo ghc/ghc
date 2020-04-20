@@ -40,11 +40,11 @@ import GHC.Driver.Monad
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Types.Basic
 
-import Stream (collect, yield)
+import GHC.Data.Stream as Stream (collect, yield)
 
 import Data.Typeable
 import Data.Maybe

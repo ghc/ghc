@@ -18,7 +18,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Cond
 import GHC.CmmToAsm.X86.Regs
@@ -34,8 +34,8 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Platform.Regs
 import GHC.Cmm
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import GHC.Types.Basic (Alignment)

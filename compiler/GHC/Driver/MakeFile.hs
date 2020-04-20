@@ -15,27 +15,27 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified GHC
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ways
-import Util
+import GHC.Utils.Misc
 import GHC.Driver.Types
 import qualified GHC.SysTools as SysTools
 import GHC.Types.Module
-import Digraph          ( SCC(..) )
+import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Driver.Finder
-import Outputable
-import Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import Data.List
-import FastString
+import GHC.Data.FastString
 import GHC.SysTools.FileCleanup
 
-import Exception
-import ErrUtils
+import GHC.Utils.Exception
+import GHC.Utils.Error
 
 import System.Directory
 import System.FilePath

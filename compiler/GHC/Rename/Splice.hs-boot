@@ -1,6 +1,6 @@
 module GHC.Rename.Splice where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Set

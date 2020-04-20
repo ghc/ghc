@@ -41,7 +41,7 @@ module GHC.Core.FamInstEnv (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Unify
 import GHC.Core.Type as Type
@@ -53,14 +53,14 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
 import GHC.Types.Unique.DFM
-import Outputable
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 import GHC.Core.Map
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.SrcLoc
-import FastString
+import GHC.Data.FastString
 import Control.Monad
 import Data.List( mapAccumL )
 import Data.Array( Array, assocs )

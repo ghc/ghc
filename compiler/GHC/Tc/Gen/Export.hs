@@ -7,7 +7,7 @@
 
 module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Builtin.Names
@@ -18,7 +18,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Module
@@ -29,14 +29,14 @@ import GHC.Types.Avail
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Types
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Unique.Set
-import Util (capitalise)
-import FastString (fsLit)
+import GHC.Utils.Misc (capitalise)
+import GHC.Data.FastString (fsLit)
 
 import Control.Monad
 import GHC.Driver.Session

@@ -1,6 +1,6 @@
 module Main where
 
-import Digraph
+import GHC.Data.Graph.Directed
 
 main = mapM_ print
   [ test001

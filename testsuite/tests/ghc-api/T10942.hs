@@ -6,8 +6,8 @@ import GHC
 import Control.Monad.IO.Class (liftIO)
 import System.Environment
 import GHC.Parser.Header
-import Outputable
-import StringBuffer
+import GHC.Utils.Outputable
+import GHC.Data.StringBuffer
 
 main :: IO ()
 main = do

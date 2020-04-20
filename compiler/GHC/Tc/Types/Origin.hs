@@ -22,7 +22,7 @@ module GHC.Tc.Types.Origin (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.TcType
 
@@ -40,8 +40,8 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 
 import GHC.Types.SrcLoc
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.Basic
 
 {- *********************************************************************

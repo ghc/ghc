@@ -19,12 +19,12 @@ module GHC.SysTools.BaseDir
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 -- See note [Base Dir] for why some of this logic is shared with ghc-pkg.
 import GHC.BaseDir
 
-import Panic
+import GHC.Utils.Panic
 
 import System.Environment (lookupEnv)
 import System.FilePath

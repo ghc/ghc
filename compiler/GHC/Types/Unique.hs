@@ -75,12 +75,12 @@ module GHC.Types.Unique (
 #include "HsVersions.h"
 #include "Unique.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
-import FastString
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))

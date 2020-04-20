@@ -20,7 +20,7 @@ where
 #include "HsVersions.h"
 
 -- NCG stuff:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Base
 import GHC.CmmToAsm.SPARC.CodeGen.Sanity
@@ -53,9 +53,9 @@ import GHC.CmmToAsm.CPrim
 
 -- The rest:
 import GHC.Types.Basic
-import FastString
-import OrdList
-import Outputable
+import GHC.Data.FastString
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Control.Monad    ( mapAndUnzipM )

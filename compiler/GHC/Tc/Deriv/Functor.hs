@@ -24,23 +24,23 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Core.DataCon
-import FastString
+import GHC.Data.FastString
 import GHC.Hs
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
-import State
+import GHC.Utils.Monad.State
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Id.Make (coerceId)

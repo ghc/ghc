@@ -38,7 +38,7 @@ module GHC.Cmm.Dataflow.Block
     , replaceLastNode
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed

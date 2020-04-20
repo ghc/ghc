@@ -8,7 +8,7 @@ module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -26,15 +26,15 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import Outputable hiding (panic, pprPanic)
-import qualified Outputable
+import GHC.Utils.Outputable hiding (panic, pprPanic)
+import qualified GHC.Utils.Outputable as Outputable
 import GHC.Platform
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer

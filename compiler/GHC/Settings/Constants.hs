@@ -1,7 +1,7 @@
 -- | Compile-time settings
 module GHC.Settings.Constants where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Config
 

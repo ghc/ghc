@@ -38,14 +38,14 @@ module GHC.SysTools (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Settings.Utils
 
 import GHC.Types.Module
 import GHC.Driver.Packages
-import Outputable
-import ErrUtils
+import GHC.Utils.Outputable
+import GHC.Utils.Error
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ways

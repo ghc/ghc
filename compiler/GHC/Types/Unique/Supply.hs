@@ -33,14 +33,14 @@ module GHC.Types.Unique.Supply (
         initUniqSupply
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique
-import PlainPanic (panic)
+import GHC.Utils.Panic.Plain (panic)
 
 import GHC.IO
 
-import MonadUtils
+import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char

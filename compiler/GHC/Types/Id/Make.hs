@@ -40,7 +40,7 @@ module GHC.Types.Id.Make (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
@@ -71,11 +71,11 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import Util
+import GHC.Utils.Misc
 import GHC.Driver.Session
-import Outputable
-import FastString
-import ListSetOps
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 

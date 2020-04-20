@@ -37,7 +37,7 @@ module GHC.CmmToAsm.Reg.Liveness (
         regLiveness,
         cmmTopLiveness
   ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
@@ -49,15 +49,15 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
-import Digraph
-import MonadUtils
-import Outputable
+import GHC.Data.Graph.Directed
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import Bag
-import State
+import GHC.Data.Bag
+import GHC.Utils.Monad.State
 
 import Data.List
 import Data.Maybe

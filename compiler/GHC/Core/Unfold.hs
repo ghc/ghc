@@ -44,7 +44,7 @@ module GHC.Core.Unfold (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core
@@ -62,12 +62,12 @@ import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import Bag
-import Util
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import GHC.Types.ForeignCall
 import GHC.Types.Name
-import ErrUtils
+import GHC.Utils.Error
 
 import qualified Data.ByteString as BS
 import Data.List

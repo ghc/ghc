@@ -1,9 +1,9 @@
 module GHC.Tc.Module where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Core.Type(TyThing)
 import GHC.Tc.Types (TcM)
-import Outputable (SDoc)
+import GHC.Utils.Outputable (SDoc)
 import GHC.Types.Name (Name)
 
 checkBootDeclM :: Bool  -- ^ True <=> an hs-boot file (could also be a sig)

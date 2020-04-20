@@ -9,13 +9,13 @@ module GHC.CmmToAsm.Reg.Linear.FreeRegs (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 
 import GHC.CmmToAsm.Config
-import Panic
+import GHC.Utils.Panic
 import GHC.Platform
 
 -- -----------------------------------------------------------------------------

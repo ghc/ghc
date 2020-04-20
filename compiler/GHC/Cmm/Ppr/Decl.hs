@@ -40,15 +40,15 @@ module GHC.Cmm.Ppr.Decl
     )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
 import GHC.Driver.Session
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 
 import Data.List
 import System.IO

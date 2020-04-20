@@ -9,7 +9,7 @@ module GHC.Core.Opt.LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core
@@ -17,7 +17,7 @@ import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
 import GHC.Builtin.Types ( unitDataConId )
 import GHC.Types.Id
 import GHC.Types.Var.Env
-import Util             ( notNull )
+import GHC.Utils.Misc    ( notNull )
 
 {-
 The liberate-case transformation

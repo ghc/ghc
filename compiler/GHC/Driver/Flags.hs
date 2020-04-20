@@ -8,10 +8,10 @@ module GHC.Driver.Flags
    )
 where
 
-import GhcPrelude
-import Outputable
-import EnumSet
-import Json
+import GHC.Prelude
+import GHC.Utils.Outputable
+import GHC.Data.EnumSet as EnumSet
+import GHC.Utils.Json
 
 -- | Debugging flags
 data DumpFlag

@@ -31,7 +31,7 @@ module GHC.Core.InstEnv (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
@@ -43,11 +43,11 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Core.Unify
-import Outputable
-import ErrUtils
+import GHC.Utils.Outputable
+import GHC.Utils.Error
 import GHC.Types.Basic
 import GHC.Types.Unique.DFM
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Id
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )

@@ -2,7 +2,7 @@
 -- exposed without importing all of its implementation.
 module GHC.Driver.Plugins where
 
-import GhcPrelude ()
+import GHC.Prelude ()
 
 data Plugin
 

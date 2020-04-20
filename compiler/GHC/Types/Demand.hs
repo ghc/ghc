@@ -58,16 +58,16 @@ module GHC.Types.Demand (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Var ( Var )
 import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Basic
-import Binary
-import Maybes           ( orElse )
+import GHC.Utils.Binary
+import GHC.Data.Maybe   ( orElse )
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )

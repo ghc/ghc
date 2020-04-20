@@ -27,13 +27,13 @@ module GHC.Core.ConLike (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.TyCo.Rep (Type, ThetaType)

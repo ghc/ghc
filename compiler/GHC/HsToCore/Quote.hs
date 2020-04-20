@@ -26,7 +26,7 @@ module GHC.HsToCore.Quote( dsBracket ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-}   GHC.HsToCore.Expr ( dsExpr )
@@ -53,14 +53,14 @@ import GHC.Core.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Basic
-import Outputable
-import Bag
+import GHC.Utils.Outputable
+import GHC.Data.Bag
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import Util
-import Maybes
-import MonadUtils
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Monad
 import GHC.Tc.Types.Evidence
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class

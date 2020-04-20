@@ -29,19 +29,19 @@ module GHC.Core.Coercion.Axiom (
        BuiltInSynFamily(..)
        ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Var
-import Util
-import Binary
-import Pair
+import GHC.Utils.Misc
+import GHC.Utils.Binary
+import GHC.Data.Pair
 import GHC.Types.Basic
 import Data.Typeable ( Typeable )
 import GHC.Types.SrcLoc

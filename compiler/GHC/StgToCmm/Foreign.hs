@@ -18,7 +18,7 @@ module GHC.StgToCmm.Foreign (
   emitCloseNursery,
  ) where
 
-import GhcPrelude hiding( succ, (<*>) )
+import GHC.Prelude hiding( succ, (<*>) )
 
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
@@ -39,14 +39,14 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
 import GHC.Driver.Session
 import GHC.Platform
-import Maybes
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 
 import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types.Prim
-import Util (zipEqual)
+import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad
 

@@ -9,7 +9,7 @@ module GHC.CmmToLlvm.Ppr (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -18,8 +18,8 @@ import GHC.CmmToLlvm.Data
 import GHC.Cmm.CLabel
 import GHC.Cmm
 
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 
 -- ----------------------------------------------------------------------------

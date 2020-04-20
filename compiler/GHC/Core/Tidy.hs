@@ -15,7 +15,7 @@ module GHC.Core.Tidy (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Seq ( seqUnfolding )
@@ -29,7 +29,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
-import Maybes
+import GHC.Data.Maybe
 import Data.List
 
 {-

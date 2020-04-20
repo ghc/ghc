@@ -8,7 +8,7 @@
 
 module GHC.StgToCmm.Hpc ( initHpc, mkTickBox ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.StgToCmm.Monad
 

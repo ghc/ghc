@@ -72,7 +72,7 @@ module GHC.Hs.Types (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr ( HsSplice, pprSplice )
 
@@ -88,10 +88,10 @@ import GHC.Core.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import Outputable
-import FastString
-import Maybes( isJust )
-import Util ( count )
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Maybe( isJust )
+import GHC.Utils.Misc ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 

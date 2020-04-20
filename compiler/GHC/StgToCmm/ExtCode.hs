@@ -37,7 +37,7 @@ module GHC.StgToCmm.ExtCode (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Monad (FCode, newUnique)
@@ -48,7 +48,7 @@ import GHC.Cmm.Graph
 
 import GHC.Cmm.BlockId
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique

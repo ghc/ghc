@@ -18,11 +18,11 @@ module GHC.Types.ForeignCall (
         Header(..), CType(..),
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
-import Binary
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Binary
+import GHC.Utils.Outputable
 import GHC.Types.Module
 import GHC.Types.Basic ( SourceText, pprWithSourceText )
 

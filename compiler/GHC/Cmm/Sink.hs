@@ -3,7 +3,7 @@ module GHC.Cmm.Sink (
      cmmSink
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
 import GHC.Cmm.Opt

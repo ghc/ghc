@@ -238,7 +238,7 @@ module GHC.Driver.Session (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
@@ -251,27 +251,28 @@ import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
 import Config
-import CliOption
+import GHC.Utils.CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
-import Panic
-import qualified PprColour as Col
-import Util
-import Maybes
-import MonadUtils
-import qualified Pretty
+import GHC.Utils.Panic
+import qualified GHC.Utils.Ppr.Colour as Col
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Monad
+import qualified GHC.Utils.Ppr as Pretty
 import GHC.Types.SrcLoc
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
-import FastString
-import Fingerprint
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Fingerprint
+import GHC.Utils.Outputable
 import GHC.Settings
 
-import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
+import {-# SOURCE #-} GHC.Utils.Error
+                               ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, DumpAction, TraceAction
                                , defaultDumpAction, defaultTraceAction )
-import Json
+import GHC.Utils.Json
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -300,8 +301,8 @@ import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
 import Text.ParserCombinators.ReadP as R
 
-import EnumSet (EnumSet)
-import qualified EnumSet
+import GHC.Data.EnumSet (EnumSet)
+import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
@@ -702,7 +703,7 @@ data DynFlags = DynFlags {
 
   ghciHistSize          :: Int,
 
-  -- | MsgDoc output action: use "ErrUtils" instead of this if you can
+  -- | MsgDoc output action: use "GHC.Utils.Error" instead of this if you can
   log_action            :: LogAction,
   dump_action           :: DumpAction,
   trace_action          :: TraceAction,

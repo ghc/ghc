@@ -113,10 +113,10 @@ module GHC.Types.Basic (
         TypeOrKind(..), isTypeLevel, isKindLevel
    ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)

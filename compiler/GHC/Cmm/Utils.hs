@@ -71,7 +71,7 @@ module GHC.Cmm.Utils(
         blockTicks
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCon     ( PrimRep(..), PrimElemRep(..) )
 import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
@@ -81,7 +81,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Types.Unique
 import GHC.Platform.Regs

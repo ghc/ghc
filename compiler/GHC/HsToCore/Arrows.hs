@@ -16,7 +16,7 @@ module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.HsToCore.Match
 import GHC.HsToCore.Utils
@@ -50,12 +50,12 @@ import GHC.Core.ConLike
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Builtin.Names
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
-import ListSetOps( assocMaybe )
+import GHC.Data.List.SetOps( assocMaybe )
 import Data.List
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique.DSet
 
 data DsCmdEnv = DsCmdEnv {

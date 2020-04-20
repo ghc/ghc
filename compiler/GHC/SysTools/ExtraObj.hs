@@ -13,17 +13,17 @@ module GHC.SysTools.ExtraObj (
   haveRtsOptsFlags
 ) where
 
-import AsmUtils
-import ErrUtils
+import GHC.Utils.Asm
+import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Driver.Packages
 import GHC.Platform
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc ( noSrcSpan )
 import GHC.Types.Module
 import GHC.SysTools.Elf
-import Util
-import GhcPrelude
+import GHC.Utils.Misc
+import GHC.Prelude
 
 import Control.Monad
 import Data.Maybe

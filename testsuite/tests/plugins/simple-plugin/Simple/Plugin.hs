@@ -4,7 +4,7 @@ module Simple.Plugin(plugin) where
 
 import GHC.Types.Unique.FM
 import GHC.Plugins
-import qualified ErrUtils
+import qualified GHC.Utils.Error
 
 -- For annotation tests
 import Simple.DataStructures

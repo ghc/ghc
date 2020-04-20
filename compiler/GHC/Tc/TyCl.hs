@@ -25,7 +25,7 @@ module GHC.Tc.TyCl (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Driver.Types
@@ -64,12 +64,12 @@ import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import Outputable
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 import GHC.Core.Unify
-import Util
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc
-import ListSetOps
+import GHC.Data.List.SetOps
 import GHC.Driver.Session
 import GHC.Types.Unique
 import GHC.Core.ConLike( ConLike(..) )

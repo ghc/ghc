@@ -8,7 +8,7 @@ module GHC.CmmToAsm.SPARC.ShortcutJump (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Imm
@@ -17,8 +17,8 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm
 
-import Panic
-import Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
 
 data JumpDest
         = DestBlockId BlockId

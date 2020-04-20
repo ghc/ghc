@@ -21,7 +21,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp
@@ -53,12 +53,12 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Module
-import ErrUtils
-import Outputable
-import GHC.Types.Basic  hiding ( SuccessFlag(..) )
-import Util             hiding ( eqListBy )
-import FastString
-import Maybes
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
+import GHC.Utils.Misc  hiding ( eqListBy )
+import GHC.Data.FastString
+import GHC.Data.Maybe
 import GHC.HsToCore.Docs
 
 import Data.Function

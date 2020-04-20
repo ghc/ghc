@@ -5,7 +5,7 @@ module GHC.Cmm.CallConv (
   realArgRegsCover
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Expr
 import GHC.Runtime.Heap.Layout
@@ -14,7 +14,7 @@ import GHC.Cmm.Ppr () -- For Outputable instances
 
 import GHC.Driver.Session
 import GHC.Platform
-import Outputable
+import GHC.Utils.Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.

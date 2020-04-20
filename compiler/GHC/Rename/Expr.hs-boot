@@ -4,7 +4,7 @@ import GHC.Hs
 import GHC.Types.Name.Set ( FreeVars )
 import GHC.Tc.Types
 import GHC.Types.SrcLoc   ( Located )
-import Outputable  ( Outputable )
+import GHC.Utils.Outputable  ( Outputable )
 
 rnLExpr :: LHsExpr GhcPs
         -> RnM (LHsExpr GhcRn, FreeVars)

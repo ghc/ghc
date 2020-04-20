@@ -1,8 +1,8 @@
 import System.Environment
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC
-import StringBuffer
+import GHC.Data.StringBuffer
 import GHC.Parser.Lexer
 import GHC.Types.SrcLoc
 

@@ -14,7 +14,7 @@ module GHC.Data.Bitmap (
         mAX_SMALL_BITMAP_SIZE,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Runtime.Heap.Layout

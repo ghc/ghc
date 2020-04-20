@@ -15,7 +15,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
@@ -30,12 +30,12 @@ import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 import GHC.Driver.Types
 import GHC.Driver.Session
-import Stream           ( Stream )
-import qualified Stream
+import GHC.Data.Stream           ( Stream )
+import qualified GHC.Data.Stream as Stream
 import GHC.SysTools.FileCleanup
 
-import ErrUtils
-import Outputable
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Types.Module
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre

@@ -53,26 +53,26 @@ module GHC.Runtime.Interpreter
   , fromEvalResult
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import Fingerprint
+import GHC.Utils.Fingerprint
 import GHC.Driver.Types
 import GHC.Types.Unique.FM
-import Panic
+import GHC.Utils.Panic
 import GHC.Driver.Session
-import Exception
+import GHC.Utils.Exception
 import GHC.Types.Basic
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Runtime.Eval.Types(BreakInfo(..))
-import Outputable(brackets, ppr, showSDocUnqual)
+import GHC.Utils.Outputable(brackets, ppr, showSDocUnqual)
 import GHC.Types.SrcLoc
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Module
 import GHC.ByteCode.Types
 import GHC.Types.Unique

@@ -17,14 +17,14 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply

@@ -9,7 +9,7 @@ module GHC.Cmm.ProcPoint
     )
 where
 
-import GhcPrelude hiding (last, unzip, succ, zip)
+import GHC.Prelude hiding (last, unzip, succ, zip)
 
 import GHC.Driver.Session
 import GHC.Cmm.BlockId
@@ -21,9 +21,9 @@ import GHC.Cmm.Info
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch
 import Data.List (sortBy)
-import Maybes
+import GHC.Data.Maybe
 import Control.Monad
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique.Supply
 import GHC.Cmm.Dataflow.Block

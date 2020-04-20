@@ -2,7 +2,7 @@
 
 module GHC.Platform.S390X where
 
-import GhcPrelude
+import GHC.Prelude
 
 #define MACHREGS_NO_REGS 0
 #define MACHREGS_s390x 1

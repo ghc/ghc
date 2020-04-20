@@ -34,7 +34,7 @@ module GHC.Iface.Load (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
@@ -48,7 +48,7 @@ import GHC.Driver.Types
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Tc.Utils.Monad
 
-import Binary   ( BinData(..) )
+import GHC.Utils.Binary   ( BinData(..) )
 import GHC.Settings.Constants
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
@@ -64,17 +64,17 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Types.Module
-import Maybes
-import ErrUtils
+import GHC.Data.Maybe
+import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Iface.Binary
-import Panic
-import Util
-import FastString
-import Fingerprint
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Utils.Fingerprint
 import GHC.Driver.Hooks
 import GHC.Types.FieldLabel
 import GHC.Iface.Rename

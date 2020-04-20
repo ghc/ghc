@@ -13,24 +13,24 @@ module GHC.CmmToAsm.Reg.Graph.SpillCost (
 
         lifeMapFromSpillCostInfo
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
-import GraphBase
+import GHC.Data.Graph.Base
 
 import GHC.Cmm.Dataflow.Collections (mapLookup)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import Digraph          (flattenSCCs)
-import Outputable
+import GHC.Data.Graph.Directed          (flattenSCCs)
+import GHC.Utils.Outputable
 import GHC.Platform
-import State
+import GHC.Utils.Monad.State
 import GHC.CmmToAsm.CFG
 
 import Data.List        (nub, minimumBy)

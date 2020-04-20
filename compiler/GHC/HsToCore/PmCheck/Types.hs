@@ -39,11 +39,11 @@ module GHC.HsToCore.PmCheck.Types (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
-import Bag
-import FastString
+import GHC.Utils.Misc
+import GHC.Data.Bag
+import GHC.Data.FastString
 import GHC.Types.Var (EvVar)
 import GHC.Types.Id
 import GHC.Types.Var.Env
@@ -52,9 +52,9 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
-import Outputable
-import ListSetOps (unionLists)
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.List.SetOps (unionLists)
+import GHC.Data.Maybe
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Types.Literal

@@ -46,12 +46,12 @@ module GHC.Types.Unique.Set (
         nonDetFoldUniqSet_Directly
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Data.Coerce
-import Outputable
+import GHC.Utils.Outputable
 import Data.Data
 import qualified Data.Semigroup as Semi
 

@@ -11,9 +11,9 @@ module Main where
 
 import GHC
 import GHC.Driver.Session
-import MonadUtils ( MonadIO(..) )
+import GHC.Utils.Monad ( MonadIO(..) )
 import GHC.Types.Basic ( failed )
-import Bag        ( bagToList )
+import GHC.Data.Bag        ( bagToList )
 import System.Environment
 import Control.Monad
 import System.IO

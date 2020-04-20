@@ -26,7 +26,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
 
@@ -58,12 +58,12 @@ import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad  ( when )
-import ListSetOps ( getNth )
+import GHC.Data.List.SetOps ( getNth )
 
 {-
 ************************************************************************

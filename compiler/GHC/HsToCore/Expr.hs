@@ -22,7 +22,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.HsToCore.Match
 import GHC.HsToCore.Match.Literal
@@ -60,12 +60,12 @@ import GHC.Core.TyCo.Ppr( pprWithTYPE )
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
-import Util
-import Bag
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.Bag
+import GHC.Utils.Outputable as Outputable
 import GHC.Core.PatSyn
 
 import Control.Monad
@@ -471,7 +471,7 @@ dsExpr (ArithSeq expr witness seq)
 Static Pointers
 ~~~~~~~~~~~~~~~
 
-See Note [Grand plan for static forms] in StaticPtrTable for an overview.
+See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an overview.
 
     g = ... static f ...
 ==>

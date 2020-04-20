@@ -19,7 +19,7 @@ module GHC.Core.Ppr.TyThing (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Type    ( Type, ArgFlag(..), TyThing(..), mkTyVarBinders, tidyOpenType )
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
@@ -31,7 +31,7 @@ import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
 import GHC.Types.Name
 import GHC.Types.Var.Env( emptyTidyEnv )
-import Outputable
+import GHC.Utils.Outputable
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API

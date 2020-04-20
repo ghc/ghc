@@ -30,7 +30,7 @@ module GHC.Tc.TyCl.Utils(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -59,12 +59,12 @@ import GHC.Core.Coercion ( ltRole )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( mkBuiltinUnique )
-import Outputable
-import Util
-import Maybes
-import Bag
-import FastString
-import FV
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Utils.FV as FV
 import GHC.Types.Module
 import qualified GHC.LanguageExtensions as LangExt
 

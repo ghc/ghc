@@ -44,7 +44,7 @@ module GHC.Rename.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
@@ -63,18 +63,18 @@ import GHC.Types.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import ErrUtils         ( MsgDoc )
+import GHC.Utils.Error  ( MsgDoc )
 import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )
-import Util
-import Maybes
+import GHC.Utils.Misc
+import GHC.Data.Maybe
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import Control.Monad
-import ListSetOps       ( minusList )
+import GHC.Data.List.SetOps ( minusList )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Rename.Unbound
 import GHC.Rename.Utils

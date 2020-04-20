@@ -28,7 +28,7 @@ module GHC.Driver.Hooks
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Pipeline.Monad
@@ -36,9 +36,9 @@ import GHC.Driver.Types
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
-import OrdList
+import GHC.Data.OrdList
 import GHC.Tc.Types
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Id
@@ -52,7 +52,7 @@ import GHC.Types.Module
 import GHC.Core.TyCon
 import GHC.Types.CostCentre
 import GHC.Stg.Syntax
-import Stream
+import GHC.Data.Stream
 import GHC.Cmm
 import GHC.Hs.Extension
 

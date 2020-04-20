@@ -49,7 +49,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Regs
 import GHC.Platform.Reg
@@ -57,7 +57,7 @@ import GHC.Platform.Reg.Class
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import qualified Data.Array as A

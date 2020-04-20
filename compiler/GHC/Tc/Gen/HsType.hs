@@ -68,7 +68,7 @@ module GHC.Tc.Gen.HsType (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Utils.Monad
@@ -103,18 +103,18 @@ import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
-import ErrUtils( MsgDoc )
+import GHC.Utils.Error( MsgDoc )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
-import Maybes
+import GHC.Data.Maybe
 import Data.List ( find )
 import Control.Monad
 

@@ -127,7 +127,7 @@ module GHC.Tc.Solver.Monad (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Types
 
@@ -148,7 +148,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
 
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -161,10 +161,10 @@ import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import Outputable
-import Bag
+import GHC.Utils.Outputable
+import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
@@ -173,16 +173,16 @@ import GHC.Core.Predicate
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import Maybes
+import GHC.Data.Maybe
 
 import GHC.Core.Map
 import Control.Monad
-import MonadUtils
+import GHC.Utils.Monad
 import Data.IORef
 import Data.List ( partition, mapAccumL )
 
 #if defined(DEBUG)
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Types.Unique.Set
 #endif
 
@@ -2860,7 +2860,7 @@ checkForCyclicBinds ev_binds_map
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic even
             -- if the edges are in nondeterministic order as explained in
-            -- Note [Deterministic SCC] in Digraph.
+            -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 #endif
 
 ----------------------------

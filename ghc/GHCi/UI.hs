@@ -41,7 +41,7 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import GHC.Driver.Session as DynFlags
-import ErrUtils hiding (traceCmd)
+import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Finder as Finder
 import GHC.Driver.Monad ( modifySession )
 import qualified GHC
@@ -66,24 +66,24 @@ import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrNam
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 
-import StringBuffer
-import Outputable hiding ( printForUser, printForUserPartWay )
+import GHC.Data.StringBuffer
+import GHC.Utils.Outputable hiding ( printForUser, printForUserPartWay )
 
 import GHC.Runtime.Loader ( initializePlugins )
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
 import Config
-import Digraph
-import Encoding
-import FastString
+import GHC.Data.Graph.Directed
+import GHC.Utils.Encoding
+import GHC.Data.FastString
 import GHC.Runtime.Linker
-import Maybes ( orElse, expectJust )
+import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
-import Panic hiding ( showException )
-import Util
+import GHC.Utils.Panic hiding ( showException )
+import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
-import Bag (unitBag)
+import GHC.Data.Bag (unitBag)
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -112,7 +112,7 @@ import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
 import Prelude hiding ((<>))
 
-import Exception hiding (catch)
+import GHC.Utils.Exception as Exception hiding (catch)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
 

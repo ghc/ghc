@@ -29,7 +29,7 @@ module GHC.Rename.Bind (
    HsSigCtxt(..)
    ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr, rnStmts )
 
@@ -51,15 +51,15 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SrcLoc as SrcLoc
-import ListSetOps       ( findDupsEq )
-import GHC.Types.Basic  ( RecFlag(..), TypeOrKind(..) )
-import Digraph          ( SCC(..) )
-import Bag
-import Util
-import Outputable
+import GHC.Data.List.SetOps    ( findDupsEq )
+import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
+import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import GHC.Types.Unique.Set
-import Maybes           ( orElse )
-import OrdList
+import GHC.Data.Maybe          ( orElse )
+import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

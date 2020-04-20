@@ -22,19 +22,19 @@ module GHC.CmmToAsm.Dwarf.Types
   )
   where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr         ( GlobalReg(..) )
-import Encoding
-import FastString
-import Outputable
+import GHC.Utils.Encoding
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Platform.Reg
 import GHC.Types.SrcLoc
-import Util
+import GHC.Utils.Misc
 
 import GHC.CmmToAsm.Dwarf.Constants
 

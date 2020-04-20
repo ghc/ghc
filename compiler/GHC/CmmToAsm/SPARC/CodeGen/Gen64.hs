@@ -7,7 +7,7 @@ module GHC.CmmToAsm.SPARC.CodeGen.Gen64 (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CmmToAsm.SPARC.CodeGen.Gen32
 import GHC.CmmToAsm.SPARC.CodeGen.Base
@@ -24,8 +24,8 @@ import GHC.Platform.Reg
 
 import GHC.Cmm
 
-import OrdList
-import Outputable
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
 
 -- | Code to assign a 64 bit value to memory.
 assignMem_I64Code

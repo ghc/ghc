@@ -10,7 +10,7 @@ module GHC.Core.Opt.Driver ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core
@@ -31,12 +31,12 @@ import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfoldin
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
-import qualified ErrUtils as Err
+import qualified GHC.Utils.Error as Err
 import GHC.Core.Opt.FloatIn  ( floatInwards )
 import GHC.Core.Opt.FloatOut ( floatOutwards )
 import GHC.Core.FamInstEnv
 import GHC.Types.Id
-import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
+import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
 import GHC.Types.Basic  ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -50,14 +50,14 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Types.SrcLoc
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Module
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Runtime.Loader -- ( initializePlugins )
 
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import GHC.Types.Unique.FM
-import Outputable
+import GHC.Utils.Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 {-
@@ -186,7 +186,7 @@ getCoreToDo dflags
                            ))
 
     -- Static forms are moved to the top level with the FloatOut pass.
-    -- See Note [Grand plan for static forms] in StaticPtrTable.
+    -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
     static_ptrs_float_outwards =
       runWhen static_ptrs $ CoreDoPasses
         [ simpl_gently -- Float Out can't handle type lets (sometimes created
@@ -248,7 +248,7 @@ getCoreToDo dflags
         else
            -- Even with full laziness turned off, we still need to float static
            -- forms to the top level. See Note [Grand plan for static forms] in
-           -- StaticPtrTable.
+           -- GHC.Iface.Tidy.StaticPtrTable.
            static_ptrs_float_outwards,
 
         simpl_phases,

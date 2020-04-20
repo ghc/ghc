@@ -48,7 +48,7 @@ module GHC.StgToCmm.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.StgToCmm.Monad
@@ -69,13 +69,13 @@ import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Module
 import GHC.Types.Literal
-import Digraph
-import Util
+import GHC.Data.Graph.Directed
+import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply (MonadUnique(..))
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.RepType
 import GHC.Types.CostCentre
 

@@ -12,9 +12,9 @@ module GHC.Cmm.Switch (
      createSwitchPlan,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Cmm.Dataflow.Label (Label)
 

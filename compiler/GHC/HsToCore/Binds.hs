@@ -25,7 +25,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
@@ -44,7 +44,7 @@ import GHC.Core.Utils
 import GHC.Core.Arity     ( etaExpand )
 import GHC.Core.Unfold
 import GHC.Core.FVs
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Core.Predicate
 
 import GHC.Builtin.Names
@@ -61,18 +61,18 @@ import GHC.Types.Var.Set
 import GHC.Core.Rules
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module
 import GHC.Types.SrcLoc
-import Maybes
-import OrdList
-import Bag
+import GHC.Data.Maybe
+import GHC.Data.OrdList
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
-import MonadUtils
+import GHC.Utils.Monad
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
@@ -1173,7 +1173,7 @@ mk_ev_binds ds_binds
                                           coVarsOfType (varType var) }
       -- It's OK to use nonDetEltsUniqSet here as stronglyConnCompFromEdgedVertices
       -- is still deterministic even if the edges are in nondeterministic order
-      -- as explained in Note [Deterministic SCC] in Digraph.
+      -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
     ds_scc (AcyclicSCC (v,r)) = NonRec v r
     ds_scc (CyclicSCC prs)    = Rec prs

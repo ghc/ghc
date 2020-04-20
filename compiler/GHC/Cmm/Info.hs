@@ -33,26 +33,26 @@ module GHC.Cmm.Info (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 import GHC.Data.Bitmap
-import Stream (Stream)
-import qualified Stream
+import GHC.Data.Stream (Stream)
+import qualified GHC.Data.Stream as Stream
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Platform
-import Maybes
+import GHC.Data.Maybe
 import GHC.Driver.Session
-import ErrUtils (withTimingSilent)
-import Panic
+import GHC.Utils.Error (withTimingSilent)
+import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
-import MonadUtils
-import Util
-import Outputable
+import GHC.Utils.Monad
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 
 import Data.ByteString (ByteString)
 import Data.Bits

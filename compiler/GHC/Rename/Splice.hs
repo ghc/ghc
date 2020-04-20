@@ -14,7 +14,7 @@ module GHC.Rename.Splice (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -28,7 +28,7 @@ import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module
 import GHC.Types.SrcLoc
 import GHC.Rename.HsType ( rnLHsType )
@@ -41,8 +41,8 @@ import GHC.Tc.Utils.Env     ( checkWellStaged )
 import GHC.Builtin.Names.TH ( liftName )
 
 import GHC.Driver.Session
-import FastString
-import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
+import GHC.Data.FastString
+import GHC.Utils.Error  ( dumpIfSet_dyn_printer, DumpFormat (..) )
 import GHC.Tc.Utils.Env ( tcMetaTy )
 import GHC.Driver.Hooks
 import GHC.Builtin.Names.TH ( quoteExpName, quotePatName, quoteDecName, quoteTypeName

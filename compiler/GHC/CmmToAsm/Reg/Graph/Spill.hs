@@ -7,7 +7,7 @@ module GHC.CmmToAsm.Reg.Graph.Spill (
         SpillStats(..),
         accSpillSL
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
@@ -16,13 +16,13 @@ import GHC.Cmm hiding (RegSet)
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 
-import MonadUtils
-import State
+import GHC.Utils.Monad
+import GHC.Utils.Monad.State
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.List

@@ -15,7 +15,7 @@ module GHC.Tc.Errors(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
@@ -51,19 +51,19 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set
-import Bag
-import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
+import GHC.Data.Bag
+import GHC.Utils.Error  ( ErrMsg, errDoc, pprLocErrMsg )
 import GHC.Types.Basic
 import GHC.Core.ConLike ( ConLike(..))
-import Util
-import FastString
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
-import ListSetOps       ( equivClasses )
-import Maybes
+import GHC.Data.List.SetOps ( equivClasses )
+import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import FV ( fvVarList, unionFV )
+import GHC.Utils.FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )

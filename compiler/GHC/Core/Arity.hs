@@ -21,7 +21,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.FVs
@@ -38,9 +38,9 @@ import GHC.Core.Coercion as Coercion
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
-import Outputable
-import FastString
-import Util     ( debugIsOn )
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc     ( debugIsOn )
 
 {-
 ************************************************************************

@@ -33,7 +33,7 @@ module GHC.Rename.Utils (
 where
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Types.Name.Reader
@@ -45,12 +45,12 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.DataCon
 import GHC.Types.SrcLoc as SrcLoc
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.Basic  ( TopLevelFlag(..) )
-import ListSetOps       ( removeDups )
+import GHC.Data.List.SetOps ( removeDups )
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import Control.Monad
 import Data.List
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE )

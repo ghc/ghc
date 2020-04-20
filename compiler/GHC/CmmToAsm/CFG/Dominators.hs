@@ -38,7 +38,7 @@ module GHC.CmmToAsm.CFG.Dominators (
   ,parents,ancestors
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Bifunctor
 import Data.Tuple (swap)
@@ -58,7 +58,7 @@ import Data.Array.Base hiding ((!))
   -- ,unsafeWrite,unsafeRead
   -- ,readArray,writeArray)
 
-import Util (debugIsOn)
+import GHC.Utils.Misc (debugIsOn)
 
 -----------------------------------------------------------------------------
 

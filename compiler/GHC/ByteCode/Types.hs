@@ -13,13 +13,13 @@ module GHC.ByteCode.Types
   , CCostCentre
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import SizedSeq
 import GHC.Core.Type

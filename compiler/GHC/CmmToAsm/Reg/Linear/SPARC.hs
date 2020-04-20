@@ -3,14 +3,14 @@
 -- | Free regs map for SPARC
 module GHC.CmmToAsm.Reg.Linear.SPARC where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.Word

@@ -32,7 +32,7 @@ module GHC.SysTools.Ar
   )
    where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.List (mapAccumL, isPrefixOf)
 import Data.Monoid ((<>))

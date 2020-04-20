@@ -130,7 +130,7 @@ module GHC.Builtin.Types (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
@@ -159,10 +159,10 @@ import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc   ( noSrcSpan )
 import GHC.Types.Unique
 import Data.Array
-import FastString
-import Outputable
-import Util
-import BooleanFormula   ( mkAnd )
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Data.BooleanFormula ( mkAnd )
 
 import qualified Data.ByteString.Char8 as BS
 

@@ -31,7 +31,7 @@ module GHC.Cmm.Expr
     )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.BlockId
@@ -39,7 +39,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
 import GHC.Driver.Session
-import Outputable (panic)
+import GHC.Utils.Outputable (panic)
 import GHC.Types.Unique
 
 import Data.Set (Set)

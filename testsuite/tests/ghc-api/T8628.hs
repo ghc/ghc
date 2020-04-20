@@ -3,12 +3,12 @@ module Main where
 import System.IO
 import GHC.Driver.Session
 import GHC
-import Exception
+import GHC.Utils.Exception
 import GHC.Types.Module
-import FastString
-import MonadUtils
-import Outputable
-import Bag (filterBag,isEmptyBag)
+import GHC.Data.FastString
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 import GHC.Builtin.Names

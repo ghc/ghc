@@ -21,14 +21,14 @@ module GHC.CmmToAsm.Ppr (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import AsmUtils
+import GHC.Utils.Asm
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
@@ -96,7 +96,7 @@ doubleToBytes d
 -- Printing ASCII strings.
 --
 -- Print as a string and escape non-printable characters.
--- This is similar to charToC in Utils.
+-- This is similar to charToC in GHC.Utils.Misc
 
 pprASCII :: ByteString -> SDoc
 pprASCII str

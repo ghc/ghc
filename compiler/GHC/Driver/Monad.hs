@@ -23,13 +23,13 @@ module GHC.Driver.Monad (
         WarnErrLogger, defaultWarnErrLogger
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import MonadUtils
+import GHC.Utils.Monad
 import GHC.Driver.Types
 import GHC.Driver.Session
-import Exception
-import ErrUtils
+import GHC.Utils.Exception
+import GHC.Utils.Error
 
 import Control.Monad
 import Data.IORef

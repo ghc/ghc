@@ -15,13 +15,13 @@ module GHC.Runtime.Linker.Types (
       SptEntry(..)
     ) where
 
-import GhcPrelude              ( FilePath, String, show )
+import GHC.Prelude             ( FilePath, String, show )
 import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
 import GHC.Types.Module        ( InstalledUnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Var           ( Id )
 import GHC.Fingerprint.Type    ( Fingerprint )
 import GHC.Types.Name.Env      ( NameEnv )
@@ -95,7 +95,7 @@ data Unlinked
                        -- carries some static pointer table entries which
                        -- should be loaded along with the BCOs.
                        -- See Note [Grant plan for static forms] in
-                       -- StaticPtrTable.
+                       -- GHC.Iface.Tidy.StaticPtrTable.
 
 instance Outputable Unlinked where
   ppr (DotO path)   = text "DotO" <+> text path
@@ -104,7 +104,7 @@ instance Outputable Unlinked where
   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
 
 -- | An entry to be inserted into a module's static pointer table.
--- See Note [Grand plan for static forms] in StaticPtrTable.
+-- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
 data SptEntry = SptEntry Id Fingerprint
 
 instance Outputable SptEntry where

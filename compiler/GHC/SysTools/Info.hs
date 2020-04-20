@@ -8,11 +8,11 @@
 -----------------------------------------------------------------------------
 module GHC.SysTools.Info where
 
-import Exception
-import ErrUtils
+import GHC.Utils.Exception
+import GHC.Utils.Error
 import GHC.Driver.Session
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Data.List
 import Data.IORef
@@ -20,7 +20,7 @@ import Data.IORef
 import System.IO
 
 import GHC.Platform
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.SysTools.Process
 

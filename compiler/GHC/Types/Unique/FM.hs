@@ -71,10 +71,10 @@ module GHC.Types.Unique.FM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
-import Outputable
+import GHC.Utils.Outputable
 
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S

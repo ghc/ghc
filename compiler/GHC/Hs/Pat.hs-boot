@@ -9,7 +9,7 @@
 
 module GHC.Hs.Pat where
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
 import Data.Kind
 

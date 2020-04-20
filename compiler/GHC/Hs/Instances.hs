@@ -16,7 +16,7 @@ module GHC.Hs.Instances where
 
 import Data.Data hiding ( Fixity )
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Hs.Extension
 import GHC.Hs.Binds
 import GHC.Hs.Decls

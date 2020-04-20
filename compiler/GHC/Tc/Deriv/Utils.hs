@@ -22,14 +22,14 @@ module GHC.Tc.Deriv.Utils (
         newDerivClsInst, extendLocalInstEnv
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Types (lookupFixity, mi_fix)
 import GHC.Hs
 import GHC.Tc.Utils.Instantiate
@@ -37,7 +37,7 @@ import GHC.Core.InstEnv
 import GHC.Iface.Load   (loadInterfaceForName)
 import GHC.Types.Module (getModule)
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate
@@ -50,13 +50,13 @@ import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprSourceTyCon)
 import GHC.Core.Type
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 
 import Control.Monad.Trans.Reader
 import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import ListSetOps (assocMaybe)
+import GHC.Data.List.SetOps (assocMaybe)
 
 -- | To avoid having to manually plumb everything in 'DerivEnv' throughout
 -- various functions in @GHC.Tc.Deriv@ and @GHC.Tc.Deriv.Infer@, we use 'DerivM', which

@@ -5,7 +5,7 @@ import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Session
-import Outputable hiding (space)
+import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath

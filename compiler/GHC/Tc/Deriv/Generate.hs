@@ -38,7 +38,7 @@ module GHC.Tc.Deriv.Generate (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Hs
@@ -46,8 +46,8 @@ import GHC.Types.Name.Reader
 import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Name
-import Fingerprint
-import Encoding
+import GHC.Utils.Fingerprint
+import GHC.Utils.Encoding
 
 import GHC.Driver.Session
 import GHC.Builtin.Utils
@@ -69,13 +69,13 @@ import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
-import FastString
-import Pair
-import Bag
+import GHC.Data.FastString
+import GHC.Data.Pair
+import GHC.Data.Bag
 
 import Data.List  ( find, partition, intersperse )
 
@@ -2400,7 +2400,7 @@ mkAuxBinderName dflags parent occ_fun
     parent_stable_hash =
       let Fingerprint high low = fingerprintString parent_stable
       in toBase62 high ++ toBase62Padded low
-      -- See Note [Base 62 encoding 128-bit integers] in Encoding
+      -- See Note [Base 62 encoding 128-bit integers] in GHC.Utils.Encoding
     parent_occ  = nameOccName parent
 
 

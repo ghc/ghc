@@ -17,7 +17,7 @@ module GHC.StgToCmm.DataCon (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 import GHC.Core  ( AltCon(..) )
@@ -38,17 +38,17 @@ import GHC.Types.CostCentre
 import GHC.Types.Module
 import GHC.Core.DataCon
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
-import Util
-import MonadUtils (mapMaybeM)
+import GHC.Utils.Misc
+import GHC.Utils.Monad (mapMaybeM)
 
 import Control.Monad
 import Data.Char

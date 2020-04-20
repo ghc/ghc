@@ -2,10 +2,10 @@
 
 module GHC.Core.Type where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, Coercion )
-import Util
+import GHC.Utils.Misc
 
 isPredTy     :: HasDebugCallStack => Type -> Bool
 isCoercionTy :: Type -> Bool

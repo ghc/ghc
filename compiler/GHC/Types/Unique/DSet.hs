@@ -37,9 +37,9 @@ module GHC.Types.Unique.DSet (
         mapUniqDSet
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique

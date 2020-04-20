@@ -20,7 +20,7 @@ module GHC.CmmToAsm.Reg.Linear.StackMap (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique

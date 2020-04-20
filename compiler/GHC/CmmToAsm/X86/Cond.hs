@@ -9,7 +9,7 @@ module GHC.CmmToAsm.X86.Cond (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 data Cond
         = ALWAYS        -- What's really used? ToDo

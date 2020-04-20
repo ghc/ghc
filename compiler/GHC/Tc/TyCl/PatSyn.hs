@@ -20,7 +20,7 @@ module GHC.Tc.TyCl.PatSyn
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Gen.Pat
@@ -35,9 +35,9 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Core.PatSyn
 import GHC.Types.Name.Set
-import Panic
-import Outputable
-import FastString
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Var
 import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSet )
 import GHC.Types.Id
@@ -57,9 +57,9 @@ import GHC.Types.Id.Make
 import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
-import Bag
-import Util
-import ErrUtils
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Utils.Error
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )

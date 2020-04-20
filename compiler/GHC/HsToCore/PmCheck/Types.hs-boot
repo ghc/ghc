@@ -1,6 +1,6 @@
 module GHC.HsToCore.PmCheck.Types where
 
-import Bag
+import GHC.Data.Bag
 
 data Delta
 

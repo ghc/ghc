@@ -10,7 +10,7 @@ module GHC.Tc.Solver.Interact (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..), isSwapped,
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
@@ -36,15 +36,15 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import GHC.Tc.Types.Evidence
-import Outputable
+import GHC.Utils.Outputable
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Solver.Monad
-import Bag
-import MonadUtils ( concatMapM, foldlM )
+import GHC.Data.Bag
+import GHC.Utils.Monad ( concatMapM, foldlM )
 
 import GHC.Core
 import Data.List( partition, deleteFirstsBy )
@@ -52,11 +52,11 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 
 import Control.Monad
-import Maybes( isJust )
-import Pair (Pair(..))
+import GHC.Data.Maybe( isJust )
+import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
-import Util
+import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad.Trans.Class

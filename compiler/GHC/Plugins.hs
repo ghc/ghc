@@ -41,13 +41,13 @@ module GHC.Plugins
    , module GHC.Types.Unique
    , module GHC.Types.Unique.Set
    , module GHC.Types.Unique.FM
-   , module FiniteMap
-   , module Util
+   , module GHC.Data.FiniteMap
+   , module GHC.Utils.Misc
    , module GHC.Serialized
    , module GHC.Types.SrcLoc
-   , module Outputable
+   , module GHC.Utils.Outputable
    , module GHC.Types.Unique.Supply
-   , module FastString
+   , module GHC.Data.FastString
    , -- * Getting 'Name's
      thNameToGhcName
    )
@@ -103,21 +103,21 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 -- Conflicts with UniqFM:
 --import LazyUniqFM
-import FiniteMap
+import GHC.Data.FiniteMap
 
 -- Common utilities
-import Util
+import GHC.Utils.Misc
 import GHC.Serialized
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique ( Unique, Uniquable(..) )
-import FastString
+import GHC.Data.FastString
 import Data.Maybe
 
 import GHC.Iface.Env    ( lookupOrigIO )
-import GhcPrelude
-import MonadUtils       ( mapMaybeM )
+import GHC.Prelude
+import GHC.Utils.Monad  ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
 

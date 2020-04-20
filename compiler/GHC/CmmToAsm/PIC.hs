@@ -47,7 +47,7 @@ module GHC.CmmToAsm.PIC (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified GHC.CmmToAsm.PPC.Instr as PPC
 import qualified GHC.CmmToAsm.PPC.Regs  as PPC
@@ -73,10 +73,10 @@ import GHC.Cmm.CLabel           ( mkForeignLabel )
 import GHC.Types.Basic
 import GHC.Types.Module
 
-import Outputable
+import GHC.Utils.Outputable
 
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 
 
 

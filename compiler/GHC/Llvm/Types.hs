@@ -9,7 +9,7 @@ module GHC.Llvm.Types where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Char
 import Data.Int
@@ -17,8 +17,8 @@ import Numeric
 
 import GHC.Platform
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 
 -- from NCG

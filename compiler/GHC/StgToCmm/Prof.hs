@@ -23,7 +23,7 @@ module GHC.StgToCmm.Prof (
         ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.StgToCmm.Closure
@@ -38,9 +38,9 @@ import GHC.Cmm.CLabel
 
 import GHC.Types.CostCentre
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Module as Module
-import Outputable
+import GHC.Utils.Outputable
 
 import Control.Monad
 import Data.Char (ord)

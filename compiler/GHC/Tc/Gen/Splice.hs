@@ -34,7 +34,7 @@ module GHC.Tc.Gen.Splice(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Types.Annotations
@@ -43,7 +43,7 @@ import GHC.Types.Name
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Tc.Gen.Expr
 import GHC.Types.SrcLoc
 import GHC.Builtin.Names.TH
@@ -103,21 +103,21 @@ import GHC.Types.Id.Info
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Serialized
-import ErrUtils
-import Util
+import GHC.Utils.Error
+import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Var.Set
 import Data.List        ( find )
 import Data.Maybe
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Basic as BasicTypes hiding( SuccessFlag(..) )
-import Maybes( MaybeErr(..) )
+import GHC.Data.Maybe( MaybeErr(..) )
 import GHC.Driver.Session
-import Panic
+import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
-import qualified EnumSet
+import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Driver.Plugins
-import Bag
+import GHC.Data.Bag
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types

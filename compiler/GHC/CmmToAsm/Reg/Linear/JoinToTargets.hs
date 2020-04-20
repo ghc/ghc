@@ -10,7 +10,7 @@
 --
 module GHC.CmmToAsm.Reg.Linear.JoinToTargets (joinToTargets) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State
 import GHC.CmmToAsm.Reg.Linear.Base
@@ -22,8 +22,8 @@ import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
-import Digraph
-import Outputable
+import GHC.Data.Graph.Directed
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set

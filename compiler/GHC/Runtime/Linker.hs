@@ -29,7 +29,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
@@ -47,18 +47,18 @@ import GHC.Driver.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Module
-import ListSetOps
+import GHC.Data.List.SetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import GHC.Driver.Session
 import GHC.Types.Basic
-import Outputable
-import Panic
-import Util
-import ErrUtils
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Error
 import GHC.Types.SrcLoc
-import qualified Maybes
+import qualified GHC.Data.Maybe as Maybes
 import GHC.Types.Unique.DSet
-import FastString
+import GHC.Data.FastString
 import GHC.Platform
 import GHC.SysTools
 import GHC.SysTools.FileCleanup
@@ -82,7 +82,7 @@ import System.Environment (lookupEnv)
 import System.Win32.Info (getSystemDirectory)
 #endif
 
-import Exception
+import GHC.Utils.Exception
 
 {- **********************************************************************
 

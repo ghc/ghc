@@ -18,7 +18,7 @@ module GHC.HsToCore (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.HsToCore.Usage
 import GHC.Driver.Session
@@ -57,14 +57,14 @@ import GHC.Types.Basic
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint     ( endPassIO )
 import GHC.Types.Var.Set
-import FastString
-import ErrUtils
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.HsToCore.Coverage
-import Util
-import MonadUtils
-import OrdList
+import GHC.Utils.Misc
+import GHC.Utils.Monad
+import GHC.Data.OrdList
 import GHC.HsToCore.Docs
 
 import Data.List

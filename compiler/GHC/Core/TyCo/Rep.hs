@@ -70,7 +70,7 @@ module GHC.Core.TyCo.Rep (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 
@@ -88,9 +88,9 @@ import GHC.Core.Coercion.Axiom
 
 -- others
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )

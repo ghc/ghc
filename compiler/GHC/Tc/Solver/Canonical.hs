@@ -11,7 +11,7 @@ module GHC.Tc.Solver.Canonical(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -35,16 +35,16 @@ import GHC.Types.Var
 import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Types.Var.Set( delVarSetList )
 import GHC.Types.Name.Occurrence ( OccName )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs.Types( HsIPName(..) )
 
-import Pair
-import Util
-import Bag
-import MonadUtils
+import GHC.Data.Pair
+import GHC.Utils.Misc
+import GHC.Data.Bag
+import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust )
 import Data.List  ( zip4 )

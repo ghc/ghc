@@ -60,7 +60,7 @@ module GHC.Iface.Type (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( coercibleTyCon, heqTyCon
@@ -73,11 +73,11 @@ import GHC.Types.Var
 import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
-import Binary
-import Outputable
-import FastString
-import FastStringEnv
-import Util
+import GHC.Utils.Binary
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+import GHC.Utils.Misc
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi

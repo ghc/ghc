@@ -46,7 +46,7 @@ module GHC.HsToCore.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr )
@@ -76,11 +76,11 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Module
 import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import Util
+import GHC.Utils.Misc
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence

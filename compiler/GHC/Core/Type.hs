@@ -221,7 +221,7 @@ module GHC.Core.Type (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 
@@ -260,15 +260,15 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , isReflexiveCo, seqCo )
 
 -- others
-import Util
-import FV
-import Outputable
-import FastString
-import Pair
-import ListSetOps
+import GHC.Utils.Misc
+import GHC.Utils.FV
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Pair
+import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
-import Maybes           ( orElse )
+import GHC.Data.Maybe   ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
 

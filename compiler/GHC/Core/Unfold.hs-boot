@@ -2,7 +2,7 @@ module GHC.Core.Unfold (
         mkUnfolding, mkInlineUnfolding
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Core
 import GHC.Driver.Session
 

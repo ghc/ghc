@@ -54,7 +54,7 @@ module GHC.Core.Make (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Id
 import GHC.Types.Var  ( EvVar, setTyVarUnique )
@@ -77,11 +77,11 @@ import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name      hiding ( varName )
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
-import Util
+import GHC.Utils.Misc
 import Data.List
 
 import Data.Char        ( ord )

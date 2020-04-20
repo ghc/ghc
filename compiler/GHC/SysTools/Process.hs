@@ -10,14 +10,14 @@ module GHC.SysTools.Process where
 
 #include "HsVersions.h"
 
-import Exception
-import ErrUtils
+import GHC.Utils.Exception
+import GHC.Utils.Error
 import GHC.Driver.Session
-import FastString
-import Outputable
-import Panic
-import GhcPrelude
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Prelude
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 
 import Control.Concurrent

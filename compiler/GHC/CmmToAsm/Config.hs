@@ -6,7 +6,7 @@ module GHC.CmmToAsm.Config
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
 import GHC.Types.Module

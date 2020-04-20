@@ -5,7 +5,7 @@ module GHC.Tc.Errors.Hole.FitTypes (
   hfIsLcl, pprHoleFitCand
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
@@ -16,7 +16,7 @@ import GHC.Types.Name.Reader
 import GHC.Hs.Doc
 import GHC.Types.Id
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Name
 
 import Data.Function ( on )

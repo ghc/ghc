@@ -8,7 +8,7 @@ module GHC.Cmm.Info.Build
   , SRTMap, srtMapNonCAFs
   ) where
 
-import GhcPrelude hiding (succ)
+import GHC.Prelude hiding (succ)
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -20,13 +20,13 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Types.Module
 import GHC.Platform
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Driver.Session
-import Maybes
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre

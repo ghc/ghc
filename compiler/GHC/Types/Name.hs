@@ -79,7 +79,7 @@ module GHC.Types.Name (
         module GHC.Types.Name.Occurrence
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( TyThing )
 
@@ -87,11 +87,11 @@ import GHC.Types.Name.Occurrence
 import GHC.Types.Module
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
-import Util
-import Maybes
-import Binary
-import FastString
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Binary
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 
 import Control.DeepSeq
 import Data.Data

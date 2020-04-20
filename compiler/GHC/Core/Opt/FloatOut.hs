@@ -10,7 +10,7 @@
 
 module GHC.Core.Opt.FloatOut ( floatOutwards ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils
@@ -19,15 +19,15 @@ import GHC.Core.Arity    ( etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
-import ErrUtils          ( dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Utils.Error   ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Id      ( Id, idArity, idType, isBottomingId,
                            isJoinId, isJoinId_maybe )
 import GHC.Core.Opt.SetLevels
 import GHC.Types.Unique.Supply ( UniqSupply )
-import Bag
-import Util
-import Maybes
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 import GHC.Core.Type
 import qualified Data.IntMap as M
 

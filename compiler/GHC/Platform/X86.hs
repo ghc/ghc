@@ -2,7 +2,7 @@
 
 module GHC.Platform.X86 where
 
-import GhcPrelude
+import GHC.Prelude
 
 #define MACHREGS_NO_REGS 0
 #define MACHREGS_i386 1

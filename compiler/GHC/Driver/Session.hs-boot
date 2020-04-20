@@ -1,8 +1,8 @@
 module GHC.Driver.Session where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
-import {-# SOURCE #-} Outputable
+import {-# SOURCE #-} GHC.Utils.Outputable
 
 data DynFlags
 

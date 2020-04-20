@@ -137,25 +137,25 @@ module GHC.Types.Module
         unitModuleSet
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
-import FastString
-import Binary
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Binary
+import GHC.Utils.Misc
 import Data.List (sortBy, sort)
 import Data.Ord
 import Data.Version
 import GHC.PackageDb
-import Fingerprint
+import GHC.Utils.Fingerprint
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
-import Encoding
+import GHC.Utils.Encoding
 
 import qualified Text.ParserCombinators.ReadP as Parse
 import Text.ParserCombinators.ReadP (ReadP, (<++))
@@ -168,7 +168,7 @@ import Data.Map (Map)
 import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified FiniteMap as Map
+import qualified GHC.Data.FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)

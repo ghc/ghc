@@ -11,14 +11,14 @@ module GHC.CmmToLlvm.Regs (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 
 import GHC.Cmm.Expr
 import GHC.Platform
-import FastString
-import Outputable ( panic )
+import GHC.Data.FastString
+import GHC.Utils.Outputable ( panic )
 import GHC.Types.Unique
 
 -- | Get the LlvmVar function variable storing the real register

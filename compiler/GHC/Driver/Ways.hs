@@ -37,7 +37,7 @@ module GHC.Driver.Ways
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Flags
 

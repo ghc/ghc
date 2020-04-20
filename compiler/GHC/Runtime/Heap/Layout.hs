@@ -44,13 +44,13 @@ module GHC.Runtime.Heap.Layout (
         card, cardRoundUp, cardTableSizeB, cardTableSizeW
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic( ConTagZ )
 import GHC.Driver.Session
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
-import FastString
+import GHC.Data.FastString
 
 import Data.Word
 import Data.Bits

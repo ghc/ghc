@@ -13,7 +13,7 @@ module GHC.HsToCore.GuardedRHSs ( dsGuarded, dsGRHSs, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} GHC.HsToCore.Match ( matchSinglePatVar )
@@ -27,9 +27,9 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
 import GHC.Core.Type ( Type )
-import Util
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )
 

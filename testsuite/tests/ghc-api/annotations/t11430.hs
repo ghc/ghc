@@ -13,12 +13,12 @@ import System.IO
 import GHC
 import GHC.Types.Basic
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import MonadUtils
-import Outputable
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
 import GHC.Hs.Decls
-import Bag (filterBag,isEmptyBag)
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 import qualified Data.Map as Map

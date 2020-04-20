@@ -38,11 +38,11 @@ module GHCi.UI.Monad (
 import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
-import Outputable       hiding (printForUser, printForUserPartWay)
-import qualified Outputable
+import GHC.Utils.Outputable       hiding (printForUser, printForUserPartWay)
+import qualified GHC.Utils.Outputable as Outputable
 import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Driver.Types
 import GHC.Types.SrcLoc
 import GHC.Types.Module
@@ -52,9 +52,9 @@ import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
-import Util
+import GHC.Utils.Misc
 
-import Exception hiding (uninterruptibleMask, mask, catch)
+import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
 import Data.Array
 import Data.IORef

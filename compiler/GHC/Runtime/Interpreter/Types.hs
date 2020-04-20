@@ -10,7 +10,7 @@ module GHC.Runtime.Interpreter.Types
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )

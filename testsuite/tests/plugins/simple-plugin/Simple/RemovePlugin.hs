@@ -4,12 +4,12 @@ module Simple.RemovePlugin where
 import Control.Monad.IO.Class
 import Data.List (intercalate)
 import GHC.Driver.Plugins
-import Bag
+import GHC.Data.Bag
 import GHC.Driver.Types
 import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Hs.Expr
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Hs
 import GHC.Hs.Binds

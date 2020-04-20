@@ -10,7 +10,7 @@ module GHC.HsToCore.PmCheck.Ppr (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -19,10 +19,10 @@ import GHC.Types.Unique.DFM
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
-import Outputable
+import GHC.Utils.Outputable
 import Control.Monad.Trans.RWS.CPS
-import Util
-import Maybes
+import GHC.Utils.Misc
+import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 import GHC.HsToCore.PmCheck.Types

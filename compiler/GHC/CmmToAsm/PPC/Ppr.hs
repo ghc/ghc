@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.CmmToAsm.PPC.Ppr (pprNatCmmDecl) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Instr
@@ -32,8 +32,8 @@ import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Driver.Session (targetPlatform)
 
 import Data.Word

@@ -32,7 +32,7 @@ module GHC.Rename.HsType (
         nubL, elemRdr
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
@@ -54,14 +54,14 @@ import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 
-import Util
-import ListSetOps       ( deleteBys )
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps ( deleteBys )
 import GHC.Types.Basic  ( compareFixity, funTyFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..)
                         , TypeOrKind(..) )
-import Outputable
-import FastString
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List          ( nubBy, partition, (\\) )

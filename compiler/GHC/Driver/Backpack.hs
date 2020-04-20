@@ -18,7 +18,7 @@ module GHC.Driver.Backpack (doBackpack) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
@@ -34,15 +34,15 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Module
 import GHC.Types.Module
 import GHC.Driver.Types
-import StringBuffer
-import FastString
-import ErrUtils
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
+import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Driver.Main
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import Outputable
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 import GHC.Parser.Header
 import GHC.Iface.Recomp
 import GHC.Driver.Make
@@ -50,11 +50,11 @@ import GHC.Types.Unique.DSet
 import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.Finder
-import Util
+import GHC.Utils.Misc
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Panic
+import GHC.Utils.Panic
 import Data.List ( partition )
 import System.Exit
 import Control.Monad

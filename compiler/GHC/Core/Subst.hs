@@ -37,7 +37,7 @@ module GHC.Core.Subst (
 #include "HsVersions.h"
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.FVs
@@ -60,9 +60,9 @@ import GHC.Types.Name     ( Name )
 import GHC.Types.Var
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
-import Maybes
-import Util
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import Data.List
 
 

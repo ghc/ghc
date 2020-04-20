@@ -13,7 +13,7 @@ module GHC.StgToCmm.Bind (
         pushUpdateFrame, emitUpdateFrame
   ) where
 
-import GhcPrelude hiding ((<*>))
+import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 
 import GHC.StgToCmm.Expr
@@ -43,12 +43,12 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Module
-import ListSetOps
-import Util
+import GHC.Data.List.SetOps
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Driver.Session
 
 import Control.Monad

@@ -16,7 +16,7 @@ GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 
 module GHC.Hs.ImpExp where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Module       ( ModuleName )
 import GHC.Hs.Doc             ( HsDocString )
@@ -24,8 +24,8 @@ import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
 

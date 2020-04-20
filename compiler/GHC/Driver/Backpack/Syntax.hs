@@ -16,14 +16,14 @@ module GHC.Driver.Backpack.Syntax (
     LRenaming, Renaming(..),
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Phases
 import GHC.Hs
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module
-import UnitInfo
+import GHC.Unit.Info
 
 {-
 ************************************************************************

@@ -13,9 +13,9 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.Types.Unique.FM
@@ -25,7 +25,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Tc.Utils.Monad
-import Util
+import GHC.Utils.Misc
 import GHC.Iface.Env
 
 import Control.Monad

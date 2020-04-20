@@ -44,7 +44,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.BlockId
 import GHC.Cmm as Cmm
@@ -56,9 +56,9 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 import qualified GHC.Cmm.Dataflow.Graph as G
 
-import Util
-import Digraph
-import Maybes
+import GHC.Utils.Misc
+import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
 
 import GHC.Types.Unique
 import qualified GHC.CmmToAsm.CFG.Dominators as Dom
@@ -72,10 +72,10 @@ import qualified Data.Set as S
 import Data.Tree
 import Data.Bifunctor
 
-import Outputable
+import GHC.Utils.Outputable
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
---import OrdList
+--import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 import GHC.Cmm.Ppr () -- For Outputable instances
 import qualified GHC.Driver.Session as D

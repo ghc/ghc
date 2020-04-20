@@ -16,16 +16,16 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Tc.Utils.Instantiate
-import Outputable
-import Pair
+import GHC.Utils.Outputable
+import GHC.Data.Pair
 import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Utils.Env
@@ -46,7 +46,7 @@ import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor, checkConstraints)
 import GHC.Builtin.Types (typeToTypeKind)
 import GHC.Core.Unify (tcUnifyTy)
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
 

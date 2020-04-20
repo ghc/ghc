@@ -25,7 +25,7 @@ module GHC.Runtime.Heap.Inspect(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Runtime.Interpreter as GHCi
@@ -50,14 +50,14 @@ import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Module
 import GHC.Iface.Env
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Driver.Session
-import Outputable as Ppr
+import GHC.Utils.Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )

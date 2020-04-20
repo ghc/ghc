@@ -11,7 +11,7 @@ module GHC.Cmm.Lint (
     cmmLint, cmmLintGraph
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.Dataflow.Block
@@ -23,7 +23,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
 import GHC.Cmm.Ppr () -- For Outputable instances
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session
 
 import Control.Monad (ap)

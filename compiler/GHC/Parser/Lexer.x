@@ -69,7 +69,7 @@ module GHC.Parser.Lexer (
    commentToAnnotation
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 -- base
 import Control.Monad
@@ -79,8 +79,7 @@ import Data.List
 import Data.Maybe
 import Data.Word
 
-import EnumSet (EnumSet)
-import qualified EnumSet
+import GHC.Data.EnumSet as EnumSet
 
 -- ghc-boot
 import qualified GHC.LanguageExtensions as LangExt
@@ -93,15 +92,15 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 -- compiler/utils
-import Bag
-import Outputable
-import StringBuffer
-import FastString
+import GHC.Data.Bag
+import GHC.Utils.Outputable
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
 import GHC.Types.Unique.FM
-import Util             ( readRational, readHexRational )
+import GHC.Utils.Misc ( readRational, readHexRational )
 
 -- compiler/main
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Session as DynFlags
 
 -- compiler/basicTypes

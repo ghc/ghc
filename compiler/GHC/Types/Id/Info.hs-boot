@@ -1,6 +1,6 @@
 module GHC.Types.Id.Info where
-import GhcPrelude
-import Outputable
+import GHC.Prelude
+import GHC.Utils.Outputable
 data IdInfo
 data IdDetails
 

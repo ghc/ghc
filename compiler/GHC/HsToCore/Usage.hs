@@ -11,7 +11,7 @@ module GHC.HsToCore.Usage (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Ways
@@ -20,12 +20,12 @@ import GHC.Tc.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Module
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
-import Fingerprint
-import Maybes
+import GHC.Utils.Fingerprint
+import GHC.Data.Maybe
 import GHC.Driver.Packages
 import GHC.Driver.Finder
 

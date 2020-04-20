@@ -29,7 +29,7 @@
 module GHC.CmmToAsm.Reg.Graph.SpillClean (
         cleanSpills
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
@@ -40,8 +40,8 @@ import GHC.Cmm
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import State
-import Outputable
+import GHC.Utils.Monad.State
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Cmm.Dataflow.Collections
 

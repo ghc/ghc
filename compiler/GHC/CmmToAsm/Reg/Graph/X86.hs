@@ -15,7 +15,7 @@ module GHC.CmmToAsm.Reg.Graph.X86 (
         squeese,
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Graph.Base  (Reg(..), RegSub(..), RegClass(..))
 import GHC.Types.Unique.Set

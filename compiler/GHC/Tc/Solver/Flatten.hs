@@ -12,7 +12,7 @@ module GHC.Tc.Solver.Flatten(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Core.TyCo.Ppr ( pprTyVar )
@@ -27,14 +27,14 @@ import GHC.Core.Coercion
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Types.Basic( SwapFlag(..) )
 
-import Util
-import Bag
+import GHC.Utils.Misc
+import GHC.Data.Bag
 import Control.Monad
-import MonadUtils    ( zipWith3M )
+import GHC.Utils.Monad ( zipWith3M )
 import Data.Foldable ( foldrM )
 
 import Control.Arrow ( first )

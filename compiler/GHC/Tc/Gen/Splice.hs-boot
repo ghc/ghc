@@ -3,7 +3,7 @@
 
 module GHC.Tc.Gen.Splice where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Types.Name
 import GHC.Hs.Expr ( PendingRnSplice, DelayedSplice )
 import GHC.Tc.Types( TcM , SpliceType )

@@ -53,7 +53,7 @@ module GHC.Core.TyCo.Subst
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type
    ( mkCastTy, mkAppTy, isCoercionTy )
@@ -74,13 +74,13 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
-import Pair
-import Util
+import GHC.Data.Pair
+import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import Outputable
+import GHC.Utils.Outputable
 
 import Data.List (mapAccumL)
 

@@ -34,7 +34,7 @@ module GHC.Tc.Gen.Match
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRhoNC, tcInferRho
                                      , tcCheckId, tcLExpr, tcLExprNC, tcExpr
@@ -56,8 +56,8 @@ import GHC.Types.Id
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Types.Evidence
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 
 -- Create chunkified tuple tybes for monad comprehensions

@@ -36,7 +36,7 @@ module GHC.Driver.Pipeline (
 #include <ghcplatform.h>
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Packages
@@ -48,18 +48,18 @@ import GHC.SysTools.ExtraObj
 import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Session
-import Panic
-import Util
-import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
-import GHC.Types.Basic  ( SuccessFlag(..) )
-import Maybes           ( expectJust )
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Data.StringBuffer ( hGetStringBuffer, hPutStringBuffer )
+import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Data.Maybe        ( expectJust )
 import GHC.Types.SrcLoc
-import GHC.CmmToLlvm    ( llvmFixupAsm, llvmVersionList )
-import MonadUtils
+import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
+import GHC.Utils.Monad
 import GHC.Platform
 import GHC.Tc.Types
 import GHC.Driver.Hooks
@@ -67,12 +67,12 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Ar
 import GHC.Settings
-import Bag              ( unitBag )
-import FastString       ( mkFastString )
-import GHC.Iface.Make   ( mkFullIface )
-import UpdateCafInfos   ( updateModDetailsCafInfos )
+import GHC.Data.Bag             ( unitBag )
+import GHC.Data.FastString      ( mkFastString )
+import GHC.Iface.Make           ( mkFullIface )
+import GHC.Iface.UpdateCafInfos ( updateModDetailsCafInfos )
 
-import Exception
+import GHC.Utils.Exception as Exception
 import System.Directory
 import System.FilePath
 import System.IO

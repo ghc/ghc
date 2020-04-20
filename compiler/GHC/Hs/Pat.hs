@@ -50,7 +50,7 @@ module GHC.Hs.Pat (
         pprParendLPat, pprConArgs
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
@@ -69,11 +69,11 @@ import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.Type
 import GHC.Types.SrcLoc
-import Bag -- collect ev vars from pats
-import Maybes
+import GHC.Data.Bag -- collect ev vars from pats
+import GHC.Data.Maybe
 import GHC.Types.Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)

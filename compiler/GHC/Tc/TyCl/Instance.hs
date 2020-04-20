@@ -21,7 +21,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Gen.Bind
@@ -61,24 +61,24 @@ import GHC.Core.Class
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
-import ErrUtils
-import FastString
+import GHC.Utils.Error
+import GHC.Data.FastString
 import GHC.Types.Id
-import ListSetOps
+import GHC.Data.List.SetOps
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import Util
-import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
+import GHC.Utils.Misc
+import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Tuple
-import Maybes
+import GHC.Data.Maybe
 import Data.List( mapAccumL )
 
 

@@ -43,7 +43,7 @@ module GHC.Core.TyCo.FVs
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 
@@ -51,13 +51,13 @@ import Data.Monoid as DM ( Endo(..), All(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Types.Var
-import FV
+import GHC.Utils.FV
 
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Util
-import Panic
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 %************************************************************************
@@ -523,14 +523,14 @@ closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in FV.
+-- Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in FV.
+-- Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
@@ -554,10 +554,10 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- make the function quadratic.
 -- It's exported, so that it can be composed with
 -- other functions that compute free variables.
--- See Note [FV naming conventions] in FV.
+-- See Note [FV naming conventions] in GHC.Utils.FV.
 --
 -- Eta-expanded because that makes it run faster (apparently)
--- See Note [FV eta expansion] in FV for explanation.
+-- See Note [FV eta expansion] in GHC.Utils.FV for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)

@@ -84,7 +84,7 @@ module GHC.Tc.Types(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Hs
@@ -102,7 +102,7 @@ import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
-import IOEnv
+import GHC.Data.IOEnv
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -113,15 +113,15 @@ import GHC.Types.Var.Env
 import GHC.Types.Module
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
-import Bag
+import GHC.Data.Bag
 import GHC.Driver.Session
-import Outputable
-import ListSetOps
-import Fingerprint
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.List.SetOps
+import GHC.Utils.Fingerprint
+import GHC.Utils.Misc
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
 
@@ -1167,7 +1167,7 @@ For (static e) to be valid, we need for every 'x' free in 'e',
 that x's binding is floatable to the top level.  Specifically:
    * x's RhsNames must be empty
    * x's type has no free variables
-See Note [Grand plan for static forms] in StaticPtrTable.hs.
+See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.hs.
 This test is made in GHC.Tc.Gen.Expr.checkClosedInStaticForm.
 Actually knowing x's RhsNames (rather than just its emptiness
 or otherwise) is just so we can produce better error messages

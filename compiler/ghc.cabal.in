@@ -136,7 +136,7 @@ Library
         UnboxedTuples
         UndecidableInstances
 
-    Include-Dirs: . utils
+    Include-Dirs: .
 
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
@@ -160,8 +160,6 @@ Library
 
     hs-source-dirs:
         .
-        main
-        utils
 
     -- we use an explicit Prelude
     Default-Extensions:
@@ -180,7 +178,7 @@ Library
         GHC.Types.Name.Shape
         GHC.Iface.Rename
         GHC.Types.Avail
-        AsmUtils
+        GHC.Utils.Asm
         GHC.Types.Basic
         GHC.Core.ConLike
         GHC.Core.DataCon
@@ -188,7 +186,7 @@ Library
         GHC.Types.Demand
         GHC.Types.Cpr
         GHC.Cmm.DebugBlock
-        Exception
+        GHC.Utils.Exception
         GHC.Types.FieldLabel
         GHC.Driver.Monad
         GHC.Driver.Hooks
@@ -222,11 +220,11 @@ Library
         GHC.Types.SrcLoc
         GHC.Types.Unique.Supply
         GHC.Types.Unique
-        UpdateCafInfos
+        GHC.Iface.UpdateCafInfos
         GHC.Types.Var
         GHC.Types.Var.Env
         GHC.Types.Var.Set
-        UnVarGraph
+        GHC.Data.Graph.UnVar
         GHC.Cmm.BlockId
         GHC.Cmm.CLabel
         GHC.Cmm
@@ -252,8 +250,8 @@ Library
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Cmm.LayoutStack
-        CliOption
-        EnumSet
+        GHC.Utils.CliOption
+        GHC.Data.EnumSet
         GHC.Cmm.Graph
         GHC.CmmToAsm.Ppr
         GHC.CmmToAsm.Config
@@ -296,7 +294,7 @@ Library
         GHC.Core.Subst
         GHC.Core.SimpleOpt
         GHC.Core
-        TrieMap
+        GHC.Data.TrieMap
         GHC.Core.Tidy
         GHC.Core.Unfold
         GHC.Core.Utils
@@ -360,26 +358,26 @@ Library
         GHC.Driver.Pipeline.Monad
         GHC.Driver.Pipeline
         GHC.Driver.Session
-        ErrUtils
+        GHC.Utils.Error
         GHC.Driver.Finder
         GHC
         GHC.Driver.Make
         GHC.Plugins
-        GhcPrelude
+        GHC.Prelude
         GHC.Parser.Header
         GHC.Driver.Main
-        HscStats
+        GHC.Hs.Stats
         GHC.Driver.Types
         GHC.Runtime.Eval
         GHC.Runtime.Eval.Types
         GHC.Runtime.Loader
-        UnitInfo
+        GHC.Unit.Info
         GHC.Driver.Packages
         GHC.Driver.Plugins
         GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing
         GHC.Settings
-        StaticPtrTable
+        GHC.Iface.Tidy.StaticPtrTable
         GHC.SysTools
         GHC.SysTools.BaseDir
         GHC.SysTools.Terminal
@@ -523,43 +521,43 @@ Library
         GHC.Core.TyCo.Ppr
         GHC.Core.TyCo.Tidy
         GHC.Core.Unify
-        Bag
-        Binary
-        BooleanFormula
-        BufWrite
-        Digraph
-        Encoding
-        FastFunctions
-        FastMutInt
-        FastString
-        FastStringEnv
-        Fingerprint
-        FiniteMap
-        FV
-        GraphBase
-        GraphColor
-        GraphOps
-        GraphPpr
-        IOEnv
-        Json
-        ListSetOps
-        Maybes
-        MonadUtils
-        OrdList
-        Outputable
-        Pair
-        Panic
-        PlainPanic
-        PprColour
-        Pretty
-        State
-        Stream
-        StringBuffer
+        GHC.Data.Bag
+        GHC.Utils.Binary
+        GHC.Data.BooleanFormula
+        GHC.Utils.BufHandle
+        GHC.Data.Graph.Directed
+        GHC.Utils.Encoding
+        GHC.Utils.IO.Unsafe
+        GHC.Data.FastMutInt
+        GHC.Data.FastString
+        GHC.Data.FastString.Env
+        GHC.Utils.Fingerprint
+        GHC.Data.FiniteMap
+        GHC.Utils.FV
+        GHC.Data.Graph.Base
+        GHC.Data.Graph.Color
+        GHC.Data.Graph.Ops
+        GHC.Data.Graph.Ppr
+        GHC.Data.IOEnv
+        GHC.Utils.Json
+        GHC.Data.List.SetOps
+        GHC.Data.Maybe
+        GHC.Utils.Monad
+        GHC.Data.OrdList
+        GHC.Utils.Outputable
+        GHC.Data.Pair
+        GHC.Utils.Panic
+        GHC.Utils.Panic.Plain
+        GHC.Utils.Ppr.Colour
+        GHC.Utils.Ppr
+        GHC.Utils.Monad.State
+        GHC.Data.Stream
+        GHC.Data.StringBuffer
         GHC.Types.Unique.DFM
         GHC.Types.Unique.DSet
         GHC.Types.Unique.FM
         GHC.Types.Unique.Set
-        Util
+        GHC.Utils.Misc
         GHC.Cmm.Dataflow
         GHC.Cmm.Dataflow.Block
         GHC.Cmm.Dataflow.Collections

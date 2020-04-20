@@ -12,18 +12,18 @@ For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 {-# LANGUAGE OverloadedStrings #-}
 module GHC.Iface.Ext.Types where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Config
-import Binary
-import FastString                 ( FastString )
+import GHC.Utils.Binary
+import GHC.Data.FastString        ( FastString )
 import GHC.Iface.Type
 import GHC.Types.Module           ( ModuleName, Module )
 import GHC.Types.Name             ( Name )
-import Outputable hiding ( (<>) )
+import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc           ( RealSrcSpan )
 import GHC.Types.Avail
-import qualified Outputable as O ( (<>) )
+import qualified GHC.Utils.Outputable as O ( (<>) )
 
 import qualified Data.Array as A
 import qualified Data.Map as M

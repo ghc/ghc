@@ -1,6 +1,6 @@
 module GHC.Tc.Utils.Unify where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Tc.Utils.TcType   ( TcTauType )
 import GHC.Tc.Types          ( TcM )
 import GHC.Tc.Types.Evidence ( TcCoercion )

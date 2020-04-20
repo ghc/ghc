@@ -17,7 +17,7 @@ module GHC.CoreToStg.Prep (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core.Opt.OccurAnal
@@ -48,18 +48,18 @@ import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
 import GHC.Types.Unique.Supply
-import Maybes
-import OrdList
-import ErrUtils
+import GHC.Data.Maybe
+import GHC.Data.OrdList
+import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Driver.Ways
-import Util
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
-import MonadUtils       ( mapAccumLM )
+import GHC.Utils.Monad      ( mapAccumLM )
 import Control.Monad
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S

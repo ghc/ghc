@@ -6,7 +6,7 @@ module GHC.CmmToAsm.SPARC.CodeGen.Gen32 (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.CodeGen.CondCode
 import GHC.CmmToAsm.SPARC.CodeGen.Amode
@@ -26,8 +26,8 @@ import GHC.Platform.Reg
 import GHC.Cmm
 
 import Control.Monad (liftM)
-import OrdList
-import Outputable
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
 
 -- | The dual to getAnyReg: compute an expression into a register, but
 --      we don't mind which one it is.

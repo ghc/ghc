@@ -16,7 +16,7 @@ module GHC.HsToCore.Match.Constructor ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 
@@ -29,12 +29,12 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Id
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)
 import Data.List.NonEmpty (NonEmpty(..))

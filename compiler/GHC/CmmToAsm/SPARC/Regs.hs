@@ -32,7 +32,7 @@ module GHC.CmmToAsm.SPARC.Regs (
 where
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.SPARC
 import GHC.Platform.Reg
@@ -40,7 +40,7 @@ import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32

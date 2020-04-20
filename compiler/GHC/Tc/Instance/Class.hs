@@ -11,7 +11,7 @@ module GHC.Tc.Instance.Class (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -40,8 +40,8 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Driver.Session
-import Outputable
-import Util( splitAtList, fstOf3 )
+import GHC.Utils.Outputable
+import GHC.Utils.Misc( splitAtList, fstOf3 )
 import Data.Maybe
 
 {- *******************************************************************

@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GHC.SysTools.Terminal (stderrSupportsAnsiColors) where
 
-import GhcPrelude
+import GHC.Prelude
 
 #if defined(MIN_VERSION_terminfo)
 import Control.Exception (catch)

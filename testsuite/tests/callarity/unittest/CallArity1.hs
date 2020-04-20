@@ -8,8 +8,8 @@ import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make
 import GHC.SysTools
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
+import GHC.Utils.Error
+import GHC.Utils.Outputable as Outputable
 import GHC.Builtin.Types
 import GHC.Types.Literal
 import GHC
@@ -21,7 +21,7 @@ import GHC.Core.Ppr
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Core.Lint
-import FastString
+import GHC.Data.FastString
 
 -- Build IDs. use mkTemplateLocal, more predictable than proper uniques
 go, go2, x, d, n, y, z, scrutf, scruta :: Id

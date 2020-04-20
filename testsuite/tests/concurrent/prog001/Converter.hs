@@ -1,7 +1,7 @@
 
 module Converter (rationalToGray, grayToSignIO, signToGray, Gray, startF, startC) where
 
-import Stream
+import GHC.Data.Stream
 import Data.Ratio
 import Control.Concurrent
 import Control.Concurrent.MVar

@@ -89,7 +89,7 @@ module GHC.Types.Var (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
@@ -100,9 +100,9 @@ import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCo
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
-import Util
-import Binary
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Binary
+import GHC.Utils.Outputable
 
 import Data.Data
 
