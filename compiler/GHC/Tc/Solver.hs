@@ -16,8 +16,7 @@ module GHC.Tc.Solver(
 
        simpl_top,
 
-       promoteTyVar,
-       promoteTyVarSet,
+       promoteTyVarSet, emitFlatConstraintsImplic,
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
@@ -163,14 +162,56 @@ simplifyTop wanteds
 solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
   = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
-       ; emitConstraints wanted
-
-       -- See Note [Fail fast if there are insoluble kind equalities]
-       ; when (insolubleWC wanted) $
-         do { traceTc "solveLocalEqualities: failing" (ppr wanted)
-            ; failM }
-
+       ; emitFlatConstraintsWC wanted
        ; return res }
+
+emitFlatConstraintsWC :: WantedConstraints -> TcM ()
+emitFlatConstraintsWC wanted
+  = do { wanted <- TcM.zonkWC wanted
+       ; case float_wc emptyVarSet wanted of
+           Nothing -> do { traceTc "tcHsSigType: failing" empty
+                         ; emitConstraints wanted
+                         ; failM }
+           Just simple_wanteds -> do { _ <- promoteTyVarSet $
+                                            tyCoVarsOfCts simple_wanteds
+                                     ; emitSimples simple_wanteds } }
+
+emitFlatConstraintsImplic :: Implication -> TcM ()
+emitFlatConstraintsImplic implic
+  = do { implic <- zonkImplication implic
+       ; case float_implic emptyVarSet implic of
+           Nothing -> do { traceTc "tcHsSigType: failing" empty
+                         ; emitImplication implic
+                         ; failM }
+           Just simple_wanteds -> do { _ <- promoteTyVarSet $
+                                            tyCoVarsOfCts simple_wanteds
+                                     ; emitSimples simple_wanteds } }
+
+float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe Cts
+float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
+  | all is_floatable simples
+  = do { inner_cts <- flatMapBagM (float_implic trapping_tvs) implics
+       ; return (simples `unionBags` inner_cts) }
+  | otherwise
+  = Nothing
+  where
+    is_floatable ct
+       | insolubleCt ct = False
+       | otherwise      = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
+
+float_implic :: TcTyCoVarSet -> Implication -> Maybe Cts
+float_implic trapping_tvs imp
+  | isInsolubleStatus (ic_status imp)
+  = Nothing   -- A short cut /plus/ we must keep track of IC_BadTelescope
+  | otherwise
+  = do { cts <- float_wc new_trapping_tvs (ic_wanted imp)
+       ; unless (isEmptyBag cts || ic_no_eqs imp) Nothing
+             -- Don't float out past local equalities
+             -- C.f GHC.Tc.Solver.approximateWC
+       ; return cts }
+  where
+    new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
+
 
 {- Note [Fail fast if there are insoluble kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1182,7 +1223,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
   = do {  -- Promote any tyvars that we cannot generalise
           -- See Note [Promote momomorphic tyvars]
        ; traceTc "decideMonoTyVars: promotion:" (ppr mono_tvs)
-       ; (prom, _) <- promoteTyVarSet mono_tvs
+       ; any_promoted <- promoteTyVarSet mono_tvs
 
        -- Default any kind/levity vars
        ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
@@ -1200,7 +1241,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        ; case () of
            _ | some_default -> simplify_cand candidates
-             | prom         -> mapM TcM.zonkTcType candidates
+             | any_promoted -> mapM TcM.zonkTcType candidates
              | otherwise    -> return candidates
        }
   where
@@ -2066,7 +2107,7 @@ we'll get more Givens (a unification is like adding a Given) to
 allow the implication to make progress.
 -}
 
-promoteTyVar :: TcTyVar -> TcM (Bool, TcTyVar)
+promoteTyVar :: TcTyVar -> TcM Bool
 -- When we float a constraint out of an implication we must restore
 -- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
 -- Return True <=> we did some promotion
@@ -2078,16 +2119,16 @@ promoteTyVar tv
          then do { cloned_tv <- TcM.cloneMetaTyVar tv
                  ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
                  ; TcM.writeMetaTyVar tv (mkTyVarTy rhs_tv)
-                 ; return (True, rhs_tv) }
-         else return (False, tv) }
+                 ; return True }
+         else return False }
 
 -- Returns whether or not *any* tyvar is defaulted
-promoteTyVarSet :: TcTyVarSet -> TcM (Bool, TcTyVarSet)
+promoteTyVarSet :: TcTyVarSet -> TcM Bool
 promoteTyVarSet tvs
-  = do { (bools, tyvars) <- mapAndUnzipM promoteTyVar (nonDetEltsUniqSet tvs)
-           -- non-determinism is OK because order of promotion doesn't matter
+  = do { bools <- mapM promoteTyVar (nonDetEltsUniqSet tvs)
+         -- Non-determinism is OK because order of promotion doesn't matter
 
-       ; return (or bools, mkVarSet tyvars) }
+       ; return (or bools) }
 
 promoteTyVarTcS :: TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
@@ -2125,7 +2166,7 @@ approximateWC float_past_equalities wc
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
     float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
       = filterBag (is_floatable trapping_tvs) simples `unionBags`
-        do_bag (float_implic trapping_tvs) implics
+        concatMapBag (float_implic trapping_tvs) implics
       where
 
     float_implic :: TcTyCoVarSet -> Implication -> Cts
@@ -2137,14 +2178,10 @@ approximateWC float_past_equalities wc
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
 
-    do_bag :: (a -> Bag c) -> Bag a -> Bag c
-    do_bag f = foldr (unionBags.f) emptyBag
-
     is_floatable skol_tvs ct
-       | isGivenCt ct     = False
-       | isHoleCt ct      = False
-       | insolubleEqCt ct = False
-       | otherwise        = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
+       | isHoleCt ct    = False  -- Never abstract over hole constraints!
+       | insolubleCt ct = False
+       | otherwise      = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
