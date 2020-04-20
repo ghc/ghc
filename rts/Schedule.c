@@ -34,6 +34,7 @@
 #include "AwaitEvent.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
+#include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"
 #include "RaiseAsync.h"
@@ -635,6 +636,9 @@ schedulePreLoop(void)
 static void
 scheduleFindWork (Capability **pcap)
 {
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
+    queueIOThread();
+#endif
     scheduleStartSignalHandlers(*pcap);
 
     scheduleProcessInbox(pcap);
