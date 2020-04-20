@@ -2818,8 +2818,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_D_faststring_stats))
   , make_ord_flag defGhcFlag "dno-llvm-mangler"
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
-  , make_ord_flag defGhcFlag "fast-llvm"
-        (NoArg (setGeneralFlag Opt_FastLlvm)) -- hidden flag
   , make_ord_flag defGhcFlag "dno-typeable-binds"
         (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
