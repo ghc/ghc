@@ -165,17 +165,27 @@ cprAnal' env args (App fun (Type ty))
     (fun_ty, fun') = cprAnal env args fun
 
 cprAnal' env args (App fun arg)
-  = (fun_ty', App fun' arg')
+  = (app_ty, App fun' arg')
   where
     -- TODO: Make incoming info a proper lattice, so that it's clear that we
     --       can always cough up another topCprType
     (arg_ty, arg')      = cprAnal env [] arg
+    -- TODO: forgetCPR on arg_ty! We assume CPR according to what WW makes of
+    -- the StrictSig and in all other cases, we won't actually get a CPR.
+    -- So the CPR of the argument is actually irrelevant. Its termination info
+    -- is useful, though. BUT, what about data con apps? There we definietely
+    -- want CPR!
     (fun_ty, fun')      = cprAnal env (arg_ty:args) fun
     -- We force arg_ty when entering a lambda or when applying a transformer.
     -- There's no need to force arg_ty after the application, because the
     -- potential divergence from forcing was already unleashed.
     -- Hence arg_str below is unused.
-    (_arg_str, fun_ty') = applyCprTy fun_ty
+    -- Why unleash in lambda and tranformer rather than here?
+    -- We need to unleash in lambda anyway, because there we see the strictness
+    -- of the binder (somewhat anticipating how the function will look after
+    -- WWing for strictness). We don't have that available here before having
+    -- analysed the fun.
+    app_ty              = applyCprTy fun_ty
 cprAnal' env args (Lam var body)
   | isTyVar var
   , (body_ty, body') <- cprAnal env args body
@@ -183,30 +193,20 @@ cprAnal' env args (Lam var body)
   | otherwise
   = (lam_ty, Lam var body')
   where
-    arg_str              = getStrDmd $ idDemandInfo var
     (arg_ty, body_args)
-      | ty:args' <- args = (ty, args') -- TODO: Make lattice explicit to see why this makes sense
-      | otherwise        = (topCprType, [])
-    (term_flag, arg_ty') = forceCprTy arg_str arg_ty
-    env'                 = extendSigEnvForDemand env var (idDemandInfo var) arg_ty'
+      | ty:args' <- args = (ty, args')      -- We know things about the argument, for example from a StrictSig or an incoming argument. NB: This can never be an anonymous (non-let-bound) lambda! The simplifier would have eliminated the necessary (App (Lam{} |> co) _) construct.
+      | otherwise        = (topCprType, []) -- An anonymous lambda or no info on its argument
+    env'                 = extendSigEnv env var (CprSig arg_ty) -- TODO: I think we also need to store assumed argument strictness (which would be all lazy here) in the env
     (body_ty, body')     = cprAnal env' body_args body
-    lam_ty               = abstractCprTy arg_str body_ty `bothCprType` term_flag
+    lam_ty               = abstractCprTy body_ty
 
 cprAnal' env args (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    -- Analogous to the Lam/App case, we have to analyse the scrutinee in a Top
-    -- context, force the resulting type with forceCprTy in the strictness of
-    -- the case_bndr demand and then bothCprType.
-    -- BUT we can also attach the residual Termination info to the case_bndr.
+    -- Analyse the scrutinee and additional force the resulting CPR type with
+    -- head strictness.
     (scrut_ty, scrut')        = cprAnal env [] scrut
-    -- FIXME: The case binder only has attached its own strictness, not the
-    --        strictness in which the scrutinee is evaluated. Yikes.
-    -- Plan: evaluate scrutinee in head strictness, or just glb case_bndr demand
-    --       with head strictness. What a mess; if only we had the proper result
-    --       from strictness analysis.
-    scrut_str                 = getStrDmd $ strictifyDmd $ idDemandInfo case_bndr
-    (whnf_flag, case_bndr_ty) = forceCprTy scrut_str scrut_ty
+    (whnf_flag, case_bndr_ty) = forceCprTy (getStrDmd seqDmd) scrut_ty
     -- Regardless of whether scrut had the CPR property or not, the case binder
     -- certainly has it. See 'extendEnvForDataAlt'.
     (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args scrut case_bndr case_bndr_ty) alts
@@ -260,7 +260,7 @@ cprTransform env args id
     sig
       -- Top-level binding, local let-binding or case binder
       | Just sig <- lookupSigEnv env id
-      = getCprSig sig
+      = cprTransformSig (idStrictness id) sig args
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env args rhs
@@ -269,7 +269,7 @@ cprTransform env args id
       = cprTransformDataConSig con args
       -- Imported function or data con worker
       | isGlobalId id
-      = getCprSig (idCprInfo id)
+      = cprTransformSig (idStrictness id) (idCprInfo id) args
       | otherwise
       = topCprType
 
@@ -290,7 +290,7 @@ cprFix top_lvl orig_env str orig_pairs
     init_sig id rhs
       -- See Note [CPR for data structures]
       | isDataStructure id rhs = topCprSig
-      | otherwise              = mkCprSig (idArity id) recFunTerm botCpr
+      | otherwise              = mkCprSig (idArity id) initRecFunTerm
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
     init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
@@ -319,6 +319,19 @@ cprFix top_lvl orig_env str orig_pairs
         go env (id, rhs) = (env', (id', rhs'))
           where
             (id', rhs', env') = cprAnalBind top_lvl env str id rhs
+
+mAX_DEPTH :: Int
+mAX_DEPTH = 4
+
+-- | A widening operator on 'CprSig' to ensure termination of fixed-point
+-- iteration. See Note [Ensuring termination of fixed-point iteration]
+pruneSig :: Int -> CprSig -> CprSig
+pruneSig d (CprSig cpr_ty)
+  -- TODO: We need the lubCpr with the initial CPR because
+  --       of functions like iterate, which we would CPR
+  --       multiple levels deep, thereby changing termination
+  --       behavior.
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` initRecFunCpr) }
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
@@ -482,7 +495,7 @@ extendSigEnvForDemand env id dmd ty
       <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
   -- TODO: Make this deep, depending on the StrDmd
   = extendSigEnv env id $ CprSig $
-      markConCprType (dataConTag dc) (dummyArgs dc) $
+      markConCprType Terminates (dataConTag dc) (dummyArgs dc) $
       -- TODO: There has to be a better way of forcing
       snd $ forceCprTy (getStrDmd dmd) ty
   | otherwise
@@ -507,7 +520,7 @@ extendEnvForDataAlt env scrut case_bndr case_bndr_ty dc bndrs
     is_product     = isJust (isDataProductTyCon_maybe tycon)
     is_sum         = isJust (isDataSumTyCon_maybe tycon)
     case_bndr_sig
-      | is_product || is_sum = markConCprType  (dataConTag dc) (dummyArgs dc) case_bndr_ty
+      | is_product || is_sum = undefined -- markConCprType  (dataConTag dc) (dummyArgs dc) case_bndr_ty
       -- Any of the constructors had existentials. This is a little too
       -- conservative (after all, we only care about the particular data con),
       -- but there is no easy way to write is_sum and this won't happen much.
