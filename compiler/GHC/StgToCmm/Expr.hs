@@ -431,11 +431,9 @@ cgCase scrut bndr alt_type _doGc alts
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg platform) ret_bndrs
        ; simple_scrut <- isSimpleScrut scrut alt_type
-       ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
-                    | not simple_scrut = True
-                    | isSingleton alts = False
-                    | up_hp_usg > 0    = False
-                    | otherwise        = True
+       ; let do_gc | _doGc         = True
+                   | up_hp_usg > 0 = False
+                   | otherwise     = True
                -- cf Note [Compiling case expressions]
              gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
 
@@ -447,9 +445,6 @@ cgCase scrut bndr alt_type _doGc alts
        ; _ <- bindArgsToRegs ret_bndrs
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
-  where
-    is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
-    is_cmp_op _                             = False
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
