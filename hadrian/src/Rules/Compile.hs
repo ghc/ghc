@@ -52,24 +52,48 @@ compilePackage rs = do
       -- are supported, because it will add the -dynamic-too flag when
       -- compiling to build the dynamic files alongside the static files
       [ root -/- "**/build/**/*.dyn_o", root -/- "**/build/**/*.dyn_hi" ]
-        &%> \ [dyn_o, _dyn_hi] -> do
+        &%> \ [dyn_o, dyn_hi] -> do
           p <- platformSupportsSharedLibs
           if p
             then do
-               -- We `need` ".o/.hi" because GHC is called with `-dynamic-too`
-               -- and builds ".dyn_o/.dyn_hi" too.
-               changed <- needHasChanged [dyn_o -<.> "o", dyn_o -<.> "hi"]
+               -- On platforms that support it, GHC is called with
+               -- `-dynamic-too` so it should build .dyn_o/.dyn_hi too.
+               --
+               -- So in theory this rule would only have to need the
+               -- corresponding static .o/.hi files to generate the dynamic
+               -- ones.
+               --
+               -- But if for some reason .o/.hi files are already available but
+               -- not the .dyn_o/dyn_hi files (e.g. a previous compilation has
+               -- been aborted), needing static files may not trigger the
+               -- compilation of the dynamic ones because Shake will detect that
+               -- the static files are already there. See #17534
+               --
+               -- Moreover GHC's recompilation avoidance is buggy with
+               -- `-dynamic-too` and GHC sometimes produces empty .dyn_o files
+               -- (cf #17968).
+               --
+               -- Long story short: if we detect that .dyn_hi or .dyn_o are
+               -- missing or that .dyn_o size is 0, we just remove
+               -- .o/.hi/.dyn_o/.dyn_hi and require .o/.hi again.
+               let
+                  static_o  = dyn_o  -<.> "o"
+                  static_hi = dyn_hi -<.> "hi"
+                  cleanup = do
+                     removeFile' dyn_o
+                     removeFile' dyn_hi
+                     removeFile' static_o
+                     removeFile' static_hi
 
-               -- If for some reason a previous Hadrian execution has been
-               -- interrupted after the rule for .o/.hi generation has completed
-               -- but before the current rule for .dyn_o/.dyn_hi has completed,
-               -- or if some of the dynamic artifacts have been removed by the
-               -- user, "needing" the non dynamic artifacts is not enough as
-               -- Shake won't execute the associated action. Hence we detect
-               -- this case and we explictly build the dynamic artifacts here:
-               case changed of
-                  [] -> compileHsObjectAndHi rs dyn_o
-                  _  -> pure ()
+               doesFileExist dyn_o >>= \case
+                  False -> cleanup
+                  True  -> getFileSize dyn_o >>= \case
+                     0 -> cleanup
+                     _ -> doesFileExist dyn_hi >>= \case
+                        False -> cleanup
+                        True  -> return ()
+
+               need [static_o,static_hi]
 
             else compileHsObjectAndHi rs dyn_o
 
