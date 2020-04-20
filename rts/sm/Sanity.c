@@ -32,11 +32,13 @@
 #include "sm/NonMoving.h"
 #include "sm/NonMovingMark.h"
 #include "Profiling.h" // prof_arena
+#include "HeapAlloc.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.
    -------------------------------------------------------------------------- */
 
+int   isHeapAlloced       ( StgPtr p);
 static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
 static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
@@ -44,6 +46,13 @@ static void  checkSTACK          (StgStack *stack);
 
 static W_    countNonMovingSegments ( struct NonmovingSegment *segs );
 static W_    countNonMovingHeap     ( struct NonmovingHeap *heap );
+
+/* -----------------------------------------------------------------------------
+   Debugging utility.
+   -------------------------------------------------------------------------- */
+
+// the HEAP_ALLOCED macro in function form. Useful for use in GDB or similar.
+int isHeapAlloced    ( StgPtr p) { return HEAP_ALLOCED(p); }
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
