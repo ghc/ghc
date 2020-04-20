@@ -132,7 +132,10 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('T4808', [fragile_for(16909, concurrent_ways), exit_code(1)], compile_and_run, [''])
+# Requires use of the FD interface which is not supported under WINIO
+test('T4808', [when(opsys('mingw32'), skip)
+              ,fragile_for(16909, concurrent_ways), exit_code(1)]
+              , compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
 # Tests ability to perform >32-bit IO operations
