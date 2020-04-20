@@ -94,6 +94,7 @@ test('mc15', normal, compile, [''])
 test('mc16', normal, compile, [''])
 test('EmptyDecls', normal, compile, [''])
 test('ParserLambdaCase', [], compile, [''])
+test('ParserArrowLambdaCase', [], compile, [''])
 
 test('ColumnPragma', normal, compile, [''])
 test('T5243', [], multimod_compile, ['T5243', ''])
