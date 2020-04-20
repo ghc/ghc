@@ -1289,9 +1289,6 @@ mkPrimOpId prim_op
                          (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
-    term | primOpIsCheap prim_op = whnfTerm
-         | otherwise             = topTerm
-
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr | isBotDiv (snd (splitStrictSig strict_sig)) = botCpr
         | otherwise                                  = topCpr
@@ -1300,7 +1297,7 @@ mkPrimOpId prim_op
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            mkCprSig arity term cpr
+           `setCprInfo`            mkCprSig arity cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
