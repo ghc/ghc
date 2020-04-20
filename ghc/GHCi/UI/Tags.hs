@@ -13,17 +13,17 @@ module GHCi.UI.Tags (
   createETagsFileCmd
 ) where
 
-import Exception
+import GHC.Utils.Exception
 import GHC
 import GHCi.UI.Monad
-import Outputable
+import GHC.Utils.Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
 import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (pprOccName)
 import GHC.Core.ConLike
-import MonadUtils
+import GHC.Utils.Monad
 
 import Control.Monad
 import Data.Function
@@ -31,7 +31,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import GHC.Driver.Phases
-import Panic
+import GHC.Utils.Panic
 import Prelude
 import System.Directory
 import System.IO

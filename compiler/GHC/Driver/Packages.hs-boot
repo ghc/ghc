@@ -1,6 +1,6 @@
 module GHC.Driver.Packages where
-import GhcPrelude
-import FastString
+import GHC.Prelude
+import GHC.Data.FastString
 import {-# SOURCE #-} GHC.Driver.Session (DynFlags)
 import {-# SOURCE #-} GHC.Types.Module(ComponentId, UnitId, InstalledUnitId)
 data PackageState

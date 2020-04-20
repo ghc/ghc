@@ -15,7 +15,7 @@ import GHC.Types.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
-import Util
+import GHC.Utils.Misc
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class

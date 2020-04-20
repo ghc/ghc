@@ -24,7 +24,7 @@ module GHC.IfaceToCore (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
@@ -66,16 +66,16 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import Outputable
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
-import Util
-import FastString
+import GHC.Utils.Misc
+import GHC.Data.FastString
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
-import ListSetOps
+import GHC.Data.List.SetOps
 import GHC.Fingerprint
-import qualified BooleanFormula as BF
+import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import qualified Data.Map as Map

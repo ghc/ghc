@@ -2,10 +2,10 @@
 
 module GHC.Llvm.MetaData where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm.Types
-import Outputable
+import GHC.Utils.Outputable
 
 -- The LLVM Metadata System.
 --

@@ -23,13 +23,13 @@ module GHC.Hs.Doc
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
-import Encoding
-import FastFunctions
+import GHC.Utils.Binary
+import GHC.Utils.Encoding
+import GHC.Utils.IO.Unsafe
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 
 import Data.ByteString (ByteString)

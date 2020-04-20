@@ -18,7 +18,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
@@ -26,7 +26,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import Util (seqList)
+import GHC.Utils.Misc (seqList)
 
 import Data.List (mapAccumL)
 

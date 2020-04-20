@@ -22,7 +22,7 @@ where
 #include "HsVersions.h"
 
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
@@ -47,8 +47,8 @@ import GHC.Types.Basic
 import GHC.Types.Literal
 import GHC.Builtin.Names
 import GHC.Driver.Session
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Data.Maybe
 

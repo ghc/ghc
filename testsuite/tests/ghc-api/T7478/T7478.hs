@@ -7,9 +7,9 @@ import System.Environment
 
 import GHC
 import qualified Config as GHC
-import qualified Outputable as GHC
+import qualified GHC.Utils.Outputable as GHC
 import GHC.Driver.Monad (liftIO)
-import Outputable (PprStyle, queryQual)
+import GHC.Utils.Outputable (PprStyle, queryQual)
 
 compileInGhc :: [FilePath]          -- ^ Targets
              -> (String -> IO ())   -- ^ handler for each SevOutput message

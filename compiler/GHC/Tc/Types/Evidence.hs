@@ -53,7 +53,7 @@ module GHC.Tc.Types.Evidence (
   ) where
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
@@ -69,16 +69,16 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
 import GHC.Types.Name
-import Pair
+import GHC.Data.Pair
 
 import GHC.Core
 import GHC.Core.Class ( classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
-import Util
-import Bag
+import GHC.Utils.Misc
+import GHC.Data.Bag
 import qualified Data.Data as Data
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set

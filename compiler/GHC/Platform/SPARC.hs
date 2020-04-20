@@ -2,7 +2,7 @@
 
 module GHC.Platform.SPARC where
 
-import GhcPrelude
+import GHC.Prelude
 
 #define MACHREGS_NO_REGS 0
 #define MACHREGS_sparc 1

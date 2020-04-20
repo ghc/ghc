@@ -6,7 +6,7 @@ module GHC.CmmToAsm.SPARC.CodeGen.CondCode (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CmmToAsm.SPARC.CodeGen.Gen32
 import GHC.CmmToAsm.SPARC.CodeGen.Base
@@ -20,8 +20,8 @@ import GHC.CmmToAsm.Format
 
 import GHC.Cmm
 
-import OrdList
-import Outputable
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
 
 
 getCondCode :: CmmExpr -> NatM CondCode

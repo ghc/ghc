@@ -17,7 +17,7 @@ module GHC.Tc.Errors.Hole
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
@@ -34,14 +34,14 @@ import GHC.Builtin.Names ( gHC_ERR )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Bag
+import GHC.Data.Bag
 import GHC.Core.ConLike ( ConLike(..) )
-import Util
+import GHC.Utils.Misc
 import GHC.Tc.Utils.Env (tcLookup)
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Session
-import Maybes
-import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
+import GHC.Data.Maybe
+import GHC.Utils.FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
 import Control.Arrow ( (&&&) )
 
