@@ -1760,6 +1760,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsOpAppPV :: SrcSpan -> Located b -> Located (InfixOp b) -> Located b -> PV (Located b)
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> MatchGroup GhcPs (Located b) -> PV (Located b)
+  -- | Disambiguate @\\case ...@ (lambda case)
+  mkHsLamCasePV :: SrcSpan -> MatchGroup GhcPs (Located b) -> PV (Located b)
   -- | Function argument representation
   type FunArg b
   -- | Bring superclass constraints on FunArg into scope.
@@ -1874,6 +1876,7 @@ instance DisambECP (HsCmd GhcPs) where
     let cmdArg c = L (getLoc c) $ HsCmdTop noExtField c
     return $ L l $ HsCmdArrForm noExtField op Infix Nothing [cmdArg c1, cmdArg c2]
   mkHsCasePV l c mg = return $ L l (HsCmdCase noExtField c mg)
+  mkHsLamCasePV l mg = return $ L l (HsCmdLamCase noExtField mg)
   type FunArg (HsCmd GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l c e = do
@@ -1930,6 +1933,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsOpAppPV l e1 op e2 = do
     return $ L l $ OpApp noExtField e1 op e2
   mkHsCasePV l e mg = return $ L l (HsCase noExtField e mg)
+  mkHsLamCasePV l mg = return $ L l (HsLamCase noExtField mg)
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l e1 e2 = do
@@ -2014,6 +2018,7 @@ instance DisambECP (PatBuilder GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = return $ L l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
+  mkHsLamCasePV l _ = addFatalError l $ text "(\\case ...)-syntax in pattern"
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2 = return $ L l (PatBuilderApp p1 p2)

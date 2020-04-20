@@ -2765,11 +2765,10 @@ aexp    :: { ECP }
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
         | '\\' 'lcase' altslist
-            {% runPV $3 >>= \ $3 ->
-               fmap ecpFromExp $
-               ams (sLL $1 $> $ HsLamCase noExtField
+            {  ECP $ $3 >>= \ $3 ->
+               amms (mkHsLamCasePV (comb2 $1 $>)
                                    (mkMatchGroup FromSource (snd $ unLoc $3)))
-                   (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc $3)) }
+                    (mj AnnLam $1:mj AnnCase $2:(fst $ unLoc $3)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runECP_P $2 >>= \ $2 ->
                             return $ ECP $

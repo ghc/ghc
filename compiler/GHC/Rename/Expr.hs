@@ -495,6 +495,10 @@ rnCmd (HsCmdCase x expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
        ; return (HsCmdCase x new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
+rnCmd (HsCmdLamCase x matches)
+  = do { (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
+       ; return (HsCmdLamCase x new_matches, ms_fvs) }
+
 rnCmd (HsCmdIf x _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLCmd b1
@@ -539,6 +543,8 @@ methodNamesCmd (HsCmdApp _ c _)          = methodNamesLCmd c
 methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match
 
 methodNamesCmd (HsCmdCase _ _ matches)
+  = methodNamesMatch matches `addOneFV` choiceAName
+methodNamesCmd (HsCmdLamCase _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
 
 --methodNamesCmd _ = emptyFVs

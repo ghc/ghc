@@ -151,13 +151,14 @@ tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
-      matches' <- tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
+      matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
       return (HsCmdCase x scrut' matches')
-  where
-    match_ctxt = MC { mc_what = CaseAlt,
-                      mc_body = mc_body }
-    mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
-                              ; tcCmd env body (stk, res_ty') }
+
+tc_cmd env in_cmd@(HsCmdLamCase x matches) (stk, res_ty)
+  = addErrCtxt (cmdCtxt in_cmd) $ do
+      (co, [scrut_ty], stk') <- matchExpectedCmdArgs 1 stk
+      matches' <- tcCmdMatches env scrut_ty matches (stk', res_ty)
+      return (mkHsCmdWrap (mkWpCastN co) (HsCmdLamCase x matches'))
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcLExpr pred (mkCheckExpType boolTy)
@@ -330,6 +331,20 @@ tc_cmd _ cmd _
   = failWithTc (vcat [text "The expression", nest 2 (ppr cmd),
                       text "was found where an arrow command was expected"])
 
+-- | Typechecking for case command alternatives. Used for both
+-- 'HsCmdCase' and 'HsCmdLamCase'.
+tcCmdMatches :: CmdEnv
+             -> TcType                           -- ^ type of the scrutinee
+             -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
+             -> CmdType
+             -> TcM (MatchGroup GhcTcId (LHsCmd GhcTcId))
+tcCmdMatches env scrut_ty matches (stk, res_ty)
+  = tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
+  where
+    match_ctxt = MC { mc_what = CaseAlt,
+                      mc_body = mc_body }
+    mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
+                              ; tcCmd env body (stk, res_ty') }
 
 matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
 matchExpectedCmdArgs 0 ty

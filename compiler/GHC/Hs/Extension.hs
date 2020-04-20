@@ -599,6 +599,7 @@ type family XCmdApp     x
 type family XCmdLam     x
 type family XCmdPar     x
 type family XCmdCase    x
+type family XCmdLamCase x
 type family XCmdIf      x
 type family XCmdLet     x
 type family XCmdDo      x
