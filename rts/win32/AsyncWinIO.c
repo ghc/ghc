@@ -426,7 +426,7 @@ bool queueIOThread()
       StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                                           processRemoteCompletion_closure);
       ASSERT(tso);
-      scheduleThread (cap, tso);
+      scheduleThreadNow (cap, tso);
       result = true;
   }
   ReleaseSRWLockExclusive (&lock);
@@ -496,6 +496,7 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     }
     return 0;
 }
+
 
 
 
