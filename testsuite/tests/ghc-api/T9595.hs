@@ -3,7 +3,7 @@ module Main where
 import GHC
 import GHC.Driver.Packages
 import GHC.Driver.Monad
-import Outputable
+import GHC.Utils.Outputable
 import System.Environment
 import GHC.Driver.Session
 import GHC.Types.Module

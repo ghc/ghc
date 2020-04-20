@@ -3,7 +3,7 @@ module GHC.Platform.Regs
        (callerSaves, activeStgRegs, haveRegBase, globalRegMaybe, freeReg)
        where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Expr
 import GHC.Platform

@@ -29,12 +29,12 @@ module GHC.Cmm.Type
 where
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 
 import Data.Word
 import Data.Int

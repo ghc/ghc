@@ -86,12 +86,12 @@ Solution: do unarise first.
 
 module GHC.Stg.CSE (stgCse) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Stg.Syntax
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
@@ -106,7 +106,7 @@ import Control.Monad( (>=>) )
 --------------
 
 -- A lookup trie for data constructor applications, i.e.
--- keys of type `(DataCon, [StgArg])`, following the patterns in TrieMap.
+-- keys of type `(DataCon, [StgArg])`, following the patterns in GHC.Data.TrieMap.
 
 data StgArgMap a = SAM
     { sam_var :: DVarEnv a

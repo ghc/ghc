@@ -15,7 +15,7 @@ module GHC.ByteCode.Asm (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
@@ -28,13 +28,13 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
 import GHC.Core.TyCon
-import FastString
+import GHC.Data.FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Runtime.Heap.Layout
 import GHC.Driver.Session
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Unique.DSet
 

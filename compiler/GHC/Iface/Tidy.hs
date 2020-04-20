@@ -14,7 +14,7 @@ module GHC.Iface.Tidy (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Driver.Session
@@ -30,7 +30,7 @@ import GHC.Core.Rules
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
-import StaticPtrTable
+import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var
@@ -54,11 +54,11 @@ import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Module
 import GHC.Driver.Types
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Unique.Supply
-import Outputable
-import Util( filterOut )
-import qualified ErrUtils as Err
+import GHC.Utils.Outputable
+import GHC.Utils.Misc( filterOut )
+import qualified GHC.Utils.Error as Err
 
 import Control.Monad
 import Data.Function
@@ -378,7 +378,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; (tidy_env, tidy_binds)
                  <- tidyTopBinds hsc_env unfold_env tidy_occ_env trimmed_binds
 
-          -- See Note [Grand plan for static forms] in StaticPtrTable.
+          -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
         ; let { spt_init_code = sptModuleInitCode mod spt_entries

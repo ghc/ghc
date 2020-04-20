@@ -3,11 +3,11 @@ module Main where
 import Data.Data
 import System.IO
 import GHC
-import FastString
+import GHC.Data.FastString
 import GHC.Types.SrcLoc
-import MonadUtils
-import Outputable
-import Bag (filterBag,isEmptyBag)
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 

@@ -189,7 +189,7 @@ module GHC.Tc.Utils.TcType (
 #include "HsVersions.h"
 
 -- friends:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
@@ -217,12 +217,12 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Types.Basic
-import Util
-import Maybes
-import ListSetOps ( getNth, findDupsEq )
-import Outputable
-import FastString
-import ErrUtils( Validity(..), MsgDoc, isValid )
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps ( getNth, findDupsEq )
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Error( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )

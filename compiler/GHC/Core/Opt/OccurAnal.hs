@@ -18,7 +18,7 @@ module GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.FVs
@@ -36,15 +36,15 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Demand ( argOneShots, argsOneShots )
-import Digraph          ( SCC(..), Node(..)
-                        , stronglyConnCompFromEdgedVerticesUniq
-                        , stronglyConnCompFromEdgedVerticesUniqR )
+import GHC.Data.Graph.Directed ( SCC(..), Node(..)
+                               , stronglyConnCompFromEdgedVerticesUniq
+                               , stronglyConnCompFromEdgedVerticesUniqR )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import Util
-import Maybes( orElse, isJust )
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.Maybe( orElse, isJust )
+import GHC.Utils.Outputable
 import Data.List
 
 {-
@@ -1240,7 +1240,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
   = DigraphNode details (varUnique bndr) (nonDetKeysUniqSet node_fvs)
     -- It's OK to use nonDetKeysUniqSet here as stronglyConnCompFromEdgedVerticesR
     -- is still deterministic with edges in nondeterministic order as
-    -- explained in Note [Deterministic SCC] in Digraph.
+    -- explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
   where
     details = ND { nd_bndr            = bndr'
                  , nd_rhs             = rhs'
@@ -1334,7 +1334,7 @@ mkLoopBreakerNodes env lvl bndr_set body_uds details_s
               -- It's OK to use nonDetKeysUniqSet here as
               -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
               -- in nondeterministic order as explained in
-              -- Note [Deterministic SCC] in Digraph.
+              -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
       where
         nd'     = nd { nd_bndr = new_bndr, nd_score = score }
         score   = nodeScore env new_bndr lb_deps nd

@@ -18,21 +18,21 @@ where
 import GHC.Settings.Utils         ( maybeRead )
 
 import Config                     ( cProjectVersion )
-import GhcPrelude
-import Binary
+import GHC.Prelude
+import GHC.Utils.Binary
 import GHC.Iface.Binary           ( getDictFastString )
-import FastMutInt
-import FastString                 ( FastString )
+import GHC.Data.FastMutInt
+import GHC.Data.FastString        ( FastString )
 import GHC.Types.Module           ( Module )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 
 import qualified Data.Array as A
 import Data.IORef

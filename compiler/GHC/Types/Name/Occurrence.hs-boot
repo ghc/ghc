@@ -1,5 +1,5 @@
 module GHC.Types.Name.Occurrence where
 
-import GhcPrelude ()
+import GHC.Prelude ()
 
 data OccName

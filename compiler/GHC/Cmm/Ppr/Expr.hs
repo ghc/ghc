@@ -39,13 +39,13 @@ module GHC.Cmm.Ppr.Expr
     )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Driver.Session (targetPlatform)
 import GHC.Cmm.Expr
 
-import Outputable
+import GHC.Utils.Outputable
 
 import Data.Maybe
 import Numeric ( fromRat )

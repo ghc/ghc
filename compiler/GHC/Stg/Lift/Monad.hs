@@ -22,21 +22,21 @@ module GHC.Stg.Lift.Monad (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Types.CostCentre ( isCurrentCCS, dontCareCCS )
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Name
-import Outputable
-import OrdList
+import GHC.Utils.Outputable
+import GHC.Data.OrdList
 import GHC.Stg.Subst
 import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 

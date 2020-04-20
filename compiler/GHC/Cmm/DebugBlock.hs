@@ -25,7 +25,7 @@ module GHC.Cmm.DebugBlock (
   UnwindExpr(..), toUnwindExpr
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.BlockId
@@ -33,12 +33,12 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Core
-import FastString      ( nilFS, mkFastString )
+import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Types.Module
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc
-import Util            ( seqList )
+import GHC.Utils.Misc      ( seqList )
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections

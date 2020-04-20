@@ -71,15 +71,15 @@ module GHC.Types.FieldLabel
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name
 
-import FastString
-import FastStringEnv
-import Outputable
-import Binary
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+import GHC.Utils.Outputable
+import GHC.Utils.Binary
 
 import Data.Data
 
