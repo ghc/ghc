@@ -40,7 +40,7 @@ import GHC.Types.Id.Info
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( tidyTopType )
 import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
-import GHC.Types.Cpr     ( mkCprSig, topTerm, botCpr )
+import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
@@ -1223,7 +1223,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     cpr = cprInfo idinfo
     final_cpr | Just _ <- mb_bot_str
-              = mkCprSig arity topTerm botCpr
+              = mkCprSig arity botCpr
               | otherwise
               = cpr
 
