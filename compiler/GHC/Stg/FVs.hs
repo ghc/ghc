@@ -47,8 +47,11 @@ import GhcPrelude
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Core    ( Tickish(Breakpoint) )
+import GHC.Core          ( Tickish(Breakpoint) )
+import GHC.Core.DataCon  ( dataConRepType )
+import GHC.Core.Type     ( isLiftedType_maybe )
 import Outputable
+import PrimOp
 import Util
 
 import Data.Maybe ( mapMaybe )
@@ -136,7 +139,16 @@ expr env = go
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
         -- See Note [Case alternative allocation strategy]
-        do_gc = True -- TODO: analyze alts and compute the flag
+        is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
+        is_cmp_op _                             = False
+        simple_scrut = isSimpleScrut scrut ty
+        -- should we use this to construct do_gc?
+        -- alts_allocate = any ( \(_, _, rhs) -> stgExprAllocates rhs ) alts
+        do_gc
+          | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
+          | not simple_scrut = True
+          | isSingleton alts = False
+          | otherwise        = True
     go (StgLet ext bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
     go (StgTick tick e) = (StgTick tick e', fvs')
@@ -168,3 +180,78 @@ alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
     -- See Note [Tracking local binders]
     (e', rhs_fvs) = expr (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
+
+-- | TODO: Note
+stgExprAllocates :: StgExpr -> Bool
+stgExprAllocates (StgLet _ _ _) = True
+stgExprAllocates (StgLetNoEscape _ _ body)
+  = stgExprAllocates body
+stgExprAllocates (StgConApp dataCon args _)
+  | Just True <- isLiftedType_maybe (dataConRepType dataCon)
+  , not (null args) = True
+stgExprAllocates (StgOpApp (StgPrimOp op) _ _) = primOpCanGC op
+stgExprAllocates (StgTick _ e) = stgExprAllocates e
+stgExprAllocates (StgCase scrut _ alt_type _ alts)
+  | stgExprAllocates scrut = True
+  | not (isSimpleScrut scrut alt_type) = False
+  | any ( \(_, _, rhs) -> stgExprAllocates rhs ) alts = True
+  | otherwise = False
+stgExprAllocates _ = False
+
+primOpCanGC :: PrimOp -> Bool
+-- NoDuplicateOp = ... blocking?
+primOpCanGC NewByteArrayOp_Char = True -- calls MAYBE_GC_N
+primOpCanGC NewPinnedByteArrayOp_Char = True -- calls MAYBE_GC_N
+primOpCanGC NewAlignedPinnedByteArrayOp_Char = True -- calls MAYBE_GC
+primOpCanGC ResizeMutableByteArrayOp_Char = True -- calls stg_newByteArrayzh
+primOpCanGC NewArrayOp = True -- calls MAYBE_GC
+primOpCanGC CloneArrayOp = True -- calls cloneArray which may call MAYBE_GC
+primOpCanGC CloneMutableArrayOp = True -- calls cloneArray which may call MAYBE_GC
+primOpCanGC FreezeArrayOp = True -- calls cloneArray which may call MAYBE_GC
+primOpCanGC ThawArrayOp = True -- calls cloneArray which may call MAYBE_GC
+primOpCanGC NewArrayArrayOp = True -- calls MAYBE_GC_N
+primOpCanGC NewSmallArrayOp = True -- calls MAYBE_GC
+primOpCanGC UnsafeThawArrayOp = True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+primOpCanGC UnsafeThawSmallArrayOp = True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+primOpCanGC CloneSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
+primOpCanGC CloneSmallMutableArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
+primOpCanGC FreezeSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
+primOpCanGC ThawSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
+primOpCanGC NewMutVarOp = True -- calls ALLOC_PRIM_P
+primOpCanGC AtomicModifyMutVar2Op = True -- calls HP_CHK_GEN_TICKY
+primOpCanGC AtomicModifyMutVar_Op = True -- calls HP_CHK_GEN_TICKY
+primOpCanGC MkWeakOp = True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+primOpCanGC AddCFinalizerToWeakOp = True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+primOpCanGC FloatDecode_IntOp = True -- calls STK_CHK_GEN_N
+primOpCanGC DoubleDecode_2IntOp = True -- calls STK_CHK_GEN_N
+primOpCanGC DoubleDecode_Int64Op = True -- calls STK_CHK_GEN_N
+primOpCanGC ForkOp = True -- calls MAYBE_GC_P
+primOpCanGC ForkOnOp = True -- calls MAYBE_GC
+primOpCanGC AtomicallyOp = True -- calls MAYBE_GC_P (and STK_CHK_GEN)
+primOpCanGC CatchSTMOp = True -- STK_CHK_GEN
+primOpCanGC CatchRetryOp = True -- calls MAYBE_GC_PP (and STK_CHK_GEN)
+primOpCanGC RetryOp = True -- calls MAYBE_GC_
+primOpCanGC NewTVarOp = True -- calls ALLOC_PRIM_P
+primOpCanGC ReadTVarOp = True -- calls MAYBE_GC_P.. how about stg_readTVarIO?
+primOpCanGC WriteTVarOp = True -- calls MAYBE_GC_PP
+primOpCanGC NewMVarOp = True -- calls ALLOC_PRIM_
+primOpCanGC TakeMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+primOpCanGC PutMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+primOpCanGC ReadMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE and GC_PRIM_P (also is blocking)
+primOpCanGC MakeStableNameOp = True -- calls MAYBE_GC_P
+primOpCanGC NewBCOOp = True -- calls ALLOC_PRIM
+primOpCanGC MkApUpd0_Op = True -- calls HP_CHK_P
+primOpCanGC UnpackClosureOp = True -- calls ALLOC_PRIM_P
+primOpCanGC WaitReadOp = True -- blocking
+primOpCanGC WaitWriteOp = True -- blocking
+primOpCanGC DelayOp = True -- blocking
+primOpCanGC _ = False
+
+-- borrowed from GHC.StgToCmm.Expr
+isSimpleScrut :: StgExpr -> AltType -> Bool
+isSimpleScrut (StgOpApp (StgPrimOp op) _ _) _ = primOpCanGC op
+isSimpleScrut (StgLit _) _ = True
+isSimpleScrut (StgApp _ []) (PrimAlt _) = True
+isSimpleScrut _  _ = False
+
+
