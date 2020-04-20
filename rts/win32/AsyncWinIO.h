@@ -23,4 +23,4 @@ extern void registerAlertableWait (HANDLE port, DWORD mssec, uint64_t num_req);
 extern OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num);
 extern void servicedIOEntries (uint64_t remaining);
 extern void completeSynchronousRequest (void);
-
+extern bool queueIOThread(void);
