@@ -25,4 +25,11 @@ Note that ``\case`` starts a layout, so you can write ::
         ...
         pN -> eN
 
+Additionally, since GHC 8.12.1, combining :extension:`LambdaCase` with
+:extension:`Arrows` allows ``\case`` syntax to be used as a command in
+``proc`` notation: ::
 
+      proc x -> (f -< x) `catchA` \case
+        p1 -> cmd1
+        ...
+        pN -> cmdN
