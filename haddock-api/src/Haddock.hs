@@ -62,7 +62,6 @@ import qualified GHC.Paths as GhcPaths
 import Paths_haddock_api (getDataDir)
 #endif
 import System.Directory (doesDirectoryExist, getTemporaryDirectory)
-import System.FilePath ((</>))
 
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)

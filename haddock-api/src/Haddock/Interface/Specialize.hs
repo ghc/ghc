@@ -15,8 +15,8 @@ import Haddock.Types
 import GHC
 import GHC.Types.Name
 import FastString
-import TysPrim ( funTyConName )
-import TysWiredIn ( listTyConName )
+import GHC.Builtin.Types.Prim ( funTyConName )
+import GHC.Builtin.Types ( listTyConName )
 
 import Control.Monad
 import Control.Monad.Trans.State
