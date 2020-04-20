@@ -995,6 +995,10 @@ zonkCmd env (HsCmdCase x expr ms)
        new_ms <- zonkMatchGroup env zonkLCmd ms
        return (HsCmdCase x new_expr new_ms)
 
+zonkCmd env (HsCmdLamCase x ms)
+  = do new_ms <- zonkMatchGroup env zonkLCmd ms
+       return (HsCmdLamCase x new_ms)
+
 zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
   = do { (env1, new_eCond) <- zonkSyntaxExpr env eCond
        ; new_ePred <- zonkLExpr env1 ePred
