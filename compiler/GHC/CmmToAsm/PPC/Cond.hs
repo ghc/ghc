@@ -8,9 +8,9 @@ module GHC.CmmToAsm.PPC.Cond (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Panic
+import GHC.Utils.Panic
 
 data Cond
         = ALWAYS

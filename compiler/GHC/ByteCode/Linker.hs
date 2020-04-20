@@ -18,7 +18,7 @@ module GHC.ByteCode.Linker (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
@@ -32,10 +32,10 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Builtin.PrimOps
 import GHC.Types.Module
-import FastString
-import Panic
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 -- Standard libraries
 import Data.Array.Unboxed

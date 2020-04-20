@@ -7,13 +7,13 @@ module GHC.SysTools.FileCleanup
   , withSystemTempDirectory, withTempDirectory
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
-import Util
-import Exception
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Exception as Exception
 import GHC.Driver.Phases
 
 import Control.Monad

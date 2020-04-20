@@ -17,7 +17,7 @@ module GHC.Core.Ppr (
         pprRules, pprOptCo
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
@@ -33,10 +33,10 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Coercion
 import GHC.Types.Basic
-import Maybes
-import Util
-import Outputable
-import FastString
+import GHC.Data.Maybe
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 
 {-

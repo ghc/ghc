@@ -27,12 +27,12 @@ module GHC.Stg.Stats ( showStgStats ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 
 import GHC.Types.Id (Id)
-import Panic
+import GHC.Utils.Panic
 
 import Data.Map (Map)
 import qualified Data.Map as Map

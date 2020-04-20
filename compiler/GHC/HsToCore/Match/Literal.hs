@@ -23,7 +23,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )
@@ -49,11 +49,11 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
 import Data.Ratio
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Basic
 import GHC.Driver.Session
-import Util
-import FastString
+import GHC.Utils.Misc
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

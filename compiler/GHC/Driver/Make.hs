@@ -33,41 +33,41 @@ module GHC.Driver.Make (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified GHC.Runtime.Linker as Linker
 
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Driver.Monad
 import GHC.Parser.Header
 import GHC.Driver.Types
 import GHC.Types.Module
-import GHC.IfaceToCore  ( typecheckIface )
-import GHC.Tc.Utils.Monad     ( initIfaceCheck )
+import GHC.IfaceToCore     ( typecheckIface )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 import GHC.Driver.Main
 
-import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Types.Basic
-import Digraph
-import Exception        ( tryIO, gbracket, gfinally )
-import FastString
-import Maybes           ( expectJust )
+import GHC.Data.Graph.Directed
+import GHC.Utils.Exception ( tryIO, gbracket, gfinally )
+import GHC.Data.FastString
+import GHC.Data.Maybe      ( expectJust )
 import GHC.Types.Name
-import MonadUtils       ( allM )
-import Outputable
-import Panic
+import GHC.Utils.Monad     ( allM )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
-import StringBuffer
+import GHC.Data.StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Tc.Utils.Backpack
 import GHC.Driver.Packages
 import GHC.Types.Unique.Set
-import Util
+import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
 import GHC.SysTools.FileCleanup
@@ -76,7 +76,7 @@ import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
-import qualified FiniteMap as Map ( insertListWith )
+import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 
 import Control.Concurrent ( forkIOWithUnmask, killThread )
 import qualified GHC.Conc as CC
@@ -1505,7 +1505,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
                         -- Add any necessary entries to the static pointer
                         -- table. See Note [Grand plan for static forms] in
-                        -- StaticPtrTable.
+                        -- GHC.Iface.Tidy.StaticPtrTable.
                 when (hscTarget (hsc_dflags hsc_env4) == HscInterpreted) $
                     liftIO $ hscAddSptEntries hsc_env4
                                  [ spt

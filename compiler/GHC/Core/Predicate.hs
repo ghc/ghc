@@ -28,7 +28,7 @@ module GHC.Core.Predicate (
   DictId, isEvVar, isDictId
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.Class
@@ -38,9 +38,9 @@ import GHC.Core.Coercion
 
 import GHC.Builtin.Names
 
-import FastString
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Control.Monad ( guard )
 

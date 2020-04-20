@@ -20,7 +20,7 @@ module GHC.Core.Opt.Simplify.Monad (
         plusSimplCount, isZeroSimplCount
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
@@ -32,12 +32,12 @@ import GHC.Core            ( RuleEnv(..) )
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Core.Opt.Monad
-import Outputable
-import FastString
-import MonadUtils
-import ErrUtils as Err
-import Util                ( count )
-import Panic               (throwGhcExceptionIO, GhcException (..))
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Monad
+import GHC.Utils.Error as Err
+import GHC.Utils.Misc      ( count )
+import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
 

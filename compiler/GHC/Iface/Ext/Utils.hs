@@ -4,14 +4,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 module GHC.Iface.Ext.Utils where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Map
-import GHC.Driver.Session         ( DynFlags )
-import FastString                 ( FastString, mkFastString )
+import GHC.Driver.Session    ( DynFlags )
+import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
-import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
+import GHC.Utils.Outputable  ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
 import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon

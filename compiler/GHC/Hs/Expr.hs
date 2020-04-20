@@ -26,7 +26,7 @@ module GHC.Hs.Expr where
 #include "HsVersions.h"
 
 -- friends:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs.Decls
 import GHC.Hs.Pat
@@ -43,9 +43,9 @@ import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Core.ConLike
 import GHC.Types.SrcLoc
-import Util
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)

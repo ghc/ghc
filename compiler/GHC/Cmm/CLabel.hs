@@ -113,7 +113,7 @@ module GHC.Cmm.CLabel (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -124,12 +124,12 @@ import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Builtin.PrimOps
 import GHC.Types.CostCentre
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Unique.Set
-import Util
+import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 
 -- -----------------------------------------------------------------------------

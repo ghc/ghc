@@ -20,7 +20,7 @@ module GHC.Core.SimpleOpt (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Arity( etaExpandToJoinPoint )
 
@@ -49,13 +49,13 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Types.Module ( Module )
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Session
-import Outputable
-import Pair
-import Util
-import Maybes       ( orElse )
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.Pair
+import GHC.Utils.Misc
+import GHC.Data.Maybe       ( orElse )
+import GHC.Data.FastString
 import Data.List
 import qualified Data.ByteString as BS
 

@@ -50,20 +50,20 @@ module GHC.Types.Literal
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Basic
-import Binary
+import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 
 import Data.ByteString (ByteString)
 import Data.Int
