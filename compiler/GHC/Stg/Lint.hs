@@ -37,12 +37,12 @@ basic properties listed above.
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
-import Bag                  ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Id         ( Id, idType, isJoinId, idName )
@@ -50,13 +50,13 @@ import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
-import ErrUtils             ( MsgDoc, Severity(..), mkLocMessage )
+import GHC.Utils.Error      ( MsgDoc, Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Module           ( Module )
-import qualified ErrUtils as Err
+import qualified GHC.Utils.Error as Err
 import Control.Applicative ((<|>))
 import Control.Monad
 

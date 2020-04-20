@@ -46,7 +46,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Reg
@@ -59,7 +59,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
-import FastString       ( FastString )
+import GHC.Data.FastString      ( FastString )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique         ( Unique )
@@ -69,7 +69,7 @@ import GHC.Types.Module
 import Control.Monad    ( ap )
 
 import GHC.CmmToAsm.Instr
-import Outputable (SDoc, pprPanic, ppr)
+import GHC.Utils.Outputable (SDoc, pprPanic, ppr)
 import GHC.Cmm (RawCmmDecl, RawCmmStatics)
 import GHC.CmmToAsm.CFG
 

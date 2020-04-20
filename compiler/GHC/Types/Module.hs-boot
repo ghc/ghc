@@ -1,6 +1,6 @@
 module GHC.Types.Module where
 
-import GhcPrelude
+import GHC.Prelude
 
 data Module
 data ModuleName

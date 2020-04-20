@@ -24,14 +24,14 @@ module GHC.Core.PatSyn (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.FieldLabel

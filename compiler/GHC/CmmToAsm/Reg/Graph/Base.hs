@@ -22,12 +22,12 @@ module GHC.CmmToAsm.Reg.Graph.Base (
         squeese
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import MonadUtils (concatMapM)
+import GHC.Utils.Monad (concatMapM)
 
 
 -- Some basic register classes.

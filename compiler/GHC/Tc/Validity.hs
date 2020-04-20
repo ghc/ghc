@@ -22,9 +22,9 @@ module GHC.Tc.Validity (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Maybes
+import GHC.Data.Maybe
 
 -- friends:
 import GHC.Tc.Utils.Unify    ( tcSubType_NC )
@@ -59,15 +59,15 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), mkTyVar )
-import FV
-import ErrUtils
+import GHC.Utils.FV
+import GHC.Utils.Error
 import GHC.Driver.Session
-import Util
-import ListSetOps
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique  ( mkAlphaTyVarUnique )
-import Bag               ( emptyBag )
+import GHC.Data.Bag      ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

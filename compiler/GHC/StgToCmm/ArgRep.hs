@@ -17,7 +17,7 @@ module GHC.StgToCmm.ArgRep (
 
         ) where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.StgToCmm.Closure    ( idPrimRep )
@@ -27,8 +27,8 @@ import GHC.Core.TyCon          ( PrimRep(..), primElemRepSizeB )
 import GHC.Types.Basic         ( RepArity )
 import GHC.Settings.Constants  ( wORD64_SIZE, dOUBLE_SIZE )
 
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 
 -- I extricated this code as this new module in order to avoid a
 -- cyclic dependency between GHC.StgToCmm.Layout and GHC.StgToCmm.Ticky.

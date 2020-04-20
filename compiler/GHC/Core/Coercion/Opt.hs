@@ -6,7 +6,7 @@ module GHC.Core.Coercion.Opt ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core.TyCo.Rep
@@ -18,11 +18,11 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.FamInstEnv ( flattenTys )
-import Pair
-import ListSetOps ( getNth )
-import Util
+import GHC.Data.Pair
+import GHC.Data.List.SetOps ( getNth )
+import GHC.Utils.Misc
 import GHC.Core.Unify
 import GHC.Core.InstEnv
 import Control.Monad   ( zipWithM )

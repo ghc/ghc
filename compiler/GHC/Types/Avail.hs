@@ -28,17 +28,17 @@ module GHC.Types.Avail (
 
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 
 import GHC.Types.FieldLabel
-import Binary
-import ListSetOps
-import Outputable
-import Util
+import GHC.Utils.Binary
+import GHC.Data.List.SetOps
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Data.Data ( Data )
 import Data.List ( find )

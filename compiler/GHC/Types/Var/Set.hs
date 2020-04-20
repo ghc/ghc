@@ -46,7 +46,7 @@ module GHC.Types.Var.Set (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import GHC.Types.Unique
@@ -55,7 +55,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
 import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
-import Outputable (SDoc)
+import GHC.Utils.Outputable (SDoc)
 
 -- | A non-deterministic Variable Set
 --
