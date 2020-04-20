@@ -2263,9 +2263,22 @@ quit _ = return True
 
 scriptCmd :: String -> InputT GHCi ()
 scriptCmd ws = do
-  case words ws of
+  case words' ws of
     [s]    -> runScript s
     _      -> throwGhcException (CmdLineError "syntax:  :script <filename>")
+
+-- | A version of 'words' that does not break on backslash-escaped spaces.
+-- E.g., 'words\' "lorem\\ ipsum dolor"' yields '["lorem ipsum", "dolor"]'.
+-- Used to scan for file paths in 'scriptCmd'.
+words' :: String -> [String]
+words' s = case dropWhile isSpace s of
+  "" -> []
+  s' -> go id s'
+ where
+  go acc []                          = [acc []]
+  go acc ('\\' : c : cs) | isSpace c = go (acc . (c :)) cs
+  go acc (c : cs) | isSpace c = acc [] : words' cs
+                  | otherwise = go (acc . (c :)) cs
 
 runScript :: String    -- ^ filename
            -> InputT GHCi ()
