@@ -40,11 +40,9 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
-import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrictDmd
+import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, seqDmd, botDiv )
-import GHC.Types.Cpr    ( mkCprSig, topTerm, botCpr )
+import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
@@ -822,7 +820,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
           | otherwise = info3
 
     bot_sig = mkClosedStrictSig (replicate new_arity topDmd) botDiv
-    bot_cpr = mkCprSig new_arity topTerm botCpr
+    bot_cpr = mkCprSig new_arity botCpr
 
      -- Zap call arity info. We have used it by now (via
      -- `tryEtaExpandRhs`), and the simplifier can invalidate this

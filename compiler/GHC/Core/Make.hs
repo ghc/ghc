@@ -882,7 +882,7 @@ mkExceptionId name
   = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
-                     `setCprInfo` mkCprSig 0 botTerm botCpr
+                     `setCprInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs) -- #15038
 
@@ -897,7 +897,7 @@ mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
-                                   `setCprInfo`           mkCprSig 1 botTerm botCpr
+                                   `setCprInfo`           mkCprSig 1 botCpr
                                    `setArityInfo`         1
                         -- Make arity and strictness agree
 
