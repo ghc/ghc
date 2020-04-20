@@ -866,20 +866,6 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
              | otherwise      = persistent
 
 
--- | The fast LLVM Pipeline skips the mangler and assembler,
--- emitting object code directly from llc.
---
--- slow: opt -> llc -> .s -> mangler -> as -> .o
--- fast: opt -> llc -> .o
---
--- hidden flag: -ffast-llvm
---
--- if keep-s-files is specified, we need to go through
--- the slow pipeline (Kavon Farvardin requested this).
-fastLlvmPipeline :: DynFlags -> Bool
-fastLlvmPipeline dflags
-  = not (gopt Opt_KeepSFiles dflags) && gopt Opt_FastLlvm dflags
-
 -- | LLVM Options. These are flags to be passed to opt and llc, to ensure
 -- consistency we list them in pairs, so that they form groups.
 llvmOptions :: DynFlags
@@ -890,7 +876,6 @@ llvmOptions dflags =
         ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
     ++ [("-stack-alignment=" ++ (show align)
         ,"-stack-alignment=" ++ (show align)) | align > 0 ]
-    ++ [("", "-filetype=obj") | fastLlvmPipeline dflags ]
 
     -- Additional llc flags
     ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
@@ -1472,8 +1457,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
 
 runPhase (RealPhase LlvmLlc) input_fn dflags
   = do
-    next_phase <- if | fastLlvmPipeline dflags -> maybeMergeForeign
-                     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
+    next_phase <- if -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
                      | gopt Opt_NoLlvmMangler dflags -> return (As False)
                      | otherwise -> return LlvmMangle
 
