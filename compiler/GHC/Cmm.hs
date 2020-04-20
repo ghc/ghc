@@ -28,7 +28,7 @@ module GHC.Cmm (
      module GHC.Cmm.Expr,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Id
 import GHC.Types.CostCentre
@@ -41,7 +41,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import Outputable
+import GHC.Utils.Outputable
 import Data.ByteString (ByteString)
 
 -----------------------------------------------------------------------------

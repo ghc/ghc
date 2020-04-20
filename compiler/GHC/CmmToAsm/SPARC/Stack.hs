@@ -7,7 +7,7 @@ module GHC.CmmToAsm.SPARC.Stack (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
@@ -15,7 +15,7 @@ import GHC.CmmToAsm.SPARC.Base
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.Config
 
-import Outputable
+import GHC.Utils.Outputable
 
 -- | Get an AddrMode relative to the address in sp.
 --      This gives us a stack relative addressing mode for volatile

@@ -2,7 +2,7 @@ module Main where
 
 import GHC
 import GHC.Driver.Monad
-import Outputable
+import GHC.Utils.Outputable
 import System.IO
 import System.Environment( getArgs )
 

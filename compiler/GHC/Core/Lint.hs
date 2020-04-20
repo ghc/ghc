@@ -23,14 +23,14 @@ module GHC.Core.Lint (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
 import GHC.Core.Opt.Monad
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Builtin.Types.Prim
@@ -43,7 +43,7 @@ import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Ppr
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Core.Coercion
 import GHC.Types.SrcLoc
 import GHC.Core.Type as Type
@@ -55,12 +55,12 @@ import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Basic
-import ErrUtils as Err
-import ListSetOps
+import GHC.Utils.Error as Err
+import GHC.Data.List.SetOps
 import GHC.Builtin.Names
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Arity        ( typeArity )
@@ -69,12 +69,12 @@ import GHC.Types.Demand ( splitStrictSig, isBotDiv )
 import GHC.Driver.Types
 import GHC.Driver.Session
 import Control.Monad
-import MonadUtils
+import GHC.Utils.Monad
 import Data.Foldable      ( toList )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.List          ( partition )
 import Data.Maybe
-import Pair
+import GHC.Data.Pair
 import qualified GHC.LanguageExtensions as LangExt
 
 {-
@@ -2211,7 +2211,7 @@ top-level ones. See Note [Exported LocalIds] and #9857.
 
 Note [Checking StaticPtrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Note [Grand plan for static forms] in StaticPtrTable for an overview.
+See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an overview.
 
 Every occurrence of the function 'makeStatic' should be moved to the
 top level by the FloatOut pass.  It's vital that we don't have nested

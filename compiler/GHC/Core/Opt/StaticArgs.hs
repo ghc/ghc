@@ -51,7 +51,7 @@ essential to make this work well!
 {-# LANGUAGE CPP #-}
 module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var
 import GHC.Core
@@ -62,15 +62,15 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
-import Outputable
+import GHC.Utils.Outputable
 
 import Data.List (mapAccumL)
-import FastString
+import GHC.Data.FastString
 
 #include "HsVersions.h"
 

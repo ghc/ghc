@@ -9,9 +9,9 @@
 
 module GHC.Core.Opt.Monad ( CoreToDo, CoreM ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import IOEnv ( IOEnv )
+import GHC.Utils.IO.Env ( IOEnv )
 
 type CoreIOEnv = IOEnv CoreReader
 

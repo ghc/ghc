@@ -4,7 +4,7 @@
 
 module GHC.Llvm.Syntax where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm.MetaData
 import GHC.Llvm.Types

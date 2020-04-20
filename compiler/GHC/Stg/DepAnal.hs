@@ -2,13 +2,13 @@
 
 module GHC.Stg.DepAnal (depSortStgPgm) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.Var.Set
 import GHC.Types.Module (Module)

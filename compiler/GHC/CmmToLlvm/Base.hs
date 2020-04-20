@@ -41,7 +41,7 @@ module GHC.CmmToLlvm.Base (
 #include "HsVersions.h"
 #include "ghcautoconf.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
@@ -49,18 +49,18 @@ import GHC.CmmToLlvm.Regs
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs )
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Cmm              hiding ( succ )
 import GHC.Cmm.Utils (regsOverlap)
-import Outputable as Outp
+import GHC.Utils.Outputable as Outp
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import BufWrite   ( BufHandle )
+import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import ErrUtils
-import qualified Stream
+import GHC.Utils.Error
+import qualified GHC.Data.Stream as Stream
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)

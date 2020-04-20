@@ -99,7 +99,7 @@ module GHC.Core (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.CostCentre
@@ -114,11 +114,11 @@ import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Types.Module
 import GHC.Types.Basic
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
-import Binary
+import GHC.Utils.Binary
 
 import Data.Data hiding (TyCon)
 import Data.Int

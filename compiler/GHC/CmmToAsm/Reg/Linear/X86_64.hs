@@ -2,12 +2,12 @@
 -- | Free regs map for x86_64
 module GHC.CmmToAsm.Reg.Linear.X86_64 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
-import Panic
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word

@@ -20,7 +20,7 @@ module GHC.Core.Opt.FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
@@ -33,9 +33,9 @@ import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Types.Var.Set
-import Util
+import GHC.Utils.Misc
 import GHC.Driver.Session
-import Outputable
+import GHC.Utils.Outputable
 -- import Data.List        ( mapAccumL )
 import GHC.Types.Basic      ( RecFlag(..), isRec )
 

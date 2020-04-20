@@ -23,7 +23,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
@@ -54,12 +54,12 @@ import GHC.Core.Coercion ( eqCoercion )
 import GHC.Core.TyCon    ( isNewTyCon )
 import GHC.Builtin.Types
 import GHC.Types.SrcLoc
-import Maybes
-import Util
+import GHC.Data.Maybe
+import GHC.Utils.Misc
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic ( isGenerated, il_value, fl_value )
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 

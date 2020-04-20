@@ -4,7 +4,7 @@ import GHC
 import GHC.Driver.Session
 import GHC.Runtime.Linker as Linker
 import System.Environment
-import MonadUtils ( MonadIO(..) )
+import GHC.Utils.Monad ( MonadIO(..) )
 
 foreign export ccall loadPackages :: IO ()
 

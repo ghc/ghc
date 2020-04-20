@@ -49,7 +49,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
@@ -60,7 +60,7 @@ import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Types.Unique
 
 import GHC.Platform.Regs
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 
 import Data.Word        ( Word8, Word16, Word32, Word64 )
