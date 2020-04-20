@@ -2577,6 +2577,14 @@ scheduleThread(Capability *cap, StgTSO *tso)
 }
 
 void
+scheduleThreadNow(Capability *cap, StgTSO *tso)
+{
+    // The thread goes at the *beginning* of the run-queue,
+    // in order to execute it as soon as possible.
+    pushOnRunQueue(cap,tso);
+}
+
+void
 scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 {
     tso->flags |= TSO_LOCKED; // we requested explicit affinity; don't
