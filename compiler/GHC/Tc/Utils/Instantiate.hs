@@ -36,7 +36,7 @@ module GHC.Tc.Utils.Instantiate (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
 
 import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
@@ -639,7 +639,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
      span <- getSrcSpanM
-     expr <- tcPolyExpr (L span user_nm_expr) sigma1
+     expr <- tcCheckExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv

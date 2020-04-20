@@ -27,4 +27,5 @@ unT2b' :: T2b -> S2
 unT2b' (MkT2b x) = x
 
 pattern MkT2b' :: S2 -> T2b
-pattern MkT2b' {unT2b} <- (unT2b' -> unT2b)
+-- pattern MkT2b' {unT2b} <- (unT2b' -> unT2b)
+pattern MkT2b' x <- (unT2b' -> x)

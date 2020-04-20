@@ -60,7 +60,7 @@ module GHC.Tc.Gen.HsType (
         checkClassKindSig,
 
         -- Pattern type signatures
-        tcHsPatSigType, tcPatSig,
+        tcHsPatSigType,
 
         -- Error messages
         funAppCtxt, addTyConFlavCtxt
@@ -75,7 +75,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
@@ -3389,58 +3388,6 @@ tcHsPatSigType ctxt sig_ty
                        -- See Note [Pattern signature binders]
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
            ; return (name, tv) }
-
-tcPatSig :: Bool                    -- True <=> pattern binding
-         -> LHsSigWcType GhcRn
-         -> ExpSigmaType
-         -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [(Name,TcTyVar)],  -- The new bit of type environment, binding
-                                    -- the scoped type variables
-                 [(Name,TcTyVar)],  -- The wildcards
-                 HsWrapper)         -- Coercion due to unification with actual ty
-                                    -- Of shape:  res_ty ~ sig_ty
-tcPatSig in_pat_bind sig res_ty
- = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
-        -- sig_tvs are the type variables free in 'sig',
-        -- and not already in scope. These are the ones
-        -- that should be brought into scope
-
-        ; if null sig_tvs then do {
-                -- Just do the subsumption check and return
-                  wrap <- addErrCtxtM (mk_msg sig_ty) $
-                          tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
-                ; return (sig_ty, [], sig_wcs, wrap)
-        } else do
-                -- Type signature binds at least one scoped type variable
-
-                -- A pattern binding cannot bind scoped type variables
-                -- It is more convenient to make the test here
-                -- than in the renamer
-        { when in_pat_bind (addErr (patBindSigErr sig_tvs))
-
-        -- Now do a subsumption check of the pattern signature against res_ty
-        ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
-
-        -- Phew!
-        ; return (sig_ty, sig_tvs, sig_wcs, wrap)
-        } }
-  where
-    mk_msg sig_ty tidy_env
-       = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType res_ty   -- should be filled in by now
-            ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
-            ; let msg = vcat [ hang (text "When checking that the pattern signature:")
-                                  4 (ppr sig_ty)
-                             , nest 2 (hang (text "fits the type of its context:")
-                                          2 (ppr res_ty)) ]
-            ; return (tidy_env, msg) }
-
-patBindSigErr :: [(Name,TcTyVar)] -> SDoc
-patBindSigErr sig_tvs
-  = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
-          <+> pprQuotedList (map fst sig_tvs))
-       2 (text "in a pattern binding signature")
 
 {- Note [Pattern signature binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

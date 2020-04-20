@@ -1483,7 +1483,7 @@ ocResolve_MachO(ObjectCode* oc)
             }
             else
             {
-                IF_DEBUG(linker, debugBelch("ocResolve_MachO: unknown section\n"));
+                IF_DEBUG(linker, debugBelch("ocResolve_MachO: unknown section name: %s\n", sectionName));
             }
         }
     }

@@ -11,7 +11,7 @@ T13242a.hs:10:5: error:
            _ <- return 'a'
            _ <- return 'b'
            return (x == x)
-    • In an equation for ‘test’:
+      In an equation for ‘test’:
           test
             = do A x <- undefined
                  _ <- return 'a'
@@ -19,7 +19,7 @@ T13242a.hs:10:5: error:
                  return (x == x)
     • Relevant bindings include x :: a (bound at T13242a.hs:10:5)
 
-T13242a.hs:13:11: error:
+T13242a.hs:13:13: error:
     • Ambiguous type variable ‘a0’ arising from a use of ‘==’
       prevents the constraint ‘(Eq a0)’ from being solved.
       Relevant bindings include x :: a0 (bound at T13242a.hs:10:5)
@@ -27,12 +27,12 @@ T13242a.hs:13:11: error:
       These potential instances exist:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq Integer
-          -- Defined in ‘integer-gmp-1.0.2.0:GHC.Integer.Type’
+          -- Defined in ‘integer-gmp-1.0.3.0:GHC.Integer.Type’
         instance Eq () -- Defined in ‘GHC.Classes’
         ...plus 21 others
         ...plus six instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-      In a stmt of a 'do' block: return (x == x)
+    • In a stmt of a 'do' block: return (x == x)
       In the expression:
         do A x <- undefined
            _ <- return 'a'

@@ -95,7 +95,8 @@ import Outputable
 import FastString
 import Bag
 import Util
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPState)
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPStatePure)
+import GHC.Parser.Lexer (ParserFlags)
 import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
 import System.Directory
@@ -879,44 +880,44 @@ parseName str = withSession $ \hsc_env -> liftIO $
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
 
 -- | Returns @True@ if passed string is a statement.
-isStmt :: DynFlags -> String -> Bool
-isStmt dflags stmt =
-  case parseThing Parser.parseStmt dflags stmt of
+isStmt :: ParserFlags -> String -> Bool
+isStmt pflags stmt =
+  case parseThing Parser.parseStmt pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string has an import declaration.
-hasImport :: DynFlags -> String -> Bool
-hasImport dflags stmt =
-  case parseThing Parser.parseModule dflags stmt of
+hasImport :: ParserFlags -> String -> Bool
+hasImport pflags stmt =
+  case parseThing Parser.parseModule pflags stmt of
     Lexer.POk _ thing -> hasImports thing
     Lexer.PFailed _ -> False
   where
     hasImports = not . null . hsmodImports . unLoc
 
 -- | Returns @True@ if passed string is an import declaration.
-isImport :: DynFlags -> String -> Bool
-isImport dflags stmt =
-  case parseThing Parser.parseImport dflags stmt of
+isImport :: ParserFlags -> String -> Bool
+isImport pflags stmt =
+  case parseThing Parser.parseImport pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
-isDecl :: DynFlags -> String -> Bool
-isDecl dflags stmt = do
-  case parseThing Parser.parseDeclaration dflags stmt of
+isDecl :: ParserFlags -> String -> Bool
+isDecl pflags stmt = do
+  case parseThing Parser.parseDeclaration pflags stmt of
     Lexer.POk _ thing ->
       case unLoc thing of
         SpliceD _ _ -> False
         _ -> True
     Lexer.PFailed _ -> False
 
-parseThing :: Lexer.P thing -> DynFlags -> String -> Lexer.ParseResult thing
-parseThing parser dflags stmt = do
+parseThing :: Lexer.P thing -> ParserFlags -> String -> Lexer.ParseResult thing
+parseThing parser pflags stmt = do
   let buf = stringToStringBuffer stmt
       loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
-  Lexer.unP parser (Lexer.mkPState dflags buf loc)
+  Lexer.unP parser (Lexer.mkPStatePure pflags buf loc)
 
 getDocs :: GhcMonad m
         => Name

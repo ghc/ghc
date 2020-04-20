@@ -1339,8 +1339,6 @@ The allowed fields, with their types, are:
 
     ``libHSfoo.a``
         The name of the library on Unix and Windows (mingw) systems.
-        Note that we don't support building dynamic libraries of Haskell
-        code on Unix systems.
 
     ``HSfoo.dll``
         The name of the dynamic library on Windows systems (optional).

@@ -73,7 +73,7 @@ foo = show $ add (One:@Zero) (One:@One)
 --     Add One One nr', AddDigit (Zero:@nr') One c, Show c
 --
 -- ==> Add One One nr', AddDigit (Zero:@nr') One c, Show c
--- 
+--
 -- ==> Add One One (One:@One), AddDigit (Zero:@(One:@One)) One c, Show c
 --
 -- ==> AddDigit (Zero:@(One:@One)) One c, Show c

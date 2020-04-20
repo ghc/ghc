@@ -31,6 +31,8 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
+import GHC.CmmToAsm.Monad
+import GHC.CmmToAsm.Config
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -925,6 +927,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
   topSRT <- get
 
   let
+    config = initConfig dflags
     srtMap = moduleSRTMap topSRT
 
     blockids = getBlockLabels lbls
@@ -1024,11 +1027,11 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
           -- Consequently we build a singleton SRT in in this case.
-          not (labelDynamic dflags this_mod lbl)
+          not (labelDynamic config this_mod lbl)
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.
-            && (not (osMachOTarget $ platformOS $ targetPlatform dflags)
+            && (not (osMachOTarget $ platformOS $ ncgPlatform config)
                || isLocalCLabel this_mod lbl) -> do
 
           -- If we have a static function closure, then it becomes the
