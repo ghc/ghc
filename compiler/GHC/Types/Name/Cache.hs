@@ -10,14 +10,14 @@ module GHC.Types.Name.Cache
     , NameCache(..), OrigNameCache
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import GHC.Builtin.Names
 
 #include "HsVersions.h"

@@ -13,7 +13,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Subst
 import GHC.Types.Var    ( Var )
@@ -28,10 +28,10 @@ import GHC.Core.Utils   ( mkAltExpr, eqExpr
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Core.Map
-import Util             ( filterOut, equalLength, debugIsOn )
+import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
 import Data.List        ( mapAccumL )
 
 {-

@@ -138,15 +138,15 @@ module GHC.Tc.Utils.Monad(
 
   -- * Types etc.
   module GHC.Tc.Types,
-  module IOEnv
+  module GHC.Data.IOEnv
   ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types     -- Re-export all
-import IOEnv            -- Re-export all
+import GHC.Data.IOEnv -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
@@ -166,20 +166,20 @@ import GHC.Builtin.Names
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import Bag
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import FastString
-import Panic
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.CostCentre.State
 
 import qualified GHC.LanguageExtensions as LangExt

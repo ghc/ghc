@@ -30,7 +30,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 import GHC.Builtin.Names.TH( liftStringName, liftName )
@@ -79,12 +79,12 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
-import ListSetOps
-import Maybes
-import Outputable
-import FastString
+import GHC.Data.List.SetOps
+import GHC.Data.Maybe
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
@@ -578,7 +578,7 @@ tcExpr (HsProc x pat cmd) res_ty
         ; return $ mkHsWrapCo coi (HsProc x pat' cmd') }
 
 -- Typechecks the static form and wraps it with a call to 'fromStaticPtr'.
--- See Note [Grand plan for static forms] in StaticPtrTable for an overview.
+-- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an overview.
 -- To type check
 --      (static e) :: p a
 -- we want to check (e :: a),

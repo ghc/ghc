@@ -26,14 +26,14 @@ module GHC.Driver.CmdLine
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
-import Outputable
-import Panic
-import Bag
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.Bag
 import GHC.Types.SrcLoc
-import Json
+import GHC.Utils.Json
 
 import Data.Function
 import Data.List

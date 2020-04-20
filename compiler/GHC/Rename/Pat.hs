@@ -44,7 +44,7 @@ module GHC.Rename.Pat (-- main entry points
 
 -- ENH: thin imports to only what is necessary for patterns
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
@@ -67,9 +67,9 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
-import Util
-import ListSetOps          ( removeDups )
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps( removeDups )
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )

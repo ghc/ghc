@@ -12,7 +12,7 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Basic ( Boxity(..), neverInlinePragma, SourceText(..) )
@@ -37,13 +37,13 @@ import GHC.Core.DataCon
 import GHC.Types.Module
 import GHC.Hs
 import GHC.Driver.Session
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map
 import GHC.Settings.Constants
-import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
-import Outputable
-import FastString ( FastString, mkFastString, fsLit )
+import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
+import GHC.Utils.Outputable
+import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class (lift)

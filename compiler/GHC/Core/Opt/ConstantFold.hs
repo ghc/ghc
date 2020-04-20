@@ -26,7 +26,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId )
 
@@ -49,13 +49,13 @@ import GHC.Core.Unfold ( exprIsConApp_maybe )
 import GHC.Core.Type
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Builtin.Names
-import Maybes      ( orElse )
+import GHC.Data.Maybe      ( orElse )
 import GHC.Types.Name ( Name, nameOccName )
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Platform
-import Util
+import GHC.Utils.Misc
 import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
 import Control.Applicative ( Alternative(..) )

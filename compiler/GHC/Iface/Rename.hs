@@ -17,10 +17,10 @@ module GHC.Iface.Rename (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.Types.Unique.FM
@@ -28,12 +28,12 @@ import GHC.Types.Avail
 import GHC.Iface.Syntax
 import GHC.Types.FieldLabel
 import GHC.Types.Var
-import ErrUtils
+import GHC.Utils.Error
 
 import GHC.Types.Name
 import GHC.Tc.Utils.Monad
-import Util
-import Fingerprint
+import GHC.Utils.Misc
+import GHC.Utils.Fingerprint
 import GHC.Types.Basic
 
 -- a bit vexing
@@ -42,7 +42,7 @@ import GHC.Driver.Session
 
 import qualified Data.Traversable as T
 
-import Bag
+import GHC.Data.Bag
 import Data.IORef
 import GHC.Types.Name.Shape
 import GHC.Iface.Env

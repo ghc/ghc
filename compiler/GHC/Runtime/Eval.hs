@@ -46,7 +46,7 @@ module GHC.Runtime.Eval (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Runtime.Eval.Types
 
@@ -82,19 +82,19 @@ import GHC.Driver.Session
 import GHC.LanguageExtensions
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import MonadUtils
+import GHC.Utils.Monad
 import GHC.Types.Module
 import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
 import GHC.Builtin.Types ( isCTupleTyConName )
-import Panic
-import Maybes
-import ErrUtils
+import GHC.Utils.Panic
+import GHC.Data.Maybe
+import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Runtime.Heap.Inspect
-import Outputable
-import FastString
-import Bag
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Utils.Misc
 import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPStatePure)
 import GHC.Parser.Lexer (ParserFlags)
 import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
@@ -106,10 +106,10 @@ import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import StringBuffer (stringToStringBuffer)
+import GHC.Data.StringBuffer (stringToStringBuffer)
 import Control.Monad
 import Data.Array
-import Exception
+import GHC.Utils.Exception
 import Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )

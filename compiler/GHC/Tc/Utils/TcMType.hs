@@ -94,7 +94,7 @@ module GHC.Tc.Utils.TcMType (
 #include "HsVersions.h"
 
 -- friends:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -119,18 +119,18 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Builtin.Names
-import Util
-import Outputable
-import FastString
-import Bag
-import Pair
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Data.Pair
 import GHC.Types.Unique.Set
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
 
 import Control.Monad
-import Maybes
+import GHC.Data.Maybe
 import Data.List        ( mapAccumL )
 import Control.Arrow    ( second )
 import qualified Data.Semigroup as Semi
