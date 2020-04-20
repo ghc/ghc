@@ -2267,12 +2267,15 @@ scriptCmd ws = do
     [s]    -> runScript s
     _      -> throwGhcException (CmdLineError "syntax:  :script <filename>")
 
--- | A version of 'words' that does not break on backslash-escaped spaces.
--- E.g., 'words\' "lorem\\ ipsum dolor"' yields '["lorem ipsum", "dolor"]'.
+-- | A version of 'words' that treats sequences enclosed in double quotes as
+-- single words and that does not break on backslash-escaped spaces.
+-- E.g., 'words\' "\"lorem ipsum\" dolor"' and 'words\' "lorem\\ ipsum dolor"'
+-- yield '["lorem ipsum", "dolor"]'.
 -- Used to scan for file paths in 'scriptCmd'.
 words' :: String -> [String]
 words' s = case dropWhile isSpace s of
   "" -> []
+  s'@('\"' : _) | [(w, s'')] <- reads s' -> w : words' s''
   s' -> go id s'
  where
   go acc []                          = [acc []]
