@@ -17,8 +17,8 @@ module Hadrian.Utilities (
 
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
-    makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
-    moveDirectory, removeDirectory,
+    makeExecutable, moveFile, removeFile, removeFile', createDirectory, copyDirectory,
+    moveDirectory, removeDirectory, getFileSize,
 
     -- * Diagnostic info
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
@@ -357,6 +357,18 @@ removeFile :: FilePath -> Action ()
 removeFile file = do
     putProgressInfo $ "| Remove file " ++ file
     liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
+
+-- | Remove a file that doesn't necessarily exist. Only print if the file
+-- existed before
+removeFile' :: FilePath -> Action ()
+removeFile' file = do
+    whenM (liftIO (IO.doesFileExist file)) $ do
+        putProgressInfo $ "| Remove file " ++ file
+        liftIO (IO.removeFile file)
+
+-- | Get file size.
+getFileSize :: FilePath -> Action Integer
+getFileSize file = liftIO (IO.getFileSize file)
 
 -- | Create a directory if it does not already exist.
 createDirectory :: FilePath -> Action ()
