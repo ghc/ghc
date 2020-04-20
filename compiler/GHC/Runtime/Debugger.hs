@@ -14,7 +14,7 @@
 
 module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect
@@ -32,12 +32,12 @@ import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 import GHC.Core.Type
 import GHC
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.Ppr.TyThing
-import ErrUtils
-import MonadUtils
+import GHC.Utils.Error
+import GHC.Utils.Monad
 import GHC.Driver.Session
-import Exception
+import GHC.Utils.Exception
 
 import Control.Monad
 import Data.List ( (\\) )

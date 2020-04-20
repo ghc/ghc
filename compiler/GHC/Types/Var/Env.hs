@@ -74,7 +74,7 @@ module GHC.Types.Var.Env (
         emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 import qualified Data.IntMap.Strict as IntMap -- TODO: Move this to UniqFM
 
 import GHC.Types.Name.Occurrence
@@ -85,9 +85,9 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique
-import Util
-import Maybes
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 
 {-
 ************************************************************************

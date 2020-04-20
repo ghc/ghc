@@ -103,7 +103,7 @@ module GHC.Parser.PostProcess (
         PatBuilder
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon )
@@ -123,16 +123,16 @@ import GHC.Types.ForeignCall
 import GHC.Builtin.Names ( allNameStrings )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
-import OrdList          ( OrdList, fromOL )
-import Bag              ( emptyBag, consBag )
-import Outputable
-import FastString
-import Maybes
-import Util
+import GHC.Data.OrdList ( OrdList, fromOL )
+import GHC.Data.Bag     ( emptyBag, consBag )
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Utils.Misc
 import GHC.Parser.Annotation
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
-import ErrUtils ( Messages )
+import GHC.Utils.Error ( Messages )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP

@@ -33,7 +33,7 @@ module GHC.Iface.Binary (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
@@ -44,18 +44,18 @@ import GHC.Types.Name
 import GHC.Driver.Session
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import Panic
-import Binary
+import GHC.Utils.Panic
+import GHC.Utils.Binary as Binary
 import GHC.Types.SrcLoc
-import ErrUtils
-import FastMutInt
+import GHC.Utils.Error
+import GHC.Data.FastMutInt
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
 import GHC.Platform
-import FastString
+import GHC.Data.FastString
 import GHC.Settings.Constants
-import Util
+import GHC.Utils.Misc
 
 import Data.Array
 import Data.Array.ST

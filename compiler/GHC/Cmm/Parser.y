@@ -202,7 +202,7 @@ necessary to the stack to accommodate it (e.g. 2).
 
 module GHC.Cmm.Parser ( parseCmmFile ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.StgToCmm.ExtCode
 import GHC.Cmm.CallConv
@@ -243,14 +243,14 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
-import ErrUtils
-import StringBuffer
-import FastString
-import Panic
+import GHC.Utils.Error
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
+import GHC.Utils.Panic
 import GHC.Settings.Constants
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic
-import Bag              ( emptyBag, unitBag )
+import GHC.Data.Bag     ( emptyBag, unitBag )
 import GHC.Types.Var
 
 import Control.Monad

@@ -40,7 +40,7 @@ module GHC.Tc.Utils.Unify (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.TyCo.Rep
@@ -62,13 +62,13 @@ import GHC.Builtin.Types.Prim( tYPE )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Types.Basic
-import Bag
-import Util
+import GHC.Data.Bag
+import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
-import Outputable
+import GHC.Utils.Outputable as Outputable
 
 import Data.Maybe( isNothing )
 import Control.Monad

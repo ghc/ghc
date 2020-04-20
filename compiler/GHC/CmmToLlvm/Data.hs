@@ -9,7 +9,7 @@ module GHC.CmmToLlvm.Data (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -20,8 +20,8 @@ import GHC.Cmm
 import GHC.Driver.Session
 import GHC.Platform
 
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import qualified Data.ByteString as BS
 
 -- ----------------------------------------------------------------------------

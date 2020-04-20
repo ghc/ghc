@@ -2,7 +2,7 @@
 module Main where
 
 import GHC
-import MonadUtils
+import GHC.Utils.Monad
 
 import System.Environment
 

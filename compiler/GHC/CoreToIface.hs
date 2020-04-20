@@ -45,7 +45,7 @@ module GHC.CoreToIface
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
@@ -62,9 +62,9 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.Type
 import GHC.Core.PatSyn
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set

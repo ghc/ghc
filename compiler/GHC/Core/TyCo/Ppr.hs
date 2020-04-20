@@ -25,7 +25,7 @@ module GHC.Core.TyCo.Ppr
         pprTyThingCategory, pprShortTyThing,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CoreToIface
    ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
@@ -50,7 +50,7 @@ import GHC.Iface.Type
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic ( PprPrec(..), topPrec, sigPrec, opPrec
                        , funPrec, appPrec, maybeParen )
 
