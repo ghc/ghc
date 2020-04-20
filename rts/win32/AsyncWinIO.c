@@ -78,21 +78,28 @@
                  +------------+process response|
                               +----------------+
 
+   The non-alertable wait itself is split into two phases during regular
+   execution:
+    1.) canQueueIOThread == true
+    2.) canQueueIOThread == false, outstanding_service_requests == true
+
+   `notifyScheduler` puts us into the first phase. During which we wait
+   for the scheduler to call `queueIOThread`.
+   During the second phase we wait for the queued haskell thread to run.
+
    The alertable wait is done by calling into GetQueuedCompletionStatusEx.
    After we return from the call we notify the haskell side of new events
-   via notifyRtsOfFinishedCall.
+   via `notifyScheduler`.
 
-   notifyRtsOfFinishedCall schedules execution of the haskell side function
-   processRemoteCompletion, which will process call backs queued to be executed
-   after IO actions finished. It also sets `outstanding_service_requests` to indicate
-   that the C side should wait until all events have been processed before proceeding.
-
-   Until/While processRemoteCompletion runs the C side will block again in the unalertable
-   wait. It will be unblocked by the execution of `servicedIOEntries` from within
+   notifyScheduler set's flags to indicate to the scheduler that new IO work
+   needs to be processed. At this point the next call to `schedule` will
+   check the flag and schedule execution of a haskell thread executing
    processRemoteCompletion.
 
-
-
+    `processRemoteCompletion` will process IO results invoking call backs and
+   processing timer events. Once done it resets `outstanding_service_requests`
+   and wakes up the IOManager thread. Which at this point becomes unblocked
+   and reenters the altertable wait state.
 
    As a design decision to keep this side as light as possible no bookkeeping
    is done here to track requests.  That is, this file has no way of knowing
@@ -179,7 +186,21 @@ OVERLAPPED_ENTRY *entries;
    Haskell I/O Manager.  */
 uint32_t num_last_completed;
 
-static void notifyRtsOfFinishedCall (uint32_t num);
+/* Notify the Haskell side of this many new finished requests */
+uint32_t num_notify;
+
+/* Indicates to the scheduler that new work is available for processing.
+    Set by:
+      runner
+      queueIOThread
+    Read by
+      queueIOThread
+*/
+static volatile bool canQueueIOThread;
+
+static void notifyScheduler(uint32_t num);
+
+// static void notifyRtsOfFinishedCall (uint32_t num);
 
 /* Create and initialize the non-threaded I/O manager.  */
 bool startupAsyncWinIO(void)
@@ -315,25 +336,6 @@ OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num)
   return entries;
 }
 
-/* Internal function to notify the RTS of NUM completed I/O requests.  */
-static void notifyRtsOfFinishedCall (uint32_t num)
-{
-  num_last_completed = num;
-#if !defined(THREADED_RTS)
-  Capability *cap = &MainCapability;
-  StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
-                                       processRemoteCompletion_closure);
-  AcquireSRWLockExclusive (&lock);
-  if (num > 0)
-    outstanding_service_requests = true;
-
-  scheduleThread (cap, tso);
-
-  WakeConditionVariable (&threadIOWait);
-  ReleaseSRWLockExclusive (&lock);
-#endif
-}
-
 /* Called by the scheduler when we have ran out of work to do and we have at
    least one thread blocked on an I/O Port.  When WAIT then if this function
    returns you will have at least one action to service, though this may be a
@@ -341,6 +343,9 @@ static void notifyRtsOfFinishedCall (uint32_t num)
 
 void awaitAsyncRequests (bool wait)
 {
+  if(queueIOThread()) {
+    return;
+  }
   AcquireSRWLockExclusive (&lock);
   /* We don't deal with spurious requests here, that's left up to AwaitEvent.c
      because in principle we need to check if the capability work queue is now
@@ -383,6 +388,52 @@ void servicedIOEntries (uint64_t remaining)
 
   WakeConditionVariable (&wakeEvent);
 }
+
+/* Sets `canQueueIOThread` to indicate to the scheduler that it should
+   queue a new haskell thread to process IO events. */
+static void notifyScheduler(uint32_t num) {
+  AcquireSRWLockExclusive (&lock);
+  ASSERT(!canQueueIOThread);
+  canQueueIOThread = true;
+  num_notify = num;
+  WakeConditionVariable(&threadIOWait);
+  ReleaseSRWLockExclusive (&lock);
+}
+
+/* Queues a new haskell thread to process IO events
+   if there is work to do.
+   Return true if work was queued.
+
+   Precond:
+    Not already waiting on service requests.
+   Postcond:
+    outstanding_service_requests = true
+    processRemoteCompletion queued.
+    IOThread blocked until processRemoteCompletion has run.
+    */
+bool queueIOThread()
+{
+  bool result = false;
+#if !defined(THREADED_RTS)
+  AcquireSRWLockExclusive (&lock);
+  if(canQueueIOThread)
+  {
+      ASSERT(!outstanding_service_requests);
+      num_last_completed = num_notify;
+      outstanding_service_requests = true;
+      canQueueIOThread = false;
+      Capability *cap = &MainCapability;
+      StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
+                                          processRemoteCompletion_closure);
+      ASSERT(tso);
+      scheduleThread (cap, tso);
+      result = true;
+  }
+  ReleaseSRWLockExclusive (&lock);
+#endif
+  return result;
+}
+
 /* Main thread runner for the non-threaded I/O Manager.  */
 
 DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
@@ -405,7 +456,8 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
          3) We are waiting for the RTS to service the last round of requests.  */
       while (completionPortHandle == INVALID_HANDLE_VALUE
              || lastEvent == IO_MANAGER_DIE
-             || outstanding_service_requests)
+             || outstanding_service_requests
+             || canQueueIOThread)
         {
           SleepConditionVariableSRW (&wakeEvent, &lock, INFINITE, 0);
           HsWord32 nextEvent = readIOManagerEvent ();
@@ -426,13 +478,13 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
           if (num_removed > 0)
             {
               queue_full = num_removed == num_callbacks;
-              notifyRtsOfFinishedCall (num_removed);
+              notifyScheduler (num_removed);
             }
         }
       else if (WAIT_TIMEOUT == GetLastError ())
         {
           num_removed = 0;
-          notifyRtsOfFinishedCall (num_removed);
+          notifyScheduler (num_removed);
         }
 
       AcquireSRWLockExclusive (&lock);
