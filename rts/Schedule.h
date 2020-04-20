@@ -27,6 +27,10 @@ void markScheduler (evac_fn evac, void *user);
 // Place a new thread on the run queue of the current Capability
 void scheduleThread (Capability *cap, StgTSO *tso);
 
+// Place a new thread on the run queue of the current Capability
+// at the front of the queue.
+void scheduleThreadNow (Capability *cap, StgTSO *tso);
+
 // Place a new thread on the run queue of a specified Capability
 // (cap is the currently owned Capability, cpu is the number of
 // the desired Capability).
