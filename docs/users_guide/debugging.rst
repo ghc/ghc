@@ -546,11 +546,17 @@ These flags dump various stages of the :ref:`native code generator's
 <native-code-gen>` pipeline, which starts with C-\\- and produces native
 assembler.
 
-.. ghc-flag:: -ddump-opt-cmm
+.. ghc-flag:: -ddump-cmm-opt
     :shortdesc: Dump the results of C-\\- to C-\\- optimising passes
     :type: dynamic
 
     Dump the results of C-\\- to C-\\- optimising passes performed by the NCG.
+
+.. ghc-flag:: -ddump-opt-cmm
+    :shortdesc: Dump the results of C-\\- to C-\\- optimising passes
+    :type: dynamic
+
+    Alias for :ghc-flag:`-ddump-cmm-opt`
 
 .. ghc-flag:: -ddump-asm-native
     :shortdesc: Dump initial assembly

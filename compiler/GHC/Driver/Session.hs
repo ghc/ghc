@@ -2658,6 +2658,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
+  , make_ord_flag defGhcFlag "ddump-cmm-opt"
+        (setDumpFlag Opt_D_dump_opt_cmm)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
@@ -2766,7 +2768,7 @@ dynamic_flags_deps = [
 
   , make_ord_flag defGhcFlag "ddump-rn-stats"
         (setDumpFlag Opt_D_dump_rn_stats)
-  , make_ord_flag defGhcFlag "ddump-opt-cmm"
+  , make_ord_flag defGhcFlag "ddump-opt-cmm" --old alias for cmm-opt
         (setDumpFlag Opt_D_dump_opt_cmm)
   , make_ord_flag defGhcFlag "ddump-simpl-stats"
         (setDumpFlag Opt_D_dump_simpl_stats)
