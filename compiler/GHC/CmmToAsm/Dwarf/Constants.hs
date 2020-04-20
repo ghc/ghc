@@ -3,12 +3,12 @@
 
 module GHC.CmmToAsm.Dwarf.Constants where
 
-import GhcPrelude
+import GHC.Prelude
 
-import AsmUtils
-import FastString
+import GHC.Utils.Asm
+import GHC.Data.FastString
 import GHC.Platform
-import Outputable
+import GHC.Utils.Outputable
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.X86.Regs

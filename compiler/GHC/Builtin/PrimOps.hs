@@ -25,7 +25,7 @@ module GHC.Builtin.PrimOps (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
@@ -45,8 +45,8 @@ import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
 import GHC.Types.Unique  ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Types.Module  ( UnitId )
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 
 {-
 ************************************************************************

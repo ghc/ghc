@@ -24,7 +24,7 @@ module GHC.StgToCmm.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCon
 import GHC.Platform
@@ -41,12 +41,12 @@ import GHC.Driver.Session
 import GHC.Types.Id
 import GHC.Cmm.Graph
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Env
 
 -------------------------------------

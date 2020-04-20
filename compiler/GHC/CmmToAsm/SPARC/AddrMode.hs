@@ -6,7 +6,7 @@ module GHC.CmmToAsm.SPARC.AddrMode (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.Base

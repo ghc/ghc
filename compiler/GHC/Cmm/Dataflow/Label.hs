@@ -13,15 +13,15 @@ module GHC.Cmm.Dataflow.Label
     , mkHooplLabel
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique (Uniquable(..))
-import TrieMap
+import GHC.Data.TrieMap
 
 
 -----------------------------------------------------------------------------

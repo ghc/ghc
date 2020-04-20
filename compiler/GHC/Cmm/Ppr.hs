@@ -40,7 +40,7 @@ module GHC.Cmm.Ppr
   )
 where
 
-import GhcPrelude hiding (succ)
+import GHC.Prelude hiding (succ)
 
 import GHC.Platform
 import GHC.Driver.Session (targetPlatform)
@@ -48,11 +48,11 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Cmm.Ppr.Decl
 import GHC.Cmm.Ppr.Expr
-import Util
+import GHC.Utils.Misc
 
 import GHC.Types.Basic
 import GHC.Cmm.Dataflow.Block

@@ -25,13 +25,13 @@ module GHC.Hs.Extension where
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Data hiding ( Fixity )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (Located)
 
 import Data.Kind

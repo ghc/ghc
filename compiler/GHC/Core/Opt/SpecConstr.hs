@@ -21,7 +21,7 @@ module GHC.Core.Opt.SpecConstr(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Subst
@@ -46,17 +46,17 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
-import Maybes           ( orElse, catMaybes, isJust, isNothing )
+import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Serialized   ( deserializeWithData )
-import Util
-import Pair
+import GHC.Utils.Misc
+import GHC.Data.Pair
 import GHC.Types.Unique.Supply
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Unique.FM
-import MonadUtils
+import GHC.Utils.Monad
 import Control.Monad    ( zipWithM )
 import Data.List
 import GHC.Builtin.Names ( specTyConName )

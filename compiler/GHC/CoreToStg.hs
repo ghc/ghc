@@ -15,7 +15,7 @@ module GHC.CoreToStg ( coreToStg ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
@@ -37,10 +37,10 @@ import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
 import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )
 import GHC.Types.Literal
-import Outputable
-import MonadUtils
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Monad
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.ForeignCall

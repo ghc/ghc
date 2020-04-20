@@ -293,7 +293,7 @@ module GHC (
 
 #include "HsVersions.h"
 
-import GhcPrelude hiding (init)
+import GHC.Prelude hiding (init)
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval
@@ -342,16 +342,16 @@ import GHC.SysTools
 import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
 import GHC.Types.Module
-import Panic
+import GHC.Utils.Panic
 import GHC.Platform
-import Bag              ( listToBag )
-import ErrUtils
-import MonadUtils
-import Util
-import StringBuffer
-import Outputable
+import GHC.Data.Bag        ( listToBag )
+import GHC.Utils.Error
+import GHC.Utils.Monad
+import GHC.Utils.Misc
+import GHC.Data.StringBuffer
+import GHC.Utils.Outputable
 import GHC.Types.Basic
-import FastString
+import GHC.Data.FastString
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
@@ -373,13 +373,13 @@ import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 import Control.Monad
 import System.Exit      ( exitWith, ExitCode(..) )
-import Exception
+import GHC.Utils.Exception
 import Data.IORef
 import System.FilePath
 import Control.Concurrent
 import Control.Applicative ((<|>))
 
-import Maybes
+import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
 import System.Environment ( getEnv )
 import System.Directory

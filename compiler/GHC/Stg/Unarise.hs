@@ -200,25 +200,25 @@ module GHC.Stg.Unarise (unarise) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.DataCon
-import FastString (FastString, mkFastString)
+import GHC.Data.FastString (FastString, mkFastString)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import GHC.Types.Id.Make (voidPrimId, voidArgId)
-import MonadUtils (mapAccumLM)
-import Outputable
+import GHC.Utils.Monad (mapAccumLM)
+import GHC.Utils.Outputable
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim (intPrimTy,wordPrimTy,word64PrimTy)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Env
 
 import Data.Bifunctor (second)

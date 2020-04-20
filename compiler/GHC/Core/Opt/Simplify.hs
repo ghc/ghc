@@ -11,7 +11,7 @@ module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Driver.Session
@@ -49,14 +49,14 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
-import MonadUtils       ( mapAccumLM, liftIO )
+import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
-import Maybes           ( orElse )
+import GHC.Data.Maybe   ( orElse )
 import Control.Monad
-import Outputable
-import FastString
-import Util
-import ErrUtils
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
+import GHC.Utils.Error
 import GHC.Types.Module ( moduleName, pprModuleName )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 

@@ -14,11 +14,11 @@ module GHC.CmmToAsm.CPrim
     , word2FloatLabel
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Type
 import GHC.Cmm.MachOp
-import Outputable
+import GHC.Utils.Outputable
 
 popCntLabel :: Width -> String
 popCntLabel w = "hs_popcnt" ++ pprWidth w

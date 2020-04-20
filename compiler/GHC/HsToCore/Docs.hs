@@ -8,8 +8,8 @@
 
 module GHC.HsToCore.Docs (extractDocs) where
 
-import GhcPrelude
-import Bag
+import GHC.Prelude
+import GHC.Data.Bag
 import GHC.Hs.Binds
 import GHC.Hs.Doc
 import GHC.Hs.Decls
