@@ -21,10 +21,10 @@ module GHC.Builtin.Types.Literals
   , typeSymbolAppendTyCon
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Type
-import Pair
+import GHC.Data.Pair
 import GHC.Tc.Utils.TcType ( TcType, tcEqType )
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                          , Injectivity(..) )
@@ -33,7 +33,7 @@ import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders )
+import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
                   ( gHC_TYPELITS
                   , gHC_TYPENATS
@@ -49,9 +49,7 @@ import GHC.Builtin.Names
                   , typeSymbolCmpTyFamNameKey
                   , typeSymbolAppendFamNameKey
                   )
-import FastString ( FastString
-                  , fsLit, nilFS, nullFS, unpackFS, mkFastString, appendFS
-                  )
+import GHC.Data.FastString
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )

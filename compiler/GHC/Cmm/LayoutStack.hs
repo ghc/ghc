@@ -3,7 +3,7 @@ module GHC.Cmm.LayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
 
-import GhcPrelude hiding ((<*>))
+import GHC.Prelude hiding ((<*>))
 
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs, newTemp  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
@@ -25,14 +25,14 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Types.Unique.Supply
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 
 import GHC.Platform
 import GHC.Driver.Session
-import FastString
-import Outputable hiding ( isEmpty )
+import GHC.Data.FastString
+import GHC.Utils.Outputable hiding ( isEmpty )
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array

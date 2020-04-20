@@ -11,14 +11,14 @@ module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core
 import GHC.Core.Seq
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import Data.List
@@ -30,9 +30,9 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
-import Util
-import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import Maybes           ( isJust, isNothing )
+import GHC.Utils.Misc
+import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Data.Maybe   ( isJust, isNothing )
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

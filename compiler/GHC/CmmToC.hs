@@ -26,7 +26,7 @@ module GHC.CmmToC (
 #include "HsVersions.h"
 
 -- Cmm stuff
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -42,13 +42,13 @@ import GHC.Cmm.Switch
 -- Utils
 import GHC.CmmToAsm.CPrim
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 
 -- The rest
 import Data.ByteString (ByteString)

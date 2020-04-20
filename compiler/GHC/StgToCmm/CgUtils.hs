@@ -16,7 +16,7 @@ module GHC.StgToCmm.CgUtils (
         get_GlobalReg_addr,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Regs
 import GHC.Cmm
@@ -25,7 +25,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Driver.Session
-import Outputable
+import GHC.Utils.Outputable
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers

@@ -121,7 +121,7 @@ module GHC.Core.Coercion (
 
 import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Type
 import GHC.Core.TyCo.Rep
@@ -136,16 +136,16 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Basic
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
-import Pair
+import GHC.Data.Pair
 import GHC.Types.SrcLoc
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
-import ListSetOps
-import Maybes
+import GHC.Data.List.SetOps
+import GHC.Data.Maybe
 import GHC.Types.Unique.FM
 
 import Control.Monad (foldM, zipWithM)

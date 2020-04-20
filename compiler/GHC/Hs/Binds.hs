@@ -23,7 +23,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module GHC.Hs.Binds where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
                                     MatchGroup, pprFunBind,
@@ -37,12 +37,12 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
-import Bag
-import FastString
-import BooleanFormula (LBooleanFormula)
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.BooleanFormula (LBooleanFormula)
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )

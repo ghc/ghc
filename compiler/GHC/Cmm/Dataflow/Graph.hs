@@ -20,8 +20,8 @@ module GHC.Cmm.Dataflow.Graph
     ) where
 
 
-import GhcPrelude
-import Util
+import GHC.Prelude
+import GHC.Utils.Misc
 
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
