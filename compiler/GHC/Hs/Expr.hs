@@ -1330,6 +1330,14 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
+  | HsCmdLamCase (XCmdLamCase id)
+                 (MatchGroup id (LHsCmd id))    -- bodies are HsCmd's
+    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
+    --       'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen' @'{'@,
+    --       'ApiAnnotation.AnnClose' @'}'@
+
+    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function
                 (LHsExpr id)            -- predicate
@@ -1371,6 +1379,7 @@ type instance XCmdApp     (GhcPass _) = NoExtField
 type instance XCmdLam     (GhcPass _) = NoExtField
 type instance XCmdPar     (GhcPass _) = NoExtField
 type instance XCmdCase    (GhcPass _) = NoExtField
+type instance XCmdLamCase (GhcPass _) = NoExtField
 type instance XCmdIf      (GhcPass _) = NoExtField
 type instance XCmdLet     (GhcPass _) = NoExtField
 
@@ -1459,6 +1468,9 @@ ppr_cmd (HsCmdLam _ matches)
 ppr_cmd (HsCmdCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
+
+ppr_cmd (HsCmdLamCase _ matches)
+  = sep [ text "\\case", nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), ptext (sLit "then")],
