@@ -1,9 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
@@ -72,7 +72,7 @@ import GHC.Exception
   of the object\'s type; useful for debugging.
 -}
 data Dynamic where
-    Dynamic :: forall a. TypeRep a -> a -> Dynamic
+    Dynamic :: forall a. TypeRep @Type a -> a -> Dynamic
 
 -- | @since 2.01
 instance Show Dynamic where
