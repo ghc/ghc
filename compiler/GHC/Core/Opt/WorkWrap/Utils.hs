@@ -1122,7 +1122,7 @@ mkWWcpr_one_layer fam_envs body_ty cpr = runMaybeT $ do
   let arg_vars = zipWith mk_ww_local arg_uniqs arg_tys
 
   maybe_arg_stuff <- lift $ zipWithM (mkWWcpr_one_layer fam_envs)
-                                     (map fst arg_tys)
+                                     (map (scaledThing . fst) arg_tys)
                                      arg_cprs
 
   let go_arg_stuff var mb_stuff =
@@ -1139,7 +1139,7 @@ mkWWcpr_one_layer fam_envs body_ty cpr = runMaybeT $ do
 
   -- Don't try to WW an unboxed tuple return type when there's nothing inside
   -- to unbox further.
-  guard (not (isUnboxedTupleCon data_con && all isNothing maybe_arg_stuff))
+  guard (not (isUnboxedTupleDataCon data_con && all isNothing maybe_arg_stuff))
 
   return ( inner_arg_vars
          , mkConApp data_con (map Type inst_tys ++ arg_cons) `mkCast` mkSymCo co
@@ -1166,15 +1166,15 @@ mkUnpackCase scrut co mult uniq boxing_con unpk_args body
 mkWWcpr_build :: CprWWBuilder -> UniqSM (CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 mkWWcpr_build ([arg_var], con_app, decon)
   | let arg_ty = idType arg_var
-  , isUnliftedType (scaledThing arg_ty)
-  , isLinear arg_ty
+  , isUnliftedType arg_ty
+  , isLinear (idScaledType arg_var)
   -- Special case when there is a single result of unlifted, linear type
   --
   -- Wrapper:     case (..call worker..) of x -> C x
   -- Worker:      case (   ..body..    ) of C x -> x
   = return ( \ wkr_call -> mkDefaultCase wkr_call arg_var con_app
            , \ body     -> decon body (varToCoreExpr arg_var)
-           , scaledThing arg_ty )
+           , arg_ty )
 mkWWcpr_build (arg_vars, con_app, decon) = do
   -- The general case
   --
@@ -1189,11 +1189,11 @@ mkWWcpr_build (arg_vars, con_app, decon) = do
   -- same as those of C.
   wrap_wild_uniq <- getUniqueM
 
-  let wrap_wild   = mk_ww_local wrap_wild_uniq (linear ubx_tup_ty,MarkedStrict)
-      arg_tys     = map idType arg_vars
-      ubx_tup_app = mkCoreUbxTup (map (scaledThing . fst) arg_tys) (map varToCoreExpr args)
+  let arg_tys     = map idType arg_vars
+      ubx_tup_app = mkCoreUbxTup arg_tys (map varToCoreExpr arg_vars)
       ubx_tup_ty  = exprType ubx_tup_app
       tup_con     = tupleDataCon Unboxed (length arg_tys)
+      wrap_wild   = mk_ww_local wrap_wild_uniq (linear ubx_tup_ty,MarkedStrict)
 
   return ( \ wkr_call -> mkSingleAltCase wkr_call wrap_wild (DataAlt tup_con)
                                          arg_vars con_app
