@@ -405,8 +405,8 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+    tc_bndrs = [ mkNamedTyConBinder Specified runtimeRep1TyVar
+               , mkNamedTyConBinder Specified runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
                                              ]

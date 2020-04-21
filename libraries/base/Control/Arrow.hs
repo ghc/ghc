@@ -1,8 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see #10528
@@ -89,7 +90,7 @@ infixr 1 ^<<, <<^
 -- The other combinators have sensible default definitions,
 -- which may be overridden for efficiency.
 
-class Category a => Arrow a where
+class Category @Type a => Arrow a where
     {-# MINIMAL arr, (first | (***)) #-}
 
     -- | Lift a function to an arrow.
