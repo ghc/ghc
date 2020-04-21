@@ -1,8 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see #10528

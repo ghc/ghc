@@ -1,19 +1,20 @@
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE NoImplicitPrelude      #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ExplicitNamespaces     #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE ExplicitNamespaces     #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy            #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -61,7 +62,8 @@ infix 4 :~:, :~~:
 -- in practice, pattern-match on the @a :~: b@ to get out the @Refl@ constructor;
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
--- @since 4.7.0.0
+-- @since 4.7.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type (:~:) :: forall k. k -> k -> Type
 data a :~: b where  -- See Note [The equality types story] in GHC.Builtin.Types.Prim
   Refl :: a :~: a
 
@@ -122,8 +124,9 @@ deriving instance a ~ b => Bounded (a :~: b)
 -- | Kind heterogeneous propositional equality. Like ':~:', @a :~~: b@ is
 -- inhabited by a terminating value if and only if @a@ is the same type as @b@.
 --
--- @since 4.10.0.0
-type (:~~:) :: k1 -> k2 -> Type
+-- @since 4.10.0.0. Kinds `k1` and `k2` explicitly quantified since
+-- 4.15.0.0.
+type (:~~:) :: forall k1 k2. k1 -> k2 -> Type
 data a :~~: b where
    HRefl :: a :~~: a
 
@@ -150,6 +153,9 @@ deriving instance a ~~ b => Bounded (a :~~: b)
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  TestEquality :: forall k. (k -> Type) -> Constraint
 class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
   testEquality :: f a -> f b -> Maybe (a :~: b)
@@ -165,7 +171,7 @@ instance TestEquality ((:~~:) a) where
 infix 4 ==
 
 -- | A type family to compute Boolean equality.
-type (==) :: k -> k -> Bool
+type (==) :: forall k. k -> k -> Bool
 type family a == b where
   f a == g b = f == g && a == b
   a == a = 'True

@@ -33,9 +33,11 @@ instance Functor U1 -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★). Functor f ⇒ Functor (Rec1 f)
   -- Defined in ‘GHC.Generics’
 instance Functor Par1 -- Defined in ‘GHC.Generics’
-instance ∀ i (c ∷ Meta) (f ∷ ★ → ★). Functor f ⇒ Functor (M1 i c f)
+instance ∀ i (meta ∷ Meta) (f ∷ ★ → ★).
+         Functor f ⇒
+         Functor (M1 i meta f)
   -- Defined in ‘GHC.Generics’
-instance ∀ i c. Functor (K1 i c) -- Defined in ‘GHC.Generics’
+instance ∀ i a. Functor (K1 i a) -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒
          Functor (f :.: g)
@@ -60,13 +62,13 @@ datatypeName
   ∷ ∀ {d} {t ∷ ★ → (★ → ★) → ★ → ★} {f ∷ ★ → ★} {a}.
     Datatype d ⇒
     t d f a → [Char]
-type Datatype :: ∀ {k}. k → Constraint
+type Datatype :: ∀ k. k → Constraint
 class Datatype d where
   datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
                    (a ∷ k1).
                  t d f a → [Char]
   ...
   	-- Defined in ‘GHC.Generics’
-(:*:) ∷ ∀ {f ∷ ★ → ★} {p} {g ∷ ★ → ★}. f p → g p → (:*:) f g p
+(:*:) ∷ ∀ {f ∷ ★ → ★} {a} {g ∷ ★ → ★}. f a → g a → (:*:) f g a
 Rep ∷ ★ → ★ → ★
 M1 ∷ ∀ k. ★ → Meta → (k → ★) → k → ★
