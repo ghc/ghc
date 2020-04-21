@@ -803,28 +803,31 @@ simplifyDeriv pred tvs thetas
        ; solved_wanteds <- zonkWC solved_wanteds
 
        -- See [STEP DAC HOIST]
-       -- Split the resulting constraints into bad and good constraints,
-       -- building an @unsolved :: WantedConstraints@ representing all
-       -- the constraints we can't just shunt to the predicates.
-       -- See Note [Exotic derived instance contexts]
+       -- From the simplified constraints extract a subset 'good' that will
+       -- become the context 'min_theta' for the derived instance.
        ; let residual_simple = approximateWC True solved_wanteds
-             (bad, good) = partitionBagWith get_good residual_simple
+             good = mapMaybeBag get_good residual_simple
 
-             get_good :: Ct -> Either Ct PredType
+             -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct is
+             -- suitable to be inferred in the context of a derived instance.
+             -- Returns @Nothing@ if the Ct is too exotic.
+             -- See Note [Exotic derived instance contexts] for what
+             -- constitutes an exotic constraint.
+             get_good :: Ct -> Maybe PredType
              get_good ct | validDerivPred skol_set p
                          , isWantedCt ct
-                         = Right p
+                         = Just p
                           -- TODO: This is wrong
                           -- NB re 'isWantedCt': residual_wanted may contain
                           -- unsolved CtDerived and we stick them into the
                           -- bad set so that reportUnsolved may decide what
                           -- to do with them
                          | otherwise
-                         = Left ct
+                         = Nothing
                            where p = ctPred ct
 
        ; traceTc "simplifyDeriv outputs" $
-         vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
+         vcat [ ppr tvs_skols, ppr residual_simple, ppr good ]
 
        -- Return the good unsolved constraints (unskolemizing on the way out.)
        ; let min_theta = mkMinimalBySCs id (bagToList good)
@@ -838,6 +841,10 @@ simplifyDeriv pred tvs thetas
                           -- The reverse substitution (sigh)
 
        -- See [STEP DAC RESIDUAL]
+       -- Ensure that min_theta is enough to solve /all/ the constraints in
+       -- solved_wanteds, by solving the implication constraint
+       --
+       --    forall tvs. min_theta => solved_wanteds
        ; min_theta_vars <- mapM newEvVar min_theta
        ; (leftover_implic, _)
            <- buildImplicationFor tc_lvl skol_info tvs_skols
