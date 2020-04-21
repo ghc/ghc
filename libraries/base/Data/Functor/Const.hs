@@ -2,7 +2,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -36,6 +38,9 @@ import GHC.Read (Read(readsPrec), readParen, lex)
 import GHC.Show (Show(showsPrec), showParen, showString)
 
 -- | The 'Const' functor.
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type    Const :: forall k. Type -> k -> Type
 newtype Const a b = Const { getConst :: a }
     deriving ( Bits       -- ^ @since 4.9.0.0
              , Bounded    -- ^ @since 4.9.0.0

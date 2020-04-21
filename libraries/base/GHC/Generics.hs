@@ -11,8 +11,10 @@
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE StandaloneKindSignatures   #-}
 {-# LANGUAGE Trustworthy                #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -754,7 +756,8 @@ import GHC.TypeLits ( KnownSymbol, KnownNat, symbolVal, natVal )
 --------------------------------------------------------------------------------
 
 -- | Void: used for datatypes without constructors
-data V1 (p :: k)
+type V1 :: forall k. k -> Type
+data V1 a
   deriving ( Eq       -- ^ @since 4.9.0.0
            , Ord      -- ^ @since 4.9.0.0
            , Read     -- ^ @since 4.9.0.0
@@ -769,7 +772,8 @@ instance Semigroup (V1 p) where
   v <> _ = v
 
 -- | Unit: used for constructors without arguments
-data U1 (p :: k) = U1
+type U1 :: forall k. k -> Type
+data U1 a = U1
   deriving ( Generic  -- ^ @since 4.7.0.0
            , Generic1 -- ^ @since 4.9.0.0
            )
@@ -820,7 +824,8 @@ instance Monoid (U1 p) where
   mempty = U1
 
 -- | Used for marking occurrences of the parameter
-newtype Par1 p = Par1 { unPar1 :: p }
+type    Par1 :: Type -> Type
+newtype Par1 a = Par1 { unPar1 :: a }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -848,7 +853,8 @@ deriving instance Monoid p => Monoid (Par1 p)
 
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
-newtype Rec1 (f :: k -> Type) (p :: k) = Rec1 { unRec1 :: f p }
+type    Rec1 :: forall k. (k -> Type) -> (k -> Type)
+newtype Rec1 f a = Rec1 { unRec1 :: f a }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -878,7 +884,8 @@ deriving instance Semigroup (f p) => Semigroup (Rec1 f p)
 deriving instance Monoid (f p) => Monoid (Rec1 f p)
 
 -- | Constants, additional parameters and recursion of kind @*@
-newtype K1 (i :: Type) c (p :: k) = K1 { unK1 :: c }
+type    K1 :: forall k. Type -> Type -> k -> Type
+newtype K1 i a b = K1 { unK1 :: a }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -919,8 +926,9 @@ deriving instance Semigroup (f p) => Semigroup (M1 i c f p)
 deriving instance Monoid (f p) => Monoid (M1 i c f p)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
-    M1 { unM1 :: f p }
+type    M1 :: forall k. Type -> Meta -> (k -> Type) -> (k -> Type)
+newtype M1 i meta f a =
+    M1 { unM1 :: f a }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -932,7 +940,8 @@ newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
+type (:+:) :: forall k. (k -> Type) -> (k -> Type) -> (k -> Type)
+data (f :+: g) a = L1 (f a) | R1 (g a)
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -944,7 +953,8 @@ data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) (f :: k -> Type) (g :: k -> Type) (p :: k) = f p :*: g p
+type (:*:) :: forall k. (k -> Type) -> (k -> Type) -> (k -> Type)
+data (f :*: g) a = f a :*: g a
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -985,8 +995,9 @@ instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) (f :: k2 -> Type) (g :: k1 -> k2) (p :: k1) =
-    Comp1 { unComp1 :: f (g p) }
+type    (:.:) :: forall k2 k1. (k2 -> Type) -> (k1 -> k2) -> (k1 -> Type)
+newtype (f :.: g) a =
+    Comp1 { unComp1 :: f (g a) }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -1017,6 +1028,7 @@ deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
 -- | Constants of unlifted kinds
 --
 -- @since 4.9.0.0
+type        URec :: forall k. Type -> k -> Type
 data family URec (a :: Type) (p :: k)
 
 -- | Used for marking occurrences of 'Addr#'
@@ -1090,37 +1102,46 @@ data instance URec Word (p :: k) = UWord { uWord# :: Word# }
 
 -- | Type synonym for @'URec' 'Addr#'@
 --
--- @since 4.9.0.0
-type UAddr   = URec (Ptr ())
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UAddr :: forall k. k -> Type
+type UAddr = URec (Ptr ())
 -- | Type synonym for @'URec' 'Char#'@
 --
--- @since 4.9.0.0
-type UChar   = URec Char
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UChar :: forall k. k -> Type
+type UChar = URec Char
 
 -- | Type synonym for @'URec' 'Double#'@
 --
--- @since 4.9.0.0
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UDouble :: forall k. k -> Type
 type UDouble = URec Double
 
 -- | Type synonym for @'URec' 'Float#'@
 --
--- @since 4.9.0.0
-type UFloat  = URec Float
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UFloat :: forall k. k -> Type
+type UFloat = URec Float
 
 -- | Type synonym for @'URec' 'Int#'@
 --
--- @since 4.9.0.0
-type UInt    = URec Int
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UInt :: forall k. k -> Type
+type UInt = URec Int
 
 -- | Type synonym for @'URec' 'Word#'@
 --
--- @since 4.9.0.0
-type UWord   = URec Word
+-- @since 4.9.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type UWord :: forall k. k -> Type
+type UWord = URec Word
 
 -- | Tag for K1: recursion (of kind @Type@)
 data R
 
 -- | Type synonym for encoding recursion (of kind @Type@)
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type Rec0 :: forall k. Type -> k -> Type
 type Rec0  = K1 R
 
 -- | Tag for M1: datatype
@@ -1131,15 +1152,27 @@ data C
 data S
 
 -- | Type synonym for encoding meta-information for datatypes
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type D1 :: forall k. Meta -> (k -> Type) -> (k -> Type)
 type D1 = M1 D
 
 -- | Type synonym for encoding meta-information for constructors
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type C1 :: forall k. Meta -> (k -> Type) -> (k -> Type)
 type C1 = M1 C
 
 -- | Type synonym for encoding meta-information for record selectors
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type S1 :: forall k. Meta -> (k -> Type) -> (k -> Type)
 type S1 = M1 S
 
 -- | Class for datatypes that represent datatypes
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  Datatype :: forall k. k -> Constraint
 class Datatype d where
   -- | The name of the datatype (unqualified)
   datatypeName :: t d (f :: k -> Type) (a :: k) -> [Char]
@@ -1164,6 +1197,9 @@ instance (KnownSymbol n, KnownSymbol m, KnownSymbol p, SingI nt)
   isNewtype    _ = fromSing  (sing  :: Sing nt)
 
 -- | Class for datatypes that represent data constructors
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  Constructor :: forall k. k -> Constraint
 class Constructor c where
   -- | The name of the constructor
   conName :: t c (f :: k -> Type) (a :: k) -> [Char]
@@ -1303,6 +1339,9 @@ data DecidedStrictness = DecidedLazy
            )
 
 -- | Class for datatypes that represent records
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  Selector :: forall k. k -> Constraint
 class Selector s where
   -- | The name of the selector
   selName :: t s (f :: k -> Type) (a :: k) -> [Char]
@@ -1355,6 +1394,7 @@ class Generic a where
 -- 'from1' . 'to1' ≡ 'Prelude.id'
 -- 'to1' . 'from1' ≡ 'Prelude.id'
 -- @
+type  Generic1 :: forall k. (k -> Type) -> Constraint
 class Generic1 (f :: k -> Type) where
   -- | Generic representation type
   type Rep1 f :: k -> Type
@@ -1479,10 +1519,16 @@ deriving instance Generic1 Down
 --------------------------------------------------------------------------------
 
 -- | The singleton kind-indexed data family.
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type Sing :: forall k. k -> Type
 data family Sing (a :: k)
 
 -- | A 'SingI' constraint is essentially an implicitly-passed singleton.
-class SingI (a :: k) where
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  SingI :: forall k. k -> Constraint
+class SingI a where
   -- | Produce the singleton explicitly. You will likely need the @ScopedTypeVariables@
   -- extension to use this method the way you want.
   sing :: Sing a
@@ -1490,6 +1536,7 @@ class SingI (a :: k) where
 -- | The 'SingKind' class is essentially a /kind/ class. It classifies all kinds
 -- for which singletons are defined. The class supports converting between a singleton
 -- type and the base (unrefined) type which it is built from.
+type  SingKind :: Type -> Constraint
 class SingKind k where
   -- | Get a base type from a proxy for the promoted kind. For example,
   -- @DemoteRep Bool@ will be the type @Bool@.

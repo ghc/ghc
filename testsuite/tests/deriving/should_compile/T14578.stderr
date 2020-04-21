@@ -13,26 +13,27 @@ Derived class instances:
       GHC.Real.Integral b => b -> T14578.Wat f g a -> T14578.Wat f g a
     (GHC.Base.<>)
       = GHC.Prim.coerce
-          @(T14578.App (Data.Functor.Compose.Compose f g) a
-            -> T14578.App (Data.Functor.Compose.Compose f g) a
-               -> T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a
+            -> T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a
+               -> T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a)
           @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
-          ((GHC.Base.<>) @(T14578.App (Data.Functor.Compose.Compose f g) a))
+          ((GHC.Base.<>)
+             @(T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a))
     GHC.Base.sconcat
       = GHC.Prim.coerce
-          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose f g) a)
-            -> T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a)
+            -> T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a)
           @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
           (GHC.Base.sconcat
-             @(T14578.App (Data.Functor.Compose.Compose f g) a))
+             @(T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a))
     GHC.Base.stimes
       = GHC.Prim.coerce
           @(b
-            -> T14578.App (Data.Functor.Compose.Compose f g) a
-               -> T14578.App (Data.Functor.Compose.Compose f g) a)
+            -> T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a
+               -> T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a)
           @(b -> T14578.Wat f g a -> T14578.Wat f g a)
           (GHC.Base.stimes
-             @(T14578.App (Data.Functor.Compose.Compose f g) a))
+             @(T14578.App (Data.Functor.Compose.Compose @(TYPE 'GHC.Types.LiftedRep) @(TYPE 'GHC.Types.LiftedRep) f g) a))
   
   instance GHC.Base.Functor f =>
            GHC.Base.Functor (T14578.App f) where
