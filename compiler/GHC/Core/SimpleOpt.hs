@@ -957,6 +957,31 @@ will happen the next time either.
 
 See test T16254, which checks the behavior of newtypes.
 
+Note [Don't float join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+exprIsConApp_maybe should succeed on
+   let v = e in Just v
+returning [x=e] as one of the [FloatBind].  But it must
+NOT succeed on
+   join j x = rhs in Just v
+because join-points can't be gaily floated.  Consider
+   case (join j x = rhs in Just) of
+     K p q -> blah
+We absolutely must not "simplify" this to
+   join j x = rhs
+   in blah
+because j's return type is (Maybe t), quite different to blah's.
+
+You might think this could never happen, because j can't be
+tail-called in the body if the body returns a constructor.  But
+in !3113 we had a /dead/ join point (which is not illegal),
+and its return type was wonky.
+
+The simple thing is not to float a join point.  The next iteration
+of the simplifier will sort everything out.  And it there is
+a join point, the chances are that the body is not a constructor
+application, so failing faster is good.
+
 Note [exprIsConApp_maybe for data-con wrappers: tricky corner]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking
@@ -1065,6 +1090,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
          in go subst' (float:floats) body (CC args co)
 
     go subst floats (Let (NonRec bndr rhs) expr) cont
+       | not (isJoinId bndr)
+         -- Crucial guard! See Note [Don't float join points]
        = let rhs'            = subst_expr subst rhs
              (subst', bndr') = subst_bndr subst bndr
              float           = FloatLet (NonRec bndr' rhs')
