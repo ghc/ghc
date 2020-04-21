@@ -406,7 +406,7 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
       in (Just (substVar env bndr, StgRhsClosure ext ccs upd args' body'), env)
 
 
-mkStgCase :: StgExpr -> OutId -> AltType -> Bool -> [StgAlt] -> StgExpr
+mkStgCase :: StgExpr -> OutId -> AltType -> StgCaseGcFlag -> [StgAlt] -> StgExpr
 mkStgCase scrut bndr ty do_gc alts
   | all isBndr alts = scrut
   | otherwise       = StgCase scrut bndr ty do_gc alts

@@ -302,7 +302,7 @@ data GcPlan
                         -- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: CgStgExpr -> Id -> AltType -> Bool -> [CgStgAlt] -> FCode ReturnKind
+cgCase :: CgStgExpr -> Id -> AltType -> StgCaseGcFlag -> [CgStgAlt] -> FCode ReturnKind
 
 {-
 Note [Scrutinising VoidRep]
@@ -424,22 +424,27 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type do_gc alts
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type do_gc alts
 
-cgCase scrut bndr alt_type _doGc alts
+cgCase scrut bndr alt_type gc_flag alts
   = -- the general case
     do { platform <- getPlatform
-       ; up_hp_usg <- getVirtHp        -- Upstream heap usage
+      -- do we still need this?
+      --  ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg platform) ret_bndrs
        ; simple_scrut <- isSimpleScrut scrut alt_type
-       ; let do_gc | _doGc         = True
-                   | up_hp_usg > 0 = False
-                   | otherwise     = True
+      --  ; let do_gc | up_hp_usg > 0 = False
+      --              | otherwise     = True
                -- cf Note [Compiling case expressions]
-             gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
+       ; let gc_plan = case gc_flag of
+               HeapCheckInAlts   -> GcInAlts alt_regs
+               HeapCheckUpstream -> NoGcInAlts
 
        ; mb_cc <- maybeSaveCostCentre simple_scrut
-
-       ; let sequel = AssignTo alt_regs do_gc{- Note [scrut sequel] -}
+         {- Note [scrut sequel] -}
+       ; let sequel = AssignTo alt_regs $
+               case gc_flag of
+                 HeapCheckInAlts   -> True
+                 HeapCheckUpstream -> False
        ; ret_kind <- withSequel sequel (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; _ <- bindArgsToRegs ret_bndrs

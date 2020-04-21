@@ -432,10 +432,10 @@ coreToStgExpr (Case scrut _ _ [])
 coreToStgExpr e0@(Case scrut bndr _ alts) = do
     alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
     scrut2 <- coreToStgExpr scrut
-    -- We conservatively set the GC flag to 'True' expecting case alternatives
-    -- to always allocate. We then patch it up in @annTopBindingsFreeVars@.
+    -- We conservatively expect case alternatives to do their own heap check.
+    -- We then patch it up in @annTopBindingsFreeVars@.
     -- See Note [Case alternative allocation strategy]
-    let do_gc = True
+    let do_gc = HeapCheckInAlts
         stg   = StgCase scrut2 bndr (mkStgAltType bndr alts) do_gc alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
