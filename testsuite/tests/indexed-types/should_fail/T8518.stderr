@@ -2,8 +2,8 @@
 T8518.hs:14:18: error:
     • Couldn't match expected type ‘Z c -> B c -> Maybe (F c)’
                   with actual type ‘F c’
-    • The function ‘rpt’ is applied to four arguments,
-      but its type ‘Int -> c -> F c’ has only two
+    • The function ‘rpt’ is applied to four value arguments,
+        but its type ‘Int -> c -> F c’ has only two
       In the expression: rpt (4 :: Int) c z b
       In an equation for ‘callCont’:
           callCont c z b
