@@ -40,7 +40,9 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
-import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
+import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
+import GHC.Builtin.Names( runRWKey )
+import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, seqDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )

@@ -12,7 +12,7 @@
 
 -- | Arity and eta expansion
 module GHC.Core.Opt.Arity
-   ( manifestArity, joinRhsArity, exprArity, typeArity
+   ( manifestArity, joinRhsArity, exprArity, typeArity, splitFunNewTys
    , exprEtaExpandArity, findRhsArity
    , etaExpand, etaExpandAT
    , exprBotStrictness_maybe
@@ -59,10 +59,11 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Builtin.Uniques
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Pair
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 {-
@@ -140,33 +141,37 @@ typeArity :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [exprArity invariant]
-typeArity ty
-  = go initRecTc ty
+typeArity ty = mapMaybe go (fst (splitPiNewTys ty))
   where
-    go rec_nts ty
-      | Just (_, ty')  <- splitForAllTy_maybe ty
-      = go rec_nts ty'
+    -- Important to look through non-recursive newtypes, so that, eg
+    --      (f x)   where f has arity 2, f :: Int -> IO ()
+    -- Here we want to get arity 1 for the result!
+    --
+    -- AND through a layer of recursive newtypes
+    -- e.g. newtype Stream m a b = Stream (m (Either b (a, Stream m a b)))
+    go ty_co_bndr = typeOneShot <$> binderRelevantType_maybe ty_co_bndr
 
-      | Just (_,arg,res) <- splitFunTy_maybe ty
-      = typeOneShot arg : go rec_nts res
+-- | Like 'splitFunTys', but this one also looks through newtypes and foralls.
+splitFunNewTys :: Type -> ([Type], Type)
+splitFunNewTys ty = (mapMaybe binderRelevantType_maybe arg_bndrs, res_ty)
+  where
+    (arg_bndrs, res_ty) = splitPiNewTys ty
 
+-- | Like 'splitPiTys', but this one also looks through newtypes.
+splitPiNewTys :: Type -> ([TyCoBinder], Type)
+splitPiNewTys ty = go initRecTc ty []
+  where
+    go rec_nts ty arg_tys
+      -- ForAllTys and FunTys
+      | Just (arg, res_ty)  <- splitPiTy_maybe ty
+      = go rec_nts res_ty (arg:arg_tys)
+      -- See Note [Expanding newtypes] in GHC.Core.TyCon
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
-      , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
-                                                -- in GHC.Core.TyCon
---   , not (isClassTyCon tc)    -- Do not eta-expand through newtype classes
---                              -- See Note [Newtype classes and eta expansion]
---                              (no longer required)
-      = go rec_nts' ty'
-        -- Important to look through non-recursive newtypes, so that, eg
-        --      (f x)   where f has arity 2, f :: Int -> IO ()
-        -- Here we want to get arity 1 for the result!
-        --
-        -- AND through a layer of recursive newtypes
-        -- e.g. newtype Stream m a b = Stream (m (Either b (a, Stream m a b)))
-
+      , Just rec_nts' <- checkRecTc rec_nts tc
+      = go rec_nts' ty' arg_tys
       | otherwise
-      = []
+      = (reverse arg_tys, ty)
 
 ---------------
 exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
