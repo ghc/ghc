@@ -1,7 +1,10 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
     -- e.g. identity/left, identity/right, association;  see #10528
@@ -20,7 +23,8 @@
 
 module Control.Category where
 
-import qualified GHC.Base (id,(.))
+import qualified GHC.Base (id, (.))
+import GHC.Base (Type, Constraint)
 import Data.Type.Coercion
 import Data.Type.Equality
 import Data.Coerce (coerce)
@@ -34,6 +38,8 @@ infixr 1 >>>, <<<
 -- [Left identity]  @'id' '.' f  =  f@
 -- [Associativity]  @f '.' (g '.' h)  =  (f '.' g) '.' h@
 --
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  Category :: forall ob. (ob -> ob -> Type) -> Constraint
 class Category cat where
     -- | the identity morphism
     id :: cat a a
@@ -51,22 +57,22 @@ class Category cat where
  #-}
 
 -- | @since 3.0
-instance Category (->) where
+instance Category @Type (->) where
     id = GHC.Base.id
     (.) = (GHC.Base..)
 
 -- | @since 4.7.0.0
-instance Category (:~:) where
+instance Category @ob (:~:) where
   id          = Refl
   Refl . Refl = Refl
 
 -- | @since 4.10.0.0
-instance Category (:~~:) where
+instance Category @ob (:~~:) where
   id            = HRefl
   HRefl . HRefl = HRefl
 
 -- | @since 4.7.0.0
-instance Category Coercion where
+instance Category @ob Coercion where
   id = Coercion
   (.) Coercion = coerce
 
