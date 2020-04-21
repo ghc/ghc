@@ -383,7 +383,7 @@ unariseMulti_maybe rho dc args ty_args
 
 elimCase :: UnariseEnv
          -> [OutStgArg] -- non-void args
-         -> InId -> AltType -> Bool -> [InStgAlt] -> UniqSM OutStgExpr
+         -> InId -> AltType -> StgCaseGcFlag -> [InStgAlt] -> UniqSM OutStgExpr
 
 elimCase rho args bndr (MultiValAlt _) _ [(_, bndrs, rhs)]
   = do let rho1 = extendRho rho bndr (MultiVal args)
@@ -416,7 +416,7 @@ elimCase _ args bndr alt_ty _ alts
 
 --------------------------------------------------------------------------------
 
-unariseAlts :: UnariseEnv -> AltType -> InId -> Bool -> [StgAlt] -> UniqSM [StgAlt]
+unariseAlts :: UnariseEnv -> AltType -> InId -> StgCaseGcFlag -> [StgAlt] -> UniqSM [StgAlt]
 unariseAlts rho (MultiValAlt n) bndr _ [(DEFAULT, [], e)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys) <- unariseConArgBinder rho bndr

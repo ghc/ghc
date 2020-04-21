@@ -123,7 +123,7 @@ binding env body_fv (StgRec pairs) = (StgRec pairs', fvs)
     fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
 
 expr :: Env -> StgExpr -> (CgStgExpr, DIdSet)
-expr env = go
+expr env = go . addGCFlag HeapCheckInAlts
   where
     go (StgApp occ as)
       = (StgApp occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
@@ -131,24 +131,13 @@ expr env = go
     go (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
     go StgLam{} = pprPanic "StgFVs: StgLam" empty
-    go (StgCase scrut bndr ty _ alts) = (StgCase scrut' bndr ty do_gc alts', fvs)
+    go (StgCase scrut bndr ty hc alts) = (StgCase scrut' bndr ty hc alts', fvs)
       where
         (scrut', scrut_fvs) = go scrut
         -- See Note [Tracking local binders]
         (alts', alt_fvss) = mapAndUnzip (alt (addLocals [bndr] env)) alts
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
-        -- See Note [Case alternative allocation strategy]
-        is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
-        is_cmp_op _                             = False
-        simple_scrut = isSimpleScrut scrut ty
-        -- should we use this to construct do_gc?
-        -- alts_allocate = any ( \(_, _, rhs) -> stgExprAllocates rhs ) alts
-        do_gc
-          | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
-          | not simple_scrut = True
-          | isSingleton alts = False
-          | otherwise        = True
     go (StgLet ext bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
     go (StgTick tick e) = (StgTick tick e', fvs')
@@ -181,22 +170,49 @@ alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
     (e', rhs_fvs) = expr (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
 
+addGCFlag :: StgCaseGcFlag -> StgExpr -> StgExpr
+addGCFlag _ (StgLet ext bind body)
+  = StgLet ext bind (addGCFlag HeapCheckInAlts body)
+
+addGCFlag upstream_alloc (StgCase scrut binds alt_ty _ alts)
+  | HeapCheckInAlts <- hc
+  = StgCase (addGCFlag upstream_alloc scrut)
+            binds 
+            alt_ty 
+            hc
+            (map (addGCFlagToAlt HeapCheckUpstream) alts)
+  | otherwise
+  = StgCase (addGCFlag upstream_alloc scrut)
+            binds 
+            alt_ty 
+            hc
+            (map (addGCFlagToAlt upstream_alloc) alts)
+  where
+    hc | stgExprMayBlockOrAllocate scrut   = HeapCheckInAlts
+       | isSingleton alts                  = HeapCheckUpstream
+       | HeapCheckInAlts == upstream_alloc = HeapCheckUpstream
+       | otherwise                         = HeapCheckInAlts
+    addGCFlagToAlt gc_flag (altCon, bs, rhs) = 
+      (altCon, bs, addGCFlag gc_flag rhs)
+
+addGCFlag _ e = e  -- Literals, variables, StgApp
+
+
 -- | TODO: Note
-stgExprAllocates :: StgExpr -> Bool
-stgExprAllocates (StgLet _ _ _) = True
-stgExprAllocates (StgLetNoEscape _ _ body)
-  = stgExprAllocates body
-stgExprAllocates (StgConApp dataCon args _)
+stgExprMayBlockOrAllocate :: StgExpr -> Bool
+stgExprMayBlockOrAllocate (StgLet _ _ _) = True
+stgExprMayBlockOrAllocate (StgLetNoEscape _ _ body)
+  = stgExprMayBlockOrAllocate body
+stgExprMayBlockOrAllocate (StgConApp dataCon args _)
   | Just True <- isLiftedType_maybe (dataConRepType dataCon)
   , not (null args) = True
-stgExprAllocates (StgOpApp (StgPrimOp op) _ _) = primOpCanGC op
-stgExprAllocates (StgTick _ e) = stgExprAllocates e
-stgExprAllocates (StgCase scrut _ alt_type _ alts)
-  | stgExprAllocates scrut = True
+stgExprMayBlockOrAllocate (StgOpApp (StgPrimOp op) _ _) = primOpCanGC op
+stgExprMayBlockOrAllocate (StgTick _ e) = stgExprMayBlockOrAllocate e
+stgExprMayBlockOrAllocate (StgCase scrut _ alt_type _ alts)
+  | stgExprMayBlockOrAllocate scrut = True
   | not (isSimpleScrut scrut alt_type) = False
-  | any ( \(_, _, rhs) -> stgExprAllocates rhs ) alts = True
-  | otherwise = False
-stgExprAllocates _ = False
+  | otherwise = any ( \(_, _, rhs) -> stgExprMayBlockOrAllocate rhs ) alts
+stgExprMayBlockOrAllocate _ = False
 
 primOpCanGC :: PrimOp -> Bool
 -- NoDuplicateOp = ... blocking?
@@ -253,5 +269,3 @@ isSimpleScrut (StgOpApp (StgPrimOp op) _ _) _ = primOpCanGC op
 isSimpleScrut (StgLit _) _ = True
 isSimpleScrut (StgApp _ []) (PrimAlt _) = True
 isSimpleScrut _  _ = False
-
-

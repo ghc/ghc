@@ -48,6 +48,9 @@ module GHC.Stg.Syntax (
         -- StgOp
         StgOp(..),
 
+        -- StgCaseGcFlag
+        StgCaseGcFlag(..),
+
         -- utils
         stgRhsArity,
         isDllConApp,
@@ -277,7 +280,7 @@ This has the same boxed/unboxed business as Core case expressions.
         (GenStgExpr pass) -- the thing to examine
         (BinderP pass) -- binds the result of evaluating the scrutinee
         AltType
-        Bool           -- GC in alts? See Note [Case alternative allocation strategy]
+        StgCaseGcFlag -- See Note [Case alternative allocation strategy]
         [GenStgAlt pass]
                     -- The DEFAULT case is always *first*
                     -- if it is there at all
@@ -449,6 +452,11 @@ data StgPass
   = Vanilla
   | LiftLams
   | CodeGen
+
+-- | Used as a flag in StgCase to determine GC strategy
+-- for case alternatives.
+data StgCaseGcFlag = HeapCheckInAlts | HeapCheckUpstream
+  deriving Eq
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
 -- returns 'empty'.
@@ -783,7 +791,7 @@ pprStgExpr (StgCase expr bndr alt_type do_gc [alt])
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            pprStgAlt False alt,
-           char '}', text "GC in alts:" <+> ppr do_gc]
+           char '}', ppr do_gc]
 
 pprStgExpr (StgCase expr bndr alt_type do_gc alts)
   = sep [sep [text "case",
@@ -791,7 +799,7 @@ pprStgExpr (StgCase expr bndr alt_type do_gc alts)
              whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            nest 2 (vcat (map (pprStgAlt True) alts)),
-           char '}', text "GC in alts:" <+> ppr do_gc]
+           char '}', ppr do_gc]
 
 
 pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc
@@ -825,3 +833,8 @@ pprStgRhs (StgRhsClosure ext cc upd_flag args body)
 pprStgRhs (StgRhsCon cc con args)
   = hcat [ ppr cc,
            space, ppr con, text "! ", brackets (interppSP args)]
+
+instance Outputable StgCaseGcFlag where
+  ppr f = text $ case f of
+    HeapCheckInAlts   -> "HeapCheckInAlts"
+    HeapCheckUpstream -> "HeapCheckUpstream"
