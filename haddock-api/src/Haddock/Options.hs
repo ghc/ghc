@@ -44,7 +44,7 @@ import qualified Data.Char as Char
 import           Data.Version
 import           Control.Applicative
 import           Distribution.Verbosity
-import           FastString
+import           GHC.Data.FastString
 import           GHC ( DynFlags, Module, moduleUnitId )
 import           Haddock.Types
 import           Haddock.Utils

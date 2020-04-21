@@ -67,11 +67,11 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Driver.Packages
-import Panic (handleGhcException)
+import GHC.Utils.Panic (handleGhcException)
 import GHC.Types.Module
-import FastString
+import GHC.Data.FastString
 import qualified GHC.Runtime.Loader
 
 --------------------------------------------------------------------------------

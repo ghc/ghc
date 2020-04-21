@@ -21,7 +21,7 @@ import GHC
 import GHC.Iface.Ext.Types ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, HieTypeFlat )
 import GHC.Iface.Type
 import GHC.Types.Name      ( getOccFS, getOccString )
-import Outputable          ( showSDoc )
+import GHC.Utils.Outputable( showSDoc )
 import GHC.Types.Var       ( VarBndr(..) )
 
 import System.FilePath.Posix ((</>), (<.>))

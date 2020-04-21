@@ -51,16 +51,16 @@ import Distribution.Verbosity
 import Text.Printf
 
 import GHC.Types.Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
 import GHC.Driver.Types
-import FastString (unpackFS)
+import GHC.Data.FastString (unpackFS)
 import GHC.Tc.Types (tcg_rdr_env)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, gre_name, globalRdrEnvElts)
-import ErrUtils (withTimingD)
+import GHC.Utils.Error (withTimingD)
 
 #if defined(mingw32_HOST_OS)
 import System.IO

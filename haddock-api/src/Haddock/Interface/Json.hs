@@ -6,10 +6,10 @@ module Haddock.Interface.Json (
   ) where
 
 import GHC.Types.Basic
-import Json
+import GHC.Utils.Json
 import GHC.Types.Module
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 
 import Control.Arrow
 import Data.Map (Map)
