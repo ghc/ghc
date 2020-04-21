@@ -1,14 +1,16 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE PolyKinds           #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE DeriveGeneric            #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE MagicHash                #-}
+{-# LANGUAGE NoImplicitPrelude        #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE StandaloneDeriving       #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE TypeOperators            #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -47,7 +49,8 @@ import GHC.Base
 -- To use this equality in practice, pattern-match on the @Coercion a b@ to get out
 -- the @Coercible a b@ instance, and then use 'coerce' to apply it.
 --
--- @since 4.7.0.0
+-- @since 4.7.0.0. Kind `k` explicitly quantified since 4.15.0.0.
+type Coercion :: forall k. k -> k -> Type
 data Coercion a b where
   Coercion :: Coercible a b => Coercion a b
 
@@ -56,25 +59,25 @@ data Coercion a b where
 -- for 'type-eq'
 
 -- | Type-safe cast, using representational equality
-coerceWith :: Coercion a b -> a -> b
+coerceWith :: Coercion @Type a b -> a -> b
 coerceWith Coercion x = coerce x
 
 -- | Generalized form of type-safe cast using representational equality
 --
 -- @since 4.10.0.0
-gcoerceWith :: Coercion a b -> (Coercible a b => r) -> r
+gcoerceWith :: Coercion @k a b -> (Coercible @k a b => r) -> r
 gcoerceWith Coercion x = x
 
 -- | Symmetry of representational equality
-sym :: Coercion a b -> Coercion b a
+sym :: Coercion @k a b -> Coercion @k b a
 sym Coercion = Coercion
 
 -- | Transitivity of representational equality
-trans :: Coercion a b -> Coercion b c -> Coercion a c
+trans :: Coercion @k a b -> Coercion @k b c -> Coercion @k a c
 trans Coercion Coercion = Coercion
 
 -- | Convert propositional (nominal) equality to representational equality
-repr :: (a Eq.:~: b) -> Coercion a b
+repr :: (a Eq.:~: b) -> Coercion @k a b
 repr Eq.Refl = Coercion
 
 -- | @since 4.7.0.0
@@ -102,18 +105,22 @@ deriving instance Coercible a b => Bounded (Coercion a b)
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type  TestCoercion :: forall k. (k -> Type) -> Constraint
 class TestCoercion f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
-  testCoercion :: f a -> f b -> Maybe (Coercion a b)
+  testCoercion :: forall (a :: k) (b :: k).
+    f a -> f b -> Maybe (Coercion @k a b)
 
 -- | @since 4.7.0.0
-instance TestCoercion ((Eq.:~:) a) where
+instance TestCoercion @k ((Eq.:~:) a) where
   testCoercion Eq.Refl Eq.Refl = Just Coercion
 
 -- | @since 4.10.0.0
-instance TestCoercion ((Eq.:~~:) a) where
+instance TestCoercion @k ((Eq.:~~:) a) where
   testCoercion Eq.HRefl Eq.HRefl = Just Coercion
 
 -- | @since 4.7.0.0
-instance TestCoercion (Coercion a) where
+instance TestCoercion @k (Coercion a) where
   testCoercion Coercion Coercion = Just Coercion
