@@ -2695,9 +2695,11 @@ commonly used commands.
 
 .. ghci-cmd:: :script; [⟨n⟩] ⟨filename⟩
 
-    Executes the lines of a file as a series of GHCi commands. This
-    command is compatible with multiline statements as set by
-    :ghci-cmd:`:set +m`
+    Executes the lines of a file as a series of GHCi commands. The syntax for
+    file-name arguments respects shell quoting rules, i.e., file names
+    containing spaces can be enclosed in double quotes or with spaces escaped
+    with a backslash. This command is compatible with multiline statements as
+    set by :ghci-cmd:`:set +m`
 
 .. ghci-cmd:: :set; [⟨option⟩ ...]
 
