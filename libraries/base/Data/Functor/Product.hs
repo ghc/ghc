@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Product
@@ -26,11 +28,15 @@ import Control.Monad (MonadPlus(..))
 import Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(mzipWith))
 import Data.Data (Data)
+import Data.Kind (Type)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted product of functors.
+--
+-- Kind `k` explicitly quantified since 4.15.0.0.
+type Product :: forall k. (k -> Type) -> (k -> Type) -> (k -> Type)
 data Product f g a = Pair (f a) (g a)
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0
