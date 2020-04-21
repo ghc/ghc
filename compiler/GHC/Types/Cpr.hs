@@ -10,11 +10,11 @@
 module GHC.Types.Cpr (
     TerminationFlag (Terminates),
     Cpr, topCpr, botCpr, conCpr, initRecFunCpr, lubCpr, asConCpr,
-    CprType (..), topCprType, botCprType, conCprType, pruneDeepCpr,
-    markConCprType, lubCprType, applyCprTy, abstractCprTy, abstractCprTyNTimes,
-    ensureCprTyArity, trimCprTy,
+    CprType (..), topCprType, botCprType, lubCprType, conCprType,
+    pruneDeepCpr, markConCprType, splitConCprTy, applyCprTy, abstractCprTy,
+    abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
-    cprTransformDataConSig, cprTransformSig, argCprTypesFromStrictSig,
+    cprTransformDataConSig, UnboxingStrategy, cprTransformSig, argCprTypesFromStrictSig,
     CprSig (..), mkCprSig, mkCprSigForArity,
     topCprSig, seqCprSig
   ) where
@@ -26,6 +26,7 @@ import GHC.Prelude
 import GHC.Types.Basic
 import GHC.Types.Demand
 import GHC.Core.DataCon
+import GHC.Core.Type
 import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -96,31 +97,9 @@ lubTermFlag MightDiverge _            = MightDiverge
 lubTermFlag _            MightDiverge = MightDiverge
 lubTermFlag Terminates   Terminates   = Terminates
 
-<<<<<<< HEAD
-lubTermFlags :: [TerminationFlag] -> TerminationFlag
-lubTermFlags = foldl' lubTermFlag botTermFlag
-
-type Termination' = (TerminationFlag, Levitated (KnownShape Termination))
-
--- | Normalises wrt. to some non-syntactic equalities, making sure there is only
--- one bottom and top.
-liftTermination' :: TerminationFlag -> Levitated (KnownShape Termination) -> Levitated Termination'
-liftTermination' Terminates   Bot = Bot
-liftTermination' MightDiverge Top = Top
-liftTermination' tm           l   = Levitate (tm, l)
-
-newtype Termination
-  = Termination (Levitated Termination')
-  deriving (Eq, Binary)
->>>>>>> f09cacb688... Nested CPR
-
-topTerm :: Termination
-topTerm = Termination Top
-=======
 data Termination
   = Term !TerminationFlag !(Levitated (KnownShape Termination))
   deriving Eq
->>>>>>> f6ac3513af... Factor Cpr and Termination into a joint lattice
 
 botTerm :: Termination
 botTerm = Term Terminates Bot
@@ -200,7 +179,7 @@ initRecFunCpr :: Cpr
 initRecFunCpr = Cpr MightDiverge Bot
 
 conCpr :: TerminationFlag -> ConTag -> [Cpr] -> Cpr
-conCpr tm t fs = Cpr tm (Levitate (Con t fs))
+conCpr tf t fs = Cpr tf (Levitate (Con t fs))
 
 -- | Forget encoded CPR info, but keep termination info.
 forgetCpr :: Cpr -> Termination
@@ -265,6 +244,18 @@ topCprType = CprType 0 topCpr
 botCprType :: CprType
 botCprType = CprType 0 botCpr
 
+lubCprType :: CprType -> CprType -> CprType
+lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
+  | ct_cpr ty1 == botCpr && n1 <= n2 = ty2
+  | ct_cpr ty2 == botCpr && n2 <= n1 = ty1
+  -- There might be non-bottom CPR types with mismatching arities.
+  -- Consider test DmdAnalGADTs. We want to return topCpr in these cases.
+  -- Returning topCprType is a safe default.
+  | n1 == n2
+  = CprType n1 (lubCpr cpr1 cpr2)
+  | otherwise
+  = topCprType
+
 extractArgCprAndTermination :: [CprType] -> [Cpr]
 extractArgCprAndTermination = map go
   where
@@ -277,22 +268,30 @@ conCprType con_tag args = CprType 0 (conCpr Terminates con_tag cprs)
   where
     cprs = extractArgCprAndTermination args
 
-markConCprType :: TerminationFlag -> ConTag -> [CprType] -> CprType -> CprType
-markConCprType tf con_tag args ty = ASSERT( ct_arty ty == 0 ) ty { ct_cpr = conCpr tf con_tag cprs }
+markConCprType :: DataCon -> CprType -> CprType
+markConCprType dc _ty@(CprType n cpr)
+  = ASSERT2( n == 0, ppr _ty ) CprType 0 (conCpr Terminates con_tag fields)
   where
-    cprs = extractArgCprAndTermination args
+    con_tag   = dataConTag dc
+    wkr_arity = dataConRepArity dc
+    fields    = case cpr of
+      NoMoreCpr (Term _ (Levitate (Con t terms)))
+        | con_tag == t       -> map NoMoreCpr terms
+      NoMoreCpr (Term _ Bot) -> replicate wkr_arity (NoMoreCpr botTerm)
+      Cpr _ (Levitate (Con t cprs))
+        | con_tag == t       -> cprs
+      Cpr _ Bot              -> replicate wkr_arity botCpr
+      _                      -> replicate wkr_arity topCpr
 
-lubCprType :: CprType -> CprType -> CprType
-lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
-  | ct_cpr ty1 == botCpr && n1 <= n2 = ty2
-  | ct_cpr ty2 == botCpr && n2 <= n1 = ty1
-  -- There might be non-bottom CPR types with mismatching arities.
-  -- Consider test DmdAnalGADTs. We want to return topCpr in these cases.
-  -- Returning topCprType is a safe default.
-  | n1 == n2
-  = CprType n1 (lubCpr cpr1 cpr2)
-  | otherwise
-  = topCprType
+splitConCprTy :: DataCon -> CprType -> Maybe [Cpr]
+splitConCprTy dc (CprType 0 (Cpr _ l))
+  | Bot <- l
+  = Just (replicate (dataConRepArity dc) botCpr)
+  | Levitate (Con t fields) <- l
+  , dataConTag dc == t
+  = Just fields
+splitConCprTy _  _
+  = Nothing
 
 applyCprTy :: CprType -> CprType
 applyCprTy (CprType n cpr)
@@ -413,18 +412,15 @@ forceCpr str cpr = runTerminationM (forceCprM str cpr)
 
 -- | 'lubTerm's the given outer @TerminationFlag@ on the @CprType@s 'ct_term'.
 bothCprType :: CprType -> TerminationFlag -> CprType
--- deepTerm because we only want to affect the WHNF layer.
--- If tm = Terminates, it's just 'id'.
--- If tm = MightDiverge, it will only set the WHNF layer to MightDiverge,
+-- If tf = Terminates, it's just 'id'.
+-- If tf = MightDiverge, it will only set the WHNF layer to MightDiverge,
 -- leaving nested termination info (e.g. on product components) intact.
-bothCprType ct tf = ct { ct_cpr = bothCpr (ct_cpr ct) tf }
+bothCprType ct Terminates   = ct
+bothCprType ct MightDiverge = ct { ct_cpr = shallowDivCpr (ct_cpr ct) }
 
-bothCpr :: Cpr -> TerminationFlag -> Cpr
-bothCpr (NoMoreCpr t)  tf  = NoMoreCpr (bothTerm t tf)
-bothCpr (Cpr tf1 l_sh) tf2 = Cpr (lubTermFlag tf1 tf2) l_sh
-
-bothTerm :: Termination -> TerminationFlag -> Termination
-bothTerm (Term tf1 l_sh) tf2 = Term (lubTermFlag tf1 tf2) l_sh
+shallowDivCpr :: Cpr -> Cpr
+shallowDivCpr (NoMoreCpr (Term _ l_sh)) = NoMoreCpr (Term MightDiverge l_sh)
+shallowDivCpr (Cpr _ l_sh)              = Cpr MightDiverge l_sh
 
 seqCprType :: CprType -> ()
 seqCprType (CprType _ cpr) = seqCpr cpr
@@ -482,20 +478,24 @@ cprTransformDataConSig con args
 
 cprTransformSig :: StrictSig -> CprSig -> [CprType] -> CprType
 cprTransformSig str_sig (CprSig sig_ty) arg_tys
-  | arg_strs <- argStrsFromStrictSig str_sig
-  , arg_tys `equalLength` arg_strs
-  , ASSERT( length arg_tys == ct_arty sig_ty ) True
-  , (tf, _) <- runTerminationM $ zipWithM_ forceCprTyM arg_strs arg_tys
+  | arg_strs <- map getStrDmd $ argDmdsFromStrictSig str_sig
+  , arg_strs `leLength` arg_tys
+  , arg_tys `lengthIs` ct_arty sig_ty
+  -- Maybe we should use resTypeArgDmd instead of strTop here. On the other
+  -- hand, I don't think it makes much of a difference; We basically only need
+  -- to pad with strTop when str_sig was topSig to begin with.
+  , (tf, _) <- runTerminationM $ zipWithM_ forceCprTyM (arg_strs ++ repeat strTop) arg_tys
   = sig_ty `bothCprType` tf
-  -- TODO: Think about what happens if arg_tys is longer than arg_strs.
   | otherwise
   = topCprType
 
 -- | We have to be sure that 'cprTransformSig' and 'argCprTypesFromStrictSig'
--- agree in how they compute the 'ArgStr's for which the 'CprSig' is computed.
--- This function encodes the common logic.
-argStrsFromStrictSig :: StrictSig -> [ArgStr]
-argStrsFromStrictSig = map getStrDmd . fst . splitStrictSig
+-- agree in how they compute the 'Demand's for which the 'CprSig' is computed.
+-- This function encodes the common (trivial) logic.
+argDmdsFromStrictSig :: StrictSig -> [Demand]
+argDmdsFromStrictSig = fst . splitStrictSig
+
+type UnboxingStrategy = Type -> Demand -> Maybe (DataCon, [Type], [Demand])
 
 -- | Produces 'CprType's the termination info of which match the given
 -- strictness signature. Examples:
@@ -503,11 +503,15 @@ argStrsFromStrictSig = map getStrDmd . fst . splitStrictSig
 --   - A head-strict demand @S@ would translate to @#@, a
 --   - A tuple demand @S(S,L)@ would translate to @#(#,*)@
 --   - A call demand @C(S)@ would translate to @strTop -> #(#,*)@
-argCprTypesFromStrictSig :: StrictSig -> [CprType]
-argCprTypesFromStrictSig sig = arg_tys
+argCprTypesFromStrictSig :: UnboxingStrategy -> [Type] -> StrictSig -> [CprType]
+argCprTypesFromStrictSig want_to_unbox arg_tys sig
+  = zipWith go arg_tys (argDmdsFromStrictSig sig)
   where
-    arg_strs = argStrsFromStrictSig sig
-    arg_tys  = zipWith ((snd .) . forceCprTy) arg_strs (repeat topCprType)
+    go arg_ty arg_dmd
+      | Just (dc, arg_tys, arg_dmds) <- want_to_unbox arg_ty arg_dmd
+      = conCprType (dataConTag dc) (zipWith go arg_tys arg_dmds)
+      | otherwise
+      = snd $ forceCprTy (getStrDmd arg_dmd) topCprType
 
 ---------------
 -- * Outputable
@@ -568,8 +572,8 @@ instance Binary r => Binary (KnownShape r) where
   get  bh = Con <$> get bh <*> get bh
 
 instance Binary TerminationFlag where
-  put_ bh MightDiverge = put_ bh False
   put_ bh Terminates   = put_ bh True
+  put_ bh MightDiverge = put_ bh False
   get  bh = do
     b <- get bh
     if b
