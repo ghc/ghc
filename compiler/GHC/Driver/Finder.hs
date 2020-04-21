@@ -774,7 +774,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
             provenance (ModOrigin{ fromOrigPackage = e,
                                    fromHiddenReexport = rhs })
               | Just False <- e
-                 = parens (text "needs flag -package-key"
+                 = parens (text "needs flag -package-id"
                     <+> ppr (moduleUnit mod))
               | (pkg:_) <- rhs
                  = parens (text "needs flag -package-id"
