@@ -100,6 +100,9 @@ Compiler
 GHCi
 ~~~~
 
+- The ``:script`` command now allows for file names that contain spaces to
+  passed as arguments: either by enclosing the file names in double quotes or by
+  escaping spaces in file names with a backslash. (#18027)
 
 Runtime system
 ~~~~~~~~~~~~~~
