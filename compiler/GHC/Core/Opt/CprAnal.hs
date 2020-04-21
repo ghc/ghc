@@ -17,6 +17,7 @@ import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core
+import GHC.Core.Opt.Arity   ( splitFunNewTys )
 import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
@@ -27,6 +28,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
@@ -209,7 +211,7 @@ cprAnal' env args (Case scrut case_bndr ty alts)
     (whnf_flag, case_bndr_ty) = forceCprTy (getStrDmd seqDmd) scrut_ty
     -- Regardless of whether scrut had the CPR property or not, the case binder
     -- certainly has it. See 'extendEnvForDataAlt'.
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args scrut case_bndr case_bndr_ty) alts
+    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
     res_ty           = foldl' lubCprType botCprType alt_tys `bothCprType` whnf_flag
 
 cprAnal' env args (Let (NonRec id rhs) body)
@@ -227,18 +229,17 @@ cprAnal' env args (Let (Rec pairs) body)
 cprAnalAlt
   :: AnalEnv
   -> [CprType]      -- ^ info about incoming arguments
-  -> CoreExpr       -- ^ scrutinee
   -> Id             -- ^ case binder
   -> CprType        -- ^ info about the case binder
   -> Alt Var        -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env args scrut case_bndr case_bndr_ty (con@(DataAlt dc),bndrs,rhs)
+cprAnalAlt env args case_bndr case_bndr_ty (con@(DataAlt dc),bndrs,rhs)
   -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
   = (rhs_ty, (con, bndrs, rhs'))
   where
-    env_alt        = extendEnvForDataAlt env scrut case_bndr case_bndr_ty dc bndrs
+    env_alt        = extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
     (rhs_ty, rhs') = cprAnal env_alt args rhs
-cprAnalAlt env args _ case_bndr case_bndr_ty (con,bndrs,rhs)
+cprAnalAlt env args case_bndr case_bndr_ty (con,bndrs,rhs)
   = (rhs_ty, (con, bndrs, rhs'))
   where
     env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
@@ -290,12 +291,12 @@ cprFix top_lvl orig_env str orig_pairs
     init_sig id rhs
       -- See Note [CPR for data structures]
       | isDataStructure id rhs = topCprSig
-      | otherwise              = mkCprSig (idArity id) initRecFunTerm
+      | otherwise              = mkCprSig (idArity id) initRecFunCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
     init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
                | otherwise    = orig_pairs
-    init_env = extendSigEnvList orig_env (map fst init_pairs)
+    init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
     -- The fixed-point varies the idCprInfo field of the binders and and their
     -- entries in the AnalEnv, and terminates if that annotation does not change
@@ -333,6 +334,18 @@ pruneSig d (CprSig cpr_ty)
   --       behavior.
   = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` initRecFunCpr) }
 
+unboxingStrategy :: AnalEnv -> UnboxingStrategy
+unboxingStrategy env ty dmd
+  = prj <$> wantToUnbox (ae_fam_envs env) has_inlineable_prag ty dmd
+  where
+    prj (dmds, DataConAppContext { dcac_dc = dc, dcac_arg_tys = tys_w_str })
+      = (dc, map (scaledThing . fst) tys_w_str, dmds)
+    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
+    -- function, we just assume that we aren't. That flag is only relevant
+    -- to Note [Do not unpack class dictionaries], the few unboxing
+    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
+    has_inlineable_prag = False
+
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
@@ -349,20 +362,23 @@ cprAnalBind top_lvl env args id rhs
   | otherwise
   = (id', rhs', env')
   where
+    arg_tys             = fst (splitFunNewTys (idType id))
     -- We compute the Termination and CPR transformer based on the strictness
     -- signature. There is no point in pretending that an arg we are strict in
     -- could lead to non-termination, as the signature then trivially
     -- MightDiverge. Instead we assume that call sites make sure to force the
     -- arguments appropriately and unleash the TerminationFlag there.
-    assumed_arg_tys = argCprTypesFromStrictSig (idStrictness id)
+    assumed_arg_cpr_tys = argCprTypesFromStrictSig (unboxingStrategy env)
+                                                   arg_tys
+                                                   (idStrictness id)
 
     -- TODO: Not sure if that special handling of join points is really
     -- necessary. It might even be harmful if the excess 'args' aren't unboxed
     -- and we blindly assume that they have the CPR property! So we should
     -- try out getting rid of this special case and 'args'.
     (rhs_ty, rhs')
-      | isJoinId id = cprAnal env (assumed_arg_tys ++ args) rhs
-      | otherwise   = cprAnal env assumed_arg_tys rhs
+      | isJoinId id = cprAnal env (assumed_arg_cpr_tys ++ args) rhs
+      | otherwise   = cprAnal env assumed_arg_cpr_tys rhs
 
     -- possibly trim thunk CPR info
     rhs_ty'
@@ -463,86 +479,46 @@ emptyAnalEnv fam_envs
   , ae_fam_envs = fam_envs
   }
 
--- | Extend an environment with the CPR sigs attached to the id
-extendSigEnvList :: AnalEnv -> [Id] -> AnalEnv
-extendSigEnvList env ids
-  = env { ae_sigs = sigs' }
-  where
-    sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
+lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
+lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
 extendSigEnv env id sig
   = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
-lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
+extendSigEnvList env ids_cprs
+  = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_cprs }
+
+-- | Extend an environment with the CPR sigs attached to the ids
+extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
+extendSigEnvFromIds env ids
+  = extendSigEnvList env [ (id, idCprInfo id) | id <- ids ]
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
-dummyArgs :: DataCon -> [CprType]
-dummyArgs dc = take (dataConRepArity dc) (repeat topCprType)
-
--- | A version of 'extendSigEnv' for a binder of which we don't see the RHS
--- needed to compute a 'CprSig' (e.g. lambdas and DataAlt field binders).
--- In this case, we can still look at their demand to attach CPR signatures
--- anticipating the unboxing done by worker/wrapper.
--- See Note [CPR for binders that will be unboxed].
-extendSigEnvForDemand :: AnalEnv -> Id -> Demand -> CprType -> AnalEnv
-extendSigEnvForDemand env id dmd ty
-  | isId id
-  , Just (_, DataConAppContext { dcac_dc = dc })
-      <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
-  -- TODO: Make this deep, depending on the StrDmd
-  = extendSigEnv env id $ CprSig $
-      markConCprType Terminates (dataConTag dc) (dummyArgs dc) $
-      -- TODO: There has to be a better way of forcing
-      snd $ forceCprTy (getStrDmd dmd) ty
-  | otherwise
-  = env
-  where
-    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
-    -- function, we just assume that we aren't. That flag is only relevant
-    -- to Note [Do not unpack class dictionaries], the few unboxing
-    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    has_inlineable_prag = False
-
-extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
+extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
-extendEnvForDataAlt env scrut case_bndr case_bndr_ty dc bndrs
-  = foldl' do_con_arg env' ids_w_strs
+extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
+  = extendSigEnv env' case_bndr (CprSig case_bndr_ty')
   where
-    env' = extendSigEnv env case_bndr (CprSig case_bndr_sig)
-
-    ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
-
     tycon          = dataConTyCon dc
     is_product     = isJust (isDataProductTyCon_maybe tycon)
     is_sum         = isJust (isDataSumTyCon_maybe tycon)
-    case_bndr_sig
-      | is_product || is_sum = undefined -- markConCprType  (dataConTag dc) (dummyArgs dc) case_bndr_ty
+    case_bndr_ty'
+      | is_product || is_sum = markConCprType dc case_bndr_ty
       -- Any of the constructors had existentials. This is a little too
       -- conservative (after all, we only care about the particular data con),
       -- but there is no easy way to write is_sum and this won't happen much.
-      | otherwise  = case_bndr_ty
-
-    -- We could have much deeper CPR info here with Nested CPR, which could
-    -- propagate available unboxed things from the scrutinee, getting rid of
-    -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
-    -- Giving strict binders the CPR property only makes sense for products, as
-    -- the arguments in Note [CPR for binders that will be unboxed] don't apply
-    -- to sums (yet); we lack WW for strict binders of sum type.
-    do_con_arg env (id, str)
-       | is_var scrut
-       -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
-       , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
-       = extendSigEnvForDemand env id dmd topCprType
-       | otherwise
-       = env
-
-    is_var (Cast e _) = is_var e
-    is_var (Var v)    = isLocalId v
-    is_var _          = False
+      | otherwise            = case_bndr_ty
+    env'
+      | Just fields <- splitConCprTy dc case_bndr_ty'
+      , let ids     = filter isId bndrs
+      , let cpr_tys = map (CprSig . CprType 0) fields
+      = extendSigEnvList env (zipEqual "extendEnvForDataAlt" ids cpr_tys)
+      | otherwise
+      = env
 
 {- Note [Ensuring termination of fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
