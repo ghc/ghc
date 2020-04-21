@@ -18,6 +18,7 @@ module GHC.Types.Demand (
         absDmd, topDmd, botDmd, seqDmd,
         lubDmd, bothDmd,
         lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
+        strictenDmd,
         isTopDmd, isAbsDmd, isSeqDmd,
         addCaseBndrDmd,
 
@@ -1294,6 +1295,15 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 -- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
+
+strictenDmd :: Demand -> Demand
+strictenDmd (JD { sd = s, ud = u})
+  = JD { sd = poke_s s, ud = poke_u u }
+  where
+    poke_s Lazy      = Str HeadStr
+    poke_s s         = s
+    poke_u Abs       = useTop
+    poke_u u         = u
 
 -- Deferring and peeling
 
