@@ -3187,13 +3187,6 @@ package_flags_deps = [
       (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name -> do
                                       upd (setUnitId name))
-                                      -- TODO: Since we JUST deprecated
-                                      -- -this-package-key, let's keep this
-                                      -- undeprecated for another cycle.
-                                      -- Deprecate this eventually.
-                                      -- deprecate "Use -this-unit-id instead")
-  , make_dep_flag defGhcFlag "this-package-key"   (HasArg $ upd . setUnitId)
-                                                  "Use -this-unit-id instead"
   , make_ord_flag defGhcFlag "this-unit-id"       (hasArg setUnitId)
   , make_ord_flag defFlag "package"               (HasArg exposePackage)
   , make_ord_flag defFlag "plugin-package-id"     (HasArg exposePluginPackageId)
@@ -4884,7 +4877,7 @@ compilerInfo dflags
        ("Requires unified installed package IDs", "YES"),
        -- Whether or not we support the @-this-package-key@ flag.  Prefer
        -- "Uses unit IDs" over it.
-       ("Uses package keys",           "YES"),
+       ("Uses package keys",           "NO"),
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
        -- Whether or not GHC compiles libraries as dynamic by default
