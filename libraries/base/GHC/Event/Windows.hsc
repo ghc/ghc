@@ -777,7 +777,6 @@ registerTimeout mgr@Manager{..} uSrelTime cb = do
     else do
       !expTime <- expirationTime mgrClock uSrelTime :: IO Q.Prio
       editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
-      wakeupIOManager
     return $ TK key
 
 -- | Update an active timeout to fire in the given number of seconds (from the
