@@ -677,6 +677,14 @@ static int
 relocateSection(ObjectCode* oc, int curSection)
 {
     Section * sect = &oc->sections[curSection];
+
+    IF_DEBUG(linker, debugBelch("relocateSection %d, info: %x\n", curSection, sect->info));
+
+    // empty sections (without segments), won't have their info filled.
+    // there is no relocation to be done for them.
+    if(sect->info == NULL)
+        return 1;
+
     MachOSection * msect = sect->info->macho_section; // for access convenience
     MachORelocationInfo * relocs = sect->info->relocation_info;
     MachOSymbol * symbols = oc->info->macho_symbols;
@@ -1192,7 +1200,7 @@ ocGetNames_MachO(ObjectCode* oc)
     SymbolAddr* commonStorage = NULL;
     unsigned long commonCounter;
 
-    IF_DEBUG(linker,debugBelch("ocGetNames_MachO: start\n"));
+    IF_DEBUG(linker,debugBelch("ocGetNames_MachO: %s start\n",  OC_INFORMATIVE_FILENAME(oc)));
 
     Section *secArray;
     secArray = (Section*)stgCallocBytes(
@@ -1449,7 +1457,7 @@ ocMprotect_MachO( ObjectCode *oc )
 int
 ocResolve_MachO(ObjectCode* oc)
 {
-    IF_DEBUG(linker, debugBelch("ocResolve_MachO: start\n"));
+    IF_DEBUG(linker, debugBelch("ocResolve_MachO: %s start\n", OC_INFORMATIVE_FILENAME(oc)));
 
     if(NULL != oc->info->dsymCmd)
     {
@@ -1460,6 +1468,9 @@ ocResolve_MachO(ObjectCode* oc)
         for (int i = 0; i < oc->n_sections; i++)
         {
             const char * sectionName = oc->info->macho_sections[i].sectname;
+
+            IF_DEBUG(linker, debugBelch("ocResolve_MachO: section %d/%d: %s\n", i, oc->n_sections, sectionName));
+
             if(    !strcmp(sectionName,"__la_symbol_ptr")
                 || !strcmp(sectionName,"__la_sym_ptr2")
                 || !strcmp(sectionName,"__la_sym_ptr3"))
@@ -1483,7 +1494,7 @@ ocResolve_MachO(ObjectCode* oc)
             }
             else
             {
-                IF_DEBUG(linker, debugBelch("ocResolve_MachO: unknown section\n"));
+                IF_DEBUG(linker, debugBelch("ocResolve_MachO: unknown section %d/%d\n", i, oc->n_sections));
             }
         }
     }
@@ -1520,7 +1531,7 @@ ocResolve_MachO(ObjectCode* oc)
 
     for(int i = 0; i < oc->n_sections; i++)
     {
-        IF_DEBUG(linker, debugBelch("ocResolve_MachO: relocating section %d\n", i));
+        IF_DEBUG(linker, debugBelch("ocResolve_MachO: relocating section %d/%d\n", i, oc->n_sections));
 
 #if defined(aarch64_HOST_ARCH)
         if (!relocateSectionAarch64(oc, &oc->sections[i]))
