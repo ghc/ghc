@@ -167,7 +167,6 @@
 -split-objs
 -syslib
 -this-component-id
--this-package-key
 -ticky-LNE
 -ticky-allocd
 -ticky-dyn-thunk
