@@ -108,6 +108,7 @@ endif
 
 # Build the GHCi library
 ifneq "$(filter $3, v p)" ""
+ifneq "$1" "ghc-bignum" # don't build it for ghc-bignum (#17791)
 $1_$2_$3_GHCI_LIB = $1/$2/build/HS$$($1_$2_COMPONENT_ID).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't put bootstrapping packages in the bindist
@@ -127,6 +128,7 @@ ifneq "$4" "0"
 $(call all-target,$1_$2,$$($1_$2_$3_GHCI_LIB))
 endif
 endif # "$$($1_$2_BUILD_GHCI_LIB)" "YES"
+endif # "$1" "ghc-bignum"
 endif # "$(filter $3, v p)" ""
 
 $(call profEnd, build-package-way($1,$2,$3))
