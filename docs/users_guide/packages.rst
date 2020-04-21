@@ -965,27 +965,17 @@ Additionally, the following flags are accepted by ``ghc-pkg``:
 
     Output the ``ghc-pkg`` version number.
 
-``--ipid``
+``--ipid``, ``--unit-id``
     .. index::
        single: --ipid; ghc-pkg option
+       single: --unit-id; ghc-pkg option
 
-    Causes ``ghc-pkg`` to interpret arguments as installed package IDs
+    Causes ``ghc-pkg`` to interpret arguments as installed unit IDs
     (e.g., an identifier like
     ``unix-2.3.1.0-de7803f1a8cd88d2161b29b083c94240``). This is useful
     if providing just the package name and version are ambiguous (in old
     versions of GHC, this was guaranteed to be unique, but this
     invariant no longer necessarily holds).
-
-``--package-key``
-    .. index::
-       single: --package-key; ghc-pkg option
-
-    Causes ``ghc-pkg`` to interpret arguments as unit IDs (e.g., an
-    identifier like ``I5BErHzyOm07EBNpKBEeUv``). Package keys are used
-    to prefix symbol names GHC produces (e.g.,
-    ``6VWy06pWzzJq9evDvK2d4w6_DataziByteStringziInternal_unsafePackLenChars_info``),
-    so if you need to figure out what package a symbol belongs to, use
-    ``ghc-pkg`` with this flag.
 
 .. _building-packages:
 
