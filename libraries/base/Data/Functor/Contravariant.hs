@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -52,6 +53,7 @@ import Data.Function (on)
 import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Functor.Compose
+import Data.Kind (Type)
 
 import Data.Monoid (Alt(..))
 import Data.Proxy
@@ -242,7 +244,7 @@ newtype Op a b = Op { getOp :: b -> a }
 deriving instance Semigroup a => Semigroup (Op a b)
 deriving instance Monoid a => Monoid (Op a b)
 
-instance Category Op where
+instance Category @Type Op where
   id = Op id
   Op f . Op g = Op (g . f)
 

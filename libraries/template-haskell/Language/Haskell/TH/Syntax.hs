@@ -3,7 +3,7 @@
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
              GADTs, UnboxedTuples, UnboxedSums, TypeInType,
-             Trustworthy #-}
+             Trustworthy, StandaloneKindSignatures #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
@@ -43,7 +43,7 @@ import Data.Ratio
 import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
-                          TYPE, RuntimeRep(..) )
+                          TYPE, RuntimeRep(..), Constraint )
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
@@ -713,11 +713,12 @@ sequenceQ = sequence
 -- >   deriving Lift
 --
 -- Levity-polymorphic since /template-haskell-2.16.0.0/.
-class Lift (t :: TYPE r) where
+type  Lift :: forall rep. TYPE rep -> Constraint
+class Lift (t :: TYPE rep) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
   lift :: Quote m => t -> m Exp
-  default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
+  default lift :: (rep ~ 'LiftedRep, Quote m) => t -> m Exp
   lift = unTypeQ . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use

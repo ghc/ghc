@@ -12,7 +12,7 @@
 -- type representations.
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables, TypeApplications #-}
 
 module Type.Reflection.Unsafe (
       -- * Type representations
@@ -27,8 +27,8 @@ import Data.Typeable.Internal hiding (mkTrApp)
 import qualified Data.Typeable.Internal as TI
 
 -- | Construct a representation for a type application.
-mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-           TypeRep (a :: k1 -> k2)
-        -> TypeRep (b :: k1)
-        -> TypeRep (a b)
+mkTrApp :: forall k1 k2 (f :: k1 -> k2) (a :: k1).
+           TypeRep @(k1->k2) f
+        -> TypeRep @k1       a
+        -> TypeRep @k2       (f a)
 mkTrApp = TI.mkTrAppChecked
