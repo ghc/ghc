@@ -1411,7 +1411,7 @@ instance ToHie (LConDecl GhcRn) where
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets } ->
         [ toHie $ C (Decl ConDec $ getRealSpan span) name
-        , toHie $ tvScopes (ResolvedScopes []) rhsScope qvars
+        , toHie $ tvScopes (ResolvedScopes []) rhsScope <$> qvars
         , toHie ctx
         , toHie dets
         ]

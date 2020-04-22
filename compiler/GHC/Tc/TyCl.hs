@@ -1593,7 +1593,7 @@ kcConDecl new_or_data res_kind (ConDeclH98
   , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
-    bindExplicitTKBndrs_Tv ex_tvs $
+    bindExplicitTKBndrs_Tv (fromMaybe [] ex_tvs) $
     do { _ <- tcHsMbContext ex_ctxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
          -- We don't need to check the telescope here,
@@ -3119,7 +3119,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts))
            <- pushTcLevelM_                             $
               solveEqualities                           $
-              bindExplicitTKBndrs_Skol explicit_tkv_nms $
+              bindExplicitTKBndrs_Skol (fromMaybe [] explicit_tkv_nms) $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
