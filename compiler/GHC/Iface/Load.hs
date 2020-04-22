@@ -1049,7 +1049,8 @@ ghcPrimIface
         mi_exports  = ghcPrimExports,
         mi_decls    = [],
         mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities }
+        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities },
+        mi_decl_docs = ghcPrimDeclDocs
         }
   where
     empty_iface = emptyFullModIface gHC_PRIM

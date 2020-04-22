@@ -16,7 +16,7 @@ module GHC.Builtin.PrimOps (
 
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
-        primOpIsCheap, primOpFixity,
+        primOpIsCheap, primOpFixity, primOpDocs,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -160,6 +160,17 @@ primOpStrictness :: PrimOp -> Arity -> StrictSig
 
 primOpFixity :: PrimOp -> Maybe Fixity
 #include "primop-fixity.hs-incl"
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{Docs}
+*                                                                      *
+************************************************************************
+-}
+
+primOpDocs :: PrimOp -> Maybe String
+#include "primop-docs.hs-incl"
 
 {-
 ************************************************************************

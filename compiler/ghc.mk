@@ -119,7 +119,8 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-vector-uniques.hs-incl   \
                     primop-vector-tys.hs-incl       \
                     primop-vector-tys-exports.hs-incl \
-                    primop-vector-tycons.hs-incl
+                    primop-vector-tycons.hs-incl    \
+                    primop-docs.hs-incl
 
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
@@ -166,6 +167,8 @@ compiler/stage$1/build/primop-vector-tys-exports.hs-incl: compiler/stage$1/build
 	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
 compiler/stage$1/build/primop-vector-tycons.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
+compiler/stage$1/build/primop-docs.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --wired-in-docs             < $$< > $$@
 
 # Usages aren't used any more; but the generator
 # can still generate them if we want them back
