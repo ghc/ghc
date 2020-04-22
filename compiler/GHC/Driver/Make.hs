@@ -1237,7 +1237,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
     let int_loop_deps = Set.fromList $
             case finish_loop of
                 Nothing   -> []
-                Just loop -> filter (/= this_build_mod) loop
+                Just loop -> delete this_build_mod loop
 
     -- If this module depends on a module within a loop then it must wait for
     -- that loop to get re-typechecked, i.e. it must wait on the module that
@@ -1300,7 +1300,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                     -- SCCs include the loop closer, so we have to filter
                     -- it out.
                     Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
-                                 filter (/= moduleName (fst this_build_mod)) $
+                                 delete (moduleName (fst this_build_mod)) $
                                  map (moduleName . fst) loop
 
                 -- Compile the module.

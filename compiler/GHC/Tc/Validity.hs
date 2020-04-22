@@ -72,7 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable
-import Data.List        ( (\\), nub )
+import Data.List        ( (\\), nub, delete )
 import qualified Data.List.NonEmpty as NE
 
 {-
@@ -2833,7 +2833,7 @@ fvType (AppTy fun arg)       = fvType fun ++ fvType arg
 fvType (FunTy _ arg res)     = fvType arg ++ fvType res
 fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
-    filter (/= tv) (fvType ty)
+    delete tv (fvType ty)
 fvType (CastTy ty _)         = fvType ty
 fvType (CoercionTy {})       = []
 

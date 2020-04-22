@@ -86,7 +86,7 @@ minusList xs@[x] ys
   | otherwise = xs
 -- Using an empty set or a singleton would also be silly, so let's not.
 minusList xs [] = xs
-minusList xs [y] = filter (/= y) xs
+minusList xs [y] = L.delete y xs
 -- When each list has at least two elements, we build a set from the
 -- second argument, allowing us to filter the first argument fairly
 -- efficiently.

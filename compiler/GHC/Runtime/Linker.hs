@@ -69,7 +69,7 @@ import Control.Monad
 import qualified Data.Set as Set
 import Data.Char (isSpace)
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
+import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition, delete)
 import Data.Maybe
 import Control.Concurrent.MVar
 
@@ -1284,7 +1284,7 @@ linkPackage hsc_env pkg
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) hs_libs
+            hs_libs'  =  delete "HSffi" hs_libs
 
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a

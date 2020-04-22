@@ -1413,7 +1413,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     -- something for its rhs, and there must be something left
     -- to build its lhs.
     go k acc ops_acc ((L l (TyElOpr op)):xs) =
-      if null acc || null (filter isTyElOpd xs)
+      if null acc || not (any isTyElOpd xs)
         then failOpFewArgs (L l op)
         else do { acc' <- eitherToP (mergeOpsAcc acc)
                 ; go (k + 1) [] (\c -> mkLHsOpTy c (L l op) (ops_acc acc')) xs }
