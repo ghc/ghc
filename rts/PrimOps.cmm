@@ -30,6 +30,7 @@ import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
 import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
+import CLOSURE base_ControlziExceptionziBase_absentSumFieldError_closure;
 import CLOSURE base_GHCziIOziException_heapOverflow_closure;
 import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
 import CLOSURE base_GHCziExceptionziType_underflowException_closure;
@@ -2616,4 +2617,9 @@ stg_raiseUnderflowzh ()
 stg_raiseOverflowzh ()
 {
     jump stg_raisezh(base_GHCziExceptionziType_overflowException_closure);
+}
+
+stg_raiseAbsentSumFieldzh ()
+{
+    jump stg_raisezh(base_ControlziExceptionziBase_absentSumFieldError_closure);
 }
