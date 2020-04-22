@@ -35,6 +35,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
                         , withHsDocContext )
+import GHC.Rename.Utils.CpsMonad ( CpsRn (..) )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
 import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
@@ -59,7 +60,7 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( debugIsOn, filterOut, lengthExceeds, partitionWith, zipWithEqual )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -1018,22 +1019,16 @@ bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
                -> [LRuleBndr GhcPs] -> [Name]
                -> ([LRuleBndr GhcRn] -> RnM (a, FreeVars))
                -> RnM (a, FreeVars)
-bindRuleTmVars doc tyvs vars names thing_inside
-  = go vars names $ \ vars' ->
-    bindLocalNamesFV names (thing_inside vars')
+bindRuleTmVars doc tyvs vars names = unCpsRn $ do
+    vars' <- sequence $ zipWithEqual "bindRuleVars" go vars names
+    CpsRn $ \thing_inside -> bindLocalNamesFV names $ thing_inside vars'
   where
-    go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
-      = go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndr noExtField (L loc n)) : vars')
-
-    go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
-       (n : ns) thing_inside
-      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
-        go vars ns $ \ vars' ->
-        thing_inside (L l (RuleBndrSig noExtField (L loc n) bsig') : vars')
-
-    go [] [] thing_inside = thing_inside []
-    go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
+    go (L l var) name = L l <$> case var of
+      RuleBndr _ (L loc _) -> pure $
+        RuleBndr noExtField $ L loc name
+      RuleBndrSig _ (L loc _) bsig -> do
+        bsig' <- CpsRn $ rnHsPatSigType bind_free_tvs doc bsig
+        pure $ RuleBndrSig noExtField (L loc name) bsig'
 
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind

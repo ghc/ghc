@@ -45,6 +45,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
                          , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
+import GHC.Rename.Utils.CpsMonad ( CpsRn (..) )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -64,6 +65,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable      ( traverse_ )
 import Data.List          ( nubBy, partition, (\\) )
 import Control.Monad      ( unless, when )
 
@@ -992,18 +994,17 @@ bindLHsTyVarBndrs :: HsDocContext
 bindLHsTyVarBndrs doc mb_in_doc mb_assoc tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
        ; checkDupRdrNames tv_names_w_loc
-       ; go tv_bndrs thing_inside }
+       -- CpsRn large exists for sake of traversals like these.
+       -- See Note [CpsRn monad] in GHC.Rename.Utils.CpsMonad.
+       ; let cpsBind vars = CpsRn $ bindLHsTyVarBndr doc mb_assoc vars
+       ; unCpsRn (traverse cpsBind tv_bndrs) $ \tv_bndrs' ->
+         do { (res, fvs) <- thing_inside tv_bndrs'
+            ; traverse_ (warn_unused fvs) tv_bndrs'
+            ; return (res, fvs) } }
   where
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs
 
-    go []     thing_inside = thing_inside []
-    go (b:bs) thing_inside = bindLHsTyVarBndr doc mb_assoc b $ \ b' ->
-                             do { (res, fvs) <- go bs $ \ bs' ->
-                                                thing_inside (b' : bs')
-                                ; warn_unused b' fvs
-                                ; return (res, fvs) }
-
-    warn_unused tv_bndr fvs = case mb_in_doc of
+    warn_unused fvs tv_bndr = case mb_in_doc of
       Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs
       Nothing     -> return ()
 
