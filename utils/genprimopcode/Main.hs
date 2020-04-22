@@ -388,6 +388,7 @@ getName PrimOpSpec{ name = n } = Just n
 getName PrimVecOpSpec{ name = n } = Just n
 getName PseudoOpSpec{ name = n } = Just n
 getName PrimTypeSpec{ ty = TyApp tc _ } = Just (show tc)
+getName PrimVecTypeSpec{ ty = TyApp tc _ } = Just (show tc)
 getName _ = Nothing
 
 {- Note [Placeholder declarations]
@@ -790,15 +791,11 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 
 gen_wired_in_docs :: Info -> String
 gen_wired_in_docs (Info _ entries)
-  = unlines $ catMaybes (map mkAlt (filter is_primop entries)) ++ [funName ++ " _ = Nothing"]
+  = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
     where
-      mkAlt po | null (desc po) = Nothing
-               | otherwise = Just (funName ++ " " ++ mkLHS po ++ " = Just " ++ show (unlatex (desc po)))
-      mkLHS po = case vecOptions po of
-        [] -> cons po
-        _  -> "(" ++ cons po ++ " _ _ _)"
-
-      funName = "primOpDocs"
+      mkDoc po | Just poName <- getName po
+               , not $ null $ desc po = Just $ show (poName, unlatex $ desc po)
+               | otherwise = Nothing
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
