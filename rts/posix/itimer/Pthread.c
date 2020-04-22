@@ -122,10 +122,18 @@ static void *itimer_thread_func(void *_handle_tick)
 
     while (!exited) {
         if (USE_TIMERFD_FOR_ITIMER) {
-            if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
-                if (errno != EINTR) {
-                    barf("Itimer: read(timerfd) failed: %s", strerror(errno));
-                }
+            ssize_t r = read(timerfd, &nticks, sizeof(nticks));
+            if ((r == 0) && (errno == 0)) {
+               /* r == 0 is expected only for non-blocking fd (in which case
+                * errno should be EAGAIN) but we use a blocking fd.
+                *
+                * Due to a kernel bug (cf https://lkml.org/lkml/2019/8/16/335)
+                * on some platforms we could see r == 0 and errno == 0.
+                */
+               IF_DEBUG(scheduler, debugBelch("read(timerfd) returned 0 with errno=0. This is a known kernel bug. We just ignore it."));
+            }
+            else if (r != sizeof(nticks) && errno != EINTR) {
+               barf("Itimer: read(timerfd) failed with %s and returned %zd", strerror(errno), r);
             }
         } else {
             if (rtsSleep(itimer_interval) != 0) {
