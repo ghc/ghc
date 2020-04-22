@@ -324,14 +324,16 @@ rnImplicitBndrs bind_free_tvs
                 fvs_with_dups
                 thing_inside
   = do { let fvs = nubL fvs_with_dups
-             real_fvs | bind_free_tvs = fvs
-                      | otherwise     = []
+             -- implicit_vs are the surface-syntax free vars that are in fact
+             -- actually captured by implicit bindings
+             implicit_vs | bind_free_tvs = fvs
+                         | otherwise     = []
 
        ; traceRn "rnImplicitBndrs" $
-         vcat [ ppr fvs_with_dups, ppr fvs, ppr real_fvs ]
+         vcat [ ppr fvs_with_dups, ppr fvs, ppr implicit_vs ]
 
        ; loc <- getSrcSpanM
-       ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_fvs
+       ; vars <- mapM (newLocalBndrRn . L loc . unLoc) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
