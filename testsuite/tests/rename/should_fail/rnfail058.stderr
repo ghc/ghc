@@ -1,0 +1,18 @@
+
+testsuite/tests/rename/should_fail/rnfail058.hs:7:19: error:
+    Not in scope: type variable ‘a’
+
+testsuite/tests/rename/should_fail/rnfail058.hs:8:23: error:
+    Not in scope: type variable ‘a’
+
+testsuite/tests/rename/should_fail/rnfail058.hs:10:26: error:
+    Not in scope: type variable ‘a’
+
+testsuite/tests/rename/should_fail/rnfail058.hs:11:27: error:
+    Not in scope: type variable ‘a’
+
+testsuite/tests/rename/should_fail/rnfail058.hs:13:31: error:
+    Not in scope: type variable ‘a’
+
+testsuite/tests/rename/should_fail/rnfail058.hs:15:28: error:
+    Not in scope: type variable ‘a’

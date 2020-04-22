@@ -1590,6 +1590,18 @@ extractHsTyRdrTyVars :: LHsType GhcPs -> FreeKiTyVarsNoDups
 extractHsTyRdrTyVars ty
   = nubL (extractHsTyRdrTyVarsDups ty)
 
+-- | Will disqualify any free vars from becoming implicit bindings if the
+-- outermost syntax is an explicit forall, respecting the "forall-or-nothing"
+-- rule.
+--
+-- It's a bit unfortunate implementation-wise that we don't always use this.
+-- This should be interrogated going forwards.
+extractHsTyRdrTyVarsWithOptOut :: LHsType GhcPs -> FreeKiTyVarsNoDups
+extractHsTyRdrTyVarsWithOptOut lty@(L _ ty) =
+  case ty of
+    HsForAllTy {} -> []
+    _ -> extractHsTyRdrTyVars lty
+
 -- | 'extractHsTyRdrTyVarsDups' finds the type/kind variables
 --                              of a HsType/HsKind.
 -- It's used when making the @forall@s explicit.
@@ -1637,20 +1649,21 @@ extractHsTyVarBndrsKVs tv_bndrs
 -- See Note [Ordering of implicit variables].
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [Located RdrName]
 extractRdrKindSigVars (L _ resultSig) = case resultSig of
-  KindSig _ k                          -> extractHsTyRdrTyVars k
-  TyVarSig _ (L _ (KindedTyVar _ _ k)) -> extractHsTyRdrTyVars k
+  KindSig _ k                          -> extractHsTyRdrTyVarsWithOptOut k
+  TyVarSig _ (L _ (KindedTyVar _ _ k)) -> extractHsTyRdrTyVarsWithOptOut k
   _ -> []
 
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order and without duplicates:
 --
 --  * data T a (b :: k1) :: k2 -> k1 -> k2 -> Type   -- result: [k2,k1]
+--  * data T a (b :: k1) :: forall. k1 -> k2 -> Type -- result: []
 --  * data T a (b :: k1)                             -- result: []
 --
 -- See Note [Ordering of implicit variables].
 extractDataDefnKindVars :: HsDataDefn GhcPs ->  FreeKiTyVarsNoDups
 extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
-  = maybe [] extractHsTyRdrTyVars ksig
+  = maybe [] extractHsTyRdrTyVarsWithOptOut ksig
 
 extract_lctxt :: LHsContext GhcPs
               -> FreeKiTyVarsWithDups -> FreeKiTyVarsWithDups
