@@ -140,12 +140,12 @@ cprAnal, cprAnal'
   -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
   -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
 
-cprAnal env args e = -- pprTraceWith "cprAnal" (\res -> ppr (fst (res)) $$ ppr e) $
+cprAnal env args e = pprTraceWith "cprAnal" (\res -> ppr (fst (res)) $$ ppr e) $
                      cprAnal' env args e
 
-cprAnal' _ _ (Lit lit)     = (topCprType, Lit lit)
-cprAnal' _ _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
-cprAnal' _ _ (Coercion co) = (topCprType, Coercion co)
+cprAnal' _ _ (Lit lit)     = (whnfTermCprType, Lit lit)
+cprAnal' _ _ (Type ty)     = (whnfTermCprType, Type ty)      -- Doesn't happen, in fact
+cprAnal' _ _ (Coercion co) = (whnfTermCprType, Coercion co)
 
 cprAnal' env args (Var var)   = (cprTransform env args var, Var var)
 
