@@ -73,7 +73,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
 
@@ -681,11 +681,9 @@ rnFamInstEqn doc atfi rhs_kvars
              -- Use the "...Dups" form because it's needed
              -- below to report unused binder on the LHS
 
-         -- Implicitly bound variables, empty if we have an explicit 'forall' according
-         -- to the "forall-or-nothing" rule.
-       ; let imp_vars = case mb_bndrs of
-               Nothing -> nubL pat_kity_vars_with_dups
-               Just _ -> []
+         -- Implicitly bound variables, empty if we have an explicit 'forall'.
+         -- See Note [forall-or-nothing rule] in GHC.Rename.HsType.
+       ; let imp_vars = nubL $ forAllOrNothing (isJust mb_bndrs) pat_kity_vars_with_dups
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
        ; let bndrs = fromMaybe [] mb_bndrs
@@ -2099,7 +2097,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
               mb_ctxt = Just (inHsDocContext ctxt)
 
         ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
-        ; rnImplicitBndrs (not explicit_forall) free_tkvs $ \ implicit_tkvs ->
+        ; rnImplicitBndrs (forAllOrNothing explicit_forall free_tkvs) $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
