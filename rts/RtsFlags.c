@@ -382,6 +382,7 @@ usage_text[] = {
 "             where [flags] can contain:",
 "                s    scheduler events",
 "                g    GC and heap events",
+"                n    non-moving GC heap census events",
 "                p    par spark events (sampled)",
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",
