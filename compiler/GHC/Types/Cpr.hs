@@ -4,13 +4,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | Types for the Constructed Product Result lattice. "GHC.Core.Opt.CprAnal"
 -- and "GHC.Core.Opt.WorkWrap.Utils" are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
     TerminationFlag (Terminates),
-    Cpr, topCpr, botCpr, conCpr, initRecFunCpr, lubCpr, asConCpr,
-    CprType (..), topCprType, botCprType, lubCprType, conCprType,
+    Cpr, topCpr, botCpr, conCpr, whnfTermCpr, initRecFunCpr, lubCpr, asConCpr,
+    CprType (..), topCprType, botCprType, whnfTermCprType, conCprType, lubCprType,
     pruneDeepCpr, markConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
@@ -99,14 +100,10 @@ lubTermFlag _            MightDiverge = MightDiverge
 lubTermFlag Terminates   Terminates   = Terminates
 
 data Termination
-  = Term !TerminationFlag !(Levitated (KnownShape Termination))
+  = Term_ !TerminationFlag !(Levitated (KnownShape Termination))
+  -- Don't use 'Term_', use 'Term' instead! Otherwise the derived Eq instance
+  -- is broken.
   deriving Eq
-
-botTerm :: Termination
-botTerm = Term Terminates Bot
-
-topTerm :: Termination
-topTerm = Term MightDiverge Top
 
 -- | Normalise the nested termination info according to
 -- > Top === Levitate (Con t [topTerm..])
@@ -118,14 +115,27 @@ normTermShape (Levitate (Con _ fields))
   | all (== botTerm) fields = Bot
 normTermShape l_sh         = l_sh
 
+pattern Term :: TerminationFlag -> Levitated (KnownShape Termination) -> Termination
+pattern Term tf l <- (Term_ tf l)
+  where
+    Term tf l = Term_ tf (normTermShape l)
+
+{-# COMPLETE Term #-}
+
+botTerm :: Termination
+botTerm = Term Terminates Bot
+
+topTerm :: Termination
+topTerm = Term MightDiverge Top
+
 lubTerm :: Termination -> Termination -> Termination
 lubTerm (Term tf1 l_sh1) (Term tf2 l_sh2)
   = Term (lubTermFlag tf1 tf2)
-         (normTermShape (lubLevitated (lubKnownShape lubTerm) l_sh1 l_sh2))
+         (lubLevitated (lubKnownShape lubTerm) l_sh1 l_sh2)
 
 pruneDeepTerm :: Int -> Termination -> Termination
 pruneDeepTerm depth (Term tf (Levitate sh))
-  = Term tf (normTermShape (pruneKnownShape pruneDeepTerm depth sh))
+  = Term tf (pruneKnownShape pruneDeepTerm depth sh)
 pruneDeepTerm _     term                    = term
 
 seqTerm :: Termination -> ()
@@ -163,14 +173,26 @@ seqTerm (Term _ l) = seqLevitated (seqKnownShape seqTerm) l
 
 data Cpr
   = Cpr !TerminationFlag !(Levitated (KnownShape Cpr))
-  | NoMoreCpr !Termination
+  | NoMoreCpr_ !Termination
   deriving Eq
+
+pattern NoMoreCpr :: Termination -> Cpr
+pattern NoMoreCpr t <- (NoMoreCpr_ t)
+  where
+    NoMoreCpr (Term MightDiverge Top) = topCpr
+    NoMoreCpr (Term Terminates   Bot) = botCpr
+    NoMoreCpr t                       = NoMoreCpr_ t
+
+{-# COMPLETE Cpr, NoMoreCpr #-}
 
 botCpr :: Cpr
 botCpr = Cpr Terminates Bot
 
 topCpr :: Cpr
 topCpr = Cpr MightDiverge Top
+
+whnfTermCpr :: Cpr
+whnfTermCpr = Cpr Terminates Top
 
 -- | The initial termination of a recursive function in fixed-point iteration.
 -- We assume a recursive call 'MightDiverge', but are optimistic about all
@@ -244,6 +266,9 @@ topCprType = CprType 0 topCpr
 
 botCprType :: CprType
 botCprType = CprType 0 botCpr
+
+whnfTermCprType :: CprType
+whnfTermCprType = CprType 0 whnfTermCpr
 
 lubCprType :: CprType -> CprType -> CprType
 lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
@@ -506,6 +531,9 @@ type UnboxingStrategy = Type -> Demand -> Maybe (DataCon, [Type], [Demand])
 --   - A call demand @C(S)@ would translate to @strTop -> #(#,*)@
 argCprTypesFromStrictSig :: UnboxingStrategy -> [Type] -> StrictSig -> [CprType]
 argCprTypesFromStrictSig want_to_unbox arg_tys sig
+  -- TODO: Maybe look at unliftedness from the unboxing strategy, just in case
+  -- we e.g. fail to mark an Int# argument as Terminates, which should always be
+  -- the case as per the let/app invariant.
   = zipWith go arg_tys (argDmdsFromStrictSig sig)
   where
     go arg_ty arg_dmd
@@ -539,8 +567,11 @@ instance Outputable Termination where
     Levitate shape -> ppr shape
 
 instance Outputable Cpr where
-  ppr (NoMoreCpr t) = ppr t
-  ppr (Cpr tf l)    = ppr tf <> case l of
+  ppr (NoMoreCpr t)          = ppr t
+  -- I like it better without the special case
+  -- ppr (Cpr MightDiverge Top) = empty
+  -- ppr (Cpr Terminates   Bot) = char 'b'
+  ppr (Cpr tf l)             = ppr tf <> case l of
     Top            -> empty
     Bot            -> char 'b'
     Levitate shape -> char 'c' <> ppr shape
