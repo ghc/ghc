@@ -208,7 +208,6 @@ import GHC.Core.DataCon
 import FastString (FastString, mkFastString)
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
@@ -580,14 +579,37 @@ mkUbxSum dc ty_args args0
         = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
 
       slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
+      slotRubbishArg PtrSlot    = StgVarArg unitDataConId -- See Note [Lifted rubbish value]
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
       slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
       slotRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
     in
       tag_arg : mkTupArgs 0 sum_slots arg_idxs
+
+
+-- Note [Lifted rubbish value]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Unboxed sums are transformed into unboxed tuples during compilation and we
+-- fill fields that can't be reached with rubbish values in mkUbxSum
+--
+-- We need a rubbish value for PtrSlot and it should be a valid (no NULL
+-- pointer) non-CAFFY closure.
+--
+-- - it can't take arguments because it's used in unarise and applying an
+--   argument would require allocating a thunk.
+--
+-- - it can't be CAFFY because that would mean making some non-CAFFY definitions
+--   that use unboxed sums CAFFY in unarise.
+--
+-- Getting this wrong causes hard-to-debug runtime issues, see #15038.
+--
+-- Previously we used a wired-in closure from base:Control.Exception.Type. But
+-- it introduced a dependency on `base` for any code using unboxed sums and it
+-- became an issue when we wanted to use unboxed sums in boot libraries used by
+-- base (see #17791). Now we use `()` closure similarly to how LitRubbish is
+-- lowered in `GHC.CoreToStg.coreToStgExpr`.
 
 --------------------------------------------------------------------------------
 
