@@ -795,27 +795,33 @@ rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
                         , rd_act = act
-                        , rd_tyvs = ty_bndrs
+                        , rd_tyvs = m_ty_bndrs
                         , rd_tmvs = tm_bndrs
                         , rd_lhs = lhs
                         , rd_rhs = rhs }))
-  = do { rule <- addHsTyVarBinds (fromMaybe [] ty_bndrs) $ \ ex_bndrs ->
-         do { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
-            ; ss <- mkGenSyms tm_bndr_names
-            ; rule <- addBinds ss $
-                      do { elt_ty <- wrapName tyVarBndrTyConName
-                         ; ty_bndrs' <- return $ case ty_bndrs of
-                             Nothing -> coreNothing' (mkListTy elt_ty)
-                             Just _  -> coreJust' (mkListTy elt_ty) ex_bndrs
-                         ; tm_bndrs' <- repListM ruleBndrTyConName
-                                                repRuleBndr
-                                                tm_bndrs
-                         ; n'   <- coreStringLit $ unpackFS $ snd $ unLoc n
-                         ; act' <- repPhases act
-                         ; lhs' <- repLE lhs
-                         ; rhs' <- repLE rhs
-                         ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act' }
-           ; wrapGenSyms ss rule  }
+  = do { let
+           go m_ex_bndrs = do
+             { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
+             ; ss <- mkGenSyms tm_bndr_names
+             ; rule <- addBinds ss $ do
+                 { elt_ty <- wrapName tyVarBndrTyConName
+                 ; ty_bndrs' <- return $ case m_ex_bndrs of
+                     Nothing -> coreNothing' (mkListTy elt_ty)
+                     Just ex_bndrs -> coreJust' (mkListTy elt_ty) ex_bndrs
+                 ; tm_bndrs' <- repListM ruleBndrTyConName
+                                        repRuleBndr
+                                        tm_bndrs
+                 ; n'   <- coreStringLit $ unpackFS $ snd $ unLoc n
+                 ; act' <- repPhases act
+                 ; lhs' <- repLE lhs
+                 ; rhs' <- repLE rhs
+                 ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act'
+                 }
+             ; wrapGenSyms ss rule
+             }
+       ; rule <- case m_ty_bndrs of
+           Just ty_bndrs -> addHsTyVarBinds ty_bndrs (go . Just)
+           Nothing -> go Nothing
        ; return (loc, rule) }
 
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
@@ -856,23 +862,23 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> MetaM (Core (M TH.Con))
 repC (L _ (ConDeclH98 { con_name   = con
-                      , con_forall = (L _ False)
+                      , con_ex_tvs = Nothing
                       , con_mb_cxt = Nothing
                       , con_args   = args }))
   = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_forall = L _ is_existential
-                      , con_ex_tvs = con_tvs
+                      , con_ex_tvs = m_con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
-  = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
-         do { c'    <- repDataCon con args
-            ; ctxt' <- repMbContext mcxt
-            ; if not is_existential && isNothing mcxt
-              then return c'
-              else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
-            }
+  = addHsTyVarBinds (fromMaybe [] m_con_tvs) $ \ex_bndrs ->
+    do { c' <- repDataCon con args
+       ; case (m_con_tvs, mcxt) of
+         (Nothing, Nothing) -> return c'
+         (_, _) -> do
+           { ctxt' <- repMbContext mcxt
+           ; rep2 forallCName [unC ex_bndrs, unC ctxt', unC c']
+           }
        }
 
 repC (L _ (ConDeclGADT { con_names  = cons
