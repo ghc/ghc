@@ -189,6 +189,9 @@ main = getArgs >>= \args ->
                       "--make-latex-doc"
                          -> putStr (gen_latex_doc p_o_specs)
 
+                      "--wired-in-docs"
+                         -> putStr (gen_wired_in_docs p_o_specs)
+
                       _ -> error "Should not happen, known_args out of sync?"
                    )
 
@@ -211,7 +214,8 @@ known_args
        "--primop-vector-tycons",
        "--make-haskell-wrappers",
        "--make-haskell-source",
-       "--make-latex-doc"
+       "--make-latex-doc",
+       "--wired-in-docs"
      ]
 
 ------------------------------------------------------------------
@@ -360,21 +364,23 @@ gen_hs_source (Info defaults entries) =
 
            prim_data t = [ "data " ++ pprTy t ]
 
-           unlatex s = case s of
-                '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
-                '{':'\\':'t':'e':'x':'t':'t':'t':' ':cs -> markup "@" "@" cs
-                '{':'\\':'t':'t':cs -> markup "@" "@" cs
-                '{':'\\':'i':'t':cs -> markup "/" "/" cs
-                '{':'\\':'e':'m':cs -> markup "/" "/" cs
-                c : cs -> c : unlatex cs
-                "" -> ""
-           markup s t xs = s ++ mk (dropWhile isSpace xs)
-                where mk ""        = t
-                      mk ('\n':cs) = ' ' : mk cs
-                      mk ('}':cs)  = t ++ unlatex cs
-                      mk (c:cs)    = c : mk cs
            escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
                 where special = "/'`\"@<"
+
+unlatex :: String -> String
+unlatex s = case s of
+  '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
+  '{':'\\':'t':'e':'x':'t':'t':'t':' ':cs -> markup "@" "@" cs
+  '{':'\\':'t':'t':cs -> markup "@" "@" cs
+  '{':'\\':'i':'t':cs -> markup "/" "/" cs
+  '{':'\\':'e':'m':cs -> markup "/" "/" cs
+  c : cs -> c : unlatex cs
+  "" -> ""
+  where markup b e xs = b ++ mk (dropWhile isSpace xs)
+          where mk ""        = e
+                mk ('\n':cs) = ' ' : mk cs
+                mk ('}':cs)  = e ++ unlatex cs
+                mk (c:cs)    = c : mk cs
 
 -- | Extract a string representation of the name
 getName :: Entry -> Maybe String
@@ -781,6 +787,18 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
             Just xx
                -> unlines alternatives
                   ++ fn_name ++ " _ = " ++ getAltRhs xx ++ "\n"
+
+gen_wired_in_docs :: Info -> String
+gen_wired_in_docs (Info _ entries)
+  = unlines $ catMaybes (map mkAlt (filter is_primop entries)) ++ [funName ++ " _ = Nothing"]
+    where
+      mkAlt po | null (desc po) = Nothing
+               | otherwise = Just (funName ++ " " ++ mkLHS po ++ " = Just " ++ show (unlatex (desc po)))
+      mkLHS po = case vecOptions po of
+        [] -> cons po
+        _  -> "(" ++ cons po ++ " _ _ _)"
+
+      funName = "primOpDocs"
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------

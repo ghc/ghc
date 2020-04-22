@@ -73,7 +73,8 @@ compilerDependencies = do
                   , "primop-vector-tycons.hs-incl"
                   , "primop-vector-tys-exports.hs-incl"
                   , "primop-vector-tys.hs-incl"
-                  , "primop-vector-uniques.hs-incl" ] ]
+                  , "primop-vector-uniques.hs-incl"
+                  , "primop-docs.hs-incl" ] ]
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
