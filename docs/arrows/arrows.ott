@@ -1,0 +1,166 @@
+embed {{ tex-preamble
+  \usepackage{mathtools,stmaryrd,textcomp}
+  \usepackage[sc,osf]{mathpazo}
+  \usepackage{microtype}
+
+  \thinmuskip=4mu
+  \medmuskip=5mu plus 4mu minus 4mu
+  \thickmuskip=6mu plus 6mu minus 2mu
+
+  \newcommand{\ltailf}{\mathop{-\mkern-13mu\prec}\mkern2mu}
+  \newcommand{\ltailh}{\mathop{-\mkern-17mu\prec\mkern-10mu\prec}\mskip2mu}
+  \newcommand{\tynil}{\textnormal{\textquotesingle}\mkern-1mu[]}
+  \newcommand{\tycons}{\mathbin{\textnormal{\textquotesingle}\mkern-6mu :} }
+}}
+
+metavar x, y ::= {{ com variables }}
+indexvar i, n ::= {{ com indicies }}
+
+grammar
+e :: 'expr_' ::= {{ com expressions }}
+  | proc pat -> cmd ::   :: Proc
+pat :: 'pat_' ::= {{ com patterns }}
+binds :: 'binds_' ::= {{ com bindings }}
+a {{ tex \alpha }}, b {{ tex \beta }}, s {{ tex \sigma }}, t {{ tex \tau }} :: 'type_' ::= {{ com types }}
+  | x               ::   :: Var   {{ com variables }}
+  | Bool            :: M :: Bool  {{ tex \mathrm{Bool} }}
+  | t1 t2           ::   :: App   {{ com application }}
+  | t1 -> ... -> tn ::   :: Fun   {{ com functions }}
+  | forall x . t    ::   :: All   {{ com quantification }} {{ tex [[forall]] [[x]] [[.]]\: [[t]] }}
+  | '[]             ::   :: Nil   {{ com promoted nil }}
+  | t1 ': ... ': tn ::   :: Cons  {{ com promoted cons }}
+  | Stk [ t ]       :: M :: Stk   {{ tex \textsc{Stk}\llbracket[[t]]\rrbracket }}
+  | Env [ t1 , t2 ] :: M :: Env   {{ tex \textsc{Env}\llbracket[[t1]],[[t2]]\rrbracket }}
+  | ( t )           :: M :: Paren
+
+G {{ tex \Gamma }}, D {{ tex \Delta }} :: 'ctxt_' ::= {{ com contexts }}
+  | empty         ::   :: Empty
+  | G1 , ... , Gn ::   :: Concat {{ com concatenation }}
+
+cmd :: 'cmd_' ::= {{ com commands }}
+  | e1 -< e2                 ::   :: AppF  {{ com arrow application (first-order) }}
+  | e1 -<< e2                ::   :: AppH  {{ com arrow application (higher-order) }}
+  | if e then cmd1 else cmd2 ::   :: If    {{ com branching }} {{ tex [[if]] \; [[e]] \; [[then]] \; [[cmd1]] \; [[else]] \; [[cmd2]] }}
+  | case e of { alts }       ::   :: Case  {{ com case analysis }} {{ tex [[case]] \; [[e]] \; [[of]] \, \{ \: [[alts]] \: \} }}
+  | let binds in cmd         ::   :: Let   {{ com local binding }} {{ tex [[let]] \; [[binds]] \; [[in]] \; [[cmd]] }}
+  | \ pat -> cmd             ::   :: Abs   {{ com command abstraction }}
+  | cmd e                    ::   :: AppC  {{ com command application }} {{ tex [[cmd]] \; [[e]] }}
+  | (| e cmd1 ... cmdn |)    ::   :: Op    {{ com control operator }}
+  | do { stmt ; cmd }        ::   :: Do    {{ com sequencing }} {{ tex [[do]] \, \{ \: [[stmt]]; \: [[cmd]] \: \} }}
+  | ( cmd )                  :: M :: Paren
+
+alts :: 'alts_' ::=
+  | </ pati -> cmdi // ; // i /> ::   :: Alts
+
+stmt :: 'stmt_' ::= {{ com statements }}
+  | let binds  :: :: Let   {{ tex [[let]] \; [[binds]] }}
+  | pat <- cmd :: :: Bind
+
+terminals :: 'terminals_' ::=
+  | empty  :: :: empty   {{ tex \emptyset }}
+  | forall :: :: forall  {{ tex \forall }}
+  | \      :: :: lambda  {{ tex \lambda\, }}
+  | ->     :: :: rarrow  {{ tex \rightarrow }}
+  | <-     :: :: larrow  {{ tex \leftarrow }}
+  | -<     :: :: tailf   {{ tex \ltailf }}
+  | -<<    :: :: tailh   {{ tex \ltailh }}
+  | (|     :: :: lbanana {{ tex \mathopen{}\llparenthesis\, }}
+  | |)     :: :: rbanana {{ tex \,\rrparenthesis\mathclose{} }}
+  | :      :: :: dcolon  {{ tex \mathrel{::} }}
+  | '[]    :: :: tnil    {{ tex \tynil }}
+  | ':     :: :: tcons   {{ tex \tycons }}
+  | =>     :: :: Rarrow  {{ tex \Rightarrow }}
+  | -->    :: :: lrarrow {{ tex \longrightarrow }}
+  | --\    :: :: starrow {{ tex \rightharpoonup }}
+  | |-->   :: :: dsarrow {{ tex \;\longmapsto\; }}
+  | |-     :: :: vdash   {{ tex \vdash }}
+
+formula :: formula_ ::=
+  | judgement             ::   :: judgement
+  | formula1 ... formulan ::   :: dots
+
+%%
+
+parsing
+
+type_Fun right type_Fun
+type_Cons right type_Cons
+type_App left type_App
+
+type_App <= type_Fun
+type_App <= type_Cons
+type_Cons <= type_Fun
+type_App <= type_All
+type_Fun <= type_All
+
+%%
+
+defns
+TcDs :: '' ::=
+
+defn pat : t => D :: :: TcPat :: 'Pat_' {{ com pattern typing }} by
+defn binds => D :: :: TcBinds :: 'Binds_' {{ com binding typing }} by
+
+defn G |- e : t :: :: TcExpr :: 'Expr_' {{ com expression typing }} by
+
+pat : t1 => D
+G|D |-a cmd : '[] --\ t2
+------------------------------ :: Proc
+G |- proc pat -> cmd : a t1 t2
+
+defn G | D |- a cmd : s --\ t :: :: TcCmd :: 'Cmd_'
+  {{ com command typing }}
+  {{ tex [[G]]\mkern2mu{[[|]]}\mkern2mu[[D]] [[|-]]_{[[a]]} [[cmd]] [[:]] [[s]] [[--\]] [[t]] }}
+by
+
+G |- e1 : a (Stk[b ': s]) t
+G,D |- e2 : b
+--------------------------- :: AppF
+G|D |-a e1 -< e2 : s --\ t
+
+G,D |- e1 : a (Stk[b ': s]) t
+G,D |- e2 : b
+----------------------------- :: AppH
+G|D |-a e1 -<< e2 : s --\ t
+
+G|D |-a cmd : (b ': s) --\ t
+G,D |- e : b
+---------------------------- :: AppC
+G|D |-a cmd e : s --\ t
+
+pat : b => D2
+G|D1,D2 |-a cmd : s --\ t
+------------------------------------- :: Abs
+G|D1 |-a \pat -> cmd : (b ': s) --\ t
+
+G |- e : forall x. </ a (Env[x, si]) ti // i /> -> a (Env[x, s1]) t1
+</ G|D |-a cmdi : si --\ ti // i />
+-------------------------------------------------------------------- :: Op
+G|D |-a (| e </ cmdi // i /> |) : s1 --\ t1
+
+binds => D2
+G|D1,D2 |-a cmd : '[] --\ t
+------------------------------------- :: Let
+G|D1 |-a let binds in cmd : '[] --\ t
+
+G,D |- e : t1
+</ pati : t1 => Di // i />
+</ G|D1,Di |-a cmdi : '[] --\ t2 // i />
+----------------------------------------------------------- :: Case
+G|D1 |-a case e of { </ pati -> cmdi // i /> } : '[] --\ t2
+
+G,D |- e : Bool
+G|D |-a cmd1 : '[] --\ t
+G|D |-a cmd2 : '[] --\ t
+-------------------------------------------- :: If
+G|D |-a if e then cmd1 else cmd2 : '[] --\ t
+
+G|D |-a let binds in cmd : '[] --\ t
+----------------------------------------- :: Do_Let
+G|D |-a do { let binds; cmd } : '[] --\ t
+
+pat : t1 => D2
+G|D1 |-a cmd1 : '[] --\ t1
+G|D1,D2 |-a cmd2 : '[] --\ t2
+---------------------------------------------- :: Do_Bind
+G|D1 |-a do { pat <- cmd1; cmd2 } : '[] --\ t2
