@@ -2653,6 +2653,15 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop  RaiseAbsentSumFieldOp "raiseAbsentSumField#" GenPrimOp
+   Void# -> a
+   {Raise an 'AbsentSumFieldError' (used for unboxed sums).}
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
+   out_of_line = True
+   has_side_effects = True
+
+
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))

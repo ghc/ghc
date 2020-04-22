@@ -37,6 +37,7 @@ module GHC.Prim.Ext
 #endif
   -- * Misc
   , getThreadAllocationCounter#
+  , raiseAbsentSumField
   ) where
 
 import GHC.Prim
@@ -103,3 +104,6 @@ foreign import prim "stg_asyncDoProczh" asyncDoProc#
 foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
   :: State# RealWorld
   -> (# State# RealWorld, INT64 #)
+
+raiseAbsentSumField :: a
+raiseAbsentSumField = raiseAbsentSumField# void#
