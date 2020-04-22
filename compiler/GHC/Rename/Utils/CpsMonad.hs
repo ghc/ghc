@@ -53,9 +53,14 @@ The idea is that '...blah...'
      so that bindNames can report unused ones
 
 In particular,
-    mapM rnPatAndThen [p1, p2, p3]
-has a *left-to-right* scoping: it makes the binders in
-p1 scope over p2,p3.
+
+> mapM rnPatAndThen [p1, p2, p3]
+
+has a *left-to-right* scoping: it makes the binders in p1 scope over p2, and
+both of those scope over p3, which is crucial for dependent binders.
+
+Other 'Traversable' instances are useful too, e.g. 'Maybe' if there is an
+optional list of binders.
 -}
 
 newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
