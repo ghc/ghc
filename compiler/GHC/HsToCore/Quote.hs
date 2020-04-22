@@ -856,20 +856,19 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> MetaM (Core (M TH.Con))
 repC (L _ (ConDeclH98 { con_name   = con
-                      , con_forall = (L _ False)
+                      , con_ex_tvs = Nothing
                       , con_mb_cxt = Nothing
                       , con_args   = args }))
   = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_forall = L _ is_existential
-                      , con_ex_tvs = con_tvs
+                      , con_ex_tvs = m_con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
-  = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
+  = do { addHsTyVarBinds (fromMaybe [] m_con_tvs) $ \ ex_bndrs ->
          do { c'    <- repDataCon con args
             ; ctxt' <- repMbContext mcxt
-            ; if not is_existential && isNothing mcxt
+            ; if isNothing m_con_tvs && isNothing mcxt
               then return c'
               else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
             }
