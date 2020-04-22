@@ -35,6 +35,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
                         , withHsDocContext )
+import GHC.Rename.Utils.CpsMonad ( CpsRn (..) )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
 import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
@@ -2055,17 +2056,19 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         -- scoping we get.  So no implicit binders at the existential forall
 
         ; let ctxt = ConDeclCtx [new_name]
-        ; bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt))
-                            Nothing ex_tvs $ \ new_ex_tvs ->
+              bind_forall :: [LHsTyVarBndr GhcPs] -> CpsRn [LHsTyVarBndr GhcRn]
+              bind_forall vars = CpsRn $
+                bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt)) Nothing vars
+        ; unCpsRn (traverse bind_forall ex_tvs) $ \ mb_new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
         ; let all_fvs  = fvs1 `plusFV` fvs2
         ; traceRn "rnConDecl" (ppr name <+> vcat
              [ text "ex_tvs:" <+> ppr ex_tvs
-             , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
+             , text "new_ex_dqtvs':" <+> ppr mb_new_ex_tvs ])
 
         ; return (decl { con_ext = noExtField
-                       , con_name = new_name, con_ex_tvs = new_ex_tvs
+                       , con_name = new_name, con_ex_tvs = mb_new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc' },
                   all_fvs) }}
