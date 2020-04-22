@@ -80,14 +80,22 @@ to break several loop.
 *********************************************************
 -}
 
-data HsSigWcTypeScoping = AlwaysBind
-                          -- ^ Always bind any free tyvars of the given type,
-                          --   regardless of whether we have a forall at the top
-                        | BindUnlessForall
-                          -- ^ Unless there's forall at the top, do the same
-                          --   thing as 'AlwaysBind'
-                        | NeverBind
-                          -- ^ Never bind any free tyvars
+data HsSigWcTypeScoping
+  = AlwaysBind
+    -- ^ Always bind any free tyvars of the given type, regardless of whether we
+    -- have a forall at the top.
+    --
+    -- For pattern type sigs and rules we /do/ want to bring those type
+    -- variables into scope, even if there's a forall at the top which usually
+    -- stops that happening, e.g:
+    --
+    -- > \ (x :: forall a. a-> b) -> e
+    --
+    -- Here we do bring 'b' into scope.
+  | BindUnlessForall
+    -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'
+  | NeverBind
+    -- ^ Never bind any free tyvars
 
 rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
@@ -96,12 +104,6 @@ rnHsSigWcType scoping doc sig_ty
     return (sig_ty', emptyFVs)
 
 rnHsSigWcTypeScoped :: HsSigWcTypeScoping
-                       -- AlwaysBind: for pattern type sigs and rules we /do/ want
-                       --             to bring those type variables into scope, even
-                       --             if there's a forall at the top which usually
-                       --             stops that happening
-                       -- e.g  \ (x :: forall a. a-> b) -> e
-                       -- Here we do bring 'b' into scope
                     -> HsDocContext -> LHsSigWcType GhcPs
                     -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                     -> RnM (a, FreeVars)
