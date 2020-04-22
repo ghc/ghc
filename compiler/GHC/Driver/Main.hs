@@ -164,7 +164,7 @@ import Stream (Stream)
 
 import Util
 
-import Data.List        ( nub, isPrefixOf, partition )
+import Data.List        ( nub, isPrefixOf, partition, delete )
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -382,7 +382,7 @@ hscParse' mod_summary
                             $ map unpackFS
                             $ srcfiles pst
                 srcs1 = case ml_hs_file (ms_location mod_summary) of
-                          Just f  -> filter (/= FilePath.normalise f) srcs0
+                          Just f  -> delete (FilePath.normalise f) srcs0
                           Nothing -> srcs0
 
             -- sometimes we see source files from earlier

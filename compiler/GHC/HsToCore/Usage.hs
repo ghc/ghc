@@ -70,7 +70,7 @@ mkDependencies iuid pluginModules
  = do
       -- Template Haskell used?
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
+          plugin_dep_pkgs = delete iuid (map (toInstalledUnitId . moduleUnitId) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
@@ -81,7 +81,7 @@ mkDependencies iuid pluginModules
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
 
-          dep_orphs = filter (/= mod) (imp_orphs imports)
+          dep_orphs = delete mod (imp_orphs imports)
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 

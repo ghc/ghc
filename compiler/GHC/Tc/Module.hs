@@ -129,7 +129,7 @@ import GHC.Core.Class
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Annotations
-import Data.List ( find, sortBy, sort )
+import Data.List ( find, sortBy, sort, delete )
 import Data.Ord
 import FastString
 import Maybes
@@ -373,7 +373,7 @@ tcRnImports hsc_env import_decls
                 -- define, or define our own family instances, at which
                 -- point we need to check them for consistency.)
         ; loadModuleInterfaces (text "Loading orphan modules")
-                               (filter (/= this_mod) (imp_orphs imports))
+                               (delete this_mod (imp_orphs imports))
 
                 -- Check type-family consistency between imports.
                 -- See Note [The type family instance consistency story]

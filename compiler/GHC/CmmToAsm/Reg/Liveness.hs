@@ -671,7 +671,7 @@ natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
                         $ sccs
 
         entry_ids       = filter (reachable_node) .
-                          filter (/= first_id) $ all_entry_ids
+                          delete first_id $ all_entry_ids
         info'           = mapFilterWithKey (\node _ -> reachable_node node) info
         reachable_node
           | Just cfg <- mCfg

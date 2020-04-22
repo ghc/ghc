@@ -44,7 +44,7 @@ import GHC.Driver.Packages
 
 import Control.Monad
 import Data.Function
-import Data.List (find, sortBy, sort)
+import Data.List (find, sortBy, sort, delete)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
@@ -893,7 +893,7 @@ addFingerprints hsc_env iface0
    -- of External, but we also need to make sure Home2 gets rebuilt
    -- as well.  See #12733 for more details.
    let orph_mods
-        = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
+        = delete this_mod -- Note [Do not update EPS with your own hi-boot]
         $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 

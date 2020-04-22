@@ -1618,7 +1618,7 @@ mkPackageState dflags dbs preload0 = do
       -- (NB: since this is only relevant for base/rts it doesn't matter
       -- that thisUnitIdInsts_ is not wired yet)
       --
-      preload3 = ordNub $ filter (/= thisPackage dflags)
+      preload3 = ordNub $ delete (thisPackage dflags)
                         $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
@@ -1844,7 +1844,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
         ways0 = ways dflags
 
-        ways1 = Set.filter (/= WayDyn) ways0
+        ways1 = Set.delete WayDyn ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 

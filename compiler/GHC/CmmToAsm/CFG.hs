@@ -80,7 +80,7 @@ import Outputable
 import GHC.Cmm.Ppr () -- For Outputable instances
 import qualified GHC.Driver.Session as D
 
-import Data.List (sort, nub, partition)
+import Data.List (sort, nub, partition, delete)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -850,7 +850,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
             successors = setFromList $ concatMap
                                       (getSuccessors cfg')
                                       -- we filter head as it's no longer part of the cfg.
-                                      (filter (/= head) $ setElems current) :: LabelSet
+                                      (delete head $ setElems current) :: LabelSet
 
     backEdges = filter isBackEdge edges
     loopBodies = map findBody backEdges :: [(Edge, LabelSet)]

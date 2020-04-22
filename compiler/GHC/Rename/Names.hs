@@ -70,7 +70,7 @@ import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
-import Data.List        ( partition, (\\), find, sortBy )
+import Data.List        ( partition, (\\), find, sortBy, delete )
 import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
@@ -1583,7 +1583,7 @@ getMinimalImports = mapM mk_minimal
            [xs] | all_used xs -> [IEThingAll noExtField (to_ie_post_rn $ noLoc n)]
                 | otherwise   ->
                    [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                                (map (to_ie_post_rn . noLoc) (delete n ns))
                                 (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
@@ -1591,7 +1591,7 @@ getMinimalImports = mapM mk_minimal
                                  ++ map flSelector fs
                   | otherwise ->
                       [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                                (map (to_ie_post_rn . noLoc) (delete n ns))
                                 (map noLoc fs)]
         where
 

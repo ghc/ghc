@@ -304,7 +304,7 @@ getCaretDiagnostic severity (RealSrcSpan span _) = do
             c    : cs -> c : expandTabs tabWidth (i + 1) cs
           where effectiveWidth = tabWidth - i `mod` tabWidth
 
-        srcLine = filter (/= '\n') (expandTabs 8 0 srcLineWithNewline)
+        srcLine = delete '\n' (expandTabs 8 0 srcLineWithNewline)
 
         start = srcSpanStartCol span - 1
         end | multiline = length srcLine

@@ -52,6 +52,7 @@ import FastString
 import GHC.Driver.Session
 
 import Control.Monad
+import Data.List (delete)
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -339,7 +340,7 @@ mkRhsClosure dflags bndr cc fvs upd_flag args body
         -- _was_ a free var of its RHS, mkClosureLFInfo thinks it *is*
         -- stored in the closure itself, so it will make sure that
         -- Node points to it...
-        ; let   reduced_fvs = filter (NonVoid bndr /=) fvs
+        ; let   reduced_fvs = delete (NonVoid bndr) fvs
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
