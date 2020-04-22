@@ -1121,25 +1121,25 @@ mkWWcpr_one_layer fam_envs body_ty cpr = runMaybeT $ do
   uniq1:arg_uniqs <- lift getUniquesM
   let arg_vars = zipWith mk_ww_local arg_uniqs arg_tys
 
-  maybe_arg_stuff <- lift $ zipWithM (mkWWcpr_one_layer fam_envs)
-                                     (map (scaledThing . fst) arg_tys)
-                                     arg_cprs
+  maybe_arg_builders <- lift $ zipWithM (mkWWcpr_one_layer fam_envs)
+                                        (map (scaledThing . fst) arg_tys)
+                                        arg_cprs
 
-  let go_arg_stuff var mb_stuff =
-        case mb_stuff of
+  let go_arg_stuff var mb_builder =
+        case mb_builder of
           Nothing ->
             -- this argument does not need to be deconstructed further
             ([var], varToCoreExpr var, id)
           Just (inner_vars, arg_con, arg_decon) ->
             (inner_vars, arg_con, arg_decon (varToCoreExpr var))
 
-  let (inner_arg_varss, arg_cons, arg_decons) = unzip3 $ zipWith go_arg_stuff arg_vars maybe_arg_stuff
+  let (inner_arg_varss, arg_cons, arg_decons) = unzip3 $ zipWith go_arg_stuff arg_vars maybe_arg_builders
       inner_arg_vars = concat     inner_arg_varss
       inner_decon    = foldl' (.) id arg_decons
 
   -- Don't try to WW an unboxed tuple return type when there's nothing inside
   -- to unbox further.
-  guard (not (isUnboxedTupleDataCon data_con && all isNothing maybe_arg_stuff))
+  guard (not (isUnboxedTupleDataCon data_con && all isNothing maybe_arg_builders))
 
   return ( inner_arg_vars
          , mkConApp data_con (map Type inst_tys ++ arg_cons) `mkCast` mkSymCo co
