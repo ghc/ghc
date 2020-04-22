@@ -53,9 +53,22 @@ The idea is that '...blah...'
      so that bindNames can report unused ones
 
 In particular,
-    mapM rnPatAndThen [p1, p2, p3]
-has a *left-to-right* scoping: it makes the binders in
-p1 scope over p2,p3.
+
+> mapM rnPatAndThen [p1, p2, p3]
+
+has a *left-to-right* scoping: it makes the binders in p1 scope over p2, and
+both of those scope over p3, which is crucial for dependent binders.
+
+Other 'Traversable' instances are useful too, e.g. 'Maybe' if there is an
+optional single binder, or 'Maybe . []' (with 'traverse . traverse') if there
+is an optional list of binders.
+
+Overall, the idea is 'CpsRn' is a working short-hand, but perhaps not quite
+justifiable if the number of continuations one needs is static: is writing the
+lambdas really that bad? But if the number of continuations is dynamic and the
+'Traversable' instances capture that dynamism, 'CpsRn' starts abstracting away
+significantly more code, and conditional and recursive code code, and therefore
+starts to carry its weight.
 -}
 
 newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
