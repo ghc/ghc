@@ -29,6 +29,7 @@ module Control.Exception.Base (
         asyncExceptionToException, asyncExceptionFromException,
         NonTermination(..),
         NestedAtomically(..),
+        AbsentSumFieldError(..),
         BlockedIndefinitelyOnMVar(..),
         FixIOException (..),
         BlockedIndefinitelyOnSTM(..),
@@ -96,7 +97,7 @@ module Control.Exception.Base (
         recSelError, recConError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         absentError, absentSumFieldError, typeError,
-        nonTermination, nestedAtomically,
+        nonTermination, nestedAtomically, absentSumFieldError
   ) where
 
 import GHC.Base
@@ -375,6 +376,16 @@ instance Exception NestedAtomically
 
 -----
 
+-- | Introduced by unarise for unused unboxed sum fields
+data AbsentSumFieldError = AbsentSumFieldError
+
+instance Show AbsentSumFieldError where
+   showsPrec _ AbsentSumFieldError = showString "Oops! Entered absent arg in unboxed sum."
+
+instance Exception AbsentSumFieldError
+
+-----
+
 recSelError, recConError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
   absentError, typeError
@@ -399,6 +410,6 @@ nonTermination = toException NonTermination
 nestedAtomically :: SomeException
 nestedAtomically = toException NestedAtomically
 
--- Introduced by unarise for unused unboxed sum fields
-absentSumFieldError :: a
-absentSumFieldError = absentError " in unboxed sum."#
+-- GHC's RTS calls this
+absentSumFieldError :: SomeException
+absentSumFieldError = toException AbsentSumFieldError
