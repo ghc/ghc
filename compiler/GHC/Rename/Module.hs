@@ -681,8 +681,8 @@ rnFamInstEqn doc atfi rhs_kvars
              -- Use the "...Dups" form because it's needed
              -- below to report unused binder on the LHS
 
-         -- Implicitly bound variables, empty if we have an explicit 'forall' according
-         -- to the "forall-or-nothing" rule.
+         -- Implicitly bound variables, empty if we have an explicit 'forall'.
+         -- See Note [forall-or-nothing rule].
        ; let imp_vars = case mb_bndrs of
                Nothing -> nubL pat_kity_vars_with_dups
                Just _ -> []
@@ -2099,7 +2099,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
               mb_ctxt = Just (inHsDocContext ctxt)
 
         ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
-        ; rnImplicitBndrs (not explicit_forall) free_tkvs $ \ implicit_tkvs ->
+        ; rnImplicitBndrs (forAllOrNothing explicit_forall free_tkvs) $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
