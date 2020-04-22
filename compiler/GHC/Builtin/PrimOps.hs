@@ -168,11 +168,7 @@ primOpFixity :: PrimOp -> Maybe Fixity
 *                                                                      *
 ************************************************************************
 
-@primOpDocs@ contains the documentation from @primops.txt@ as a list of
-pairs (name, docs). We use stringy names here because wired-in names are
-not available yet, and not all of them are a @PrimOp@ (they could be
-tycons or pseudoops for example)
-
+See Note [GHC.Prim Docs]
 -}
 
 primOpDocs :: [(String, String)]
