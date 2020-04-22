@@ -1,10 +1,6 @@
 module T7944 where
 
-import GHC.Exts
-
--- Force specialisation of "go"
-data SPEC = SPEC | SPEC2
-{-# ANN type SPEC ForceSpecConstr #-}
+import GHC.Types
 
 -- This is more or less just an ordinary fold
 go :: SPEC -> [a] -> IntMap a -> IntMap a
