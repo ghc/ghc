@@ -105,6 +105,7 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('ghci065', [extra_hc_opts("-haddock")], ghci_script, ['ghci065.script'])
+test('ghci066', normal, ghci_script, ['ghci066.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])

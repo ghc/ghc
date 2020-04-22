@@ -789,6 +789,22 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
                -> unlines alternatives
                   ++ fn_name ++ " _ = " ++ getAltRhs xx ++ "\n"
 
+{-
+Note [GHC.Prim Docs]
+~~~~~~~~~~~~~~~~~~~~
+For haddocks of GHC.Prim we generate a dummy haskell file (gen_hs_source) that
+contains the type signatures and the commends (but no implementations)
+specifically for consumption by haddock.
+
+GHCi's :doc command reads directly from ModIface's though, and GHC.Prim has a
+wired-in iface that has nothing to do with the above haskell file. The code
+below converts primops.txt into an intermediate form that would later be turned
+into a proper DeclDocMap.
+
+We output the docs as a list of pairs (name, docs). We use stringy names here
+because mapping names to "Name"s is difficult for things like primtypes and
+pseudoops.
+-}
 gen_wired_in_docs :: Info -> String
 gen_wired_in_docs (Info _ entries)
   = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
