@@ -1125,6 +1125,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     if (RtsFlags.DebugFlags.nonmoving_gc)
         nonmovingPrintAllocatorCensus();
 #endif
+#if defined(TRACING)
+    if (RtsFlags.TraceFlags.nonmoving_gc)
+        nonmovingTraceAllocatorCensus();
+#endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 

@@ -1161,6 +1161,10 @@ When the program is linked with the :ghc-flag:`-eventlog` option
 
     - ``g`` — GC events, including GC start/stop. Enabled by default.
 
+    - ``n`` — non-moving garbage collector (see :rts-flag:`--nonmoving-gc`)
+      events including start and end of the concurrent mark and census
+      information to characterise heap fragmentation. Disabled by default.
+
     - ``p`` — parallel sparks (sampled). Enabled by default.
 
     - ``f`` — parallel sparks (fully accurate). Disabled by default.
