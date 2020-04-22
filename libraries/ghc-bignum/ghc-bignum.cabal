@@ -93,6 +93,8 @@ library
   ghc-options: -this-unit-id ghc-bignum
 
   include-dirs: include
+  c-sources:
+     cbits/weak_symbols.c
 
   if flag(gmp)
       cpp-options: -DBIGNUM_GMP
