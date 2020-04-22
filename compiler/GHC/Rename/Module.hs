@@ -683,8 +683,9 @@ rnFamInstEqn doc atfi rhs_kvars
 
          -- Implicitly bound variables, empty if we have an explicit 'forall' according
          -- to the "forall-or-nothing" rule.
-       ; let imp_vars | isNothing mb_bndrs = nubL pat_kity_vars_with_dups
-                      | otherwise = []
+       ; let imp_vars = case mb_bndrs of
+               Nothing -> nubL pat_kity_vars_with_dups
+               Just _ -> []
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
        ; let bndrs = fromMaybe [] mb_bndrs

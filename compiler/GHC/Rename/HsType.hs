@@ -1628,7 +1628,7 @@ extractHsTyRdrTyVarsDups ty
 --     Note [Ordering of implicit variables] and
 --     Note [Implicit quantification in type synonyms].
 extractHsTyRdrTyVarsKindVars :: LHsType GhcPs -> FreeKiTyVarsNoDups
-extractHsTyRdrTyVarsKindVars (unLoc -> ty) =
+extractHsTyRdrTyVarsKindVars (L _ ty) =
   case ty of
     HsParTy _ ty -> extractHsTyRdrTyVarsKindVars ty
     HsKindSig _ _ ki -> extractHsTyRdrTyVars ki
@@ -1656,12 +1656,12 @@ extractHsTyVarBndrsKVs tv_bndrs
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [Located RdrName]
-extractRdrKindSigVars (L _ resultSig)
-  | KindSig _ k                          <- resultSig = extractHsTyRdrTyVars k
-  | TyVarSig _ (L _ (KindedTyVar _ _ k)) <- resultSig = extractHsTyRdrTyVars k
-  | otherwise =  []
+extractRdrKindSigVars (L _ resultSig) = case resultSig of
+  KindSig _ k                          -> extractHsTyRdrTyVars k
+  TyVarSig _ (L _ (KindedTyVar _ _ k)) -> extractHsTyRdrTyVars k
+  _ -> []
 
--- Get type/kind variables mentioned in the kind signature, preserving
+-- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order and without duplicates:
 --
 --  * data T a (b :: k1) :: k2 -> k1 -> k2 -> Type   -- result: [k2,k1]
@@ -1744,7 +1744,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
     tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
 
-extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
+extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVarsWithDups
 -- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
