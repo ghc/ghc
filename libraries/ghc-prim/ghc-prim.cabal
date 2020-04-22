@@ -46,6 +46,7 @@ Library
         GHC.IntWord64
         GHC.Magic
         GHC.Prim.Ext
+        GHC.Prim.Panic
         GHC.PrimopWrappers
         GHC.Tuple
         GHC.Types

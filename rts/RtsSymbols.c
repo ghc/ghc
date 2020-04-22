@@ -732,6 +732,7 @@
       SymI_HasProto(stg_raiseUnderflowzh)                               \
       SymI_HasProto(stg_raiseOverflowzh)                                \
       SymI_HasProto(stg_raiseIOzh)                                      \
+      SymI_HasProto(stg_paniczh)                                        \
       SymI_HasProto(stg_readTVarzh)                                     \
       SymI_HasProto(stg_readTVarIOzh)                                   \
       SymI_HasProto(resumeThread)                                       \

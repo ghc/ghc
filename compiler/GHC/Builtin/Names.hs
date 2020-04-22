@@ -511,7 +511,7 @@ genericTyConNames = [
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
+gHC_PRIM, gHC_PRIM_PANIC, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE, gHC_INTEGER_TYPE, gHC_NATURAL,
@@ -527,6 +527,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
+gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
