@@ -632,3 +632,12 @@ stg_raiseIOzh (P_ exception)
 {
     jump stg_raisezh (exception);
 }
+
+/* The FFI doesn't support variadic C functions so we can't directly expose
+ * `barf` to Haskell code. Instead we define "stg_panic#" and it is exposed to
+ * Haskell programs in GHC.Prim.Panic.
+ */
+stg_paniczh (W_ str)
+{
+    ccall barf(str) never returns;
+}
