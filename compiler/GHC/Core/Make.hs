@@ -735,6 +735,7 @@ errorIds
       rEC_CON_ERROR_ID,
       rEC_SEL_ERROR_ID,
       aBSENT_ERROR_ID,
+      aBSENT_SUM_FIELD_ERROR_ID,
       tYPE_ERROR_ID   -- Used with Opt_DeferTypeErrors, see #10284
       ]
 
@@ -746,8 +747,6 @@ absentSumFieldErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
-absentSumFieldErrorName = err_nm "absentSumFieldError"  absentSumFieldErrorIdKey
-                            aBSENT_SUM_FIELD_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
@@ -774,25 +773,40 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Absent argument error for unused unboxed sum fields are different than absent
--- error used in dummy worker functions (see `mkAbsentErrorApp`):
 --
--- - `absentSumFieldError` can't take arguments because it's used in unarise for
---   unused pointer fields in unboxed sums, and applying an argument would
---   require allocating a thunk.
+-- Unboxed sums are transformed into unboxed tuples during compilation and we
+-- fill fields that can't be reached with rubbish values in
+-- GHC.Stg.Unarise.mkUbxSum.
 --
--- - `absentSumFieldError` can't be CAFFY because that would mean making some
---   non-CAFFY definitions that use unboxed sums CAFFY in unarise.
+-- We need a rubbish value for PtrSlot and it should be a valid (no NULL
+-- pointer) non-CAFFY closure.
 --
---   To make `absentSumFieldError` non-CAFFY we get a stable pointer to it in
---   RtsStartup.c and mark it as non-CAFFY here.
+-- - it can't take arguments because it's used in unarise and applying an
+--   argument would require allocating a thunk.
+--
+-- - it can't be CAFFY because that would mean making some non-CAFFY definitions
+--   that use unboxed sums CAFFY in unarise.
 --
 -- Getting this wrong causes hard-to-debug runtime issues, see #15038.
 --
--- TODO: Remove stable pointer hack after fixing #9718.
---       However, we should still be careful about not making things CAFFY just
---       because they use unboxed sums. Unboxed objects are supposed to be
---       efficient, and none of the other unboxed literals make things CAFFY.
+-- Previously we used `base:Control.Exception.Base.absentSumFieldError` as a
+-- wired-in closure but it introduced a dependency on `base` for any code using
+-- unboxed sums. It became an issue when we wanted to use unboxed sums in
+-- boot libraries used by base (see #17791). Now we use the following
+-- indirections:
+--
+-- * wired-in closure `ghc-prim:GHC.Prim.Ext.raiseAbsentSumField`
+--   defined in ghc-prim so boot libraries can depend on it
+--
+-- * `raiseAbsentSumField` calls `raiseAbsentSumField#` primop defined in the RTS
+--
+-- * `raiseAbsentSumField#` raises `base:Control.Exception.Base.AbsentSumFieldError`
+--   exception.
+--
+-- The indirection via the RTS is enough to avoid link errors when libraries are
+-- loaded eagerly (e.g. prelinked .o built for GHCi, cf #17791).
+
+absentSumFieldErrorName = mkWiredInIdName gHC_PRIM_EXT (fsLit "raiseAbsentSumField") absentSumFieldErrorIdKey aBSENT_SUM_FIELD_ERROR_ID
 
 aBSENT_SUM_FIELD_ERROR_ID
   = mkVanillaGlobalWithInfo absentSumFieldErrorName
