@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
-        nubL, elemRdr
+        forAllOrNothing, nubL, elemRdr
   ) where
 
 import GHC.Prelude
@@ -128,11 +128,11 @@ rn_hs_sig_wc_type scoping ctxt
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-             bind_free_tvs = case scoping of
-                               AlwaysBind       -> True
-                               BindUnlessForall -> not (isLHsForAllTy hs_ty)
-                               NeverBind        -> False
-       ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
+             implicit_bndrs = case scoping of
+               AlwaysBind       -> tv_rdrs
+               BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) tv_rdrs
+               NeverBind        -> []
+       ; rnImplicitBndrs implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
              ib_ty'  = HsIB { hsib_ext = vars
@@ -302,35 +302,51 @@ rnHsSigType :: HsDocContext
 rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
+       ; rnImplicitBndrs (forAllOrNothing (isLHsForAllTy hs_ty) vars) $ \ vars ->
     do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
 
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
                 , fvs ) } }
 
-rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
-                           -- E.g.  f :: forall a. a->b
-                           --  we do not want to bring 'b' into scope, hence False
-                           -- But   f :: a -> b
-                           --  we want to bring both 'a' and 'b' into scope
+-- Note [forall-or-nothing rule]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Free variables in signatures are usually bound in an implicit
+-- 'forall' at the beginning of user-written signatures. However, if the
+-- signature has an explicit forall at the beginning, this is disabled.
+--
+-- The idea is nested foralls express something which is only
+-- expressible explicitly, while a top level forall could (usually) be
+-- replaced with an implicit binding. Top-level foralls alone ("forall.") are
+-- therefore an indication that the user is trying to be fastidious, so
+-- we don't implicitly bind any variables.
+
+-- | See note Note [forall-or-nothing rule]. This tiny little function is used
+-- (rather than its small body inlined) to indicate we implementing that rule.
+forAllOrNothing :: Bool
+                -- ^ True <=> explicit forall
+                -- E.g.  f :: forall a. a->b
+                --  we do not want to bring 'b' into scope, hence True
+                -- But   f :: a -> b
+                --  we want to bring both 'a' and 'b' into scope, hence False
                 -> FreeKiTyVarsWithDups
-                                   -- Free vars of hs_ty (excluding wildcards)
-                                   -- May have duplicates, which is
-                                   -- checked here
+                -- ^ Free vars of the type
+                -> FreeKiTyVarsWithDups
+forAllOrNothing True  _   = []
+forAllOrNothing False fvs = fvs
+
+
+rnImplicitBndrs :: FreeKiTyVarsWithDups
+                -- ^ Surface-syntax free vars that we will implicitly bind.
+                -- May have duplicates, which is checked here
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs bind_free_tvs
-                fvs_with_dups
+rnImplicitBndrs implicit_vs_with_dups
                 thing_inside
-  = do { let fvs = nubL fvs_with_dups
-             -- implicit_vs are the surface-syntax free vars that are in fact
-             -- actually captured by implicit bindings
-             implicit_vs | bind_free_tvs = fvs
-                         | otherwise     = []
+  = do { let implicit_vs = nubL implicit_vs_with_dups
 
        ; traceRn "rnImplicitBndrs" $
-         vcat [ ppr fvs_with_dups, ppr fvs, ppr implicit_vs ]
+         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
        ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) implicit_vs
