@@ -1290,8 +1290,8 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
-    cpr | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
-        | otherwise                                      = topCpr
+    cpr | isDeadEndDiv (snd (splitStrictSig strict_sig)) = initRecFunCpr
+        | otherwise                                      = whnfTermCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
