@@ -75,7 +75,7 @@ import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
 
 import Control.Applicative ((<|>))
-import Data.List        ( intercalate )
+import Data.List        ( intercalate , find )
 import Data.Array
 import Data.Maybe
 import qualified Data.Map as Map
@@ -260,8 +260,15 @@ ghcPrimExports
    | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
 
 ghcPrimDeclDocs :: DeclDocMap
-ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe mkDeclDoc allThePrimOps
-  where mkDeclDoc po = fmap (\doc -> (idName (primOpId po), mkHsDocString doc)) $ primOpDocs po
+ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
+  where
+    names = map idName ghcPrimIds ++
+            map (idName . primOpId) allThePrimOps ++
+            map tyConName (funTyCon : exposedPrimTyCons)
+    findName (nameStr, doc)
+      | Just name <- find ((nameStr ==) . getOccString) names
+      = Just (name, mkHsDocString doc)
+      | otherwise = Nothing
 
 {-
 ************************************************************************
