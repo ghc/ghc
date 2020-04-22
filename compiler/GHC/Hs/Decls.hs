@@ -1402,12 +1402,19 @@ data ConDecl pass
       { con_ext     :: XConDeclH98 pass
       , con_name    :: Located (IdP pass)
 
-      , con_forall  :: Located Bool
-                              -- ^ True <=> explicit user-written forall
-                              --     e.g. data T a = forall b. MkT b (b->a)
-                              --     con_ex_tvs = {b}
-                              -- False => con_ex_tvs is empty
-      , con_ex_tvs :: [LHsTyVarBndr pass]      -- ^ Existentials only
+      , con_ex_tvs :: Maybe [LHsTyVarBndr pass]
+        -- ^ Existentials only
+        --
+        -- Just _ <=> explicit user-written forall
+        --     e.g. data T a = forall b. MkT b (b->a)
+        --     con_ex_tvs = Just {b}
+        --
+        -- Why Just [] vs Nothing?
+        --     e.g. data T = forall. MkT
+        --     con_ex_tvs = Just {b}
+        --
+        --     e.g. data T = MkT
+        --     con_ex_tvs = Nothing
       , con_mb_cxt :: Maybe (LHsContext pass)  -- ^ User-written context (if any)
       , con_args   :: HsConDeclDetails pass    -- ^ Arguments; can be InfixCon
 
@@ -1529,7 +1536,10 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_mb_cxt = mcxt
                        , con_args = args
                        , con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll ForallInvis ex_tvs cxt, ppr_details args]
+  = sep [ ppr_mbDoc doc
+        , pprHsForAll ForallInvis (fromMaybe [] ex_tvs) cxt
+        , ppr_details args
+        ]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con

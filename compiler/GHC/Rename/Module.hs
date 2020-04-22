@@ -2056,10 +2056,12 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
         ; let ctxt = ConDeclCtx [new_name]
         ; bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt))
-                            Nothing ex_tvs $ \ new_ex_tvs ->
+                            Nothing (fromMaybe [] ex_tvs) $ \ new_ex_tvs0 ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
         ; let all_fvs  = fvs1 `plusFV` fvs2
+        ; when (isJust ex_tvs) $ MASSERT(null new_ex_tvs0)
+        ; let new_ex_tvs = new_ex_tvs0 <$ ex_tvs
         ; traceRn "rnConDecl" (ppr name <+> vcat
              [ text "ex_tvs:" <+> ppr ex_tvs
              , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])

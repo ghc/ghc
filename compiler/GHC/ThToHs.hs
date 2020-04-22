@@ -52,7 +52,7 @@ import GHC.Utils.Monad ( foldrM )
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 
-import Data.Maybe( catMaybes, isNothing )
+import Data.Maybe( catMaybes, fromMaybe, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
@@ -593,18 +593,17 @@ cvtConstr (ForallC tvs ctxt con)
       = Just (L loc (cxt1 ++ cxt2))
 
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
-      = con { con_forall = noLoc $ not (null all_tvs)
+      = con { con_forall = noLoc True
             , con_qvars  = mkHsQTvs all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
-      = con { con_forall = noLoc $ not (null all_tvs)
-            , con_ex_tvs = all_tvs
+      = con { con_ex_tvs = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = hsQTvExplicit tvs' ++ ex_tvs
+        all_tvs = Just $ hsQTvExplicit tvs' ++ fromMaybe [] ex_tvs
 
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")

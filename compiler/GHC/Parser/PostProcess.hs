@@ -657,8 +657,7 @@ mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
 mkConDeclH98 name mb_forall mb_cxt args
   = ConDeclH98 { con_ext    = noExtField
                , con_name   = name
-               , con_forall = noLoc $ isJust mb_forall
-               , con_ex_tvs = mb_forall `orElse` []
+               , con_ex_tvs = mb_forall
                , con_mb_cxt = mb_cxt
                , con_args   = args
                , con_doc    = Nothing }
