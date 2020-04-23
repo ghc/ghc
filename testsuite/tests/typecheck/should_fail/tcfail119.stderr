@@ -1,7 +1,7 @@
 
 tcfail119.hs:11:8: error:
     • Couldn't match type ‘Bool’ with ‘[Char]’
-      Expected type: Bool
-        Actual type: String
+      Expected: Bool
+        Actual: String
     • In the pattern: "Foo"
       In an equation for ‘b’: b x "Foo" = ()

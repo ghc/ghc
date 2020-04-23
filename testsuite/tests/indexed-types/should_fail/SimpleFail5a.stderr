@@ -1,12 +1,12 @@
 
 SimpleFail5a.hs:31:11: error:
     • Couldn't match type ‘a’ with ‘Int’
+      Expected: S3 a
+        Actual: S3 Int
       ‘a’ is a rigid type variable bound by
         the type signature for:
           bar3wrong :: forall a. S3 a -> a
         at SimpleFail5a.hs:30:1-22
-      Expected type: S3 a
-        Actual type: S3 Int
     • In the pattern: D3Int
       In an equation for ‘bar3wrong’: bar3wrong D3Int = 1
     • Relevant bindings include

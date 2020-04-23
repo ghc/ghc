@@ -2043,7 +2043,7 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
 
     -- this guarantees (TyEq:TV)
   | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
-  , swapOverTyVars tv1 tv2
+  , swapOverTyVars (isGiven ev) tv1 tv2
   = do { traceTcS "canEqTyVar swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
        ; let role    = eqRelRole eq_rel
              sym_co2 = mkTcSymCo co2

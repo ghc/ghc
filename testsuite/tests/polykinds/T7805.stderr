@@ -1,6 +1,8 @@
 
 T7805.hs:7:21: error:
-    Expected kind ‘forall a. a -> a’, but ‘x’ has kind ‘k0’
-    In the first argument of ‘HR’, namely ‘x’
-    In the first argument of ‘F’, namely ‘(HR x)’
-    In the type instance declaration for ‘F’
+    • Expected kind ‘forall a. a -> a’, but ‘x’ has kind ‘k0’
+      Cannot instantiate unification variable ‘k0’
+      with a kind involving polytypes: forall a. a -> a
+    • In the first argument of ‘HR’, namely ‘x’
+      In the first argument of ‘F’, namely ‘(HR x)’
+      In the type instance declaration for ‘F’

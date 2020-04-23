@@ -1,8 +1,8 @@
 
 tcfail076.hs:18:82: error:
     • Couldn't match type ‘res1’ with ‘res’
-      Expected type: m res1
-        Actual type: m res
+      Expected: m res1
+        Actual: m res
       ‘res1’ is a rigid type variable bound by
         a type expected by the context:
           forall res1. (b -> m res1) -> m res1

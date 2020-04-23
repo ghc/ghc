@@ -1531,9 +1531,12 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
     insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
 
-    what = case ctLocTypeOrKind_maybe (ctLoc ct) of
-      Just KindLevel -> text "kind"
-      _              -> text "type"
+    what = text $ levelString $
+           ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
+
+levelString :: TypeOrKind -> String
+levelString TypeLevel = "type"
+levelString KindLevel = "kind"
 
 mkEqInfoMsg :: Ct -> TcType -> TcType -> Report
 -- Report (a) ambiguity if either side is a type function application
@@ -1583,11 +1586,13 @@ misMatchOrCND insoluble_occurs_check ctxt ct ty1 ty2
     misMatchMsg ctxt ct ty1 ty2
 
   | otherwise
-  = couldNotDeduce givens ([eq_pred], orig)
+  = mconcat [ couldNotDeduce givens ([eq_pred], orig)
+            , important $ mk_supplementary_ea_msg ctxt level ty1 ty2 orig ]
   where
     ev      = ctEvidence ct
     eq_pred = ctEvPred ev
     orig    = ctEvOrigin ev
+    level   = ctLocTypeOrKind_maybe (ctEvLoc ev) `orElse` TypeLevel
     givens  = [ given | given <- getUserGivens ctxt, not (ic_no_eqs given)]
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
@@ -1724,22 +1729,21 @@ headline_eq_msg :: Bool -> Ct -> Type -> Type -> SDoc
 -- headline message
 headline_eq_msg add_ea ct ty1 ty2
 
-  | isLiftedRuntimeRep ty1 || isLiftedRuntimeRep ty2
+  | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
+    (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1)
   = text "Couldn't match a lifted type with an unlifted type"
 
   | isAtomicTy ty1 || isAtomicTy ty2
   = -- Print with quotes
-    vcat [ sep [ text herald1 <+> quotes (ppr ty1)
-               , nest padding $
-                 text herald2 <+> quotes (ppr ty2) ]
-        , sameOccExtra ty2 ty1 ]
+    sep [ text herald1 <+> quotes (ppr ty1)
+        , nest padding $
+          text herald2 <+> quotes (ppr ty2) ]
 
   | otherwise
   = -- Print with vertical layout
     vcat [ text herald1 <> colon <+> ppr ty1
          , nest padding $
-           text herald2 <> colon <+> ppr ty2
-         , sameOccExtra ty2 ty1 ]
+           text herald2 <> colon <+> ppr ty2 ]
   where
     herald1 = conc [ "Couldn't match"
                    , if is_repr then "representation of" else ""
@@ -1753,9 +1757,7 @@ headline_eq_msg add_ea ct ty1 ty2
 
     is_repr = case ctEqRel ct of { ReprEq -> True; NomEq -> False }
 
-    what = case ctLocTypeOrKind_maybe (ctLoc ct) of
-             Just KindLevel -> "kind"
-             _              -> "type"
+    what = levelString (ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel)
 
     conc :: [String] -> String
     conc = foldr1 add_space
@@ -1795,7 +1797,7 @@ tk_eq_msg ctxt ct ty1 ty2 orig@(TypeEqOrigin { uo_actual = act
     mk_ea_msg ctxt (Just ct) level orig
 
   | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
-    ea_looks_same
+    ea_looks_same ty1 ty2 exp act
   = mk_ea_msg ctxt (Just ct) level orig
 
   | otherwise  -- The mismatched types are /inside/ exp and act
@@ -1805,14 +1807,6 @@ tk_eq_msg ctxt ct ty1 ty2 orig@(TypeEqOrigin { uo_actual = act
   where
     ct_loc = ctLoc ct
     level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
-
-    ea_looks_same = (act `looks_same` ty1 && exp `looks_same` ty2) ||
-                    (exp `looks_same` ty1 && act `looks_same` ty2)
-    looks_same t1 t2 = t1 `pickyEqType` t2
-                    || t1 `eqType` liftedTypeKind && t2 `eqType` liftedTypeKind
-      -- pickyEqType is sensitive to synonyms, so only replies True
-      -- when the types really look the same.  However,
-      -- (TYPE 'LiftedRep) and Type both print the same way.
 
     thing_msg (Just thing) _  levity = quotes thing <+> text "is" <+> levity
     thing_msg Nothing      an levity = text "got" <+> an <+> levity <+> text "type"
@@ -1844,30 +1838,52 @@ tk_eq_msg ctxt ct ty1 ty2 orig@(TypeEqOrigin { uo_actual = act
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
 
 tk_eq_msg ctxt ct ty1 ty2
-          (KindEqOrigin cty1 mb_cty2 sub_o sub_t_or_k)
+          (KindEqOrigin cty1 mb_cty2 sub_o mb_sub_t_or_k)
   = vcat [ headline_eq_msg False ct ty1 ty2
-         , msg1
-         , msg2 ]
+         , supplementary_msg ]
   where
-    sub_what = case sub_t_or_k of Just KindLevel -> text "kinds"
-                                  _              -> text "types"
-    msg1 = sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
-           case mb_cty2 of
-             Just cty2
-               |  printExplicitCoercions
-               || not (cty1 `pickyEqType` cty2)
-               -> hang (text "When matching" <+> sub_what)
-                     2 (vcat [ ppr cty1 <+> dcolon <+>
-                               ppr (tcTypeKind cty1)
-                             , ppr cty2 <+> dcolon <+>
-                               ppr (tcTypeKind cty2) ])
-             _ -> text "When matching the kind of" <+> quotes (ppr cty1)
+    sub_t_or_k = mb_sub_t_or_k `orElse` TypeLevel
+    sub_whats  = text (levelString sub_t_or_k) <> char 's'
+                 -- "types" or "kinds"
 
-    msg2 = case sub_o of
-             TypeEqOrigin {} -> mk_ea_msg ctxt Nothing TypeLevel sub_o
-             _               -> empty
+    supplementary_msg
+      = sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
+        case mb_cty2 of
+          Just cty2
+            |  printExplicitCoercions
+            || not (cty1 `pickyEqType` cty2)
+            -> vcat [ hang (text "When matching" <+> sub_whats)
+                         2 (vcat [ ppr cty1 <+> dcolon <+>
+                                   ppr (tcTypeKind cty1)
+                                 , ppr cty2 <+> dcolon <+>
+                                   ppr (tcTypeKind cty2) ])
+                    , mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o ]
+          _ -> text "When matching the kind of" <+> quotes (ppr cty1)
 
 tk_eq_msg _ _ _ _ _ = panic "typeeq_mismatch_msg"
+
+ea_looks_same :: Type -> Type -> Type -> Type -> Bool
+-- True if the faulting types (ty1, ty2) look the same as
+-- the expected/actual types (exp, act).
+-- If so, we don't want to redundantly report the latter
+ea_looks_same ty1 ty2 exp act
+  = (act `looks_same` ty1 && exp `looks_same` ty2) ||
+    (exp `looks_same` ty1 && act `looks_same` ty2)
+  where
+    looks_same t1 t2 = t1 `pickyEqType` t2
+                    || t1 `eqType` liftedTypeKind && t2 `eqType` liftedTypeKind
+      -- pickyEqType is sensitive to synonyms, so only replies True
+      -- when the types really look the same.  However,
+      -- (TYPE 'LiftedRep) and Type both print the same way.
+
+mk_supplementary_ea_msg :: ReportErrCtxt -> TypeOrKind
+                        -> Type -> Type -> CtOrigin -> SDoc
+mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+  | TypeEqOrigin { uo_expected = exp, uo_actual = act } <- orig
+  , not (ea_looks_same ty1 ty2 exp act)
+  = mk_ea_msg ctxt Nothing level orig
+  | otherwise
+  = empty
 
 mk_ea_msg :: ReportErrCtxt -> Maybe Ct -> TypeOrKind -> CtOrigin -> SDoc
 -- Constructs a "Couldn't match" message
@@ -1907,7 +1923,7 @@ mk_ea_msg ctxt at_top level
 
     (expTy1, expTy2) = expandSynonymsToMatch exp act
 
-mk_ea_msg _ _ _ _ = panic "mk_ea_msg"
+mk_ea_msg _ _ _ _ = empty
 
 -- | Prints explicit kinds (with @-fprint-explicit-kinds@) in an 'SDoc' when a
 -- type mismatch occurs to due invisible kind arguments.

@@ -20,13 +20,12 @@ tcCheckMonoExpr, tcCheckMonoExprNC ::
        -> TcRhoType
        -> TcM (LHsExpr GhcTcId)
 
-tcInferSigma ::
-          LHsExpr GhcRn
-       -> TcM (LHsExpr GhcTcId, TcSigmaType)
+tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+
+tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
 
 tcInferRho, tcInferRhoNC ::
-          LHsExpr GhcRn
-       -> TcM (LHsExpr GhcTcId, TcRhoType)
+          LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcRhoType)
 
 tcSyntaxOp :: CtOrigin
            -> SyntaxExprRn

@@ -62,7 +62,7 @@ import GHC.Driver.Packages ( trusted, getPackageDetails, getInstalledPackageDeta
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
-import TysWiredIn( stringTyCon_RDR )
+import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer

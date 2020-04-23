@@ -6,6 +6,8 @@ T15361.hs:13:13: error:
                    HRefl :: forall {k1} (a :: k1). a :~~: a,
                  in an equation for ‘foo’
         at T15361.hs:13:5-9
+      Expected: a :~~: c
+        Actual: a :~~: a
       ‘a’ is a rigid type variable bound by
         the type signature for:
           foo :: forall a b c. (a :~~: b) -> a :~~: c

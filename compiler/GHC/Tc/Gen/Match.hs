@@ -37,7 +37,7 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
-                                       , tcMonoExpr, tcMonoExprNC
+                                       , tcMonoExpr, tcMonoExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcCheckId )
 
@@ -324,7 +324,7 @@ tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTcId)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; tcLExpr body res_ty
+        ; tcMonoExpr body res_ty
         }
 
 {-
@@ -437,7 +437,7 @@ tcLcStmt :: TyCon       -- The list type constructor ([])
          -> TcExprStmtChecker
 
 tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
-  = do { body' <- tcLExprNC body elt_ty
+  = do { body' <- tcMonoExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
@@ -818,7 +818,7 @@ tcMcStmt _ stmt _ _
 tcDoStmt :: TcExprStmtChecker
 
 tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
-  = do { body' <- tcLExprNC body res_ty
+  = do { body' <- tcMonoExprNC body res_ty
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 

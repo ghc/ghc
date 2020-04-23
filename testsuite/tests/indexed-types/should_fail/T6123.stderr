@@ -1,7 +1,6 @@
 
 T6123.hs:10:14: error:
-    • Occurs check: cannot construct the infinite type: a0 ~ Id a0
-        arising from a use of ‘cid’
+    • Couldn't match type ‘a0’ with ‘Id a0’ arising from a use of ‘cid’
       The type variable ‘a0’ is ambiguous
     • In the expression: cid undefined
       In an equation for ‘cundefined’: cundefined = cid undefined

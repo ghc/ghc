@@ -1,8 +1,8 @@
 
 TcMultiWayIfFail.hs:6:24: error:
     • Couldn't match type ‘[Char]’ with ‘Int’
-      Expected type: Int
-        Actual type: String
+      Expected: Int
+        Actual: String
     • In the expression: "2"
       In the expression:
         if | True -> 1 :: Int

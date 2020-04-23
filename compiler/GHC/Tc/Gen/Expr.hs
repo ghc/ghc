@@ -16,10 +16,10 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr,
          tcCheckMonoExpr, tcCheckMonoExprNC, tcMonoExpr, tcMonoExprNC,
-         tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
+         tcInferSigma, tcInferRho, tcInferRhoNC,
+         tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
-         addExprErrCtxt,
          addAmbiguousNameErr,
          getFixedTyVars ) where
 
@@ -117,7 +117,7 @@ tcPolyExpr, tcPolyExprNC
   -> TcM (LHsExpr GhcTcId)
 
 tcPolyExpr expr res_ty
-  = addExprErrCtxt expr $
+  = addExprCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty)
        ; tcPolyExprNC expr res_ty }
 
@@ -155,7 +155,7 @@ tcMonoExpr, tcMonoExprNC
     -> TcM (LHsExpr GhcTcId)
 
 tcMonoExpr expr res_ty
-  = addErrCtxt (exprCtxt expr) $
+  = addExprCtxt expr $
     tcMonoExprNC expr res_ty
 
 tcMonoExprNC (L loc expr) res_ty
@@ -1285,50 +1285,6 @@ tcInferApp expr
       = case getFunLoc args of
           Nothing  -> thing_inside  -- Don't set the location twice
           Just loc -> setSrcSpan loc thing_inside
-
----------------------
-tcFunApp :: Maybe SDoc  -- like "The function `f' is applied to"
-                        -- or leave out to get exactly that message
-         -> LHsExpr GhcRn                  -- Renamed function
-         -> LHsExpr GhcTcId -> TcSigmaType -- Function and its type
-         -> [LHsExprArgIn]                 -- Arguments
-         -> ExpRhoType                     -- Overall result type
-         -> TcM (HsWrapper, LHsExpr GhcTcId, [LHsExprArgOut])
-            -- (wrapper-for-result, fun, args)
-            -- For an ordinary function application,
-            -- these should be assembled as wrap_res[ fun args ]
-            -- But OpApp is slightly different, so that's why the caller
-            -- must assemble
-
--- tcFunApp deals with the general case;
--- the special cases are handled by tcApp
-tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
-  = do { let orig = lexprCtOrigin rn_fun
-
-       ; traceTc "tcFunApp" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
-       ; (wrap_fun, tc_args, actual_res_ty)
-           <- tcArgs rn_fun fun_sigma orig rn_args
-                     (m_herald `orElse` mk_app_msg rn_fun rn_args)
-
-            -- this is just like tcWrapResult, but the types don't line
-            -- up to call that function
-       ; wrap_res <- addFunResCtxt True (unLoc rn_fun) actual_res_ty res_ty $
-                     tcSubTypeHR orig
-                       (unLoc $ wrapHsArgs rn_fun rn_args)
-                       actual_res_ty res_ty
-
-       ; return (wrap_res, mkLHsWrap wrap_fun tc_fun, tc_args) }
-
-mk_app_msg :: LHsExpr GhcRn -> [LHsExprArgIn] -> SDoc
-mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
-                          , text "is applied to"]
-  where
-    what | null type_app_args = "function"
-         | otherwise          = "expression"
-    -- Include visible type arguments (but not other arguments) in the herald.
-    -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify.
-    expr = mkHsAppTypes fun type_app_args
-    type_app_args = [hs_ty | HsTypeArg _ hs_ty <- args]
 
 tcInferApp_finish
     :: HsExpr GhcRn                 -- Renamed function

@@ -1,14 +1,13 @@
 
 T14040a.hs:26:46: error:
     • Couldn't match kind ‘k1’ with ‘WeirdList z’
+      Expected kind ‘WeirdList k1’,
+        but ‘xs’ has kind ‘WeirdList (WeirdList z)’
         because kind variable ‘z’ would escape its scope
       This (rigid, skolem) kind variable is bound by
         ‘forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs)’
         at T14040a.hs:(25,19)-(27,41)
-      Expected kind: WeirdList k1
-        Actual kind: WeirdList (WeirdList z)
-      When checking the kind of xs :: WeirdList (WeirdList z)
     • In the second argument of ‘p’, namely ‘xs’
       In the type ‘Sing wl
                    -> (forall (y :: Type). p _ WeirdNil)
@@ -27,14 +26,13 @@ T14040a.hs:26:46: error:
 
 T14040a.hs:27:27: error:
     • Couldn't match kind ‘k0’ with ‘z’
+      Expected kind ‘WeirdList k0’,
+        but ‘WeirdCons x xs’ has kind ‘WeirdList z’
         because kind variable ‘z’ would escape its scope
       This (rigid, skolem) kind variable is bound by
         ‘forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs)’
         at T14040a.hs:(25,19)-(27,41)
-      Expected kind: WeirdList k0
-        Actual kind: WeirdList z
-      When checking the kind of WeirdCons x xs :: WeirdList z
     • In the second argument of ‘p’, namely ‘(WeirdCons x xs)’
       In the type ‘Sing wl
                    -> (forall (y :: Type). p _ WeirdNil)

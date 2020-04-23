@@ -27,22 +27,23 @@ VtaFail.hs:28:15: error:
 
 VtaFail.hs:35:18: error:
     • Couldn't match type ‘Int’ with ‘Bool’
-      Expected type: Proxy Bool
-        Actual type: Proxy Int
+      Expected: Proxy Bool
+        Actual: Proxy Int
     • In the second argument of ‘foo’, namely ‘(P :: Proxy Int)’
       In the expression: foo @Bool (P :: Proxy Int)
       In an equation for ‘baz’: baz = foo @Bool (P :: Proxy Int)
 
 VtaFail.hs:42:17: error:
-    • Expected kind ‘* -> k0 -> *’, but ‘Maybe’ has kind ‘* -> *’
+    • Couldn't match kind ‘*’ with ‘k0 -> *’
+      Expected kind ‘* -> k0 -> *’, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘Maybe’
       In the expression: too @Maybe T
       In an equation for ‘threeBad’: threeBad = too @Maybe T
 
 VtaFail.hs:43:27: error:
     • Couldn't match type ‘Either’ with ‘(->)’
-      Expected type: Three (->)
-        Actual type: Three Either
+      Expected: Three (->)
+        Actual: Three Either
     • In the second argument of ‘too’, namely ‘(T :: Three Either)’
       In the expression: too @(->) (T :: Three Either)
       In an equation for ‘threeWorse’:

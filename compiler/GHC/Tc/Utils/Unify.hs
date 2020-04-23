@@ -546,7 +546,7 @@ tcSubTypeNC :: CtOrigin   -- origin used for instantiation only
             -> TcM HsWrapper
 tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
-      Infer inf_res     -> fillInferResult inst_orig ty_actual inf_res
+      Infer inf_res     -> instantiateAndFillInferResult inst_orig ty_actual inf_res
       Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
                                        ty_actual ty_expected
 
@@ -1491,7 +1491,7 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
     go tv2 | tv1 == tv2  -- Same type variable => no-op
            = return (mkNomReflCo (mkTyVarTy tv1))
 
-           | swapOverTyVars tv1 tv2   -- Distinct type variables
+           | swapOverTyVars False tv1 tv2   -- Distinct type variables
                -- Swap meta tyvar to the left if poss
            = do { tv1 <- zonkTyCoVarKind tv1
                      -- We must zonk tv1's kind because that might
@@ -1548,12 +1548,11 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
     defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
 
-swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
-swapOverTyVars tv1 tv2
-  -- Swap (skolem ~ meta-tv) regardless of level, so that
-  -- the unification variable is on the left
-  | pri1 == 0, pri2 > 0 = True
-  | pri2 == 0, pri1 > 0 = False
+swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
+swapOverTyVars is_given tv1 tv2
+  -- See Note [Get unification variables on the left]
+  | not is_given, pri1 == 0, pri2 > 0 = True
+  | not is_given, pri2 == 0, pri1 > 0 = False
 
   -- Level comparison: see Note [TyVar/TyVar orientation]
   | lvl1 `strictlyDeeperThan` lvl2 = False
@@ -1642,6 +1641,22 @@ So we look for a positive reason to swap, using a three-step test:
   ties by eliminating the younger type variable, based on their
   Uniques.  See Note [Eliminate younger unification variables]
   (which also explains why we don't do this any more)
+
+Note [Unification variables on the left]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For wanteds, but not givens, swap (skolem ~ meta-tv) regardless of
+level, so that the unification variable is on the left.
+
+* We /don't/ want this for Givens because if we ave
+    [G] a[2] ~ alpha[1]
+    [W] Bool ~ a[2]
+  we want to rewrite the wanted to Bool ~ alpha[1],
+  so we can float the constraint and solve it.
+
+* But for Wanteds putting the unification variable on
+  the left means an easier job whene floating, and when
+  reporting errors -- just fewer cases to consider.
 
 Note [Deeper level on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -41,13 +41,13 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 T10403.hs:28:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘f0’ with ‘B t’
+      Expected: H (B t)
+        Actual: H f0
         because type variable ‘t’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
           app2 :: forall t. H (B t)
         at T10403.hs:27:1-15
-      Expected type: H (B t)
-        Actual type: H f0
     • In the expression: h2 (H . I) (B ())
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include

@@ -1,6 +1,12 @@
 
 T9201.hs:6:17: error:
     • Expected kind ‘x’, but ‘a’ has kind ‘y’
+      ‘y’ is a rigid type variable bound by
+        the class declaration for ‘MonoidalCCC’
+        at T9201.hs:5:30
+      ‘x’ is a rigid type variable bound by
+        the class declaration for ‘MonoidalCCC’
+        at T9201.hs:5:25
     • In the first argument of ‘f’, namely ‘a’
       In the second argument of ‘d’, namely ‘(f a)’
       In the type signature: ret :: d a (f a)

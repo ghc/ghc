@@ -1,8 +1,8 @@
 
 readFail032.hs:25:38: error:
     • Couldn't match type ‘Char’ with ‘[Char]’
-      Expected type: [String]
-        Actual type: String
+      Expected: [String]
+        Actual: String
     • In the second argument of ‘(:)’, namely ‘"Type error on line 25"’
       In the expression:
         "Type error on line 25" : "Type error on line 25"

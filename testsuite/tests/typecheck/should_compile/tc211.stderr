@@ -1,7 +1,7 @@
 
 tc211.hs:21:17: error:
-    • Couldn't match expected type ‘a -> a’
-                  with actual type ‘forall a6. a6 -> a6’
+    • Couldn't match expected type: a -> a
+                  with actual type: forall a. a -> a
     • In the first argument of ‘(:) ::
                                   (forall a. a -> a)
                                   -> [forall a. a -> a] -> [forall a. a -> a]’, namely

@@ -1,6 +1,10 @@
 
 T14066.hs:15:59: error:
     • Expected kind ‘k0’, but ‘b’ has kind ‘k’
+        because kind variable ‘k’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        ‘forall k (b :: k). SameKind a b’
+        at T14066.hs:15:29-59
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type signature: g :: forall k (b :: k). SameKind a b
       In the expression:

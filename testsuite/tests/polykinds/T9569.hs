@@ -11,6 +11,10 @@ class Deferrable (c :: Constraint) where
 
 deferPair :: (Deferrable c1, Deferrable c2)
           => Proxy (c1,c2) -> (((c1,c2) :: Constraint) => a) -> a
+             -- NB: ((c1,c2) :: Constraint) => blah
+             -- is different form
+             --     (c1,c2) => blah
+             -- The former has dict, the latter has two
 deferPair _ _ = undefined
 
 instance (Deferrable c1, Deferrable c2) => Deferrable (c1,c2) where

@@ -1,8 +1,8 @@
 
 tcfail068.hs:14:9: error:
     • Couldn't match type ‘s1’ with ‘s’
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -24,8 +24,8 @@ tcfail068.hs:14:9: error:
 
 tcfail068.hs:19:9: error:
     • Couldn't match type ‘s1’ with ‘s’
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s (IndTree s a)
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s (IndTree s a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -55,8 +55,8 @@ tcfail068.hs:19:9: error:
 
 tcfail068.hs:24:36: error:
     • Couldn't match type ‘s1’ with ‘s’
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s (IndTree s a)
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s (IndTree s a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -92,8 +92,8 @@ tcfail068.hs:24:36: error:
 
 tcfail068.hs:36:46: error:
     • Couldn't match type ‘s1’ with ‘s’
-      Expected type: GHC.ST.ST s1 (c, IndTree s b)
-        Actual type: GHC.ST.ST s (c, IndTree s b)
+      Expected: GHC.ST.ST s1 (c, IndTree s b)
+        Actual: GHC.ST.ST s (c, IndTree s b)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (c, IndTree s b)

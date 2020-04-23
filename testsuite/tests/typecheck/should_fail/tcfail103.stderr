@@ -1,8 +1,8 @@
 
 tcfail103.hs:15:13: error:
     • Couldn't match type ‘s’ with ‘t’
-      Expected type: ST s Int
-        Actual type: ST t Int
+      Expected: ST s Int
+        Actual: ST t Int
       ‘s’ is a rigid type variable bound by
         the type signature for:
           g :: forall s. ST s Int

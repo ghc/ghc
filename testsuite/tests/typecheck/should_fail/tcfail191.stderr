@@ -1,8 +1,8 @@
 
 tcfail191.hs:11:26: error:
     • Couldn't match type ‘a’ with ‘[a]’
-      Expected type: [a] -> [[a]]
-        Actual type: [a] -> [a]
+      Expected: [a] -> [[a]]
+        Actual: [a] -> [a]
       ‘a’ is a rigid type variable bound by
         a type expected by the context:
           forall {a}. [a] -> [[a]]
