@@ -23,8 +23,10 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindLHsTyVarBndr, bindLHsTyVarBndrs, rnImplicitBndrs,
-        bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
+        bindLHsTyVarBndr, bindLHsTyVarBndrs, bindLHsTyVarTermBndrs,
+        rnImplicitBndrs,
+        bindHsQTyVars, bindHsQTyVisVars, 
+        bindSigTyVarsFV, bindLRdrNames,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
@@ -55,6 +57,7 @@ import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 
 import Util
+import Lens
 import ListSetOps       ( deleteBys )
 import GHC.Types.Basic  ( compareFixity, funTyFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..)
@@ -320,7 +323,30 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 -- replaced with an implicit binding. top-level foralls alone are
 -- therefore an indication that the user is trying to be fastidious, so
 -- we can help them by not "fixing up" their unbound variables silently.
-
+--
+-- Additionally some declarations accepting invisible patterns at the
+-- type level have an analogous rule. For example in all of:
+--
+-- > data Foo @k (a :: k) where
+--
+-- > class Foo @k (a :: k) where
+--
+-- > type Foo @k (a :: k) = ...
+--
+-- > type family Foo @k (a :: k)
+--
+-- > data family Foo @k (a :: k)
+--
+-- The @... also prevents variables from being implicitly bound.
+--
+-- Like outermost foralls, the optional invisible bindings hint at the
+-- fastidiousness of the programmer. But there is also additional
+-- precedent from ScopedTypeVariables where only explicit 'forall' binds
+-- over the body. A dual way of looking at that is the user-written free
+-- type variables in a term-level definition are only bound on the LHS
+-- as implicit vars explicitly, never implicitly. So why should free
+-- variables in a type-level definition be bound over there implicitly
+-- either?
 forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
@@ -790,6 +816,62 @@ bindLRdrNames rdrs thing_inside
          thing_inside var_names }
 
 ---------------
+bindHsQTyVisVars :: forall a b
+                  .  HsDocContext
+                  -> Maybe SDoc         -- Just d => check for unused tvs
+                                        --   d is a phrase like "in the type ..."
+                  -> Maybe a            -- Just _  => an associated type decl
+                  -> [Located RdrName]  -- Kind variables from scope, no dups
+                  -> (LHsQTyVisVars GhcPs)
+                  -> (LHsQTyVisVars GhcRn -> Bool -> RnM (b, FreeVars))
+                      -- The Bool is True <=> all kind variables used in the
+                      -- kind signature are bound on the left.  Reason:
+                      -- the last clause of Note [CUSKs: Complete user-supplied
+                      -- kind signatures] in GHC.Hs.Decls
+                  -> RnM (b, FreeVars)
+bindHsQTyVisVars doc mb_in_doc mb_assoc body_kv_occs hsqv_bndrs thing_inside
+  = do { let hs_tv_bndrs = hsQTVisvExplicit hsqv_bndrs
+             bndr_kv_occs = extractHsTyVarTermBndrsKVs hs_tv_bndrs
+
+       ; let -- See Note [bindHsQTyVars examples] for what
+             -- all these various things are doing
+             bndrs, kv_occs, implicit_kvs :: [Located RdrName]
+             bndrs        = map (hsLTyVarLocName . fmap tyBinderIgnoreVis) hs_tv_bndrs
+             kv_occs      = nubL
+               -- Note [forall-or-nothing rule].
+               $ forAllOrNothing (tyBinderAnyInvisible hs_tv_bndrs)
+               -- Make sure to list the binder kvs before the
+               -- body kvs, as mandated by
+               -- Note [Ordering of implicit variables]
+               $ bndr_kv_occs ++ body_kv_occs
+             implicit_kvs = qty_filter_occs bndrs kv_occs
+             del          = deleteBys eqLocated
+             all_bound_on_lhs = null ((body_kv_occs `del` bndrs) `del` bndr_kv_occs)
+
+       ; traceRn "checkMixedVars3" $
+           vcat [ text "kv_occs" <+> ppr kv_occs
+                , text "bndrs"   <+> ppr hs_tv_bndrs
+                , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
+                , text "wubble" <+> ppr ((kv_occs \\ bndrs) \\ bndr_kv_occs)
+                ]
+
+       ; implicit_kv_nms <- mapM (newTyVarNameRn mb_assoc) implicit_kvs
+
+       ; bindLocalNamesFV implicit_kv_nms                     $
+         bindLHsTyVarTermBndrs doc mb_in_doc mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
+    do { traceRn "bindHsQTyVars" (ppr hsqv_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
+       ; thing_inside (HsQTVisvs { hsqv_ext = implicit_kv_nms
+                                 , hsqv_explicit  = rn_bndrs
+                                 })
+                      all_bound_on_lhs } }
+
+--
+--unless there are explicit
+-- invisible binders in which case no variables are returned per the forall-or-none rule.
+--
+-- Like -- See Note [forall-or-nothing rule].
+--
+
 bindHsQTyVars :: forall a b.
                  HsDocContext
               -> Maybe SDoc         -- Just d => check for unused tvs
@@ -818,11 +900,12 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, kv_occs, implicit_kvs :: [Located RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             kv_occs      = nubL (bndr_kv_occs ++ body_kv_occs)
-                                 -- Make sure to list the binder kvs before the
-                                 -- body kvs, as mandated by
-                                 -- Note [Ordering of implicit variables]
-             implicit_kvs = filter_occs bndrs kv_occs
+             kv_occs      = nubL
+               -- Make sure to list the binder kvs before the
+               -- body kvs, as mandated by
+               -- Note [Ordering of implicit variables]
+               $ bndr_kv_occs ++ body_kv_occs
+             implicit_kvs = qty_filter_occs bndrs kv_occs
              del          = deleteBys eqLocated
              all_bound_on_lhs = null ((body_kv_occs `del` bndrs) `del` bndr_kv_occs)
 
@@ -842,16 +925,15 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                               , hsq_explicit  = rn_bndrs })
                       all_bound_on_lhs } }
 
+qty_filter_occs :: [Located RdrName]   -- Bound here
+            -> [Located RdrName]   -- Potential implicit binders
+            -> [Located RdrName]   -- Final implicit binders
+-- Filter out any potential implicit binders that are either
+-- already in scope, or are explicitly bound in the same HsQTyVars
+qty_filter_occs bndrs occs
+  = filterOut is_in_scope occs
   where
-    filter_occs :: [Located RdrName]   -- Bound here
-                -> [Located RdrName]   -- Potential implicit binders
-                -> [Located RdrName]   -- Final implicit binders
-    -- Filter out any potential implicit binders that are either
-    -- already in scope, or are explicitly bound in the same HsQTyVars
-    filter_occs bndrs occs
-      = filterOut is_in_scope occs
-      where
-        is_in_scope locc = locc `elemRdr` bndrs
+    is_in_scope locc = locc `elemRdr` bndrs
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -880,6 +962,15 @@ Then:
 
 * Order is not important in these lists.  All we are doing is
   bring Names into scope.
+
+Suppose this time we have
+   data T @k (a::k1) (b::k) :: k2 -> k1 -> *
+
+Then:
+  implicit_kvs = []
+
+  k1 and k2 are improperly unbound because we don't implicitly bind when there
+  is an @_ invisible binder. See Note [forall-or-nothing rule].
 
 Finally, you may wonder why filter_occs removes in-scope variables
 from bndr/body_kv_occs.  How can anything be in scope?  Answer:
@@ -952,29 +1043,62 @@ NB: we do this only at the binding site of 'tvs'.
 -}
 
 bindLHsTyVarBndrs :: HsDocContext
-                  -> Maybe SDoc            -- Just d => check for unused tvs
+                  -> Maybe SDoc            -- ^ Just d => check for unused tvs
                                            --   d is a phrase like "in the type ..."
-                  -> Maybe a               -- Just _  => an associated type decl
-                  -> [LHsTyVarBndr GhcPs]  -- User-written tyvars
+                  -> Maybe a               -- ^ Just _  => an associated type decl
+                  -> [LHsTyVarBndr GhcPs]  -- ^ User-written tyvars
                   -> ([LHsTyVarBndr GhcRn] -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
-bindLHsTyVarBndrs doc mb_in_doc mb_assoc tv_bndrs thing_inside
+bindLHsTyVarBndrs = bind_ty_vars bindLHsTyVarBndr (HsTyVarVisBndr NoExtField) hsTyVarName
+
+bindLHsTyVarTermBndrs :: HsDocContext
+                      -> Maybe SDoc               -- ^ Same as @bindLHsTyVarBndrs@
+                      -> Maybe a                  -- ^ Same as @bindLHsTyVarBndrs@
+                      -> [LHsTyVarTermBndr GhcPs] -- ^ Same as @bindLHsTyVarBndrs@
+                      -> ([LHsTyVarTermBndr GhcRn] -> RnM (b, FreeVars))
+                      -> RnM (b, FreeVars)
+bindLHsTyVarTermBndrs = bind_ty_vars bindLHsTyVarTermBndr id (hsTyVarName . tyBinderIgnoreVis)
+
+bind_ty_vars :: ( HsDocContext
+                 -> Maybe a   -- associated class
+                 -> Located (binder GhcPs)
+                 -> (Located (binder GhcRn) -> RnM (b, FreeVars))
+                 -> RnM (b, FreeVars))
+             -> (binder GhcRn -> HsTyVarTermBndr GhcRn)
+             -> (binder GhcPs -> RdrName)
+             -> HsDocContext
+             -> Maybe SDoc
+             -> Maybe a
+             -> [Located (binder GhcPs)]
+             -> ([Located (binder GhcRn)] -> RnM (b, FreeVars))
+             -> RnM (b, FreeVars)
+bind_ty_vars f g h doc mb_in_doc mb_assoc tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
        ; checkDupRdrNames tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
-    tv_names_w_loc = map hsLTyVarLocName tv_bndrs
+    tv_names_w_loc = (map . mapLoc) h tv_bndrs
 
     go []     thing_inside = thing_inside []
-    go (b:bs) thing_inside = bindLHsTyVarBndr doc mb_assoc b $ \ b' ->
+    go (b:bs) thing_inside = f doc mb_assoc b $ \ b' ->
                              do { (res, fvs) <- go bs $ \ bs' ->
                                                 thing_inside (b' : bs')
-                                ; warn_unused b' fvs
+                                ; warn_unused (fmap g b') fvs
                                 ; return (res, fvs) }
 
     warn_unused tv_bndr fvs = case mb_in_doc of
       Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs
       Nothing     -> return ()
+
+bindLHsTyVarTermBndr :: HsDocContext
+                     -> Maybe a   -- associated class
+                     -> LHsTyVarTermBndr GhcPs
+                     -> (LHsTyVarTermBndr GhcRn -> RnM (b, FreeVars))
+                     -> RnM (b, FreeVars)
+bindLHsTyVarTermBndr doc mb_assoc bndr thing_inside =
+  bindLHsTyVarBndr doc mb_assoc (fmap tyBinderIgnoreVis bndr) $ \bndr' ->
+    thing_inside $ flip fmap bndr' $ \unLocBdndr' ->
+      set tyBinderIgnoreVis_ unLocBdndr' $ unLoc bndr
 
 bindLHsTyVarBndr :: HsDocContext
                  -> Maybe a   -- associated class
@@ -1398,10 +1522,10 @@ dataKindsErr env thing
 inTypeDoc :: HsType GhcPs -> SDoc
 inTypeDoc ty = text "In the type" <+> quotes (ppr ty)
 
-warnUnusedForAll :: SDoc -> LHsTyVarBndr GhcRn -> FreeVars -> TcM ()
+warnUnusedForAll :: SDoc -> LHsTyVarTermBndr GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll in_doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $
-    unless (hsTyVarName tv `elemNameSet` used_names) $
+    unless (hsTyVarName (tyBinderIgnoreVis tv) `elemNameSet` used_names) $
     addWarnAt (Reason Opt_WarnUnusedForalls) loc $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
          , in_doc ]
@@ -1636,7 +1760,7 @@ extractHsTysRdrTyVarsDups :: [LHsType GhcPs] -> FreeKiTyVarsWithDups
 extractHsTysRdrTyVarsDups tys
   = extract_ltys tys []
 
--- Returns the free kind variables of any explicitly-kinded binders, returning
+-- | Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 -- NB: Does /not/ delete the binders themselves.
@@ -1644,8 +1768,12 @@ extractHsTysRdrTyVarsDups tys
 --     E.g. given  [k1, a:k1, b:k2]
 --          the function returns [k1,k2], even though k1 is bound here
 extractHsTyVarBndrsKVs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVarsNoDups
-extractHsTyVarBndrsKVs tv_bndrs
-  = nubL (extract_hs_tv_bndrs_kvs tv_bndrs)
+extractHsTyVarBndrsKVs = nubL . extract_hs_tv_bndrs_kvs
+
+-- | Returns the free kind variables of any explicitly-kinded binders, just like
+-- @extractHsTyVarBndrsKVs@.
+extractHsTyVarTermBndrsKVs :: [LHsTyVarTermBndr GhcPs] -> FreeKiTyVarsNoDups
+extractHsTyVarTermBndrsKVs = nubL . extract_hs_tv_term_bndrs_kvs
 
 -- Returns the free kind variables in a type family result signature, returning
 -- variable occurrences in left-to-right order.
@@ -1739,17 +1867,24 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
     tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
 
-extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVarsWithDups
--- Returns the free kind variables of any explicitly-kinded binders, returning
+-- | Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 -- NB: Does /not/ delete the binders themselves.
 --     Duplicates are /not/ removed
 --     E.g. given  [k1, a:k1, b:k2]
 --          the function returns [k1,k2], even though k1 is bound here
+extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVarsWithDups
 extract_hs_tv_bndrs_kvs tv_bndrs =
     foldr extract_lty []
           [k | L _ (KindedTyVar _ _ k) <- tv_bndrs]
+
+-- | Like @extract_hs_tv_term_bndrs_kvs@, ignores visibility information as this
+-- is for the quantifier, not lambda/term side, where it doesn't matter for name
+-- resolution.
+extract_hs_tv_term_bndrs_kvs :: [LHsTyVarTermBndr GhcPs] -> FreeKiTyVarsWithDups
+extract_hs_tv_term_bndrs_kvs = extract_hs_tv_bndrs_kvs .
+  (fmap . fmap) tyBinderIgnoreVis
 
 extract_tv :: Located RdrName
            -> [Located RdrName] -> [Located RdrName]

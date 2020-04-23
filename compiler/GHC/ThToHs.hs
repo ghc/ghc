@@ -479,11 +479,11 @@ cvt_ci_decs doc decs
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext GhcPs
                      , Located RdrName
-                     , LHsQTyVars GhcPs)
+                     , LHsQTyVisVars GhcPs)
 cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
-       ; tvs' <- cvtTvs tvs
+       ; tvs' <- cvtTVisvs tvs
        ; return (cxt', tc', tvs')
        }
 
@@ -510,7 +510,7 @@ cvt_datainst_hdr cxt bndrs tys
 ----------------
 cvt_tyfam_head :: TypeFamilyHead
                -> CvtM ( Located RdrName
-                       , LHsQTyVars GhcPs
+                       , LHsQTyVisVars GhcPs
                        , Hs.LFamilyResultSig GhcPs
                        , Maybe (Hs.LInjectivityAnn GhcPs))
 
@@ -1323,7 +1323,13 @@ cvtOpAppP x op y
 --      Types and type variables
 
 cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
-cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
+cvtTvs = fmap mkHsQTvs . traverse cvt_tv
+
+-- TODO expose visibility on the TH side
+cvtTVisvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVisVars GhcPs)
+cvtTVisvs =
+  fmap (mkHsQTVisvs . (fmap . fmap) (HsTyVarVisBndr NoExtField)) .
+  traverse cvt_tv
 
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr GhcPs)
 cvt_tv (TH.PlainTV nm)

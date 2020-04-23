@@ -136,6 +136,7 @@ import ErrUtils ( Messages )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
+import Data.Bifunctor  ( first )
 import Data.Char
 import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
@@ -799,26 +800,35 @@ eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
-            -> P ( LHsQTyVars GhcPs  -- the synthesized type variables
-                 , [AddAnn] )        -- action which adds annotations
+            -> P ( LHsQTyVisVars GhcPs
+                   -- the synthesized type variables
+                 , [AddAnn]
+                   -- action which adds annotations
+                 )
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 checkTyVars pp_what equals_or_where tc tparms
   = do { (tvs, anns) <- fmap unzip $ mapM check tparms
-       ; return (mkHsQTvs tvs, concat anns) }
+       ; return (mkHsQTVisvs tvs, concat anns) }
   where
-    check (HsTypeArg _ ki@(L loc _))
-                              = addFatalError loc $
-                                      vcat [ text "Unexpected type application" <+>
-                                            text "@" <> ppr ki
-                                          , text "In the" <+> pp_what <+>
-                                            ptext (sLit "declaration for") <+> quotes (ppr tc)]
-    check (HsValArg ty) = chkParens [] ty
+    --check (HsTypeArg _ ki@(L loc _))
+    --                          = addFatalError loc $
+    --                                  vcat [ text "Unexpected type application" <+>
+    --                                        text "@" <> ppr ki
+    --                                      , text "In the" <+> pp_what <+>
+    --                                        ptext (sLit "declaration for") <+> quotes (ppr tc)]
+    check (HsValArg ty) = (fmap . first . fmap)
+      (HsTyVarVisBndr NoExtField)
+      (chkParens [] ty)
+    check (HsTypeArg l ty) = (fmap . first . fmap)
+      (HsTyVarInvisBndr NoExtField l)
+      (chkParens [] ty)
     check (HsArgPar sp) = addFatalError sp $
                           vcat [text "Malformed" <+> pp_what
                             <+> text "declaration for" <+> quotes (ppr tc)]
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddAnn] -> LHsType GhcPs
+    chkParens :: [AddAnn]
+              -> LHsType GhcPs
               -> P (LHsTyVarBndr GhcPs, [AddAnn])
     chkParens acc (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) ty
     chkParens acc ty = do

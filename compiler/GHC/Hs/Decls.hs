@@ -557,7 +557,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
             , tcdLName  :: Located (IdP pass)     -- ^ Type constructor
-            , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
+            , tcdTyVars :: LHsQTyVisVars pass     -- ^ Type variables; for an
                                                   -- associated type these
                                                   -- include outer binders
             , tcdFixity :: LexicalFixity    -- ^ Fixity used in the declaration
@@ -574,7 +574,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
-             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
+             , tcdTyVars   :: LHsQTyVisVars pass   -- ^ Type variables
                               -- See Note [TyVar binders for associated declarations]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
@@ -582,7 +582,7 @@ data TyClDecl pass
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: LHsContext pass,         -- ^ Context...
                 tcdLName   :: Located (IdP pass),      -- ^ Name of the class
-                tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
+                tcdTyVars  :: LHsQTyVisVars pass,      -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
                 tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
@@ -712,7 +712,7 @@ tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
 tcdName :: TyClDecl (GhcPass p) -> IdP (GhcPass p)
 tcdName = unLoc . tyClDeclLName
 
-tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
+tyClDeclTyVars :: TyClDecl pass -> LHsQTyVisVars pass
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 
@@ -739,13 +739,13 @@ hsDeclHasCusk (FamDecl { tcdFam =
                , fdTyVars    = tyvars
                , fdResultSig = L _ resultSig } }) =
     case fam_info of
-      ClosedTypeFamily {} -> hsTvbAllKinded tyvars
+      ClosedTypeFamily {} -> hsTtvbAllKinded tyvars
                           && isJust (famResultKindSignature resultSig)
       _ -> True -- Un-associated open type/data families have CUSKs
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
-  = hsTvbAllKinded tyvars && isJust (hsTyKindSig rhs)
+  = hsTtvbAllKinded tyvars && isJust (hsTyKindSig rhs)
 hsDeclHasCusk (DataDecl { tcdDExt = DataDeclRn { tcdDataCusk = cusk }}) = cusk
-hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
+hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTtvbAllKinded tyvars
 
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -797,11 +797,11 @@ instance OutputableBndrId p
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => Located (IdP (GhcPass p))
-   -> LHsQTyVars (GhcPass p)
+   -> LHsQTyVisVars (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
    -> SDoc
-pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
+pp_vanilla_decl_head thing (HsQTVisvs { hsqv_explicit = tyvars }) fixity context
  = hsep [pprLHsContext context, pp_tyvars tyvars]
   where
     pp_tyvars (varl:varsr)
@@ -1079,7 +1079,7 @@ data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
   , fdLName          :: Located (IdP pass)           -- type constructor
-  , fdTyVars         :: LHsQTyVars pass              -- type variables
+  , fdTyVars         :: LHsQTyVisVars pass           -- type variables
                        -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig pass        -- result signature

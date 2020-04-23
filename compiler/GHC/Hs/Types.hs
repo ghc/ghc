@@ -6,9 +6,12 @@
 GHC.Hs.Types: Abstract syntax: user-defined types
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -16,11 +19,13 @@ GHC.Hs.Types: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Hs.Types (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
-        HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
-        LHsQTyVars(..),
+        HsTyVarBndr(..), LHsTyVarBndr, LHsQTyVars(..),
+        ForallVisFlag(..),
+        HsTyVarTermBndr(..), LHsTyVarTermBndr, LHsQTyVisVars(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
@@ -50,9 +55,11 @@ module GHC.Hs.Types (
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
-        isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
+        mkHsQTVisvs, hsQTVisvExplicit, emptyLHsQTVisvs, isEmptyLHsQTVisvs,
+        isHsKindedTyVar, tyBinderIgnoreVis_, tyBinderIgnoreVis,
+        tyBinderAnyInvisible, hsTtvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
-        hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
+        hsTyVarName, hsAllLTyVarNames, hsAllLTyVisVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
@@ -90,6 +97,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import Outputable
 import FastString
+import Lens ( view )
 import Maybes( isJust )
 import Util ( count )
 
@@ -323,16 +331,13 @@ type LHsTyVarBndr pass = Located (HsTyVarBndr pass)
 
 -- | Located Haskell Quantified Type Variables
 data LHsQTyVars pass   -- See Note [HsType binders]
-  = HsQTvs { hsq_ext :: XHsQTvs pass
+  = HsQTvs
+    { hsq_ext :: XHsQTvs pass
 
-           , hsq_explicit :: [LHsTyVarBndr pass]
-                -- Explicit variables, written by the user
+    , hsq_explicit :: [LHsTyVarBndr pass]
+      -- ^ Explicit variables, written by the user
     }
   | XLHsQTyVars !(XXLHsQTyVars pass)
-
-type HsQTvsRn = [Name]  -- Implicit variables
-  -- For example, in   data T (a :: k1 -> k2) = ...
-  -- the 'a' is explicit while 'k1', 'k2' are implicit
 
 type instance XHsQTvs GhcPs = NoExtField
 type instance XHsQTvs GhcRn = HsQTvsRn
@@ -340,17 +345,54 @@ type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
 
+-- | Located Haskell Type Variable Binder with visibility
+type LHsTyVarTermBndr pass = Located (HsTyVarTermBndr pass)
+                         -- See Note [HsType binders]
+
+-- | Located Haskell Quantified Type Variables with visibility
+data LHsQTyVisVars pass   -- See Note [HsType binders]
+  = HsQTVisvs
+    { hsqv_ext :: XHsQTvs pass
+
+    , hsqv_explicit :: [LHsTyVarTermBndr pass]
+      -- ^ Explicit variables, written by the user
+    }
+  | XLHsQTyVisVars !(XXLHsQTyVisVars pass)
+
+type instance XHsQTVisvs GhcPs = NoExtField
+type instance XHsQTVisvs GhcRn = HsQTvsRn
+type instance XHsQTVisvs GhcTc = HsQTvsRn
+
+type instance XXLHsQTyVisVars  (GhcPass _) = NoExtCon
+
+type HsQTvsRn = [Name]  -- Implicit variables
+  -- For example, in   data T (a :: k1 -> k2) = ...
+  -- the 'a' is explicit while 'k1', 'k2' are implicit
+
 mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }
+
+mkHsQTVisvs :: [LHsTyVarTermBndr GhcPs] -> LHsQTyVisVars GhcPs
+mkHsQTVisvs tvs = HsQTVisvs { hsqv_ext = noExtField, hsqv_explicit = tvs }
 
 hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr pass]
 hsQTvExplicit = hsq_explicit
 
+hsQTVisvExplicit :: LHsQTyVisVars pass -> [LHsTyVarTermBndr pass]
+hsQTVisvExplicit = hsqv_explicit
+
 emptyLHsQTvs :: LHsQTyVars GhcRn
 emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
+emptyLHsQTVisvs :: LHsQTyVisVars GhcRn
+emptyLHsQTVisvs = HsQTVisvs { hsqv_ext = [], hsqv_explicit = [] }
+
 isEmptyLHsQTvs :: LHsQTyVars GhcRn -> Bool
 isEmptyLHsQTvs (HsQTvs { hsq_ext = imp, hsq_explicit = exp })
+  = null imp && null exp
+
+isEmptyLHsQTVisvs :: LHsQTyVisVars GhcRn -> Bool
+isEmptyLHsQTVisvs (HsQTVisvs { hsqv_ext = imp, hsqv_explicit = exp })
   = null imp && null exp
 
 ------------------------------------------------
@@ -481,7 +523,9 @@ instance OutputableBndr HsIPName where
 
 --------------------------------------------------
 
--- | Haskell Type Variable Binder
+-- | Haskell Type Variable Binder in Quantifiers
+--
+-- This is quantifiers like 'forall'
 data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
@@ -511,13 +555,84 @@ isHsKindedTyVar (UserTyVar {})   = False
 isHsKindedTyVar (KindedTyVar {}) = True
 isHsKindedTyVar (XTyVarBndr {})  = False
 
--- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
-hsTvbAllKinded :: LHsQTyVars pass -> Bool
-hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
-
 instance NamedThing (HsTyVarBndr GhcRn) where
   getName (UserTyVar _ v) = unLoc v
   getName (KindedTyVar _ v _) = unLoc v
+
+--------------------------------------------------
+
+-- | Haskell Type Variable Binder not in Quantifiers
+--
+-- This is for the type variables binders that would become regular term-level
+-- expression binders in a fully dependent Haskell. Put differently, they are
+-- for type-level '\' or other constructor associated with a /kind/-level '-> or
+-- ''forall'.
+--
+-- At the moment this differs in that in tracks the visibility of the parameters
+-- in addition. This is because we track visibility per the entire group with
+-- 'forall', but per parameter with '\'.
+data HsTyVarTermBndr pass
+
+  -- | Visible binder
+  = HsTyVarVisBndr
+    (XHsTyVarVisBndr pass)
+    (HsTyVarBndr pass)
+
+  -- | Invisible binder
+  | HsTyVarInvisBndr
+    (XHsTyVarInvisBndr pass)
+    SrcSpan -- ^ location of '@' prefix
+    (HsTyVarBndr pass)
+
+  | XTyVarTermBndr
+      !(XXTyVarTermBndr pass)
+
+type instance XHsTyVarVisBndr   (GhcPass _) = NoExtField
+type instance XHsTyVarInvisBndr (GhcPass _) = NoExtField
+
+type instance XXTyVarTermBndr   (GhcPass _) = NoExtCon
+
+tyBinderIgnoreVis_ :: ( Functor f
+                      , XXTyVarTermBndr pass0 ~ NoExtCon
+                      , XXTyVarTermBndr pass1 ~ NoExtCon
+                      , XHsTyVarVisBndr pass0 ~ XHsTyVarVisBndr pass1
+                      , XHsTyVarInvisBndr pass0 ~ XHsTyVarInvisBndr pass1
+                      )
+                   => (HsTyVarBndr pass0 -> f (HsTyVarBndr pass1))
+                   -> HsTyVarTermBndr pass0 -> f (HsTyVarTermBndr pass1)
+tyBinderIgnoreVis_ f = \case
+   HsTyVarVisBndr x b -> HsTyVarVisBndr x <$> f b
+   HsTyVarInvisBndr x y b -> HsTyVarInvisBndr x y <$> f b
+#if __GLASGOW_HASKELL__ < 811
+   XTyVarTermBndr x -> noExtCon x
+#endif
+
+tyBinderIgnoreVis :: forall pass
+                  .  XXTyVarTermBndr pass ~ NoExtCon
+                  => HsTyVarTermBndr pass
+                  -> HsTyVarBndr pass
+tyBinderIgnoreVis = view $ tyBinderIgnoreVis_ @_ @pass @pass
+
+tyBinderAnyInvisible :: XXTyVarTermBndr pass ~ NoExtCon
+                     => [LHsTyVarTermBndr pass]
+                     -> Bool
+tyBinderAnyInvisible bndrs = flip any bndrs $ \case
+  L _ (HsTyVarVisBndr {}) -> False
+  L _ (HsTyVarInvisBndr {}) -> True
+#if __GLASGOW_HASKELL__ < 811
+  L _ (XTyVarTermBndr x) -> noExtCon x
+#endif
+
+-- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
+hsTtvbAllKinded :: XXTyVarTermBndr pass ~ NoExtCon
+                => LHsQTyVisVars pass
+                -> Bool
+hsTtvbAllKinded = all (isHsKindedTyVar . tyBinderIgnoreVis . unLoc) . hsQTVisvExplicit
+
+instance NamedThing (HsTyVarTermBndr GhcRn) where
+  getName = getName . tyBinderIgnoreVis
+
+--------------------------------------------------
 
 -- | Haskell Type
 data HsType pass
@@ -1034,6 +1149,13 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
 
+hsAllLTyVisVarNames :: LHsQTyVisVars GhcRn -> [Name]
+-- All variables
+hsAllLTyVisVarNames (HsQTVisvs { hsqv_ext = kvs
+                               , hsqv_explicit = tvs
+                               })
+  = kvs ++ hsLTyVarNames ((fmap . fmap) tyBinderIgnoreVis tvs)
+
 hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
 hsLTyVarLocName = mapLoc hsTyVarName
 
@@ -1396,9 +1518,20 @@ instance OutputableBndrId p
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
 instance OutputableBndrId p
+       => Outputable (LHsQTyVisVars (GhcPass p)) where
+    ppr (HsQTVisvs { hsqv_explicit = tvs }) = interppSP tvs
+
+instance OutputableBndrId p
        => Outputable (HsTyVarBndr (GhcPass p)) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+
+instance OutputableBndrId p
+       => Outputable (HsTyVarTermBndr (GhcPass p)) where
+    ppr b = maybeAt <> ppr (tyBinderIgnoreVis b)
+      where maybeAt = case b of
+              HsTyVarVisBndr {} -> empty
+              HsTyVarInvisBndr {} -> char '@'
 
 instance Outputable thing
        => Outputable (HsImplicitBndrs (GhcPass p) thing) where
