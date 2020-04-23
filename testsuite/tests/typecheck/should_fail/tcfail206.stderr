@@ -15,12 +15,12 @@ tcfail206.hs:8:5: error:
 
 tcfail206.hs:11:5: error:
     • Couldn't match type ‘a’ with ‘Bool’
+      Expected type: a -> (a, Bool)
+        Actual type: a -> (a, a)
       ‘a’ is a rigid type variable bound by
         the type signature for:
           c :: forall a. a -> (a, Bool)
         at tcfail206.hs:10:1-19
-      Expected type: a -> (a, Bool)
-        Actual type: a -> (a, a)
     • In the expression: (True || False,)
       In an equation for ‘c’: c = (True || False,)
     • Relevant bindings include
@@ -43,12 +43,12 @@ tcfail206.hs:17:5: error:
 
 tcfail206.hs:20:5: error:
     • Couldn't match type ‘a’ with ‘Bool’
+      Expected type: a -> (# a, Bool #)
+        Actual type: a -> (# a, a #)
       ‘a’ is a rigid type variable bound by
         the type signature for:
           f :: forall a. a -> (# a, Bool #)
         at tcfail206.hs:19:1-21
-      Expected type: a -> (# a, Bool #)
-        Actual type: a -> (# a, a #)
     • In the expression: (# True || False, #)
       In an equation for ‘f’: f = (# True || False, #)
     • Relevant bindings include

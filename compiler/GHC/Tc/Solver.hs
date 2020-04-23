@@ -16,7 +16,7 @@ module GHC.Tc.Solver(
 
        simpl_top,
 
-       promoteTyVarSet, emitFlatConstraintsImplic,
+       promoteTyVarSet, emitFlatConstraints,
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
@@ -162,68 +162,128 @@ simplifyTop wanteds
 solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
   = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
-       ; emitFlatConstraintsWC wanted
+       ; emitFlatConstraints wanted
        ; return res }
 
-emitFlatConstraintsWC :: WantedConstraints -> TcM ()
-emitFlatConstraintsWC wanted
+emitFlatConstraints :: WantedConstraints -> TcM ()
+emitFlatConstraints wanted
   = do { wanted <- TcM.zonkWC wanted
-       ; case float_wc emptyVarSet wanted of
-           Nothing -> do { traceTc "tcHsSigType: failing" empty
+       ; case floatKindEqualities wanted of
+           Nothing -> do { traceTc "emitFlatConstraints: failing" (ppr wanted)
                          ; emitConstraints wanted
                          ; failM }
            Just simple_wanteds -> do { _ <- promoteTyVarSet $
                                             tyCoVarsOfCts simple_wanteds
                                      ; emitSimples simple_wanteds } }
 
-emitFlatConstraintsImplic :: Implication -> TcM ()
-emitFlatConstraintsImplic implic
-  = do { implic <- zonkImplication implic
-       ; case float_implic emptyVarSet implic of
-           Nothing -> do { traceTc "tcHsSigType: failing" empty
-                         ; emitImplication implic
-                         ; failM }
-           Just simple_wanteds -> do { _ <- promoteTyVarSet $
-                                            tyCoVarsOfCts simple_wanteds
-                                     ; emitSimples simple_wanteds } }
-
-float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe Cts
-float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-  | all is_floatable simples
-  = do { inner_cts <- flatMapBagM (float_implic trapping_tvs) implics
-       ; return (simples `unionBags` inner_cts) }
-  | otherwise
-  = Nothing
+floatKindEqualities :: WantedConstraints -> Maybe Cts
+-- Float out all the constraints from the WantedConstraints,
+-- Return Nothing if any constraints can't be floated (captured
+-- by skolems), or if there is an insoluble constraint, or
+-- IC_Telescope telescope error
+floatKindEqualities wc = float_wc emptyVarSet wc
   where
-    is_floatable ct
-       | insolubleCt ct = False
-       | otherwise      = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
+    float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe Cts
+    float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
+      | all is_floatable simples
+      = do { inner_cts <- flatMapBagM (float_implic trapping_tvs) implics
+           ; return (simples `unionBags` inner_cts) }
+      | otherwise
+      = Nothing
+      where
+        is_floatable ct
+           | insolubleEqCt ct = False
+           | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
-float_implic :: TcTyCoVarSet -> Implication -> Maybe Cts
-float_implic trapping_tvs imp
-  | isInsolubleStatus (ic_status imp)
-  = Nothing   -- A short cut /plus/ we must keep track of IC_BadTelescope
-  | otherwise
-  = do { cts <- float_wc new_trapping_tvs (ic_wanted imp)
-       ; unless (isEmptyBag cts || ic_no_eqs imp) Nothing
-             -- Don't float out past local equalities
-             -- C.f GHC.Tc.Solver.approximateWC
-       ; return cts }
-  where
-    new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
+    float_implic :: TcTyCoVarSet -> Implication -> Maybe Cts
+    float_implic trapping_tvs imp
+      | isInsolubleStatus (ic_status imp)
+      = Nothing   -- A short cut /plus/ we must keep track of IC_BadTelescope
+      | otherwise
+      = do { cts <- float_wc new_trapping_tvs (ic_wanted imp)
+           ; unless (isEmptyBag cts || ic_no_eqs imp) $
+             Nothing
+                 -- Don't float out past local equalities
+                 -- C.f GHC.Tc.Solver.approximateWC
+           ; return cts }
+      where
+        new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
 
 
-{- Note [Fail fast if there are insoluble kind equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Rather like in simplifyInfer, fail fast if there is an insoluble
-constraint.  Otherwise we'll just succeed in kind-checking a nonsense
-type, with a cascade of follow-up errors.
+{- Note [Failure in local type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When kind checking a type signature, we like to fail fast if we can't
+solve all the kind equality constraints: see Note [Fail fast on kind
+errors].  But what about /local/ type signatures, mentioning in-scope
+type varaibles for which there might be given equalities.  Here's
+an example (T15076b):
 
-For example polykinds/T12593, T15577, and many others.
+  class (a ~ b) => C a b
+  data SameKind :: k -> k -> Type where { SK :: SameKind a b }
 
-Take care to ensure that you emit the insoluble constraints before
-failing, because they are what will ultimately lead to the error
-messsage!
+  bar :: forall (a :: Type) (b :: Type).
+         C a b => Proxy a -> Proxy b -> ()
+  bar _ _ = const () (undefined :: forall (x :: a) (y :: b). SameKind x y)
+
+Consider the type singature on 'undefined'. It's ill-kinded unless
+a~b.  But the superclass of (C a b) means that indeed (a~b). So all
+should be well. BUT it's hard to see that when kind-checking the signature
+for undefined.  We want to emit a residual (a~b) constraint, to solve
+later.
+
+Another possiblity is that we might have something like
+   F alpha ~ [Int]
+where alpha is bound further out, which might become soluble
+"later" when we learn more about alpha.  So we want to emit
+those residual constraints.
+
+BUT it's no good simply wrapping all unsolved constraints from
+a type signature in an implication constraint to solve later. The
+problem is that we are going to /use/ that signature, including
+instantiate it.  Say we have
+     f :: forall a.  (forall b. blah) -> blah2
+     f x = <body>
+To typecheck the definition of f, we have to instantiate those
+foralls.  Moreover, any unsolved kind equalities will be coercion
+holes in the type.  If we naively wrap them in an implication like
+     forall a. (co1:k1~k2,  forall b.  co2:k3~k4)
+hoping to solve it later, we might end up filling in the holes
+co1 and co2 with coercions involving 'a' and 'b' -- but by now
+we've instantiated the type.  Chaos!
+
+Moreover, the unsolved constraints might be skolem-escpae things, and
+if we proceed with f bound to a nonsensical type, we get a cascade of
+follow-up errors. For example polykinds/T12593, T15577, and many others.
+
+So here's the plan:
+
+* solveLocalEqualitiesX: try to solve the constraints (solveLocalEqualitiesX)
+
+* buildTvImplication: build an implication for the residual, unsolved
+  constraint
+
+* emitFlatConstraints: try to float out every unsolved equalities
+  inside that implication, in the hope that it constrains only global
+  type variables, not the locally-quantified ones.
+
+  * If we fail, or find an insoluble constraint, emit the implication,
+    so that the errors will be reported, and fail.
+
+  * If we succeed in floating all the equalities, promote them and
+    re-emit them as flat constraint, not wrapped at all (since they
+    don't mention any of the quantified variables.
+
+* Note that this float-and-promote step means that anonymous
+  wildcards get floated to top level, as we want; see
+  Note [Checking partial type signatures] in GHC.Tc.Geh.HsType.
+
+All this is done:
+
+* in solveLocalEqualities, where there is no kind-generalisation
+  to complicate matters.
+
+* in GHC.Tc.Gen.HsType.tcHsSigType, where quantification intervenes.
+
 -}
 
 solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)

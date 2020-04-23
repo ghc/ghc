@@ -71,7 +71,7 @@ tcDefaults decls@(L locn (DefaultDecl _ _) : _)
 tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
 tc_default_ty deflt_clss hs_ty
  = do   { (ty, _kind) <- solveEqualities $
-                         tcLHsType hs_ty
+                         tcInferLHsType hs_ty
         ; ty <- zonkTcTypeToType ty   -- establish Type invariants
         ; checkValidType DefaultDeclCtxt ty
 

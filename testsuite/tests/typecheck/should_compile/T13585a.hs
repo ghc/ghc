@@ -65,7 +65,7 @@ _Wrapping :: Rewrapping s t => (Unwrapped s -> s) -> Iso s t (Unwrapped s) (Unwr
 _Wrapping _ = _Wrapped
 {-# INLINE _Wrapping #-}
 
-iso :: forall s t a b. (s -> a) -> (b -> t) -> Iso s t a b
+iso :: (s -> a) -> (b -> t) -> Iso s t a b
 iso sa bt = dimap sa (fmap bt)
 {-# INLINE iso #-}
 

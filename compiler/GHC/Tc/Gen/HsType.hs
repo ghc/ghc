@@ -31,8 +31,8 @@ module GHC.Tc.Gen.HsType (
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
         ContextKind(..),
 
-                -- Type checking type and class decls
-        bindTyClTyVars,
+        -- Type checking type and class decls, and instances thereof
+        bindTyClTyVars, tcFamTyPats,
         etaExpandAlgTyCon, tcbVisibilities,
 
           -- tyvars
@@ -46,12 +46,10 @@ module GHC.Tc.Gen.HsType (
         tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
-        tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
-        tcHsMbContext, tcHsContext, tcLHsPredType, tcInferApps,
+        tcInferLHsType, tcInferLHsTypeUnsaturated, tcCheckLHsType,
+        tcHsMbContext, tcHsContext, tcLHsPredType,
         failIfEmitsConstraints,
         solveEqualities, -- useful re-export
-
-        typeLevelMode, kindLevelMode,
 
         kindGeneralizeAll, kindGeneralizeSome, kindGeneralizeNone,
 
@@ -114,6 +112,7 @@ import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
+import Bag( unitBag )
 import Maybes
 import Data.List ( find )
 import Control.Monad
@@ -159,6 +158,91 @@ checking until step (3).
               Check types AND do validity checking
 *                                                                      *
 ************************************************************************
+
+Note [Keeping implicitly quantified variables in order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the user implicitly quantifies over variables (say, in a type
+signature), we need to come up with some ordering on these variables.
+This is done by bumping the TcLevel, bringing the tyvars into scope,
+and then type-checking the thing_inside. The constraints are all
+wrapped in an implication, which is then solved. Finally, we can
+zonk all the binders and then order them with scopedSort.
+
+It's critical to solve before zonking and ordering in order to uncover
+any unifications. You might worry that this eager solving could cause
+trouble elsewhere. I don't think it will. Because it will solve only
+in an increased TcLevel, it can't unify anything that was mentioned
+elsewhere. Additionally, we require that the order of implicitly
+quantified variables is manifest by the scope of these variables, so
+we're not going to learn more information later that will help order
+these variables.
+
+Note [Recipe for checking a signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Checking a user-written signature requires several steps:
+
+ 1. Generate constraints.
+ 2. Solve constraints.
+ 3. Promote tyvars and/or kind-generalize.
+ 4. Zonk.
+ 5. Check validity.
+
+There may be some surprises in here:
+
+Step 2 is necessary for two reasons: most signatures also bring
+implicitly quantified variables into scope, and solving is necessary
+to get these in the right order (see Note [Keeping implicitly
+quantified variables in order]). Additionally, solving is necessary in
+order to kind-generalize correctly: otherwise, we do not know which
+metavariables are left unsolved.
+
+Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
+kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
+metatyvars generated in the type may have a bumped TcLevel, because explicit
+foralls raise the TcLevel. To avoid these variables from ever being visible in
+the surrounding context, we must obey the following dictum:
+
+  Every metavariable in a type must either be
+    (A) generalized, or
+    (B) promoted, or        See Note [Promotion in signatures]
+    (C) a cause to error    See Note [Naughty quantification candidates] in GHC.Tc.Utils.TcMType
+
+The kindGeneralize functions do not require pre-zonking; they zonk as they
+go.
+
+If you are actually doing kind-generalization, you need to bump the level
+before generating constraints, as we will only generalize variables with
+a TcLevel higher than the ambient one.
+
+After promoting/generalizing, we need to zonk again because both
+promoting and generalizing fill in metavariables.
+
+Note [Promotion in signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If an unsolved metavariable in a signature is not generalized
+(because we're not generalizing the construct -- e.g., pattern
+sig -- or because the metavars are constrained -- see kindGeneralizeSome)
+we need to promote to maintain (WantedTvInv) of Note [TcLevel and untouchable type variables]
+in GHC.Tc.Utils.TcType. Note that promotion is identical in effect to generalizing
+and the reinstantiating with a fresh metavariable at the current level.
+So in some sense, we generalize *all* variables, but then re-instantiate
+some of them.
+
+Here is an example of why we must promote:
+  foo (x :: forall a. a -> Proxy b) = ...
+
+In the pattern signature, `b` is unbound, and will thus be brought into
+scope. We do not know its kind: it will be assigned kappa[2]. Note that
+kappa is at TcLevel 2, because it is invented under a forall. (A priori,
+the kind kappa might depend on `a`, so kappa rightly has a higher TcLevel
+than the surrounding context.) This kappa cannot be solved for while checking
+the pattern signature (which is not kind-generalized). When we are checking
+the *body* of foo, though, we need to unify the type of x with the argument
+type of bar. At this point, the ambient TcLevel is 1, and spotting a
+matavariable with level 2 would violate the (WantedTvInv) invariant of
+Note [TcLevel and untouchable type variables]. So, instead of kind-generalizing,
+we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
+
 -}
 
 funsSigCtxt :: [Located Name] -> UserTypeCtxt
@@ -213,7 +297,7 @@ kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
            <- pushTcLevelM                           $
               solveLocalEqualitiesX "kcClassSigType" $
               bindImplicitTKBndrs_Skol sig_vars      $
-              tc_lhs_type typeLevelMode hs_ty liftedTypeKind
+              tcLHsType hs_ty liftedTypeKind
 
        ; emitResidualTvConstraint skol_info spec_tkvs tc_lvl wanted }
 
@@ -250,26 +334,17 @@ tcHsSigType ctxt sig_ty
 
           -- Generalise here: see Note [Kind generalisation]
        ; (implic, ty) <- tc_hs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
-       ; ty <- zonkTcType ty
 
        -- Spit out the implication (and perhpas fail fast)
-       ; emitFlatConstraintsImplic implic
+       -- See Note [Kind-checking type signatures] in GHC.Tc.Solver
+       ; emitFlatConstraints (mkImplicWC (unitBag implic))
 
+       ; ty <- zonkTcType ty
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
        ; return ty }
   where
     skol_info = SigTypeSkol ctxt
-
--- Does validity checking and zonking.
-tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
-tcStandaloneKindSig (L _ kisig) = case kisig of
-  StandaloneKindSig _ (L _ name) ksig ->
-    let ctxt = StandaloneKindSigCtxt name in
-    addSigCtxt ctxt (hsSigType ksig) $
-    do { kind <- tcTopLHsType kindLevelMode ksig (expectedKindInCtxt ctxt)
-       ; checkValidType ctxt kind
-       ; return (name, kind) }
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
@@ -286,7 +361,7 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
                  solveLocalEqualitiesX "tc_hs_sig_type" $
                  bindImplicitTKBndrs_Skol sig_vars      $
                  do { kind <- newExpectedKind ctxt_kind
-                    ; tc_lhs_type typeLevelMode hs_ty kind }
+                    ; tcLHsType hs_ty kind }
        -- Any remaining variables (unsolved in the solveLocalEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
@@ -309,39 +384,52 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
 
 {- Note [Skolem escape in type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The case in tcHsSigType is tricky.  Consider (T11142)
+tcHsSigType is tricky.  Consider (T11142)
   foo :: forall b. (forall k (a :: k). SameKind a b) -> ()
-This is ill-kinded becuase of a nested skolem-escape; but
-the offending constraint isn't "obviosuly insoluble" like Int~Bool.
-Somewhat unsatisfyingly, we just look for an unsolved implication
-constraint, relying on the fact that we've just run the solver,
-and the result still isn't solved.
+This is ill-kinded becuase of a nested skolem-escape.
 
-At top level this doesn't arise, because we use solveEqualities, which
-solves /all/ the equalities. But for a nested type signature we might
-have some unsolved top-level constraints on in-scope variables that
-will "later" become soluble.  Tricky.
+That will show up as an un-solvable constraint in the implicaiton
+returned by buildTvImplication in tc_hs_sig_type.
 
-But in tcClassSigType we must *not* fail fast here, because there
-are skolems from the class decl which are in scope; but its fine
-not to because tcClassDecl1 has a solveEqualities wrapped around
-all the tcClassSigType calls.
+Then, in GHC.Tc.Solver.emitFlatConstraints (called from tcHsSigType)
+we'll try to float out the constraint, be unable to do so, and fail.
+See GHC.Tc.Solver Note [Failure in local type signatures].
 
-In contrast, ordinary tcHsSigType is going back to the world
-of terms, and we really must fail fast.
+The separation between tcHsSigType and tc_hs_sig_type is because
+tcClassSigType wants to use the latter, but *not* fail fast, because
+there are skolems from the class decl which are in scope; but its fine
+not to because tcClassDecl1 has a solveEqualities wrapped around all
+the tcClassSigType calls.
 
-That's why the fail-test is in tcHsSigType, not tc_hs_sig_type:
-tcClassSigType goes direct to tc_hs_sig_type.
+That's why tcHsSigType does emitFlatConstraints (which fails fast) but
+tcClassSigType just does emitImplication (which does not).  Ugh.
 -}
 
+-- Does validity checking and zonking.
+tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
+tcStandaloneKindSig (L _ kisig) = case kisig of
+  StandaloneKindSig _ (L _ name) ksig ->
+    let ctxt = StandaloneKindSigCtxt name in
+    addSigCtxt ctxt (hsSigType ksig) $
+    do { mode <- mkMode KindLevel
+       ; kind <- tc_top_lhs_type mode ksig (expectedKindInCtxt ctxt)
+       ; checkValidType ctxt kind
+       ; return (name, kind) }
 
-tcTopLHsType :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
+
+tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
+tcTopLHsType hs_ty ctxt_kind
+  = do { mode <- mkMode TypeLevel
+       ; tc_top_lhs_type mode hs_ty ctxt_kind }
+
+tc_top_lhs_type :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
 --   we want to fully solve /all/ equalities, and report errors
 -- Does zonking, but not validity checking because it's used
 --   for things (like deriving and instances) that aren't
 --   ordinary types
-tcTopLHsType mode hs_sig_type ctxt_kind
+-- Used for both types and kinds
+tc_top_lhs_type mode hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { traceTc "tcTopLHsType {" (ppr hs_ty)
        ; (spec_tkvs, ty)
@@ -369,7 +457,7 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
 tcHsDeriv hs_ty
   = do { ty <- checkNoErrs $  -- Avoid redundant error report
                               -- with "illegal deriving", below
-               tcTopLHsType typeLevelMode hs_ty AnyKind
+               tcTopLHsType hs_ty AnyKind
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
@@ -398,7 +486,7 @@ tcDerivStrategy mb_lds
     tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
-      ty' <- checkNoErrs $ tcTopLHsType typeLevelMode ty AnyKind
+      ty' <- checkNoErrs $ tcTopLHsType ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'
       pure (ViaStrategy via_pred, via_tvs)
 
@@ -416,7 +504,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
          -- eagerly avoids follow-on errors when checkValidInstance
          -- sees an unsolved coercion hole
          inst_ty <- checkNoErrs $
-                    tcTopLHsType typeLevelMode hs_inst_ty (TheKind constraintKind)
+                    tcTopLHsType hs_inst_ty (TheKind constraintKind)
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty
        ; return inst_ty }
 
@@ -426,14 +514,16 @@ tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
 -- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
-  = do { ty <- solveLocalEqualities "tcHsTypeApp" $
+  = do { mode <- mkMode TypeLevel
+       ; let mode' = mode { mode_holes = False }
+                     -- See Note [Wildcards in visible type application]
+       ; ty <- addTypeCtxt hs_ty                  $
+               solveLocalEqualities "tcHsTypeApp" $
                -- We are looking at a user-written type, very like a
                -- signature so we want to solve its equalities right now
-               unsetWOptM Opt_WarnPartialTypeSignatures $
-               setXOptM LangExt.PartialTypeSignatures $
-               -- See Note [Wildcards in visible type application]
                tcNamedWildCardBinders sig_wcs $ \ _ ->
-               tcCheckLHsType hs_ty (TheKind kind)
+               tc_lhs_type mode' hs_ty kind
+
        -- We do not kind-generalize type applications: we just
        -- instantiate with exactly what the user says.
        -- See Note [No generalization in type application]
@@ -477,6 +567,33 @@ There is also the possibility of mentioning a wildcard
 
 -}
 
+tcFamTyPats :: TyCon
+            -> HsTyPats GhcRn                -- Patterns
+            -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
+-- Check the LHS of a type/data family instance
+-- e.g.   type instance F ty1 .. tyn = ...
+-- Used for both type and data families
+tcFamTyPats fam_tc hs_pats
+  = do { traceTc "tcFamTyPats {" $
+         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
+
+
+       ; mode <- mkMode TypeLevel
+       ; let fun_ty = mkTyConApp fam_tc []
+             mode'  = mode { mode_holes = False }
+                      -- See Note [Wildcards in family instances] in
+                      -- GHC.Rename.Module
+       ; (fam_app, res_kind) <- tcInferTyApps mode' lhs_fun fun_ty hs_pats
+
+       ; traceTc "End tcFamTyPats }" $
+         vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
+
+       ; return (fam_app, res_kind) }
+  where
+    fam_name  = tyConName fam_tc
+    fam_arity = tyConArity fam_tc
+    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
+
 {-
 ************************************************************************
 *                                                                      *
@@ -494,38 +611,37 @@ tcHsOpenType ty   = addTypeCtxt ty $ tcHsOpenTypeNC ty
 tcHsLiftedType ty = addTypeCtxt ty $ tcHsLiftedTypeNC ty
 
 tcHsOpenTypeNC   ty = do { ek <- newOpenTypeKind
-                         ; tc_lhs_type typeLevelMode ty ek }
-tcHsLiftedTypeNC ty = tc_lhs_type typeLevelMode ty liftedTypeKind
+                         ; tcLHsType ty ek }
+tcHsLiftedTypeNC ty = tcLHsType ty liftedTypeKind
 
 -- Like tcHsType, but takes an expected kind
 tcCheckLHsType :: LHsType GhcRn -> ContextKind -> TcM TcType
 tcCheckLHsType hs_ty exp_kind
   = addTypeCtxt hs_ty $
     do { ek <- newExpectedKind exp_kind
-       ; tc_lhs_type typeLevelMode hs_ty ek }
+       ; tcLHsType hs_ty ek }
 
-tcLHsType :: LHsType GhcRn -> TcM (TcType, TcKind)
+tcInferLHsType :: LHsType GhcRn -> TcM (TcType, TcKind)
 -- Called from outside: set the context
-tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
+tcInferLHsType hs_ty = addTypeCtxt hs_ty $
+                       do { mode <- mkMode TypeLevel
+                          ; tc_infer_lhs_type mode hs_ty }
 
--- Like tcLHsType, but use it in a context where type synonyms and type families
+-- Like tcInferLHsType, but use it in a context where type synonyms and type families
 -- do not need to be saturated, like in a GHCi :kind call
-tcLHsTypeUnsaturated :: LHsType GhcRn -> TcM (TcType, TcKind)
-tcLHsTypeUnsaturated hs_ty
+tcInferLHsTypeUnsaturated :: LHsType GhcRn -> TcM (TcType, TcKind)
+tcInferLHsTypeUnsaturated hs_ty
   | Just (hs_fun_ty, hs_args) <- splitHsAppTys (unLoc hs_ty)
   = addTypeCtxt hs_ty $
-    do { (fun_ty, _ki) <- tcInferAppHead mode hs_fun_ty
-       ; tcInferApps_nosat mode hs_fun_ty fun_ty hs_args }
+    do { mode <- mkMode TypeLevel
+       ; (fun_ty, _ki) <- tcInferAppHead mode hs_fun_ty
+       ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args }
          -- Notice the 'nosat'; do not instantiate trailing
          -- invisible arguments of a type family.
          -- See Note [Dealing with :kind]
 
   | otherwise
-  = addTypeCtxt hs_ty $
-    tc_infer_lhs_type mode hs_ty
-
-  where
-    mode = typeLevelMode
+  = tcInferLHsType hs_ty
 
 {- Note [Dealing with :kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -536,7 +652,7 @@ Consider this GHCi command
 
 We will only get the 'forall' if we /refrain/ from saturating those
 invisible binders. But generally we /do/ saturate those invisible
-binders (see tcInferApps), and we want to do so for nested application
+binders (see tcInferTyApps), and we want to do so for nested application
 even in GHCi.  Consider for example (#16287)
   ghci> type family F :: k
   ghci> data T :: (forall k. k) -> Type
@@ -544,7 +660,7 @@ even in GHCi.  Consider for example (#16287)
 We want to reject this. It's just at the very top level that we want
 to switch off saturation.
 
-So tcLHsTypeUnsaturated does a little special case for top level
+So tcInferLHsTypeUnsaturated does a little special case for top level
 applications.  Actually the common case is a bare variable, as above.
 
 
@@ -567,21 +683,28 @@ concern things that the renamer can't handle.
 -- grow, at least to include the distinction between patterns and
 -- not-patterns.
 --
--- To find out where the mode is used, search for 'mode_level'
-data TcTyMode = TcTyMode { mode_level :: TypeOrKind }
+-- To find out where the mode is used, search for 'mode_tyki'
+--
+-- This data type is purely local, not exported from this module
+data TcTyMode
+  = TcTyMode { mode_tyki:: TypeOrKind
 
-typeLevelMode :: TcTyMode
-typeLevelMode = TcTyMode { mode_level = TypeLevel }
+             -- See Note [Level for anonymous wildcards]
+             , mode_lvl   :: TcLevel
+             , mode_holes :: Bool
+                 -- True <=> emit a hole constraints for an
+                 --          anonymous wildcard
+    }
 
-kindLevelMode :: TcTyMode
-kindLevelMode = TcTyMode { mode_level = KindLevel }
-
--- switch to kind level
-kindLevel :: TcTyMode -> TcTyMode
-kindLevel mode = mode { mode_level = KindLevel }
+mkMode :: TypeOrKind -> TcM TcTyMode
+mkMode tyki
+  = do { lvl <- getTcLevel
+       ; return (TcTyMode { mode_tyki  = tyki
+                          , mode_lvl   = lvl
+                          , mode_holes = True }) }
 
 instance Outputable TcTyMode where
-  ppr = ppr . mode_level
+  ppr = ppr . mode_tyki
 
 {-
 Note [Bidirectional type checking]
@@ -657,10 +780,11 @@ tc_infer_hs_type mode (HsParTy _ t)
 tc_infer_hs_type mode ty
   | Just (hs_fun_ty, hs_args) <- splitHsAppTys ty
   = do { (fun_ty, _ki) <- tcInferAppHead mode hs_fun_ty
-       ; tcInferApps mode hs_fun_ty fun_ty hs_args }
+       ; tcInferTyApps mode hs_fun_ty fun_ty hs_args }
 
 tc_infer_hs_type mode (HsKindSig _ ty sig)
-  = do { sig' <- tcLHsKindSig KindSigCtxt sig
+  = do { let mode' = mode { mode_tyki = KindLevel }
+       ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
                  -- things like instantiate its foralls, so it needs
@@ -694,6 +818,11 @@ tc_infer_hs_type mode other_ty
        ; return (ty', kv) }
 
 ------------------------------------------
+tcLHsType :: LHsType GhcRn -> TcKind -> TcM TcType
+tcLHsType hs_ty exp_kind
+  = do { mode <- mkMode TypeLevel
+       ; tc_lhs_type mode hs_ty exp_kind }
+
 tc_lhs_type :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_lhs_type mode (L span ty) exp_kind
   = setSrcSpan span $
@@ -864,7 +993,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
 
 --------- Constraint types
 tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
-  = do { MASSERT( isTypeLevel (mode_level mode) )
+  = do { MASSERT( isTypeLevel (mode_tyki mode) )
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; ipClass <- tcLookupClass ipClassName
@@ -893,12 +1022,12 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type _    wc@(HsWildCardTy _)        ek = tcAnonWildCardOcc wc ek
+tc_hs_type mode ty@(HsWildCardTy _)        ek = tcAnonWildCardOcc mode ty ek
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
             -> TcM TcType
-tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
+tc_fun_type mode ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
@@ -912,46 +1041,8 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
        ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
 
----------------------------
-tcAnonWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
-tcAnonWildCardOcc wc exp_kind
-  = do { wc_tv <- newWildTyVar  -- The wildcard's kind will be an un-filled-in meta tyvar
-
-       ; part_tysig <- xoptM LangExt.PartialTypeSignatures
-       ; warning <- woptM Opt_WarnPartialTypeSignatures
-
-       ; unless (part_tysig && not warning) $
-         emitAnonWildCardHoleConstraint wc_tv
-         -- Why the 'unless' guard?
-         -- See Note [Wildcards in visible kind application]
-
-       ; checkExpectedKind wc (mkTyVarTy wc_tv)
-                           (tyVarKind wc_tv) exp_kind }
-
-{- Note [Wildcards in visible kind application]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are cases where users might want to pass in a wildcard as a visible kind
-argument, for instance:
-
-data T :: forall k1 k2. k1 → k2 → Type where
-  MkT :: T a b
-x :: T @_ @Nat False n
-x = MkT
-
-So we should allow '@_' without emitting any hole constraints, and
-regardless of whether PartialTypeSignatures is enabled or not. But how would
-the typechecker know which '_' is being used in VKA and which is not when it
-calls emitNamedWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
-The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
-but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
-And whenever we see a '@', we automatically turn on PartialTypeSignatures and
-turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
-under these conditions.
-See related Note [Wildcards in visible type application] here and
-Note [The wildcard story for types] in GHC.Hs.Types
-
-Note [Skolem escape and forall-types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Skolem escape and forall-types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Checking telescopes].
 
 Consider
@@ -1125,7 +1216,7 @@ splitHsAppTys hs_ty
 tcInferAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 -- Version of tc_infer_lhs_type specialised for the head of an
 -- application. In particular, for a HsTyVar (which includes type
--- constructors, it does not zoom off into tcInferApps and family
+-- constructors, it does not zoom off into tcInferTyApps and family
 -- saturation
 tcInferAppHead mode (L _ (HsTyVar _ _ (L _ tv)))
   = tcTyVar mode tv
@@ -1140,24 +1231,24 @@ tcInferAppHead mode ty
 -- These kinds should be used to instantiate invisible kind variables;
 -- they come from an enclosing class for an associated type/data family.
 --
--- tcInferApps also arranges to saturate any trailing invisible arguments
+-- tcInferTyApps also arranges to saturate any trailing invisible arguments
 --   of a type-family application, which is usually the right thing to do
--- tcInferApps_nosat does not do this saturation; it is used only
+-- tcInferTyApps_nosat does not do this saturation; it is used only
 --   by ":kind" in GHCi
-tcInferApps, tcInferApps_nosat
+tcInferTyApps, tcInferTyApps_nosat
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, args, result kind)
-tcInferApps mode hs_ty fun hs_args
-  = do { (f_args, res_k) <- tcInferApps_nosat mode hs_ty fun hs_args
+tcInferTyApps mode hs_ty fun hs_args
+  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
        ; saturateFamApp f_args res_k }
 
-tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
-  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
+tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
+  = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args
-       ; traceTc "tcInferApps }" (ppr f_args <+> dcolon <+> ppr res_k)
+       ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
   where
 
@@ -1210,21 +1301,19 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
         Anon InvisArg _         -> instantiate ki_binder inner_ki
 
         Named (Bndr _ Specified) ->  -- Visible kind application
-          do { traceTc "tcInferApps (vis kind app)"
+          do { traceTc "tcInferTyApps (vis kind app)"
                        (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (tyBinderType ki_binder)
                              , ppr subst ])
 
              ; let exp_kind = substTy subst $ tyBinderType ki_binder
-
+                   arg_mode = mode { mode_tyki  = KindLevel
+                                   , mode_holes = False }
+                   -- mode_holes: see Note [Wildcards in visible kind application]
              ; ki_arg <- addErrCtxt (funAppCtxt orig_hs_ty hs_ki_arg n) $
-                         unsetWOptM Opt_WarnPartialTypeSignatures $
-                         setXOptM LangExt.PartialTypeSignatures $
-                             -- Urgh!  see Note [Wildcards in visible kind application]
-                             -- ToDo: must kill this ridiculous messing with DynFlags
-                         tc_lhs_type (kindLevel mode) hs_ki_arg exp_kind
+                         tc_lhs_type arg_mode hs_ki_arg exp_kind
 
-             ; traceTc "tcInferApps (vis kind app)" (ppr exp_kind)
+             ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
              ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
              ; go (n+1) fun' subst' inner_ki hs_args }
 
@@ -1246,7 +1335,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
 
         -- "normal" case
         | otherwise
-         -> do { traceTc "tcInferApps (vis normal app)"
+         -> do { traceTc "tcInferTyApps (vis normal app)"
                           (vcat [ ppr ki_binder
                                 , ppr arg
                                 , ppr (tyBinderType ki_binder)
@@ -1254,7 +1343,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                 ; let exp_kind = substTy subst $ tyBinderType ki_binder
                 ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                           tc_lhs_type mode arg exp_kind
-                ; traceTc "tcInferApps (vis normal app) 2" (ppr exp_kind)
+                ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                 ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
                 ; go (n+1) fun' subst' inner_ki args }
 
@@ -1268,7 +1357,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                      -- This zonk is essential, to expose the fruits
                      -- of matchExpectedFunKind to the 'go' loop
 
-              ; traceTc "tcInferApps (no binder)" $
+              ; traceTc "tcInferTyApps (no binder)" $
                    vcat [ ppr fun <+> dcolon <+> ppr fun_ki
                         , ppr arrows_needed
                         , ppr co
@@ -1277,7 +1366,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                 -- Use go_init to establish go's INVARIANT
       where
         instantiate ki_binder inner_ki
-          = do { traceTc "tcInferApps (need to instantiate)"
+          = do { traceTc "tcInferTyApps (need to instantiate)"
                          (vcat [ ppr ki_binder, ppr subst])
                ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
                ; go n (mkAppTy fun arg') subst' inner_ki all_args }
@@ -1380,7 +1469,7 @@ The way in which tcTypeKind can crash is in applications
 if 'a' is a type variable whose kind doesn't have enough arrows
 or foralls.  (The crash is in piResultTys.)
 
-The loop in tcInferApps has to be very careful to maintain the (PKTI).
+The loop in tcInferTyApps has to be very careful to maintain the (PKTI).
 For example, suppose
     kappa is a unification variable
     We have already unified kappa := Type
@@ -1392,7 +1481,7 @@ If we call tcTypeKind on that, we'll crash, because the (un-zonked)
 kind of 'a' is just kappa, not an arrow kind.  So we must zonk first.
 
 So the type inference engine is very careful when building applications.
-This happens in tcInferApps. Suppose we are kind-checking the type (a Int),
+This happens in tcInferTyApps. Suppose we are kind-checking the type (a Int),
 where (a :: kappa).  Then in tcInferApps we'll run out of binders on
 a's kind, so we'll call matchExpectedFunKind, and unify
    kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
@@ -1535,10 +1624,12 @@ tcHsMbContext Nothing    = return []
 tcHsMbContext (Just cxt) = tcHsContext cxt
 
 tcHsContext :: LHsContext GhcRn -> TcM [PredType]
-tcHsContext = tc_hs_context typeLevelMode
+tcHsContext cxt = do { mode <- mkMode TypeLevel
+                     ; tc_hs_context mode cxt }
 
 tcLHsPredType :: LHsType GhcRn -> TcM PredType
-tcLHsPredType = tc_lhs_pred typeLevelMode
+tcLHsPredType pred = do { mode <- mkMode TypeLevel
+                        ; tc_lhs_pred mode pred }
 
 tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
 tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
@@ -1558,7 +1649,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
            ATcTyCon tc_tc
              -> do { -- See Note [GADT kind self-reference]
-                     unless (isTypeLevel (mode_level mode))
+                     unless (isTypeLevel (mode_tyki mode))
                             (promotionErr name TyConPE)
                    ; check_tc tc_tc
                    ; return (mkTyConTy tc_tc, tyConKind tc_tc) }
@@ -1589,7 +1680,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   where
     check_tc :: TyCon -> TcM ()
     check_tc tc = do { data_kinds   <- xoptM LangExt.DataKinds
-                     ; unless (isTypeLevel (mode_level mode) ||
+                     ; unless (isTypeLevel (mode_tyki mode) ||
                                data_kinds ||
                                isKindTyCon tc) $
                        promotionErr name NoDataKindsTC }
@@ -1736,8 +1827,6 @@ in the e2 example, we'll desugar the type, zonking the kind unification
 variables as we go.  When we encounter the unconstrained kappa, we
 want to default it to '*', not to (Any *).
 
-Help functions for type applications
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -}
 
 addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
@@ -1749,98 +1838,12 @@ addTypeCtxt (L _ ty) thing
   where
     doc = text "In the type" <+> quotes (ppr ty)
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
                 Type-variable binders
-%*                                                                      *
-%************************************************************************
-
-Note [Keeping implicitly quantified variables in order]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the user implicitly quantifies over variables (say, in a type
-signature), we need to come up with some ordering on these variables.
-This is done by bumping the TcLevel, bringing the tyvars into scope,
-and then type-checking the thing_inside. The constraints are all
-wrapped in an implication, which is then solved. Finally, we can
-zonk all the binders and then order them with scopedSort.
-
-It's critical to solve before zonking and ordering in order to uncover
-any unifications. You might worry that this eager solving could cause
-trouble elsewhere. I don't think it will. Because it will solve only
-in an increased TcLevel, it can't unify anything that was mentioned
-elsewhere. Additionally, we require that the order of implicitly
-quantified variables is manifest by the scope of these variables, so
-we're not going to learn more information later that will help order
-these variables.
-
-Note [Recipe for checking a signature]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Checking a user-written signature requires several steps:
-
- 1. Generate constraints.
- 2. Solve constraints.
- 3. Promote tyvars and/or kind-generalize.
- 4. Zonk.
- 5. Check validity.
-
-There may be some surprises in here:
-
-Step 2 is necessary for two reasons: most signatures also bring
-implicitly quantified variables into scope, and solving is necessary
-to get these in the right order (see Note [Keeping implicitly
-quantified variables in order]). Additionally, solving is necessary in
-order to kind-generalize correctly: otherwise, we do not know which
-metavariables are left unsolved.
-
-Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
-kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
-metatyvars generated in the type may have a bumped TcLevel, because explicit
-foralls raise the TcLevel. To avoid these variables from ever being visible in
-the surrounding context, we must obey the following dictum:
-
-  Every metavariable in a type must either be
-    (A) generalized, or
-    (B) promoted, or        See Note [Promotion in signatures]
-    (C) a cause to error    See Note [Naughty quantification candidates] in GHC.Tc.Utils.TcMType
-
-The kindGeneralize functions do not require pre-zonking; they zonk as they
-go.
-
-If you are actually doing kind-generalization, you need to bump the level
-before generating constraints, as we will only generalize variables with
-a TcLevel higher than the ambient one.
-
-After promoting/generalizing, we need to zonk again because both
-promoting and generalizing fill in metavariables.
-
-Note [Promotion in signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If an unsolved metavariable in a signature is not generalized
-(because we're not generalizing the construct -- e.g., pattern
-sig -- or because the metavars are constrained -- see kindGeneralizeSome)
-we need to promote to maintain (WantedTvInv) of Note [TcLevel and untouchable type variables]
-in GHC.Tc.Utils.TcType. Note that promotion is identical in effect to generalizing
-and the reinstantiating with a fresh metavariable at the current level.
-So in some sense, we generalize *all* variables, but then re-instantiate
-some of them.
-
-Here is an example of why we must promote:
-  foo (x :: forall a. a -> Proxy b) = ...
-
-In the pattern signature, `b` is unbound, and will thus be brought into
-scope. We do not know its kind: it will be assigned kappa[2]. Note that
-kappa is at TcLevel 2, because it is invented under a forall. (A priori,
-the kind kappa might depend on `a`, so kappa rightly has a higher TcLevel
-than the surrounding context.) This kappa cannot be solved for while checking
-the pattern signature (which is not kind-generalized). When we are checking
-the *body* of foo, though, we need to unify the type of x with the argument
-type of bar. At this point, the ambient TcLevel is 1, and spotting a
-matavariable with level 2 would violate the (WantedTvInv) invariant of
-Note [TcLevel and untouchable type variables]. So, instead of kind-generalizing,
-we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
-
--}
+*                                                                      *
+********************************************************************* -}
 
 tcNamedWildCardBinders :: [Name]
                        -> ([(Name, TcTyVar)] -> TcM a)
@@ -1849,22 +1852,44 @@ tcNamedWildCardBinders :: [Name]
 -- plain wildcards _ are anonymous and dealt with by HsWildCardTy
 -- Soe Note [The wildcard story for types] in GHC.Hs.Types
 tcNamedWildCardBinders wc_names thing_inside
-  = do { wcs <- mapM (const newWildTyVar) wc_names
+  = do { wcs <- mapM newNamedWildTyVar wc_names
        ; let wc_prs = wc_names `zip` wcs
        ; tcExtendNameTyVarEnv wc_prs $
          thing_inside wc_prs }
 
-newWildTyVar :: TcM TcTyVar
+newNamedWildTyVar :: Name -> TcM TcTyVar
 -- ^ New unification variable '_' for a wildcard
-newWildTyVar
+newNamedWildTyVar _name   -- Currently ignoring the "_x" wildcard name used in the type
   = do { kind <- newMetaKindVar
-       ; uniq <- newUnique
        ; details <- newMetaDetails TauTv
-       ; let name  = mkSysTvName uniq (fsLit "w")
-                     -- See Note [Wildcard names]
-             tyvar = mkTcTyVar name kind details
+       ; wc_name <- newMetaTyVarName (fsLit "w")   -- See Note [Wildcard names]
+       ; let tyvar = mkTcTyVar wc_name kind details
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
+
+---------------------------
+tcAnonWildCardOcc :: TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc (TcTyMode { mode_lvl = lvl, mode_holes = emit_holes })
+                  ty exp_kind
+  = do { kv_details <- newTauTvDetailsAtLevel lvl
+       ; kv_name    <- newMetaTyVarName (fsLit "k")
+       ; wc_details <- newTauTvDetailsAtLevel lvl
+       ; wc_name    <- newMetaTyVarName (fsLit "w")   -- See Note [Wildcard names]
+       ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
+             wc_kind = mkTyVarTy kv
+       ; let wc_tv   = mkTcTyVar wc_name wc_kind wc_details
+
+       ; traceTc "tcAnonWildCardOcc" (ppr lvl <+> ppr emit_holes)
+       ; when emit_holes $
+         emitAnonWildCardHoleConstraint wc_tv
+         -- Why the 'when' guard?
+         -- See Note [Wildcards in visible kind application]
+
+       -- You might think that this would always just unify
+       -- wc_kind with exp_kind, so we could avoid even creating kv
+       -- But the level numbers might not allow that unification,
+       -- so we have to do it properly (T14140a)
+       ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
 
 {- Note [Wildcard names]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1873,8 +1898,30 @@ If we use the latter, we get messages like
      Found type wildcard ‘_’ standing for ‘_1’
 which is a bit confusing.  I prefer
      Found type wildcard ‘_’ standing for ‘w0’
--}
 
+Note [Wildcards in visible kind application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are cases where users might want to pass in a wildcard as a visible kind
+argument, for instance:
+
+data T :: forall k1 k2. k1 → k2 → Type where
+  MkT :: T a b
+x :: T @_ @Nat False n
+x = MkT
+
+So we should allow '@_' without emitting any hole constraints, and
+regardless of whether PartialTypeSignatures is enabled or not. But how
+would the typechecker know which '_' is being used in VKA and which is
+not when it calls emitNamedWildCardHoleConstraints in
+tcHsPartialSigType on all HsWildCardBndrs?  The solution is to neither
+rename nor include unnamed wildcards in HsWildCardBndrs, but instead
+give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
+
+And whenever we see a '@', we set mode_holes to False, so that
+we do not call emitAnonWildCardHoleConstraint in tcAnonWildCardOcc.
+See related Note [Wildcards in visible type application] here and
+Note [The wildcard story for types] in GHC.Hs.Types
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -3218,16 +3265,19 @@ tcHsPartialSigType ctxt sig_ty
          , hsib_body = hs_ty } <- ib_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTyInvis hs_ty
   = addSigCtxt ctxt hs_ty $
-    do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
+    do { mode <- mkMode TypeLevel
+       ; (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
             <- solveLocalEqualities "tcHsPartialSigType"    $
                tcNamedWildCardBinders sig_wcs $ \ wcs ->
                bindImplicitTKBndrs_Tv implicit_hs_tvs       $
                bindExplicitTKBndrs_Tv explicit_hs_tvs       $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
-                    (theta, wcx) <- tcPartialContext hs_ctxt
+                    (theta, wcx) <- tcPartialContext mode hs_ctxt
 
-                  ; tau <- tcHsOpenType hs_tau
+                  ; ek <- newOpenTypeKind
+                  ; tau <- addTypeCtxt hs_tau $
+                           tc_lhs_type mode hs_tau ek
 
                   ; return (wcs, wcx, theta, tau) }
 
@@ -3263,16 +3313,16 @@ tcHsPartialSigType ctxt sig_ty
        ; traceTc "tcHsPartialSigType" (ppr tv_prs)
        ; return (wcs, wcx, tv_prs, theta, tau) }
 
-tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
-tcPartialContext hs_theta
+tcPartialContext :: TcTyMode -> HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
+tcPartialContext mode hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
-  , L wc_loc wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
+  , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpan wc_loc $
-                     tcAnonWildCardOcc wc constraintKind
-       ; theta <- mapM tcLHsPredType hs_theta1
+                     tcAnonWildCardOcc mode ty constraintKind
+       ; theta <- mapM (tc_lhs_pred mode) hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise
-  = do { theta <- mapM tcLHsPredType hs_theta
+  = do { theta <- mapM (tc_lhs_pred mode) hs_theta
        ; return (theta, Nothing) }
 
 {- Note [Checking partial type signatures]
@@ -3326,9 +3376,13 @@ we do the following
   f's body, so we must know precisely where all the a's are; they
   must not be hidden under (filled-in) unification variables!
 
-  We achieve this in the usual way: we push a level at a forall,
-  so now the unification variable for the "_" can't unify with
-  'a'.
+  We achieve this:
+  - For /named/ wildcards, we create them at the outer level, and push
+    the level when we go inside a forall.  So now the unification
+    variable for the "_" can't unify with 'a'.
+  - For /anonymous/ wildcards, we float them all out in
+    floatKindEqualities, and promote them in emitFlatConstraints.
+    See Note [Failure in local type signatures] in GHC.Tc.Solver.
 
 * Just as for ordinary signatures, we must zonk the type after
   kind-checking it, to ensure that all the nested forall binders can
@@ -3513,10 +3567,16 @@ It does sort checking and desugaring at the same time, in one single pass.
 
 tcLHsKindSig :: UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tcLHsKindSig ctxt hs_kind
+  = do { mode <- mkMode KindLevel
+       ; tc_lhs_kind_sig mode ctxt hs_kind }
+
+tc_lhs_kind_sig :: TcTyMode -> UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
+tc_lhs_kind_sig mode ctxt hs_kind
 -- See  Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
 -- Result is zonked
-  = do { kind <- solveLocalEqualities "tcLHsKindSig" $
-                 tc_lhs_kind kindLevelMode hs_kind
+  = do { kind <- addErrCtxt (text "In the kind" <+> quotes (ppr hs_kind)) $
+                 solveLocalEqualities "tcLHsKindSig" $
+                 tc_lhs_type mode hs_kind liftedTypeKind
        ; traceTc "tcLHsKindSig" (ppr hs_kind $$ ppr kind)
        -- No generalization:
        ; kindGeneralizeNone kind
@@ -3531,11 +3591,6 @@ tcLHsKindSig ctxt hs_kind
        ; checkValidType ctxt kind
        ; traceTc "tcLHsKindSig2" (ppr kind)
        ; return kind }
-
-tc_lhs_kind :: TcTyMode -> LHsKind GhcRn -> TcM Kind
-tc_lhs_kind mode k
-  = addErrCtxt (text "In the kind" <+> quotes (ppr k)) $
-    tc_lhs_type (kindLevel mode) k liftedTypeKind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err

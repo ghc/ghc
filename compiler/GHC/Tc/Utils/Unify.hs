@@ -1038,18 +1038,12 @@ buildTvImplication skol_info skol_tvs tclvl wanted
                                      -- are solved by filling in coercion holes, not
                                      -- by creating a value-level evidence binding
        ; implic   <- newImplication
---       ; let status | insolubleWC wanted = IC_Insoluble
---                    | otherwise          = IC_Unsolved
---             -- If the inner constraints are insoluble,
---             -- we should mark the outer one similarly,
---             -- so that insolubleWC works on the outer one
 
        ; return (implic { ic_tclvl     = tclvl
                         , ic_skols     = skol_tvs
                         , ic_no_eqs    = True
                         , ic_wanted    = wanted
                         , ic_binds     = ev_binds
---                        , ic_status    = status
                         , ic_info      = skol_info }) }
 
 implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
@@ -1556,6 +1550,11 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
 swapOverTyVars tv1 tv2
+  -- Swap (skolem ~ meta-tv) regardless of level, so that
+  -- the unification variable is on the left
+  | pri1 == 0, pri2 > 0 = True
+  | pri2 == 0, pri1 > 0 = False
+
   -- Level comparison: see Note [TyVar/TyVar orientation]
   | lvl1 `strictlyDeeperThan` lvl2 = False
   | lvl2 `strictlyDeeperThan` lvl1 = True

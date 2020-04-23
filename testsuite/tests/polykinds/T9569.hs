@@ -10,7 +10,7 @@ class Deferrable (c :: Constraint) where
   defer :: Proxy c -> (c => a) -> a
 
 deferPair :: (Deferrable c1, Deferrable c2)
-          => Proxy (c1,c2) -> ((c1,c2) => a) -> a
+          => Proxy (c1,c2) -> (((c1,c2) :: Constraint) => a) -> a
 deferPair _ _ = undefined
 
 instance (Deferrable c1, Deferrable c2) => Deferrable (c1,c2) where

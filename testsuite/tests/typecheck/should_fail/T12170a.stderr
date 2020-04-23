@@ -1,8 +1,8 @@
 
 T12170a.hs:20:35: error:
     • Couldn't match type ‘Ref m0’ with ‘IORef’
-      Expected type: IORef (f0 ()) -> m0 (f0 ())
-        Actual type: Ref m0 (f0 ()) -> m0 (f0 ())
+      Expected: IORef (f0 ()) -> m0 (f0 ())
+        Actual: Ref m0 (f0 ()) -> m0 (f0 ())
       The type variable ‘m0’ is ambiguous
     • In the second argument of ‘(.)’, namely ‘readRef’
       In the second argument of ‘(>>=)’, namely ‘join . readRef’

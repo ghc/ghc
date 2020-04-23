@@ -1,12 +1,12 @@
 
 T2714.hs:8:7: error:
     • Couldn't match type ‘c’ with ‘f0 (a -> b)’
+      Expected: c -> a
+        Actual: f0 (a -> b) -> f0 b
       ‘c’ is a rigid type variable bound by
         a type expected by the context:
           forall c. c -> a
         at T2714.hs:8:1-13
-      Expected type: c -> a
-        Actual type: f0 (a -> b) -> f0 b
     • In the expression: ffmap x
       In an equation for ‘f’: f x = ffmap x
     • Relevant bindings include

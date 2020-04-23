@@ -1,6 +1,9 @@
 
 T3592.hs:8:5: error:
-    • Cannot instantiate unification variable ‘a0’
+    • Couldn't match type ‘a0’ with ‘T a’
+      Expected: T a -> String
+        Actual: a0 -> String
+      Cannot instantiate unification variable ‘a0’
       with a type involving polytypes: T a
     • In the expression: show
       In an equation for ‘f’: f = show

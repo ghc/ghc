@@ -8,14 +8,14 @@ tcfail174.hs:9:5: error:
 
 tcfail174.hs:16:14: error:
     • Couldn't match type ‘a1’ with ‘a’
+      Expected type: Capture (forall x. x -> a)
+        Actual type: Capture (forall a. a -> a)
       ‘a1’ is a rigid type variable bound by
         the type a -> a
         at tcfail174.hs:16:1-14
       ‘a’ is a rigid type variable bound by
         the inferred type of h1 :: Capture a
         at tcfail174.hs:16:1-14
-      Expected type: Capture (forall x. x -> a)
-        Actual type: Capture (forall a. a -> a)
     • In the first argument of ‘Capture’, namely ‘g’
       In the expression: Capture g
       In an equation for ‘h1’: h1 = Capture g
@@ -24,6 +24,8 @@ tcfail174.hs:16:14: error:
 
 tcfail174.hs:19:14: error:
     • Couldn't match type ‘a’ with ‘b’
+      Expected type: Capture (forall x. x -> b)
+        Actual type: Capture (forall a. a -> a)
       ‘a’ is a rigid type variable bound by
         the type a -> a
         at tcfail174.hs:1:1
@@ -31,8 +33,6 @@ tcfail174.hs:19:14: error:
         the type signature for:
           h2 :: forall b. Capture b
         at tcfail174.hs:18:1-15
-      Expected type: Capture (forall x. x -> b)
-        Actual type: Capture (forall a. a -> a)
     • In the first argument of ‘Capture’, namely ‘g’
       In the expression: Capture g
       In an equation for ‘h2’: h2 = Capture g

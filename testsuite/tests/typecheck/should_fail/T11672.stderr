@@ -4,8 +4,8 @@ T11672.hs:9:10: error:
       When matching types
         a0 :: Symbol
         Int -> Bool :: *
-      Expected type: Proxy a0
-        Actual type: Proxy (Int -> Bool)
+      Expected: Proxy a0
+        Actual: Proxy (Int -> Bool)
     • In the first argument of ‘f’, namely
         ‘(Proxy :: Proxy (Int -> Bool))’
       In the expression: f (Proxy :: Proxy (Int -> Bool))

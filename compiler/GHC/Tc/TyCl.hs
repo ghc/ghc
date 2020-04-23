@@ -2918,36 +2918,11 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; return (qtvs, pats, rhs_ty) }
 
 -----------------
-tcFamTyPats :: TyCon
-            -> HsTyPats GhcRn                -- Patterns
-            -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
--- Used for both type and data families
-tcFamTyPats fam_tc hs_pats
-  = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
-
-       ; let fun_ty = mkTyConApp fam_tc []
-
-       ; (fam_app, res_kind) <- unsetWOptM Opt_WarnPartialTypeSignatures $
-                                setXOptM LangExt.PartialTypeSignatures $
-                                -- See Note [Wildcards in family instances] in
-                                -- GHC.Rename.Module
-                                tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
-
-       ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
-
-       ; return (fam_app, res_kind) }
-  where
-    fam_name  = tyConName fam_tc
-    fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
-
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns
 --
 -- We expect fam_app to look like (F t1 .. tn)
--- tcInferApps is capable of returning ((F ty1 |> co) ty2),
+-- tcFamTyPats is capable of returning ((F ty1 |> co) ty2),
 -- but that can't happen here because we already checked the
 -- arity of F matches the number of pattern
 unravelFamInstPats fam_app

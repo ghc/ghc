@@ -685,7 +685,8 @@ isOutOfScopeCt :: Ct -> Bool
 -- A Hole that does not have a leading underscore is
 -- simply an out-of-scope variable, and we treat that
 -- a bit differently when it comes to error reporting
-isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+isOutOfScopeCt (CHoleCan { cc_hole = ExprHole, cc_occ = occ })
+  = not (startsWithUnderscore occ)
 isOutOfScopeCt _ = False
 
 isExprHoleCt :: Ct -> Bool
