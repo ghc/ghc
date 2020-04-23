@@ -79,6 +79,7 @@ import GHC.Types.Name( isInternalName )
 import Outputable
 import GHC.Types.SrcLoc
 import Util
+import Panic
 import GHC.Driver.Session
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -392,10 +393,24 @@ mkErrorAppDs :: Id              -- The error function
 mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     dflags <- getDynFlags
+    noBase <- gopt Opt_NoBase <$> getDynFlags
     let
-        full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
-        core_msg = Lit (mkLitString full_msg)
-        -- mkLitString returns a result of type String#
+        full_msg
+         -- When the `-no-base` command-line flag is used, we panic when this expresssion
+         -- is actually used. This is used by packages that can't depend on `base`.
+         --
+         -- BUT the TYPE of the expression we return is actually used in some
+         -- cases (see `matchSimply` in GHC.HsToCore.Match) even if the
+         -- expression itself is discared... So we put the panic pretty deep in
+         -- the expression.
+         | noBase    = pgmErrorDoc "References to `base` package are not allowed (-no-base is set)" $
+                        vcat [ ppr src_loc
+                             , text "Would reference `" <> ppr err_id <> text "' in `" <> msg <> text "'"
+                             ]
+
+         | otherwise = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
+        core_msg = Lit (mkLitString full_msg) -- mkLitString returns a result of type String#
+
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-
@@ -991,3 +1006,4 @@ isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
 
 isTrueLHsExpr (L _ (HsPar _ e))   = isTrueLHsExpr e
 isTrueLHsExpr _                   = Nothing
+
