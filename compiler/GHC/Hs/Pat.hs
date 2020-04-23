@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -23,8 +24,11 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Hs.Pat (
-        Pat(..), InPat, OutPat, LPat,
+        Pat(..), LPat,
+        ConPatTc (..),
+        CoPat (..),
         ListPatTc(..),
+        ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
@@ -59,7 +63,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Basic
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
-import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import GHC.Builtin.Types
 import GHC.Types.Var
 import GHC.Types.Name.Reader ( RdrName )
@@ -71,11 +74,9 @@ import GHC.Core.Type
 import GHC.Types.SrcLoc
 import Bag -- collect ev vars from pats
 import Maybes
+import GHC.Types.Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
-
-type InPat p  = LPat p        -- No 'Out' constructors
-type OutPat p = LPat p        -- No 'In' constructors
 
 type LPat p = XRec p Pat
 
@@ -173,30 +174,12 @@ data Pat p
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
         ------------ Constructor patterns ---------------
-  | ConPatIn    (Located (IdP p))
-                (HsConPatDetails p)
-    -- ^ Constructor Pattern In
-
-  | ConPatOut {
-        pat_con     :: Located ConLike,
-        pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
-                                        -- tyvars of the constructor/pattern synonym
-                                        --   Use (conLikeResTy pat_con pat_arg_tys) to get
-                                        --   the type of the pattern
-
-        pat_tvs   :: [TyVar],           -- Existentially bound type variables
-                                        -- in correctly-scoped order e.g. [k:*, x:k]
-        pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
-                                        -- One reason for putting coercion variable here, I think,
-                                        --      is to ensure their kinds are zonked
-
-        pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
-        pat_args  :: HsConPatDetails p,
-        pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
-                                        -- Only relevant for pattern-synonyms;
-                                        --   ignored for data cons
+  | ConPat {
+        pat_con_ext :: XConPat p,
+        pat_con     :: Located (ConLikeP p),
+        pat_args    :: HsConPatDetails p
     }
-    -- ^ Constructor Pattern Out
+    -- ^ Constructor Pattern
 
         ------------ View patterns ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
@@ -262,17 +245,6 @@ data Pat p
 
     -- ^ Pattern with a type signature
 
-        ------------ Pattern coercions (translation only) ---------------
-  | CoPat       (XCoPat p)
-                HsWrapper           -- Coercion Pattern
-                                    -- If co :: t1 ~ t2, p :: t2,
-                                    -- then (CoPat co p) :: t1
-                (Pat p)             -- Why not LPat?  Ans: existing locn will do
-                Type                -- Type of whole pattern, t1
-        -- During desugaring a (CoPat co pat) turns into a cast with 'co' on
-        -- the scrutinee, followed by a match on 'pat'
-    -- ^ Coercion Pattern
-
   -- | Trees that Grow extension point for new constructors
   | XPat
       !(XXPat p)
@@ -306,6 +278,10 @@ type instance XTuplePat GhcPs = NoExtField
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
+type instance XConPat GhcPs = NoExtField
+type instance XConPat GhcRn = NoExtField
+type instance XConPat GhcTc = ConPatTc
+
 type instance XSumPat GhcPs = NoExtField
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
@@ -329,9 +305,16 @@ type instance XSigPat GhcPs = NoExtField
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
-type instance XCoPat  (GhcPass _) = NoExtField
+type instance XXPat GhcPs = NoExtCon
+type instance XXPat GhcRn = NoExtCon
+type instance XXPat GhcTc = CoPat
+  -- After typechecking, we add one extra constructor: CoPat
 
-type instance XXPat   (GhcPass _) = NoExtCon
+type family ConLikeP x
+
+type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
+type instance ConLikeP GhcRn = Name -- IdP GhcRn
+type instance ConLikeP GhcTc = ConLike
 
 -- ---------------------------------------------------------------------
 
@@ -343,6 +326,52 @@ hsConPatArgs :: HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
+
+-- | This is the extension field for ConPat, added after typechecking
+-- It adds quite a few extra fields, to support elaboration of pattern matching.
+data ConPatTc
+  = ConPatTc
+    { -- | The universal arg types  1-1 with the universal
+      -- tyvars of the constructor/pattern synonym
+      -- Use (conLikeResTy pat_con cpt_arg_tys) to get
+      -- the type of the pattern
+      cpt_arg_tys :: [Type]
+
+    , -- | Existentially bound type variables
+      -- in correctly-scoped order e.g. [k:*  x:k]
+      cpt_tvs   :: [TyVar]
+
+    , -- | Ditto *coercion variables* and *dictionaries*
+      -- One reason for putting coercion variable here  I think
+      --      is to ensure their kinds are zonked
+      cpt_dicts :: [EvVar]
+
+    , -- | Bindings involving those dictionaries
+      cpt_binds :: TcEvBinds
+
+    , -- ^ Extra wrapper to pass to the matcher
+      -- Only relevant for pattern-synonyms;
+      --   ignored for data cons
+      cpt_wrap  :: HsWrapper
+    }
+
+-- | Coercion Pattern (translation only)
+--
+-- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
+-- scrutinee, followed by a match on 'pat'.
+data CoPat
+  = CoPat
+    { -- | Coercion Pattern
+      -- If co :: t1 ~ t2, p :: t2,
+      -- then (CoPat co p) :: t1
+      co_cpt_wrap :: HsWrapper
+
+    , -- | Why not LPat?  Ans: existing locn will do
+      co_pat_inner :: Pat GhcTc
+
+    , -- | Type of whole pattern, t1
+      co_pat_ty :: Type
+    }
 
 -- | Haskell Record Fields
 --
@@ -498,16 +527,23 @@ pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
 
-pprParendPat :: (OutputableBndrId p)
-             => PprPrec -> Pat (GhcPass p) -> SDoc
-pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \print_tc_elab ->
-                     if need_parens print_tc_elab pat
-                     then parens (pprPat pat)
-                     else  pprPat pat
+pprParendPat :: forall p. OutputableBndrId p
+             => PprPrec
+             -> Pat (GhcPass p)
+             -> SDoc
+pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_elab ->
+    if need_parens print_tc_elab pat
+    then parens (pprPat pat)
+    else pprPat pat
   where
     need_parens print_tc_elab pat
-      | CoPat {} <- pat = print_tc_elab
-      | otherwise       = patNeedsParens p pat
+      | GhcTc <- ghcPass @p
+      , XPat ext <- pat
+      , CoPat {} <- ext
+      = print_tc_elab
+
+      | otherwise
+      = patNeedsParens p pat
       -- For a CoPat we need parens if we are going to show it, which
       -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
       -- But otherwise the CoPat is discarded, so it
@@ -527,12 +563,6 @@ pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprIfTc @p $
-                                  sdocWithDynFlags $ \ dflags ->
-                                  if gopt Opt_PrintTypecheckerElaboration dflags
-                                  then hang (text "CoPat" <+> parens (ppr co))
-                                          2 (pprParendPat appPrec pat)
-                                  else pprPat pat
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
   where ppr_ty = case ghcPass @p of
                    GhcPs -> ppr ty
@@ -548,22 +578,37 @@ pprPat (TuplePat _ pats bx)
   | otherwise
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
-pprPat (ConPatIn con details)   = pprUserCon (unLoc con) details
-pprPat (ConPatOut { pat_con = con
-                  , pat_tvs = tvs
-                  , pat_dicts = dicts
-                  , pat_binds = binds
-                  , pat_args = details })
-  = sdocOption sdocPrintTypecheckerElaboration $ \case
-      False -> pprUserCon (unLoc con) details
-      True  -> -- Tiresome; in GHC.Tc.Gen.Bind.tcRhs we print out a
-               -- typechecked Pat in an error message,
-               -- and we want to make sure it prints nicely
-               ppr con
-                  <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                                 , pprIfTc @p $ ppr binds ])
-                  <+> pprConArgs details
-
+pprPat (ConPat { pat_con = con
+               , pat_args = details
+               , pat_con_ext = ext
+               }
+       )
+  = case ghcPass @p of
+      GhcPs -> pprUserCon (unLoc con) details
+      GhcRn -> pprUserCon (unLoc con) details
+      GhcTc -> sdocOption sdocPrintTypecheckerElaboration $ \case
+        False -> pprUserCon (unLoc con) details
+        True  ->
+          -- Tiresome; in TcBinds.tcRhs we print out a typechecked Pat in an
+          -- error message, and we want to make sure it prints nicely
+          ppr con
+            <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+                           , ppr binds ])
+            <+> pprConArgs details
+        where ConPatTc { cpt_tvs = tvs
+                       , cpt_dicts = dicts
+                       , cpt_binds = binds
+                       } = ext
+pprPat (XPat ext) = case ghcPass @p of
+#if __GLASGOW_HASKELL__ < 811
+  GhcPs -> noExtCon ext
+  GhcRn -> noExtCon ext
+#endif
+  GhcTc -> pprHsWrapper co $ \parens ->
+      if parens
+      then pprParendPat appPrec pat
+      else pprPat pat
+    where CoPat co pat _ = ext
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
            => con -> HsConPatDetails (GhcPass p) -> SDoc
@@ -602,21 +647,24 @@ instance (Outputable p, Outputable arg)
 -}
 
 mkPrefixConPat :: DataCon ->
-                  [OutPat (GhcPass p)] -> [Type] -> OutPat (GhcPass p)
+                  [LPat GhcTc] -> [Type] -> LPat GhcTc
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc)
-                      , pat_tvs = []
-                      , pat_dicts = []
-                      , pat_binds = emptyTcEvBinds
-                      , pat_args = PrefixCon pats
-                      , pat_arg_tys = tys
-                      , pat_wrap = idHsWrapper }
+  = noLoc $ ConPat { pat_con = noLoc (RealDataCon dc)
+                   , pat_args = PrefixCon pats
+                   , pat_con_ext = ConPatTc
+                     { cpt_tvs = []
+                     , cpt_dicts = []
+                     , cpt_binds = emptyTcEvBinds
+                     , cpt_arg_tys = tys
+                     , cpt_wrap = idHsWrapper
+                     }
+                   }
 
-mkNilPat :: Type -> OutPat (GhcPass p)
+mkNilPat :: Type -> LPat GhcTc
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
-mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
+mkCharLitPat :: SourceText -> Char -> LPat GhcTc
 mkCharLitPat src c = mkPrefixConPat charDataCon
                           [noLoc $ LitPat noExtField (HsCharPrim src c)] []
 
@@ -684,7 +732,7 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: (OutputableBndrId p) => LPat (GhcPass p) -> Bool
+isIrrefutableHsPat :: forall p. (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -700,13 +748,14 @@ isIrrefutableHsPat :: (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 isIrrefutableHsPat
   = goL
   where
+    goL :: LPat (GhcPass p) -> Bool
     goL = go . unLoc
 
+    go :: Pat (GhcPass p) -> Bool
     go (WildPat {})        = True
     go (VarPat {})         = True
     go (LazyPat {})        = True
     go (BangPat _ pat)     = goL pat
-    go (CoPat _ _ pat _)   = go  pat
     go (ParPat _ pat)      = goL pat
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
@@ -716,18 +765,19 @@ isIrrefutableHsPat
                     -- See Note [Unboxed sum patterns aren't irrefutable]
     go (ListPat {})        = False
 
-    go (ConPatIn {})       = False     -- Conservative
-    go (ConPatOut
-        { pat_con  = L _ (RealDataCon con)
+    go (ConPat
+        { pat_con  = con
         , pat_args = details })
-                           =
-      isJust (tyConSingleDataCon_maybe (dataConTyCon con))
-      -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
-      -- the latter is false of existentials. See #4439
-      && all goL (hsConPatArgs details)
-    go (ConPatOut
-        { pat_con = L _ (PatSynCon _pat) })
-                           = False -- Conservative
+                           = case ghcPass @p of
+       GhcPs -> False -- Conservative
+       GhcRn -> False -- Conservative
+       GhcTc -> case con of
+         L _ (PatSynCon _pat)  -> False -- Conservative
+         L _ (RealDataCon con) ->
+           isJust (tyConSingleDataCon_maybe (dataConTyCon con))
+           -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
+           -- the latter is false of existentials. See #4439
+           && all goL (hsConPatArgs details)
     go (LitPat {})         = False
     go (NPat {})           = False
     go (NPlusKPat {})      = False
@@ -735,6 +785,14 @@ isIrrefutableHsPat
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
+
+    go (XPat ext)          = case ghcPass @p of
+#if __GLASGOW_HASKELL__ < 811
+      GhcPs -> noExtCon ext
+      GhcRn -> noExtCon ext
+#endif
+      GhcTc -> go pat
+        where CoPat _ pat _ = ext
 
 -- | Is the pattern any of combination of:
 --
@@ -777,16 +835,21 @@ is the only thing that could possibly be matched!
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
-patNeedsParens :: PprPrec -> Pat p -> Bool
+patNeedsParens :: forall p. IsPass p => PprPrec -> Pat (GhcPass p) -> Bool
 patNeedsParens p = go
   where
+    go :: Pat (GhcPass p) -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
-    go (ConPatIn _ ds)   = conPatNeedsParens p ds
-    go cp@(ConPatOut {}) = conPatNeedsParens p (pat_args cp)
+    go (ConPat { pat_args = ds})
+                         = conPatNeedsParens p ds
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
-    go (CoPat _ _ p _)   = go p
+    go (XPat ext)        = case ghcPass @p of
+      GhcPs -> noExtCon ext
+      GhcRn -> noExtCon ext
+      GhcTc -> go inner
+        where CoPat _ inner _ = ext
     go (WildPat {})      = False
     go (VarPat {})       = False
     go (LazyPat {})      = False
@@ -798,7 +861,6 @@ patNeedsParens p = go
     go (ListPat {})      = False
     go (LitPat _ l)      = hsLitNeedsParens p l
     go (NPat _ lol _ _)  = hsOverLitNeedsParens p (unLoc lol)
-    go (XPat {})         = True -- conservative default
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
@@ -811,7 +873,10 @@ conPatNeedsParens p = go
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
-parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
+parenthesizePat :: IsPass p
+                => PprPrec
+                -> LPat (GhcPass p)
+                -> LPat (GhcPass p)
 parenthesizePat p lpat@(L loc pat)
   | patNeedsParens p pat = L loc (ParPat noExtField lpat)
   | otherwise            = lpat
@@ -837,12 +902,16 @@ collectEvVarsPat pat =
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
     SumPat _ p _ _   -> collectEvVarsLPat p
-    ConPatOut {pat_dicts = dicts, pat_args  = args}
+    ConPat
+      { pat_args  = args
+      , pat_con_ext = ConPatTc
+        { cpt_dicts = dicts
+        }
+      }
                      -> unionBags (listToBag dicts)
                                    $ unionManyBags
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
     SigPat  _ p _    -> collectEvVarsLPat p
-    CoPat _ _ p _    -> collectEvVarsPat  p
-    ConPatIn _  _    -> panic "foldMapPatBag: ConPatIn"
+    XPat (CoPat _ p _) -> collectEvVarsPat  p
     _other_pat       -> emptyBag
