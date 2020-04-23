@@ -152,8 +152,8 @@ module GHC.Driver.Types (
         -- * Exstensible Iface fields
         ExtensibleFields(..), FieldName,
         emptyExtensibleFields,
-        readField, readIfaceField, readIfaceFieldWith,
-        writeField, writeIfaceField, writeIfaceFieldWith,
+        readField, readFieldWith, readIfaceField, readIfaceFieldWith,
+        writeField, writeFieldWith, writeIfaceField, writeIfaceFieldWith,
         deleteField, deleteIfaceField,
     ) where
 
@@ -1541,6 +1541,15 @@ data ForeignStubs
       --  2) C stubs to use when calling
       --     "foreign exported" functions
 
+instance Binary ForeignStubs where
+  put_ bh NoStubs = putByte bh 0
+  put_ bh (ForeignStubs _f1 _f2) = put_ bh NoStubs --putByte bh 1 >> put_ bh f1 >> put_ bh f2
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return NoStubs
+      _ -> return NoStubs --ForeignStubs <$> get bh <*> get bh
+
 appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
 appendStubC NoStubs            c_code = ForeignStubs empty c_code
 appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
@@ -2462,6 +2471,10 @@ type FixityEnv = NameEnv FixItem
 -- so that we can generate an interface from it
 data FixItem = FixItem OccName Fixity
 
+instance Binary FixItem where
+  put_ bh (FixItem f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = FixItem <$> get bh <*> get bh
+
 instance Outputable FixItem where
   ppr (FixItem occ fix) = ppr fix <+> ppr occ
 
@@ -3067,6 +3080,15 @@ data HpcInfo
      { hpcUsed          :: AnyHpcUsage  -- ^ Is hpc used anywhere on the module \*tree\*?
      }
 
+instance Binary HpcInfo where
+  put_ bh (HpcInfo f1 f2) = putByte bh 0 >> put_ bh f1 >> put_ bh f2
+  put_ bh (NoHpcInfo f1)  = putByte bh 1 >> put_ bh f1
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> HpcInfo <$> get bh <*> get bh
+      _ -> NoHpcInfo <$> get bh
+
 -- | This is used to signal if one of my imports used HPC instrumentation
 -- even if there is no module-local HPC usage
 type AnyHpcUsage = Bool
@@ -3218,6 +3240,10 @@ data CompleteMatch = CompleteMatch {
                           , completeMatchTyCon :: Name
                             -- ^ The TyCon that they cover (e.g. Maybe)
                           }
+
+instance Binary CompleteMatch where
+  put_ bh (CompleteMatch f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = CompleteMatch <$> get bh <*> get bh
 
 instance Outputable CompleteMatch where
   ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
@@ -3405,3 +3431,4 @@ deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
 
 deleteIfaceField :: FieldName -> ModIface -> ModIface
 deleteIfaceField name iface = iface { mi_ext_fields = deleteField name (mi_ext_fields iface) }
+

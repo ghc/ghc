@@ -240,6 +240,7 @@ module GHC.Driver.Session (
 
 import GhcPrelude
 
+import Binary
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Types.Module
@@ -423,6 +424,24 @@ data SafeHaskellMode
    | Sf_SafeInferred  -- ^ inferred as safe
    | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
    deriving (Eq)
+
+instance Binary SafeHaskellMode where
+  put_ bh Sf_None         = putByte bh 0
+  put_ bh Sf_Unsafe       = putByte bh 1
+  put_ bh Sf_Trustworthy  = putByte bh 2
+  put_ bh Sf_Safe         = putByte bh 3
+  put_ bh Sf_SafeInferred = putByte bh 4
+  put_ bh Sf_Ignore       = putByte bh 5
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return Sf_None
+      1 -> return Sf_Unsafe
+      2 -> return Sf_Trustworthy
+      3 -> return Sf_Safe
+      4 -> return Sf_SafeInferred
+      _ -> return Sf_Ignore
+
 
 instance Show SafeHaskellMode where
     show Sf_None         = "None"
@@ -3609,6 +3628,7 @@ fFlagsDeps = [
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
   flagSpec "write-ide-info"                   Opt_WriteHie,
+  flagSpec "write-core-field"                 Opt_WriteCoreField,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "version-macros"                   Opt_VersionMacros,

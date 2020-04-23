@@ -16,6 +16,7 @@ module GHC.Iface.Make
    , mkIfaceExports
    , coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
+   , toIfaceModGuts
    )
 where
 
@@ -60,6 +61,7 @@ import Util             hiding ( eqListBy )
 import FastString
 import Maybes
 import GHC.HsToCore.Docs
+import GHC.Iface.Binary
 
 import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
@@ -78,24 +80,31 @@ import GHC.Driver.Plugins (LoadedPlugin(..))
 mkPartialIface :: HscEnv
                -> ModDetails
                -> ModGuts
-               -> PartialModIface
+               -> IO PartialModIface
 mkPartialIface hsc_env mod_details
-  ModGuts{ mg_module       = this_mod
-         , mg_hsc_src      = hsc_src
-         , mg_usages       = usages
-         , mg_used_th      = used_th
-         , mg_deps         = deps
-         , mg_rdr_env      = rdr_env
-         , mg_fix_env      = fix_env
-         , mg_warns        = warns
-         , mg_hpc_info     = hpc_info
-         , mg_safe_haskell = safe_mode
-         , mg_trust_pkg    = self_trust
-         , mg_doc_hdr      = doc_hdr
-         , mg_decl_docs    = decl_docs
-         , mg_arg_docs     = arg_docs
-         }
-  = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
+  guts@ModGuts{ mg_module       = this_mod
+              , mg_hsc_src      = hsc_src
+              , mg_usages       = usages
+              , mg_used_th      = used_th
+              , mg_deps         = deps
+              , mg_rdr_env      = rdr_env
+              , mg_fix_env      = fix_env
+              , mg_warns        = warns
+              , mg_hpc_info     = hpc_info
+              , mg_safe_haskell = safe_mode
+              , mg_trust_pkg    = self_trust
+              , mg_doc_hdr      = doc_hdr
+              , mg_decl_docs    = decl_docs
+              , mg_arg_docs     = arg_docs
+              }
+  | gopt Opt_WriteCoreField dflags = do
+    fields <- writeFieldWith "ghc/core" write (mi_ext_fields iface)
+    return iface{mi_ext_fields = fields}
+  | otherwise = return iface
+  where
+    dflags = hsc_dflags hsc_env
+    write bh = putWithUserData (const $ return ()) bh (toIfaceModGuts guts)
+    iface = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
 -- | Fully instantiate a interface
@@ -722,3 +731,39 @@ bogusIfaceRule id_name
         ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
         ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
         ifRuleAuto = True }
+
+---------------------------
+
+toIfaceModGuts :: ModGuts -> IfaceModGuts
+toIfaceModGuts (ModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                        f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29) =
+  IfaceModGuts
+    f1
+    f2
+    f3
+    f4
+    f5
+    f6
+    f7
+    f8
+    f9
+    (map toIfaceTyCon f10)
+    (map instanceToIfaceInst f11)
+    (map famInstToIfaceFamInst f12)
+    (map patSynToIfaceDecl f13)
+    (map coreRuleToIfaceRule f14)
+    (map toIfaceBind f15)
+    f16
+    f17
+    f18
+    f19
+    f20
+    f21
+    f22
+    (map instanceToIfaceInst $ instEnvElts f23)
+    (map famInstToIfaceFamInst $ famInstEnvElts f24)
+    f25
+    f26
+    f27
+    f28
+    f29

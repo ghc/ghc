@@ -63,6 +63,7 @@ module GHC.Types.Unique.DFM (
 
 import GhcPrelude
 
+import Binary
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import Outputable
 
@@ -125,6 +126,10 @@ taggedFst (TaggedVal v _) = v
 taggedSnd :: TaggedVal val -> Int
 taggedSnd (TaggedVal _ i) = i
 
+instance Binary a => Binary (TaggedVal a) where
+  put_ bh (TaggedVal v t) = put_ bh v >> put_ bh t
+  get bh = TaggedVal <$> get bh <*> get bh
+
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
 
@@ -138,6 +143,10 @@ data UniqDFM ele =
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
+
+instance Binary a => Binary (UniqDFM a) where
+  put_ bh (UDFM udfm t) = put_ bh (M.toList udfm) >> put_ bh t
+  get bh = UDFM <$> (M.fromList <$> get bh) <*> get bh
 
 -- | Deterministic, in O(n log n).
 instance Foldable UniqDFM where

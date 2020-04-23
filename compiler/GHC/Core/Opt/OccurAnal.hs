@@ -2082,7 +2082,6 @@ data OccEnv
                    -- Range is just Local Ids
     }
 
-
 -----------------------------
 -- OccEncl is used to control whether to inline into constructor arguments
 -- For example:

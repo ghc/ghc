@@ -61,7 +61,11 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         ticky =
           map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk]
 
-        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel))
+        -- Extensible interface files from GHC
+        ext =
+          map (`gopt` dflags) [Opt_WriteCoreField]
+
+        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel), ext)
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags

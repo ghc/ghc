@@ -19,7 +19,8 @@ module GHC.IfaceToCore (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+        tcIfaceModGuts,
  ) where
 
 #include "HsVersions.h"
@@ -1835,3 +1836,61 @@ bindIfaceTyConBinderX :: (IfaceBndr -> (TyCoVar -> IfL a) -> IfL a)
 bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
   = bind_tv tv $ \tv' ->
     thing_inside (Bndr tv' vis)
+
+
+{-
+************************************************************************
+*                                                                      *
+                Extensible Core Field
+*                                                                      *
+************************************************************************
+-}
+
+tcIfaceBinding :: IfaceBinding -> IfL (Bind Id)
+tcIfaceBinding (IfaceNonRec (IfLetBndr fs ty info ji) rhs)
+  = do  { name    <- newIfaceName (mkVarOccFS fs)
+        ; ty'     <- tcIfaceType ty
+        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+                              NotTopLevel name ty' info
+        ; let id = mkLocalIdWithInfo name ty' id_info
+                     `asJoinId_maybe` tcJoinInfo ji
+        ; rhs' <- tcIfaceExpr rhs
+        ; return (NonRec id rhs') }
+
+tcIfaceBinding (IfaceRec pairs)
+  = do { ids <- mapM tc_rec_bndr (map fst pairs)
+       ; extendIfaceIdEnv ids $ do
+       { pairs' <- zipWithM tc_pair pairs ids
+       ; return (Rec pairs') } }
+ where
+   tc_rec_bndr (IfLetBndr fs ty _ ji)
+     = do { name <- newIfaceName (mkVarOccFS fs)
+          ; ty'  <- tcIfaceType ty
+          ; return (mkLocalId name ty' `asJoinId_maybe` tcJoinInfo ji) }
+   tc_pair (IfLetBndr _ _ info _, rhs) id
+     = do { rhs' <- tcIfaceExpr rhs
+          ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+                                NotTopLevel (idName id) (idType id) info
+          ; return (setIdInfo id id_info, rhs') }
+
+tcIfaceModGuts :: IfaceModGuts -> IfL ModGuts
+tcIfaceModGuts (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                        f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29) = do
+  f10' <- mapM tcIfaceTyCon f10
+  f11' <- mapM tcIfaceInst f11
+  f12' <- mapM tcIfaceFamInst f12
+  f13' <- mapM tcIfacePatSyn f13
+  f14' <- mapM tcIfaceRule f14
+  f15' <- mapM tcIfaceBinding f15
+  f23' <- extendInstEnvList emptyInstEnv <$> mapM tcIfaceInst f23
+  f24' <- extendFamInstEnvList emptyFamInstEnv <$> mapM tcIfaceFamInst f24
+
+  return $ ModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10' f11' f12' f13' f14' f15' f16 f17 f18
+                        f19 f20 f21 f22 f23' f24' f25 f26 f27 f28 f29
+
+  where
+    tcIfacePatSyn ps = do
+      decl <- tcIfaceDecl False ps
+      case decl of
+        AConLike (PatSynCon ps') -> return ps'
+        _                        -> panic "tcIfaceModGuts: a non-patsyn decl was stored in the patsyns field"

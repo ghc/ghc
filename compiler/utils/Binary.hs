@@ -74,6 +74,8 @@ import FastMutInt
 import Fingerprint
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
+import GHC.ForeignSrcLang.Type
+import Data.IntMap as M (toList)
 
 import Control.DeepSeq
 import Foreign
@@ -1455,3 +1457,24 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
+
+instance Binary ForeignSrcLang where
+  put_ bh LangC      = putByte bh 0
+  put_ bh LangCxx    = putByte bh 1
+  put_ bh LangObjc   = putByte bh 2
+  put_ bh LangObjcxx = putByte bh 3
+  put_ bh LangAsm    = putByte bh 4
+  put_ bh RawObject  = putByte bh 5
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return LangC
+      1 -> return LangCxx
+      2 -> return LangObjc
+      3 -> return LangObjcxx
+      4 -> return LangAsm
+      _ -> return RawObject
+
+instance Binary ele => Binary (UniqFM ele) where
+  put_ bh ufm = put_ bh (M.toList $ ufmToIntMap ufm)
+  get bh = listToUFM <$> (get bh :: IO [(Int, ele)])

@@ -72,6 +72,7 @@ module GHC.Types.Name.Reader (
 
 import GhcPrelude
 
+import Binary
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Avail
@@ -466,6 +467,10 @@ data GlobalRdrElt
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
 
+instance Binary GlobalRdrElt where
+  put_ bh (GRE f1 f2 f3 f4) = put_ bh f1 >> put_ bh f2 >> put_ bh f3 >> put_ bh f4
+  get bh = GRE <$> get bh <*> get bh <*> get bh  <*> get bh
+
 -- | The children of a Name are the things that are abbreviated by the ".."
 --   notation in export lists.  See Note [Parents]
 data Parent = NoParent
@@ -473,6 +478,17 @@ data Parent = NoParent
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
             deriving (Eq, Data)
+
+instance Binary Parent where
+  put_ bh NoParent = putByte bh 0
+  put_ bh (ParentIs f1) = putByte bh 1 >> put_ bh f1
+  put_ bh (FldParent f1 f2) = putByte bh 2 >> put_ bh f1 >> put_ bh f2
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return NoParent
+      1 -> ParentIs <$> get bh
+      _ -> FldParent <$> get bh <*> get bh
 
 instance Outputable Parent where
    ppr NoParent        = empty
@@ -1130,6 +1146,10 @@ data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
                             is_item :: ImpItemSpec }
                 deriving( Eq, Data )
 
+instance Binary ImportSpec where
+  put_ bh (ImpSpec f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = ImpSpec <$> get bh <*> get bh
+
 -- | Import Declaration Specification
 --
 -- Describes a particular import declaration and is
@@ -1146,6 +1166,10 @@ data ImpDeclSpec
         is_qual     :: Bool,       -- ^ Was this import qualified?
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
     } deriving (Eq, Data)
+
+instance Binary ImpDeclSpec where
+  put_ bh (ImpDeclSpec f1 f2 f3 f4) = put_ bh f1 >> put_ bh f2 >> put_ bh f3 >> put_ bh f4
+  get bh = ImpDeclSpec <$> get bh <*> get bh <*> get bh <*> get bh
 
 -- | Import Item Specification
 --
@@ -1167,6 +1191,15 @@ data ImpItemSpec
         -- Here the constructors of @T@ are not named explicitly;
         -- only @T@ is named explicitly.
   deriving (Eq, Data)
+
+instance Binary ImpItemSpec where
+  put_ bh ImpAll = putByte bh 0
+  put_ bh (ImpSome f1 f2) = putByte bh 1 >> put_ bh f1 >> put_ bh f2
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return ImpAll
+      _ -> ImpSome <$> get bh <*> get bh
 
 bestImport :: [ImportSpec] -> ImportSpec
 -- See Note [Choosing the best import declaration]

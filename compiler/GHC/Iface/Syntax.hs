@@ -22,6 +22,7 @@ module GHC.Iface.Syntax (
         IfaceAxBranch(..),
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
+        IfaceModGuts(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -57,7 +58,7 @@ import GHC.Types.Name
 import GHC.Types.CostCentre
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
-import GHC.Types.Annotations( AnnPayload, AnnTarget )
+import GHC.Types.Annotations( AnnPayload, AnnTarget, Annotation )
 import GHC.Types.Basic
 import Outputable
 import GHC.Types.Module
@@ -72,6 +73,14 @@ import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Builtin.Types ( constraintKindTyConName )
 import Util (seqList)
+import GHC.Driver.Phases
+import GHC.ForeignSrcLang.Type
+import GHC.ByteCode.Types
+import GHC.Driver.Session
+import GHC.Hs.Doc ( ArgDocMap, DeclDocMap, HsDocString )
+import GHC.Types.Avail
+import GHC.Types.Name.Reader
+import {-# SOURCE #-} GHC.Driver.Types
 
 import Control.Monad
 import System.IO.Unsafe
@@ -378,6 +387,40 @@ data IfaceIdDetails
   = IfVanillaId
   | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
   | IfDFunId
+
+
+data IfaceModGuts = IfaceModGuts {
+    img_module    :: !Module,
+    img_hsc_src   :: HscSource,
+    img_loc       :: SrcSpan,
+    img_exports   :: ![AvailInfo],
+    img_deps      :: !Dependencies,
+    img_usages    :: ![Usage],
+    img_used_th   :: !Bool,
+    img_rdr_env   :: !GlobalRdrEnv,
+    img_fix_env   :: !FixityEnv,
+    img_tcs       :: ![IfaceTyCon],
+    img_insts     :: ![IfaceClsInst],
+    img_fam_insts :: ![IfaceFamInst],
+    img_patsyns   :: ![IfaceDecl],
+    img_rules     :: ![IfaceRule],
+    img_binds     :: ![IfaceBinding],
+    img_foreign   :: !ForeignStubs,
+    img_foreign_files :: ![(ForeignSrcLang, FilePath)],
+    img_warns     :: !Warnings,
+    img_anns      :: [Annotation],
+    img_complete_sigs :: [CompleteMatch],
+    img_hpc_info  :: !HpcInfo,
+    img_modBreaks :: !(Maybe ModBreaks),
+    img_inst_env     :: [IfaceClsInst],
+    img_fam_inst_env :: [IfaceFamInst],
+    img_safe_haskell :: SafeHaskellMode,
+    img_trust_pkg    :: Bool,
+    img_doc_hdr       :: !(Maybe HsDocString),
+    img_decl_docs     :: !DeclDocMap,
+    img_arg_docs      :: !ArgDocMap
+  }
+
 
 {-
 Note [Versioning of instances]
@@ -2404,6 +2447,44 @@ instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
 
+instance Binary IfaceModGuts where
+  put_ bh (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                        f19 f20 f21 _f22 f23 f24 f25 f26 f27 f28 f29) = do
+    put_ bh f1
+    put_ bh f2
+    put_ bh f3
+    put_ bh f4
+    put_ bh f5
+    put_ bh f6
+    put_ bh f7
+    put_ bh f8
+    put_ bh f9
+    put_ bh f10
+    put_ bh f11
+    put_ bh f12
+    put_ bh f13
+    put_ bh f14
+    put_ bh f15
+    put_ bh f16
+    put_ bh f17
+    put_ bh f18
+    put_ bh f19
+    put_ bh f20
+    put_ bh f21
+    put_ bh f23
+    put_ bh f24
+    put_ bh f25
+    put_ bh f26
+    put_ bh f27
+    put_ bh f28
+    put_ bh f29
+
+  get bh = IfaceModGuts <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> return Nothing <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+
 
 {-
 ************************************************************************
@@ -2573,3 +2654,11 @@ instance NFData IfaceClsInst where
 
 instance NFData IfaceAnnotation where
   rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()
+
+instance NFData IfaceModGuts where
+  rnf (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                    f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29) =
+    rnf f1 `seq` f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
+    f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
+    f16 `seq` f17 `seq` f18 `seq` f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+    `seq` rnf f24 `seq` f25 `seq` rnf f26 `seq` f27 `seq` f28 `seq` f29 `seq` ()

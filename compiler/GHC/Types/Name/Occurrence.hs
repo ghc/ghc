@@ -393,6 +393,10 @@ instance Uniquable OccName where
 newtype OccEnv a = A (UniqFM a)
   deriving Data
 
+instance Binary a => Binary (OccEnv a) where
+  put_ bh (A ufm) = put_ bh ufm
+  get  bh = A <$> get bh
+
 emptyOccEnv :: OccEnv a
 unitOccEnv  :: OccName -> a -> OccEnv a
 extendOccEnv :: OccEnv a -> OccName -> a -> OccEnv a

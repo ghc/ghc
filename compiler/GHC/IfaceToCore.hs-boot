@@ -2,13 +2,13 @@ module GHC.IfaceToCore where
 
 import GhcPrelude
 import GHC.Iface.Syntax ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule
-                        , IfaceAnnotation, IfaceCompleteMatch )
+                        , IfaceAnnotation, IfaceCompleteMatch, IfaceModGuts )
 import GHC.Core.TyCo.Rep   ( TyThing )
 import GHC.Tc.Types        ( IfL )
 import GHC.Core.InstEnv    ( ClsInst )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core         ( CoreRule )
-import GHC.Driver.Types ( CompleteMatch )
+import GHC.Driver.Types ( CompleteMatch, ModGuts )
 import GHC.Types.Annotations ( Annotation )
 
 tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing
@@ -17,3 +17,4 @@ tcIfaceInst         :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst      :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations  :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
+tcIfaceModGuts      :: IfaceModGuts -> IfL ModGuts

@@ -207,6 +207,7 @@ data GeneralFlag
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
+   | Opt_WriteCoreField
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs

@@ -27,6 +27,7 @@ module GHC.Iface.Load (
         initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
+        loadCore,
 
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface
@@ -80,6 +81,7 @@ import GHC.Types.FieldLabel
 import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
 import GHC.Driver.Plugins
+import {-# SOURCE #-} GHC.IfaceToCore ( tcIfaceModGuts )
 
 import Control.Monad
 import Control.Exception
@@ -1006,6 +1008,19 @@ readIface wanted_mod file_path
 
             Left exn    -> return (Failed (text (showException exn)))
     }
+
+{-
+*********************************************************
+*                                                       *
+        Typechecking the extensible core field
+*                                                       *
+*********************************************************
+-}
+
+loadCore :: ModIface -> IfL (Maybe ModGuts)
+loadCore iface = do
+  ncu <- mkNameCacheUpdater
+  mapM tcIfaceModGuts =<< liftIO (readIfaceFieldWith "ghc/core" (getWithUserData ncu) iface)
 
 {-
 *********************************************************
