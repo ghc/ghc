@@ -26,27 +26,15 @@
 #include "WSDeque.h"
 #endif
 
-#if defined(THREADED_RTS)
-SpinLock gc_alloc_block_sync;
-#endif
-
 bdescr* allocGroup_sync(uint32_t n)
 {
-    bdescr *bd;
     uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
+    return allocGroupOnNode_lock(node,n);
 }
 
 bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n)
 {
-    bdescr *bd;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
+    return allocGroupOnNode_lock(node,n);
 }
 
 static uint32_t
@@ -55,7 +43,7 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     bdescr *bd;
     uint32_t i;
     uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_SM_LOCK;
     bd = allocLargeChunkOnNode(node,1,n);
     // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
     // fragmentation-friendly way.
@@ -68,7 +56,7 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     bd[n-1].link = NULL;
     // We have to hold the lock until we've finished fiddling with the metadata,
     // otherwise the block allocator can get confused.
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_SM_LOCK;
     *hd = bd;
     return n;
 }
@@ -76,17 +64,13 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
 void
 freeChain_sync(bdescr *bd)
 {
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    freeChain(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    freeChain_lock(bd);
 }
 
 void
 freeGroup_sync(bdescr *bd)
 {
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    freeGroup(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    freeGroup_lock(bd);
 }
 
 /* -----------------------------------------------------------------------------

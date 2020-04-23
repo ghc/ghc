@@ -174,12 +174,6 @@ initStorage (void)
   // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
   nonmovingInit();
 
-#if defined(THREADED_RTS)
-  // nonmovingAddCapabilities allocates segments, which requires taking the gc
-  // sync lock, so initialize it before nonmovingAddCapabilities
-  initSpinLock(&gc_alloc_block_sync);
-#endif
-
   if (RtsFlags.GcFlags.useNonmoving)
       nonmovingAddCapabilities(n_capabilities);
 

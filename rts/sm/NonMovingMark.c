@@ -442,6 +442,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
     q->top->head++;
 }
 
+// TODO: Eliminate this
 /* A variant of push to be used by the minor GC when it encounters a reference
  * to an object in the non-moving heap. In contrast to the other push
  * operations this uses the gc_alloc_block_sync spinlock instead of the
@@ -459,13 +460,13 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
         // allocate a fresh block.
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        ACQUIRE_SM_LOCK;
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
         q->blocks = bd;
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        RELEASE_SM_LOCK;
     }
 
     MarkQueueEnt ent = {

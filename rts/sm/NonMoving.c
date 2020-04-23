@@ -467,8 +467,7 @@ unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
  * Request a fresh segment from the free segment list or allocate one of the
  * given node.
  *
- * Caller must hold SM_MUTEX (although we take the gc_alloc_block_sync spinlock
- * under the assumption that we are in a GC context).
+ * Caller must hold SM_MUTEX.
  */
 static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
 {
@@ -480,12 +479,10 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
     if (ret == NULL) {
         // Take gc spinlock: another thread may be scavenging a moving
         // generation and call `todo_block_full`
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
         bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
         // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
 
         for (StgWord32 i = 0; i < bd->blocks; ++i) {
             initBdescr(&bd[i], oldest_gen, oldest_gen);

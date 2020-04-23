@@ -939,11 +939,6 @@ static void report_summary(const RTSSummaryStats* sum)
                     , col_width[3], "Yields");
         statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
                     , col_width[0], ""
-                    , col_width[1], "gc_alloc_block_sync"
-                    , col_width[2], gc_alloc_block_sync.spin
-                    , col_width[3], gc_alloc_block_sync.yield);
-        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
-                    , col_width[0], ""
                     , col_width[1], "gc_spin"
                     , col_width[2], stats.gc_spin_spin
                     , col_width[3], stats.gc_spin_yield);
@@ -1124,10 +1119,6 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 
     // next, internal counters
 #if defined(PROF_SPIN)
-    MR_STAT("gc_alloc_block_sync_spin", FMT_Word64, gc_alloc_block_sync.spin);
-    MR_STAT("gc_alloc_block_sync_yield", FMT_Word64,
-            gc_alloc_block_sync.yield);
-    MR_STAT("gc_alloc_block_sync_spin", FMT_Word64, gc_alloc_block_sync.spin);
     MR_STAT("gc_spin_spin", FMT_Word64, stats.gc_spin_spin);
     MR_STAT("gc_spin_yield", FMT_Word64, stats.gc_spin_yield);
     MR_STAT("mut_spin_spin", FMT_Word64, stats.mut_spin_spin);
