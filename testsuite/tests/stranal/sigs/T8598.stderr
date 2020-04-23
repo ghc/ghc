@@ -7,12 +7,17 @@ T8598.fun: <S,1*U(U)>
 
 ==================== Cpr signatures ====================
 <<<<<<< HEAD
+<<<<<<< HEAD
 T8598.$trModule:
 T8598.fun: m1
 =======
 T8598.$trModule: #1(#, #) 1(1(-), 1(-))
 T8598.fun: * 1(-)
 >>>>>>> 6bb3d74323... Nested CPR
+=======
+T8598.$trModule: #c1(#c1(#), #c1(#))
+T8598.fun: *c1(*)
+>>>>>>> 7dc0a59c86... A slew of testsuite changes
 
 
 
