@@ -8,6 +8,7 @@ T12370.foo: <S(SS),1*U(1*U(U),1*U(U))>
 
 ==================== Cpr signatures ====================
 <<<<<<< HEAD
+<<<<<<< HEAD
 T12370.$trModule:
 T12370.bar: m1
 T12370.foo: m1
@@ -16,6 +17,11 @@ T12370.$trModule: #1(#, #) 1(1(-), 1(-))
 T12370.bar: #1(#) 1(-)
 T12370.foo: #1(#) 1(-)
 >>>>>>> 6bb3d74323... Nested CPR
+=======
+T12370.$trModule: #c1(#c1(#), #c1(#))
+T12370.bar: #c1(#)
+T12370.foo: #c1(#)
+>>>>>>> 7dc0a59c86... A slew of testsuite changes
 
 
 
