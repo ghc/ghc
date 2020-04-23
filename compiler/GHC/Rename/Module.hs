@@ -1560,7 +1560,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
              doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
+       ; bindHsQTyVisVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
     do { (rhs', fvs) <- rnTySyn doc rhs
        ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
                          , tcdFixity = fixity
@@ -1576,7 +1576,7 @@ rnTyClDecl (DataDecl
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
+       ; bindHsQTyVisVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
@@ -1600,7 +1600,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         -- Tyvars scope over superclass context and method signatures
         ; ((tyvars', context', fds', ats'), stuff_fvs)
-            <- bindHsQTyVars cls_doc Nothing Nothing kvs tyvars $ \ tyvars' _ -> do
+            <- bindHsQTyVisVars cls_doc Nothing Nothing kvs tyvars $ \ tyvars' _ -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds fds
@@ -1635,7 +1635,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         -- we want to name both "x" tyvars with the same unique, so that they are
         -- easy to group together in the typechecker.
         ; (mbinds', sigs', meth_fvs)
-            <- rnMethodBinds True cls' (hsAllLTyVarNames tyvars') mbinds sigs
+            <- rnMethodBinds True cls' (hsAllLTyVisVarNames tyvars') mbinds sigs
                 -- No need to check for duplicate method signatures
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
@@ -1654,7 +1654,9 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
     cls_doc  = ClassDeclCtx lcls
 
 -- Does the data type declaration include a CUSK?
-data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
+data_decl_has_cusk :: XXTyVarTermBndr pass ~ NoExtCon
+                   => LHsQTyVisVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass')
+                   -> RnM Bool
 data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
@@ -1664,7 +1666,7 @@ data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
               unlifted_newtypes && isNothing kind_sig
           | otherwise = False
     -- See Note [CUSKs: complete user-supplied kind signatures] in GHC.Hs.Decls
-  ; return $ hsTvbAllKinded tyvars && no_rhs_kvs && not non_cusk_newtype
+  ; return $ hsTtvbAllKinded tyvars && no_rhs_kvs && not non_cusk_newtype
   }
 
 {- Note [Unlifted Newtypes and CUSKs]
@@ -1853,7 +1855,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdInjectivityAnn = injectivity })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; ((tyvars', res_sig', injectivity'), fv1) <-
-            bindHsQTyVars doc Nothing mb_cls kvs tyvars $ \ tyvars' _ ->
+            bindHsQTyVisVars doc Nothing mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
                ; (res_sig', fv_kind) <- wrapLocFstM rn_sig res_sig
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
@@ -1949,7 +1951,7 @@ rnFamResultSig doc (TyVarSig _ tvbndr)
 -- | Rename injectivity annotation. Note that injectivity annotation is just the
 -- part after the "|".  Everything that appears before it is renamed in
 -- rnFamDecl.
-rnInjectivityAnn :: LHsQTyVars GhcRn           -- ^ Type variables declared in
+rnInjectivityAnn :: LHsQTyVisVars GhcRn        -- ^ Type variables declared in
                                                --   type family head
                  -> LFamilyResultSig GhcRn     -- ^ Result signature
                  -> LInjectivityAnn GhcPs      -- ^ Injectivity annotation
@@ -1966,7 +1968,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
                 ; injTo'   <- mapM rnLTyVar injTo
                 ; return $ L srcSpan (InjectivityAnn injFrom' injTo') }
 
-   ; let tvNames  = Set.fromList $ hsAllLTyVarNames tvBndrs
+   ; let tvNames  = Set.fromList $ hsAllLTyVisVarNames tvBndrs
          resName  = hsLTyVarName resTv
          -- See Note [Renaming injectivity annotation]
          lhsValid = EQ == (stableNameCmp resName (unLoc injFrom'))

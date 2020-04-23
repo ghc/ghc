@@ -447,7 +447,7 @@ repTyClD (L loc (FamDecl { tcdFam = fam })) = liftM Just $
 
 repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
-       ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
+       ; dec <- addTyClTyVarTermBinds tvs $ \bndrs ->
                 repSynDecl tc1 bndrs rhs
        ; return (Just (loc, dec)) }
 
@@ -455,7 +455,7 @@ repTyClD (L loc (DataDecl { tcdLName = tc
                           , tcdTyVars = tvs
                           , tcdDataDefn = defn }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
-       ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
+       ; dec <- addTyClTyVarTermBinds tvs $ \bndrs ->
                 repDataDefn tc1 (Left bndrs) defn
        ; return (Just (loc, dec)) }
 
@@ -464,7 +464,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
-       ; dec  <- addTyVarBinds tvs $ \bndrs ->
+       ; dec  <- addTyVarTermBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
           -- See Note [Scoped type variables in class and instance declarations]
               ; (ss, sigs_binds) <- rep_sigs_binds sigs meth_binds
@@ -540,7 +540,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
              resTyVar = case resultSig of
                      TyVarSig _ bndr -> mkHsQTvs [bndr]
                      _               -> mkHsQTvs []
-       ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
+       ; dec <- addTyClTyVarTermBinds tvs $ \bndrs ->
                 addTyClTyVarBinds resTyVar $ \_ ->
            case info of
              ClosedTypeFamily Nothing ->
@@ -1131,6 +1131,23 @@ addHsTyVarBinds exp_tvs thing_inside
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
+-- TODO Ericson2314 add visibility info to TH
+addHsTyVarTermBinds :: [LHsTyVarTermBndr GhcRn]  -- the binders to be added
+                    -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))  -- action in the ext env
+                    -> MetaM (Core (M a))
+addHsTyVarTermBinds exp_tvs thing_inside
+  = do { fresh_exp_names <- mkGenSyms $ hsLTyVarNames $
+         (fmap . fmap) tyBinderIgnoreVis exp_tvs
+       ; term <- addBinds fresh_exp_names $
+                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
+                                     (exp_tvs `zip` fresh_exp_names)
+                    ; thing_inside kbs }
+       ; wrapGenSyms fresh_exp_names term }
+  where
+    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind
+      (fmap tyBinderIgnoreVis tv)
+      (coreVar v)
+
 addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
               -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))  -- action in the ext env
               -> MetaM (Core (M a))
@@ -1144,32 +1161,59 @@ addTyVarBinds (HsQTvs { hsq_ext = imp_tvs
     addHsTyVarBinds exp_tvs $
     thing_inside
 
+addTyVarTermBinds :: LHsQTyVisVars GhcRn                    -- the binders to be added
+                  -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))  -- action in the ext env
+                  -> MetaM (Core (M a))
+-- gensym as above
+addTyVarTermBinds (HsQTVisvs { hsqv_ext = imp_tvs
+                             , hsqv_explicit = exp_tvs
+                             })
+                  thing_inside
+  = addSimpleTyVarBinds imp_tvs $
+    addHsTyVarTermBinds exp_tvs $
+    thing_inside
+
 addTyClTyVarBinds :: LHsQTyVars GhcRn
                   -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))
                   -> MetaM (Core (M a))
-
--- Used for data/newtype declarations, and family instances,
--- so that the nested type variables work right
---    instance C (T a) where
---      type W (T a) = blah
--- The 'a' in the type instance is the one bound by the instance decl
-addTyClTyVarBinds tvs m
-  = do { let tv_names = hsAllLTyVarNames tvs
-       ; env <- lift $ dsGetMetaEnv
-       ; freshNames <- mkGenSyms (filterOut (`elemNameEnv` env) tv_names)
-            -- Make fresh names for the ones that are not already in scope
-            -- This makes things work for family declarations
-
-       ; term <- addBinds freshNames $
-                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
-                                     (hsQTvExplicit tvs)
-                    ; m kbs }
-
-       ; wrapGenSyms freshNames term }
+addTyClTyVarBinds tvs m = add_ty_cl_ty_var_names (hsAllLTyVarNames tvs) $ do
+  kbs <- repListM tyVarBndrTyConName mk_tv_bndr $ hsQTvExplicit tvs
+  m kbs
   where
     mk_tv_bndr :: LHsTyVarBndr GhcRn -> MetaM (Core (M TH.TyVarBndr))
     mk_tv_bndr tv = do { v <- lookupBinder (hsLTyVarName tv)
                        ; repTyVarBndrWithKind tv v }
+
+-- TODO Ericson2314 add visibility info to TH
+addTyClTyVarTermBinds :: LHsQTyVisVars GhcRn
+                      -> (Core [(M TH.TyVarBndr)] -> MetaM (Core (M a)))
+                      -> MetaM (Core (M a))
+addTyClTyVarTermBinds tvs m = add_ty_cl_ty_var_names (hsAllLTyVisVarNames tvs) $ do
+  kbs <- repListM tyVarBndrTyConName mk_tv_bndr $ hsQTVisvExplicit tvs
+  m kbs
+  where
+    mk_tv_bndr :: LHsTyVarTermBndr GhcRn -> MetaM (Core (M TH.TyVarBndr))
+    mk_tv_bndr tv = do { let tv' = fmap tyBinderIgnoreVis tv
+                       ; v <- lookupBinder (hsLTyVarName tv')
+                       ; repTyVarBndrWithKind tv' v }
+
+-- | Used for data/newtype declarations, and family instances,
+-- so that the nested type variables work right
+--    instance C (T a) where
+--      type W (T a) = blah
+-- The 'a' in the type instance is the one bound by the instance decl
+add_ty_cl_ty_var_names :: [Name]
+                       -> MetaM (Core (M a))
+                       -> MetaM (Core (M a))
+add_ty_cl_ty_var_names tv_names m
+  = do { env <- lift $ dsGetMetaEnv
+       ; freshNames <- mkGenSyms (filterOut (`elemNameEnv` env) tv_names)
+            -- Make fresh names for the ones that are not already in scope
+            -- This makes things work for family declarations
+
+       ; term <- addBinds freshNames m
+
+       ; wrapGenSyms freshNames term }
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --

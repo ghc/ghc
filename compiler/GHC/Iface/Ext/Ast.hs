@@ -2,6 +2,7 @@
 Main functions for .hie file generation
 -}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -397,6 +398,14 @@ tvScopes
   -> [LHsTyVarBndr a]
   -> [TVScoped (LHsTyVarBndr a)]
 tvScopes tvScope rhsScope xs =
+  map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
+
+tvVisScopes
+  :: TyVarScope
+  -> Scope
+  -> [LHsTyVarTermBndr a]
+  -> [TVScoped (LHsTyVarTermBndr a)]
+tvVisScopes tvScope rhsScope xs =
   map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
 
 {- Note [Scoping Rules for SigPat]
@@ -1585,9 +1594,9 @@ instance ToHie (TScoped (LHsType GhcRn)) where
       HsStarTy _ _ -> []
       XHsType _ -> []
 
-instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
+instance (ToHie tm, ToHie ty, ToHie (TScoped ty)) => ToHie (HsArg tm ty) where
   toHie (HsValArg tm) = toHie tm
-  toHie (HsTypeArg _ ty) = toHie ty
+  toHie (HsTypeArg _ ty) = toHie $ TS (ResolvedScopes []) ty
   toHie (HsArgPar sp) = pure $ locOnly sp
 
 instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
@@ -1600,10 +1609,38 @@ instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
         , toHie kind
         ]
 
+instance ToHie (TVScoped (LHsTyVarTermBndr GhcRn)) where
+  toHie (TVS tsc sc (L span bndr)) = concatM $ makeNode bndr span : case bndr of
+    HsTyVarVisBndr _ b -> case b of
+      UserTyVar _ var ->
+        [ toHie $ C (TyVarBind sc tsc) var
+        ]
+      KindedTyVar _ var kind ->
+        [ toHie $ C (TyVarBind sc tsc) var
+        , toHie kind
+        ]
+    HsTyVarInvisBndr _ _ b -> case b of
+      UserTyVar _ var ->
+        [ toHie $ C (TyVarBind sc tsc) var
+        ]
+      KindedTyVar _ var kind ->
+        [ toHie $ C (TyVarBind sc tsc) var
+        , toHie kind
+        ]
+
 instance ToHie (TScoped (LHsQTyVars GhcRn)) where
   toHie (TS sc (HsQTvs implicits vars)) = concatM $
     [ pure $ bindingsOnly bindings
     , toHie $ tvScopes sc NoScope vars
+    ]
+    where
+      varLoc = loc vars
+      bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
+
+instance ToHie (TScoped (LHsQTyVisVars GhcRn)) where
+  toHie (TS sc (HsQTVisvs implicits vars)) = concatM $
+    [ pure $ bindingsOnly bindings
+    , toHie $ tvVisScopes sc NoScope vars
     ]
     where
       varLoc = loc vars
