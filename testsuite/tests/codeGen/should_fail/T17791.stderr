@@ -1,0 +1,2 @@
+References to `base` package are not allowed (-no-base is set)
+  T17791.hs:(7,4)-(8,35)|case
