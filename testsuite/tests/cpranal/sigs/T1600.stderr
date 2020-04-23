@@ -1,7 +1,9 @@
 
 ==================== Cpr signatures ====================
-FacState.$trModule: #1(#, #) 1(1(-), 1(-))
-FacState.fac: *1(*, #) 1(-, 1(-))
-FacState.facIO: *1(*, #) 1(-, 1(-))
+Lib.$trModule: #c1(#c1(#), #c1(#))
+Lib.fac1: *c1(*, #c1(#))
+Lib.fac2: *c1(*, #c1(#))
+Lib.fac3: *c1(*, *c1(#))
+Lib.facIO: *c1(*, #c1(#))
 
 
