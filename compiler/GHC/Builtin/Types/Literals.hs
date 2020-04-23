@@ -19,21 +19,27 @@ module GHC.Builtin.Types.Literals
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
+
+  , arrowEnvTyCon
+  , arrowStackTupTyCon
+  , arrowEnvTupTyCon
   ) where
 
 import GhcPrelude
 
 import GHC.Core.Type
+import GHC.Core.FamInstEnv
 import Pair
 import GHC.Tc.Utils.TcType ( TcType, tcEqType )
-import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
-                         , Injectivity(..) )
+-- import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
+--                          , Injectivity(..) )
+import GHC.Core.TyCon
 import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
-import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
-import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn, toBranchedAxiom )
+import GHC.Types.Name          ( Name, BuiltInSyntax(..), mkWiredInName, mkNewTyCoOcc, nameOccName )
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders )
+import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders, alphaTyVar, alphaTy )
 import GHC.Builtin.Names
                   ( gHC_TYPELITS
                   , gHC_TYPENATS
@@ -48,6 +54,13 @@ import GHC.Builtin.Names
                   , typeNatCmpTyFamNameKey
                   , typeSymbolCmpTyFamNameKey
                   , typeSymbolAppendFamNameKey
+
+                  , gHC_DESUGAR
+                  , arrowEnvTyConKey
+                  , arrowEnvDataConKey
+                  , arrowEnvCoAxiomKey
+                  , arrowStackTupTyFamKey
+                  , arrowEnvTupTyFamKey
                   )
 import FastString ( FastString
                   , fsLit, nilFS, nullFS, unpackFS, mkFastString, appendFS
@@ -56,6 +69,8 @@ import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
+
+import Outputable
 
 {-
 Note [Type-level literals]
@@ -130,6 +145,125 @@ There are a few steps to adding a built-in type family:
     built-in type family deals with Nats or Symbols, respectively.
 -}
 
+arrowEnvTyCon :: TyCon
+arrowEnvTyCon
+  = mkAlgTyCon name
+               (mkAnonTyConBinders VisArg tvs)
+               liftedTypeKind
+               [Representational]
+               Nothing
+               []              -- No stupid theta
+               rhs
+               (VanillaAlgTyCon (mkPrelTyConRepName name))
+               False           -- Not in GADT syntax
+  where
+    name   = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
+               arrowEnvTyConKey arrowEnvTyCon
+    tvs    = [alphaTyVar]
+    rhs_ty = alphaTy
+    rhs    = NewTyCon data_con rhs_ty (tvs, rhs_ty) co_ax False
+
+    co_ax_name = mkWiredInName gHC_DESUGAR (mkNewTyCoOcc (nameOccName name))
+                   arrowEnvCoAxiomKey (ACoAxiom (toBranchedAxiom co_ax)) UserSyntax
+    co_ax      = mkNewTypeCoAxiom co_ax_name arrowEnvTyCon tvs
+                                  [Representational] rhs_ty
+
+    data_con  = pcDataCon data_name tvs [rhs_ty] arrowEnvTyCon
+    data_name = mkWiredInDataConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
+                  arrowEnvDataConKey data_con
+
+arrowEnvTy :: Type -> Type
+arrowEnvTy ty = mkTyConApp arrowEnvTyCon [ty]
+
+arrowStackTupTyCon :: TyCon
+arrowStackTupTyCon =
+  mkFamilyTyCon name
+    (mkTemplateAnonTyConBinders [ mkListTy liftedTypeKind ])
+    liftedTypeKind
+    Nothing
+    (BuiltInSynFamTyCon tcb)
+    Nothing
+    NotInjective
+  where
+    name = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowStackTup")
+             arrowStackTupTyFamKey arrowStackTupTyCon
+    tcb = BuiltInSynFamily
+      { sfMatchFam      = matchFamArrowStackTup
+      , sfInteractTop   = \_ _ -> []
+      , sfInteractInert = \_ _ _ _ -> [] }
+
+    matchFamArrowStackTup tys = do
+      [stk_ty] <- pure tys
+      stk_tys <- isPromotedListTy stk_ty
+      pure (axArrowStackTupDef, [stk_ty], mkBoxedTupleTy stk_tys)
+
+axArrowStackTupDef :: CoAxiomRule
+axArrowStackTupDef = CoAxiomRule
+  { coaxrName      = fsLit "ArrowStackTupDef"
+  , coaxrAsmpRoles = [Nominal]
+  , coaxrRole      = Nominal
+  , coaxrProves    = \cs -> do
+      [Pair ty1 ty2] <- pure cs
+      tys2 <- isPromotedListTy ty2
+      pure (mkTyConApp arrowStackTupTyCon [ty1] === mkBoxedTupleTy tys2)
+  }
+
+-- splitBoxedTupleTyConApp_maybe :: Arity -> Type -> Maybe [Type]
+-- splitBoxedTupleTyConApp_maybe 1 ty = Just [ty]
+-- splitBoxedTupleTyConApp_maybe i ty = do
+--   (tc, tys) <- splitTyConApp_maybe ty
+--   guard (tc == tupleTyCon Boxed i)
+--   guard (length tys == i)
+--   pure tys
+
+arrowEnvTupTyCon :: TyCon
+arrowEnvTupTyCon =
+  mkFamilyTyCon name
+    (mkTemplateAnonTyConBinders [ liftedTypeKind, mkListTy liftedTypeKind ])
+    liftedTypeKind
+    Nothing
+    (BuiltInSynFamTyCon tcb)
+    Nothing
+    (Injective [True, True])
+  where
+    name = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnvTup")
+             arrowEnvTupTyFamKey arrowEnvTupTyCon
+    tcb = BuiltInSynFamily
+      { sfMatchFam      = matchFamArrowEnvTup
+      , sfInteractTop   = interactTopArrowEnvTup
+      , sfInteractInert = interactInertArrowEnvTup }
+
+    matchFamArrowEnvTup tys = do
+      [env_ty, stk_ty] <- pure tys
+      stk_tys <- isPromotedListTy stk_ty
+      let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty : stk_tys)
+      pure (axArrowEnvTupDef, [env_ty, stk_ty], rhs_ty)
+
+    interactTopArrowEnvTup [env_ty, stk_ty] tup_ty
+      | Just (tup_tc, env_ty':stk_tys) <- splitTyConApp_maybe tup_ty
+      , isBoxedTupleTyCon tup_tc
+      = [ arrowEnvTy env_ty === env_ty'
+        , stk_ty === mkPromotedListTy liftedTypeKind stk_tys ]
+    interactTopArrowEnvTup _ _ = []
+
+    interactInertArrowEnvTup [env_ty1, stk_ty1] tup_ty1
+                             [env_ty2, stk_ty2] tup_ty2
+      | tup_ty1 `tcEqType` tup_ty2
+      = [ env_ty1 === env_ty2, stk_ty1 === stk_ty2 ]
+    interactInertArrowEnvTup _ _ _ _ = []
+
+axArrowEnvTupDef :: CoAxiomRule
+axArrowEnvTupDef = CoAxiomRule
+  { coaxrName      = fsLit "ArrowEnvTupDef"
+  , coaxrAsmpRoles = [Nominal, Nominal]
+  , coaxrRole      = Nominal
+  , coaxrProves    = \cs -> do
+      [Pair env_ty1 env_ty2, Pair stk_ty1 stk_ty2] <- pure cs
+      stk_tys2 <- isPromotedListTy stk_ty2
+      let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty2 : stk_tys2)
+      pure (mkTyConApp arrowEnvTupTyCon [env_ty1, stk_ty1] === rhs_ty)
+  }
+
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats
 -}
@@ -150,6 +284,10 @@ typeNatTyCons =
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
+
+  , arrowEnvTyCon
+  , arrowStackTupTyCon
+  , arrowEnvTupTyCon
   ]
 
 typeNatAddTyCon :: TyCon
@@ -490,6 +628,9 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axModDef
   , axMod1
   , axLogDef
+
+  , axArrowStackTupDef
+  , axArrowEnvTupDef
   ]
 
 

@@ -1894,6 +1894,11 @@ typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 unsafeEqualityTyConKey :: Unique
 unsafeEqualityTyConKey = mkPreludeTyConUnique 191
 
+-- Arrow notation
+arrowEnvTyConKey, arrowStackTupTyFamKey, arrowEnvTupTyFamKey :: Unique
+arrowEnvTyConKey      = mkPreludeTyConUnique 192
+arrowStackTupTyFamKey = mkPreludeTyConUnique 193
+arrowEnvTupTyFamKey   = mkPreludeTyConUnique 194
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
@@ -2067,6 +2072,9 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 113
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
 unsafeReflDataConKey      = mkPreludeDataConUnique 114
+
+arrowEnvDataConKey :: Unique
+arrowEnvDataConKey = mkPreludeDataConUnique 115
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES DataUniques 200-250
@@ -2318,6 +2326,9 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
+
+arrowEnvCoAxiomKey :: Unique
+arrowEnvCoAxiomKey = mkPreludeTyConUnique 503
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES IdUniques 200-499

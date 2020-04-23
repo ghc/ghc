@@ -18,6 +18,9 @@ module GHC.Builtin.Types (
 
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
+        pcDataCon,          -- used in FIXME: where is it used?
+        mkWiredInDataConName,
+
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
 
@@ -62,7 +65,7 @@ module GHC.Builtin.Types (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-        mkListTy, mkPromotedListTy,
+        mkListTy, mkPromotedListTy, isPromotedListTy,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -1688,3 +1691,16 @@ extractPromotedList tys = go tys
 
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
+
+isPromotedListTy :: Type -> Maybe [Type]
+isPromotedListTy list_ty
+  | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
+  , tc `hasKey` consDataConKey
+  = (t :) <$> isPromotedListTy ts
+
+  | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
+  , tc `hasKey` nilDataConKey
+  = Just []
+
+  | otherwise
+  = Nothing

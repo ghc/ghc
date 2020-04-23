@@ -1,7 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude
-           , RankNTypes
+           , DataKinds
            , ExistentialQuantification
+           , RankNTypes
+           , StandaloneKindSignatures
+           , TypeFamilies
+           , TypeFamilyDependencies
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -19,11 +23,17 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
+module GHC.Desugar
+  ( -- * Arrows
+    (>>>), ArrowEnv(..), ArrowStackTup, ArrowEnvTup
+    -- * Annotations
+  , AnnotationWrapper(..), toAnnotationWrapper
+  ) where
 
 import Control.Arrow    (Arrow(..))
 import Control.Category ((.))
 import Data.Data        (Data)
+import Data.Kind        (Type)
 
 -- A version of Control.Category.>>> overloaded on Arrow
 (>>>) :: forall arr. Arrow arr => forall a b c. arr a b -> arr b c -> arr a c
@@ -33,6 +43,14 @@ import Data.Data        (Data)
 --     arrows stuff needs reworking anyway!
 f >>> g = g . f
 {-# INLINE (>>>) #-} -- see Note [INLINE on >>>] in Control.Category
+
+newtype ArrowEnv a = ArrowEnv a
+
+type ArrowStackTup :: [Type] -> Type
+type family ArrowStackTup stk
+
+type ArrowEnvTup :: Type -> [Type] -> Type
+type family ArrowEnvTup env stk = arg | arg -> env stk
 
 -- A wrapper data type that lets the typechecker get at the appropriate dictionaries for an annotation
 data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
