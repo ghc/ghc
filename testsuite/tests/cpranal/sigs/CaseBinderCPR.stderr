@@ -1,18 +1,6 @@
 
-==================== Strictness signatures ====================
-CaseBinderCPR.$trModule:
-CaseBinderCPR.f_list_cmp: <L,C(C1(U(U)))><S,1*U><S,1*U>
-
-
-
 ==================== Cpr signatures ====================
-CaseBinderCPR.$trModule: #1(#, #) 1(1(-), 1(-))
-CaseBinderCPR.f_list_cmp: * 1(-)
-
-
-
-==================== Strictness signatures ====================
-CaseBinderCPR.$trModule:
-CaseBinderCPR.f_list_cmp: <L,C(C1(U(1*U)))><S,1*U><S,1*U>
+CaseBinderCPR.$trModule: #c1(#c1(#), #c1(#))
+CaseBinderCPR.f_list_cmp: *c1(*)
 
 
