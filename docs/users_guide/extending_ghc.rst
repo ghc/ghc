@@ -777,6 +777,11 @@ each case:
 To read an interface file from an external tool without linking to GHC, the format
 is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
+Compared to annotations, extensible fields are less structured, in the sense that the
+data is not associated with any particular definition with the module. This allows tools
+more freedom with the structure of their data, but comes with the tradeoff of losing the
+structure that GHC provides with the annotation API.
+
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
 
