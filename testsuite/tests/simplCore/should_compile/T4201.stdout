@@ -1,4 +1,4 @@
   [HasNoCafRefs, LambdaFormInfo: LFReEntrant 1, Arity: 1,
-   Strictness: <S,1*U>,
+   Strictness: <S,1*U>, CPR: #,
    Unfolding: InlineRule (0, True, True)
               bof `cast` (Sym (N:Foo[0]) %<'Many>_N ->_R <T>_R)]

@@ -6,6 +6,7 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule4 :: GHC.Prim.Addr#
 [GblId,
+ Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T3772.$trModule4 = "main"#
@@ -14,9 +15,13 @@ T3772.$trModule4 = "main"#
 T3772.$trModule3 :: GHC.Types.TrName
 [GblId,
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
  Cpr=# 1(-),
 >>>>>>> 6bb3d74323... Nested CPR
+=======
+ Cpr=#c1(#),
+>>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
@@ -24,6 +29,7 @@ T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule2 :: GHC.Prim.Addr#
 [GblId,
+ Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T3772.$trModule2 = "T3772"#
@@ -32,9 +38,13 @@ T3772.$trModule2 = "T3772"#
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
  Cpr=# 1(-),
 >>>>>>> 6bb3d74323... Nested CPR
+=======
+ Cpr=#c1(#),
+>>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
@@ -43,9 +53,13 @@ T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
 T3772.$trModule :: GHC.Types.Module
 [GblId,
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
  Cpr=#1(#, #) 1(1(-), 1(-)),
 >>>>>>> 6bb3d74323... Nested CPR
+=======
+ Cpr=#c1(#c1(#), #c1(#)),
+>>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T3772.$trModule
