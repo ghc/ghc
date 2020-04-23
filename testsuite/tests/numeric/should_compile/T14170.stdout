@@ -6,6 +6,7 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 NatVal.$trModule4 :: GHC.Prim.Addr#
 [GblId,
+ Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 NatVal.$trModule4 = "main"#
@@ -13,7 +14,7 @@ NatVal.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 NatVal.$trModule3 :: GHC.Types.TrName
 [GblId,
- Cpr=# 1(-),
+ Cpr=#c1(#),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 NatVal.$trModule3 = GHC.Types.TrNameS NatVal.$trModule4
@@ -21,6 +22,7 @@ NatVal.$trModule3 = GHC.Types.TrNameS NatVal.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 NatVal.$trModule2 :: GHC.Prim.Addr#
 [GblId,
+ Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 NatVal.$trModule2 = "NatVal"#
@@ -28,7 +30,7 @@ NatVal.$trModule2 = "NatVal"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 NatVal.$trModule1 :: GHC.Types.TrName
 [GblId,
- Cpr=# 1(-),
+ Cpr=#c1(#),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 NatVal.$trModule1 = GHC.Types.TrNameS NatVal.$trModule2
@@ -36,7 +38,7 @@ NatVal.$trModule1 = GHC.Types.TrNameS NatVal.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 NatVal.$trModule :: GHC.Types.Module
 [GblId,
- Cpr=#1(#, #) 1(1(-), 1(-)),
+ Cpr=#c1(#c1(#), #c1(#)),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 NatVal.$trModule
@@ -45,6 +47,7 @@ NatVal.$trModule
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 foo :: Integer
 [GblId,
+ Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 foo = 0
