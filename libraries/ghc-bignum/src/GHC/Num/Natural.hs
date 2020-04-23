@@ -268,15 +268,20 @@ naturalSubUnsafe (NB x) (NB y) =
 -- | Multiplication
 naturalMul :: Natural -> Natural -> Natural
 {-# NOINLINE naturalMul #-}
-naturalMul (NS x)   (NS y)   = case timesWord2# x y of
-                                 (# h,l #) -> naturalFromWord2# h l
-naturalMul (NS 0##) _        = NS 0##
-naturalMul _        (NS 0##) = NS 0##
-naturalMul (NS 1##) y        = y
-naturalMul x        (NS 1##) = x
-naturalMul (NB x) (NS y) = NB (bigNatMulWord# x y)
-naturalMul (NS x) (NB y) = NB (bigNatMulWord# y x)
-naturalMul (NB x) (NB y) = NB (bigNatMul y x)
+naturalMul a b = case a of
+   NS 0## -> NS 0##
+   NS 1## -> b
+   NS x   -> case b of
+               NS 0## -> NS 0##
+               NS 1## -> a
+               NS y   -> case timesWord2# x y of
+                           (# h,l #) -> naturalFromWord2# h l
+               NB y   -> NB (bigNatMulWord# y x)
+   NB x   -> case b of
+               NS 0## -> NS 0##
+               NS 1## -> a
+               NS y   -> NB (bigNatMulWord# x y)
+               NB y   -> NB (bigNatMul x y)
 
 -- | Square a Natural
 naturalSqr :: Natural -> Natural
