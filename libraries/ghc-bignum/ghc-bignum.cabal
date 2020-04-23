@@ -85,6 +85,8 @@ library
   hs-source-dirs: src/
   include-dirs: include/
   ghc-options: -Wall
+  if impl(ghc >= 8.11)
+      ghc-options: -no-base
   cc-options: -std=c99 -Wall
 
   -- GHC has wired-in IDs from the ghc-bignum package. Hence the unit-id
