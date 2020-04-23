@@ -508,26 +508,26 @@ wordWriteMutableByteArrayBE# w mba off = writeWord8ArrayAsWord# mba (word2Int# o
 --
 -- @'n' is the number of bytes to read.
 wordFromByteArrayLE# :: Word# -> ByteArray# -> Word# -> Word#
-wordFromByteArrayLE# n ba off
-   -- Optimize when we read a full word
-   | WORD_SIZE_IN_BYTES## <- n
-   = case indexWord8ArrayAsWord# ba (word2Int# off) of
+wordFromByteArrayLE# n ba off =
+   case n of
+      -- Optimize when we read a full word
+      WORD_SIZE_IN_BYTES## -> case indexWord8ArrayAsWord# ba (word2Int# off) of
 #if defined(WORDS_BIGENDIAN)
-      w -> wordReverseBytes# w
+         w -> wordReverseBytes# w
 #else
-      w -> w
+         w -> w
 #endif
 
-wordFromByteArrayLE# n ba off = go 0## 0#
-   where
-      go w c
-         | isTrue# (c ==# word2Int# n)
-         = w
+      _ -> let
+            go w c
+               | isTrue# (c ==# word2Int# n)
+               = w
 
-         | True
-         = case indexWord8Array# ba (word2Int# off +# c) of
-            b -> go (w `or#` (b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
-                    (c +# 1#)
+               | True
+               = case indexWord8Array# ba (word2Int# off +# c) of
+                  b -> go (w `or#` (b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
+                          (c +# 1#)
+           in go 0## 0#
 
 -- | Read a Word from @/ByteArray/@ in base-256 big-endian representation.
 --

@@ -605,53 +605,58 @@ integerShiftL !x (W# w) = integerShiftL# x w
 -- Fake 2's complement for negative values (might be slow)
 integerOr :: Integer -> Integer -> Integer
 {-# NOINLINE integerOr #-}
-integerOr (IS x)   (IS y)   = IS (orI# x y)
-integerOr (IS 0#)  y        = y
-integerOr x        (IS 0#)  = x
-integerOr (IS -1#) !_       = IS -1#
-integerOr !_       (IS -1#) = IS -1#
-integerOr x        (IS y)   = integerOr (IS y) x
-integerOr (IP x)   (IP y)   = integerFromBigNat (bigNatOr x y)
-integerOr (IN x)   (IN y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAnd  -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# x 1##)
-                                       (bigNatSubWordUnsafe# y 1##))
-                                    1##)
-integerOr (IP x)   (IN y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAndNot -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# y 1##)
-                                       x)
-                                    1##)
-integerOr (IN x)   (IP y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAndNot -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# x 1##)
-                                       y)
-                                    1##)
-integerOr (IS x)   (IP y)
-   | isTrue# (x >=# 0#)     = integerFromBigNat (bigNatOrWord# y (int2Word# x))
-   | True                   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAndNot -- use De Morgan's laws
-                                       (bigNatFromWord#
-                                          (int2Word# (negateInt# x) `minusWord#` 1##))
-                                       y)
-                                    1##)
-integerOr (IS x)   (IN y)
-   | isTrue# (x >=# 0#)     = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAndNotWord# -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# y 1##)
-                                       (int2Word# x))
-                                    1##)
-   | True                   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatAndWord#  -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# y 1##)
-                                       (int2Word# (negateInt# x) `minusWord#` 1##))
-                                    1##)
+integerOr a b = case a of
+   IS  0# -> b
+   IS -1# -> IS -1#
+   IS  x  -> case b of
+               IS  0# -> a
+               IS -1# -> IS -1#
+               IS  y  -> IS (orI# x y)
+               IP  y
+                  | isTrue# (x >=# 0#) -> integerFromBigNat (bigNatOrWord# y (int2Word# x))
+                  | True               -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatAndNot -- use De Morgan's laws
+                                                   (bigNatFromWord#
+                                                      (int2Word# (negateInt# x) `minusWord#` 1##))
+                                                   y)
+                                                1##)
+               IN y
+                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatAndNotWord# -- use De Morgan's laws
+                                                   (bigNatSubWordUnsafe# y 1##)
+                                                   (int2Word# x))
+                                                1##)
+                  | True               -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatAndWord#  -- use De Morgan's laws
+                                                   (bigNatSubWordUnsafe# y 1##)
+                                                   (int2Word# (negateInt# x) `minusWord#` 1##))
+                                                1##)
+   IP  x  -> case b of
+               IS _ -> integerOr b a
+               IP y -> integerFromBigNat (bigNatOr x y)
+               IN y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatAndNot -- use De Morgan's laws
+                              (bigNatSubWordUnsafe# y 1##)
+                              x)
+                           1##)
+   IN  x  -> case b of
+               IS _ -> integerOr b a
+               IN y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatAnd  -- use De Morgan's laws
+                              (bigNatSubWordUnsafe# x 1##)
+                              (bigNatSubWordUnsafe# y 1##))
+                           1##)
+               IP y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatAndNot -- use De Morgan's laws
+                              (bigNatSubWordUnsafe# x 1##)
+                              y)
+                           1##)
 
 
 -- | Bitwise XOR operation
@@ -659,48 +664,53 @@ integerOr (IS x)   (IN y)
 -- Fake 2's complement for negative values (might be slow)
 integerXor :: Integer -> Integer -> Integer
 {-# NOINLINE integerXor #-}
-integerXor (IS x)   (IS y)   = IS (xorI# x y)
-integerXor x        (IS 0#)  = x
-integerXor (IS 0#)  y        = y
-integerXor (IS -1#) y        = integerComplement y
-integerXor x        (IS -1#) = integerComplement x
-integerXor x        (IS y)   = integerXor (IS y) x
-integerXor (IP x)   (IP y)   = integerFromBigNat (bigNatXor x y)
-integerXor (IN x)   (IN y)   = integerFromBigNat
-                                 (bigNatXor -- xor (not x) (not y) = xor x y
-                                    (bigNatSubWordUnsafe# x 1##)
-                                    (bigNatSubWordUnsafe# y 1##))
-integerXor (IP x)   (IN y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatXor
-                                       x
-                                       (bigNatSubWordUnsafe# y 1##))
-                                    1##)
-integerXor (IN x)   (IP y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatXor
-                                       y
-                                       (bigNatSubWordUnsafe# x 1##))
-                                    1##)
-integerXor (IS x)   (IP y)
-   | isTrue# (x >=# 0#)      = integerFromBigNat (bigNatXorWord# y (int2Word# x))
-   | True                    = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatXorWord#
-                                       y
-                                       (int2Word# (negateInt# x) `minusWord#` 1##))
-                                    1##)
-integerXor (IS x)   (IN y)
-   | isTrue# (x >=# 0#)      = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatXorWord#
-                                       (bigNatSubWordUnsafe# y 1##)
-                                       (int2Word# x))
-                                    1##)
-   | True                    = integerFromBigNat
-                                 (bigNatXorWord# -- xor (not x) (not y) = xor x y
-                                    (bigNatSubWordUnsafe# y 1##)
-                                    (int2Word# (negateInt# x) `minusWord#` 1##))
+integerXor a b = case a of
+   IS  0# -> b
+   IS -1# -> integerComplement b
+   IS x   -> case b of
+               IS  0# -> a
+               IS -1# -> integerComplement a
+               IS y   -> IS (xorI# x y)
+               IP y
+                  | isTrue# (x >=# 0#) -> integerFromBigNat (bigNatXorWord# y (int2Word# x))
+                  | True               -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatXorWord#
+                                                   y
+                                                   (int2Word# (negateInt# x) `minusWord#` 1##))
+                                                1##)
+               IN y
+                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatXorWord#
+                                                   (bigNatSubWordUnsafe# y 1##)
+                                                   (int2Word# x))
+                                                1##)
+                  | True               -> integerFromBigNat
+                                             (bigNatXorWord# -- xor (not x) (not y) = xor x y
+                                                (bigNatSubWordUnsafe# y 1##)
+                                                (int2Word# (negateInt# x) `minusWord#` 1##))
+   IP x   -> case b of
+               IS _ -> integerXor b a
+               IP y -> integerFromBigNat (bigNatXor x y)
+               IN y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatXor
+                              x
+                              (bigNatSubWordUnsafe# y 1##))
+                           1##)
+   IN x   -> case b of
+               IS _ -> integerXor b a
+               IN y -> integerFromBigNat
+                        (bigNatXor -- xor (not x) (not y) = xor x y
+                           (bigNatSubWordUnsafe# x 1##)
+                           (bigNatSubWordUnsafe# y 1##))
+               IP y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatXor
+                              y
+                              (bigNatSubWordUnsafe# x 1##))
+                           1##)
 
 
 
@@ -709,30 +719,35 @@ integerXor (IS x)   (IN y)
 -- Fake 2's complement for negative values (might be slow)
 integerAnd :: Integer -> Integer -> Integer
 {-# NOINLINE integerAnd #-}
-integerAnd (IS x)   (IS y)   = IS (andI# x y)
-integerAnd (IS 0#)  !_       = IS 0#
-integerAnd !_       (IS 0#)  = IS 0#
-integerAnd (IS -1#) y        = y
-integerAnd x        (IS -1#) = x
-integerAnd x        (IS y)   = integerAnd (IS y) x
-integerAnd (IP x)   (IP y)   = integerFromBigNat (bigNatAnd x y)
-integerAnd (IN x)   (IN y)   = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatOr  -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# x 1##)
-                                       (bigNatSubWordUnsafe# y 1##))
-                                    1##)
-integerAnd (IP x)   (IN y)   = integerFromBigNat (bigNatAndNot x (bigNatSubWordUnsafe# y 1##))
-integerAnd (IN x)   (IP y)   = integerFromBigNat (bigNatAndNot y (bigNatSubWordUnsafe# x 1##))
-integerAnd (IS x)   (IP y)   = integerFromBigNat (bigNatAndInt# y x)
-integerAnd (IS x)   (IN y)
-   | isTrue# (x >=# 0#)      = integerFromWord# (int2Word# x `andNot#` (indexWordArray# y 0# `minusWord#` 1##))
-   | True                    = integerFromBigNatNeg
-                                 (bigNatAddWord#
-                                    (bigNatOrWord#  -- use De Morgan's laws
-                                       (bigNatSubWordUnsafe# y 1##)
-                                       (wordFromAbsInt# x `minusWord#` 1##))
-                                    1##)
+integerAnd a b = case a of
+   IS 0#  -> IS 0#
+   IS -1# -> b
+   IS x   -> case b of
+               IS  0# -> IS 0#
+               IS -1# -> a
+               IS y   -> IS (andI# x y)
+               IP y   -> integerFromBigNat (bigNatAndInt# y x)
+               IN y
+                  | isTrue# (x >=# 0#) -> integerFromWord# (int2Word# x `andNot#` (indexWordArray# y 0# `minusWord#` 1##))
+                  | True               -> integerFromBigNatNeg
+                                             (bigNatAddWord#
+                                                (bigNatOrWord#  -- use De Morgan's laws
+                                                   (bigNatSubWordUnsafe# y 1##)
+                                                   (wordFromAbsInt# x `minusWord#` 1##))
+                                                1##)
+   IP x   -> case b of
+               IS _ -> integerAnd b a
+               IP y -> integerFromBigNat (bigNatAnd x y)
+               IN y -> integerFromBigNat (bigNatAndNot x (bigNatSubWordUnsafe# y 1##))
+   IN x   -> case b of
+               IS _ -> integerAnd b a
+               IN y -> integerFromBigNatNeg
+                        (bigNatAddWord#
+                           (bigNatOr  -- use De Morgan's laws
+                              (bigNatSubWordUnsafe# x 1##)
+                              (bigNatSubWordUnsafe# y 1##))
+                           1##)
+               IP y -> integerFromBigNat (bigNatAndNot y (bigNatSubWordUnsafe# x 1##))
 
 
 
