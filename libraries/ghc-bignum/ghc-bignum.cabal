@@ -87,6 +87,35 @@ library
   ghc-options: -Wall
   cc-options: -std=c99 -Wall
 
+  -- Note [Avoid patError]
+  -- ~~~~~~~~~~~~~~~~~~~~~
+  --
+  -- ghc-bignum is below `base` package. Hence if we use the natural set of definitions
+  -- for functions, e.g.:
+  --
+  --     integerXor (IS x) y      = ...
+  --     integerXor x      (IS y) = ...
+  --     integerXor ...
+  --
+  -- then GHC may not be smart enough (especially when compiling with -O0)
+  -- to see that all the cases are handled, and will thus insert calls to
+  -- base:Control.Exception.Base.patError. But we are below base in the
+  -- package hierarchy, so this causes link failure!
+  --
+  -- We therefore help GHC out, by being more explicit about what all the
+  -- cases are:
+  --
+  --     integerXor a b = case a of
+  --        IS x -> case b of
+  --                 IS y -> ...
+  --                 IN y -> ...
+  --        ...
+  --
+  -- To make it easier to detect places where GHC would have inserted a
+  -- `patError`, we implemented the `-no-base` flag that we use below.
+  if impl(ghc >= 8.11)
+      ghc-options: -no-base
+
   -- GHC has wired-in IDs from the ghc-bignum package. Hence the unit-id
   -- of the package should not contain the version: i.e. it must be
   -- "ghc-bignum" and not "ghc-bignum-1.0".
