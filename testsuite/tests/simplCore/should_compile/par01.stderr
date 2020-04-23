@@ -16,27 +16,27 @@ end Rec }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule4 :: GHC.Prim.Addr#
-[GblId, Unf=OtherCon []]
+[GblId, Cpr=#, Unf=OtherCon []]
 Par01.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule3 :: GHC.Types.TrName
-[GblId, Cpr=# 1(-), Unf=OtherCon []]
+[GblId, Cpr=#c1(#), Unf=OtherCon []]
 Par01.$trModule3 = GHC.Types.TrNameS Par01.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule2 :: GHC.Prim.Addr#
-[GblId, Unf=OtherCon []]
+[GblId, Cpr=#, Unf=OtherCon []]
 Par01.$trModule2 = "Par01"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule1 :: GHC.Types.TrName
-[GblId, Cpr=# 1(-), Unf=OtherCon []]
+[GblId, Cpr=#c1(#), Unf=OtherCon []]
 Par01.$trModule1 = GHC.Types.TrNameS Par01.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Par01.$trModule :: GHC.Types.Module
-[GblId, Cpr=#1(#, #) 1(1(-), 1(-)), Unf=OtherCon []]
+[GblId, Cpr=#c1(#c1(#), #c1(#)), Unf=OtherCon []]
 Par01.$trModule
   = GHC.Types.Module Par01.$trModule3 Par01.$trModule1
 
