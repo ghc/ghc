@@ -21,8 +21,11 @@ module GHC.Builtin.Types.Literals
   , typeSymbolAppendTyCon
 
   , arrowEnvTyCon
+  , arrowEnvTy
   , arrowStackTupTyCon
+  , arrowStackTupTy
   , arrowEnvTupTyCon
+  , arrowEnvTupTy
   ) where
 
 import GhcPrelude
@@ -69,8 +72,6 @@ import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
-
-import Outputable
 
 {-
 Note [Type-level literals]
@@ -197,6 +198,9 @@ arrowStackTupTyCon =
       stk_tys <- isPromotedListTy stk_ty
       pure (axArrowStackTupDef, [stk_ty], mkBoxedTupleTy stk_tys)
 
+arrowStackTupTy :: Type -> Type
+arrowStackTupTy stk_ty = mkTyConApp arrowStackTupTyCon [stk_ty]
+
 axArrowStackTupDef :: CoAxiomRule
 axArrowStackTupDef = CoAxiomRule
   { coaxrName      = fsLit "ArrowStackTupDef"
@@ -205,16 +209,8 @@ axArrowStackTupDef = CoAxiomRule
   , coaxrProves    = \cs -> do
       [Pair ty1 ty2] <- pure cs
       tys2 <- isPromotedListTy ty2
-      pure (mkTyConApp arrowStackTupTyCon [ty1] === mkBoxedTupleTy tys2)
+      pure (arrowStackTupTy ty1 === mkBoxedTupleTy tys2)
   }
-
--- splitBoxedTupleTyConApp_maybe :: Arity -> Type -> Maybe [Type]
--- splitBoxedTupleTyConApp_maybe 1 ty = Just [ty]
--- splitBoxedTupleTyConApp_maybe i ty = do
---   (tc, tys) <- splitTyConApp_maybe ty
---   guard (tc == tupleTyCon Boxed i)
---   guard (length tys == i)
---   pure tys
 
 arrowEnvTupTyCon :: TyCon
 arrowEnvTupTyCon =
@@ -239,18 +235,33 @@ arrowEnvTupTyCon =
       let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty : stk_tys)
       pure (axArrowEnvTupDef, [env_ty, stk_ty], rhs_ty)
 
-    interactTopArrowEnvTup [env_ty, stk_ty] tup_ty
-      | Just (tup_tc, env_ty':stk_tys) <- splitTyConApp_maybe tup_ty
+    interactTopArrowEnvTup [env_ty, stk_ty] rhs_ty
+      --     ArrowEnvTup env stk ~ ArrowEnv env'
+      -- ==> env ~ env'
+      --     stk ~ '[]
+      | Just (env_tc, [env_ty']) <- splitTyConApp_maybe rhs_ty
+      , env_tc == arrowEnvTyCon
+      = [ arrowEnvTy env_ty === env_ty'
+        , stk_ty === mkPromotedListTy liftedTypeKind [] ]
+
+      --     ArrowEnvTup env stk ~ (env', t1, ..., tn)
+      -- ==> ArrowEnv env ~ env'
+      --     stk ~ '[t1, ..., tn]
+      | Just (tup_tc, env_ty':stk_tys) <- splitTyConApp_maybe rhs_ty
       , isBoxedTupleTyCon tup_tc
       = [ arrowEnvTy env_ty === env_ty'
         , stk_ty === mkPromotedListTy liftedTypeKind stk_tys ]
+
     interactTopArrowEnvTup _ _ = []
 
-    interactInertArrowEnvTup [env_ty1, stk_ty1] tup_ty1
-                             [env_ty2, stk_ty2] tup_ty2
-      | tup_ty1 `tcEqType` tup_ty2
+    interactInertArrowEnvTup [env_ty1, stk_ty1] rhs_ty1
+                             [env_ty2, stk_ty2] rhs_ty2
+      | rhs_ty1 `tcEqType` rhs_ty2
       = [ env_ty1 === env_ty2, stk_ty1 === stk_ty2 ]
     interactInertArrowEnvTup _ _ _ _ = []
+
+arrowEnvTupTy :: Type -> Type -> Type
+arrowEnvTupTy env_ty stk_ty = mkTyConApp arrowEnvTupTyCon [env_ty, stk_ty]
 
 axArrowEnvTupDef :: CoAxiomRule
 axArrowEnvTupDef = CoAxiomRule
@@ -261,7 +272,7 @@ axArrowEnvTupDef = CoAxiomRule
       [Pair env_ty1 env_ty2, Pair stk_ty1 stk_ty2] <- pure cs
       stk_tys2 <- isPromotedListTy stk_ty2
       let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty2 : stk_tys2)
-      pure (mkTyConApp arrowEnvTupTyCon [env_ty1, stk_ty1] === rhs_ty)
+      pure (arrowEnvTupTy env_ty1 stk_ty1 === rhs_ty)
   }
 
 {-------------------------------------------------------------------------------
