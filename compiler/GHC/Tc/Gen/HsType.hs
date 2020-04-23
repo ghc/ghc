@@ -4,8 +4,12 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -1851,7 +1855,7 @@ kcDeclHeader
   :: InitialKindStrategy
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVisVars GhcRn -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
@@ -1878,7 +1882,7 @@ kcCheckDeclHeader
   :: SAKS_or_CUSK
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVisVars GhcRn -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
@@ -1887,12 +1891,12 @@ kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
 kcCheckDeclHeader_cusk
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVisVars GhcRn -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader_cusk name flav
-              (HsQTvs { hsq_ext = kv_ns
-                      , hsq_explicit = hs_tvs }) kc_res_ki
+              (HsQTVisvs { hsqv_ext = kv_ns
+                         , hsqv_explicit = hs_tvs }) kc_res_ki
   -- CUSK case
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
@@ -1900,7 +1904,8 @@ kcCheckDeclHeader_cusk name flav
            <- pushTcLevelM_                               $
               solveEqualities                             $
               bindImplicitTKBndrs_Q_Skol kv_ns            $
-              bindExplicitTKBndrs_Q_Skol ctxt_kind hs_tvs $
+              bindExplicitTKBndrs_Q_Skol ctxt_kind
+                ((fmap . fmap) tyBinderIgnoreVis hs_tvs)  $
               newExpectedKind =<< kc_res_ki
 
            -- Now, because we're in a CUSK,
@@ -1968,12 +1973,12 @@ kcCheckDeclHeader_cusk name flav
 kcInferDeclHeader
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn
+  -> LHsQTyVisVars GhcRn
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded non-generalized TcTyCon
 kcInferDeclHeader name flav
-              (HsQTvs { hsq_ext = kv_ns
-                      , hsq_explicit = hs_tvs }) kc_res_ki
+              (HsQTVisvs { hsqv_ext = kv_ns
+                         , hsqv_explicit = hs_tvs }) kc_res_ki
   -- No standalane kind signature and no CUSK.
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
@@ -1981,7 +1986,8 @@ kcInferDeclHeader name flav
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
            <- bindImplicitTKBndrs_Q_Tv kv_ns            $
-              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_tvs $
+              bindExplicitTKBndrs_Q_Tv ctxt_kind
+                ((fmap . fmap) tyBinderIgnoreVis hs_tvs)$
               newExpectedKind =<< kc_res_ki
               -- Why "_Tv" not "_Skol"? See third wrinkle in
               -- Note [Inferring kinds for type declarations] in GHC.Tc.TyCl,
@@ -2022,12 +2028,12 @@ kcCheckDeclHeader_sig
   :: Kind              -- ^ Standalone kind signature, fully zonked! (zonkTcTypeToType)
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVisVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcCheckDeclHeader_sig kisig name flav
-          (HsQTvs { hsq_ext      = implicit_nms
-                  , hsq_explicit = explicit_nms }) kc_res_ki
+          (HsQTVisvs { hsqv_ext      = implicit_nms
+                  , hsqv_explicit = explicit_nms }) kc_res_ki
   = addTyConFlavCtxt name flav $
     do {  -- Step 1: zip user-written binders with quantifiers from the kind signature.
           -- For example:
@@ -2093,7 +2099,9 @@ kcCheckDeclHeader_sig kisig name flav
                      --
                      -- Does 'forall k1 k2' become a part of 'tyConBinders' or 'tyConResKind'?
                      -- See Note [Arity inference in kcCheckDeclHeader_sig]
-                   ; let (invis_binders, r_ki) = split_invis kisig' m_res_ki
+                   ; let (invis_binders, r_ki)
+                           | tyBinderAnyInvisible explicit_nms = ([], kisig')
+                           | otherwise = split_invis kisig' m_res_ki
 
                      -- Check that the inline result kind annotation is valid.
                      -- For example:
@@ -2141,6 +2149,7 @@ kcCheckDeclHeader_sig kisig name flav
     --    ----------------------------------------------
     --    ZippedBinder   forall {k}.
     --    ZippedBinder   forall (a::k).
+    --    ZippedBinder   forall (a::k).     @x
     --    ZippedBinder   forall (b::k) ->   x
     --    ZippedBinder   (a~b) =>
     --    ZippedBinder   Proxy a ->         p
@@ -2155,13 +2164,22 @@ kcCheckDeclHeader_sig kisig name flav
 
       -- Inferred variable, no user-written binder.
       -- Example:   forall {k}.
-      ZippedBinder (Named (Bndr v Specified)) Nothing ->
-        return (mkNamedTyConBinder Specified v, [])
+      ZippedBinder (Named (Bndr v Inferred)) Nothing ->
+        return (mkNamedTyConBinder Inferred v, [])
 
       -- Specified variable, no user-written binder.
       -- Example:   forall (a::k).
-      ZippedBinder (Named (Bndr v Inferred)) Nothing ->
-        return (mkNamedTyConBinder Inferred v, [])
+      ZippedBinder (Named (Bndr v Specified)) Nothing ->
+        return (mkNamedTyConBinder Specified v, [])
+
+      -- Specified variable, with a user-written binder.
+      -- Example:   forall (a::k).
+      --            @k
+      ZippedBinder (Named (Bndr v Specified)) (Just (L _ (HsTyVarInvisBndr _ _ b))) ->
+        return $
+          let v_name = getName b
+              tcb = mkNamedTyConBinder Specified v
+          in (tcb, [(v_name, v)])
 
       -- Constraint, no user-written binder.
       -- Example:   (a~b) =>
@@ -2172,7 +2190,7 @@ kcCheckDeclHeader_sig kisig name flav
 
       -- Non-dependent visible argument with a user-written binder.
       -- Example:   Proxy a ->
-      ZippedBinder (Anon VisArg bndr_ki) (Just b) ->
+      ZippedBinder (Anon VisArg bndr_ki) (Just (L _ (HsTyVarVisBndr _ b))) ->
         return $
           let v_name = getName b
               tv = mkTyVar v_name bndr_ki
@@ -2181,7 +2199,7 @@ kcCheckDeclHeader_sig kisig name flav
 
       -- Dependent visible argument with a user-written binder.
       -- Example:   forall (b::k) ->
-      ZippedBinder (Named (Bndr v Required)) (Just b) ->
+      ZippedBinder (Named (Bndr v Required)) (Just (L _ (HsTyVarVisBndr _ b))) ->
         return $
           let v_name = getName b
               tcb = mkNamedTyConBinder Required v
@@ -2203,7 +2221,8 @@ kcCheckDeclHeader_sig kisig name flav
     check_zipped_binder :: ZippedBinder -> TcM ()
     check_zipped_binder (ZippedBinder _ Nothing) = return ()
     check_zipped_binder (ZippedBinder tb (Just b)) =
-      case unLoc b of
+      -- @tyBinderType@ ignores visibility so we can too.
+      case tyBinderIgnoreVis $ unLoc b of
         UserTyVar _ _ -> return ()
         KindedTyVar _ v v_hs_ki -> do
           v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
@@ -2228,15 +2247,16 @@ kcCheckDeclHeader_sig kisig name flav
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
 data ZippedBinder =
-  ZippedBinder TyBinder (Maybe (LHsTyVarBndr GhcRn))
+  ZippedBinder TyBinder (Maybe (LHsTyVarTermBndr GhcRn))
 
 -- See Note [Arity inference in kcCheckDeclHeader_sig]
 zipBinders
-  :: Kind                      -- kind signature
-  -> [LHsTyVarBndr GhcRn]      -- user-written binders
-  -> ([ZippedBinder],          -- zipped binders
-      [LHsTyVarBndr GhcRn],    -- remaining user-written binders
-      Kind)                    -- remainder of the kind signature
+  :: Kind                       -- ^ kind signature
+  -> [LHsTyVarTermBndr GhcRn]   -- ^ user-written binders
+  -> ( [ZippedBinder]           -- zipped binders
+     , [LHsTyVarTermBndr GhcRn] -- remaining user-written binders
+     , Kind                     -- remainder of the kind signature
+     )
 zipBinders = zip_binders []
   where
     zip_binders acc ki [] = (reverse acc, [], ki)
@@ -2245,19 +2265,23 @@ zipBinders = zip_binders []
         Nothing -> (reverse acc, b:bs, ki)
         Just (tb, ki') ->
           let
-            (zb, bs') | zippable  = (ZippedBinder tb (Just b),  bs)
-                      | otherwise = (ZippedBinder tb Nothing, b:bs)
-            zippable =
+            (zb, bs') = case unLoc b of
+              HsTyVarVisBndr {}
+                | zippable ForallVis   -> (ZippedBinder tb (Just b),  bs)
+              HsTyVarInvisBndr {}
+                | zippable ForallInvis -> (ZippedBinder tb (Just b),  bs)
+              _                        -> (ZippedBinder tb Nothing, b:bs)
+            zippable vis =
               case tb of
-                Named (Bndr _ Specified) -> False
+                Named (Bndr _ Specified) -> vis == ForallVis
                 Named (Bndr _ Inferred)  -> False
-                Named (Bndr _ Required)  -> True
-                Anon InvisArg _ -> False
-                Anon VisArg   _ -> True
+                Named (Bndr _ Required)  -> vis == ForallInvis
+                Anon InvisArg _ -> vis == ForallVis
+                Anon VisArg   _ -> vis == ForallInvis
           in
             zip_binders (zb:acc) ki' bs'
 
-tooManyBindersErr :: Kind -> [LHsTyVarBndr GhcRn] -> SDoc
+tooManyBindersErr :: Kind -> [LHsTyVarTermBndr GhcRn] -> SDoc
 tooManyBindersErr ki bndrs =
    hang (text "Not a function kind:")
       4 (ppr ki) $$
@@ -2317,6 +2341,12 @@ Consider the following declarations:
     type G :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
     type family G a b :: forall r2. (r1, r2) -> Type
 
+    type F :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
+    type family F a @j (b :: j)
+
+    type G :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
+    type family G a @j (b :: j) :: forall r2. (r1, r2) -> Type
+
 In step 1 (zip user-written binders), we zip the quantifiers in the signature
 with the binders in the header using 'zipBinders'. In both F and G, this results in
 the following zipped binders:
@@ -2327,20 +2357,31 @@ the following zipped binders:
     ZippedBinder   forall j.
     ZippedBinder   j ->         b
 
+While In both H and I, this results in the following zipped binders:
+
+                   TyBinder     LHsTyVarBndr
+    ---------------------------------------
+    ZippedBinder   Type ->      a
+    ZippedBinder   forall j.    @j
+    ZippedBinder   j ->         (b :: j)
 
 At this point, we have accumulated three zipped binders which correspond to a
 prefix of the standalone kind signature:
 
   Type -> forall j. j -> ...
 
-In step 2 (split off invisible binders), we have to decide how much remaining
-invisible binders of the standalone kind signature to split off:
+In step 2 (split off invisible binders), we have to decide whether and how much
+remaining invisible binders of the standalone kind signature to split off:
 
     forall k1 k2. (k1, k2) -> Type
     ^^^^^^^^^^^^^
     split off or not?
 
-This decision is made in 'split_invis':
+Whether we do is decided from whether we have any user-written invisible binders. If we
+do, we force the user to match everything, per the "forall-or-nothing" rule
+(which isn't just about 'forall's). See Note [forall-or-nothing rule].
+
+If we are splitting, how many to take vs leave is decided in 'split_invis':
 
 * If a user-written result kind signature is not provided, as in F,
   then split off all invisible binders. This is why we need special treatment
@@ -2623,6 +2664,16 @@ bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
   -- newFlexiKinded...           see Note [Non-cloning for tyvar binders]
   -- cloneFlexiKindedTyVarTyVar: see Note [Cloning for tyvar binders]
 
+-- | Actually, the implicit part is entirely up to the @new_tv@ function
+-- argument. What makes this differ from @bindExplicitTKBndrsX@ is it is not
+-- dependent---the names are attached to ty vars and the environment then
+-- extended all at once, so the kinds of later variables cannot refer to earlier
+-- ones.
+--
+-- Furthermore, this has nothing to do with visibility: 'forall ->' vs 'forall
+-- .' has nothing to do with how type variables are bound /in the rest of the
+-- type/ (as opposed to a term given this type, in which case it might with
+-- scoped type variables).
 bindImplicitTKBndrsX
    :: (Name -> TcM TcTyVar) -- new_tv function
    -> [Name]

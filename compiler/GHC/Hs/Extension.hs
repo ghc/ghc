@@ -674,6 +674,11 @@ type family XXLHsQTyVars  x
 
 -- -------------------------------------
 
+type family XHsQTVisvs       x
+type family XXLHsQTyVisVars  x
+
+-- -------------------------------------
+
 type family XHsIB              x b
 type family XXHsImplicitBndrs  x b
 
@@ -713,6 +718,12 @@ type family XXType           x
 type family XUserTyVar   x
 type family XKindedTyVar x
 type family XXTyVarBndr  x
+
+-- ---------------------------------------------------------------------
+
+type family XHsTyVarVisBndr   x
+type family XHsTyVarInvisBndr x
+type family XXTyVarTermBndr   x
 
 -- ---------------------------------------------------------------------
 
