@@ -13,8 +13,7 @@ ToDo:
 -}
 
 {-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards,
-    DeriveFunctor #-}
-{-# LANGUAGE LambdaCase #-}
+    DeriveFunctor, LambdaCase, TypeApplications #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
 
 module GHC.Core.Opt.ConstantFold
@@ -241,32 +240,34 @@ primOpRules nm = \case
    Double2FloatOp -> mkPrimOpRule nm 1 [ liftLit double2FloatLit ]
 
    -- Float
-   FloatAddOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
-                                     , identity zerof ]
-   FloatSubOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
-                                     , rightIdentity zerof ]
-   FloatMulOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
-                                     , identity onef
-                                     , strengthReduction twof FloatAddOp  ]
+   FloatAddOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
+                                          , identity zerof ]
+   FloatSubOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
+                                          , rightIdentity zerof ]
+   FloatMulOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
+                                          , identity onef
+                                          , strengthReduction twof FloatAddOp  ]
              -- zeroElem zerof doesn't hold because of NaN
-   FloatDivOp   -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
-                                     , rightIdentity onef ]
-   FloatNegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
-                                     , inversePrimOp FloatNegOp ]
+   FloatDivOp        -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
+                                          , rightIdentity onef ]
+   FloatNegOp        -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                          , inversePrimOp FloatNegOp ]
+   FloatDecode_IntOp -> mkPrimOpRule nm 1 [ unaryLit floatDecodeOp ]
 
    -- Double
-   DoubleAddOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
-                                      , identity zerod ]
-   DoubleSubOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
-                                      , rightIdentity zerod ]
-   DoubleMulOp   -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
-                                      , identity oned
-                                      , strengthReduction twod DoubleAddOp  ]
+   DoubleAddOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
+                                             , identity zerod ]
+   DoubleSubOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
+                                             , rightIdentity zerod ]
+   DoubleMulOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
+                                             , identity oned
+                                             , strengthReduction twod DoubleAddOp  ]
               -- zeroElem zerod doesn't hold because of NaN
-   DoubleDivOp   -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
-                                      , rightIdentity oned ]
-   DoubleNegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
-                                      , inversePrimOp DoubleNegOp ]
+   DoubleDivOp          -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
+                                             , rightIdentity oned ]
+   DoubleNegOp          -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                             , inversePrimOp DoubleNegOp ]
+   DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit doubleDecodeOp ]
 
    -- Relational operators
 
@@ -512,12 +513,37 @@ floatOp2 op env (LitFloat f1) (LitFloat f2)
 floatOp2 _ _ _ _ = Nothing
 
 --------------------------
+floatDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
+floatDecodeOp env (LitFloat ((decodeFloat . fromRational @Float) -> (m, e)))
+  = Just $ mkCoreUbxTup [intPrimTy, intPrimTy]
+                        [ mkIntVal (roPlatform env) (toInteger m)
+                        , mkIntVal (roPlatform env) (toInteger e) ]
+floatDecodeOp _   _
+  = Nothing
+
+--------------------------
 doubleOp2 :: (Rational -> Rational -> Rational)
           -> RuleOpts -> Literal -> Literal
           -> Maybe (Expr CoreBndr)
 doubleOp2 op env (LitDouble f1) (LitDouble f2)
   = Just (mkDoubleVal env (f1 `op` f2))
 doubleOp2 _ _ _ _ = Nothing
+
+--------------------------
+doubleDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
+doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
+  = Just $ mkCoreUbxTup [iNT64Ty, intPrimTy]
+                        [ Lit (mkLitINT64 (roPlatform env) (toInteger m))
+                        , mkIntVal platform (toInteger e) ]
+  where
+    platform = roPlatform env
+    (iNT64Ty, mkLitINT64)
+      | platformWordSizeInBits platform < 64
+      = (int64PrimTy, mkLitInt64Wrap)
+      | otherwise
+      = (intPrimTy  , mkLitIntWrap)
+doubleDecodeOp _   _
+  = Nothing
 
 --------------------------
 {- Note [The litEq rule: converting equality to case]
@@ -1333,7 +1359,6 @@ builtinBignumRules _ =
       , rule_encodeFloat        "integerEncodeFloat"  integerEncodeFloatName  mkFloatLitFloat
       , rule_convert            "integerToFloat"      integerToFloatName      (\_ -> mkFloatLitFloat)
       , rule_encodeFloat        "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
-      , rule_decodeDouble       "integerDecodeDouble" integerDecodeDoubleName
       , rule_convert            "integerToDouble"     integerToDoubleName     (\_ -> mkDoubleLitDouble)
       , rule_binopi             "integerGcd"          integerGcdName          gcd
       , rule_binopi             "integerLcm"          integerLcmName          lcm
@@ -1408,9 +1433,6 @@ builtinBignumRules _ =
           rule_encodeFloat str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_Int_encodeFloat op }
-          rule_decodeDouble str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_decodeDouble }
           rule_passthrough str name toIntegerName
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_passthrough toIntegerName }
@@ -1743,22 +1765,6 @@ match_rationalTo mkLit _ id_unf _ [xl, yl]
   , y /= 0
   = Just (mkLit (fromRational (x % y)))
 match_rationalTo _ _ _ _ _ = Nothing
-
-match_decodeDouble :: RuleFun
-match_decodeDouble env id_unf fn [xl]
-  | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType fn) of
-    Just (_, _, res)
-      | Just [_lev1, _lev2, _integerTy, intHashTy] <- tyConAppArgs_maybe res
-      -> case decodeFloat (fromRational x :: Double) of
-           (y, z) ->
-             Just $ mkCoreUbxTup [integerTy, intHashTy]
-                                 [Lit (mkLitInteger y),
-                                  Lit (mkLitInt (roPlatform env) (toInteger z))]
-    _ ->
-        pprPanic "match_decodeDouble: Id has the wrong type"
-          (ppr fn <+> dcolon <+> ppr (idType fn))
-match_decodeDouble _ _ _ _ = Nothing
 
 match_passthrough :: Name -> RuleFun
 match_passthrough n _ _ _ [App (Var x) y]
