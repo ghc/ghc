@@ -403,7 +403,8 @@ lvlApp :: LevelEnv
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
        -> LvlM LevelledExpr                    -- Result expression
 lvlApp env orig_expr ((_,AnnVar fn), args)
-  -- TODO: runRW#'s continuation must remain a join point; don't float!
+  -- Try to ensure that runRW#'s continuation isn't floated out.
+  -- See Note [Simplification of runRW#].
   | fn `hasKey` runRWKey
   = do { args' <- mapM (lvlExpr env) args
        ; return (foldl' App (lookupVar env fn) args') }

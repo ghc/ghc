@@ -764,6 +764,40 @@ we will check any unfolding after it has been unfolded; checking the
 unfolding beforehand is merely an optimization, and one that actively
 hurts us here.
 
+Note [Linting of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~
+runRW# has some very peculiar behavior (see Note [runRW magic] in
+GHC.CoreToStg.Prep) which CoreLint must accommodate.
+
+As described in Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils, the simplifier pushes casts out of
+lambdas. Concretely, the simplifier will transform
+
+    runRW# @r @ty (\s -> expr `cast` co)
+
+into
+
+    runRW# @r @ty ((\s -> expr) `cast` co)
+
+Consequently we need to handle the case that the continuation is a
+cast of a lambda. See Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils.
+
+In the event that the continuation is headed by a lambda (which
+will bind the State# token) we can safely allow calls to join
+points since CorePrep is going to apply the continuation to
+RealWorld.
+
+In the case that the continuation is not a lambda we lint the
+continuation disallowing join points, to rule out things like,
+
+    join j = ...
+    in runRW# @r @ty (
+         let x = jump j
+         in x
+       )
+
+
 ************************************************************************
 *                                                                      *
 \subsection[lintCoreExpr]{lintCoreExpr}
@@ -875,15 +909,16 @@ lintCoreExpr e@(App _ _)
   , arg_ty1 : arg_ty2 : arg3 : rest <- args
   = do { fun_ty1 <- lintCoreArg (idType fun) arg_ty1
        ; fun_ty2 <- lintCoreArg fun_ty1      arg_ty2
-         -- The simplifier pushes casts out of the continuation lambda;
-         -- consequently we need to handle the case that the continuation is a
-         -- cast lambda. See Note [Casts and lambdas] in
-         -- GHC.Core.Opt.Simplify.Utils.
-       ; arg3_ty <- case arg3 of
-                      Cast expr co -> do
-                        expr_ty <- lintJoinLams 1 (Just fun) expr
-                        lintCastExpr expr expr_ty co
-                      _ -> lintJoinLams 1 (Just fun) arg3
+         -- See Note [Linting of runRW#]
+       ; let lintRunRWCont :: CoreArg -> LintM LintedType
+             lintRunRWCont (Cast expr co) = do
+                ty <- lintRunRWCont expr
+                lintCastExpr expr ty co
+             lintRunRWCont expr@(Lam _ _) = do
+                lintJoinLams 1 (Just fun) expr
+             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             -- TODO: Look through ticks?
+       ; arg3_ty <- lintRunRWCont arg3
        ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty
        ; lintCoreArgs app_ty rest }
 

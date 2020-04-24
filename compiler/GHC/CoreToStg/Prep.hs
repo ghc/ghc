@@ -974,8 +974,78 @@ pragma.  It is levity-polymorphic.
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 
-It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in GHC.CoreToByteCode).
+It's correctness needs no special treatment in GHC except this special inlining
+here in CorePrep (and in GHC.CoreToByteCode).
+
+However, there are a variety of optimisation opportunities that the simplifier
+takes advantage of. See Note [Simplification of runRW#].
+
+
+Note [Simplification of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the program,
+
+    case runRW# (\s -> let n = I# 42# in n) of
+      I# n# -> f n#
+
+There is no reason why we should allocate an I# constructor given that we
+immediately destructure it. To avoid this the simplifier will push strict
+contexts into runRW's continuation. That is, it transforms
+
+    K[ runRW# @r @ty cont ]
+              ~>
+    runRW# @r @ty K[cont]
+
+This has a few interesting implications. Consider, for instance, this program:
+
+    join j = ...
+    in case runRW# @r @ty cont of
+         result -> jump j result
+
+Performing the transform described above would result in:
+
+    join j x = ...
+    in runRW# @r @ty (\s ->
+         case cont of in
+           result -> jump j result
+       )
+
+If runRW# were a "normal" function this call to join point j would not be
+allowed in its continuation argument. However, since runRW# is inlined (as
+described in Note [runRW magic] above), this is completely fine.
+
+Moreover, it's helpful to ensure that runRW's continuation isn't floated out
+(since doing so would then require a call, whereas we would otherwise end up
+with straight-line). Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
+treatment for runRW# applications, ensure the arguments are not floated if
+MFEs.
+
+Consequently, Core Lint has some special treatment to allow this behavior (see
+Note [Linting of runRW#]).
+
+Other considered designs
+------------------------
+
+One design that was rejected was to *require* that runRW#'s continuation be
+headed by a lambda. However, this proved to be quite fragile. For instance,
+SetLevels is very eager to float bottoming expressions. For instance given
+something of the form,
+
+    runRW# @r @ty (\s -> case expr of x -> undefined)
+
+SetLevels will see that the body the lambda is bottoming and will consequently
+float it to the top-level (assuming expr has no free coercion variables which
+prevent this). We therefore end up with
+
+    runRW# @r @ty (\s -> lvl s)
+
+Which the simplifier will beta reduce, leaving us with
+
+    runRW# @r @ty lvl
+
+Breaking our desired invariant. Ultimately we decided to simply accept that
+the continuation may not be a manifest lambda.
+
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg

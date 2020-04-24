@@ -147,7 +147,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, runRWId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1323,10 +1323,11 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
-lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, runRWIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+runRWIdName       = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1408,6 +1409,13 @@ oneShotId = pcMiscPrelId oneShotName ty info
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x
+
+runRWId :: Id -- See Note [runRW magic] in GHC.CoreToStg.Prep
+runRWId = pcMiscPrelId runRWIdName ty info
+  where
+    info = noCafIdInfo `setStrictnessInfo` mkClosedStrictSig [strictApply1Dmd] topDiv
+    ty  = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] 
+          $ mkVisFunTy (realWorldStatePrimTy `mkVisFunTy` openAlphaTy) openAlphaTy
 
 --------------------------------------------------------------------------------
 magicDictId :: Id  -- See Note [magicDictId magic]
