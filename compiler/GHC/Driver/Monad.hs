@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, RankNTypes #-}
+{-# LANGUAGE CPP, DeriveFunctor, RankNTypes, DerivingVia #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --
@@ -30,6 +30,8 @@ import GHC.Driver.Types
 import GHC.Driver.Session
 import Exception
 import ErrUtils
+import Control.Monad.Catch(MonadMask, MonadCatch, MonadThrow)
+import Control.Monad.Trans.Reader
 
 import Control.Monad
 import Data.IORef
@@ -91,6 +93,9 @@ logWarnings warns = do
 -- e.g., to maintain additional state consider wrapping this monad or using
 -- 'GhcT'.
 newtype Ghc a = Ghc { unGhc :: Session -> IO a } deriving (Functor)
+    deriving MonadCatch via (ReaderT Session IO)
+    deriving MonadThrow via (ReaderT Session IO)
+    deriving MonadMask via (ReaderT Session IO)
 
 -- | The Session is a handle to the complete state of a compilation
 -- session.  A compilation session consists of a set of modules

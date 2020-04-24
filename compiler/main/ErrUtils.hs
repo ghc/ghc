@@ -66,6 +66,7 @@ module ErrUtils (
 
 import GhcPrelude
 
+import Control.Monad.Catch (MonadMask)
 import Bag
 import Exception
 import Outputable
@@ -93,6 +94,7 @@ import System.IO
 import System.IO.Error  ( catchIOError )
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
+import OpenTelemetry
 
 -------------------------
 type MsgDoc  = SDoc
@@ -661,7 +663,7 @@ data PrintTimings = PrintTimings | DontPrintTimings
 -- requested, the result is only forced when timings are enabled.
 --
 -- See Note [withTiming] for more.
-withTiming :: MonadIO m
+withTiming :: (MonadIO m, MonadMask m)
            => DynFlags     -- ^ DynFlags
            -> SDoc         -- ^ The name of the phase
            -> (a -> ())    -- ^ A function to force the result
@@ -672,7 +674,7 @@ withTiming dflags what force action =
   withTiming' dflags what force PrintTimings action
 
 -- | Like withTiming but get DynFlags from the Monad.
-withTimingD :: (MonadIO m, HasDynFlags m)
+withTimingD :: (MonadIO m, HasDynFlags m, MonadMask m)
            => SDoc         -- ^ The name of the phase
            -> (a -> ())    -- ^ A function to force the result
                            -- (often either @const ()@ or 'rnf')
@@ -688,7 +690,7 @@ withTimingD what force action = do
 --
 --   See Note [withTiming] for more.
 withTimingSilent
-  :: MonadIO m
+  :: (MonadIO m, MonadMask m)
   => DynFlags   -- ^ DynFlags
   -> SDoc       -- ^ The name of the phase
   -> (a -> ())  -- ^ A function to force the result
@@ -704,7 +706,7 @@ withTimingSilent dflags what force action =
 --
 --   See Note [withTiming] for more.
 withTimingSilentD
-  :: (MonadIO m, HasDynFlags m)
+  :: (MonadIO m, HasDynFlags m, MonadMask m)
   => SDoc       -- ^ The name of the phase
   -> (a -> ())  -- ^ A function to force the result
                 -- (often either @const ()@ or 'rnf')
@@ -715,7 +717,7 @@ withTimingSilentD what force action = do
   withTiming' dflags what force DontPrintTimings action
 
 -- | Worker for 'withTiming' and 'withTimingSilent'.
-withTiming' :: MonadIO m
+withTiming' :: (MonadIO m, MonadMask m)
             => DynFlags   -- ^ A means of getting a 'DynFlags' (often
                             -- 'getDynFlags' will work here)
             -> SDoc         -- ^ The name of the phase
@@ -729,12 +731,14 @@ withTiming' dflags what force_result prtimings action
           then do whenPrintTimings $
                     logInfo dflags (defaultUserStyle dflags) $
                       text "***" <+> what <> colon
-                  eventBegins dflags what
-                  alloc0 <- liftIO getAllocationCounter
-                  start <- liftIO getCPUTime
-                  !r <- action
-                  () <- pure $ force_result r
-                  eventEnds dflags what
+                  (alloc0, start, r) <- telem $ do
+                    eventBegins dflags what
+                    alloc0 <- liftIO getAllocationCounter
+                    start <- liftIO getCPUTime
+                    !r <- action
+                    () <- pure $ force_result r
+                    eventEnds dflags what
+                    return (alloc0, start, r)
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
@@ -762,6 +766,7 @@ withTiming' dflags what force_result prtimings action
            else action
 
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
+          telem = withSpan (showSDocOneLine dflags what)
           eventBegins dflags w = do
             whenPrintTimings $ traceMarkerIO (eventBeginsDoc dflags w)
             liftIO $ traceEventIO (eventBeginsDoc dflags w)

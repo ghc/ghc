@@ -37,6 +37,7 @@ import GhcPrelude
 
 import qualified GHC.Runtime.Linker as Linker
 
+import Control.Monad.Catch (MonadMask)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
@@ -120,7 +121,7 @@ label_self thread_name = do
 -- again.
 -- In case of errors, just throw them.
 --
-depanal :: GhcMonad m =>
+depanal :: (GhcMonad m, MonadMask m) =>
            [ModuleName]  -- ^ excluded modules
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
@@ -132,7 +133,7 @@ depanal excluded_mods allow_dup_roots = do
 
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
-depanalE :: GhcMonad m =>     -- New for #17459
+depanalE :: (GhcMonad m, MonadMask m) =>     -- New for #17459
             [ModuleName]      -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
             -> m (ErrorMessages, ModuleGraph)
@@ -161,7 +162,7 @@ depanalE excluded_mods allow_dup_roots = do
 -- Unlike 'depanal' this function will not update 'hsc_mod_graph' with the
 -- new module graph.
 depanalPartial
-    :: GhcMonad m
+    :: (GhcMonad m, MonadMask m)
     => [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
     -> m (ErrorMessages, ModuleGraph)
@@ -284,7 +285,7 @@ data LoadHowMuch
 -- After processing this empty ModuleGraph, the errors of depanalE are thrown.
 -- All other errors are reported using the 'defaultWarnErrLogger'.
 --
-load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
+load :: (GhcMonad m, MonadMask m) => LoadHowMuch -> m SuccessFlag
 load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph

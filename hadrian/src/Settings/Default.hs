@@ -76,6 +76,7 @@ stage0Packages = do
              , text
              , transformers
              , unlit
+             , exceptions
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]

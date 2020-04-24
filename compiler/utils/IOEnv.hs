@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -11,7 +12,7 @@
 --
 
 module IOEnv (
-        IOEnv, -- Instance of Monad
+        IOEnv(..), -- Instance of Monad
 
         -- Monad utilities
         module MonadUtils,
@@ -45,13 +46,19 @@ import System.IO        ( fixIO )
 import Control.Monad
 import MonadUtils
 import Control.Applicative (Alternative(..))
+import Control.Monad.Trans.Reader
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 
 ----------------------------------------------------------------------
 -- Defining the monad type
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a) deriving (Functor)
+newtype IOEnv env a = IOEnv (env -> IO a)
+  deriving (Functor)
+  deriving MonadCatch via (ReaderT env IO)
+  deriving MonadThrow via (ReaderT env IO)
+  deriving MonadMask via (ReaderT env IO)
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
@@ -100,6 +107,9 @@ instance ExceptionMonad (IOEnv a) where
                                 g_restore (IOEnv m) = IOEnv $ \s -> io_restore (m s)
                              in
                                 unIOEnv (f g_restore) s
+
+
+
 
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
     getDynFlags = do env <- getEnv

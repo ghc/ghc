@@ -35,6 +35,7 @@ module GHCi.UI.Monad (
 
 #include "HsVersions.h"
 
+import Control.Monad.Catch (MonadMask)
 import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
@@ -273,7 +274,7 @@ instance Applicative GHCi where
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
 
-class GhcMonad m => GhciMonad m where
+class (MonadMask m, GhcMonad m) => GhciMonad m where
   getGHCiState    :: m GHCiState
   setGHCiState    :: GHCiState -> m ()
   modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
@@ -320,6 +321,7 @@ instance ExceptionMonad GHCi where
                              in
                                 unGHCi (f g_restore) s
 
+{-
 instance MonadThrow Ghc where
   throwM = liftIO . throwM
 
@@ -340,6 +342,7 @@ instance MonadMask Ghc where
       (unGhc acquire s)
       (\resource exitCase -> unGhc (release resource exitCase) s)
       (\resource -> unGhc (use resource) s)
+      -}
 
 instance MonadThrow GHCi where
   throwM = liftIO . throwM

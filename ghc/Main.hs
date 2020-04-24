@@ -63,6 +63,7 @@ import Util
 import Panic
 import GHC.Types.Unique.Supply
 import MonadUtils       ( liftIO )
+import OpenTelemetry
 
 -- Imports for --abi-hash
 import GHC.Iface.Load      ( loadUserInterface )
@@ -98,7 +99,7 @@ import Prelude
 -- GHC's command-line interface
 
 main :: IO ()
-main = do
+main = withSpan "main" $ do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering

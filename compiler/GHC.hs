@@ -378,6 +378,7 @@ import Data.IORef
 import System.FilePath
 import Control.Concurrent
 import Control.Applicative ((<|>))
+import Control.Monad.Catch (MonadMask)
 
 import Maybes
 import System.IO.Error  ( isDoesNotExistError )
@@ -1068,15 +1069,15 @@ instance Outputable CoreModule where
 -- desugars the module, then returns the resulting Core module (consisting of
 -- the module name, type declarations, and function declarations) if
 -- successful.
-compileToCoreModule :: GhcMonad m => FilePath -> m CoreModule
+compileToCoreModule :: (GhcMonad m, MonadMask m) => FilePath -> m CoreModule
 compileToCoreModule = compileCore False
 
 -- | Like compileToCoreModule, but invokes the simplifier, so
 -- as to return simplified and tidied Core.
-compileToCoreSimplified :: GhcMonad m => FilePath -> m CoreModule
+compileToCoreSimplified :: (MonadMask m, GhcMonad m) => FilePath -> m CoreModule
 compileToCoreSimplified = compileCore True
 
-compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
+compileCore :: (GhcMonad m, MonadMask m) => Bool -> FilePath -> m CoreModule
 compileCore simplify fn = do
    -- First, set the target to the desired filename
    target <- guessTarget fn Nothing

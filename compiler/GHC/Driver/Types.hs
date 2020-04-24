@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
 
 -- | Types for the per-module compiler
 module GHC.Driver.Types (
@@ -231,6 +232,8 @@ import Exception
 import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State (StateT(StateT))
+import Control.Monad.Catch (MonadMask, MonadCatch, MonadThrow)
 import Control.Monad.Trans.Class
 
 -- -----------------------------------------------------------------------------
@@ -275,6 +278,9 @@ data HscStatus
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
     deriving (Functor)
+    deriving MonadCatch via (ReaderT HscEnv (StateT WarningMessages IO))
+    deriving MonadThrow via (ReaderT HscEnv (StateT WarningMessages IO))
+    deriving MonadMask via (ReaderT HscEnv (StateT WarningMessages IO))
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)

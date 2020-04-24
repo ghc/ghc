@@ -44,6 +44,7 @@ import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when )
 import Data.Maybe       ( isJust )
 import Data.IORef
+import Control.Monad.Catch
 import qualified Data.Set as Set
 
 -----------------------------------------------------------------
@@ -52,7 +53,7 @@ import qualified Data.Set as Set
 --
 -----------------------------------------------------------------
 
-doMkDependHS :: GhcMonad m => [FilePath] -> m ()
+doMkDependHS :: (MonadMask m ,GhcMonad m) => [FilePath] -> m ()
 doMkDependHS srcs = do
     -- Initialisation
     dflags0 <- GHC.getSessionDynFlags

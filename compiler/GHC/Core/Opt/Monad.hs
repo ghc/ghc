@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -79,7 +80,11 @@ import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 import Panic (throwGhcException, GhcException(..))
-
+import Control.Monad.Catch
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Writer
+import IOEnv (IOEnv(IOEnv))
+import Data.Semigroup ((<>))
 {-
 ************************************************************************
 *                                                                      *
@@ -127,7 +132,7 @@ instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = text "Simplifier"
   ppr (CoreDoPluginPass s _)   = text "Core plugin: " <+> text s
   ppr CoreDoFloatInwards       = text "Float inwards"
-  ppr (CoreDoFloatOutwards f)  = text "Float out" <> parens (ppr f)
+  ppr (CoreDoFloatOutwards f)  = text "Float out" Outputable.<> parens (ppr f)
   ppr CoreLiberateCase         = text "Liberate case"
   ppr CoreDoStaticArgs         = text "Static argument"
   ppr CoreDoCallArity          = text "Called arity analysis"
@@ -171,10 +176,10 @@ instance Outputable SimplMode where
                    , sm_eta_expand = eta, sm_case_case = cc })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
-               brackets (text (concat $ intersperse "," ss)) <> comma
-             , pp_flag i   (sLit "inline") <> comma
-             , pp_flag r   (sLit "rules") <> comma
-             , pp_flag eta (sLit "eta-expand") <> comma
+               brackets (text (concat $ intersperse "," ss)) Outputable.<> comma
+             , pp_flag i   (sLit "inline") Outputable.<> comma
+             , pp_flag r   (sLit "rules") Outputable.<> comma
+             , pp_flag eta (sLit "eta-expand") Outputable.<> comma
              , pp_flag cc  (sLit "case-of-case") ])
          where
            pp_flag f s = ppUnless f (text "no") <+> ptext s
@@ -576,12 +581,21 @@ plusWriter w1 w2 = CoreWriter {
         cw_simpl_count = (cw_simpl_count w1) `plusSimplCount` (cw_simpl_count w2)
     }
 
+instance Monoid CoreWriter where
+  mempty = emptyWriter unsafeGlobalDynFlags
+
+instance Semigroup CoreWriter where
+  (<>) = plusWriter
+
 type CoreIOEnv = IOEnv CoreReader
 
 -- | The monad used by Core-to-Core passes to register simplification statistics.
 --  Also used to have common state (in the form of UniqueSupply) for generating Uniques.
 newtype CoreM a = CoreM { unCoreM :: CoreIOEnv (a, CoreWriter) }
     deriving (Functor)
+    deriving MonadCatch via (WriterT CoreWriter (ReaderT CoreReader IO))
+    deriving MonadThrow via (WriterT CoreWriter (ReaderT CoreReader IO))
+    deriving MonadMask via (WriterT CoreWriter (ReaderT CoreReader IO))
 
 instance Monad CoreM where
     mx >>= f = CoreM $ do
