@@ -55,7 +55,6 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
 import GHC.Types.Unique     ( hasKey )
-import GHC.Builtin.Names    ( keepAliveIdKey )
 import Outputable
 import GHC.Types.Module           ( Module )
 import qualified ErrUtils as Err
@@ -106,9 +105,7 @@ lintStgArg (StgLitArg _) = return ()
 lintStgArg (StgVarArg v) = lintStgVar v
 
 lintStgVar :: Id -> LintM ()
-lintStgVar id
-  | id `hasKey` keepAliveIdKey = addErrL (text "keepAlive# not permitted in STG")
-  | otherwise = checkInScope id
+lintStgVar id = checkInScope id
 
 lintStgBinds
     :: (OutputablePass a, BinderP a ~ Id)
@@ -185,6 +182,9 @@ lintStgExpr app@(StgConApp con args _arg_tys) = do
                ppr app)
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
+
+lintStgExpr (StgOpApp (StgPrimOp KeepAliveOp) _ _) =
+    addErrL (text "keepAlive# should have been desugared by CorePrep")
 
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args

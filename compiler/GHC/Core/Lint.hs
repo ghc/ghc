@@ -927,7 +927,7 @@ lintCoreExpr e@(App _ _)
   = failWithL (text "Invalid runRW# application")
 
   | Var fun <- fun
-  , fun `hasKey` keepAliveIdKey
+  , Just KeepAliveOp <- isPrimOpId_maybe f
   , [arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5, arg6] <- args
   = do { fun_ty6 <- lintCoreArgs (idType fun)
                       [ arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5 ]
@@ -936,7 +936,7 @@ lintCoreExpr e@(App _ _)
        }
 
   | Var fun <- fun
-  , fun `hasKey` keepAliveIdKey
+  , Just KeepAliveOp <- isPrimOpId_maybe f
   = failWithL (text "Invalid keepAlive# application")
 
   | otherwise

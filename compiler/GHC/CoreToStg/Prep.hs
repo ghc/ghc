@@ -868,7 +868,7 @@ cpeApp top_env expr
     cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
                          CpeApp (Type _result_rep), CpeApp (Type result_ty),
                          CpeApp x, CpeApp y] 2
-        | f `hasKey` keepAliveIdKey
+        | Just KeepAliveOp <- isPrimOpId_maybe f
         = do { y' <- newVar result_ty
              ; s2 <- newVar realWorldStatePrimTy
              ; let touchId = mkPrimOpId TouchOp
@@ -878,7 +878,7 @@ cpeApp top_env expr
              ; pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
              }
     cpe_app _env (Var f) args n
-        | f `hasKey` keepAliveIdKey
+        | Just KeepAliveOp <- isPrimOpId_maybe f
         = pprPanic "cpe_app(keepAlive#)" (ppr args $$ ppr n)
 
     cpe_app env (Var v) args depth

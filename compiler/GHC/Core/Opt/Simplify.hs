@@ -38,7 +38,7 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey, keepAliveIdKey )
+import GHC.Builtin.Names( runRWKey )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
@@ -1956,7 +1956,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
 --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
 rebuildContPrimop :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFloats, OutExpr))
 rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
-  | fun `hasKey` keepAliveIdKey
+  | Just KeepAliveOp <- isPrimOpId_maybe fun
   , [ ValArg y
     , ValArg x
     , TyArg {} -- res_ty

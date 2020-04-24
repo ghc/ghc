@@ -98,7 +98,7 @@ import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import GHC.Builtin.Names      ( runRWKey, keepAliveIdKey )
+import GHC.Builtin.Names      ( runRWKey )
 import Util
 import Outputable
 import FastString
@@ -398,6 +398,12 @@ lvlNonTailExpr env expr
   = lvlExpr (placeJoinCeiling env) expr
 
 -------------------------------------------
+isContPrimOp :: Id -> Bool
+isContPrimOp fn
+  | fn `hasKey` runRWKey = True
+  | Just KeepAliveOp <- isPrimOpId_maybe fn = True
+  | otherwise = Falsej
+
 lvlApp :: LevelEnv
        -> CoreExprWithFVs
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
@@ -406,7 +412,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
   -- Try to ensure that runRW#'s continuation isn't floated out.
   -- See Note [Simplification of runRW#].
   -- TODO: update for keepAlive#
-  | fn `hasKey` runRWKey || fn `hasKey` keepAliveIdKey
+  | isContPrimOp fn
   = do { args' <- mapM (lvlExpr env) args
        ; return (foldl' App (lookupVar env fn) args') }
 
