@@ -379,7 +379,6 @@ basicKnownKeyNames
         integerToDoubleName,
         integerEncodeFloatName,
         integerEncodeDoubleName,
-        integerDecodeDoubleName,
         integerGcdName,
         integerLcmName,
         integerAndName,
@@ -397,7 +396,6 @@ basicKnownKeyNames
         naturalRemName,
         naturalQuotRemName,
         bignatFromWordListName,
-
         -- Float/Double
         rationalToFloatName,
         rationalToDoubleName,
@@ -1155,7 +1153,6 @@ integerFromNaturalName
    , integerToDoubleName
    , integerEncodeFloatName
    , integerEncodeDoubleName
-   , integerDecodeDoubleName
    , integerGcdName
    , integerLcmName
    , integerAndName
@@ -1223,7 +1220,6 @@ integerToFloatName        = bniVarQual "integerToFloat#"           integerToFloa
 integerToDoubleName       = bniVarQual "integerToDouble#"          integerToDoubleIdKey
 integerEncodeFloatName    = bniVarQual "integerEncodeFloat#"       integerEncodeFloatIdKey
 integerEncodeDoubleName   = bniVarQual "integerEncodeDouble#"      integerEncodeDoubleIdKey
-integerDecodeDoubleName   = bniVarQual "integerDecodeDouble#"      integerDecodeDoubleIdKey
 integerGcdName            = bniVarQual "integerGcd"                integerGcdIdKey
 integerLcmName            = bniVarQual "integerLcm"                integerLcmIdKey
 integerAndName            = bniVarQual "integerAnd"                integerAndIdKey
@@ -2466,7 +2462,6 @@ integerFromNaturalIdKey
    , integerFromWordIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
-   , integerDecodeDoubleIdKey
    , naturalToWordIdKey
    , naturalAddIdKey
    , naturalSubIdKey
@@ -2518,7 +2513,6 @@ integerShiftRIdKey         = mkPreludeMiscIdUnique 637
 integerFromWordIdKey       = mkPreludeMiscIdUnique 638
 integerFromWord64IdKey     = mkPreludeMiscIdUnique 639
 integerFromInt64IdKey      = mkPreludeMiscIdUnique 640
-integerDecodeDoubleIdKey   = mkPreludeMiscIdUnique 641
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
 naturalAddIdKey            = mkPreludeMiscIdUnique 651
