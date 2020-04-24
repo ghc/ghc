@@ -10,6 +10,12 @@
     and `unTypeQ` are also generalised in terms of `Quote` rather than specific
     to `Q`.
 
+  * Fix Eq/Ord instances for `Bytes`: we were comparing pointers while we should
+    compare the actual bytes (#16457).
+
+  * Fix Show instance for `Bytes`: we were showing the pointer value while we
+    want to show the contents (#16457).
+
 ## 2.16.0.0 *TBA*
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and
