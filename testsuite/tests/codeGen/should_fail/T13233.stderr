@@ -20,3 +20,15 @@ T13233.hs:22:16: error:
     Levity-polymorphic arguments:
       a :: TYPE rep1
       b :: TYPE rep2
+
+T13233.hs:27:10: error:
+    Cannot use function with levity-polymorphic arguments:
+      mkWeak# :: a
+                 -> b
+                 -> (State# RealWorld -> (# State# RealWorld, c #))
+                 -> State# RealWorld
+                 -> (# State# RealWorld, Weak# b #)
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
+    Levity-polymorphic arguments: a :: TYPE rep
