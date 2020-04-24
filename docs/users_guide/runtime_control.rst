@@ -1190,9 +1190,8 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     accurate mode every spark event is logged individually. The latter
     has a higher runtime overhead and is not enabled by default.
 
-    The format of the log file is described by the header
-    ``EventLogFormat.h`` that comes with GHC, and it can be parsed in
-    Haskell using the
+    The format of the log file is described in this users guide in
+    :ref:`eventlog-encodings` It can be parsed in Haskell using the
     `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
     library. To dump the contents of a ``.eventlog`` file as text, use
     the tool ``ghc-events show`` that comes with the
