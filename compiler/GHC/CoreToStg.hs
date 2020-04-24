@@ -539,12 +539,10 @@ coreToStgApp f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                -- As described in Note [Primop wrappers] in GHC.Builtin.PrimOps, here we
-                -- turn unsaturated primop applications into applications of
-                -- the primop's wrapper.
-                PrimOpId op
-                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
-                  | otherwise    -> StgApp (primOpWrapperId op) args'
+                -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
+                -- we require that primop applications be saturated.
+                PrimOpId op      -> ASSERT( saturated )
+                                    StgOpApp (StgPrimOp op) args' res_ty
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
