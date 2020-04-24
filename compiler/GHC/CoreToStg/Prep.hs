@@ -71,7 +71,7 @@ import qualified Data.Set as S
 
 The goal of this pass is to prepare for code generation.
 
-1.  Saturate constructor applications.
+1.  Saturate constructor and primop applications.
 
 2.  Convert to A-normal form; that is, function arguments
     are always variables.
@@ -1151,15 +1151,11 @@ maybeSaturate deals with eta expanding to saturate things that can't deal with
 unsaturated applications (identified by 'hasNoBinding', currently just
 foreign calls and unboxed tuple/sum constructors).
 
-Note that eta expansion in CorePrep is very fragile due to the "prediction" of
-CAFfyness made during tidying (see Note [CAFfyness inconsistencies due to eta
-expansion in CorePrep] in GHC.Iface.Tidy for details.  We previously saturated primop
+Historical Note: Note that eta expansion in CorePrep used to be very fragile
+due to the "prediction" of CAFfyness that we used to make during tidying.
+We previously saturated primop
 applications here as well but due to this fragility (see #16846) we now deal
 with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
-
-It's quite likely that eta expansion of constructor applications will
-eventually break in a similar way to how primops did. We really should
-eliminate this case as well.
 -}
 
 maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
