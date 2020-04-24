@@ -590,6 +590,8 @@ primOpOcc op = case primOpInfo op of
 
 {- Note [Primop wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: Update this
+
 Previously hasNoBinding would claim that PrimOpIds didn't have a curried
 function definition. This caused quite some trouble as we would be forced to
 eta expand unsaturated primop applications very late in the Core pipeline. Not
@@ -617,6 +619,9 @@ found using 'PrimOp.primOpWrapperId'.
 Nota Bene: GHC.PrimopWrappers is needed *regardless*, because it's
 used by GHCi, which does not implement primops direct at all.
 
+Note [Eta expanding primops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: Write this
 -}
 
 -- | Returns the 'Id' of the wrapper associated with the given 'PrimOp'.
