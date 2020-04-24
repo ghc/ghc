@@ -676,3 +676,82 @@ A variable-length packet encoding a profile sample.
 
    TODO
 
+.. _nonmoving-gc-events:
+
+Non-moving GC event output
+--------------------------
+
+These events mark various stages of the
+:rts-flag:`non-moving collection <--nonmoving-gc>` lifecycle. These are enabled
+with the ``+RTS -lg`` event-set.
+
+.. event-type:: CONC_MARK_BEGIN
+
+   :tag: 200
+   :length: fixed
+
+   Marks the beginning of marking by the concurrent collector.
+
+.. event-type:: CONC_MARK_END
+
+   :tag: 201
+   :length: fixed
+
+   Marks the end of marking by the concurrent collector.
+
+.. event-type:: CONC_SYNC_BEGIN
+
+   :tag: 202
+   :length: fixed
+
+   Marks the beginning of the concurrent garbage collector's
+   post-mark synchronization phase.
+
+.. event-type:: CONC_SYNC_END
+
+   :tag: 203
+   :length: fixed
+
+   Marks the end of the concurrent garbage collector's
+   post-mark synchronization phase.
+
+.. event-type:: CONC_SWEEP_BEGIN
+
+   :tag: 204
+   :length: fixed
+
+   Marks the beginning of the concurrent garbage collector's
+   sweep phase.
+
+.. event-type:: CONC_SWEEP_END
+
+   :tag: 205
+   :length: fixed
+
+   Marks the end of the concurrent garbage collector's
+   sweep phase.
+
+.. event-type:: CONC_UPD_REM_SET_FLUSH
+
+   :tag: 206
+   :length: fixed
+
+   Marks a capability flushing its local update remembered set
+   accumulator.
+
+Non-moving heap census
+~~~~~~~~~~~~~~~~~~~~~~
+
+The non-moving heap census events (enabled with the ``+RTS -ln`` event-set) are
+intended to provide insight into fragmentation of the non-moving heap.
+
+.. event-type:: NONMOVING_HEAP_CENSUS
+
+   :tag: 207
+   :length: fixed
+   :field Word8: base-2 logarithm of *blk_sz*.
+   :field Word32: number of active segments.
+   :field Word32: number of filled segments.
+   :field Word32: number of live blocks.
+
+   Describes the occupancy of the *blk_sz* sub-heap.
