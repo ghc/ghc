@@ -405,6 +405,7 @@ lvlApp :: LevelEnv
 lvlApp env orig_expr ((_,AnnVar fn), args)
   -- Try to ensure that runRW#'s continuation isn't floated out.
   -- See Note [Simplification of runRW#].
+  -- TODO: update for keepAlive#
   | fn `hasKey` runRWKey || fn `hasKey` keepAliveIdKey
   = do { args' <- mapM (lvlExpr env) args
        ; return (foldl' App (lookupVar env fn) args') }

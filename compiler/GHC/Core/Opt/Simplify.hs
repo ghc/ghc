@@ -1882,59 +1882,11 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
 
 ---------- Simplify continuation-passing primops --------------
 -- (Do this after absorbing all arguments)
---
--- Push strict contexts into keepAlive# continuation
---
--- That is,
---
---     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
---       ~>
---     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
-  | fun `hasKey` keepAliveIdKey
-  , [ ValArg y
-    , ValArg x
-    , TyArg {} -- res_ty
-    , TyArg {} -- res_rep
-    , TyArg {as_arg_ty=arg_ty}
-    , TyArg {as_arg_ty=arg_rep}
-    ] <- rev_args
-  = do { let ty' = contResultType cont
-       ; j <- newJoinId [] ty'
-       ; let env' = zapSubstEnv env
-       ; y' <- simplExprC env' y cont
-       ; let bind = NonRec j y'
-       ; x' <- simplExpr env' x
-       ; arg_rep' <- simplType env' arg_rep
-       ; arg_ty' <- simplType env' arg_ty
-       ; let call' = mkApps (Var fun)
-               [ mkTyArg arg_rep', mkTyArg arg_ty'
-               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
-               , x'
-               , Var j
-               ]
-       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
-         return (emptyFloats env `extendFloats` bind, call') }
+rebuildCall env arg_info cont
+  | Just do_it <- rebuildContPrimop env arg_info cont
+  = do_it
 
----------- The runRW# rule. Do this after absorbing all arguments ------
--- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
--- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont })
-  | fun `hasKey` runRWKey
-  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
-  , [ TyArg {}, TyArg {} ] <- rev_args
-  = do { s <- newId (fsLit "s") realWorldStatePrimTy
-       ; let env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
-             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
-                                , sc_env = env', sc_cont = cont }
-       ; body' <- simplExprC env' arg cont'
-       ; let arg'  = Lam s body'
-             ty'   = contResultType cont
-             rr'   = getRuntimeRep ty'
-             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
-       ; return (emptyFloats env, call') }
-
+---------- Simplify value applications --------------
 rebuildCall env info@(ArgInfo { ai_type = fun_ty, ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
@@ -1985,6 +1937,72 @@ rebuildCall env info@(ArgInfo { ai_type = fun_ty, ai_encl = encl_rules
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   = rebuild env (argInfoExpr fun rev_args) cont
+
+-- | A few primops take the form of:
+--
+-- @
+-- op :: ... -> a -> a
+-- @
+--
+-- and have semantics which permit us to "extend the reach" of their
+-- continuation. For instance, see Note [Simplifying runRW#].
+--
+-- Push strict contexts into keepAlive# continuation
+--
+-- That is,
+--
+--     K[keepAlive# @arg_rep @arg_ty @res_rep @res_ty x (\s -> rhs) s0] :: (out_ty :: TYPE out_rep)
+--       ~>
+--     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
+rebuildContPrimop :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFloats, OutExpr))
+rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  | fun `hasKey` keepAliveIdKey
+  , [ ValArg y
+    , ValArg x
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = Just $ do
+       { let ty' = contResultType cont
+       ; j <- newJoinId [] ty'
+       ; let env' = zapSubstEnv env
+       ; y' <- simplExprC env' y cont
+       ; let bind = NonRec j y'
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
+       ; let call' = mkApps (Var fun)
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , x'
+               , Var j
+               ]
+       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
+         return (emptyFloats env `extendFloats` bind, call') }
+
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
+rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args })
+            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont })
+  | fun `hasKey` runRWKey
+  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
+  , [ TyArg {}, TyArg {} ] <- rev_args
+  = Just $ do
+       { s <- newId (fsLit "s") realWorldStatePrimTy
+       ; let env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
+                                , sc_env = env', sc_cont = cont }
+       ; body' <- simplExprC env' arg cont'
+       ; let arg'  = Lam s body'
+             ty'   = contResultType cont
+             rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
+
+rebuildContPrimop _ _ _ = Nothing
+
 
 {- Note [Trying rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
