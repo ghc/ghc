@@ -974,8 +974,43 @@ pragma.  It is levity-polymorphic.
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 
-It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in GHC.CoreToByteCode).
+It's correctness needs no special treatment in GHC except this special inlining
+here in CorePrep (and in GHC.CoreToByteCode).
+
+However, there are a variety of optimisation opportunities that the simplifier
+takes advantage of. See Note [Simplification of runRW#].
+
+
+Note [Simplification of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the program,
+
+    case runRW# (\s -> let n = I# 42# in n) of
+      I# n# -> f n#
+
+There is no reason why we should allocate an I# constructor given that we
+immediately destructure it. To avoid this the simplifier will push strict
+contexts into runRW's continuation. That is, it transforms
+
+    K[ runRW# @r @ty cont ]
+              ~>
+    runRW# @r @ty K[cont]
+
+This has a few interesting implications. Consider, for instance, this program:
+
+    join j = ...
+    in case runRW# @r @ty cont of
+         result -> jump j result
+
+Performing the transform described above would result in:
+
+    join j = ...
+    in runRW# @r @ty (
+         case cont of in
+         result -> jump j result
+
+TODO
+
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg

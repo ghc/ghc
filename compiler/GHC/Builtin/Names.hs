@@ -246,7 +246,6 @@ basicKnownKeyNames
         -- See Note [TyConRepNames for non-wired-in TyCons]
         ioTyConName, ioDataConName,
         runMainIOName,
-        runRWName,
 
         -- Type representation types
         trModuleTyConName, trModuleDataConName,
@@ -912,9 +911,8 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName :: Name
+runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
-runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey

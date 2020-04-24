@@ -875,15 +875,29 @@ lintCoreExpr e@(App _ _)
   , arg_ty1 : arg_ty2 : arg3 : rest <- args
   = do { fun_ty1 <- lintCoreArg (idType fun) arg_ty1
        ; fun_ty2 <- lintCoreArg fun_ty1      arg_ty2
+         -- Note [Linting of runRW#]
+         -- ~~~~~~~~~~~~~~~~~~~~~~~~
+         -- runRW# has some very peculiar behavior (see Note [runRW magic] in
+         -- GHC.CoreToStg.Prep) which CoreLint must accommodate.
+         --
          -- The simplifier pushes casts out of the continuation lambda;
          -- consequently we need to handle the case that the continuation is a
          -- cast lambda. See Note [Casts and lambdas] in
          -- GHC.Core.Opt.Simplify.Utils.
-       ; arg3_ty <- case arg3 of
-                      Cast expr co -> do
-                        expr_ty <- lintJoinLams 1 (Just fun) expr
-                        lintCastExpr expr expr_ty co
-                      _ -> lintJoinLams 1 (Just fun) arg3
+         --
+         -- In the event that the continuation is headed by a lambda (which
+         -- will bind the State# token) we can safely allow calls to join
+         -- points since CorePrep is going to apply the continuation to
+         -- RealWorld.
+       ; let lintRunRWCont :: CoreArg -> LintM LintedType
+             lintRunRWCont (Cast expr co) = do
+                ty <- lintRunRWCont expr
+                lintCastExpr expr ty co
+             lintRunRWCont expr@(Lam _ _) = do
+                lintJoinLams 1 (Just fun) expr
+             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             -- TODO: Look through ticks?
+       ; arg3_ty <- lintRunRWCont arg3
        ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty
        ; lintCoreArgs app_ty rest }
 
