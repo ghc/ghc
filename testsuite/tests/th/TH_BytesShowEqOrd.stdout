@@ -1,0 +1,6 @@
+same pointer, same offset, same bytes: compare abcde to abcde => EQ
+same pointer, different offset, same bytes: compare abcde to abcde => EQ
+same pointer, different offset, different bytes: compare abcde to klmno => LT
+same pointer, different offset, different bytes: compare klmno to abcde => GT
+different pointer, different offset, same bytes: compare abcde to abcde => EQ
+different pointer, different offset, different bytes: compare abcde to fghij => LT

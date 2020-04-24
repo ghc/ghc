@@ -45,12 +45,15 @@ import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
                           TYPE, RuntimeRep(..) )
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
+import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 import Prelude
 import Foreign.ForeignPtr
+import Foreign.C.String
+import Foreign.C.Types
 
 -----------------------------------------------------
 --
@@ -1868,7 +1871,45 @@ data Bytes = Bytes
    -- , bytesInitialized :: Bool -- ^ False: only use `bytesSize` to allocate
    --                            --   an uninitialized region
    }
-   deriving (Eq,Ord,Data,Generic,Show)
+   deriving (Data,Generic)
+
+-- We can't derive Show instance for Bytes because we don't want to show the
+-- pointer value but the actual bytes (similarly to what ByteString does). See
+-- #16457.
+instance Show Bytes where
+   show b = unsafePerformIO $ withForeignPtr (bytesPtr b) $ \ptr ->
+               peekCStringLen ( ptr `plusPtr` fromIntegral (bytesOffset b)
+                              , fromIntegral (bytesSize b)
+                              )
+
+-- We can't derive Eq and Ord instances for Bytes because we don't want to
+-- compare pointer values but the actual bytes (similarly to what ByteString
+-- does).  See #16457
+instance Eq Bytes where
+   (==) = eqBytes
+
+instance Ord Bytes where
+   compare = compareBytes
+
+eqBytes :: Bytes -> Bytes -> Bool
+eqBytes a@(Bytes fp off len) b@(Bytes fp' off' len')
+  | len /= len'              = False    -- short cut on length
+  | fp == fp' && off == off' = True     -- short cut for the same bytes
+  | otherwise                = compareBytes a b == EQ
+
+compareBytes :: Bytes -> Bytes -> Ordering
+compareBytes (Bytes _   _    0)    (Bytes _   _    0)    = EQ  -- short cut for empty Bytes
+compareBytes (Bytes fp1 off1 len1) (Bytes fp2 off2 len2) =
+    unsafePerformIO $
+      withForeignPtr fp1 $ \p1 ->
+      withForeignPtr fp2 $ \p2 -> do
+        i <- memcmp (p1 `plusPtr` fromIntegral off1)
+                    (p2 `plusPtr` fromIntegral off2)
+                    (fromIntegral (min len1 len2))
+        return $! (i `compare` 0) <> (len1 `compare` len2)
+
+foreign import ccall unsafe "memcmp"
+  memcmp :: Ptr a -> Ptr b -> CSize -> IO CInt
 
 
 -- | Pattern in Haskell given in @{}@
