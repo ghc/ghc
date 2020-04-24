@@ -515,20 +515,12 @@ hasNoBinding :: Id -> Bool
 -- ^ Returns @True@ of an 'Id' which may not have a
 -- binding, even though it is defined in this module.
 
--- Data constructor workers used to be things of this kind, but
--- they aren't any more.  Instead, we inject a binding for
--- them at the CorePrep stage.
---
--- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in GHC.Builtin.PrimOps.
--- for the history of this.
---
--- Note that CorePrep currently eta expands things no-binding things and this
--- can cause quite subtle bugs. See Note [Eta expansion of hasNoBinding things
--- in CorePrep] in CorePrep for details.
---
--- EXCEPT: unboxed tuples, which definitely have no binding
+-- Data constructor workers used to be things of this kind, but they aren't any
+-- more.  Instead, we inject a binding for them at the CorePrep stage. The
+-- exception to this is unboxed tuples and sums datacons, which definitely have
+-- no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> False   -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
+                        PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)

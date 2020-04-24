@@ -176,6 +176,7 @@ nameToCLabel n suffix = mkFastString label
         ]
 
 
+-- See Note [Primop wrappers] in GHC.Builtin.PrimOps
 primopToCLabel :: PrimOp -> String -> String
 primopToCLabel primop suffix = concat
     [ "ghczmprim_GHCziPrimopWrappers_"

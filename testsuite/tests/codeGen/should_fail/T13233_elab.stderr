@@ -18,3 +18,12 @@ T13233_elab.hs:25:16: error:
     Levity-polymorphic arguments:
       a :: TYPE rep1
       b :: TYPE rep2
+
+T13233_elab.hs:33:10:
+    Cannot use function with levity-polymorphic arguments:
+      mkWeak# @rep @a @b @c :: a
+                               -> b
+                               -> (State# RealWorld -> (# State# RealWorld, c #))
+                               -> State# RealWorld
+                               -> (# State# RealWorld, Weak# b #)
+    Levity-polymorphic arguments: a :: TYPE rep
