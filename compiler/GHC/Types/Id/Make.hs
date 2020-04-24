@@ -706,8 +706,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- particular, the wrapper constructor is not inlined inside
              -- an INLINE rhs or when it is not applied to any arguments.
              -- See Note [Inline partially-applied constructor wrappers]
-             -- Passing Nothing here allows the wrapper to inline when
-             -- unsaturated.
              wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOpts wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
                       | otherwise        = mkInlineUnfolding defaultSimpleOpts wrap_rhs
@@ -1289,9 +1287,10 @@ mkPrimOpId prim_op
                          (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
-    -- PrimOps don't ever construct a product, but we want to preserve bottoms
-    cpr | isDeadEndDiv (snd (splitStrictSig strict_sig)) = initRecFunCpr
-        | otherwise                                      = whnfTermCpr
+    -- PrimOps don't ever construct a product, but we want to assume that cheap
+    -- ones terminate.
+    cpr | primOpIsCheap prim_op = whnfTermCpr
+        | otherwise             = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
