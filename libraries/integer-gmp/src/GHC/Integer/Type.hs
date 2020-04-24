@@ -1618,7 +1618,6 @@ foreign import ccall unsafe "integer_gmp_invert"
 -- Conversions to/from floating point
 
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
--- decodeDoubleInteger 0.0## = (# S# 0#, 0# #)
 #if WORD_SIZE_IN_BITS == 64
 decodeDoubleInteger x = case decodeDouble_Int64# x of
                           (# m#, e# #) -> (# S# m#, e# #)
@@ -1626,7 +1625,10 @@ decodeDoubleInteger x = case decodeDouble_Int64# x of
 decodeDoubleInteger x = case decodeDouble_Int64# x of
                           (# m#, e# #) -> (# int64ToInteger m#, e# #)
 #endif
-{-# CONSTANT_FOLDED decodeDoubleInteger #-}
+-- Rather than constant-folding `decodeDoubleInteger`, we have constant-folding
+-- RULEs for the `decodeDouble_Int64#` PrimOp. Hence we inline this function.
+-- As a bonus, inlining might eliminate the S# box!
+{-# INLINE decodeDoubleInteger #-}
 
 -- provided by GHC's RTS
 foreign import ccall unsafe "__int_encodeDouble"

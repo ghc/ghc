@@ -381,7 +381,6 @@ basicKnownKeyNames
         quotIntegerName, remIntegerName, divIntegerName, modIntegerName,
         floatFromIntegerName, doubleFromIntegerName,
         encodeFloatIntegerName, encodeDoubleIntegerName,
-        decodeDoubleIntegerName,
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
@@ -1125,7 +1124,6 @@ integerTyConName, mkIntegerName, integerSDataConName,
     quotIntegerName, remIntegerName, divIntegerName, modIntegerName,
     floatFromIntegerName, doubleFromIntegerName,
     encodeFloatIntegerName, encodeDoubleIntegerName,
-    decodeDoubleIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
@@ -1163,7 +1161,6 @@ floatFromIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "floatFromInteger")     
 doubleFromIntegerName = varQual gHC_INTEGER_TYPE (fsLit "doubleFromInteger")     doubleFromIntegerIdKey
 encodeFloatIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "encodeFloatInteger")  encodeFloatIntegerIdKey
 encodeDoubleIntegerName = varQual gHC_INTEGER_TYPE (fsLit "encodeDoubleInteger") encodeDoubleIntegerIdKey
-decodeDoubleIntegerName = varQual gHC_INTEGER_TYPE (fsLit "decodeDoubleInteger") decodeDoubleIntegerIdKey
 gcdIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "gcdInteger")        gcdIntegerIdKey
 lcmIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "lcmInteger")        lcmIntegerIdKey
 andIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "andInteger")        andIntegerIdKey
@@ -2149,7 +2146,6 @@ mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     quotIntegerIdKey, remIntegerIdKey, divIntegerIdKey, modIntegerIdKey,
     floatFromIntegerIdKey, doubleFromIntegerIdKey,
     encodeFloatIntegerIdKey, encodeDoubleIntegerIdKey,
-    decodeDoubleIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
     shiftLIntegerIdKey, shiftRIntegerIdKey :: Unique
@@ -2193,7 +2189,8 @@ shiftRIntegerIdKey            = mkPreludeMiscIdUnique 96
 wordToIntegerIdKey            = mkPreludeMiscIdUnique 97
 word64ToIntegerIdKey          = mkPreludeMiscIdUnique 98
 int64ToIntegerIdKey           = mkPreludeMiscIdUnique 99
-decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 100
+-- This one is "free"
+-- decodeDoubleIntegerIdKey   = mkPreludeMiscIdUnique 100
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
