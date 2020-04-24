@@ -1048,14 +1048,10 @@ integerFromInt64# !x = IS x
 
 -- | Decode a Double# into (# Integer mantissa, Int# exponent #)
 integerDecodeDouble# :: Double# -> (# Integer, Int# #)
-{-# NOINLINE integerDecodeDouble# #-}
+{-# INLINE integerDecodeDouble# #-} -- decodeDouble_Int64# is constant-folded
+                                    -- in GHC.Core.Opt.ConstantFold
 integerDecodeDouble# !x = case decodeDouble_Int64# x of
                             (# m, e #) -> (# integerFromInt64# m, e #)
-
--- | Decode a Double# into (# Integer mantissa, Int# exponent #)
-integerDecodeDouble :: Double -> (Integer, Int)
-integerDecodeDouble (D# x) = case integerDecodeDouble# x of
-   (# m, e #) -> (m, I# e)
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Double#
 integerEncodeDouble# :: Integer -> Int# -> Double#
