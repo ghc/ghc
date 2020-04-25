@@ -18,6 +18,7 @@ module GHCi.UI.Info
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch as MC
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
@@ -270,7 +271,7 @@ collectInfo ms loaded = do
             foldM (go df) ms invalidated
   where
     go df m name = do { info <- getModInfo name; return (M.insert name info m) }
-                   `gcatch`
+                   `MC.catch`
                    (\(e :: SomeException) -> do
                          liftIO $ putStrLn
                                 $ showSDocForUser df alwaysQualify

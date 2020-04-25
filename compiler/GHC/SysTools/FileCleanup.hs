@@ -299,7 +299,7 @@ withTempDirectory targetDir template =
     (ignoringIOErrors . removeDirectoryRecursive)
 
 ignoringIOErrors :: IO () -> IO ()
-ignoringIOErrors ioe = ioe `catch` (\e -> const (return ()) (e :: IOError))
+ignoringIOErrors ioe = ioe `catchIO` const (return ())
 
 
 createTempDirectory :: FilePath -> String -> IO FilePath
