@@ -31,12 +31,11 @@ enum SweepResult {
 GNUC_ATTR_HOT static enum SweepResult
 nonmovingSweepSegment(struct NonmovingSegment *seg)
 {
+    const nonmoving_block_idx blk_cnt = nonmovingSegmentBlockCount(seg);
     bool found_free = false;
     bool found_live = false;
 
-    for (nonmoving_block_idx i = 0;
-         i < nonmovingSegmentBlockCount(seg);
-         ++i)
+    for (nonmoving_block_idx i = 0; i < blk_cnt; ++i)
     {
         if (seg->bitmap[i] == nonmovingMarkEpoch) {
             found_live = true;
