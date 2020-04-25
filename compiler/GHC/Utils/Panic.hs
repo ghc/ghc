@@ -36,6 +36,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception as Exception
 
 import Control.Monad.IO.Class
+import qualified Control.Monad.Catch as MC
 import Control.Concurrent
 import Data.Typeable      ( cast )
 import Debug.Trace        ( trace )
@@ -155,7 +156,7 @@ throwGhcExceptionIO :: GhcException -> IO a
 throwGhcExceptionIO = Exception.throwIO
 
 handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
-handleGhcException = ghandle
+handleGhcException = MC.handle
 
 panicDoc, sorryDoc, pgmErrorDoc :: String -> SDoc -> a
 panicDoc    x doc = throwGhcException (PprPanic        x doc)
@@ -197,7 +198,7 @@ signalHandlersRefCount = unsafePerformIO $ newMVar (0,Nothing)
 
 -- | Temporarily install standard signal handlers for catching ^C, which just
 -- throw an exception in the current thread.
-withSignalHandlers :: (ExceptionMonad m, MonadIO m) => m a -> m a
+withSignalHandlers :: ExceptionMonad m => m a -> m a
 withSignalHandlers act = do
   main_thread <- liftIO myThreadId
   wtid <- liftIO (mkWeakThreadId main_thread)
@@ -256,4 +257,4 @@ withSignalHandlers act = do
         (c,oldHandlers) -> return (c-1,oldHandlers)
 
   mayInstallHandlers
-  act `gfinally` mayUninstallHandlers
+  act `MC.finally` mayUninstallHandlers

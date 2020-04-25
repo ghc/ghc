@@ -22,7 +22,6 @@ module GHC (
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,
         runGhc, runGhcT, initGhcMonad,
-        gcatch, gbracket, gfinally,
         printException,
         handleSourceError,
         needsTemplateHaskellOrQQ,
@@ -378,6 +377,7 @@ import Data.IORef
 import System.FilePath
 import Control.Concurrent
 import Control.Applicative ((<|>))
+import Control.Monad.Catch as MC
 
 import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
@@ -400,7 +400,7 @@ defaultErrorHandler :: (ExceptionMonad m)
                     => FatalMessager -> FlushOut -> m a -> m a
 defaultErrorHandler fm (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  ghandle (\exception -> liftIO $ do
+  MC.handle (\exception -> liftIO $ do
            flushOut
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
@@ -437,7 +437,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
 {-# DEPRECATED defaultCleanupHandler "Cleanup is now done by runGhc/runGhcT" #-}
 defaultCleanupHandler :: (ExceptionMonad m) => DynFlags -> m a -> m a
 defaultCleanupHandler _ m = m
- where _warning_suppression = m `gonException` undefined
+ where _warning_suppression = m `MC.onException` undefined
 
 
 -- %************************************************************************
@@ -483,7 +483,7 @@ runGhcT mb_top_dir ghct = do
     withCleanupSession ghct
 
 withCleanupSession :: GhcMonad m => m a -> m a
-withCleanupSession ghc = ghc `gfinally` cleanup
+withCleanupSession ghc = ghc `MC.finally` cleanup
   where
    cleanup = do
       hsc_env <- getSession
@@ -1698,7 +1698,7 @@ interpretPackageEnv dflags = do
 
     getEnvVar :: MaybeT IO String
     getEnvVar = do
-      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      mvar <- liftMaybeT $ MC.try $ getEnv "GHC_ENVIRONMENT"
       case mvar of
         Right var -> return var
         Left err  -> if isDoesNotExistError err then mzero

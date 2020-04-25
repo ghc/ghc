@@ -108,6 +108,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import Control.Monad
+import Control.Monad.Catch as MC
 import Data.Array
 import GHC.Utils.Exception
 import Unsafe.Coerce ( unsafeCoerce )
@@ -291,7 +292,7 @@ withVirtualCWD m = do
             setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
             liftIO $ setCurrentDirectory orig_dir
 
-      gbracket set_cwd reset_cwd $ \_ -> m
+      MC.bracket set_cwd reset_cwd $ \_ -> m
 
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
