@@ -11,6 +11,9 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
+  * The planned deprecation of `Data.Monoid.First` and `Data.Monoid.Last`
+    is scrapped due to difficulties with the suggested migration path.
+
   * Add `Generic` instances to `Fingerprint`, `GiveGCStats`, `GCFlags`,
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
