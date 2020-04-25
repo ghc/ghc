@@ -205,7 +205,7 @@ getTempDir dflags = do
             Just dir -> do
                 removeDirectory our_dir
                 return dir
-      `catchIO` \e -> if isAlreadyExistsError e
+      `catch` \e -> if isAlreadyExistsError e
                       then mkTempDir prefix else ioError e
 
 {- Note [Deterministic base name]
@@ -248,7 +248,7 @@ removeTmpFiles dflags fs
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
 removeWith :: DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
-removeWith dflags remover f = remover f `catchIO`
+removeWith dflags remover f = remover f `catch`
   (\e ->
    let msg = if isDoesNotExistError e
              then text "Warning: deleting non-existent" <+> text f
@@ -310,5 +310,5 @@ createTempDirectory dir template = do
             let path = dir </> template ++ show x
             createDirectory path
             return path
-          `catchIO` \e -> if isAlreadyExistsError e
+          `catch` \e -> if isAlreadyExistsError e
                           then findTempName (x+1) else ioError e
