@@ -508,6 +508,19 @@ on, where the number of ``*``\ s indicates the level of the heading
 If you use section headings, then Haddock will generate a table of
 contents at the top of the module documentation for you.
 
+By default, when generating HTML documentation Haddock will create an
+anchor to each section of the form ``#g:n``, where ``n`` is an integer
+that might change as you add new section headings. If you want to
+create stable links, you can add an explicit anchor (see
+:ref:`anchors`) after the section heading: ::
+
+  module Foo (
+    -- * Classes #classes#
+    C(..)
+  ) where
+
+This will create an HTML anchor ``#g:classes`` to the section.
+
 The alternative style of placing the commas at the beginning of each
 line is also supported. e.g.: ::
 
@@ -1149,6 +1162,8 @@ Inspired by reSTs grid tables Haddock supports a complete table representation v
     -- +------------------------+ span rows. | f(n) = \sum_{i=1}   |
     -- | body row 4             |            | \]                  |
     -- +------------------------+------------+---------------------+
+
+.. _anchors:
 
 Anchors
 ~~~~~~~

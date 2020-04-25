@@ -672,10 +672,16 @@ numberSectionHeadings = go 1
   where go :: Int -> [ExportItem DocNameI] -> [ExportItem DocNameI]
         go _ [] = []
         go n (ExportGroup lev _ doc : es)
-          = ExportGroup lev (show n) doc : go (n+1) es
+          = case collectAnchors doc of
+              [] -> ExportGroup lev (show n) doc : go (n+1) es
+              (a:_) -> ExportGroup lev a doc : go (n+1) es
         go n (other:es)
           = other : go n es
 
+        collectAnchors :: DocH (Wrap (ModuleName, OccName)) (Wrap DocName) -> [String]
+        collectAnchors (DocAppend a b) = collectAnchors a ++ collectAnchors b
+        collectAnchors (DocAName a) = [a]
+        collectAnchors _ = []
 
 processExport :: Bool -> LinksInfo -> Bool -> Maybe Package -> Qualification
               -> ExportItem DocNameI -> Maybe Html
