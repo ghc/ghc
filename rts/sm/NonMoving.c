@@ -402,10 +402,10 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
-    nonmovingClearBitmap(seg);
     bd->nonmoving_segment.log_block_size = log_block_size;
     bd->nonmoving_segment.next_free_snap = 0;
     bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
+    nonmovingClearBitmap(seg);
 }
 
 // Add a segment to the free list.
