@@ -201,7 +201,7 @@ runSomethingWith dflags phase_name pgm args io = do
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r
 handleProc pgm phase_name proc = do
-    (rc, r) <- proc `catchIO` handler
+    (rc, r) <- proc `catch` handler
     case rc of
       ExitSuccess{} -> return r
       ExitFailure n -> throwGhcExceptionIO (

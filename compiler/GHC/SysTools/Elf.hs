@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-
 -----------------------------------------------------------------------------
 --
@@ -252,7 +253,8 @@ readElfSectionByIndex :: DynFlags
                       -> ByteString
                       -> IO (Maybe Section)
 
-readElfSectionByIndex dflags hdr secTable i bs = action `catchIO` \_ -> do
+readElfSectionByIndex dflags hdr secTable i bs
+  = action `catchIO` \_ -> do
     debugTraceMsg dflags 3 $
       text ("Unable to read ELF section")
     return Nothing
@@ -394,7 +396,8 @@ readElfNoteAsString :: DynFlags
                     -> String
                     -> IO (Maybe String)
 
-readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
+readElfNoteAsString dflags path sectionName noteId
+  = action `catchIO`  \_ -> do
     debugTraceMsg dflags 3 $
          text ("Unable to read ELF note \"" ++ noteId ++
                "\" in section \"" ++ sectionName ++ "\"")
