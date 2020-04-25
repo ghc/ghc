@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -77,6 +78,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
+import qualified Control.Monad.Catch as MC (handle)
 import Data.List        ( isInfixOf, intercalate )
 import Data.Maybe
 import Data.Version
@@ -101,7 +103,7 @@ preprocess :: HscEnv
            -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
-  ghandle handler $
+  MC.handle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
   (dflags, fp, mb_iface) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
