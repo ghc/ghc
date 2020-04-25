@@ -615,14 +615,15 @@ checkModUsage this_pkg UsageHomeModule{
 checkModUsage _this_pkg UsageFile{ usg_file_path = file,
                                    usg_file_hash = old_hash } =
   liftIO $
-    handleIO handle $ do
+    handle handler $ do
       new_hash <- getFileHash file
       if (old_hash /= new_hash)
          then return recomp
          else return UpToDate
  where
-   recomp = RecompBecause (file ++ " changed")
-   handle =
+   recomp  = RecompBecause (file ++ " changed")
+   handler :: IOException -> IO RecompileRequired
+   handler =
 #if defined(DEBUG)
        \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
 #else
