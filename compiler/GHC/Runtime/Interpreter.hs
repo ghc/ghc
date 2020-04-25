@@ -65,7 +65,7 @@ import GHC.Driver.Types
 import GHC.Types.Unique.FM
 import GHC.Utils.Panic
 import GHC.Driver.Session
-import GHC.Utils.Exception
+import GHC.Utils.Exception as Ex
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -85,6 +85,7 @@ import GHC.Driver.Ways
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC (mask, onException)
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
@@ -211,17 +212,17 @@ hscInterp hsc_env = case hsc_interp hsc_env of
 -- | Grab a lock on the 'IServ' and do something with it.
 -- Overloaded because this is used from TcM as well as IO.
 withIServ
-  :: (MonadIO m, ExceptionMonad m)
+  :: (ExceptionMonad m)
   => IServConfig -> IServ -> (IServInstance -> m (IServInstance, a)) -> m a
 withIServ conf (IServ mIServState) action = do
-  gmask $ \restore -> do
+  MC.mask $ \restore -> do
     state <- liftIO $ takeMVar mIServState
 
     iserv <- case state of
       -- start the external iserv process if we haven't done so yet
       IServPending ->
          liftIO (spawnIServ conf)
-           `gonException` (liftIO $ putMVar mIServState state)
+           `MC.onException` (liftIO $ putMVar mIServState state)
 
       IServRunning inst -> return inst
 
@@ -234,7 +235,7 @@ withIServ conf (IServ mIServState) action = do
         iservCall iserv (FreeHValueRefs (iservPendingFrees iserv))
       -- run the inner action
       restore $ action iserv')
-          `gonException` (liftIO $ putMVar mIServState (IServRunning iserv'))
+          `MC.onException` (liftIO $ putMVar mIServState (IServRunning iserv'))
     liftIO $ putMVar mIServState (IServRunning iserv'')
     return a
 
@@ -584,7 +585,7 @@ stopInterp hsc_env = case hsc_interp hsc_env of
   Just InternalInterp -> pure ()
 #endif
   Just (ExternalInterp _ (IServ mstate)) ->
-    gmask $ \_restore -> modifyMVar_ mstate $ \state -> do
+    MC.mask $ \_restore -> modifyMVar_ mstate $ \state -> do
       case state of
         IServPending    -> pure state -- already stopped
         IServRunning i  -> do
@@ -614,7 +615,7 @@ runWithPipes createProc prog opts = do
     wh <- mkHandle wfd2
     return (ph, rh, wh)
       where mkHandle :: CInt -> IO Handle
-            mkHandle fd = (fdToHandle fd) `onException` (c__close fd)
+            mkHandle fd = (fdToHandle fd) `Ex.onException` (c__close fd)
 
 #else
 runWithPipes createProc prog opts = do

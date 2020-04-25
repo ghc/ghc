@@ -89,6 +89,7 @@ import Data.Time
 import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC (handle)
 import System.IO
 import System.IO.Error  ( catchIOError )
 import GHC.Conc         ( getAllocationCounter )
@@ -800,7 +801,7 @@ logOutput dflags msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
-    = ghandle $ \e -> case e of
+    = MC.handle $ \e -> case e of
                       PprPanic str doc ->
                           pprDebugAndThen dflags panic (text str) doc
                       PprSorry str doc ->

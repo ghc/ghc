@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
+{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor, DerivingVia #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -65,8 +65,9 @@ import Control.Monad
 import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
-import Control.Monad.Catch
+import Control.Monad.Catch as MC
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
 import qualified Data.IntMap.Strict as IntMap
@@ -259,6 +260,7 @@ recordBreak brkLoc = do
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
     deriving (Functor)
+    deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT (IORef GHCiState) Ghc)
 
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
@@ -310,61 +312,6 @@ instance HasDynFlags (InputT GHCi) where
 instance GhcMonad (InputT GHCi) where
   setSession = lift . setSession
   getSession = lift getSession
-
-instance ExceptionMonad GHCi where
-  gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
-  gmask f =
-      GHCi $ \s -> gmask $ \io_restore ->
-                             let
-                                g_restore (GHCi m) = GHCi $ \s' -> io_restore (m s')
-                             in
-                                unGHCi (f g_restore) s
-
-instance MonadThrow Ghc where
-  throwM = liftIO . throwM
-
-instance MonadCatch Ghc where
-  catch = gcatch
-
-instance MonadMask Ghc where
-  mask f = Ghc $ \s ->
-    mask $ \io_restore ->
-      let g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-      in unGhc (f g_restore) s
-  uninterruptibleMask f = Ghc $ \s ->
-    uninterruptibleMask $ \io_restore ->
-      let g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-      in unGhc (f g_restore) s
-  generalBracket acquire release use = Ghc $ \s ->
-    generalBracket
-      (unGhc acquire s)
-      (\resource exitCase -> unGhc (release resource exitCase) s)
-      (\resource -> unGhc (use resource) s)
-
-instance MonadThrow GHCi where
-  throwM = liftIO . throwM
-
-instance MonadCatch GHCi where
-  catch = gcatch
-
-instance MonadMask GHCi where
-  mask f = GHCi $ \s ->
-    mask $ \io_restore ->
-      let g_restore (GHCi m) = GHCi $ \s -> io_restore (m s)
-      in unGHCi (f g_restore) s
-  uninterruptibleMask f = GHCi $ \s ->
-    uninterruptibleMask $ \io_restore ->
-      let g_restore (GHCi m) = GHCi $ \s -> io_restore (m s)
-      in unGHCi (f g_restore) s
-  generalBracket acquire release use = GHCi $ \s ->
-    generalBracket
-      (unGHCi acquire s)
-      (\resource exitCase -> unGHCi (release resource exitCase) s)
-      (\resource -> unGHCi (use resource) s)
-
-instance ExceptionMonad (InputT GHCi) where
-  gcatch = catch
-  gmask = mask
 
 isOptionSet :: GhciMonad m => GHCiOption -> m Bool
 isOptionSet opt
@@ -482,7 +429,7 @@ runWithStats
   => (a -> Maybe Integer) -> m a -> m (ActionStats, Either SomeException a)
 runWithStats getAllocs action = do
   t0 <- liftIO getCurrentTime
-  result <- gtry action
+  result <- MC.try action
   let allocs = either (const Nothing) getAllocs result
   t1 <- liftIO getCurrentTime
   let elapsedTime = realToFrac $ t1 `diffUTCTime` t0

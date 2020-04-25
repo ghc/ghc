@@ -148,6 +148,14 @@ Arrow notation
    ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
    signatures, including those for class methods defined inside classes.
 
+- The ``Exception`` module was boiled down acknowledging the existence of 
+  the ``exceptions`` dependency. In particular, the ``ExceptionMonad``
+  class is not a proper class anymore, but a mere synonym for ``MonadThrow``,
+  ``MonadCatch``, ``MonadMask`` (all from ``exceptions``) and ``MonadIO``. 
+  All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are 
+  erased, and their ``exceptions``-alternatives are meant to be used in the
+  GHC code instead.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

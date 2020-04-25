@@ -59,6 +59,7 @@ stage0Packages = do
              , compareSizes
              , compiler
              , deriveConstants
+             , exceptions
              , genapply
              , genprimopcode
              , ghc

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, RankNTypes #-}
+{-# LANGUAGE CPP, DeriveFunctor, DerivingVia, RankNTypes #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --
@@ -32,6 +32,8 @@ import GHC.Utils.Exception
 import GHC.Utils.Error
 
 import Control.Monad
+import Control.Monad.Catch as MC
+import Control.Monad.Trans.Reader
 import Data.IORef
 
 -- -----------------------------------------------------------------------------
@@ -50,7 +52,7 @@ import Data.IORef
 -- If you do not use 'Ghc' or 'GhcT', make sure to call 'GHC.initGhcMonad'
 -- before any call to the GHC API functions can occur.
 --
-class (Functor m, MonadIO m, ExceptionMonad m, HasDynFlags m) => GhcMonad m where
+class (Functor m, ExceptionMonad m, HasDynFlags m) => GhcMonad m where
   getSession :: m HscEnv
   setSession :: HscEnv -> m ()
 
@@ -71,7 +73,7 @@ modifySession f = do h <- getSession
 withSavedSession :: GhcMonad m => m a -> m a
 withSavedSession m = do
   saved_session <- getSession
-  m `gfinally` setSession saved_session
+  m `MC.finally` setSession saved_session
 
 -- | Call an action with a temporarily modified Session.
 withTempSession :: GhcMonad m => (HscEnv -> HscEnv) -> m a -> m a
@@ -90,7 +92,9 @@ logWarnings warns = do
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
 -- e.g., to maintain additional state consider wrapping this monad or using
 -- 'GhcT'.
-newtype Ghc a = Ghc { unGhc :: Session -> IO a } deriving (Functor)
+newtype Ghc a = Ghc { unGhc :: Session -> IO a }
+  deriving (Functor)
+  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT Session IO)
 
 -- | The Session is a handle to the complete state of a compilation
 -- session.  A compilation session consists of a set of modules
@@ -110,16 +114,6 @@ instance MonadIO Ghc where
 
 instance MonadFix Ghc where
   mfix f = Ghc $ \s -> mfix (\x -> unGhc (f x) s)
-
-instance ExceptionMonad Ghc where
-  gcatch act handle =
-      Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
-  gmask f =
-      Ghc $ \s -> gmask $ \io_restore ->
-                             let
-                                g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-                             in
-                                unGhc (f g_restore) s
 
 instance HasDynFlags Ghc where
   getDynFlags = getSessionDynFlags
@@ -155,7 +149,8 @@ reifyGhc act = Ghc $ act
 --
 -- Note that the wrapped monad must support IO and handling of exceptions.
 newtype GhcT m a = GhcT { unGhcT :: Session -> m a }
-    deriving (Functor)
+  deriving (Functor)
+  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT Session m)
 
 liftGhcT :: m a -> GhcT m a
 liftGhcT m = GhcT $ \_ -> m
@@ -169,16 +164,6 @@ instance Monad m => Monad (GhcT m) where
 
 instance MonadIO m => MonadIO (GhcT m) where
   liftIO ioA = GhcT $ \_ -> liftIO ioA
-
-instance ExceptionMonad m => ExceptionMonad (GhcT m) where
-  gcatch act handle =
-      GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
-  gmask f =
-      GhcT $ \s -> gmask $ \io_restore ->
-                           let
-                              g_restore (GhcT m) = GhcT $ \s -> io_restore (m s)
-                           in
-                              unGhcT (f g_restore) s
 
 instance MonadIO m => HasDynFlags (GhcT m) where
   getDynFlags = GhcT $ \(Session r) -> liftM hsc_dflags (liftIO $ readIORef r)

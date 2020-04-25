@@ -12,6 +12,7 @@ import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 import GHC.Builtin.Names
+import Control.Monad.Catch as MC
 
 main :: IO()
 main
@@ -25,7 +26,7 @@ main
                      , IIDecl (simpleImportDecl (mkModuleNameFS (fsLit "System.IO")))]
           runDecls "data X = Y ()"
           execStmt "print True" execOptions
-          gtry $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
+          MC.try $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
           runDecls "data X = Y () deriving Show"
           _ <- dynCompileExpr "'x'"
           execStmt "print (Y ())" execOptions

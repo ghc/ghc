@@ -72,6 +72,7 @@ Library
                    template-haskell == 2.17.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
+                   exceptions == 0.10.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,

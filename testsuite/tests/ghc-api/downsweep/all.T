@@ -3,7 +3,7 @@ test('PartialDownsweep',
      , ignore_stderr
      ],
      compile_and_run,
-     ['-package ghc'])
+     ['-package ghc -package exceptions'])
 
 test('OldModLocation',
      [ extra_run_opts('"' + config.libdir + '"')

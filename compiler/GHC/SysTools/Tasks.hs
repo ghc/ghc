@@ -186,7 +186,7 @@ runClang dflags args = traceToolCommand dflags "clang" $ do
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  Exception.catch (do
+  catch (do
         runSomethingFiltered dflags id "Clang (Assembler)" clang args2 Nothing mb_env
     )
     (\(err :: SomeException) -> do

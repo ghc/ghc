@@ -72,6 +72,7 @@ import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
+import qualified Control.Monad.Catch as MC
 
 import System.FilePath
 import System.Directory
@@ -216,7 +217,7 @@ linkDependencies hsc_env pls span needed_mods = do
 withExtendedLinkEnv :: (ExceptionMonad m) =>
                        DynLinker -> [(Name,ForeignHValue)] -> m a -> m a
 withExtendedLinkEnv dl new_env action
-    = gbracket (liftIO $ extendLinkEnv dl new_env)
+    = MC.bracket (liftIO $ extendLinkEnv dl new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where

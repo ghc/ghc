@@ -80,7 +80,7 @@ import GHC.Data.FastString
 import GHC.Runtime.Linker
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
-import GHC.Utils.Panic hiding ( showException )
+import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
@@ -91,6 +91,7 @@ import System.Console.Haskeline as Haskeline
 import Control.Applicative hiding (empty)
 import Control.DeepSeq (deepseq)
 import Control.Monad as Monad
+import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -112,7 +113,7 @@ import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
 import Prelude hiding ((<>))
 
-import GHC.Utils.Exception as Exception hiding (catch)
+import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
 
@@ -984,12 +985,9 @@ runCommands gCmd = runCommands' handler Nothing gCmd >> return ()
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> Maybe (GHCi ()) -- ^ Source error handler
              -> InputT GHCi (Maybe String)
-             -> InputT GHCi (Maybe Bool)
-         -- We want to return () here, but have to return (Maybe Bool)
-         -- because gmask is not polymorphic enough: we want to use
-         -- unmask at two different types.
-runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
-    b <- ghandle (\e -> case fromException e of
+             -> InputT GHCi ()
+runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
+    b <- handle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
                                  Just ghce ->
@@ -999,7 +997,7 @@ runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
                                    liftIO (Exception.throwIO e))
             (unmask $ runOneCommand eh gCmd)
     case b of
-      Nothing -> return Nothing
+      Nothing -> return ()
       Just success -> do
         unless success $ maybe (return ()) lift sourceErrorHandler
         unmask $ runCommands' eh sourceErrorHandler gCmd
@@ -1039,7 +1037,7 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       let p = prompt st
       setGHCiState st{ prompt = prompt_cont st }
-      mb_cmd <- collectCommand q "" `GHC.gfinally`
+      mb_cmd <- collectCommand q "" `MC.finally`
                 modifyGHCiState (\st' -> st' { prompt = p })
       return mb_cmd
     -- we can't use removeSpaces for the sublines here, so
@@ -1819,7 +1817,7 @@ instancesCmd s = do
 -- '-fdefer-type-errors' again if it has not been set before.
 wrapDeferTypeErrors :: GHC.GhcMonad m => m a -> m a
 wrapDeferTypeErrors load =
-  gbracket
+  MC.bracket
     (do
       -- Force originalFlags to avoid leaking the associated HscEnv
       !originalFlags <- getDynFlags
@@ -1960,11 +1958,11 @@ doLoad retain_context howmuch = do
   -- Enable buffering stdout and stderr as we're compiling. Keeping these
   -- handles unbuffered will just slow the compilation down, especially when
   -- compiling in parallel.
-  gbracket (liftIO $ do hSetBuffering stdout LineBuffering
-                        hSetBuffering stderr LineBuffering)
-           (\_ ->
-            liftIO $ do hSetBuffering stdout NoBuffering
-                        hSetBuffering stderr NoBuffering) $ \_ -> do
+  MC.bracket (liftIO $ do hSetBuffering stdout LineBuffering
+                          hSetBuffering stderr LineBuffering)
+             (\_ ->
+              liftIO $ do hSetBuffering stdout NoBuffering
+                          hSetBuffering stderr NoBuffering) $ \_ -> do
       ok <- trySuccess $ GHC.load howmuch
       afterLoad ok retain_context
       return ok
@@ -2048,7 +2046,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: GHC.GhcMonad m => InteractiveImport -> m Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do e <- gtry $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
+         = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
@@ -2556,7 +2554,7 @@ restoreContextOnFailure :: GhciMonad m => m a -> m a
 restoreContextOnFailure do_this = do
   st <- getGHCiState
   let rc = remembered_ctx st; tc = transient_ctx st
-  do_this `gonException` (modifyGHCiState $ \st' ->
+  do_this `MC.onException` (modifyGHCiState $ \st' ->
      st' { remembered_ctx = rc, transient_ctx = tc })
 
 -- -----------------------------------------------------------------------------
@@ -4160,13 +4158,13 @@ showException se =
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
 ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = gmask $ \restore -> do
+ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
                  !dflags <- getDynFlags
-                 gcatch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
+                 catch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
 
 ghciTry :: ExceptionMonad m => m a -> m (Either SomeException a)
-ghciTry m = fmap Right m `gcatch` \e -> return $ Left e
+ghciTry m = fmap Right m `catch` \e -> return $ Left e
 
 tryBool :: ExceptionMonad m => m a -> m Bool
 tryBool m = do

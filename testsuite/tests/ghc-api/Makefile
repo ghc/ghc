@@ -17,7 +17,7 @@ T8639_api:
 
 T8628:
 	rm -f T8628.o T8628.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc T8628
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc -package exceptions T8628
 	./T8628 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 T9015:

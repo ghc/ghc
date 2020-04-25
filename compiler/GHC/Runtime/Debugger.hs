@@ -40,6 +40,7 @@ import GHC.Driver.Session
 import GHC.Utils.Exception
 
 import Control.Monad
+import Control.Monad.Catch as MC
 import Data.List ( (\\) )
 import Data.Maybe
 import Data.IORef
@@ -192,7 +193,7 @@ showTerm term = do
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)
             else return Nothing
-         `gfinally` do
+         `MC.finally` do
            setSession hsc_env
            GHC.setSessionDynFlags dflags
   cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} =
@@ -228,7 +229,7 @@ pprTypeAndContents id = do
       let depthBound = 100
       -- If the value is an exception, make sure we catch it and
       -- show the exception, rather than propagating the exception out.
-      e_term <- gtry $ GHC.obtainTermFromId depthBound False id
+      e_term <- MC.try $ GHC.obtainTermFromId depthBound False id
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>
