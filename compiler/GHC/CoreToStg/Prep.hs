@@ -24,7 +24,9 @@ import GHC.Core.Opt.OccurAnal
 
 import GHC.Driver.Types
 import GHC.Builtin.Names
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Builtin.PrimOps    ( PrimOp(TouchOp) )
+import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Types.Id.Make      ( mkPrimOpId, realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
@@ -760,7 +762,13 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
-{- Note [runRW arg]
+instance Outputable ArgInfo where
+  ppr (CpeApp arg) = text "app" <+> ppr arg
+  ppr (CpeCast co) = text "cast" <+> ppr co
+  ppr (CpeTick tick) = text "tick" <+> ppr tick
+
+{-
+ Note [runRW arg]
 ~~~~~~~~~~~~~~~~~~~
 If we got, say
    runRW# (case bot of {})
@@ -769,6 +777,22 @@ which happened in #11291, we do /not/ want to turn it into
 because that gives a panic in CoreToStg.myCollectArgs, which expects
 only variables in function position.  But if we are sure to make
 runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
+
+
+Note [CorePrep handling of keepAlive#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lower keepAlive# applications to touch#. Specifically:
+
+    keepAlive# @a @r @b x k s0
+
+is lowered to:
+
+    case k s of _b0 { (# y, s1 #) ->
+      case touch# @a x s1 of s2 { _ ->
+        (# y, s2 #)
+      }
+    }
+
 -}
 
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
@@ -823,14 +847,40 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
-    cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
+        -- N.B. While it may appear that n == 1 in the case of runRW#
+        -- applications, keep in mind that we may have applications that return
+        , n >= 1
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
-            _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
+             -- TODO: What about casts?
+
+    cpe_app _env (Var f) args n
+        | f `hasKey` runRWKey
+        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
+
+    -- See Note [CorePrep handling of keepAlive#]
+    cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
+                         CpeApp (Type _result_rep), CpeApp (Type result_ty),
+                         CpeApp x, CpeApp y] 2
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        = do { y' <- newVar result_ty
+             ; s2 <- newVar realWorldStatePrimTy
+             ; let touchId = mkPrimOpId TouchOp
+                   expr = Case y y' result_ty [(DEFAULT, [], rhs1)]
+                   rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var realWorldPrimId]
+                          in Case scrut s2 result_ty [(DEFAULT, [], Var y')]
+             ; pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
+             }
+    cpe_app _env (Var f) args n
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        = pprPanic "cpe_app(keepAlive#)" (ppr args $$ ppr n)
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -959,8 +1009,77 @@ pragma.  It is levity-polymorphic.
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 
-It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in GHC.CoreToByteCode).
+It's correctness needs no special treatment in GHC except this special inlining
+here in CorePrep (and in GHC.CoreToByteCode).
+
+However, there are a variety of optimisation opportunities that the simplifier
+takes advantage of. See Note [Simplification of runRW#].
+
+
+Note [Simplification of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the program,
+
+    case runRW# (\s -> let n = I# 42# in n) of
+      I# n# -> f n#
+
+There is no reason why we should allocate an I# constructor given that we
+immediately destructure it. To avoid this the simplifier will push strict
+contexts into runRW's continuation. That is, it transforms
+
+    K[ runRW# @r @ty cont ]
+              ~>
+    runRW# @r @ty K[cont]
+
+This has a few interesting implications. Consider, for instance, this program:
+
+    join j = ...
+    in case runRW# @r @ty cont of
+         result -> jump j result
+
+Performing the transform described above would result in:
+
+    join j x = ...
+    in runRW# @r @ty (\s ->
+         case cont of in
+           result -> jump j result
+       )
+
+If runRW# were a "normal" function this call to join point j would not be
+allowed in its continuation argument. However, since runRW# is inlined (as
+described in Note [runRW magic] above), such join point occurences are
+completely fine. Both occurrence analysis and Core Lint have special treatment
+for runRW# applications. See Note [Linting of runRW#] for details on the latter.
+
+Moreover, it's helpful to ensure that runRW's continuation isn't floated out
+(since doing so would then require a call, whereas we would otherwise end up
+with straight-line). Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
+treatment for runRW# applications, ensure the arguments are not floated if
+MFEs.
+
+Other considered designs
+------------------------
+
+One design that was rejected was to *require* that runRW#'s continuation be
+headed by a lambda. However, this proved to be quite fragile. For instance,
+SetLevels is very eager to float bottoming expressions. For instance given
+something of the form,
+
+    runRW# @r @ty (\s -> case expr of x -> undefined)
+
+SetLevels will see that the body the lambda is bottoming and will consequently
+float it to the top-level (assuming expr has no free coercion variables which
+prevent this). We therefore end up with
+
+    runRW# @r @ty (\s -> lvl s)
+
+Which the simplifier will beta reduce, leaving us with
+
+    runRW# @r @ty lvl
+
+Breaking our desired invariant. Ultimately we decided to simply accept that
+the continuation may not be a manifest lambda.
+
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg

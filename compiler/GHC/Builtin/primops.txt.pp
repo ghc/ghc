@@ -3239,6 +3239,12 @@ primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    -- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 
+primop KeepAliveOp "keepAlive#" GenPrimOp
+   o -> p -> p
+   { TODO. }
+   with
+   strictness = { \ _arity -> mkClosedStrictSig [topDmd, strictApply1Dmd] topDiv }
+
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
    with

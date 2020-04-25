@@ -531,6 +531,7 @@ hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> False   -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
+                        NoBindingId      -> True
                         _                -> isCompulsoryUnfolding (idUnfolding id)
                                             -- See Note [Levity-polymorphic Ids]
 

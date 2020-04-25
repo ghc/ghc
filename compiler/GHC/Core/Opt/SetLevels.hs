@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section{GHC.Core.Opt.SetLevels}
+\section{GHC.Core.Op.SetLevels}
 
                 ***************************
                         Overview
@@ -91,12 +91,14 @@ import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, 
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
+import GHC.Types.Unique       ( hasKey )
 import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
+import GHC.Builtin.Names      ( runRWKey )
 import Util
 import Outputable
 import FastString
@@ -396,11 +398,24 @@ lvlNonTailExpr env expr
   = lvlExpr (placeJoinCeiling env) expr
 
 -------------------------------------------
+isContPrimOp :: Id -> Bool
+isContPrimOp fn
+  | fn `hasKey` runRWKey = True
+  | Just KeepAliveOp <- isPrimOpId_maybe fn = True
+  | otherwise = Falsej
+
 lvlApp :: LevelEnv
        -> CoreExprWithFVs
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
-        -> LvlM LevelledExpr                   -- Result expression
+       -> LvlM LevelledExpr                    -- Result expression
 lvlApp env orig_expr ((_,AnnVar fn), args)
+  -- Try to ensure that runRW#'s continuation isn't floated out.
+  -- See Note [Simplification of runRW#].
+  -- TODO: update for keepAlive#
+  | isContPrimOp fn
+  = do { args' <- mapM (lvlExpr env) args
+       ; return (foldl' App (lookupVar env fn) args') }
+
   | floatOverSat env   -- See Note [Floating over-saturated applications]
   , arity > 0
   , arity < n_val_args

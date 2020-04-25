@@ -461,7 +461,7 @@ lintCoreBindings dflags pass local_in_scope binds
     addLoc TopLevelBindings           $
     do { checkL (null dups) (dupVars dups)
        ; checkL (null ext_dups) (dupExtVars ext_dups)
-       ; lintRecBindings TopLevel all_pairs $
+       ; lintRecBindings TopLevel all_pairs $ \_ ->
          return () }
   where
     all_pairs = flattenBinds binds
@@ -572,17 +572,23 @@ Check a core binding, returning the list of variables bound.
 -}
 
 lintRecBindings :: TopLevelFlag -> [(Id, CoreExpr)]
-                -> LintM a -> LintM a
+                -> ([LintedId] -> LintM a) -> LintM a
 lintRecBindings top_lvl pairs thing_inside
   = lintIdBndrs top_lvl bndrs $ \ bndrs' ->
     do { zipWithM_ lint_pair bndrs' rhss
-       ; thing_inside }
+       ; thing_inside bndrs' }
   where
     (bndrs, rhss) = unzip pairs
     lint_pair bndr' rhs
       = addLoc (RhsOf bndr') $
         do { rhs_ty <- lintRhs bndr' rhs         -- Check the rhs
            ; lintLetBind top_lvl Recursive bndr' rhs rhs_ty }
+
+lintLetBody :: [LintedId] -> CoreExpr -> LintM LintedType
+lintLetBody bndrs body
+  = do { body_ty <- addLoc (BodyOfLetRec bndrs) (lintCoreExpr body)
+       ; mapM_ (lintJoinBndrType body_ty) bndrs
+       ; return body_ty }
 
 lintLetBind :: TopLevelFlag -> RecFlag -> LintedId
               -> CoreExpr -> LintedType -> LintM ()
@@ -678,22 +684,9 @@ lintRhs :: Id -> CoreExpr -> LintM LintedType
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
     | Just arity <- isJoinId_maybe bndr
-    = lint_join_lams arity arity True rhs
+    = lintJoinLams arity (Just bndr) rhs
     | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
-    = lint_join_lams arity arity False rhs
-  where
-    lint_join_lams 0 _ _ rhs
-      = lintCoreExpr rhs
-
-    lint_join_lams n tot enforce (Lam var expr)
-      = lintLambda var $ lint_join_lams (n-1) tot enforce expr
-
-    lint_join_lams n tot True _other
-      = failWithL $ mkBadJoinArityMsg bndr tot (tot-n) rhs
-    lint_join_lams _ _ False rhs
-      = markAllJoinsBad $ lintCoreExpr rhs
-          -- Future join point, not yet eta-expanded
-          -- Body is not a tail position
+    = lintJoinLams arity Nothing rhs
 
 -- Allow applications of the data constructor @StaticPtr@ at the top
 -- but produce errors otherwise.
@@ -714,6 +707,22 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
         )
         binders0
     go _ = markAllJoinsBad $ lintCoreExpr rhs
+
+-- | Lint the RHS of a join point with expected join arity of @n@ (see Note
+-- [Join points] in GHC.Core).
+lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM LintedType
+lintJoinLams join_arity enforce rhs
+  = go join_arity rhs
+  where
+    go 0 rhs             = lintCoreExpr rhs
+    go n (Lam var expr)  = lintLambda var $ go (n-1) expr
+      -- N.B. join points can be cast. e.g. we consider ((\x -> ...) `cast` ...)
+      -- to be a join point at join arity 1.
+    go n _other | Just bndr <- enforce -- Join point with too few RHS lambdas
+                = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
+                | otherwise -- Future join point, not yet eta-expanded
+                = markAllJoinsBad $ lintCoreExpr rhs
+                  -- Body of lambda is not a tail position
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
@@ -755,6 +764,40 @@ we will check any unfolding after it has been unfolded; checking the
 unfolding beforehand is merely an optimization, and one that actively
 hurts us here.
 
+Note [Linting of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~
+runRW# has some very peculiar behavior (see Note [runRW magic] in
+GHC.CoreToStg.Prep) which CoreLint must accommodate.
+
+As described in Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils, the simplifier pushes casts out of
+lambdas. Concretely, the simplifier will transform
+
+    runRW# @r @ty (\s -> expr `cast` co)
+
+into
+
+    runRW# @r @ty ((\s -> expr) `cast` co)
+
+Consequently we need to handle the case that the continuation is a
+cast of a lambda. See Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils.
+
+In the event that the continuation is headed by a lambda (which
+will bind the State# token) we can safely allow calls to join
+points since CorePrep is going to apply the continuation to
+RealWorld.
+
+In the case that the continuation is not a lambda we lint the
+continuation disallowing join points, to rule out things like,
+
+    join j = ...
+    in runRW# @r @ty (
+         let x = jump j
+         in x
+       )
+
+
 ************************************************************************
 *                                                                      *
 \subsection[lintCoreExpr]{lintCoreExpr}
@@ -768,6 +811,18 @@ type LintedKind     = Kind
 type LintedCoercion = Coercion
 type LintedTyCoVar  = TyCoVar
 type LintedId       = Id
+
+-- | Lint an expression cast through the given coercion, returning the type
+-- resulting from the cast.
+lintCastExpr :: CoreExpr -> LintedType -> Coercion -> LintM LintedType
+lintCastExpr expr expr_ty co
+  = do { co' <- lintCoercion co
+       ; let (Pair from_ty to_ty, role) = coercionKindRole co'
+       ; checkValueType to_ty $
+         text "target of cast" <+> quotes (ppr co')
+       ; lintRole co' Representational role
+       ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
+       ; return to_ty }
 
 lintCoreExpr :: CoreExpr -> LintM LintedType
 -- The returned type has the substitution from the monad
@@ -786,14 +841,8 @@ lintCoreExpr (Lit lit)
   = return (literalType lit)
 
 lintCoreExpr (Cast expr co)
-  = do { expr_ty <- markAllJoinsBad $ lintCoreExpr expr
-       ; co' <- lintCoercion co
-       ; let (Pair from_ty to_ty, role) = coercionKindRole co'
-       ; checkValueType to_ty $
-         text "target of cast" <+> quotes (ppr co')
-       ; lintRole co' Representational role
-       ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
-       ; return to_ty }
+  = do expr_ty <- markAllJoinsBad   $ lintCoreExpr expr
+       lintCastExpr expr expr_ty co
 
 lintCoreExpr (Tick tickish expr)
   = do case tickish of
@@ -830,7 +879,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
          -- Now lint the binder
        ; lintBinder LetBind bndr $ \bndr' ->
     do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
-       ; addLoc (BodyOfLetRec [bndr]) (lintCoreExpr body) } }
+       ; lintLetBody [bndr'] body } }
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
@@ -847,13 +896,50 @@ lintCoreExpr e@(Let (Rec pairs) body)
         ; checkL (all isJoinId bndrs || all (not . isJoinId) bndrs) $
           mkInconsistentRecMsg bndrs
 
-        ; lintRecBindings NotTopLevel pairs $
-          addLoc (BodyOfLetRec bndrs)       $
-          lintCoreExpr body }
+        ; lintRecBindings NotTopLevel pairs $ \ bndrs' ->
+          lintLetBody bndrs' body }
   where
     bndrs = map fst pairs
 
 lintCoreExpr e@(App _ _)
+  | Var fun <- fun
+  , fun `hasKey` runRWKey
+    -- N.B. we may have an over-saturated application of the form:
+    --   runRW (\s -> \x -> ...) y
+  , arg_ty1 : arg_ty2 : arg3 : rest <- args
+  = do { fun_ty1 <- lintCoreArg (idType fun) arg_ty1
+       ; fun_ty2 <- lintCoreArg fun_ty1      arg_ty2
+         -- See Note [Linting of runRW#]
+       ; let lintRunRWCont :: CoreArg -> LintM LintedType
+             lintRunRWCont (Cast expr co) = do
+                ty <- lintRunRWCont expr
+                lintCastExpr expr ty co
+             lintRunRWCont expr@(Lam _ _) = do
+                lintJoinLams 1 (Just fun) expr
+             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             -- TODO: Look through ticks?
+       ; arg3_ty <- lintRunRWCont arg3
+       ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty
+       ; lintCoreArgs app_ty rest }
+
+  | Var fun <- fun
+  , fun `hasKey` runRWKey
+  = failWithL (text "Invalid runRW# application")
+
+  | Var fun <- fun
+  , Just KeepAliveOp <- isPrimOpId_maybe f
+  , [arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5, arg6] <- args
+  = do { fun_ty6 <- lintCoreArgs (idType fun)
+                      [ arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5 ]
+       ; arg6_ty <- lintJoinLams 0 (Just fun) arg6     -- f  :: State# RW -> (# State# RW, o #)
+       ; lintValApp arg6 fun_ty6 arg6_ty
+       }
+
+  | Var fun <- fun
+  , Just KeepAliveOp <- isPrimOpId_maybe f
+  = failWithL (text "Invalid keepAlive# application")
+
+  | otherwise
   = do { fun_ty <- lintCoreFun fun (length args)
        ; lintCoreArgs fun_ty args }
   where
@@ -950,6 +1036,25 @@ checkDeadIdOcc id
   = return ()
 
 ------------------
+lintJoinBndrType :: LintedType -- Type of the body
+                 -> LintedId   -- Possibly a join Id
+                -> LintM ()
+-- Checks that the return type of a join Id matches the body
+-- E.g. join j x = rhs in body
+--      The type of 'rhs' must be the same as the type of 'body'
+lintJoinBndrType body_ty bndr
+  | Just arity <- isJoinId_maybe bndr
+  , let bndr_ty = idType bndr
+  , (bndrs, res) <- splitPiTys bndr_ty
+  = checkL (length bndrs >= arity
+            && body_ty `eqType` mkPiTys (drop arity bndrs) res) $
+    hang (text "Join point returns different type than body")
+       2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+               , text "Join arity:" <+> ppr arity
+               , text "Body type:" <+> ppr body_ty ])
+  | otherwise
+  = return ()
+
 checkJoinOcc :: Id -> JoinArity -> LintM ()
 -- Check that if the occurrence is a JoinId, then so is the
 -- binding site, and it's a valid join Id
@@ -1114,11 +1219,15 @@ lintTyApp fun_ty arg_ty
   = failWithL (mkTyAppMsg fun_ty arg_ty)
 
 -----------------
+
+-- | @lintValApp arg fun_ty arg_ty@ lints an application of @fun arg@
+-- where @fun :: fun_ty@ and @arg :: arg_ty@, returning the type of the
+-- application.
 lintValApp :: CoreExpr -> LintedType -> LintedType -> LintM LintedType
 lintValApp arg fun_ty arg_ty
-  | Just (arg,res) <- splitFunTy_maybe fun_ty
-  = do { ensureEqTys arg arg_ty err1
-       ; return res }
+  | Just (arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  = do { ensureEqTys arg_ty' arg_ty err1
+       ; return res_ty' }
   | otherwise
   = failWithL err2
   where
@@ -2751,11 +2860,11 @@ mkInvalidJoinPointMsg var ty
         2 (ppr var <+> dcolon <+> ppr ty)
 
 mkBadJoinArityMsg :: Var -> Int -> Int -> CoreExpr -> SDoc
-mkBadJoinArityMsg var ar nlams rhs
+mkBadJoinArityMsg var ar n rhs
   = vcat [ text "Join point has too few lambdas",
            text "Join var:" <+> ppr var,
            text "Join arity:" <+> ppr ar,
-           text "Number of lambdas:" <+> ppr nlams,
+           text "Number of lambdas:" <+> ppr (ar - n),
            text "Rhs = " <+> ppr rhs
            ]
 

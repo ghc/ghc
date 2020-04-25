@@ -482,7 +482,6 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ty1
-
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic
