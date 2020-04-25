@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -77,6 +78,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
+import qualified Control.Monad.Catch as MC (handle)
 import Data.List        ( isInfixOf, intercalate )
 import Data.Maybe
 import Data.Version
@@ -101,7 +103,7 @@ preprocess :: HscEnv
            -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
-  ghandle handler $
+  MC.handle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
   (dflags, fp, mb_iface) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
@@ -496,14 +498,14 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let exe_file = exeFileName staticLink dflags
-  e_exe_time <- tryIO $ getModificationUTCTime exe_file
+  e_exe_time <- try $ getModificationUTCTime exe_file
   case e_exe_time of
-    Left _  -> return True
+    Left (_ :: IOException)  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
-        e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let (errs,extra_times) = partitionEithers e_extra_times
+        e_extra_times <- mapM (try . getModificationUTCTime) extra_ld_inputs
+        let (errs :: [IOException], extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
             then return True
@@ -518,9 +520,9 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
-        e_lib_times <- mapM (tryIO . getModificationUTCTime)
+        e_lib_times <- mapM (try . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
-        let (lib_errs,lib_times) = partitionEithers e_lib_times
+        let (lib_errs :: [IOException], lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
            else checkLinkInfo dflags pkg_deps exe_file
