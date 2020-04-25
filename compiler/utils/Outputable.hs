@@ -135,6 +135,7 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Stack        ( callStack, prettyCallStack )
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC ()
 import Exception
 
 {-

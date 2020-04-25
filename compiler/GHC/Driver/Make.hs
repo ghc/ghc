@@ -53,7 +53,6 @@ import GHC.Driver.Main
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Types.Basic
 import Digraph
-import Exception        ( tryIO, gbracket, gfinally )
 import FastString
 import Maybes           ( expectJust )
 import GHC.Types.Name
@@ -85,6 +84,7 @@ import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
+import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.List
 import qualified Data.List as List
@@ -994,10 +994,10 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     -- Reset the number of capabilities once the upsweep ends.
     let resetNumCapabilities orig_n = liftIO $ setNumCapabilities orig_n
 
-    gbracket updNumCapabilities resetNumCapabilities $ \_ -> do
+    MC.bracket updNumCapabilities resetNumCapabilities $ \_ -> do
 
     -- Sync the global session with the latest HscEnv once the upsweep ends.
-    let finallySyncSession io = io `gfinally` do
+    let finallySyncSession io = io `MC.finally` do
             hsc_env <- liftIO $ readMVar hsc_env_var
             setSession hsc_env
 
@@ -1061,7 +1061,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
 
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
-                m_res <- try $ unmask $ prettyPrintGhcErrors lcl_dflags $
+                m_res <- MC.try $ unmask $ prettyPrintGhcErrors lcl_dflags $
                         parUpsweep_one mod home_mod_map comp_graph_loops
                                        lcl_dflags mHscMessage cleanup
                                        par_sem hsc_env_var old_hpt_var
@@ -1097,12 +1097,12 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
 
         -- Kill all the workers, masking interrupts (since killThread is
         -- interruptible). XXX: This is not ideal.
-        ; killWorkers = uninterruptibleMask_ . mapM_ killThread }
+        ; killWorkers = MC.uninterruptibleMask_ . mapM_ killThread }
 
 
     -- Spawn the workers, making sure to kill them later. Collect the results
     -- of each compile.
-    results <- liftIO $ bracket spawnWorkers killWorkers $ \_ ->
+    results <- liftIO $ MC.bracket spawnWorkers killWorkers $ \_ ->
         -- Loop over each module in the compilation graph in order, printing
         -- each message from its log_queue.
         forM comp_graph $ \(mod,mvar,log_queue) -> do
@@ -1278,7 +1278,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
         let logger err = printBagOfErrors lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
-        let withSem sem = bracket_ (waitQSem sem) (signalQSem sem)
+        let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
         mb_mod_info <- withSem par_sem $
             handleSourceError (\err -> do logger err; return Nothing) $ do
                 -- Have the ModSummary and HscEnv point to our local log_action
@@ -2456,7 +2456,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
            Just (_,t) ->
                Just <$> check_timestamp old_summary location src_fn t
            Nothing    -> do
-                m <- tryIO (getModificationUTCTime src_fn)
+                m <- try (getModificationUTCTime src_fn)
                 case m of
                    Right t ->
                        Just <$> check_timestamp old_summary location src_fn t
@@ -2670,7 +2670,7 @@ withDeferredDiagnostics f = do
         setLogAction action = modifySession $ \hsc_env ->
           hsc_env{ hsc_dflags = (hsc_dflags hsc_env){ log_action = action } }
 
-    gbracket
+    MC.bracket
       (setLogAction deferDiagnostics)
       (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
       (\_ -> f)
