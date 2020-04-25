@@ -7,10 +7,11 @@ import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
 import Outputable
-import Exception (ExceptionMonad, ghandle)
+import Exception (ExceptionMonad)
 import Bag
 
 import Control.Monad
+import Control.Monad.Catch as MC (handle)
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception
 import Data.IORef
@@ -28,8 +29,8 @@ any_failed = unsafePerformIO $ newIORef False
 
 it :: ExceptionMonad m => [Char] -> m Bool -> m ()
 it msg act =
-    ghandle (\(_ex :: AssertionFailed) -> dofail) $
-    ghandle (\(_ex :: ExitCode) -> dofail) $ do
+    MC.handle (\(_ex :: AssertionFailed) -> dofail) $
+    MC.handle (\(_ex :: ExitCode) -> dofail) $ do
     res <- act
     case res of
       False -> dofail
