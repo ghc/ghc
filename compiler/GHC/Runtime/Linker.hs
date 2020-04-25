@@ -72,6 +72,7 @@ import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
+import qualified Control.Monad.Catch as MC
 
 import System.FilePath
 import System.Directory
@@ -213,10 +214,10 @@ linkDependencies hsc_env pls span needed_mods = do
 
 -- | Temporarily extend the linker state.
 
-withExtendedLinkEnv :: (ExceptionMonad m) =>
+withExtendedLinkEnv :: ExceptionMonad m =>
                        DynLinker -> [(Name,ForeignHValue)] -> m a -> m a
 withExtendedLinkEnv dl new_env action
-    = gbracket (liftIO $ extendLinkEnv dl new_env)
+    = MC.bracket (liftIO $ extendLinkEnv dl new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where
@@ -1688,7 +1689,7 @@ loadFramework :: HscEnv -> [FilePath] -> FilePath -> IO (Maybe String)
 loadFramework hsc_env extraPaths rootname
    = do { either_dir <- tryIO getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
-                                  Left _ -> []
+                                  Left _ :: -> []
                                   Right dir -> [dir </> "Library/Frameworks"]
               ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
         ; mb_fwk <- findFile ps fwk_file

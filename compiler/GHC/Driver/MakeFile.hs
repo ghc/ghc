@@ -155,9 +155,9 @@ beginMkDependHS dflags = do
                         then return ()
                         else chuck
 
-           catchIO slurp
+           catch slurp
                 (\e -> if isEOFError e then return () else ioError e)
-           catchIO chuck
+           catch chuck
                 (\e -> if isEOFError e then return () else ioError e)
 
            return (Just makefile_hdl)
@@ -335,7 +335,7 @@ endMkDependHS dflags
                 hPutStrLn tmp_hdl l
                 slurp
 
-        catchIO slurp
+        catch slurp
                 (\e -> if isEOFError e then return () else ioError e)
 
         hClose hdl
