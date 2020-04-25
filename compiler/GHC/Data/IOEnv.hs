@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -43,6 +44,8 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
+import Control.Monad.Trans.Reader
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import GHC.Utils.Monad
 import Control.Applicative (Alternative(..))
 
@@ -51,7 +54,9 @@ import Control.Applicative (Alternative(..))
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a) deriving (Functor)
+newtype IOEnv env a = IOEnv (env -> IO a)
+  deriving (Functor)
+  deriving (MonadThrow, MonadCatch, MonadMask, MonadIO) via (ReaderT env IO)
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
@@ -90,16 +95,6 @@ instance Show IOEnvFailure where
     show IOEnvFailure = "IOEnv failure"
 
 instance Exception IOEnvFailure
-
-instance ExceptionMonad (IOEnv a) where
-  gcatch act handle =
-      IOEnv $ \s -> unIOEnv act s `gcatch` \e -> unIOEnv (handle e) s
-  gmask f =
-      IOEnv $ \s -> gmask $ \io_restore ->
-                             let
-                                g_restore (IOEnv m) = IOEnv $ \s -> io_restore (m s)
-                             in
-                                unIOEnv (f g_restore) s
 
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
     getDynFlags = do env <- getEnv
@@ -175,9 +170,6 @@ instance MonadPlus (IOEnv env)
 ----------------------------------------------------------------------
 -- Accessing input/output
 ----------------------------------------------------------------------
-
-instance MonadIO (IOEnv env) where
-    liftIO io = IOEnv (\ _ -> io)
 
 newMutVar :: a -> IOEnv env (IORef a)
 newMutVar val = liftIO (newIORef val)
