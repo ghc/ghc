@@ -231,6 +231,7 @@ import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+import Control.Monad.Catch as MC (MonadCatch, catch)
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -352,12 +353,12 @@ instance Exception SourceError
 
 -- | Perform the given action and call the exception handler if the action
 -- throws a 'SourceError'.  See 'SourceError' for more information.
-handleSourceError :: (ExceptionMonad m) =>
+handleSourceError :: (MonadCatch m) =>
                      (SourceError -> m a) -- ^ exception handler
                   -> m a -- ^ action to perform
                   -> m a
 handleSourceError handler act =
-  gcatch act (\(e :: SourceError) -> handler e)
+  MC.catch act (\(e :: SourceError) -> handler e)
 
 -- | An error thrown if the GHC API is used in an incorrect fashion.
 newtype GhcApiError = GhcApiError String
