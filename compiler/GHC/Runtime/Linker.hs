@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -72,6 +72,7 @@ import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
+import qualified Control.Monad.Catch as MC
 
 import System.FilePath
 import System.Directory
@@ -213,10 +214,10 @@ linkDependencies hsc_env pls span needed_mods = do
 
 -- | Temporarily extend the linker state.
 
-withExtendedLinkEnv :: (ExceptionMonad m) =>
+withExtendedLinkEnv :: (MonadIO m, ExceptionMonad m) =>
                        DynLinker -> [(Name,ForeignHValue)] -> m a -> m a
 withExtendedLinkEnv dl new_env action
-    = gbracket (liftIO $ extendLinkEnv dl new_env)
+    = MC.bracket (liftIO $ extendLinkEnv dl new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where
@@ -1686,9 +1687,9 @@ addEnvPaths name list
 -- name. They are searched for in different paths than normal libraries.
 loadFramework :: HscEnv -> [FilePath] -> FilePath -> IO (Maybe String)
 loadFramework hsc_env extraPaths rootname
-   = do { either_dir <- tryIO getHomeDirectory
+   = do { either_dir <- try getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
-                                  Left _ -> []
+                                  Left (_ :: IOException) -> []
                                   Right dir -> [dir </> "Library/Frameworks"]
               ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
         ; mb_fwk <- findFile ps fwk_file

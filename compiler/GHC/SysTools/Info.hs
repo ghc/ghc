@@ -150,7 +150,7 @@ getLinkerInfo' dflags = do
         | otherwise = fail "invalid --version output, or linker is unsupported"
 
   -- Process the executable call
-  info <- catchIO (do
+  info <- catch (do
              case os of
                OSSolaris2 ->
                  -- Solaris uses its own Solaris linker. Even all
@@ -194,7 +194,7 @@ getLinkerInfo' dflags = do
                  -- it's still easy to figure out.
                  parseLinkerInfo (lines stdo) (lines stde) exitc
             )
-            (\err -> do
+            (\(err :: IOException) -> do
                 debugTraceMsg dflags 2
                     (text "Error (figuring out linker information):" <+>
                      text (show err))
@@ -244,14 +244,14 @@ getCompilerInfo' dflags = do
         | otherwise = fail "invalid -v output, or compiler is unsupported"
 
   -- Process the executable call
-  info <- catchIO (do
+  info <- catch (do
                 (exitc, stdo, stde) <-
                     readProcessEnvWithExitCode pgm ["-v"] c_locale_env
                 -- Split the output by lines to make certain kinds
                 -- of processing easier.
                 parseCompilerInfo (lines stdo) (lines stde) exitc
             )
-            (\err -> do
+            (\(err :: IOException) -> do
                 debugTraceMsg dflags 2
                     (text "Error (figuring out C compiler information):" <+>
                      text (show err))

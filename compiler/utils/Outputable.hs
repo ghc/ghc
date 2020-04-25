@@ -135,6 +135,7 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Stack        ( callStack, prettyCallStack )
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC ()
 import Exception
 
 {-
@@ -1266,7 +1267,7 @@ pprTraceIt desc x = pprTraceWith desc ppr x
 
 -- | @pprTraceException desc x action@ runs action, printing a message
 -- if it throws an exception.
-pprTraceException :: ExceptionMonad m => String -> SDoc -> m a -> m a
+pprTraceException :: (MonadIO m, ExceptionMonad m) => String -> SDoc -> m a -> m a
 pprTraceException heading doc =
     handleGhcException $ \exc -> liftIO $ do
         putStrLn $ showSDocDump unsafeGlobalDynFlags (sep [text heading, nest 2 doc])

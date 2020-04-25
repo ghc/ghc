@@ -207,7 +207,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
       -- of the options they've specified. llc doesn't care what other
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
-  catchIO (do
+  catch (do
               (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
               {- > llc -version
@@ -224,7 +224,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
               hClose perr
               return mb_ver
             )
-            (\err -> do
+            (\(err :: IOException) -> do
                 debugTraceMsg dflags 2
                     (text "Error (figuring out LLVM version):" <+>
                       text (show err))

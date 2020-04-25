@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-
 -----------------------------------------------------------------------------
 --
@@ -142,7 +143,7 @@ data ElfHeader = ElfHeader
 
 -- | Read the ELF header
 readElfHeader :: DynFlags -> ByteString -> IO (Maybe ElfHeader)
-readElfHeader dflags bs = runGetOrThrow getHeader bs `catchIO` \_ -> do
+readElfHeader dflags bs = runGetOrThrow getHeader bs `catch` \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
       text ("Unable to read ELF header")
     return Nothing
@@ -199,7 +200,7 @@ readElfSectionTable :: DynFlags
                     -> ByteString
                     -> IO (Maybe SectionTable)
 
-readElfSectionTable dflags hdr bs = action `catchIO` \_ -> do
+readElfSectionTable dflags hdr bs = action `catch` \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
       text ("Unable to read ELF section table")
     return Nothing
@@ -252,7 +253,8 @@ readElfSectionByIndex :: DynFlags
                       -> ByteString
                       -> IO (Maybe Section)
 
-readElfSectionByIndex dflags hdr secTable i bs = action `catchIO` \_ -> do
+readElfSectionByIndex dflags hdr secTable i bs
+  = action `catch` \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
       text ("Unable to read ELF section")
     return Nothing
@@ -321,7 +323,7 @@ readElfSectionByName :: DynFlags
                      -> String
                      -> IO (Maybe LBS.ByteString)
 
-readElfSectionByName dflags bs name = action `catchIO` \_ -> do
+readElfSectionByName dflags bs name = action `catch` \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
       text ("Unable to read ELF section \"" ++ name ++ "\"")
     return Nothing
@@ -345,7 +347,7 @@ readElfNoteBS :: DynFlags
               -> String
               -> IO (Maybe LBS.ByteString)
 
-readElfNoteBS dflags bs sectionName noteId = action `catchIO`  \_ -> do
+readElfNoteBS dflags bs sectionName noteId = action `catch`  \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
          text ("Unable to read ELF note \"" ++ noteId ++
                "\" in section \"" ++ sectionName ++ "\"")
@@ -394,7 +396,8 @@ readElfNoteAsString :: DynFlags
                     -> String
                     -> IO (Maybe String)
 
-readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
+readElfNoteAsString dflags path sectionName noteId
+  = action `catch`  \(_ :: IOException) -> do
     debugTraceMsg dflags 3 $
          text ("Unable to read ELF note \"" ++ noteId ++
                "\" in section \"" ++ sectionName ++ "\"")

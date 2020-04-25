@@ -520,9 +520,9 @@ getPackageConfRefs :: DynFlags -> IO [PkgDbRef]
 getPackageConfRefs dflags = do
   let system_conf_refs = [UserPkgDb, GlobalPkgDb]
 
-  e_pkg_path <- tryIO (getEnv $ map toUpper (programName dflags) ++ "_PACKAGE_PATH")
+  e_pkg_path <- try (getEnv $ map toUpper (programName dflags) ++ "_PACKAGE_PATH")
   let base_conf_refs = case e_pkg_path of
-        Left _ -> system_conf_refs
+        Left (_ :: IOException) -> system_conf_refs
         Right path
          | not (null path) && isSearchPathSeparator (last path)
          -> map PkgDbPath (splitSearchPath (init path)) ++ system_conf_refs
@@ -636,7 +636,7 @@ readPackageDatabase dflags conf_file = do
     -- assumes it's a file and tries to overwrite with 'writeFile'.
     -- ghc-pkg also cooperates with this workaround.
     tryReadOldFileStyleUnitInfo = do
-      content <- readFile conf_file `catchIO` \_ -> return ""
+      content <- readFile conf_file `catch` \(_ :: IOException) -> return ""
       if take 2 content == "[]"
         then do
           let conf_dir = conf_file <.> "d"

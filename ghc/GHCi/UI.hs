@@ -80,7 +80,7 @@ import FastString
 import GHC.Runtime.Linker
 import Maybes ( orElse, expectJust )
 import GHC.Types.Name.Set
-import Panic hiding ( showException )
+import Panic hiding ( showException, try )
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Bag (unitBag)
@@ -91,6 +91,7 @@ import System.Console.Haskeline as Haskeline
 import Control.Applicative hiding (empty)
 import Control.DeepSeq (deepseq)
 import Control.Monad as Monad
+import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -112,7 +113,7 @@ import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
 import Prelude hiding ((<>))
 
-import Exception hiding (catch)
+import Exception hiding (try, catch, mask, handle)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
 
@@ -986,10 +987,10 @@ runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> InputT GHCi (Maybe String)
              -> InputT GHCi (Maybe Bool)
          -- We want to return () here, but have to return (Maybe Bool)
-         -- because gmask is not polymorphic enough: we want to use
+         -- because mask is not polymorphic enough: we want to use
          -- unmask at two different types.
-runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
-    b <- ghandle (\e -> case fromException e of
+runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
+    b <- handle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
                                  Just ghce ->
@@ -1039,7 +1040,7 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       let p = prompt st
       setGHCiState st{ prompt = prompt_cont st }
-      mb_cmd <- collectCommand q "" `GHC.gfinally`
+      mb_cmd <- collectCommand q "" `MC.finally`
                 modifyGHCiState (\st' -> st' { prompt = p })
       return mb_cmd
     -- we can't use removeSpaces for the sublines here, so
@@ -1819,7 +1820,7 @@ instancesCmd s = do
 -- '-fdefer-type-errors' again if it has not been set before.
 wrapDeferTypeErrors :: GHC.GhcMonad m => m a -> m a
 wrapDeferTypeErrors load =
-  gbracket
+  MC.bracket
     (do
       -- Force originalFlags to avoid leaking the associated HscEnv
       !originalFlags <- getDynFlags
@@ -1960,11 +1961,11 @@ doLoad retain_context howmuch = do
   -- Enable buffering stdout and stderr as we're compiling. Keeping these
   -- handles unbuffered will just slow the compilation down, especially when
   -- compiling in parallel.
-  gbracket (liftIO $ do hSetBuffering stdout LineBuffering
-                        hSetBuffering stderr LineBuffering)
-           (\_ ->
-            liftIO $ do hSetBuffering stdout NoBuffering
-                        hSetBuffering stderr NoBuffering) $ \_ -> do
+  MC.bracket (liftIO $ do hSetBuffering stdout LineBuffering
+                          hSetBuffering stderr LineBuffering)
+             (\_ ->
+              liftIO $ do hSetBuffering stdout NoBuffering
+                          hSetBuffering stderr NoBuffering) $ \_ -> do
       ok <- trySuccess $ GHC.load howmuch
       afterLoad ok retain_context
       return ok
@@ -2048,7 +2049,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: GHC.GhcMonad m => InteractiveImport -> m Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do e <- gtry $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
+         = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
@@ -2406,7 +2407,7 @@ browseModule bang modl exports_only = do
                 (local,external) = ASSERT( all isExternalName names )
                                    partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName)
-                -- try to sort by src location. If the first name in our list
+                -- tryIO to sort by src location. If the first name in our list
                 -- has a good source location, then they all should.
                 loc_sort ns
                       | n:_ <- ns, isGoodSrcSpan (nameSrcSpan n)
@@ -2556,7 +2557,7 @@ restoreContextOnFailure :: GhciMonad m => m a -> m a
 restoreContextOnFailure do_this = do
   st <- getGHCiState
   let rc = remembered_ctx st; tc = transient_ctx st
-  do_this `gonException` (modifyGHCiState $ \st' ->
+  do_this `MC.onException` (modifyGHCiState $ \st' ->
      st' { remembered_ctx = rc, transient_ctx = tc })
 
 -- -----------------------------------------------------------------------------
@@ -3669,7 +3670,7 @@ breakSwitch (arg1:rest)
               breakByModuleLine md (read arg1) rest
            [] -> do
               liftIO $ putStrLn "No modules are loaded with debugging support."
-   | otherwise = do -- try parsing it as an identifier
+   | otherwise = do -- tryIO parsing it as an identifier
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
         maybe_info <- GHC.getModuleInfo (GHC.nameModule name)
         case maybe_info of
@@ -4062,13 +4063,13 @@ showException se =
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
 ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = gmask $ \restore -> do
+ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
                  !dflags <- getDynFlags
-                 gcatch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
+                 catch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
 
 ghciTry :: ExceptionMonad m => m a -> m (Either SomeException a)
-ghciTry m = fmap Right m `gcatch` \e -> return $ Left e
+ghciTry m = fmap Right m `catch` \e -> return $ Left e
 
 tryBool :: ExceptionMonad m => m a -> m Bool
 tryBool m = do
@@ -4115,7 +4116,7 @@ wantInterpretedModuleName modname = do
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $
-       throwGhcException (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
+       throwGhcException (CmdLineError ("module '" ++ str ++ "' is not interpreted; tryIO \':add *" ++ str ++ "' first"))
    return modl
 
 wantNameFromInterpretedModule :: GHC.GhcMonad m
@@ -4145,3 +4146,13 @@ clearAllTargets = discardActiveBreakPoints
                 >> GHC.setTargets []
                 >> GHC.load LoadAllTargets
                 >> pure ()
+
+-- Monomorphised versions of exception-handling utilities
+catchIO :: IO a -> (IOException -> IO a) -> IO a
+catchIO = catch
+
+handleIO :: (IOException -> IO a) -> IO a -> IO a
+handleIO = flip catchIO
+
+tryIO :: IO a -> IO (Either IOException a)
+tryIO = try

@@ -89,6 +89,7 @@ import Data.Time
 import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC (handle)
 import System.IO
 import System.IO.Error  ( catchIOError )
 import GHC.Conc         ( getAllocationCounter )
@@ -795,9 +796,9 @@ logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logOutput dflags sty msg
   = putLogMsg dflags NoReason SevOutput noSrcSpan sty msg
 
-prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
+prettyPrintGhcErrors :: (MonadIO m, ExceptionMonad m) => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
-    = ghandle $ \e -> case e of
+    = MC.handle $ \e -> case e of
                       PprPanic str doc ->
                           pprDebugAndThen dflags panic (text str) doc
                       PprSorry str doc ->
@@ -828,9 +829,10 @@ traceCmd dflags phase_name cmd_line action
               FlushErr io -> io
 
            -- And run it!
-        ; action `catchIO` handle_exn verb
+        ; action `catch` handle_exn verb
         }
   where
+    handle_exn :: Int -> IOException -> IO a
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2
                                 (text "Failed:"
