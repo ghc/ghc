@@ -17,12 +17,12 @@ import qualified Documentation.Haddock.Parser as P
 import Documentation.Haddock.Types
 
 import GHC.Driver.Session ( DynFlags )
-import FastString   ( fsLit )
+import GHC.Data.FastString   ( fsLit )
 import GHC.Parser.Lexer ( mkPState, unP, ParseResult(POk) )
 import GHC.Parser       ( parseIdentifier )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.SrcLoc ( mkRealSrcLoc, unLoc )
-import StringBuffer ( stringToStringBuffer )
+import GHC.Data.StringBuffer ( stringToStringBuffer )
 
 parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod RdrName
 parseParas d p = overDoc (P.overIdentifier (parseIdent d)) . P.parseParas p

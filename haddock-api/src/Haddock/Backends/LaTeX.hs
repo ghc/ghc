@@ -21,16 +21,16 @@ import Documentation.Haddock.Markup
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
-import Pretty hiding (Doc, quote)
-import qualified Pretty
+import GHC.Utils.Ppr hiding (Doc, quote)
+import qualified GHC.Utils.Ppr as Pretty
 
 import GHC.Types.Basic        ( PromotionFlag(..) )
 import GHC
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
 import GHC.Types.Name.Reader ( rdrNameOcc )
-import FastString           ( unpackFS )
-import Outputable           ( panic)
+import GHC.Data.FastString   ( unpackFS )
+import GHC.Utils.Outputable  ( panic)
 
 import qualified Data.Map as Map
 import System.Directory

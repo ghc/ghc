@@ -38,7 +38,7 @@ import GHC.Types.Basic (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import GHC.Types.Name
-import BooleanFormula
+import GHC.Data.BooleanFormula
 import GHC.Types.Name.Reader ( rdrNameOcc )
 
 -- | Pretty print a declaration

@@ -17,7 +17,7 @@ import GHC.Types.Module ( ModuleName, moduleNameString )
 import GHC.Types.Name   ( getOccString, isInternalName, Name, nameModule, nameUnique )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( getKey )
-import Encoding ( utf8DecodeByteString )
+import GHC.Utils.Encoding ( utf8DecodeByteString )
 
 import System.FilePath.Posix ((</>))
 

@@ -29,7 +29,7 @@ import qualified Data.List as List
 import GHC hiding (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import FastString (unpackFS)
+import GHC.Data.FastString (unpackFS)
 
 
 -- | Indicator of how to render a 'DocName' into 'Html'

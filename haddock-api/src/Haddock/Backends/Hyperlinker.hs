@@ -21,7 +21,7 @@ import System.FilePath
 import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..) )
 import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result)
 import Data.Map as M
-import FastString     ( mkFastString )
+import GHC.Data.FastString     ( mkFastString )
 import GHC.Types.Module        ( Module, moduleName )
 import GHC.Types.Name.Cache    ( initNameCache )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )

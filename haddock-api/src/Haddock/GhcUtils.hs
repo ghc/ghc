@@ -23,9 +23,9 @@ import Data.Char ( isSpace )
 
 import Haddock.Types( DocName, DocNameI )
 
-import Exception
-import FV
-import Outputable ( Outputable, panic, showPpr )
+import GHC.Utils.Exception
+import GHC.Utils.FV as FV
+import GHC.Utils.Outputable ( Outputable, panic, showPpr )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Module
@@ -43,8 +43,8 @@ import GHC.Core.Type     ( isRuntimeRepVar )
 import GHC.Builtin.Types( liftedRepDataConTyCon )
 import GHC.Hs.Utils (CollectPass(..))
 
-import           StringBuffer ( StringBuffer )
-import qualified StringBuffer             as S
+import           GHC.Data.StringBuffer ( StringBuffer )
+import qualified GHC.Data.StringBuffer             as S
 
 import           Data.ByteString ( ByteString )
 import qualified Data.ByteString          as BS

@@ -34,7 +34,6 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
-import Data.Ord
 import Control.Applicative
 import Control.Monad
 import Data.Traversable
@@ -50,12 +49,12 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Driver.Packages   ( lookupModuleInAllPackages, PackageName(..) )
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Tc.Types
-import FastString ( unpackFS, bytesFS )
+import GHC.Data.FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
-import qualified Outputable as O
+import qualified GHC.Utils.Outputable as O
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.

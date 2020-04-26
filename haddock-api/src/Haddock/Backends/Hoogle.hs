@@ -26,8 +26,7 @@ import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 
 import GHC
-import Outputable
-import GHC.Types.Name.Set
+import GHC.Utils.Outputable as Outputable
 
 import Data.Char
 import Data.List

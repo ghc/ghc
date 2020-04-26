@@ -30,15 +30,15 @@ import qualified Data.Set as Set
 import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Core (isOrphan)
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
 import GHC.Types.Module ( ModuleSet, moduleSetElts )
-import MonadUtils (liftIO)
+import GHC.Utils.Monad (liftIO)
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import Outputable (text, sep, (<+>))
+import GHC.Utils.Outputable (text, sep, (<+>))
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep

@@ -62,10 +62,9 @@ import Haddock.Types
 import Haddock.GhcUtils
 
 import GHC.Types.Basic ( PromotionFlag(..) )
-import Exception (ExceptionMonad)
+import GHC.Utils.Exception (ExceptionMonad)
 import GHC
 import GHC.Types.Name
-import Outputable ( panic )
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
@@ -88,7 +87,7 @@ import Distribution.ReadE
 import qualified System.Posix.Internals
 #endif
 
-import MonadUtils ( MonadIO(..) )
+import GHC.Utils.Monad ( MonadIO(..) )
 
 
 --------------------------------------------------------------------------------

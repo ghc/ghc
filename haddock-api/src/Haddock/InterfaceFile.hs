@@ -32,9 +32,9 @@ import Data.Map (Map)
 import Data.Word
 
 import GHC.Iface.Binary (getSymtabName, getDictFastString)
-import Binary
-import FastMutInt
-import FastString
+import GHC.Utils.Binary
+import GHC.Data.FastMutInt
+import GHC.Data.FastString
 import GHC hiding (NoLink)
 import GHC.Driver.Monad (withSession)
 import GHC.Driver.Types

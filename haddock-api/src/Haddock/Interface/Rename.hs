@@ -19,10 +19,9 @@ import Data.Traversable (mapM)
 import Haddock.GhcUtils
 import Haddock.Types
 
-import Bag (emptyBag)
+import GHC.Data.Bag (emptyBag)
 import GHC hiding (NoLink)
 import GHC.Types.Name
-import Outputable ( panic )
 import GHC.Types.Name.Reader (RdrName(Exact))
 import GHC.Builtin.Types (eqTyCon_RDR)
 

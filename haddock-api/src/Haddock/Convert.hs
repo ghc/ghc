@@ -19,7 +19,7 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
-import Bag ( emptyBag )
+import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), SourceText(..), LexicalFixity(..)
                   , PromotionFlag(..), DefMethSpec(..) )
 import GHC.Core.Class
@@ -44,7 +44,7 @@ import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
 import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
-import Util ( chkAppend,dropList, filterByList, filterOut )
+import GHC.Utils.Misc ( chkAppend,dropList, filterByList, filterOut )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 

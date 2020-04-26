@@ -11,15 +11,15 @@ import qualified Data.ByteString as BS
 
 import GHC.Types.Basic     ( IntegralLit(..) )
 import GHC.Driver.Session
-import ErrUtils            ( pprLocErrMsg )
-import FastString          ( mkFastString )
+import GHC.Utils.Error     ( pprLocErrMsg )
+import GHC.Data.FastString ( mkFastString )
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
                            , mkPStatePure, lexer, mkParserFlags', getErrorMessages)
-import Bag                 ( bagToList )
-import Outputable          ( showSDoc, panic, text, ($$) )
+import GHC.Data.Bag         ( bagToList )
+import GHC.Utils.Outputable ( showSDoc, panic, text, ($$) )
 import GHC.Types.SrcLoc
-import StringBuffer        ( StringBuffer, atEnd )
+import GHC.Data.StringBuffer ( StringBuffer, atEnd )
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
