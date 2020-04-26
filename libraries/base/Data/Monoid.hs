@@ -234,9 +234,9 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
   maxBound = pure maxBound
 
 -- | Note that even if the underlying 'Num' and 'Applicative' instances are
--- lawful, for most 'Applicative's, this instance will not be lawful. It's
--- particularly tempting to use this with lists, but then these laws all fail
--- to hold:
+-- lawful, for most 'Applicative's, this instance will not be lawful. If you use
+-- this instance with the list 'Applicative', the following customary laws will
+-- not hold:
 --
 -- Commutativity:
 --
@@ -259,7 +259,7 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
 -- >>> (Ap [1,2] * 3) + (Ap [1,2] * 4)
 -- Ap {getAp = [7,11,10,14]}
 --
--- | @since 4.12.0.0
+-- @since 4.12.0.0
 instance (Applicative f, Num a) => Num (Ap f a) where
   (+)         = liftA2 (+)
   (*)         = liftA2 (*)
