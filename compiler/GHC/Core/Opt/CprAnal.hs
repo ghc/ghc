@@ -210,7 +210,7 @@ cprAnal' env args (Case scrut case_bndr ty alts)
     -- Regardless of whether scrut had the CPR property or not, the case binder
     -- certainly has it. See 'extendEnvForDataAlt'.
     (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
-    res_ty           = foldl' lubCprType botCprType alt_tys `bothCprType` whnf_flag
+    res_ty           = lubCprTypes alt_tys `bothCprType` whnf_flag
 
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
@@ -287,7 +287,7 @@ cprFix
 cprFix top_lvl env str orig_pairs
   = loop 1 initial_pairs
   where
-    init_sig id = mkCprSig (idArity id) initRecFunCpr
+    init_sig id = mkCprSig (idArity id) divergeCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     initial_pairs | ae_virgin env = [(setIdCprInfo id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
@@ -336,7 +336,7 @@ pruneSig d (CprSig cpr_ty)
   --       of functions like iterate, which we would CPR
   --       multiple levels deep, thereby changing termination
   --       behavior.
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` initRecFunCpr) }
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` divergeCpr) }
 
 unboxingStrategy :: AnalEnv -> UnboxingStrategy
 unboxingStrategy env ty dmd
