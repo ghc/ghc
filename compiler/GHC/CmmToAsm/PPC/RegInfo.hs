@@ -19,7 +19,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Instr
 
@@ -28,7 +28,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Types.Unique
-import Outputable (ppr, text, Outputable, (<>))
+import GHC.Utils.Outputable (ppr, text, Outputable, (<>))
 
 data JumpDest = DestBlockId BlockId
 

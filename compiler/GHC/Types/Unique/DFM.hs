@@ -61,10 +61,10 @@ module GHC.Types.Unique.DFM (
         alwaysUnsafeUfmToUdfm,
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
-import Outputable
+import GHC.Utils.Outputable
 
 import qualified Data.IntMap as M
 import Data.Data

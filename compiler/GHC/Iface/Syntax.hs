@@ -42,7 +42,7 @@ module GHC.Iface.Syntax (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
@@ -59,19 +59,19 @@ import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Module
 import GHC.Types.SrcLoc
-import Fingerprint
-import Binary
-import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
+import GHC.Utils.Fingerprint
+import GHC.Utils.Binary
+import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
-import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
+import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Builtin.Types ( constraintKindTyConName )
-import Util (seqList)
+import GHC.Utils.Misc (seqList)
 
 import Control.Monad
 import System.IO.Unsafe

@@ -46,7 +46,7 @@ module GHC.Tc.Utils.Zonk (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Types.Id
@@ -74,11 +74,11 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Platform
 import GHC.Types.Basic
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc
-import Bag
-import Outputable
-import Util
+import GHC.Data.Bag
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 import GHC.Core
 

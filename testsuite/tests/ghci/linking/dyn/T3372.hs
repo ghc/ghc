@@ -11,7 +11,7 @@ import Control.Concurrent.Chan
 
 import GHC ( Ghc )
 import qualified GHC
-import qualified MonadUtils as GHC
+import qualified GHC.Utils.Monad as GHC
 
 import qualified GHC.Exts
 

@@ -9,7 +9,7 @@ import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Types.Avail
 import GHC.Hs.Expr
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Hs.ImpExp
 import GHC.Hs.Decls
 import GHC.Hs.Doc

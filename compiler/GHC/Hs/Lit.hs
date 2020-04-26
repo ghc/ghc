@@ -19,7 +19,7 @@ module GHC.Hs.Lit where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
 import GHC.Types.Basic
@@ -27,8 +27,8 @@ import GHC.Types.Basic
    , negateFractionalLit, SourceText(..), pprWithSourceText
    , PprPrec(..), topPrec )
 import GHC.Core.Type
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Hs.Extension
 
 import Data.ByteString (ByteString)

@@ -90,7 +90,7 @@ module GHC.Builtin.Types.Prim(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
@@ -116,8 +116,8 @@ import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Builtin.Names
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
 

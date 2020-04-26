@@ -159,7 +159,7 @@ module GHC.Driver.Types (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval.Types ( Resume )
@@ -202,21 +202,21 @@ import GHC.Driver.Phases
 import qualified GHC.Driver.Phases as Phase
 import GHC.Types.Basic
 import GHC.Iface.Syntax
-import Maybes
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
-import FastString
-import StringBuffer     ( StringBuffer )
-import Fingerprint
-import MonadUtils
-import Bag
-import Binary
-import ErrUtils
+import GHC.Data.FastString
+import GHC.Data.StringBuffer ( StringBuffer )
+import GHC.Utils.Fingerprint
+import GHC.Utils.Monad
+import GHC.Data.Bag
+import GHC.Utils.Binary
+import GHC.Utils.Error
 import GHC.Types.Name.Cache
 import GHC.Platform
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique.DSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
@@ -227,7 +227,7 @@ import Data.IORef
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Time
-import Exception
+import GHC.Utils.Exception
 import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
@@ -1524,7 +1524,7 @@ data CgGuts
         cg_spt_entries :: [SptEntry]
                 -- ^ Static pointer table entries for static forms defined in
                 -- the module.
-                -- See Note [Grand plan for static forms] in StaticPtrTable
+                -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
     }
 
 -----------------------------------

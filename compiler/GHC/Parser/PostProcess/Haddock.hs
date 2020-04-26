@@ -2,7 +2,7 @@
 
 module GHC.Parser.PostProcess.Haddock where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Types.SrcLoc

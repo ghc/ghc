@@ -10,7 +10,7 @@
 -- | Typechecking transformation rules
 module GHC.Tc.Gen.Rule ( tcRules ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Types
@@ -33,9 +33,9 @@ import GHC.Types.Var( EvVar )
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( RuleName )
 import GHC.Types.SrcLoc
-import Outputable
-import FastString
-import Bag
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Data.Bag
 
 {-
 Note [Typechecking rules]
