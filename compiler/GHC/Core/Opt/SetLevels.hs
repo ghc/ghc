@@ -88,7 +88,7 @@ import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
 import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, prependArgsStrictSig )
-import GHC.Types.Cpr          ( mkCprSig, botCpr )
+import GHC.Types.Cpr          ( mkCprSig, divergeCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
@@ -984,7 +984,7 @@ annotateBotStr id n_extra mb_str
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
                               `setIdStrictness` (prependArgsStrictSig n_extra sig)
-                              `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
+                              `setIdStrictness` (increaseStrictSigArity n_extra sig)
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
