@@ -1307,7 +1307,7 @@ mk_absent_let dflags fam_envs arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
   where
-    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 botCpr
+    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 divergeCpr
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
