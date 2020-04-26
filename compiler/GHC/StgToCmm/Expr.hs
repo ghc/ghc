@@ -14,7 +14,7 @@ module GHC.StgToCmm.Expr ( cgExpr ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude hiding ((<*>))
+import GHC.Prelude hiding ((<*>))
 
 import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 
@@ -46,10 +46,10 @@ import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
-import Maybes
-import Util
-import FastString
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )

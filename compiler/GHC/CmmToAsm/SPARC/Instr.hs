@@ -24,7 +24,7 @@ module GHC.CmmToAsm.SPARC.Instr (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Stack
 import GHC.CmmToAsm.SPARC.Imm
@@ -43,8 +43,8 @@ import GHC.Cmm.CLabel
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Platform
 
 

@@ -15,7 +15,7 @@ module GHC.Cmm.Lexer (
    CmmToken(..), cmmlex,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Expr
 
@@ -23,10 +23,10 @@ import GHC.Parser.Lexer
 import GHC.Cmm.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
-import StringBuffer
-import FastString
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
 import GHC.Parser.CharClass
-import Util
+import GHC.Utils.Misc
 --import TRACE
 
 import Data.Word

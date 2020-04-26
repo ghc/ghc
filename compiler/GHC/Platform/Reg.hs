@@ -26,9 +26,9 @@ module GHC.Platform.Reg (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Platform.Reg.Class
 import Data.List (intersect)

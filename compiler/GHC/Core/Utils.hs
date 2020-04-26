@@ -62,7 +62,7 @@ module GHC.Core.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
@@ -86,19 +86,19 @@ import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Types.Prim
-import FastString
-import Maybes
-import ListSetOps       ( minusList )
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps( minusList )
 import GHC.Types.Basic     ( Arity )
-import Util
-import Pair
+import GHC.Utils.Misc
+import GHC.Data.Pair
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List
 import Data.Ord            ( comparing )
-import OrdList
+import GHC.Data.OrdList
 import qualified Data.Set as Set
 import GHC.Types.Unique.Set
 
@@ -2099,7 +2099,7 @@ eqExpr in_scope e1 e2
         env' = rnBndrs2 env bs1 bs2
 
     go env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
-      | null a1   -- See Note [Empty case alternatives] in TrieMap
+      | null a1   -- See Note [Empty case alternatives] in GHC.Data.TrieMap
       = null a2 && go env e1 e2 && eqTypeX env t1 t2
       | otherwise
       =  go env e1 e2 && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
@@ -2147,7 +2147,7 @@ diffExpr top env (Let bs1 e1) (Let bs2 e2)
     in ds ++ diffExpr top env' e1 e2
 diffExpr top env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
   | equalLength a1 a2 && not (null a1) || eqTypeX env t1 t2
-    -- See Note [Empty case alternatives] in TrieMap
+    -- See Note [Empty case alternatives] in GHC.Data.TrieMap
   = diffExpr top env e1 e2 ++ concat (zipWith diffAlt a1 a2)
   where env' = rnBndr2 env b1 b2
         diffAlt (c1, bs1, e1) (c2, bs2, e2)

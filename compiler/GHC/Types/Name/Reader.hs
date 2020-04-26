@@ -70,21 +70,21 @@ module GHC.Types.Name.Reader (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Avail
 import GHC.Types.Name.Set
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
-import FastString
+import GHC.Data.FastString
 import GHC.Types.FieldLabel
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Name.Env
 
 import Data.Data

@@ -4,7 +4,7 @@ import Control.Exception
 import Data.Char
 import System.IO
 
-import StringBuffer
+import GHC.Data.StringBuffer
 
 twoBOMs = "T6016-twoBOMs"
 

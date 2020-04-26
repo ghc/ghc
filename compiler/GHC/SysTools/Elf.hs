@@ -14,16 +14,16 @@ module GHC.SysTools.Elf (
     makeElfNote
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import AsmUtils
-import Exception
+import GHC.Utils.Asm
+import GHC.Utils.Exception
 import GHC.Driver.Session
 import GHC.Platform
-import ErrUtils
-import Maybes     (MaybeT(..),runMaybeT)
-import Util       (charToC)
-import Outputable (text,hcat,SDoc)
+import GHC.Utils.Error
+import GHC.Data.Maybe       (MaybeT(..),runMaybeT)
+import GHC.Utils.Misc       (charToC)
+import GHC.Utils.Outputable (text,hcat,SDoc)
 
 import Control.Monad (when)
 import Data.Binary.Get

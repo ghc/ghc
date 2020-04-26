@@ -22,14 +22,14 @@ module GHC.HsToCore.PmCheck (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.HsToCore.PmCheck.Types
 import GHC.HsToCore.PmCheck.Oracle
 import GHC.HsToCore.PmCheck.Ppr
 import GHC.Types.Basic (Origin, isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
-import FastString (unpackFS, lengthFS)
+import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Tc.Utils.Zonk (shortCutLit)
@@ -39,8 +39,8 @@ import GHC.Types.Name
 import GHC.Tc.Instance.Family
 import GHC.Builtin.Types
 import GHC.Types.SrcLoc
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
@@ -52,14 +52,14 @@ import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
 import GHC.HsToCore.Utils (selectMatchVar)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
-import Bag
-import OrdList
+import GHC.Data.Bag
+import GHC.Data.OrdList
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.HsToCore.Utils       (isTrueLHsExpr)
-import Maybes
+import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import MonadUtils (concatMapM)
+import GHC.Utils.Monad (concatMapM)
 
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)

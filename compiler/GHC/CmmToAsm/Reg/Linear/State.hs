@@ -38,7 +38,7 @@ module GHC.CmmToAsm.Reg.Linear.State (
 )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.StackMap

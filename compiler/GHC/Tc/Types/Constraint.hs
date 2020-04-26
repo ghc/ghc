@@ -70,7 +70,7 @@ module GHC.Tc.Types.Constraint (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Types ( TcLclEnv, setLclEnvTcLevel, getLclEnvTcLevel
                                    , setLclEnvLoc, getLclEnvLoc )
@@ -90,15 +90,15 @@ import GHC.Core
 
 import GHC.Core.TyCo.Ppr
 import GHC.Types.Name.Occurrence
-import FV
+import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Driver.Session
 import GHC.Types.Basic
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import Bag
-import Util
+import GHC.Data.Bag
+import GHC.Utils.Misc
 
 import Control.Monad ( msum )
 
@@ -439,12 +439,12 @@ tyCoVarsOfCt :: Ct -> TcTyCoVarSet
 tyCoVarsOfCt = fvVarSet . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a deterministically ordered.
--- list. See Note [Deterministic FV] in FV.
+-- list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
 tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a composable FV computation.
--- See Note [Deterministic FV] in FV.
+-- See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoFVsOfCt :: Ct -> FV
 tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
   -- This must consult only the ctPred, so that it gets *tidied* fvs if the
@@ -452,34 +452,34 @@ tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
   -- fields of the Ct, only the predicate in the CtEvidence.
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
--- set. See Note [Deterministic FV] in FV.
+-- set. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCts :: Cts -> TcTyCoVarSet
 tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a deterministically
--- ordered list. See Note [Deterministic FV] in FV.
+-- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
 tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a composable FV
--- computation. See Note [Deterministic FV] in FV.
+-- computation. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoFVsOfCts :: Cts -> FV
 tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
--- set. See Note [Deterministic FV] in FV.
+-- set. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoVarsOfWC = fvVarSet . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a deterministically
--- ordered list. See Note [Deterministic FV] in FV.
+-- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a composable FV
--- computation. See Note [Deterministic FV] in FV.
+-- computation. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoFVsOfWC :: WantedConstraints -> FV
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic })
@@ -487,7 +487,7 @@ tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic })
     tyCoFVsOfBag tyCoFVsOfImplic implic
 
 -- | Returns free variables of Implication as a composable FV computation.
--- See Note [Deterministic FV] in FV.
+-- See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoFVsOfImplic :: Implication -> FV
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoFVsOfImplic (Implic { ic_skols = skols

@@ -33,17 +33,17 @@ module GHC.Driver.Finder (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Module
 import GHC.Driver.Types
 import GHC.Driver.Packages
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Builtin.Names ( gHC_PRIM )
 import GHC.Driver.Session
-import Outputable
-import Maybes           ( expectJust )
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.Maybe    ( expectJust )
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
 import System.Directory

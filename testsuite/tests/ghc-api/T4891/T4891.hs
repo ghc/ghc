@@ -19,8 +19,8 @@ import GHC.Types.Name (getOccString)
 import Unsafe.Coerce
 import Control.Monad
 import Data.Maybe
-import Bag
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Outputable
 import GHC.Driver.Monad
 import X
 

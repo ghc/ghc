@@ -12,7 +12,7 @@
 -- | Typecheck arrow notation
 module GHC.Tc.Gen.Arrow ( tcProc ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcLExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcCheckExpr )
 
@@ -35,8 +35,8 @@ import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
 import GHC.Types.SrcLoc
-import Outputable
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Control.Monad
 

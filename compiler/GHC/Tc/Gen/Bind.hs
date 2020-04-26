@@ -20,7 +20,7 @@ module GHC.Tc.Gen.Bind
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcLExpr )
@@ -28,7 +28,7 @@ import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import GHC.Core (Tickish (..))
 import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Hs
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
@@ -56,13 +56,13 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
-import Bag
-import ErrUtils
-import Digraph
-import Maybes
-import Util
+import GHC.Data.Bag
+import GHC.Utils.Error
+import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
+import GHC.Utils.Misc
 import GHC.Types.Basic
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Builtin.Names( ipClassName )
 import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
@@ -552,7 +552,7 @@ mkEdges sig_fn binds
     ]
     -- It's OK to use nonDetEltsUFM here as stronglyConnCompFromEdgedVertices
     -- is still deterministic even if the edges are in nondeterministic order
-    -- as explained in Note [Deterministic SCC] in Digraph.
+    -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
   where
     bind_fvs (FunBind { fun_ext = fvs }) = fvs
     bind_fvs (PatBind { pat_ext = fvs }) = fvs

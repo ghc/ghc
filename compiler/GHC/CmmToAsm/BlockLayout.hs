@@ -14,7 +14,7 @@ module GHC.CmmToAsm.BlockLayout
 where
 
 #include "HsVersions.h"
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
@@ -28,19 +28,19 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Platform
 import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique
 
-import Digraph
-import Outputable
-import Maybes
+import GHC.Data.Graph.Directed
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
 --import Debug.Trace
-import ListSetOps (removeDups)
+import GHC.Data.List.SetOps (removeDups)
 
-import OrdList
+import GHC.Data.OrdList
 import Data.List
 import Data.Foldable (toList)
 

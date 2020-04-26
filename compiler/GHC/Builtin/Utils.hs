@@ -47,7 +47,7 @@ module GHC.Builtin.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Uniques
 import GHC.Types.Unique ( isValidKnownKeyUnique )
@@ -63,14 +63,14 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Driver.Types
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
 

@@ -11,11 +11,11 @@ import Data.List (intercalate)
 import Data.Maybe
 import Data.Time.Calendar
 import Data.Time.Clock
-import Exception
+import GHC.Utils.Exception
 import GHC.Parser.Header
 import GHC.Driver.Types
-import Outputable
-import StringBuffer
+import GHC.Utils.Outputable
+import GHC.Data.StringBuffer
 import System.Directory
 import System.Environment
 import System.Process
