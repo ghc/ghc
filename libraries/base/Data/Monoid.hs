@@ -233,7 +233,7 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
   minBound = pure minBound
   maxBound = pure maxBound
 
--- Note that even if the underlying 'Num' and 'Applicative' instances are
+-- | Note that even if the underlying 'Num' and 'Applicative' instances are
 -- lawful, for most 'Applicative's, this instance will not be lawful. It's
 -- particularly tempting to use this with lists, but then these laws all fail
 -- to hold:
