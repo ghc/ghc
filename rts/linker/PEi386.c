@@ -769,12 +769,12 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
     WCHAR* abs_path = malloc(sizeof(WCHAR) * init_buf_size);
     DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
     if (!wResult){
-        sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+        IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
     }
     else if (wResult > init_buf_size) {
         abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
         if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
-            sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+            IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
         }
     }
 
