@@ -39,13 +39,13 @@ module GHC.Driver.Phases (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import System.FilePath
-import Binary
-import Util
+import GHC.Utils.Binary
+import GHC.Utils.Misc
 
 -----------------------------------------------------------------------------
 -- Phases

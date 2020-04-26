@@ -13,7 +13,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -28,14 +28,14 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Ppr
 
-import BufWrite
+import GHC.Utils.BufHandle
 import GHC.Driver.Session
 import GHC.Platform ( platformArch, Arch(..) )
-import ErrUtils
-import FastString
-import Outputable
+import GHC.Utils.Error
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.SysTools ( figureLlvmVersion )
-import qualified Stream
+import qualified GHC.Data.Stream as Stream
 
 import Control.Monad ( when, forM_ )
 import Data.Maybe ( fromMaybe, catMaybes )

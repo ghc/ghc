@@ -1,6 +1,6 @@
 module GHC.IfaceToCore where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Iface.Syntax ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule
                         , IfaceAnnotation, IfaceCompleteMatch )
 import GHC.Core.TyCo.Rep   ( TyThing )

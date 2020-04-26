@@ -104,7 +104,7 @@ module GHC.Hs.Utils(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs.Decls
 import GHC.Hs.Binds
@@ -130,10 +130,10 @@ import GHC.Types.Name.Set hiding ( unitFV )
 import GHC.Types.Name.Env
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import FastString
-import Util
-import Bag
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
+import GHC.Data.Bag
+import GHC.Utils.Outputable
 import GHC.Settings.Constants
 
 import Data.Either

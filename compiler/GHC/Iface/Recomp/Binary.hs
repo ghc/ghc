@@ -10,13 +10,13 @@ module GHC.Iface.Recomp.Binary
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Fingerprint
-import Binary
+import GHC.Utils.Fingerprint
+import GHC.Utils.Binary
 import GHC.Types.Name
-import PlainPanic
-import Util
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f

@@ -4,7 +4,7 @@
 
 -- | Package manipulation
 module GHC.Driver.Packages (
-        module UnitInfo,
+        module GHC.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
         PackageState(preloadPackages, explicitPackages, moduleNameProvidersMap, requirementContext),
@@ -69,10 +69,10 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.PackageDb
-import UnitInfo
+import GHC.Unit.Info
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.Name       ( Name, nameModule_maybe )
@@ -80,17 +80,17 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Module
-import Util
-import Panic
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Platform
-import Outputable
-import Maybes
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.Maybe
 
 import System.Environment ( getEnv )
-import FastString
-import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn,
+import GHC.Data.FastString
+import GHC.Utils.Error  ( debugTraceMsg, MsgDoc, dumpIfSet_dyn,
                           withTiming, DumpFormat (..) )
-import Exception
+import GHC.Utils.Exception
 
 import System.Directory
 import System.FilePath as FilePath

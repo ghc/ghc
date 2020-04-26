@@ -3,8 +3,8 @@ module Main (main) where
 
 import GHC
 import GHC.Driver.Session
-import Outputable
-import MonadUtils
+import GHC.Utils.Outputable
+import GHC.Utils.Monad
 import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.SrcLoc as SrcLoc

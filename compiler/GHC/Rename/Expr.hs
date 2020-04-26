@@ -26,7 +26,7 @@ module GHC.Rename.Expr (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
                         , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
@@ -54,12 +54,12 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import Data.List
-import Util
-import ListSetOps       ( removeDups )
-import ErrUtils
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps ( removeDups )
+import GHC.Utils.Error
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
-import FastString
+import GHC.Data.FastString
 import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
@@ -353,7 +353,7 @@ rnExpr (ArithSeq x _ seq)
 
 For the static form we check that it is not used in splices.
 We also collect the free variables of the term which come from
-this module. See Note [Grand plan for static forms] in StaticPtrTable.
+this module. See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
 -}
 
 rnExpr e@(HsStatic _ expr) = do

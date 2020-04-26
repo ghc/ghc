@@ -13,14 +13,14 @@ module GHC.Core.Opt.DmdAnal ( dmdAnalProgram ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core.Opt.WorkWrap.Utils ( findTypeShape )
 import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Seq     ( seqBinds )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import Data.List        ( mapAccumL )
@@ -32,11 +32,11 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
-import Util
-import Maybes           ( isJust )
+import GHC.Utils.Misc
+import GHC.Data.Maybe         ( isJust )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Utils.Error        ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 
 {-

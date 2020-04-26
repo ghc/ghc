@@ -24,7 +24,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Instr
@@ -46,9 +46,9 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique ( pprUniqueAlways )
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
-import FastString
+import GHC.Data.FastString
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out

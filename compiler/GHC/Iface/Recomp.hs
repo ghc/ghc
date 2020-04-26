@@ -12,7 +12,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp.Binary
@@ -29,16 +29,16 @@ import GHC.Driver.Session
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Module
-import ErrUtils
-import Digraph
+import GHC.Utils.Error
+import GHC.Data.Graph.Directed
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique
-import Util             hiding ( eqListBy )
-import Maybes
-import Binary
-import Fingerprint
-import Exception
+import GHC.Utils.Misc hiding ( eqListBy )
+import GHC.Data.Maybe
+import GHC.Utils.Binary
+import GHC.Utils.Fingerprint
+import GHC.Utils.Exception
 import GHC.Types.Unique.Set
 import GHC.Driver.Packages
 
@@ -766,7 +766,7 @@ addFingerprints hsc_env iface0
                    -- used to construct the edges and
                    -- stronglyConnCompFromEdgedVertices is deterministic
                    -- even with non-deterministic order of edges as
-                   -- explained in Note [Deterministic SCC] in Digraph.
+                   -- explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
           where getParent :: OccName -> OccName
                 getParent occ = lookupOccEnv parent_map occ `orElse` occ
 

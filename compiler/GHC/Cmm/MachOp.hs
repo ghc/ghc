@@ -28,11 +28,11 @@ module GHC.Cmm.MachOp
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.Type
-import Outputable
+import GHC.Utils.Outputable
 
 -----------------------------------------------------------------------------
 --              MachOp

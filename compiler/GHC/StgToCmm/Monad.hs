@@ -59,7 +59,7 @@ module GHC.StgToCmm.Monad (
         CgInfoDownwards(..), CgState(..)        -- non-abstract
     ) where
 
-import GhcPrelude hiding( sequence, succ )
+import GHC.Prelude hiding( sequence, succ )
 
 import GHC.Platform
 import GHC.Cmm
@@ -73,13 +73,13 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Module
 import GHC.Types.Id
 import GHC.Types.Var.Env
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Basic( ConTagZ )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import FastString
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List

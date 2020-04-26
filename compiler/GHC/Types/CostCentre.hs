@@ -20,17 +20,17 @@ module GHC.Types.CostCentre (
         cmpCostCentre   -- used for removing dups in a list
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
+import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Module
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Types.CostCentre.State
 
 import Data.Data

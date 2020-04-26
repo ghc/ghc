@@ -20,7 +20,7 @@ module GHC.Runtime.Loader (
         lessUnsafeCoerce
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Driver.Session
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
@@ -46,11 +46,11 @@ import GHC.Core.TyCon    ( TyCon )
 import GHC.Types.Name    ( Name, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.Module  ( Module, ModuleName )
-import Panic
-import FastString
-import ErrUtils
-import Outputable
-import Exception
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Exception
 import GHC.Driver.Hooks
 
 import Control.Monad     ( unless )

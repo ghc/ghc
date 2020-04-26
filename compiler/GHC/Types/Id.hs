@@ -118,7 +118,7 @@ module GHC.Types.Id (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
@@ -146,13 +146,13 @@ import GHC.Types.Module
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Misc
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,

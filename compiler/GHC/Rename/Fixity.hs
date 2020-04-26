@@ -16,7 +16,7 @@ module GHC.Rename.Fixity
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Load
 import GHC.Hs
@@ -29,8 +29,8 @@ import GHC.Types.Module
 import GHC.Types.Basic  ( Fixity(..), FixityDirection(..), minPrecedence,
                           defaultFixity, SourceText(..) )
 import GHC.Types.SrcLoc
-import Outputable
-import Maybes
+import GHC.Utils.Outputable
+import GHC.Data.Maybe
 import Data.List
 import Data.Function    ( on )
 import GHC.Rename.Unbound

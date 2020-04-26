@@ -64,7 +64,7 @@ module GHC.Core.Opt.SetLevels (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
@@ -97,13 +97,13 @@ import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import Util
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Unique.DFM
-import FV
+import GHC.Utils.FV
 import Data.Maybe
-import MonadUtils       ( mapAccumLM )
+import GHC.Utils.Monad  ( mapAccumLM )
 
 {-
 ************************************************************************
@@ -702,7 +702,7 @@ lvlMFE env strict_ctxt ann_expr
     join_arity_maybe = Nothing
 
     is_mk_static = isJust (collectMakeStaticArgs expr)
-        -- Yuk: See Note [Grand plan for static forms] in main/StaticPtrTable
+        -- Yuk: See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
@@ -1699,7 +1699,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
     rhs_ty        = exprType de_tagged_rhs
 
     mk_id uniq rhs_ty
-      -- See Note [Grand plan for static forms] in StaticPtrTable.
+      -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
       | is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty

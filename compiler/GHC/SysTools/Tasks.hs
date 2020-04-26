@@ -8,19 +8,19 @@
 -----------------------------------------------------------------------------
 module GHC.SysTools.Tasks where
 
-import Exception
-import ErrUtils
+import GHC.Utils.Exception as Exception
+import GHC.Utils.Error
 import GHC.Driver.Types
 import GHC.Driver.Session
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
-import Util
+import GHC.Utils.Misc
 
 import Data.List
 
 import System.IO
 import System.Process
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
