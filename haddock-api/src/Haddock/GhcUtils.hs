@@ -445,11 +445,6 @@ modifySessionDynFlags f = do
   return ()
 
 
--- | A variant of 'gbracket' where the return value from the first computation
--- is not required.
-gbracket_ :: ExceptionMonad m => m a -> m b -> m c -> m c
-gbracket_ before_ after thing = gbracket before_ (const after) (const thing)
-
 -- Extract the minimal complete definition of a Name, if one exists
 minimalDef :: GhcMonad m => Name -> m (Maybe ClassMinimalDef)
 minimalDef n = do

@@ -67,6 +67,7 @@ import GHC
 import GHC.Types.Name
 
 import Control.Monad ( liftM )
+import Control.Monad.Catch ( bracket_ )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
 import Numeric ( showIntAtBase )
 import Data.Map ( Map )
@@ -404,7 +405,7 @@ writeUtf8File filepath contents = withFile filepath WriteMode $ \h -> do
     hPutStr h contents
 
 withTempDir :: (ExceptionMonad m) => FilePath -> m a -> m a
-withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
+withTempDir dir = bracket_ (liftIO $ createDirectory dir)
                             (liftIO $ removeDirectoryRecursive dir)
 
 -----------------------------------------------------------------------------

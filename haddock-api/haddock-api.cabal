@@ -58,6 +58,7 @@ library
                , containers
                , deepseq
                , directory
+               , exceptions
                , filepath
                , ghc-boot
                , transformers
