@@ -39,7 +39,7 @@ import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
-import GHC.Types.Cpr    ( mkCprSig, botCpr )
+import GHC.Types.Cpr    ( mkCprSig, divergeCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Utils
@@ -739,7 +739,7 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
     info4 | is_bot    = info3
                           `setStrictnessInfo`
                             mkClosedStrictSig (replicate new_arity topDmd) botDiv
-                          `setCprInfo` mkCprSig new_arity botCpr
+                          `setCprInfo` mkCprSig new_arity divergeCpr
           | otherwise = info3
 
      -- Zap call arity info. We have used it by now (via
