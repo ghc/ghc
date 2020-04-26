@@ -233,6 +233,32 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
   minBound = pure minBound
   maxBound = pure maxBound
 
+-- Note that even if the underlying 'Num' and 'Applicative' instances are
+-- lawful, for most 'Applicative's, this instance will not be lawful. It's
+-- particularly tempting to use this with lists, but then these laws all fail
+-- to hold:
+--
+-- Commutativity:
+--
+-- >>> Ap [10,20] + Ap [1,2]
+-- Ap {getAp = [11,12,21,22]}
+-- >>> Ap [1,2] + Ap [10,20]
+-- Ap {getAp = [11,21,12,22]}
+--
+-- Additive inverse:
+--
+-- >>> Ap [] + negate (Ap [])
+-- Ap {getAp = []}
+-- >>> fromInteger 0 :: Ap [] Int
+-- Ap {getAp = [0]}
+--
+-- Distributivity:
+--
+-- >>> Ap [1,2] * (3 + 4)
+-- Ap {getAp = [7,14]}
+-- >>> (Ap [1,2] * 3) + (Ap [1,2] * 4)
+-- Ap {getAp = [7,11,10,14]}
+--
 -- | @since 4.12.0.0
 instance (Applicative f, Num a) => Num (Ap f a) where
   (+)         = liftA2 (+)
