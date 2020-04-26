@@ -54,16 +54,16 @@ import GHC.Driver.Phases  ( HscSource(..) )
 import GHC.Driver.Types   ( IsBootInterface, WarningTxt(..) )
 import GHC.Driver.Session
 import GHC.Driver.Backpack.Syntax
-import UnitInfo
+import GHC.Unit.Info
 
 -- compiler/utils
-import OrdList
-import BooleanFormula   ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
-import FastString
-import Maybes           ( isJust, orElse )
-import Outputable
-import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
-import GhcPrelude
+import GHC.Data.OrdList
+import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
+import GHC.Data.FastString
+import GHC.Data.Maybe          ( isJust, orElse )
+import GHC.Utils.Outputable
+import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
+import GHC.Prelude
 
 -- compiler/basicTypes
 import GHC.Types.Name.Reader

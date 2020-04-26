@@ -17,7 +17,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Driver.Session
@@ -26,9 +26,9 @@ import GHC.Stg.FVs ( annBindingFreeVars )
 import GHC.Stg.Lift.Analysis
 import GHC.Stg.Lift.Monad
 import GHC.Stg.Syntax
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import Control.Monad ( when )
 import Data.Maybe ( isNothing )

@@ -8,18 +8,18 @@ module GHC.Iface.Recomp.Flags (
       , fingerprintHpcFlags
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
+import GHC.Utils.Binary
 import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Types.Module
 import GHC.Types.Name
-import Fingerprint
+import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
--- import Outputable
+-- import GHC.Utils.Outputable
 
-import qualified EnumSet
+import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base

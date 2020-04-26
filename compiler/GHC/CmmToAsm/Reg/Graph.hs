@@ -5,9 +5,9 @@
 module GHC.CmmToAsm.Reg.Graph (
         regAlloc
 ) where
-import GhcPrelude
+import GHC.Prelude
 
-import qualified GraphColor as Color
+import qualified GHC.Data.Graph.Color as Color
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Graph.Spill
 import GHC.CmmToAsm.Reg.Graph.SpillClean
@@ -20,13 +20,13 @@ import GHC.CmmToAsm.Config
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
-import Bag
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import Util (seqList)
+import GHC.Utils.Misc (seqList)
 import GHC.CmmToAsm.CFG
 
 import Data.Maybe

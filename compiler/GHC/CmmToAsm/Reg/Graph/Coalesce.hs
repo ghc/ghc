@@ -3,15 +3,15 @@ module GHC.CmmToAsm.Reg.Graph.Coalesce (
         regCoalesce,
         slurpJoinMovs
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 
 import GHC.Cmm
-import Bag
-import Digraph
+import GHC.Data.Bag
+import GHC.Data.Graph.Directed
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply

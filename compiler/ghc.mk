@@ -76,7 +76,7 @@ compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/
 	@echo '  , cStage'                                                  >> $$@
 	@echo '  ) where'                                                   >> $$@
 	@echo                                                               >> $$@
-	@echo 'import GhcPrelude'                                           >> $$@
+	@echo 'import GHC.Prelude'                                          >> $$@
 	@echo                                                               >> $$@
 	@echo 'import GHC.Version'                                          >> $$@
 	@echo                                                               >> $$@

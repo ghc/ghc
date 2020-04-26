@@ -8,11 +8,11 @@ module GHC.Types.Cpr (
     CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
-import Outputable
-import Binary
+import GHC.Utils.Outputable
+import GHC.Utils.Binary
 
 --
 -- * CprResult

@@ -55,7 +55,7 @@ module GHC.HsToCore.Monad (
         pprRuntimeTrace
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Core.FamInstEnv
@@ -68,7 +68,7 @@ import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -76,15 +76,15 @@ import GHC.Core.TyCon
 import GHC.HsToCore.PmCheck.Types
 import GHC.Types.Id
 import GHC.Types.Module
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Core.Type
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Driver.Session
-import ErrUtils
-import FastString
+import GHC.Utils.Error
+import GHC.Data.FastString
 import GHC.Types.Unique.FM ( lookupWithDefaultUFM )
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State

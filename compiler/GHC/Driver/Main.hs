@@ -84,7 +84,7 @@ module GHC.Driver.Main
     , hscAddSptEntries
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
@@ -97,7 +97,7 @@ import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
 import GHC.Types.Var.Env       ( emptyTidyEnv )
-import Panic
+import GHC.Utils.Panic
 import GHC.Core.ConLike
 
 import GHC.Parser.Annotation
@@ -107,7 +107,7 @@ import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump
 import GHC.Core
-import StringBuffer
+import GHC.Data.StringBuffer
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc
@@ -134,14 +134,14 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Cmm
-import GHC.Cmm.Parser         ( parseCmmFile )
+import GHC.Cmm.Parser       ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Driver.CodeOutput
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import Fingerprint      ( Fingerprint )
+import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Env
 import GHC.Builtin.Names
@@ -149,20 +149,20 @@ import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
 
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Name.Env
-import HscStats         ( ppSourceStats )
+import GHC.Hs.Stats         ( ppSourceStats )
 import GHC.Driver.Types
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Unique.Supply
-import Bag
-import Exception
-import qualified Stream
-import Stream (Stream)
+import GHC.Data.Bag
+import GHC.Utils.Exception
+import qualified GHC.Data.Stream as Stream
+import GHC.Data.Stream (Stream)
 
-import Util
+import GHC.Utils.Misc
 
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
@@ -1767,7 +1767,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     return (new_tythings, new_ictxt)
 
 -- | Load the given static-pointer table entries into the interpreter.
--- See Note [Grand plan for static forms] in StaticPtrTable.
+-- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()

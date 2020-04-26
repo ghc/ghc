@@ -159,7 +159,7 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Module
 import GHC.Types.Name.Occurrence
@@ -167,7 +167,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.SrcLoc
-import FastString
+import GHC.Data.FastString
 
 {-
 ************************************************************************

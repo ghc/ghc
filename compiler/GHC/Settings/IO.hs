@@ -9,16 +9,16 @@ module GHC.Settings.IO
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Settings.Platform
 import GHC.Settings.Utils
 
 import Config
-import CliOption
-import Fingerprint
+import GHC.Utils.CliOption
+import GHC.Utils.Fingerprint
 import GHC.Platform
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Settings
 import GHC.SysTools.BaseDir
 

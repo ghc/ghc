@@ -4,9 +4,9 @@ module GHC.Tc.Types.EvTerm
     ( evDelayedError, evCallStack )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
+import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make

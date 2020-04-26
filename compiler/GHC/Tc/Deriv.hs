@@ -15,7 +15,7 @@ module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Driver.Session
@@ -47,9 +47,9 @@ import GHC.Types.Avail
 import GHC.Core.Unify( tcUnifyTy )
 import GHC.Core.Class
 import GHC.Core.Type
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Core.DataCon
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Set as NameSet
@@ -60,11 +60,11 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
-import Util
-import Outputable
-import FastString
-import Bag
-import FV (fvVarList, unionFV, mkFVs)
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

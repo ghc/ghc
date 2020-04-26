@@ -105,7 +105,7 @@ module GHC.StgToCmm.Ticky (
   tickySlowCall, tickySlowCallPat,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
@@ -124,9 +124,9 @@ import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
-import FastString
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 import GHC.Driver.Session
 
