@@ -10,8 +10,8 @@
 -- and "GHC.Core.Opt.WorkWrap.Utils" are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
     TerminationFlag (Terminates),
-    Cpr, topCpr, botCpr, conCpr, whnfTermCpr, initRecFunCpr, lubCpr, asConCpr,
-    CprType (..), topCprType, botCprType, whnfTermCprType, conCprType, lubCprType,
+    Cpr, topCpr, conCpr, whnfTermCpr, divergeCpr, lubCpr, asConCpr,
+    CprType (..), topCprType, whnfTermCprType, conCprType, lubCprType, lubCprTypes,
     pruneDeepCpr, markConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
@@ -194,12 +194,17 @@ topCpr = Cpr MightDiverge Top
 whnfTermCpr :: Cpr
 whnfTermCpr = Cpr Terminates Top
 
--- | The initial termination of a recursive function in fixed-point iteration.
--- We assume a recursive call 'MightDiverge', but are optimistic about all
--- CPR and nested termination information. I.e., we assume that evaluating
--- returned tuple components 'Terminates' rapidly.
-initRecFunCpr :: Cpr
-initRecFunCpr = Cpr MightDiverge Bot
+-- | Used as
+--
+--   * The initial CPR of a recursive function in fixed-point iteration
+--   * The CPR of 'undefined'/'error'/other sources of divergence.
+--
+-- We assume that evaluation to WHNF surely diverges (so 'MightDiverge'), but
+-- are optimistic about all CPR and nested termination information. I.e., we
+-- assume that returned tuple components terminate rapidly and construct a
+-- product.
+divergeCpr :: Cpr
+divergeCpr = Cpr MightDiverge Bot
 
 conCpr :: TerminationFlag -> ConTag -> [Cpr] -> Cpr
 conCpr tf t fs = Cpr tf (Levitate (Con t fs))
@@ -219,7 +224,8 @@ lubCpr cpr1            cpr2
   = NoMoreCpr (lubTerm (forgetCpr cpr1) (forgetCpr cpr2))
 
 trimCpr :: Cpr -> Cpr
-trimCpr = NoMoreCpr . forgetCpr
+trimCpr cpr@(Cpr _ Bot) = cpr -- don't trim away bottom (we didn't do so before Nested CPR) TODO: Explain; CPR'ing for the error case
+trimCpr cpr             = NoMoreCpr (forgetCpr cpr)
 
 pruneDeepCpr :: Int -> Cpr -> Cpr
 pruneDeepCpr depth (Cpr tf (Levitate sh)) = Cpr tf (pruneKnownShape pruneDeepCpr depth sh)
@@ -281,6 +287,9 @@ lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
   = CprType n1 (lubCpr cpr1 cpr2)
   | otherwise
   = topCprType
+
+lubCprTypes :: [CprType] -> CprType
+lubCprTypes = foldl' lubCprType botCprType
 
 extractArgCprAndTermination :: [CprType] -> [Cpr]
 extractArgCprAndTermination = map go
