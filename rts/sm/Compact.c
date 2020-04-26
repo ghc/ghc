@@ -27,6 +27,7 @@
 #include "MarkWeak.h"
 #include "StablePtr.h"
 #include "StableName.h"
+#include "Hash.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)

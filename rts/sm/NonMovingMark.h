@@ -8,13 +8,10 @@
 
 #pragma once
 
-#include "Hash.h"
 #include "Task.h"
 #include "NonMoving.h"
 
 #include "BeginPrivate.h"
-
-#include "Hash.h"
 
 enum EntryType {
     NULL_ENTRY = 0,

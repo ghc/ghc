@@ -9,7 +9,6 @@
 #pragma once
 
 #include "NonMoving.h"
-#include "Hash.h"
 
 GNUC_ATTR_HOT void nonmovingSweep(void);
 
