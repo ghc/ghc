@@ -125,8 +125,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
 -----------------------------------------------------
 
 instance Quasi IO where
-  qNewName s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
-                  ; pure (mkNameU s n) }
+  qNewName = newNameIO
 
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
@@ -152,6 +151,13 @@ instance Quasi IO where
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
+
+instance Quote IO where
+  newName = newNameIO
+
+newNameIO :: String -> IO Name
+newNameIO s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
+                 ; pure (mkNameU s n) }
 
 badIO :: String -> IO a
 badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
