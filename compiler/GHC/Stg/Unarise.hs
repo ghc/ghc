@@ -251,7 +251,7 @@ import qualified Data.IntMap as IM
 --
 data UnariseEnv = UnariseEnv
    { unenvRho    :: !(VarEnv UnariseVal)  -- ^ rho environment
-   , unenvNoBase :: !Bool                 -- ^ Is -no-base set?
+   , unenvNoBase :: !Bool                 -- ^ Is `base` package available?
    }
 
 data UnariseVal

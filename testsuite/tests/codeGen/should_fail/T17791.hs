@@ -1,8 +1,12 @@
-{-# OPTIONS_GHC -no-base #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
--- Test that -no-base flag works as expected
-main :: IO ()
-main = do
-   let x = Just "test"
-   case x of
-      Nothing -> putStrLn "Nothing"
+module T17791 where
+
+data Maybe a = Just a | Nothing
+
+data Int = Int
+data String = String
+
+foo :: Maybe String -> Int
+foo x = case x of
+   Nothing -> Int

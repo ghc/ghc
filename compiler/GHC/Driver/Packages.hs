@@ -21,6 +21,7 @@ module GHC.Driver.Packages (
         -- * Querying the package config
         lookupUnit,
         lookupUnit',
+        lookupBase,
         lookupInstalledPackage,
         lookupPackageName,
         improveUnitId,
@@ -2185,6 +2186,16 @@ isDynLinkName platform this_mod name
         _         -> mod /= this_mod
 
   | otherwise = False  -- no, it is not even an external name
+
+-- | Indicate if `base` is available. It if isn't, we shouldn't generate
+-- implicit references to `base` entitites (`patError`, etc.)
+--
+-- As `base` is always in the preload set, we simply check if
+-- `Control.Exception.Base` module is exposed.
+lookupBase :: DynFlags -> Bool
+lookupBase dflags = case lookupModuleInAllPackages dflags (mkModuleName "Control.Exception.Base") of
+   [] -> False
+   _  -> True
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages
