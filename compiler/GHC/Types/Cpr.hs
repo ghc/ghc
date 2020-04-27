@@ -206,8 +206,8 @@ whnfTermCpr = Cpr Terminates Top
 divergeCpr :: Cpr
 divergeCpr = Cpr MightDiverge Bot
 
-conCpr :: TerminationFlag -> ConTag -> [Cpr] -> Cpr
-conCpr tf t fs = Cpr tf (Levitate (Con t fs))
+conCpr :: ConTag -> [Cpr] -> Cpr
+conCpr t fs = Cpr Terminates (Levitate (Con t fs))
 
 -- | Forget encoded CPR info, but keep termination info.
 forgetCpr :: Cpr -> Termination
@@ -299,13 +299,13 @@ extractArgCprAndTermination = map go
     go _               = topCpr
 
 conCprType :: ConTag -> [CprType] -> CprType
-conCprType con_tag args = CprType 0 (conCpr Terminates con_tag cprs)
+conCprType con_tag args = CprType 0 (conCpr con_tag cprs)
   where
     cprs = extractArgCprAndTermination args
 
 markConCprType :: DataCon -> CprType -> CprType
 markConCprType dc _ty@(CprType n cpr)
-  = ASSERT2( n == 0, ppr _ty ) CprType 0 (conCpr Terminates con_tag fields)
+  = ASSERT2( n == 0, ppr _ty ) CprType 0 (conCpr con_tag fields)
   where
     con_tag   = dataConTag dc
     wkr_arity = dataConRepArity dc
