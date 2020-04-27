@@ -429,11 +429,12 @@ mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
 {-
 Note [TcRhoType]
 ~~~~~~~~~~~~~~~~
-A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
-  YES    (forall a. a->a) -> Int
+A TcRhoType has no foralls or contexts at the top
   NO     forall a. a ->  Int
   NO     Eq a => a -> a
-  NO     Int -> forall a. a -> Int
+  YES    a -> a
+  YES    (forall a. a->a) -> Int
+  YES    Int -> forall a. a -> Int
 
 
 ************************************************************************

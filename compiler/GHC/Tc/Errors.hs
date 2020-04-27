@@ -422,10 +422,12 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
 
   | otherwise
   = do { traceTc "reportImplic" (ppr implic')
+       ; when bad_telescope $ reportBadTelescope ctxt tcl_env info tvs
+               -- Do /not/ use the tidied tvs because then are in the
+               -- wrong order, so tidying will rename things wrongly
        ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
-         warnRedundantConstraints ctxt' tcl_env info' dead_givens
-       ; when bad_telescope $ reportBadTelescope ctxt' tcl_env info' tvs' }
+         warnRedundantConstraints ctxt' tcl_env info' dead_givens }
   where
     tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status

@@ -852,7 +852,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; when (isJust m_ksig) $
          checkDataKindSig (DataInstanceSort new_or_data) $
          snd $ tcSplitPiTys res_kind
-         -- See Note [Datatype return kinds], end of point (4)
+         -- See Note [Datatype return kinds], point (4a)
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of

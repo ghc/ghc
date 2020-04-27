@@ -13,8 +13,9 @@
 -- | Type subsumption and unification
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
-  tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeHR,
+  tcWrapResult, tcWrapResultO, tcWrapResultMono,
+  tcSkolemise, tcSkolemiseET,
+  tcSubType, tcSubTypeSigma, tcSubTypePat,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
@@ -30,7 +31,7 @@ module GHC.Tc.Utils.Unify (
   matchExpectedTyConApp,
   matchExpectedAppTy,
   matchExpectedFunTys,
-  matchActualFunTys, matchActualFunTysPart,
+  matchActualFunTys, matchActualFunTy,
   matchExpectedFunKind,
 
   metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
@@ -216,7 +217,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
-           ; wrap <- tcSubType AppOrigin GenSigCtxt unif_fun_ty fun_ty
+           ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
 
@@ -237,31 +238,45 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
--- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
--- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
+                  -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
+-- If    matchActualFunTys n ty = (wrap, [t1,..,tn], res_ty)
+-- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
+--       and res_ty is a RhoType
 matchActualFunTys herald ct_orig mb_thing n_val_args_wanted fun_ty
-  = matchActualFunTysPart herald ct_orig mb_thing
-                          n_val_args_wanted []
-                          n_val_args_wanted fun_ty
+  = go n_val_args_wanted [] fun_ty
+  where
+    go 0 _ fun_ty
+      = do { (wrap, rho) <- topInstantiate ct_orig fun_ty
+           ; return (wrap, [], rho) }
+    go n so_far fun_ty
+      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTy herald ct_orig mb_thing
+                                                               (n_val_args_wanted, so_far)
+                                                               fun_ty
+           ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
+           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty doc
+           ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
+      where
+        doc = text "When inferring the argument type of a function with type" <+>
+              quotes (ppr fun_ty)
 
 -- | Variant of 'matchActualFunTys' that works when supplied only part
 -- (that is, to the right of some arrows) of the full function type
-matchActualFunTysPart
+matchActualFunTy
   :: SDoc -- See Note [Herald for matchExpectedFunTys]
   -> CtOrigin
-  -> Maybe (HsExpr GhcRn)  -- The thing with type TcSigmaType
-  -> Arity                 -- Total number of value args in the call
-  -> [TcSigmaType]         -- Types of values args to which function has
-                           --   been applied already (reversed)
-  -> Arity                 -- Number of new value args wanted
+  -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
+  -> (Arity, [TcSigmaType]) -- Total number of value args in the call, and
+                            -- types of values args to which function has
+                            --   been applied already (reversed)
+                            -- Both are used only for error messages)
   -> TcSigmaType           -- Type to analyse
-  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+  -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
 -- See Note [matchActualFunTys error handling] for all these arguments
-matchActualFunTysPart herald ct_orig mb_thing
-                      n_val_args_in_call arg_tys_so_far
-                      n_val_args_wanted fun_ty
-  = go n_val_args_wanted arg_tys_so_far fun_ty
+-- If   (wrap, arg_ty, res_ty) = matchActualFunTy ... fun_ty
+-- then wrap :: fun_ty ~> (arg_ty -> res_ty)
+-- and NB: res_ty is an (uninstantiated) SigmaType
+matchActualFunTy herald ct_orig mb_thing err_info fun_ty
+  = go fun_ty
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
 -- it's important for higher rank: the argument might be of form
@@ -288,40 +303,28 @@ matchActualFunTysPart herald ct_orig mb_thing
     --    bizarre to build the HsWrapper but not the arg_tys.
     --
     -- Refactoring is welcome.
-    go :: Arity
-       -> [TcSigmaType] -- Types of value args to which the function has
-                        -- been applied so far (reversed)
-                        -- Used only for error messages
-       -> TcSigmaType   -- the remainder of the type as we're processing
-       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-    go 0 _ ty = return (idHsWrapper, [], ty)
+    go :: TcSigmaType   -- the remainder of the type as we're processing
+       -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
+    go ty | Just ty' <- tcView ty = go ty'
 
-    go n so_far ty
-      | Just ty' <- tcView ty = go n so_far ty'
-
-    go n so_far ty
+    go ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (wrap2, arg_tys, res_ty) <- go n so_far rho
-           ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
+           ; (wrap2, arg_ty, res_ty) <- go rho
+           ; return (wrap2 <.> wrap1, arg_ty, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go n so_far (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty:so_far) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
-                    , arg_ty : tys, ty_r ) }
-      where
-        doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr fun_ty)
+        return (idHsWrapper, arg_ty, res_ty)
 
-    go n so_far ty@(TyVarTy tv)
+    go ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n so_far ty'
-               Flexi        -> defer n ty }
+               Indirect ty' -> go ty'
+               Flexi        -> defer ty }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -338,22 +341,23 @@ matchActualFunTysPart herald ct_orig mb_thing
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go n so_far ty = addErrCtxtM (mk_ctxt so_far ty) (defer n ty)
+    go ty = addErrCtxtM (mk_ctxt ty) (defer ty)
 
     ------------
-    defer n fun_ty
-      = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
-           ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkVisFunTys arg_tys res_ty
+    defer fun_ty
+      = do { arg_ty <- newOpenFlexiTyVarTy
+           ; res_ty <- newOpenFlexiTyVarTy
+           ; let unif_fun_ty = mkVisFunTy arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_tys, res_ty) }
+           ; return (mkWpCastN co, arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: [TcType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt arg_tys res_ty env
+    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt res_ty env
       = do { (env', ty) <- zonkTidyTcType env $
-                           mkVisFunTys (reverse arg_tys) res_ty
+                           mkVisFunTys (reverse arg_tys_so_far) res_ty
            ; return (env', mk_fun_tys_msg herald ty n_val_args_in_call) }
+    (n_val_args_in_call, arg_tys_so_far) = err_info
 
 mk_fun_tys_msg :: SDoc -> TcType -> Arity -> SDoc
 mk_fun_tys_msg herald ty n_args_in_call
@@ -510,6 +514,35 @@ expected_ty.
 -}
 
 
+-----------------
+-- tcWrapResult needs both un-type-checked (for origins and error messages)
+-- and type-checked (for wrapping) expressions
+tcWrapResult :: HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
+             -> TcM (HsExpr GhcTcId)
+tcWrapResult rn_expr = tcWrapResultO (exprCtOrigin rn_expr) rn_expr
+
+tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
+               -> TcM (HsExpr GhcTcId)
+tcWrapResultO orig rn_expr expr actual_ty res_ty
+  = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
+                                      , text "Expected:" <+> ppr res_ty ])
+       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just rn_expr) actual_ty res_ty
+       ; return (mkHsWrap wrap expr) }
+
+tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTcId
+                 -> TcRhoType   -- Actual -- a rho-type not a sigma-type
+                 -> ExpRhoType  -- Expected
+                 -> TcM (HsExpr GhcTcId)
+-- A version of tcWrapResult to use when the actual type is a
+-- rho-type, so nothing to instantiate; just go straight to unify.
+-- It means we don't need to pass in a CtOrigin
+tcWrapResultMono rn_expr expr act_ty res_ty
+  = ASSERT2( isRhoTy act_ty, ppr act_ty $$ ppr rn_expr )
+    do { co <- case res_ty of
+                  Infer inf_res -> fillInferResult act_ty inf_res
+                  Check exp_ty  -> unifyType (Just rn_expr) act_ty exp_ty
+       ; return (mkHsWrapCo co expr) }
+
 ------------------------
 tcSubTypePat :: CtOrigin -> UserTypeCtxt
             -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
@@ -527,16 +560,15 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
        ; return (mkWpCastN (mkTcSymCo co)) }
 
 ---------------
-tcSubType :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType :: CtOrigin -> UserTypeCtxt
+          -> TcSigmaType  -- Actual
+          -> ExpRhoType   -- Expected
+          -> TcM HsWrapper
+-- Checks that 'actual' is more polymorphic than 'expected'
 tcSubType orig ctxt ty_actual ty_expected
   = addSubTypeCtxt ty_actual ty_expected $
     do { traceTc "tcSubType" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
        ; tcSubTypeNC orig ctxt Nothing ty_actual ty_expected }
-
--- | Call this variant when you are in a higher-rank situation
-tcSubTypeHR :: CtOrigin -> HsExpr GhcRn -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
-tcSubTypeHR orig expr
-  = tcSubTypeNC orig GenSigCtxt (Just expr)
 
 tcSubTypeNC :: CtOrigin   -- origin used for instantiation only
             -> UserTypeCtxt
@@ -698,24 +730,6 @@ to a UserTypeCtxt of GenSigCtxt.  Why?
   and GHC.Tc.Utils.Unify.alwaysBuildImplication checks the UserTypeCtxt.
   See Note [When to build an implication]
 -}
-
------------------
--- needs both un-type-checked (for origins) and type-checked (for wrapping)
--- expressions
-tcWrapResult :: HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
-             -> TcM (HsExpr GhcTcId)
-tcWrapResult rn_expr = tcWrapResultO (exprCtOrigin rn_expr) rn_expr
-
--- | Sometimes we don't have a @HsExpr Name@ to hand, and this is more
--- convenient.
-tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
-               -> TcM (HsExpr GhcTcId)
-tcWrapResultO orig rn_expr expr actual_ty res_ty
-  = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
-                                      , text "Expected:" <+> ppr res_ty ])
-       ; cow <- tcSubTypeNC orig GenSigCtxt (Just rn_expr)
-                            actual_ty res_ty
-       ; return (mkHsWrap cow expr) }
 
 
 {- **********************************************************************
@@ -1550,7 +1564,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
-  -- See Note [Get unification variables on the left]
+  -- See Note [Unification variables on the left]
   | not is_given, pri1 == 0, pri2 > 0 = True
   | not is_given, pri2 == 0, pri1 > 0 = False
 

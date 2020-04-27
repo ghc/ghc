@@ -2315,18 +2315,18 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
 2. Where these kinds come from: Return kinds are processed through several
    different code paths:
 
-     data/newtypes: The return kind is part of the TyCon kind, gotten either
+   Data/newtypes: The return kind is part of the TyCon kind, gotten either
      by checkInitialKind (standalone kind signature / CUSK) or
      inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
      then passed to tcDataDefn.
 
-     families: The return kind is either written in a standalone signature
+   Families: The return kind is either written in a standalone signature
      or extracted from a family declaration in getInitialKind.
      If a family declaration is missing a result kind, it is assumed to be
      Type. This assumption is in getInitialKind for CUSKs or
      get_fam_decl_initial_kind for non-signature & non-CUSK cases.
 
-     instances: The data family already has a known kind. The return kind
+   Instances: The data family already has a known kind. The return kind
      of an instance is then calculated by applying the data family tycon
      to the patterns provided, as computed by the typeKind lhs_ty in the
      end of tcDataFamInstHeader. In the case of an instance written in GADT
@@ -2362,7 +2362,7 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
      data T5 :: Bool                          -- bad
      data T6 :: Type -> Bool                  -- bad
 
-   Exactly the same applies to data instance (but not data famlily)
+   Exactly the same applies to data instance (but not data family)
    declarations.  Examples
      data instance D1 :: Type                 -- good
      data instance D2 :: Boool -> Type        -- good

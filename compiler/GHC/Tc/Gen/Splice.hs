@@ -1430,7 +1430,7 @@ reifyInstances th_nm th_tys
             <- pushTcLevelM_   $
                solveEqualities $ -- Avoid error cascade if there are unsolved
                bindImplicitTKBndrs_Skol tv_names $
-               fst <$> tcInferLHsType rn_ty
+               tcInferLHsType rn_ty
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind

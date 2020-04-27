@@ -26,7 +26,7 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
-        WantedConstraints(..), insolubleWC, insolubleOrImplicWC,
+        WantedConstraints(..), insolubleWC,
         emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics,
@@ -934,7 +934,8 @@ addInsols wc cts
   = wc { wc_simple = wc_simple wc `unionBags` cts }
 
 dropMisleading :: WantedConstraints -> WantedConstraints
--- Drop misleading constraints
+-- Drop misleading constraints; really just class constraints
+-- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
 dropMisleading (WC { wc_simple = simples, wc_impl = implics })
   = WC { wc_simple = filterBag keep_ct simples
        , wc_impl   = mapBag drop_implic implics }
@@ -943,7 +944,6 @@ dropMisleading (WC { wc_simple = simples, wc_impl = implics })
       = implic { ic_wanted = dropMisleading (ic_wanted implic) }
     keep_ct ct
       | isHoleCt ct      = isOutOfScopeCt ct
-      | insolubleEqCt ct = True
       | otherwise        = case classifyPredType (ctPred ct) of
                              ClassPred {} -> False
                              _ -> True
@@ -964,17 +964,6 @@ insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples })
   =  anyBag insolubleCt     simples
   || anyBag insolubleImplic implics
-
-insolubleOrImplicWC :: WantedConstraints -> Bool
--- Any insoluble simple constraints, or any (non-empty) implications
--- The latter are almost certainly skolem-escape violations
-insolubleOrImplicWC (WC { wc_impl = implics, wc_simple = simples })
-  =  anyBag insolubleCt simples
-  || non_empty_implics implics
-  where
-     non_empty_implics = anyBag (non_empty_wc . ic_wanted)
-     non_empty_wc (WC { wc_impl = implics, wc_simple = simples })
-       = not (isEmptyBag simples) || non_empty_implics implics
 
 insolubleCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints

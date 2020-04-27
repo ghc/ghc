@@ -972,12 +972,12 @@ bindLHsTyVarBndr _doc mb_assoc (L loc
 bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind))
                  thing_inside
   = do { sig_ok <- xoptM LangExt.KindSignatures
-           ; unless sig_ok (badKindSigErr doc kind)
-           ; (kind', fvs1) <- rnLHsKind doc kind
-           ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
-           ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
-               $ thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
-           ; return (b, fvs1 `plusFV` fvs2) }
+       ; unless sig_ok (badKindSigErr doc kind)
+       ; (kind', fvs1) <- rnLHsKind doc kind
+       ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
+       ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
+           $ thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
+       ; return (b, fvs1 `plusFV` fvs2) }
 
 newTyVarNameRn :: Maybe a -> Located RdrName -> RnM Name
 newTyVarNameRn mb_assoc (L loc rdr)

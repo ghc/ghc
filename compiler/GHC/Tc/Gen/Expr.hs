@@ -436,11 +436,11 @@ tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferRhoNC op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin expr
-                                 (mkVisFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg (unLoc op) arg2 arg2_ty 2
-       ; return ( mkHsWrap wrap_res $
-                  SectionR x (mkLHsWrap wrap_fun op') arg2' ) }
+       ; let expr'      = SectionR x (mkLHsWrap wrap_fun op') arg2'
+             act_res_ty = mkVisFunTy arg1_ty op_res_ty
+       ; tcWrapResultMono expr expr' act_res_ty res_ty }
+
   where
     fn_orig = lexprCtOrigin op
     -- It's important to use the origin of 'op', so that call-stacks
@@ -456,11 +456,10 @@ tcExpr expr@(SectionL x arg1 op) res_ty
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
            <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
                                 n_reqd_args op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin expr
-                                 (mkVisFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg (unLoc op) arg1 arg1_ty 1
-       ; return ( mkHsWrap wrap_res $
-                  SectionL x arg1' (mkLHsWrap wrap_fn op') ) }
+       ; let expr'      = SectionL x arg1' (mkLHsWrap wrap_fn op')
+             act_res_ty = mkVisFunTys arg_tys op_res_ty
+       ; tcWrapResultMono expr expr' act_res_ty res_ty }
   where
     fn_orig = lexprCtOrigin op
     -- It's important to use the origin of 'op', so that call-stacks
@@ -490,18 +489,17 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; arg_tys <- case boxity of
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
-       ; let actual_res_ty
-                 = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
-                            (mkTupleTy1 boxity arg_tys)
-                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
-
-       ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple") expr
-                             actual_res_ty res_ty
 
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
 
-       ; return $ mkHsWrap wrap (ExplicitTuple x tup_args1 boxity) }
+       ; let expr'      = ExplicitTuple x tup_args1 boxity
+             act_res_ty = mkVisFunTys [ty | (ty, (L _ (Missing _)))
+                                               <- arg_tys `zip` tup_args]
+                                      (mkTupleTy1 boxity arg_tys)
+                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
+
+       ; tcWrapResultMono expr expr' act_res_ty res_ty }
 
 tcExpr (ExplicitSum _ alt arity expr) res_ty
   = do { let sum_tc = sumTyCon arity
@@ -673,25 +671,26 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
         ; checkMissingFields con_like rbinds
 
         ; (con_expr, con_sigma) <- tcInferId con_name
-        ; (con_wrap, con_tau) <-
-            topInstantiate (OccurrenceOf con_name) con_sigma
+        ; (con_wrap, con_tau)   <- topInstantiate orig con_sigma
               -- a shallow instantiation should really be enough for
               -- a data constructor.
         ; let arity = conLikeArity con_like
               Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
-        ; case conLikeWrapId_maybe con_like of
-               Nothing -> nonBidirectionalErr (conLikeName con_like)
-               Just con_id -> do {
-                  res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
-                                          expr actual_res_ty res_ty
-                ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
-                ; return $
-                  mkHsWrap res_wrap $
-                  RecordCon { rcon_ext = RecordConTc
-                                 { rcon_con_like = con_like
-                                 , rcon_con_expr = mkHsWrap con_wrap con_expr }
-                            , rcon_con_name = L loc con_id
-                            , rcon_flds = rbinds' } } }
+        ; case conLikeWrapId_maybe con_like of {
+               Nothing -> nonBidirectionalErr (conLikeName con_like) ;
+               Just con_id ->
+
+     do { rbinds' <- tcRecordBinds con_like arg_tys rbinds
+        ; let rcon_tc = RecordConTc
+                           { rcon_con_like = con_like
+                           , rcon_con_expr = mkHsWrap con_wrap con_expr }
+              expr' = RecordCon { rcon_ext = rcon_tc
+                                , rcon_con_name = L loc con_id
+                                , rcon_flds = rbinds' }
+
+        ; tcWrapResultMono expr expr' actual_res_ty res_ty } } }
+  where
+    orig = OccurrenceOf con_name
 
 {-
 Note [Type of a record update]
@@ -942,8 +941,6 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; wrap_res <- tcSubTypeHR (exprCtOrigin expr) expr
-                                  rec_res_ty res_ty
         ; co_scrut <- unifyType (Just (unLoc record_expr)) record_rho scrut_ty
                 -- NB: normal unification is OK here (as opposed to subsumption),
                 -- because for this to work out, both record_rho and scrut_ty have
@@ -973,16 +970,16 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         ; req_wrap <- instCallConstraints RecordUpdOrigin req_theta'
 
         -- Phew!
-        ; return $
-          mkHsWrap wrap_res $
-          RecordUpd { rupd_expr
-                          = mkLHsWrap fam_co (mkLHsWrapCo co_scrut record_expr')
-                    , rupd_flds = rbinds'
-                    , rupd_ext = RecordUpdTc
-                        { rupd_cons = relevant_cons
-                        , rupd_in_tys = scrut_inst_tys
-                        , rupd_out_tys = result_inst_tys
-                        , rupd_wrap = req_wrap }} }
+        ; let upd_tc = RecordUpdTc { rupd_cons = relevant_cons
+                                   , rupd_in_tys = scrut_inst_tys
+                                   , rupd_out_tys = result_inst_tys
+                                   , rupd_wrap = req_wrap }
+              expr' = RecordUpd { rupd_expr = mkLHsWrap fam_co $
+                                              mkLHsWrapCo co_scrut record_expr'
+                                , rupd_flds = rbinds'
+                                , rupd_ext = upd_tc }
+
+        ; tcWrapResult expr expr' rec_res_ty res_ty }
 
 tcExpr e@(HsRecFld _ f) res_ty
     = tcCheckRecSelId e f res_ty
@@ -1401,9 +1398,9 @@ tcArgs fun orig_fun_ty orig_args
                _ -> ty_app_err upsilon_ty hs_ty_arg }
 
     go n so_far fun_ty (HsEValArg loc arg : args)
-      = do { (wrap, [arg_ty], res_ty)
-               <- matchActualFunTysPart herald fun_orig (Just fun)
-                                        n_val_args so_far 1 fun_ty
+      = do { (wrap, arg_ty, res_ty)
+               <- matchActualFunTy herald fun_orig (Just fun)
+                                   (n_val_args, so_far) fun_ty
            ; arg' <- tcArg fun arg arg_ty n
            ; (args', inner_res_ty) <- go (n+1) (arg_ty:so_far) res_ty args
            ; return ( addArgWrap wrap $ HsEValArg loc arg' : args'

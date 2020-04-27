@@ -920,11 +920,11 @@ It is conceivable to do a better job at tracking whether or not a type
 is flattened, but this is left as future work. (Mar '15)
 
 
-Note [FunTy and decomposing tycon applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When can_eq_nc' attempts to decompose a tycon application we haven't yet zonked.
-This means that we may very well have a FunTy containing a type of some unknown
-kind. For instance, we may have,
+Note [Decomposing FunTy]
+~~~~~~~~~~~~~~~~~~~~~~~~
+can_eq_nc' may attempt to decompose a FunTy that is un-zonked.  This
+means that we may very well have a FunTy containing a type of some
+unknown kind. For instance, we may have,
 
     FunTy (a :: k) Int
 
@@ -1020,24 +1020,26 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
   = do { setEvBindIfWanted ev (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
--- Try to decompose type constructor applications
--- Including FunTy (s -> t)
-can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-    --- See Note [FunTy and decomposing type constructor applications]
-  | FunTy { ft_af = af1, ft_arg = ty1a, ft_res = ty1b } <- ty1
-  , FunTy { ft_af = af2, ft_arg = ty2a, ft_res = ty2b } <- ty2
-  , af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
-  , Just ty1a_rep <- getRuntimeRep_maybe ty1a
-  , Just ty1b_rep <- getRuntimeRep_maybe ty1b
+-- Decompose FunTy: (s -> t) and (c => t)
+-- NB: don't decompose (Int -> blah) ~ (Show a => blah)
+can_eq_nc' _flat _rdr_env _envs ev eq_rel
+           (FunTy { ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _
+           (FunTy { ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _
+  | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
+  , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
   = canDecomposableTyConAppOK ev eq_rel funTyCon
                               [ty1a_rep, ty1b_rep, ty1a, ty1b]
                               [ty2a_rep, ty2b_rep, ty2a, ty2b]
 
-  | TyConApp tc1 tys1 <- ty1
-  , TyConApp tc2 tys2 <- ty2
-  , not (isTypeFamilyTyCon tc1)
+-- Decompose type constructor applications
+-- NB: e have expanded type synonyms already
+can_eq_nc' _flat _rdr_env _envs ev eq_rel
+           (TyConApp tc1 tys1) _
+           (TyConApp tc2 tys2) _
+  | not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
@@ -1505,7 +1507,6 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
     -- the wrong thing (from a pretty printing point of view)
     -- for functions, because we've lost the AnonArgFlag; but
     -- in fact we never call canTyConApp on a saturated FunTyCon
-    -- Note [FunTy and decomposing type constructor applications]
     ty1 = mkTyConApp tc1 tys1
     ty2 = mkTyConApp tc2 tys2
 
