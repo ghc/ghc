@@ -1893,11 +1893,10 @@ occAnalApp env (Var fun, args, ticks)
 
   | Just KeepAliveOp <- isPrimOpId_maybe fun
   , [r1, t1, r2, t2, x, s, k]  <- args
-  , let (x_usage, x') = occAnal env x
-  , let (s_usage, s') = occAnal env s
+  , let (usages, xs) = occAnalArgs env [r1, t1, r2, t2, x, s] [[], []]
   , let (k_usage, k') = occAnalRhs env (Just 1) k
-  = ( x_usage `andUDs` s_usage `andUDs` k_usage
-    , mkTicks ticks $ mkApps (Var fun) [r1, t1, r2, t2, x', s', k']
+  = ( markAllNonTailCalled usages `andUDs` k_usage
+    , mkTicks ticks $ mkApps (Var fun) (xs ++ [k'])
     )
 
   | otherwise
