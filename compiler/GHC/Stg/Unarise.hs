@@ -249,7 +249,10 @@ import qualified Data.IntMap as IM
 -- INVARIANT: OutStgArgs in the range only have NvUnaryTypes
 --            (i.e. no unboxed tuples, sums or voids)
 --
-type UnariseEnv = VarEnv UnariseVal
+data UnariseEnv = UnariseEnv
+   { unenvRho    :: !(VarEnv UnariseVal)  -- ^ rho environment
+   , unenvNoBase :: !Bool                 -- ^ Is `base` package available?
+   }
 
 data UnariseVal
   = MultiVal [OutStgArg] -- MultiVal to tuple. Can be empty list (void).
@@ -259,47 +262,55 @@ instance Outputable UnariseVal where
   ppr (MultiVal args) = text "MultiVal" <+> ppr args
   ppr (UnaryVal arg)   = text "UnaryVal" <+> ppr arg
 
+mapRho :: (VarEnv UnariseVal -> VarEnv UnariseVal) -> UnariseEnv -> UnariseEnv
+mapRho f env = env { unenvRho = f (unenvRho env) }
+
 -- | Extend the environment, checking the UnariseEnv invariant.
 extendRho :: UnariseEnv -> Id -> UnariseVal -> UnariseEnv
-extendRho rho x (MultiVal args)
+extendRho env x (MultiVal args)
   = ASSERT(all (isNvUnaryType . stgArgType) args)
-    extendVarEnv rho x (MultiVal args)
-extendRho rho x (UnaryVal val)
+    mapRho (\rho -> extendVarEnv rho x (MultiVal args)) env
+extendRho env x (UnaryVal val)
   = ASSERT(isNvUnaryType (stgArgType val))
-    extendVarEnv rho x (UnaryVal val)
+    mapRho (\rho -> extendVarEnv rho x (UnaryVal val)) env
 
 --------------------------------------------------------------------------------
 
-unarise :: UniqSupply -> [StgTopBinding] -> [StgTopBinding]
-unarise us binds = initUs_ us (mapM (unariseTopBinding emptyVarEnv) binds)
+unarise :: Bool -> UniqSupply -> [StgTopBinding] -> [StgTopBinding]
+unarise noBase us binds = initUs_ us (mapM (unariseTopBinding env) binds)
+   where
+      env = UnariseEnv
+               { unenvRho   = emptyVarEnv
+               , unenvNoBase = noBase
+               }
 
 unariseTopBinding :: UnariseEnv -> StgTopBinding -> UniqSM StgTopBinding
-unariseTopBinding rho (StgTopLifted bind)
-  = StgTopLifted <$> unariseBinding rho bind
+unariseTopBinding env (StgTopLifted bind)
+  = StgTopLifted <$> unariseBinding env bind
 unariseTopBinding _ bind@StgTopStringLit{} = return bind
 
 unariseBinding :: UnariseEnv -> StgBinding -> UniqSM StgBinding
-unariseBinding rho (StgNonRec x rhs)
-  = StgNonRec x <$> unariseRhs rho rhs
-unariseBinding rho (StgRec xrhss)
-  = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
+unariseBinding env (StgNonRec x rhs)
+  = StgNonRec x <$> unariseRhs env rhs
+unariseBinding env (StgRec xrhss)
+  = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs env rhs) xrhss
 
 unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
-  = do (rho', args1) <- unariseFunArgBinders rho args
-       expr' <- unariseExpr rho' expr
+unariseRhs env (StgRhsClosure ext ccs update_flag args expr)
+  = do (env', args1) <- unariseFunArgBinders env args
+       expr' <- unariseExpr env' expr
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
-unariseRhs rho (StgRhsCon ccs con args)
+unariseRhs env (StgRhsCon ccs con args)
   = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
-    return (StgRhsCon ccs con (unariseConArgs rho args))
+    return (StgRhsCon ccs con (unariseConArgs env args))
 
 --------------------------------------------------------------------------------
 
 unariseExpr :: UnariseEnv -> StgExpr -> UniqSM StgExpr
 
-unariseExpr rho e@(StgApp f [])
-  = case lookupVarEnv rho f of
+unariseExpr env e@(StgApp f [])
+  = case lookupVarEnv (unenvRho env) f of
       Just (MultiVal args)  -- Including empty tuples
         -> return (mkTuple args)
       Just (UnaryVal (StgVarArg f'))
@@ -309,10 +320,10 @@ unariseExpr rho e@(StgApp f [])
       Nothing
         -> return e
 
-unariseExpr rho e@(StgApp f args)
-  = return (StgApp f' (unariseFunArgs rho args))
+unariseExpr env e@(StgApp f args)
+  = return (StgApp f' (unariseFunArgs env args))
   where
-    f' = case lookupVarEnv rho f of
+    f' = case lookupVarEnv (unenvRho env) f of
            Just (UnaryVal (StgVarArg f')) -> f'
            Nothing -> f
            err -> pprPanic "unariseExpr - app2" (ppr e $$ ppr err)
@@ -322,59 +333,59 @@ unariseExpr rho e@(StgApp f args)
 unariseExpr _ (StgLit l)
   = return (StgLit l)
 
-unariseExpr rho (StgConApp dc args ty_args)
-  | Just args' <- unariseMulti_maybe rho dc args ty_args
+unariseExpr env (StgConApp dc args ty_args)
+  | Just args' <- unariseMulti_maybe env dc args ty_args
   = return (mkTuple args')
 
   | otherwise
-  , let args' = unariseConArgs rho args
+  , let args' = unariseConArgs env args
   = return (StgConApp dc args' (map stgArgType args'))
 
-unariseExpr rho (StgOpApp op args ty)
-  = return (StgOpApp op (unariseFunArgs rho args) ty)
+unariseExpr env (StgOpApp op args ty)
+  = return (StgOpApp op (unariseFunArgs env args) ty)
 
 unariseExpr _ e@StgLam{}
   = pprPanic "unariseExpr: found lambda" (ppr e)
 
-unariseExpr rho (StgCase scrut bndr alt_ty alts)
+unariseExpr env (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
   | StgApp v [] <- scrut
-  , Just (MultiVal xs) <- lookupVarEnv rho v
-  = elimCase rho xs bndr alt_ty alts
+  , Just (MultiVal xs) <- lookupVarEnv (unenvRho env) v
+  = elimCase env xs bndr alt_ty alts
 
   -- Handle strict lets for tuples and sums:
   --   case (# a,b #) of r -> rhs
   -- and analogously for sums
   | StgConApp dc args ty_args <- scrut
-  , Just args' <- unariseMulti_maybe rho dc args ty_args
-  = elimCase rho args' bndr alt_ty alts
+  , Just args' <- unariseMulti_maybe env dc args ty_args
+  = elimCase env args' bndr alt_ty alts
 
   -- general case
   | otherwise
-  = do scrut' <- unariseExpr rho scrut
-       alts'  <- unariseAlts rho alt_ty bndr alts
+  = do scrut' <- unariseExpr env scrut
+       alts'  <- unariseAlts env alt_ty bndr alts
        return (StgCase scrut' bndr alt_ty alts')
                        -- bndr may have a unboxed sum/tuple type but it will be
                        -- dead after unarise (checked in GHC.Stg.Lint)
 
-unariseExpr rho (StgLet ext bind e)
-  = StgLet ext <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr env (StgLet ext bind e)
+  = StgLet ext <$> unariseBinding env bind <*> unariseExpr env e
 
-unariseExpr rho (StgLetNoEscape ext bind e)
-  = StgLetNoEscape ext <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr env (StgLetNoEscape ext bind e)
+  = StgLetNoEscape ext <$> unariseBinding env bind <*> unariseExpr env e
 
-unariseExpr rho (StgTick tick e)
-  = StgTick tick <$> unariseExpr rho e
+unariseExpr env (StgTick tick e)
+  = StgTick tick <$> unariseExpr env e
 
 -- Doesn't return void args.
 unariseMulti_maybe :: UnariseEnv -> DataCon -> [InStgArg] -> [Type] -> Maybe [OutStgArg]
-unariseMulti_maybe rho dc args ty_args
+unariseMulti_maybe env dc args ty_args
   | isUnboxedTupleCon dc
-  = Just (unariseConArgs rho args)
+  = Just (unariseConArgs env args)
 
   | isUnboxedSumCon dc
-  , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
-  = Just (mkUbxSum dc ty_args args1)
+  , let args1 = ASSERT(isSingleton args) (unariseConArgs env args)
+  = Just (mkUbxSum (unenvNoBase env) dc ty_args args1)
 
   | otherwise
   = Nothing
@@ -385,8 +396,8 @@ elimCase :: UnariseEnv
          -> [OutStgArg] -- non-void args
          -> InId -> AltType -> [InStgAlt] -> UniqSM OutStgExpr
 
-elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
-  = do let rho1 = extendRho rho bndr (MultiVal args)
+elimCase env args bndr (MultiValAlt _) [(_, bndrs, rhs)]
+  = do let rho1 = extendRho env bndr (MultiVal args)
            rho2
              | isUnboxedTupleBndr bndr
              = mapTupleIdBinders bndrs args rho1
@@ -397,12 +408,12 @@ elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
 
        unariseExpr rho2 rhs
 
-elimCase rho args bndr (MultiValAlt _) alts
+elimCase env args bndr (MultiValAlt _) alts
   | isUnboxedSumBndr bndr
   = do let (tag_arg : real_args) = args
        tag_bndr <- mkId (mkFastString "tag") tagTy
           -- this won't be used but we need a binder anyway
-       let rho1 = extendRho rho bndr (MultiVal args)
+       let rho1 = extendRho env bndr (MultiVal args)
            scrut' = case tag_arg of
                       StgVarArg v     -> StgApp v []
                       StgLitArg l     -> StgLit l
@@ -417,15 +428,15 @@ elimCase _ args bndr alt_ty alts
 --------------------------------------------------------------------------------
 
 unariseAlts :: UnariseEnv -> AltType -> InId -> [StgAlt] -> UniqSM [StgAlt]
-unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e)]
+unariseAlts env (MultiValAlt n) bndr [(DEFAULT, [], e)]
   | isUnboxedTupleBndr bndr
-  = do (rho', ys) <- unariseConArgBinder rho bndr
+  = do (rho', ys) <- unariseConArgBinder env bndr
        e' <- unariseExpr rho' e
        return [(DataAlt (tupleDataCon Unboxed n), ys, e')]
 
-unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
+unariseAlts env (MultiValAlt n) bndr [(DataAlt _, ys, e)]
   | isUnboxedTupleBndr bndr
-  = do (rho', ys1) <- unariseConArgBinders rho ys
+  = do (rho', ys1) <- unariseConArgBinders env ys
        MASSERT(ys1 `lengthIs` n)
        let rho'' = extendRho rho' bndr (MultiVal (map StgVarArg ys1))
        e' <- unariseExpr rho'' e
@@ -436,27 +447,27 @@ unariseAlts _ (MultiValAlt _) bndr alts
   = pprPanic "unariseExpr: strange multi val alts" (ppr alts)
 
 -- In this case we don't need to scrutinize the tag bit
-unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
+unariseAlts env (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
   | isUnboxedSumBndr bndr
-  = do (rho_sum_bndrs, sum_bndrs) <- unariseConArgBinder rho bndr
+  = do (rho_sum_bndrs, sum_bndrs) <- unariseConArgBinder env bndr
        rhs' <- unariseExpr rho_sum_bndrs rhs
        return [(DataAlt (tupleDataCon Unboxed (length sum_bndrs)), sum_bndrs, rhs')]
 
-unariseAlts rho (MultiValAlt _) bndr alts
+unariseAlts env (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
-  = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
+  = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder env bndr
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
        let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
        return [ (DataAlt (tupleDataCon Unboxed (length scrt_bndrs)),
                  scrt_bndrs,
                  inner_case) ]
 
-unariseAlts rho _ _ alts
-  = mapM (\alt -> unariseAlt rho alt) alts
+unariseAlts env _ _ alts
+  = mapM (\alt -> unariseAlt env alt) alts
 
 unariseAlt :: UnariseEnv -> StgAlt -> UniqSM StgAlt
-unariseAlt rho (con, xs, e)
-  = do (rho', xs') <- unariseConArgBinders rho xs
+unariseAlt env (con, xs, e)
+  = do (rho', xs') <- unariseConArgBinders env xs
        (con, xs',) <$> unariseExpr rho' e
 
 --------------------------------------------------------------------------------
@@ -475,12 +486,12 @@ unariseSumAlt :: UnariseEnv
               -> [StgArg] -- sum components _excluding_ the tag bit.
               -> StgAlt   -- original alternative with sum LHS
               -> UniqSM StgAlt
-unariseSumAlt rho _ (DEFAULT, _, e)
-  = ( DEFAULT, [], ) <$> unariseExpr rho e
+unariseSumAlt env _ (DEFAULT, _, e)
+  = ( DEFAULT, [], ) <$> unariseExpr env e
 
-unariseSumAlt rho args (DataAlt sumCon, bs, e)
-  = do let rho' = mapSumIdBinders bs args rho
-       e' <- unariseExpr rho' e
+unariseSumAlt env args (DataAlt sumCon, bs, e)
+  = do let env' = mapSumIdBinders bs args env
+       e' <- unariseExpr env' e
        return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon)) intPrimTy), [], e' )
 
 unariseSumAlt _ scrt alt
@@ -502,8 +513,8 @@ mapTupleIdBinders ids args0 rho0
       ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
 
       map_ids :: UnariseEnv -> [(Id, [PrimRep])] -> [StgArg] -> UnariseEnv
-      map_ids rho [] _  = rho
-      map_ids rho ((x, x_reps) : xs) args =
+      map_ids env [] _  = env
+      map_ids env ((x, x_reps) : xs) args =
         let
           x_arity = length x_reps
           (x_args, args') =
@@ -513,9 +524,9 @@ mapTupleIdBinders ids args0 rho0
           rho'
             | x_arity == 1
             = ASSERT(x_args `lengthIs` 1)
-              extendRho rho x (UnaryVal (head x_args))
+              extendRho env x (UnaryVal (head x_args))
             | otherwise
-            = extendRho rho x (MultiVal x_args)
+            = extendRho env x (MultiVal x_args)
         in
           map_ids rho' xs args'
     in
@@ -555,11 +566,12 @@ mapSumIdBinders ids sum_args _
 --   [ 1#, rubbish ]
 --
 mkUbxSum
-  :: DataCon      -- Sum data con
+  :: Bool         -- Are we allowed to reference base package?
+  -> DataCon      -- Sum data con
   -> [Type]       -- Type arguments of the sum data con
   -> [OutStgArg]  -- Actual arguments of the alternative.
   -> [OutStgArg]  -- Final tuple arguments
-mkUbxSum dc ty_args args0
+mkUbxSum noBase dc ty_args args0
   = let
       (_ : sum_slots) = ubxSumRepType (map typePrimRep ty_args)
         -- drop tag slot
@@ -580,8 +592,10 @@ mkUbxSum dc ty_args args0
         = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
 
       slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
+      slotRubbishArg PtrSlot
+         | noBase    = StgVarArg unitDataConId
+         | otherwise = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+                       -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
       slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
@@ -650,13 +664,13 @@ So in short, when we have a void id,
 unariseArgBinder
     :: Bool -- data con arg?
     -> UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
-unariseArgBinder is_con_arg rho x =
+unariseArgBinder is_con_arg env x =
   case typePrimRep (idType x) of
     []
       | is_con_arg
-      -> return (extendRho rho x (MultiVal []), [])
+      -> return (extendRho env x (MultiVal []), [])
       | otherwise -- fun arg, do not remove void binders
-      -> return (extendRho rho x (MultiVal []), [voidArgId])
+      -> return (extendRho env x (MultiVal []), [voidArgId])
 
     [rep]
       -- Arg represented as single variable, but original type may still be an
@@ -668,20 +682,20 @@ unariseArgBinder is_con_arg rho x =
       -- binders should vanish. See Note [Post-unarisation invariants].
       | isUnboxedSumType (idType x) || isUnboxedTupleType (idType x)
       -> do x' <- mkId (mkFastString "us") (primRepToType rep)
-            return (extendRho rho x (MultiVal [StgVarArg x']), [x'])
+            return (extendRho env x (MultiVal [StgVarArg x']), [x'])
       | otherwise
-      -> return (rho, [x])
+      -> return (env, [x])
 
     reps -> do
       xs <- mkIds (mkFastString "us") (map primRepToType reps)
-      return (extendRho rho x (MultiVal (map StgVarArg xs)), xs)
+      return (extendRho env x (MultiVal (map StgVarArg xs)), xs)
 
 --------------------------------------------------------------------------------
 
 -- | MultiVal a function argument. Never returns an empty list.
 unariseFunArg :: UnariseEnv -> StgArg -> [StgArg]
-unariseFunArg rho (StgVarArg x) =
-  case lookupVarEnv rho x of
+unariseFunArg env (StgVarArg x) =
+  case lookupVarEnv (unenvRho env) x of
     Just (MultiVal [])  -> [voidArg]   -- NB: do not remove void args
     Just (MultiVal as)  -> as
     Just (UnaryVal arg) -> [arg]
@@ -692,7 +706,7 @@ unariseFunArgs :: UnariseEnv -> [StgArg] -> [StgArg]
 unariseFunArgs = concatMap . unariseFunArg
 
 unariseFunArgBinders :: UnariseEnv -> [Id] -> UniqSM (UnariseEnv, [Id])
-unariseFunArgBinders rho xs = second concat <$> mapAccumLM unariseFunArgBinder rho xs
+unariseFunArgBinders env xs = second concat <$> mapAccumLM unariseFunArgBinder env xs
 
 -- Result list of binders is never empty
 unariseFunArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
@@ -702,8 +716,8 @@ unariseFunArgBinder = unariseArgBinder False
 
 -- | MultiVal a DataCon argument. Returns an empty list when argument is void.
 unariseConArg :: UnariseEnv -> InStgArg -> [OutStgArg]
-unariseConArg rho (StgVarArg x) =
-  case lookupVarEnv rho x of
+unariseConArg env (StgVarArg x) =
+  case lookupVarEnv (unenvRho env) x of
     Just (UnaryVal arg) -> [arg]
     Just (MultiVal as) -> as      -- 'as' can be empty
     Nothing
@@ -719,7 +733,7 @@ unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]
 unariseConArgs = concatMap . unariseConArg
 
 unariseConArgBinders :: UnariseEnv -> [Id] -> UniqSM (UnariseEnv, [Id])
-unariseConArgBinders rho xs = second concat <$> mapAccumLM unariseConArgBinder rho xs
+unariseConArgBinders env xs = second concat <$> mapAccumLM unariseConArgBinder env xs
 
 -- Different from `unariseFunArgBinder`: result list of binders may be empty.
 -- See DataCon applications case in Note [Post-unarisation invariants].
