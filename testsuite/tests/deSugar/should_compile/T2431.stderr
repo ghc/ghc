@@ -7,7 +7,7 @@ Result size of Tidy Core
 T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
- Cpr=#c1(),
+ Cpr=#c1(*),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
