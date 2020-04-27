@@ -88,13 +88,13 @@ defaults
 -- primops also have additional internal implementations under certain
 -- conditions. Now that `foreign import prim` exists, only those primops
 -- which have both internal and external implementations ought to be
--- this file. The rest aren't really primops, since they don't need
+-- in this file. The rest aren't really primops, since they don't need
 -- bespoke compiler support but just a general way to interface with
 -- C--. They are just foreign calls.
 --
 -- Unfortunately, for the time being most of the primops which should be
 -- moved according to the previous paragraph can't yet. There are some
--- superficial restrictions in `foreign import prim` which mus be fixed
+-- superficial restrictions in `foreign import prim` which must be fixed
 -- first. Specifically, `foreign import prim` always requires:
 --
 --   - No polymorphism in type
