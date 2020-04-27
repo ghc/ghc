@@ -931,14 +931,7 @@ Other
     :shortdesc: Don't generate bindings for Typeable methods
     :type: dynamic
 
-    This avoids generating Typeable-related bindings for modules and types. This
+    This avoid generating Typeable-related bindings for modules and types. This
     is useful when debugging because it gives smaller modules and dumps, but the
     compiler will panic if you try to use Typeable instances of things that you
     built with this flag.
-
-.. ghc-flag:: -no-base
-    :shortdesc: Don't generate references to `base` package
-    :type: dynamic
-
-    This avoids generating references to entities from `base` package. It is
-    useful for packages that live below `base` (big numbers, etc.).

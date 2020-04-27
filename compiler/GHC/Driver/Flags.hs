@@ -196,9 +196,6 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
    | Opt_NumConstantFolding
-   | Opt_NoBase                     -- ^ Disallow compiler generated references
-                                    -- to `base`. This is useful for packages
-                                    -- below `base`.
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!

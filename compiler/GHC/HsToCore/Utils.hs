@@ -81,6 +81,7 @@ import GHC.Types.SrcLoc
 import Util
 import Panic
 import GHC.Driver.Session
+import GHC.Driver.Packages
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -393,19 +394,19 @@ mkErrorAppDs :: Id              -- The error function
 mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     dflags <- getDynFlags
-    noBase <- gopt Opt_NoBase <$> getDynFlags
+    noBase <- (not . lookupBase) <$> getDynFlags
     let
         full_msg
-         -- When the `-no-base` command-line flag is used, we don't want to
-         -- generate an error expression as it refers to `base` (`patError`,
-         -- etc.). See #17791. Instead we return a panic that will be triggered
-         -- later when the expression we return is actually used.
+         -- When `base` package isn't available, we don't want to generate an
+         -- error expression that refers to it (`patError`, etc.). See #17791.
+         -- Instead we return a panic that will be triggered later when the
+         -- expression we return is actually used.
          --
-         -- We can't panic right now because the type of the expression we
-         -- return is actually used in some cases (see `matchSimply` in
+         -- We can't directly return a panic because the type of the expression
+         -- we return is actually used in some cases (see `matchSimply` in
          -- GHC.HsToCore.Match) even if the expression itself ends up not being
          -- used... So we put the panic pretty deep in the expression.
-         | noBase    = pgmErrorDoc "References to `base` package are not allowed (-no-base is set)" $
+         | noBase    = pgmErrorDoc "Implicit references to `base` package are not allowed (`base` is not exposed)" $
                         vcat [ ppr src_loc
                              , text "Would reference `" <> ppr err_id <> text "' in `" <> msg <> text "'"
                              ]

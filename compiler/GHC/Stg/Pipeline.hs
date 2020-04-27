@@ -26,6 +26,7 @@ import GHC.Stg.Lift     ( stgLiftLams )
 import GHC.Types.Module ( Module )
 
 import GHC.Driver.Session
+import GHC.Driver.Packages
 import ErrUtils
 import GHC.Types.Unique.Supply
 import Outputable
@@ -98,7 +99,7 @@ stg2stg dflags this_mod binds
           StgUnarise -> do
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
-            let binds' = unarise (gopt Opt_NoBase dflags) us binds
+            let binds' = unarise (not (lookupBase dflags)) us binds
             liftIO (dump_when Opt_D_dump_stg_unarised "Unarised STG:" binds')
             liftIO (stg_linter True "Unarise" binds')
             return binds'

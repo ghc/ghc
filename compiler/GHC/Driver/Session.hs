@@ -2538,8 +2538,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
   , make_ord_flag defGhcFlag "fno-opt-coercion"
         (NoArg (setGeneralFlag Opt_G_NoOptCoercion))
-  , make_ord_flag defGhcFlag "no-base"
-        (NoArg (setGeneralFlag Opt_NoBase))
   , make_ord_flag defGhcFlag "with-rtsopts"
         (HasArg setRtsOpts)
   , make_ord_flag defGhcFlag "rtsopts"
@@ -5174,7 +5172,6 @@ data FilesToClean = FilesToClean {
 -- | An empty FilesToClean
 emptyFilesToClean :: FilesToClean
 emptyFilesToClean = FilesToClean Set.empty Set.empty
-
 
 -- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
