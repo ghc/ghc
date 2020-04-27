@@ -78,7 +78,7 @@ annTopBindingsFreeVars = map go
 
 -- | Annotates an STG binding with its free variables.
 annBindingFreeVars :: StgBinding -> CgStgBinding
-annBindingFreeVars = fst . binding emptyEnv emptyDVarSet
+annBindingFreeVars = fst . binding HeapCheckInAlts emptyEnv emptyDVarSet
 
 boundIds :: StgBinding -> [Id]
 boundIds (StgNonRec b _) = [b]
@@ -108,97 +108,111 @@ args env = mkFreeVarSet env . mapMaybe f
     f (StgVarArg occ) = Just occ
     f _               = Nothing
 
-binding :: Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
-binding env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
+binding :: StgCaseGcFlag -> Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
+binding gcf env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
   where
     -- See Note [Tracking local binders]
-    (r', rhs_fvs) = rhs env r
+    (r', rhs_fvs) = rhs gcf env r
     fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
-binding env body_fv (StgRec pairs) = (StgRec pairs', fvs)
+binding gcf env body_fv (StgRec pairs) = (StgRec pairs', fvs)
   where
     -- See Note [Tracking local binders]
     bndrs = map fst pairs
-    (rhss, rhs_fvss) = mapAndUnzip (rhs env . snd) pairs
+    (rhss, rhs_fvss) = mapAndUnzip (rhs gcf env . snd) pairs
     pairs' = zip bndrs rhss
     fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
 
-expr :: Env -> StgExpr -> (CgStgExpr, DIdSet)
-expr env = go . addGCFlag HeapCheckInAlts
+expr :: StgCaseGcFlag -> Env -> StgExpr -> (CgStgExpr, DIdSet)
+expr gcf env = go gcf
   where
-    go (StgApp occ as)
+    go _ (StgApp occ as)
       = (StgApp occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
-    go (StgLit lit) = (StgLit lit, emptyDVarSet)
-    go (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
-    go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
-    go StgLam{} = pprPanic "StgFVs: StgLam" empty
-    go (StgCase scrut bndr ty hc alts) = (StgCase scrut' bndr ty hc alts', fvs)
+    go _ (StgLit lit) = (StgLit lit, emptyDVarSet)
+    go _ (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
+    go _ (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
+    go _ StgLam{} = pprPanic "StgFVs: StgLam" empty
+    go gcf (StgCase scrut bndr ty hc alts) = (StgCase scrut' bndr ty hc alts', fvs)
       where
-        (scrut', scrut_fvs) = go scrut
+        (scrut', scrut_fvs) = go gcf scrut
         -- See Note [Tracking local binders]
-        (alts', alt_fvss) = mapAndUnzip (alt (addLocals [bndr] env)) alts
+        alt_gcf = gcFlagForCase gcf scrut alts
+        (alts', alt_fvss) = mapAndUnzip (alt alt_gcf (addLocals [bndr] env)) alts
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
-    go (StgLet ext bind body) = go_bind (StgLet ext) bind body
-    go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
-    go (StgTick tick e) = (StgTick tick e', fvs')
+    go gcf (StgLet ext bind body) = go_bind gcf (StgLet ext) bind body
+    go gcf (StgLetNoEscape ext bind body) = go_bind gcf (StgLetNoEscape ext) bind body
+    go gcf (StgTick tick e) = (StgTick tick e', fvs')
       where
-        (e', fvs) = go e
+        (e', fvs) = go gcf e
         fvs' = unionDVarSet (tickish tick) fvs
         tickish (Breakpoint _ ids) = mkDVarSet ids
         tickish _                  = emptyDVarSet
 
-    go_bind dc bind body = (dc bind' body', fvs)
+    go_bind gcf dc bind body = (dc bind' body', fvs)
       where
         -- See Note [Tracking local binders]
         env' = addLocals (boundIds bind) env
-        (body', body_fvs) = expr env' body
-        (bind', fvs) = binding env' body_fvs bind
+        (body', body_fvs) = expr gcf env' (addGCFlag gcf body)
+        (bind', fvs) = binding gcf env' body_fvs bind
 
-rhs :: Env -> StgRhs -> (CgStgRhs, DIdSet)
-rhs env (StgRhsClosure _ ccs uf bndrs body)
+rhs :: StgCaseGcFlag -> Env -> StgRhs -> (CgStgRhs, DIdSet)
+rhs gcf env (StgRhsClosure _ ccs uf bndrs body)
   = (StgRhsClosure fvs ccs uf bndrs body', fvs)
   where
     -- See Note [Tracking local binders]
-    (body', body_fvs) = expr (addLocals bndrs env) body
+    (body', body_fvs) = expr gcf (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
-rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
+rhs _ env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
 
-alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
-alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
+alt :: StgCaseGcFlag -> Env -> StgAlt -> (CgStgAlt, DIdSet)
+alt gcf env (con, bndrs, e) = ((con, bndrs, e'), fvs)
   where
     -- See Note [Tracking local binders]
-    (e', rhs_fvs) = expr (addLocals bndrs env) e
+    (e', rhs_fvs) = expr gcf (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
 
+-- | ...
 addGCFlag :: StgCaseGcFlag -> StgExpr -> StgExpr
-addGCFlag _ (StgLet ext bind body)
-  = StgLet ext bind (addGCFlag HeapCheckInAlts body)
+addGCFlag upstream_alloc (StgLet ext bind body)
+  = StgLet ext (gcFlagForBinding upstream_alloc bind)
+               (addGCFlag HeapCheckInAlts body)
+
+addGCFlag upstream_alloc (StgLetNoEscape ext bind body)
+  = StgLetNoEscape ext (gcFlagForBinding upstream_alloc bind)
+                       (addGCFlag HeapCheckInAlts body)
 
 addGCFlag upstream_alloc (StgCase scrut binds alt_ty _ alts)
-  | HeapCheckInAlts <- hc
+  | HeapCheckInAlts <- gcFlagForCase upstream_alloc scrut alts
   = StgCase (addGCFlag upstream_alloc scrut)
             binds
             alt_ty
-            hc
+            (gcFlagForCase upstream_alloc scrut alts)
             (map (addGCFlagToAlt HeapCheckUpstream) alts)
   | otherwise
   = StgCase (addGCFlag upstream_alloc scrut)
             binds
             alt_ty
-            hc
+            (gcFlagForCase upstream_alloc scrut alts)
             (map (addGCFlagToAlt upstream_alloc) alts)
   where
-    hc | stgExprMayBlockOrAllocate scrut   = HeapCheckInAlts
-       | isSingleton alts                  = HeapCheckUpstream
-       | HeapCheckInAlts == upstream_alloc = HeapCheckUpstream
-       | otherwise                         = HeapCheckInAlts
-    addGCFlagToAlt gc_flag (altCon, bs, rhs) =
-      (altCon, bs, addGCFlag gc_flag rhs)
+    addGCFlagToAlt gc_flag (altCon, bs, rhs)
+       = (altCon, bs, addGCFlag gc_flag rhs)
 
 addGCFlag _ e = e  -- Literals, variables, StgApp
 
+gcFlagForBinding :: StgCaseGcFlag -> StgBinding -> StgBinding
+gcFlagForBinding upstream_alloc (StgNonRec bind rhs)
+  = StgNonRec bind (gcFlagForRhs upstream_alloc rhs)
+gcFlagForBinding upstream_alloc (StgRec pairs)
+  = StgRec (map (fmap (gcFlagForRhs upstream_alloc)) pairs)
 
--- | TODO: Note
+gcFlagForRhs :: StgCaseGcFlag -> StgRhs -> StgRhs
+gcFlagForRhs upstream_alloc (StgRhsClosure fvs ccs uf bs e)
+  = StgRhsClosure fvs ccs uf bs (addGCFlag upstream_alloc e)
+gcFlagForRhs _ (StgRhsCon ccs dataCon args)
+  = StgRhsCon ccs dataCon args
+
+-- | ...
 stgExprMayBlockOrAllocate :: StgExpr -> Bool
 stgExprMayBlockOrAllocate (StgLet _ _ _) = True
 stgExprMayBlockOrAllocate (StgLetNoEscape _ _ body)
@@ -206,7 +220,7 @@ stgExprMayBlockOrAllocate (StgLetNoEscape _ _ body)
 stgExprMayBlockOrAllocate (StgConApp dataCon args _)
   | Just True <- isLiftedType_maybe (dataConRepType dataCon)
   , not (null args) = True
-stgExprMayBlockOrAllocate (StgOpApp (StgPrimOp op) _ _) = primOpCanGC op
+stgExprMayBlockOrAllocate (StgOpApp (StgPrimOp op) _ _) = primOpMayBlockOrAllocate op
 stgExprMayBlockOrAllocate (StgTick _ e) = stgExprMayBlockOrAllocate e
 stgExprMayBlockOrAllocate (StgCase scrut _ alt_type _ alts)
   | stgExprMayBlockOrAllocate scrut = True
@@ -214,58 +228,83 @@ stgExprMayBlockOrAllocate (StgCase scrut _ alt_type _ alts)
   | otherwise = any ( \(_, _, rhs) -> stgExprMayBlockOrAllocate rhs ) alts
 stgExprMayBlockOrAllocate _ = False
 
-primOpCanGC :: PrimOp -> Bool
+--  * If the scrutinee <scrut> requires any non-trivial work, we MUST GcInAlts.
+--    For example if <scrut> was (g x), then calling g might result in lots of
+--    allocation, so any heap check done at the start of f is irrelevant to the
+--    branches. They must do their own checks.
+--  * If there is just one alternative, then it's always good to amalgamate
+--  * If there is heap allocation in the code before the case, then we are going
+--    to do a heap-check upstream anyway. In that case, don't do one in the
+--    alterantives too. The single check might allocate too much space, but the
+--    alternatives that use less space simply move Hp back down again, which only
+--    costs one instruction.
+--  * Otherwise, if there no heap alloation upstream, put heap checks in each
+--    alternative. The reasoning here was that if one alternative needs heap and
+--    the other one  doesn't we don't want to pay the runtime for the heap check
+--    in the case where the heap-free alternative is taken.
+gcFlagForCase :: StgCaseGcFlag  -- ^ GC strategy of context
+              -> StgExpr        -- ^ scrutinee
+              -> [StgAlt]       -- ^ alternatives
+              -> StgCaseGcFlag
+gcFlagForCase gcf scrut alts
+  | stgExprMayBlockOrAllocate scrut = HeapCheckInAlts
+  | isSingleton alts                = HeapCheckUpstream
+  | HeapCheckInAlts <- gcf          = HeapCheckUpstream
+  | otherwise                       = HeapCheckInAlts
+
+primOpMayBlockOrAllocate :: PrimOp -> Bool
+primOpMayBlockOrAllocate p = case p of
 -- NoDuplicateOp = ... blocking?
-primOpCanGC NewByteArrayOp_Char = True -- calls MAYBE_GC_N
-primOpCanGC NewPinnedByteArrayOp_Char = True -- calls MAYBE_GC_N
-primOpCanGC NewAlignedPinnedByteArrayOp_Char = True -- calls MAYBE_GC
-primOpCanGC ResizeMutableByteArrayOp_Char = True -- calls stg_newByteArrayzh
-primOpCanGC NewArrayOp = True -- calls MAYBE_GC
-primOpCanGC CloneArrayOp = True -- calls cloneArray which may call MAYBE_GC
-primOpCanGC CloneMutableArrayOp = True -- calls cloneArray which may call MAYBE_GC
-primOpCanGC FreezeArrayOp = True -- calls cloneArray which may call MAYBE_GC
-primOpCanGC ThawArrayOp = True -- calls cloneArray which may call MAYBE_GC
-primOpCanGC NewArrayArrayOp = True -- calls MAYBE_GC_N
-primOpCanGC NewSmallArrayOp = True -- calls MAYBE_GC
-primOpCanGC UnsafeThawArrayOp = True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
-primOpCanGC UnsafeThawSmallArrayOp = True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
-primOpCanGC CloneSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
-primOpCanGC CloneSmallMutableArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
-primOpCanGC FreezeSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
-primOpCanGC ThawSmallArrayOp = True -- calls cloneSmallArray which may call MAYBE_GC
-primOpCanGC NewMutVarOp = True -- calls ALLOC_PRIM_P
-primOpCanGC AtomicModifyMutVar2Op = True -- calls HP_CHK_GEN_TICKY
-primOpCanGC AtomicModifyMutVar_Op = True -- calls HP_CHK_GEN_TICKY
-primOpCanGC MkWeakOp = True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
-primOpCanGC AddCFinalizerToWeakOp = True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
-primOpCanGC FloatDecode_IntOp = True -- calls STK_CHK_GEN_N
-primOpCanGC DoubleDecode_2IntOp = True -- calls STK_CHK_GEN_N
-primOpCanGC DoubleDecode_Int64Op = True -- calls STK_CHK_GEN_N
-primOpCanGC ForkOp = True -- calls MAYBE_GC_P
-primOpCanGC ForkOnOp = True -- calls MAYBE_GC
-primOpCanGC AtomicallyOp = True -- calls MAYBE_GC_P (and STK_CHK_GEN)
-primOpCanGC CatchSTMOp = True -- STK_CHK_GEN
-primOpCanGC CatchRetryOp = True -- calls MAYBE_GC_PP (and STK_CHK_GEN)
-primOpCanGC RetryOp = True -- calls MAYBE_GC_
-primOpCanGC NewTVarOp = True -- calls ALLOC_PRIM_P
-primOpCanGC ReadTVarOp = True -- calls MAYBE_GC_P.. how about stg_readTVarIO?
-primOpCanGC WriteTVarOp = True -- calls MAYBE_GC_PP
-primOpCanGC NewMVarOp = True -- calls ALLOC_PRIM_
-primOpCanGC TakeMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
-primOpCanGC PutMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
-primOpCanGC ReadMVarOp = True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE and GC_PRIM_P (also is blocking)
-primOpCanGC MakeStableNameOp = True -- calls MAYBE_GC_P
-primOpCanGC NewBCOOp = True -- calls ALLOC_PRIM
-primOpCanGC MkApUpd0_Op = True -- calls HP_CHK_P
-primOpCanGC UnpackClosureOp = True -- calls ALLOC_PRIM_P
-primOpCanGC WaitReadOp = True -- blocking
-primOpCanGC WaitWriteOp = True -- blocking
-primOpCanGC DelayOp = True -- blocking
-primOpCanGC _ = False
+  NewByteArrayOp_Char -> True -- calls MAYBE_GC_N
+  NewPinnedByteArrayOp_Char  -> True -- calls MAYBE_GC_N
+  NewAlignedPinnedByteArrayOp_Char  -> True -- calls MAYBE_GC
+  ResizeMutableByteArrayOp_Char  -> True -- calls stg_newByteArrayzh
+  NewArrayOp -> True -- calls MAYBE_GC
+  CloneArrayOp  -> True -- calls cloneArray which may call MAYBE_GC
+  CloneMutableArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  FreezeArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  ThawArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  NewArrayArrayOp -> True -- calls MAYBE_GC_N
+  NewSmallArrayOp -> True -- calls MAYBE_GC
+  UnsafeThawArrayOp -> True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+  UnsafeThawSmallArrayOp -> True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+  CloneSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  CloneSmallMutableArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  FreezeSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  ThawSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  NewMutVarOp -> True -- calls ALLOC_PRIM_P
+  AtomicModifyMutVar2Op -> True -- calls HP_CHK_GEN_TICKY
+  AtomicModifyMutVar_Op -> True -- calls HP_CHK_GEN_TICKY
+  MkWeakOp -> True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+  AddCFinalizerToWeakOp -> True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+  FloatDecode_IntOp -> True -- calls STK_CHK_GEN_N
+  DoubleDecode_2IntOp -> True -- calls STK_CHK_GEN_N
+  DoubleDecode_Int64Op -> True -- calls STK_CHK_GEN_N
+  ForkOp -> True -- calls MAYBE_GC_P
+  ForkOnOp -> True -- calls MAYBE_GC
+  AtomicallyOp -> True -- calls MAYBE_GC_P (and STK_CHK_GEN)
+  CatchSTMOp -> True -- STK_CHK_GEN
+  CatchRetryOp -> True -- calls MAYBE_GC_PP (and STK_CHK_GEN)
+  RetryOp -> True -- calls MAYBE_GC_
+  NewTVarOp -> True -- calls ALLOC_PRIM_P
+  ReadTVarOp -> True -- calls MAYBE_GC_P.. how about stg_readTVarIO?
+  WriteTVarOp -> True -- calls MAYBE_GC_PP
+  NewMVarOp -> True -- calls ALLOC_PRIM_
+  TakeMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+  PutMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+  ReadMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE and GC_PRIM_P (also is blocking)
+  MakeStableNameOp -> True -- calls MAYBE_GC_P
+  NewBCOOp -> True -- calls ALLOC_PRIM
+  MkApUpd0_Op -> True -- calls HP_CHK_P
+  UnpackClosureOp -> True -- calls ALLOC_PRIM_P
+  WaitReadOp -> True -- blocking
+  WaitWriteOp -> True -- blocking
+  DelayOp -> True -- blocking
+  _ -> False
 
 -- borrowed from GHC.StgToCmm.Expr
 isSimpleScrut :: StgExpr -> AltType -> Bool
-isSimpleScrut (StgOpApp (StgPrimOp op) _ _) _ = primOpCanGC op
+isSimpleScrut (StgOpApp (StgPrimOp op) _ _) _ = primOpMayBlockOrAllocate op
 isSimpleScrut (StgLit _) _ = True
 isSimpleScrut (StgApp _ []) (PrimAlt _) = True
 isSimpleScrut _  _ = False
