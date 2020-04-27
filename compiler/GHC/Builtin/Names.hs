@@ -111,6 +111,10 @@ by the user. For those things that *can* appear in source programs,
 
      See also Note [Built-in syntax and the OrigNameCache]
 
+Note that one-tuples are an exception to the rule, as they do get assigned
+known keys. See
+Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
+in GHC.Builtin.Types.
 
 Note [The integer library]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
