@@ -680,6 +680,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
+                         `setCprInfo`           mkCprSig wrap_arity wrap_cpr
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
@@ -695,6 +696,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
+
+             wrap_cpr = conCpr (dataConTag data_con) (replicate wkr_arity topCpr)
 
              wrap_prag = dataConWrapperInlinePragma
                          `setInlinePragmaActivation` activateDuringFinal
@@ -740,6 +743,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
              -- wrapper
+    wkr_arity    = dataConRepArity data_con
 
     new_tycon = isNewTyCon tycon
     arg_ibangs

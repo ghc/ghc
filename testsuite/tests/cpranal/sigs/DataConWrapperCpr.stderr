@@ -7,6 +7,6 @@ DataConWrapperCpr.$tc'Foo: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#),
 DataConWrapperCpr.$tcFoo: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
                               #c5(*))
 DataConWrapperCpr.$trModule: #c1(#c1(#), #c1(#))
-DataConWrapperCpr.foo: #c1(#)
+DataConWrapperCpr.foo: #c1(*)
 
 
