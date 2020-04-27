@@ -1215,9 +1215,6 @@ void freeObjectCode (ObjectCode *oc)
                            oc->sections[i].mapped_size);
                     break;
                 case SECTION_M32:
-                    IF_DEBUG(zero_on_gc,
-                        memset(oc->sections[i].start,
-                            0x00, oc->sections[i].size));
                     // Freed by m32_allocator_free
                     break;
 #endif
