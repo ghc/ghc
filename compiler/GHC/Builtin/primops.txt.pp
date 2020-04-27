@@ -89,7 +89,7 @@ defaults
 -- conditions. Now that `foreign import prim` exists, only those primops
 -- which have both internal and external implementations ought to be
 -- this file. The rest aren't really primops, since they don't need
--- bespoke compiler support but just a general way to interface with
+-- bespoke iompiler support but just a general way to interface with
 -- C--. They are just foreign calls.
 --
 -- Unfortunately, for the time being most of the primops which should be
@@ -3240,10 +3240,10 @@ primop SeqOp "seq#" GenPrimOp
    -- See Note [seq# magic] in GHC.Core.Op.ConstantFold
 
 primop KeepAliveOp "keepAlive#" GenPrimOp
-   o -> p -> p
+   o -> State# RealWorld -> (State# RealWorld -> p) -> p
    { TODO. }
    with
-   strictness = { \ _arity -> mkClosedStrictSig [topDmd, strictApply1Dmd] topDiv }
+   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictApply1Dmd] topDiv }
 
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)

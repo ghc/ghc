@@ -96,9 +96,10 @@ import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
+import GHC.Builtin.Names      ( runRWKey )
+import GHC.Builtin.PrimOps  ( PrimOp(KeepAliveOp) )
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import GHC.Builtin.Names      ( runRWKey )
 import Util
 import Outputable
 import FastString
@@ -402,7 +403,7 @@ isContPrimOp :: Id -> Bool
 isContPrimOp fn
   | fn `hasKey` runRWKey = True
   | Just KeepAliveOp <- isPrimOpId_maybe fn = True
-  | otherwise = Falsej
+  | otherwise = False
 
 lvlApp :: LevelEnv
        -> CoreExprWithFVs

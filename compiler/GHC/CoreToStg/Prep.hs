@@ -24,9 +24,9 @@ import GHC.Core.Opt.OccurAnal
 
 import GHC.Driver.Types
 import GHC.Builtin.Names
-import GHC.Builtin.PrimOps    ( PrimOp(TouchOp) )
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import GHC.Types.Id.Make      ( mkPrimOpId, realWorldPrimId )
+import GHC.Builtin.PrimOps    ( PrimOp(KeepAliveOp) )
+import GHC.Types.Id.Make      ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
@@ -58,7 +58,7 @@ import GHC.Driver.Ways
 import Util
 import Outputable
 import FastString
-import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.Name   ( mkSystemVarName, NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
@@ -781,17 +781,9 @@ runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
 
 Note [CorePrep handling of keepAlive#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Lower keepAlive# applications to touch#. Specifically:
+TODO
 
     keepAlive# @a @r @b x k s0
-
-is lowered to:
-
-    case k s of _b0 { (# y, s1 #) ->
-      case touch# @a x s1 of s2 { _ ->
-        (# y, s2 #)
-      }
-    }
 
 -}
 
@@ -866,16 +858,28 @@ cpeApp top_env expr
 
     -- See Note [CorePrep handling of keepAlive#]
     cpe_app env (Var f) [CpeApp (Type arg_rep), CpeApp (Type arg_ty),
-                         CpeApp (Type _result_rep), CpeApp (Type result_ty),
-                         CpeApp x, CpeApp y] 2
+                         CpeApp (Type result_rep), CpeApp (Type result_ty),
+                         CpeApp x, CpeApp s, CpeApp y] _n
         | Just KeepAliveOp <- isPrimOpId_maybe f
-        = do { y' <- newVar result_ty
-             ; s2 <- newVar realWorldStatePrimTy
-             ; let touchId = mkPrimOpId TouchOp
-                   expr = Case y y' result_ty [(DEFAULT, [], rhs1)]
-                   rhs1 = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, x, Var realWorldPrimId]
-                          in Case scrut s2 result_ty [(DEFAULT, [], Var y')]
-             ; pprTrace "cpe_app" (ppr expr) $ cpeBody env expr
+        = do { uniq <- getUniqueM
+             ; let name = mkSystemVarName uniq (fsLit "$j")
+                   ty = (mkVisFunTy realWorldStatePrimTy result_ty)
+                   id_info = vanillaIdInfo `setArityInfo` 1
+                   bndr = mkLocalVar (JoinId 1) name ty id_info
+               -- We need to transform the application into ANF so we must bind
+               -- the continuation. However, since it might contain join points
+               -- we must join-bind it.
+             ; (bndr', rhs) <- cpeJoinPair env bndr y
+             ; (x_floats, x') <- cpeArg env evalDmd x arg_ty
+             ; (s_floats, s') <- cpeArg env evalDmd s realWorldStatePrimTy
+             ; let body = pprTrace "cpe_app" (ppr expr) $
+                     Let (NonRec bndr' rhs) $
+                     mkApps (Var f)
+                      [ Type arg_rep, Type arg_ty
+                      , Type result_rep, Type result_ty
+                      , x', s', Var bndr
+                      ]
+             ; return (x_floats `appendFloats` s_floats, body)
              }
     cpe_app _env (Var f) args n
         | Just KeepAliveOp <- isPrimOpId_maybe f

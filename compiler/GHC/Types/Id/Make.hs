@@ -76,7 +76,7 @@ import GHC.Driver.Session
 import Outputable
 import FastString
 import ListSetOps
-import GHC.Types.Var (VarBndr(Bndr), setIdDetails)
+import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )

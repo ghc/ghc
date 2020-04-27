@@ -54,7 +54,6 @@ import ErrUtils             ( MsgDoc, Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
-import GHC.Types.Unique     ( hasKey )
 import Outputable
 import GHC.Types.Module           ( Module )
 import qualified ErrUtils as Err
@@ -182,9 +181,6 @@ lintStgExpr app@(StgConApp con args _arg_tys) = do
                ppr app)
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
-
-lintStgExpr (StgOpApp (StgPrimOp KeepAliveOp) _ _) =
-    addErrL (text "keepAlive# should have been desugared by CorePrep")
 
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args

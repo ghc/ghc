@@ -90,7 +90,7 @@ withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
                     (# s', rootAddr #) -> (# s', Ptr rootAddr #) )
   blockList <- mkBlockList buffer
   let serialized = SerializedCompact blockList rootPtr
-  IO (\s1 -> case func serialized of IO action' -> keepAlive# buffer (action' s1))
+  IO (\s1 -> case func serialized of IO action' -> keepAlive# buffer s1 action')
 
 fixupPointers :: Addr# -> Addr# -> State# RealWorld ->
                  (# State# RealWorld, Maybe (Compact a) #)

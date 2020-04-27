@@ -40,6 +40,7 @@ import Digraph          ( SCC(..), Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq
                         , stronglyConnCompFromEdgedVerticesUniqR )
 import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.PrimOps( PrimOp(KeepAliveOp) )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -1889,6 +1890,15 @@ occAnalApp env (Var fun, args, ticks)
   , [t1, t2, arg]  <- args
   , let (usage, arg') = occAnalRhs env (Just 1) arg
   = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+
+  | Just KeepAliveOp <- isPrimOpId_maybe fun
+  , [r1, t1, r2, t2, x, s, k]  <- args
+  , let (x_usage, x') = occAnal env x
+  , let (s_usage, s') = occAnal env s
+  , let (k_usage, k') = occAnalRhs env (Just 1) k
+  = ( x_usage `andUDs` s_usage `andUDs` k_usage
+    , mkTicks ticks $ mkApps (Var fun) [r1, t1, r2, t2, x', s', k']
+    )
 
   | otherwise
   = (all_uds, mkTicks ticks $ mkApps fun' args')

@@ -37,8 +37,9 @@ import GHC.Core.DataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
-import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
+import GHC.Builtin.PrimOps  ( PrimOp(SeqOp, KeepAliveOp) )
 import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Types.Demand ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
@@ -61,7 +62,6 @@ import FastString
 import Util
 import ErrUtils
 import GHC.Types.Module ( moduleName, pprModuleName )
-import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 
 
 {-
@@ -1955,9 +1955,10 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
 --       ~>
 --     keepAlive# @arg_rep @arg_ty @out_rep @out_ty x (\s -> K[rhs]) s0
 rebuildContPrimop :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFloats, OutExpr))
-rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args })
+                  (ApplyToVal { sc_arg = k, sc_env = k_se, sc_cont = cont})
   | Just KeepAliveOp <- isPrimOpId_maybe fun
-  , [ ValArg y
+  , [ ValArg s0
     , ValArg x
     , TyArg {} -- res_ty
     , TyArg {} -- res_rep
@@ -1965,27 +1966,30 @@ rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
     , TyArg {as_arg_ty=arg_rep}
     ] <- rev_args
   = Just $ do
-       { let ty' = contResultType cont
-       ; j <- newJoinId [] ty'
+       { s <- newId (fsLit "s") realWorldStatePrimTy
+       ; let k_env = (k_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+             k_cont = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
+                                 , sc_env = k_env, sc_cont = cont }
+       ; k' <- simplExprC k_env k k_cont
        ; let env' = zapSubstEnv env
-       ; y' <- simplExprC env' y cont
-       ; let bind = NonRec j y'
+       ; s0' <- simplExpr env' s0
        ; x' <- simplExpr env' x
        ; arg_rep' <- simplType env' arg_rep
        ; arg_ty' <- simplType env' arg_ty
-       ; let call' = mkApps (Var fun)
+       ; let ty' = contResultType cont
+             call' = mkApps (Var fun)
                [ mkTyArg arg_rep', mkTyArg arg_ty'
                , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
                , x'
-               , Var j
+               , s0'
+               , Lam s k'
                ]
-       ; --pprTrace "rebuild keepAlive" (ppr fun $$ ppr rev_args $$ ppr cont) $
-         return (emptyFloats env `extendFloats` bind, call') }
+       ; return (emptyFloats env, call') }
 
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
 -- K[ runRW# rr ty (\s. body) ]  -->  runRW rr' ty' (\s. K[ body ])
 rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont })
+                  (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont })
   | fun `hasKey` runRWKey
   , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args

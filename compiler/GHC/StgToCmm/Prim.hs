@@ -26,6 +26,7 @@ module GHC.StgToCmm.Prim (
 
 import GhcPrelude hiding ((<*>))
 
+import {-# SOURCE #-} GHC.StgToCmm.Expr ( cgExpr )
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Env
@@ -38,6 +39,7 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Basic
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
@@ -81,6 +83,16 @@ cgOpApp :: StgOp        -- The op
 cgOpApp (StgFCallOp fcall ty) stg_args res_ty
   = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
+
+cgOpApp (StgPrimOp KeepAliveOp) args _res_ty
+  | [x, s, StgVarArg k] <- args = do
+      { emitComment $ fsLit "keepAlive#"
+      ; r <- cgExpr (StgApp k [s])
+      ; cmm_args <- getNonVoidArgAmodes [x, StgVarArg realWorldPrimId]
+      ; emitPrimCall [] MO_Touch cmm_args
+      ; return r
+      }
+  | otherwise = pprPanic "ill-formed keepAlive#" (ppr args)
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
@@ -1521,6 +1533,8 @@ emitPrimOp dflags = \case
   TraceEventBinaryOp -> alwaysExternal
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
+
+  KeepAliveOp -> panic "keepAlive# should have been desugared by CorePrep"
 
  where
   platform = targetPlatform dflags

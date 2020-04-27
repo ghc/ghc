@@ -33,6 +33,7 @@ import GHC.Core.Opt.Monad
 import Bag
 import GHC.Types.Literal
 import GHC.Core.DataCon
+import GHC.Builtin.PrimOps  ( PrimOp(KeepAliveOp) )
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Utils.TcType ( isFloatingTy )
 import GHC.Types.Var as Var
@@ -927,16 +928,30 @@ lintCoreExpr e@(App _ _)
   = failWithL (text "Invalid runRW# application")
 
   | Var fun <- fun
-  , Just KeepAliveOp <- isPrimOpId_maybe f
-  , [arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5, arg6] <- args
-  = do { fun_ty6 <- lintCoreArgs (idType fun)
-                      [ arg_ty1, arg_ty2, arg_ty3, arg_ty4, arg5 ]
-       ; arg6_ty <- lintJoinLams 0 (Just fun) arg6     -- f  :: State# RW -> (# State# RW, o #)
-       ; lintValApp arg6 fun_ty6 arg6_ty
+  , Just KeepAliveOp <- isPrimOpId_maybe fun
+  , arg_rep : arg_ty : res_rep : res_ty : arg : s : k : rest <- args
+  = pprTrace "keepAlive Lint" empty $
+    do { fun_ty1 <- lintCoreArgs (idType fun)
+                      [ arg_rep, arg_ty, res_rep, res_ty, arg, s ]
+       ; let lintRunRWCont :: CoreArg -> LintM LintedType
+             lintRunRWCont (Cast expr co) = do
+                ty <- lintRunRWCont expr
+                lintCastExpr expr ty co
+             lintRunRWCont expr@(Lam _ _) = do
+                lintJoinLams 1 (Just fun) expr
+             lintRunRWCont expr@(Var v)
+               | isJoinId v
+               , idJoinArity v == 1
+               = return (idType v)
+             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             -- TODO: Look through ticks?
+       ; k_ty    <- lintRunRWCont k
+       ; fun_ty2 <- lintValApp k fun_ty1 k_ty
+       ; lintCoreArgs fun_ty2 rest
        }
 
   | Var fun <- fun
-  , Just KeepAliveOp <- isPrimOpId_maybe f
+  , Just KeepAliveOp <- isPrimOpId_maybe fun
   = failWithL (text "Invalid keepAlive# application")
 
   | otherwise

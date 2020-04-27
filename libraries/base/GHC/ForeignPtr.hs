@@ -55,7 +55,6 @@ import GHC.Base
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
-import GHC.Prim         ( keepAlive# )
 
 import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
 
@@ -412,7 +411,7 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- 'Storable' class.
 withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
   case f (unsafeForeignPtrToPtr fo) of
-    IO action# -> keepAlive# r (action# s)
+    IO action# -> keepAlive# r s action#
 
 
 touchForeignPtr :: ForeignPtr a -> IO ()
