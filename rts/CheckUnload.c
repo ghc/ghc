@@ -17,6 +17,7 @@
 #include "CheckUnload.h"
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
+#include "sm/HeapUtils.h"
 
 //
 // Code that we unload may be referenced from:
@@ -147,12 +148,10 @@ static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
 static void checkAddress (HashTable *addrs, const void *addr,
         OCSectionIndices *s_indices)
 {
-    ObjectCode *oc;
-
     if (!lookupHashTable(addrs, (W_)addr)) {
         insertHashTable(addrs, (W_)addr, addr);
 
-        oc = findOC(s_indices, addr);
+        ObjectCode *oc = findOC(s_indices, addr);
         if (oc != NULL) {
             oc->referenced = 1;
             return;
@@ -160,186 +159,359 @@ static void checkAddress (HashTable *addrs, const void *addr,
     }
 }
 
-static void searchStackChunk (HashTable *addrs, StgPtr sp, StgPtr stack_end,
+static StgPtr
+search_small_bitmap (HashTable *addrs, StgPtr p, StgWord size, StgWord bitmap,
         OCSectionIndices *s_indices)
 {
-    StgPtr p;
-    const StgRetInfoTable *info;
-
-    p = sp;
-    while (p < stack_end) {
-        info = get_ret_itbl((StgClosure *)p);
-
-        switch (info->i.type) {
-        case RET_SMALL:
-        case RET_BIG:
-            checkAddress(addrs, (const void*)info, s_indices);
-            break;
-
-        default:
-            break;
+    while (size > 0) {
+        if ((bitmap & 1) == 0) {
+            checkAddress(addrs, (void*)*p, s_indices);
         }
+        p++;
+        bitmap = bitmap >> 1;
+        size--;
+    }
+    return p;
+}
 
-        p += stack_frame_sizeW((StgClosure*)p);
+typedef struct {
+    HashTable *addrs;
+    OCSectionIndices *s_indices;
+} SearchArgs;
+
+static void
+search_payload_loc(StgClosure **p, void *args_)
+{
+    SearchArgs *args = (SearchArgs*)args_;
+    checkAddress(args->addrs, *p, args->s_indices);
+}
+
+static void
+search_large_bitmap (HashTable *addrs, StgPtr p, StgLargeBitmap *large_bitmap, StgWord size,
+        OCSectionIndices *s_indices)
+{
+    SearchArgs args = { .addrs = addrs, .s_indices = s_indices };
+    walk_large_bitmap(search_payload_loc, (StgClosure**)p, large_bitmap, size, &args);
+}
+
+static void
+search_PAP_payload (HashTable *addrs, StgClosure *fun, StgClosure **payload, StgWord size,
+        OCSectionIndices *s_indices)
+{
+    const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(fun));
+    StgPtr p = (StgPtr)payload;
+
+    StgWord bitmap;
+    switch (fun_info->f.fun_type) {
+    case ARG_GEN:
+        bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+        goto small_bitmap;
+    case ARG_GEN_BIG:
+        search_large_bitmap(addrs, p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
+        break;
+    case ARG_BCO:
+        search_large_bitmap(addrs, (StgPtr)payload, BCO_BITMAP(fun), size, s_indices);
+        break;
+    default:
+        bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+    small_bitmap:
+        search_small_bitmap(addrs, p, size, bitmap, s_indices);
+        break;
     }
 }
 
+static StgPtr
+search_arg_block (HashTable *addrs, const StgFunInfoTable *fun_info, StgClosure **args,
+        OCSectionIndices *s_indices)
+{
+    StgWord bitmap;
+    StgWord size;
+
+    StgPtr p = (StgPtr)args;
+    switch (fun_info->f.fun_type) {
+    case ARG_GEN:
+        bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+        size = BITMAP_SIZE(fun_info->f.b.bitmap);
+        goto small_bitmap;
+    case ARG_GEN_BIG:
+        size = GET_FUN_LARGE_BITMAP(fun_info)->size;
+        search_large_bitmap(addrs, p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
+        p += size;
+        break;
+    default:
+        bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+        size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+    small_bitmap:
+        p = search_small_bitmap(addrs, p, size, bitmap, s_indices);
+        break;
+    }
+    return p;
+}
+
+static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
+        OCSectionIndices *s_indices)
+{
+    StgWord bitmap;
+    StgWord size;
+
+    while (p < stack_end) {
+        const StgRetInfoTable *info = get_ret_itbl((StgClosure *)p);
+
+        switch (info->i.type) {
+
+        case UPDATE_FRAME:
+        {
+            StgUpdateFrame *frame = (StgUpdateFrame *)p;
+            checkAddress(addrs, frame->updatee, s_indices);
+            p += sizeofW(StgUpdateFrame);
+            continue;
+        }
+
+        // small bitmap (< 32 entries, or 64 on a 64-bit machine)
+        case CATCH_STM_FRAME:
+        case CATCH_RETRY_FRAME:
+        case ATOMICALLY_FRAME:
+        case UNDERFLOW_FRAME:
+        case STOP_FRAME:
+        case CATCH_FRAME:
+        case RET_SMALL:
+        {
+            bitmap = BITMAP_BITS(info->i.layout.bitmap);
+            size   = BITMAP_SIZE(info->i.layout.bitmap);
+            p++;
+            p = search_small_bitmap(addrs, p, size, bitmap, s_indices);
+            continue;
+        }
+
+        case RET_BCO:
+        {
+            p++;
+            checkAddress(addrs, (void*)*p, s_indices);
+            StgBCO *bco = (StgBCO *)*p;
+            p++;
+            StgWord size = BCO_BITMAP_SIZE(bco);
+            search_large_bitmap(addrs, p, BCO_BITMAP(bco), size, s_indices);
+            p += size;
+            continue;
+        }
+
+        // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
+        case RET_BIG:
+        {
+            StgWord size = GET_LARGE_BITMAP(&info->i)->size;
+            p++;
+            search_large_bitmap(addrs, p, GET_LARGE_BITMAP(&info->i), size, s_indices);
+            p += size;
+            continue;
+        }
+
+        case RET_FUN:
+        {
+            StgRetFun *ret_fun = (StgRetFun *)p;
+            checkAddress(addrs, ret_fun->fun, s_indices);
+            const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+            p = search_arg_block(addrs, fun_info, ret_fun->payload, s_indices);
+            continue;
+        }
+
+        default:
+            barf("searchStackChunk: weird activation record found on stack: %d", (int)(info->i.type));
+        }
+    }
+}
 
 static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
         OCSectionIndices *s_indices)
 {
-    StgPtr p;
-    const StgInfoTable *info;
-    uint32_t size;
-    bool prim;
-
     for (; bd != NULL; bd = bd->link) {
 
         if (bd->flags & BF_PINNED) {
-            // Assume that objects in PINNED blocks cannot refer to
+            // Assume that objects in PINNED blocks cannot refer to dynamically
+            // loaded objects
             continue;
         }
 
-        p = bd->start;
+        StgPtr p = bd->start;
         while (p < bd->free) {
-            info = get_itbl((StgClosure *)p);
-            prim = false;
+            StgClosure *c = (StgClosure*)p;
+            const StgInfoTable *info = get_itbl(c);
+            uint32_t size;
+
+            checkAddress(addrs, info, s_indices);
+
+            // NOTE: No need to check SRTs below because we can't refer to a
+            // dynamically loaded object from SRTs.
 
             switch (info->type) {
 
-            case THUNK:
-                size = thunk_sizeW_fromITBL(info);
-                break;
-
-            case THUNK_1_1:
-            case THUNK_0_2:
-            case THUNK_2_0:
-                size = sizeofW(StgThunkHeader) + 2;
-                break;
-
-            case THUNK_1_0:
-            case THUNK_0_1:
-            case THUNK_SELECTOR:
-                size = sizeofW(StgThunkHeader) + 1;
-                break;
-
+            case CONSTR:
+            case CONSTR_1_0:
+            case CONSTR_0_1:
+            case CONSTR_2_0:
+            case CONSTR_1_1:
+            case CONSTR_0_2:
+            case CONSTR_NOCAF:
             case FUN:
             case FUN_1_0:
             case FUN_0_1:
             case FUN_1_1:
             case FUN_0_2:
             case FUN_2_0:
-            case CONSTR:
-            case CONSTR_NOCAF:
-            case CONSTR_1_0:
-            case CONSTR_0_1:
-            case CONSTR_1_1:
-            case CONSTR_0_2:
-            case CONSTR_2_0:
-                size = sizeW_fromITBL(info);
-                break;
-
-            case BLACKHOLE:
-            case BLOCKING_QUEUE:
-                prim = true;
-                size = sizeW_fromITBL(info);
-                break;
-
-            case IND:
-                // Special case/Delicate Hack: INDs don't normally
-                // appear, since we're doing this heap census right
-                // after GC.  However, GarbageCollect() also does
-                // resurrectThreads(), which can update some
-                // blackholes when it calls raiseAsync() on the
-                // resurrected threads.  So we know that any IND will
-                // be the size of a BLACKHOLE.
-                prim = true;
-                size = BLACKHOLE_sizeW();
-                break;
-
-            case BCO:
-                prim = true;
-                size = bco_sizeW((StgBCO *)p);
-                break;
-
-            case MVAR_CLEAN:
-            case MVAR_DIRTY:
-            case TVAR:
-            case WEAK:
+            case FUN_STATIC: // TODO: skip this?
             case PRIM:
             case MUT_PRIM:
+            case MVAR_CLEAN:
+            case MVAR_DIRTY:
             case MUT_VAR_CLEAN:
             case MUT_VAR_DIRTY:
-                prim = true;
-                size = sizeW_fromITBL(info);
-                break;
-
-            case AP:
-                prim = true;
-                size = ap_sizeW((StgAP *)p);
-                break;
-
-            case PAP:
-                prim = true;
-                size = pap_sizeW((StgPAP *)p);
-                break;
-
-            case AP_STACK:
+            case TVAR:
+            case BCO:
+            case BLOCKING_QUEUE:
             {
-                StgAP_STACK *ap = (StgAP_STACK *)p;
-                prim = true;
-                size = ap_stack_sizeW(ap);
-                searchStackChunk(addrs, (StgPtr)ap->payload,
-                                 (StgPtr)ap->payload + ap->size, s_indices);
+                for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
+                    checkAddress(addrs, c->payload[i], s_indices);
+                }
+                size = closure_sizeW(c);
+                break;
+            }
+
+            case THUNK:
+            case THUNK_1_0:
+            case THUNK_0_1:
+            case THUNK_2_0:
+            case THUNK_1_1:
+            case THUNK_0_2:
+            case THUNK_SELECTOR:
+            case THUNK_STATIC: // TODO: skip this?
+            {
+                StgThunk *thunk = (StgThunk*)c;
+                for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
+                    checkAddress(addrs, thunk->payload[i], s_indices);
+                }
+                size = closure_sizeW(c);
                 break;
             }
 
             case ARR_WORDS:
-                prim = true;
-                size = arr_words_sizeW((StgArrBytes*)p);
+            {
+                size = arr_words_sizeW((StgArrBytes*)c);
                 break;
+            }
 
             case MUT_ARR_PTRS_CLEAN:
             case MUT_ARR_PTRS_DIRTY:
             case MUT_ARR_PTRS_FROZEN_CLEAN:
             case MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+            {
+                StgMutArrPtrs *a = (StgMutArrPtrs*)c;
+                for (W_ i = 0; i < a->ptrs; ++i) {
+                    checkAddress(addrs, a->payload[i], s_indices);
+                }
+                size = mut_arr_ptrs_sizeW(a);
                 break;
+            }
 
             case SMALL_MUT_ARR_PTRS_CLEAN:
             case SMALL_MUT_ARR_PTRS_DIRTY:
             case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
             case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
+            {
+                StgSmallMutArrPtrs *a = (StgSmallMutArrPtrs*)c;
+                for (W_ i = 0; i < a->ptrs; ++i) {
+                    checkAddress(addrs, a->payload[i], s_indices);
+                }
+                size = small_mut_arr_ptrs_sizeW(a);
                 break;
+            }
 
             case TSO:
-                prim = true;
+            {
+                StgTSO *tso = (StgTSO*)c;
+
+                if (tso->bound != NULL) {
+                    checkAddress(addrs, tso->bound->tso, s_indices);
+                }
+
+                checkAddress(addrs, tso->blocked_exceptions, s_indices);
+                checkAddress(addrs, tso->bq, s_indices);
+                checkAddress(addrs, tso->trec, s_indices);
+                checkAddress(addrs, tso->stackobj, s_indices);
+                checkAddress(addrs, tso->_link, s_indices);
+                checkAddress(addrs, tso->block_info.closure, s_indices);
+
                 size = sizeofW(StgTSO);
                 break;
+            }
 
-            case STACK: {
-                StgStack *stack = (StgStack*)p;
-                prim = true;
-                searchStackChunk(addrs, stack->sp,
-                                 stack->stack + stack->stack_size, s_indices);
+            case STACK:
+            {
+                StgStack *stack = (StgStack*)c;
+                searchStackChunk(addrs, stack->sp, stack->stack + stack->stack_size, s_indices);
                 size = stack_sizeW(stack);
                 break;
             }
 
-            case TREC_CHUNK:
-                prim = true;
-                size = sizeofW(StgTRecChunk);
+            case WEAK:
+            {
+                StgWeak *w = (StgWeak*)c;
+                checkAddress(addrs, w->value, s_indices);
+                checkAddress(addrs, w->key, s_indices);
+                checkAddress(addrs, w->finalizer, s_indices);
+                checkAddress(addrs, w->cfinalizers, s_indices);
+                size = closure_sizeW(c);
                 break;
-
-            default:
-                barf("searchHeapBlocks, unknown object: %d", info->type);
             }
 
-            if (!prim) {
-                checkAddress(addrs,info, s_indices);
+            case AP_STACK:
+            {
+                StgAP_STACK *ap = (StgAP_STACK*)c;
+                checkAddress(addrs, ap->fun, s_indices);
+                searchStackChunk(addrs, (StgPtr)ap->payload, (StgPtr)ap->payload + ap->size, s_indices);
+                size = ap_stack_sizeW(ap);
+                break;
+            }
+
+            case PAP:
+            {
+                StgPAP *pap = (StgPAP*)c;
+                checkAddress(addrs, pap->fun, s_indices);
+                search_PAP_payload(addrs, pap->fun, pap->payload, pap->n_args, s_indices);
+                size = closure_sizeW(c);
+                break;
+            }
+
+            case AP:
+            {
+                StgAP *ap = (StgAP*)c;
+                checkAddress(addrs, ap->fun, s_indices);
+                search_PAP_payload(addrs, ap->fun, ap->payload, ap->n_args, s_indices);
+                size = closure_sizeW(c);
+                break;
+            }
+
+            case IND:
+            case IND_STATIC: // TODO: skip this?
+            case BLACKHOLE:
+            {
+                checkAddress(addrs, ((StgInd*)c)->indirectee, s_indices);
+                size = closure_sizeW(c);
+                break;
+            }
+
+            case COMPACT_NFDATA:
+            {
+                barf("searchHeapBlocks: COMPACT_NFDATA");
+                break;
+            }
+
+            case TREC_CHUNK:
+            {
+                barf("searchHeapBlocks: TREC_CHUNK");
+                break;
+            }
+
+            default:
+                barf("searchHeapBlocks: %d", info->type);
             }
 
             p += size;
@@ -355,11 +527,9 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
 static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
         OCSectionIndices* s_indices)
 {
-    IndexTable *i;
-
     checkAddress(addrs, ccs, s_indices);
     checkAddress(addrs, ccs->cc, s_indices);
-    for (i = ccs->indexTable; i != NULL; i = i->next) {
+    for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
             searchCostCentres(addrs, i->ccs, s_indices);
         }
@@ -378,50 +548,43 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
 //
 void checkUnload (StgClosure *static_objects)
 {
-  uint32_t g, n;
-  HashTable *addrs;
-  StgClosure* p;
-  const StgInfoTable *info;
-  ObjectCode *oc, *prev, *next;
-  gen_workspace *ws;
-  StgClosure* link;
-
   if (unloaded_objects == NULL) return;
 
   ACQUIRE_LOCK(&linker_unloaded_mutex);
 
   OCSectionIndices *s_indices = buildOCSectionIndices(unloaded_objects);
   // Mark every unloadable object as unreferenced initially
-  for (oc = unloaded_objects; oc; oc = oc->next) {
+  for (ObjectCode *oc = unloaded_objects; oc; oc = oc->next) {
       IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
                                   oc->fileName));
       oc->referenced = false;
   }
 
-  addrs = allocHashTable();
+  HashTable *addrs = allocHashTable();
 
-  for (p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
+  StgClosure *link = NULL;
+  for (StgClosure *p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
       p = UNTAG_STATIC_LIST_PTR(p);
       checkAddress(addrs, p, s_indices);
-      info = get_itbl(p);
+      const StgInfoTable *info = get_itbl(p);
       checkAddress(addrs, info, s_indices);
       link = *STATIC_LINK(info, p);
   }
 
   // CAFs on revertible_caf_list are not on static_objects
-  for (p = (StgClosure*)revertible_caf_list;
+  for (StgClosure *p = (StgClosure*)revertible_caf_list;
        p != END_OF_CAF_LIST;
        p = ((StgIndStatic *)p)->static_link) {
       p = UNTAG_STATIC_LIST_PTR(p);
       checkAddress(addrs, p, s_indices);
   }
 
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      searchHeapBlocks (addrs, generations[g].blocks, s_indices);
-      searchHeapBlocks (addrs, generations[g].large_objects, s_indices);
+  for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      searchHeapBlocks(addrs, generations[g].blocks, s_indices);
+      searchHeapBlocks(addrs, generations[g].large_objects, s_indices);
 
-      for (n = 0; n < n_capabilities; n++) {
-          ws = &gc_threads[n]->gens[g];
+      for (uint32_t n = 0; n < n_capabilities; n++) {
+          gen_workspace *ws = &gc_threads[n]->gens[g];
           searchHeapBlocks(addrs, ws->todo_bd, s_indices);
           searchHeapBlocks(addrs, ws->part_list, s_indices);
           searchHeapBlocks(addrs, ws->scavd_list, s_indices);
@@ -433,8 +596,7 @@ void checkUnload (StgClosure *static_objects)
   searchCostCentres(addrs, CCS_MAIN, s_indices);
 
   /* Also check each cost centre in the CC_LIST */
-  CostCentre *cc;
-  for (cc = CC_LIST; cc != NULL; cc = cc->link) {
+  for (CostCentre *cc = CC_LIST; cc != NULL; cc = cc->link) {
       checkAddress(addrs, cc, s_indices);
   }
 #endif /* PROFILING */
@@ -443,8 +605,9 @@ void checkUnload (StgClosure *static_objects)
   // Look through the unloadable objects, and any object that is still
   // marked as unreferenced can be physically unloaded, because we
   // have no references to it.
-  prev = NULL;
-  for (oc = unloaded_objects; oc; oc = next) {
+  ObjectCode *prev = NULL;
+  ObjectCode *next = NULL;
+  for (ObjectCode *oc = unloaded_objects; oc; oc = next) {
       next = oc->next;
       if (oc->referenced == 0) {
           if (prev == NULL) {
