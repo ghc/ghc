@@ -7,7 +7,7 @@ Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall {a}. (# #) -> a
-[GblId, Arity=1, Str=<B,A>b, Cpr=#b, Unf=OtherCon []]
+[GblId, Arity=1, Str=<B,A>b, Cpr=*b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
 end Rec }
 
@@ -16,7 +16,7 @@ f [InlPrag=NOUSERINLINE[final]] :: forall a. Int -> a
 [GblId,
  Arity=1,
  Str=<B,A>b,
- Cpr=#b,
+ Cpr=*b,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
@@ -61,7 +61,7 @@ T13143.$trModule
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
-[GblId, Str=b, Cpr=#b]
+[GblId, Str=b, Cpr=*b]
 lvl = T13143.$wf @Int GHC.Prim.(##)
 
 Rec {
