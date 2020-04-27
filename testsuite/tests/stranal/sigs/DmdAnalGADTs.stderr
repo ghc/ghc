@@ -68,7 +68,7 @@ DmdAnalGADTs.$tc'B: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
 DmdAnalGADTs.$tcD: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
                        #c4(#c5(*), #c5(*)))
 DmdAnalGADTs.$trModule: #c1(#c1(#), #c1(#))
-DmdAnalGADTs.diverges: *(#..)
+DmdAnalGADTs.diverges: *b
 DmdAnalGADTs.f: *
 DmdAnalGADTs.f': #c1(#)
 DmdAnalGADTs.g: *
