@@ -57,7 +57,7 @@ module GHC.Types.Name.Reader (
         gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, greLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         Parent(..), greParent_maybe,
@@ -841,6 +841,12 @@ isLocalGRE (GRE {gre_lcl = lcl }) = lcl
 isRecFldGRE :: GlobalRdrElt -> Bool
 isRecFldGRE (GRE {gre_par = FldParent{}}) = True
 isRecFldGRE _                             = False
+
+isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
+-- ^ Is this a record field defined with DuplicateRecordFields?
+-- (See Note [Parents for record fields])
+isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}}) = True
+isOverloadedRecFldGRE _                                             = False
 
 -- Returns the field label of this GRE, if it has one
 greLabel :: GlobalRdrElt -> Maybe FieldLabelString
