@@ -1958,6 +1958,7 @@ rebuildContPrimop :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFlo
 rebuildContPrimop env (ArgInfo { ai_fun = fun, ai_args = rev_args })
                   (ApplyToVal { sc_arg = k, sc_env = k_se, sc_cont = cont})
   | Just KeepAliveOp <- isPrimOpId_maybe fun
+  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ ValArg s0
     , ValArg x
     , TyArg {} -- res_ty
