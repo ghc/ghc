@@ -54,7 +54,6 @@ import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType,
 import GHC.Types.Var.Env
 import GHC.Types.Unique
 import GHC.Iface.Make             ( mkIfaceExports )
-import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -390,7 +389,6 @@ getRealSpan _ = Nothing
 
 grhss_span :: GRHSs (GhcPass p) body -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLoc bs) (map getLoc xs)
-grhss_span (XGRHSs _) = panic "XGRHS has no span"
 
 bindingsOnly :: [Context Name] -> HieM [HieAST a]
 bindingsOnly [] = pure []
@@ -542,7 +540,7 @@ instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
   loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
   loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
                                               [loc a, loc tvs, loc b, loc c]
-  loc _ = noSrcSpan
+
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty

@@ -289,6 +289,7 @@ rnExpr (ExplicitTuple x tup_args boxity)
                                       ; return (L l (Present x e'), fvs) }
     rnTupArg (L l (Missing _)) = return (L l (Missing noExtField)
                                         , emptyFVs)
+    rnTupArg (L _ (XTupArg a)) = noExtCon a
 
 rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
@@ -431,6 +432,7 @@ rnCmdArgs (arg:args)
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
+  rnCmdTop' (XCmdTop a) = noExtCon a
   rnCmdTop' (HsCmdTop _ cmd)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
