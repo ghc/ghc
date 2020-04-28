@@ -78,7 +78,7 @@ annTopBindingsFreeVars = map go
 
 -- | Annotates an STG binding with its free variables.
 annBindingFreeVars :: StgBinding -> CgStgBinding
-annBindingFreeVars = fst . binding HeapCheckInAlts emptyEnv emptyDVarSet
+annBindingFreeVars = fst . binding False emptyEnv emptyDVarSet
 
 boundIds :: StgBinding -> [Id]
 boundIds (StgNonRec b _) = [b]
@@ -108,22 +108,22 @@ args env = mkFreeVarSet env . mapMaybe f
     f (StgVarArg occ) = Just occ
     f _               = Nothing
 
-binding :: StgCaseGcFlag -> Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
-binding gcf env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
+binding :: Bool -> Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
+binding upstream_allocates env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
   where
     -- See Note [Tracking local binders]
-    (r', rhs_fvs) = rhs gcf env r
+    (r', rhs_fvs) = rhs upstream_allocates env r
     fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
-binding gcf env body_fv (StgRec pairs) = (StgRec pairs', fvs)
+binding upstream_allocates env body_fv (StgRec pairs) = (StgRec pairs', fvs)
   where
     -- See Note [Tracking local binders]
     bndrs = map fst pairs
-    (rhss, rhs_fvss) = mapAndUnzip (rhs gcf env . snd) pairs
+    (rhss, rhs_fvss) = mapAndUnzip (rhs upstream_allocates env . snd) pairs
     pairs' = zip bndrs rhss
     fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
 
-expr :: StgCaseGcFlag -> Env -> StgExpr -> (CgStgExpr, DIdSet)
-expr gcf env = go gcf
+expr :: Bool -> Env -> StgExpr -> (CgStgExpr, DIdSet)
+expr upstream_allocates env = go upstream_allocates
   where
     go _ (StgApp occ as)
       = (StgApp occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
@@ -131,86 +131,68 @@ expr gcf env = go gcf
     go _ (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
     go _ (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
     go _ StgLam{} = pprPanic "StgFVs: StgLam" empty
-    go gcf (StgCase scrut bndr ty hc alts) = (StgCase scrut' bndr ty hc alts', fvs)
+    go upstream_allocates (StgCase scrut bndr ty _ alts)
+      = (StgCase scrut' bndr ty hc alts', fvs)
       where
-        (scrut', scrut_fvs) = go gcf scrut
+        -- Note [Computing StgCaseGcFlag]
+        --  * If the scrutinee <scrut> requires any non-trivial work, we MUST GcInAlts.
+        --    For example if <scrut> was (g x), then calling g might result in lots of
+        --    allocation, so any heap check done at the start of f is irrelevant to the
+        --    branches. They must do their own checks.
+        --  * If there is just one alternative, then it's always good to amalgamate
+        --  * If there is heap allocation in the code before the case, then we are going
+        --    to do a heap-check upstream anyway. In that case, don't do one in the
+        --    alterantives too.
+        --  * Otherwise, if there no heap allocation upstream, put heap checks in each
+        --    alternative. The reasoning here was that if one alternative needs heap and
+        --    the other one  doesn't we don't want to pay the runtime for the heap check
+        --    in the case where the heap-free alternative is taken.
+        hc | stgExprMayBlockOrAllocate scrut = HeapCheckInAlts
+           | isSingleton alts                = HeapCheckUpstream
+           | upstream_allocates              = HeapCheckUpstream
+           | otherwise                       = HeapCheckInAlts
+        upstream_allocates'
+           | HeapCheckInAlts <- hc = False
+           | otherwise             = upstream_allocates
+        (scrut', scrut_fvs) = go upstream_allocates' scrut
         -- See Note [Tracking local binders]
-        alt_gcf = gcFlagForCase gcf scrut alts
-        (alts', alt_fvss) = mapAndUnzip (alt alt_gcf (addLocals [bndr] env)) alts
+        (alts', alt_fvss)
+          = mapAndUnzip (alt upstream_allocates' (addLocals [bndr] env)) alts
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
-    go gcf (StgLet ext bind body) = go_bind gcf (StgLet ext) bind body
-    go gcf (StgLetNoEscape ext bind body) = go_bind gcf (StgLetNoEscape ext) bind body
-    go gcf (StgTick tick e) = (StgTick tick e', fvs')
+    go upstream_allocates (StgLet ext bind body)
+      = go_bind upstream_allocates (StgLet ext) bind body
+    go upstream_allocates (StgLetNoEscape ext bind body)
+      = go_bind upstream_allocates (StgLetNoEscape ext) bind body
+    go upstream_allocates (StgTick tick e) = (StgTick tick e', fvs')
       where
-        (e', fvs) = go gcf e
+        (e', fvs) = go upstream_allocates e
         fvs' = unionDVarSet (tickish tick) fvs
         tickish (Breakpoint _ ids) = mkDVarSet ids
         tickish _                  = emptyDVarSet
 
-    go_bind gcf dc bind body = (dc bind' body', fvs)
+    go_bind upstream_allocates dc bind body = (dc bind' body', fvs)
       where
         -- See Note [Tracking local binders]
         env' = addLocals (boundIds bind) env
-        (body', body_fvs) = expr gcf env' (addGCFlag gcf body)
-        (bind', fvs) = binding gcf env' body_fvs bind
+        (body', body_fvs) = expr True env' body
+        (bind', fvs) = binding upstream_allocates env' body_fvs bind
 
-rhs :: StgCaseGcFlag -> Env -> StgRhs -> (CgStgRhs, DIdSet)
-rhs gcf env (StgRhsClosure _ ccs uf bndrs body)
+rhs :: Bool -> Env -> StgRhs -> (CgStgRhs, DIdSet)
+rhs upstream_allocates env (StgRhsClosure _ ccs uf bndrs body)
   = (StgRhsClosure fvs ccs uf bndrs body', fvs)
   where
     -- See Note [Tracking local binders]
-    (body', body_fvs) = expr gcf (addLocals bndrs env) body
+    (body', body_fvs) = expr upstream_allocates (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
 rhs _ env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
 
-alt :: StgCaseGcFlag -> Env -> StgAlt -> (CgStgAlt, DIdSet)
-alt gcf env (con, bndrs, e) = ((con, bndrs, e'), fvs)
+alt :: Bool -> Env -> StgAlt -> (CgStgAlt, DIdSet)
+alt upstream_allocates env (con, bndrs, e) = ((con, bndrs, e'), fvs)
   where
     -- See Note [Tracking local binders]
-    (e', rhs_fvs) = expr gcf (addLocals bndrs env) e
+    (e', rhs_fvs) = expr upstream_allocates (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
-
--- | ...
-addGCFlag :: StgCaseGcFlag -> StgExpr -> StgExpr
-addGCFlag upstream_alloc (StgLet ext bind body)
-  = StgLet ext (gcFlagForBinding upstream_alloc bind)
-               (addGCFlag HeapCheckInAlts body)
-
-addGCFlag upstream_alloc (StgLetNoEscape ext bind body)
-  = StgLetNoEscape ext (gcFlagForBinding upstream_alloc bind)
-                       (addGCFlag HeapCheckInAlts body)
-
-addGCFlag upstream_alloc (StgCase scrut binds alt_ty _ alts)
-  | HeapCheckInAlts <- gcFlagForCase upstream_alloc scrut alts
-  = StgCase (addGCFlag upstream_alloc scrut)
-            binds
-            alt_ty
-            (gcFlagForCase upstream_alloc scrut alts)
-            (map (addGCFlagToAlt HeapCheckUpstream) alts)
-  | otherwise
-  = StgCase (addGCFlag upstream_alloc scrut)
-            binds
-            alt_ty
-            (gcFlagForCase upstream_alloc scrut alts)
-            (map (addGCFlagToAlt upstream_alloc) alts)
-  where
-    addGCFlagToAlt gc_flag (altCon, bs, rhs)
-       = (altCon, bs, addGCFlag gc_flag rhs)
-
-addGCFlag _ e = e  -- Literals, variables, StgApp
-
-gcFlagForBinding :: StgCaseGcFlag -> StgBinding -> StgBinding
-gcFlagForBinding upstream_alloc (StgNonRec bind rhs)
-  = StgNonRec bind (gcFlagForRhs upstream_alloc rhs)
-gcFlagForBinding upstream_alloc (StgRec pairs)
-  = StgRec (map (fmap (gcFlagForRhs upstream_alloc)) pairs)
-
-gcFlagForRhs :: StgCaseGcFlag -> StgRhs -> StgRhs
-gcFlagForRhs upstream_alloc (StgRhsClosure fvs ccs uf bs e)
-  = StgRhsClosure fvs ccs uf bs (addGCFlag upstream_alloc e)
-gcFlagForRhs _ (StgRhsCon ccs dataCon args)
-  = StgRhsCon ccs dataCon args
 
 -- | ...
 stgExprMayBlockOrAllocate :: StgExpr -> Bool
@@ -227,30 +209,6 @@ stgExprMayBlockOrAllocate (StgCase scrut _ alt_type _ alts)
   | not (isSimpleScrut scrut alt_type) = False
   | otherwise = any ( \(_, _, rhs) -> stgExprMayBlockOrAllocate rhs ) alts
 stgExprMayBlockOrAllocate _ = False
-
---  * If the scrutinee <scrut> requires any non-trivial work, we MUST GcInAlts.
---    For example if <scrut> was (g x), then calling g might result in lots of
---    allocation, so any heap check done at the start of f is irrelevant to the
---    branches. They must do their own checks.
---  * If there is just one alternative, then it's always good to amalgamate
---  * If there is heap allocation in the code before the case, then we are going
---    to do a heap-check upstream anyway. In that case, don't do one in the
---    alterantives too. The single check might allocate too much space, but the
---    alternatives that use less space simply move Hp back down again, which only
---    costs one instruction.
---  * Otherwise, if there no heap alloation upstream, put heap checks in each
---    alternative. The reasoning here was that if one alternative needs heap and
---    the other one  doesn't we don't want to pay the runtime for the heap check
---    in the case where the heap-free alternative is taken.
-gcFlagForCase :: StgCaseGcFlag  -- ^ GC strategy of context
-              -> StgExpr        -- ^ scrutinee
-              -> [StgAlt]       -- ^ alternatives
-              -> StgCaseGcFlag
-gcFlagForCase gcf scrut alts
-  | stgExprMayBlockOrAllocate scrut = HeapCheckInAlts
-  | isSingleton alts                = HeapCheckUpstream
-  | HeapCheckInAlts <- gcf          = HeapCheckUpstream
-  | otherwise                       = HeapCheckInAlts
 
 primOpMayBlockOrAllocate :: PrimOp -> Bool
 primOpMayBlockOrAllocate p = case p of
