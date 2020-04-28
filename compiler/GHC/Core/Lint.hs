@@ -939,7 +939,7 @@ lintCoreExpr e@(App _ _)
                 lintCastExpr expr ty co
              lintRunRWCont expr@(Lam _ _) = do
                 lintJoinLams 1 (Just fun) expr
-             lintRunRWCont expr@(Var v)
+             lintRunRWCont (Var v)
                | isJoinId v
                , idJoinArity v == 1
                = return (idType v)
