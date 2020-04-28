@@ -127,7 +127,7 @@
   unsound. In particular the GC assumes no heap objects are generated,
   and no heap memory is requested while it is running.
 
-  To work around this the scheduler invokes <insertName> which checks
+  To work around this the scheduler invokes queueIOThread which checks
   if a new thread should be created. Since we only use this code path
   in the non-threaded runtime this is safe. The scheduler is never
   running concurrently with the GC or Mutator.
@@ -496,6 +496,7 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     }
     return 0;
 }
+
 
 
 
