@@ -17,7 +17,7 @@ import GHC.Prelude
 
 import GHC.Utils.Outputable
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Types.FieldLabel
@@ -160,7 +160,7 @@ ns_module = mkHoleModule . ns_mod_name
 -}
 
 -- | Substitution on @{A.T}@.  We enforce the invariant that the
--- 'nameModule' of keys of this map have 'moduleUnitId' @hole@
+-- 'nameModule' of keys of this map have 'moduleUnit' @hole@
 -- (meaning that if we have a hole substitution, the keys of the map
 -- are never affected.)  Alternatively, this is isomorphic to
 -- @Map ('ModuleName', 'OccName') 'Name'@.

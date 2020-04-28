@@ -42,7 +42,7 @@ import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Types ( Warnings(..), plusWarns )
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
@@ -396,21 +396,21 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
 --      package, so if they get inlined across a package boundary we'll still
 --      know where they're from.
 --
-patchForeignImport :: UnitId -> ForeignImport -> ForeignImport
-patchForeignImport unitId (CImport cconv safety fs spec src)
-        = CImport cconv safety fs (patchCImportSpec unitId spec) src
+patchForeignImport :: Unit -> ForeignImport -> ForeignImport
+patchForeignImport unit (CImport cconv safety fs spec src)
+        = CImport cconv safety fs (patchCImportSpec unit spec) src
 
-patchCImportSpec :: UnitId -> CImportSpec -> CImportSpec
-patchCImportSpec unitId spec
+patchCImportSpec :: Unit -> CImportSpec -> CImportSpec
+patchCImportSpec unit spec
  = case spec of
-        CFunction callTarget    -> CFunction $ patchCCallTarget unitId callTarget
+        CFunction callTarget    -> CFunction $ patchCCallTarget unit callTarget
         _                       -> spec
 
-patchCCallTarget :: UnitId -> CCallTarget -> CCallTarget
-patchCCallTarget unitId callTarget =
+patchCCallTarget :: Unit -> CCallTarget -> CCallTarget
+patchCCallTarget unit callTarget =
   case callTarget of
   StaticTarget src label Nothing isFun
-                              -> StaticTarget src label (Just unitId) isFun
+                              -> StaticTarget src label (Just unit) isFun
   _                           -> callTarget
 
 {-

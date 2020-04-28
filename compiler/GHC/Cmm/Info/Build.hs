@@ -18,7 +18,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Platform
 import GHC.Data.Graph.Directed
 import GHC.Cmm.CLabel

@@ -70,7 +70,7 @@ import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Data.OrdList
@@ -474,7 +474,7 @@ instance HasDynFlags FCode where
 getPlatform :: FCode Platform
 getPlatform = targetPlatform <$> getDynFlags
 
-getThisPackage :: FCode UnitId
+getThisPackage :: FCode Unit
 getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a

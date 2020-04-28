@@ -39,7 +39,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
 import GHC.Iface.Env
 import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
 import GHC.Types.Unique.FM
@@ -325,7 +325,7 @@ getSymbolTable bh ncu = do
     newSTArray_ :: forall s. (Int, Int) -> ST s (STArray s Int Name)
     newSTArray_ = newArray_
 
-type OnDiskName = (UnitId, ModuleName, OccName)
+type OnDiskName = (Unit, ModuleName, OccName)
 
 fromOnDiskName :: NameCache -> OnDiskName -> (NameCache, Name)
 fromOnDiskName nc (pid, mod_name, occ) =
@@ -342,7 +342,7 @@ fromOnDiskName nc (pid, mod_name, occ) =
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    put_ bh (moduleUnitId mod, moduleName mod, nameOccName name)
+    put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
 
 
 -- Note [Symbol table representation of names]

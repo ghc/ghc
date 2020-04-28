@@ -110,7 +110,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Error
@@ -381,7 +381,7 @@ data FrontendResult
 --
 --            if I have a Module, this_mod, in hand representing the module
 --            currently being compiled,
---            then moduleUnitId this_mod == thisPackage dflags
+--            then moduleUnit this_mod == thisPackage dflags
 --
 --      - For any code involving Names, we want semantic modules.
 --        See lookupIfaceTop in GHC.Iface.Env, mkIface and addFingerprints
@@ -553,7 +553,7 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in GHC.Driver.Types
-        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Types.Module
+        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Unit.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
         tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module
@@ -1350,12 +1350,12 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: Set InstalledUnitId,
+        imp_dep_pkgs :: Set UnitId,
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: Set InstalledUnitId,
+        imp_trust_pkgs :: Set UnitId,
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if

@@ -32,7 +32,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import GHC.Core.Unify     ( tcMatchTys )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv ( flattenTys )
 import GHC.Tc.Utils.Instantiate
@@ -2149,7 +2149,7 @@ sameOccExtra ty1 ty2
   , let n1 = tyConName tc1
         n2 = tyConName tc2
         same_occ = nameOccName n1                   == nameOccName n2
-        same_pkg = moduleUnitId (nameModule n1) == moduleUnitId (nameModule n2)
+        same_pkg = moduleUnit (nameModule n1) == moduleUnit (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
   = text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
@@ -2166,7 +2166,7 @@ sameOccExtra ty1 ty2
                   , ppUnless (same_pkg || pkg == mainUnitId) $
                     nest 4 $ text "in package" <+> quotes (ppr pkg) ])
        where
-         pkg = moduleUnitId mod
+         pkg = moduleUnit mod
          mod = nameModule nm
          loc = nameSrcSpan nm
 

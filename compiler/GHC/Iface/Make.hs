@@ -52,7 +52,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
@@ -153,7 +153,7 @@ mkIfaceTc hsc_env safe_mode mod_details
           let pluginModules =
                 map lpModule (cachedPlugins (hsc_dflags hsc_env))
           deps <- mkDependencies
-                    (thisInstalledUnitId (hsc_dflags hsc_env))
+                    (thisUnitId (hsc_dflags hsc_env))
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
