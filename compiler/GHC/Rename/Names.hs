@@ -1389,6 +1389,7 @@ findImportUsage imports used_gres
     import_usage :: ImportMap
     import_usage = mkImportMap used_gres
 
+    unused_decl (L _loc (XImportDecl a)) = noExtCon a
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where

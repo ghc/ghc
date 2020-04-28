@@ -41,7 +41,6 @@ import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Types.Var              ( Id, Var, setVarName, varName, varType )
 import GHC.Tc.Types
 import GHC.Iface.Make             ( mkIfaceExports )
-import GHC.Utils.Panic
 import GHC.Data.Maybe
 
 import GHC.Iface.Ext.Types
@@ -303,7 +302,6 @@ getRealSpan _ = Nothing
 
 grhss_span :: GRHSs (GhcPass p) body -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLoc bs) (map getLoc xs)
-grhss_span (XGRHSs _) = panic "XGRHS has no span"
 
 bindingsOnly :: [Context Name] -> [HieAST a]
 bindingsOnly [] = []
@@ -476,7 +474,7 @@ instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
   loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
   loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
                                               [loc a, loc tvs, loc b, loc c]
-  loc _ = noSrcSpan
+
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
@@ -693,7 +691,6 @@ instance ( a ~ GhcPass p
       PatSynBind _ psb ->
         [ toHie $ L span psb -- PatSynBinds only occur at the top level
         ]
-      XHsBindsLR _ -> []
 
 instance ( ToHie (Located (Match (GhcPass p) body))
          ) => ToHie (MatchGroup (GhcPass p) body) where
@@ -703,7 +700,6 @@ instance ( ToHie (Located (Match (GhcPass p) body))
       , toHie alts
       ]
     MG{} -> []
-    XMatchGroup _ -> []
 
 instance ( a ~ GhcPass p
          , ToHie (Context (Located (IdP a)))
@@ -732,7 +728,6 @@ instance ( a ~ GhcPass p
           toBind (PrefixCon args) = PrefixCon $ map (C Use) args
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
-      XPatSynBind _ -> []
 
 instance ( ToHie (MatchGroup a (LHsExpr a))
          ) => ToHie (HsPatSynDir a) where
@@ -875,7 +870,6 @@ instance ( ToHie body
      [ toHie grhss
      , toHie $ RS (mkScope $ grhss_span grhs) binds
      ]
-    XGRHSs _ -> []
 
 instance ( ToHie (Located body)
          , ToHie (RScoped (GuardLStmt (GhcPass a)))
@@ -886,7 +880,6 @@ instance ( ToHie (Located body)
       [ toHie $ listScopes (mkLScope body) guards
       , toHie body
       ]
-    XGRHS _ -> []
 
 instance ( a ~ GhcPass p
          , ToHie (Context (Located (IdP a)))
