@@ -1461,7 +1461,8 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (BindStmt _ pat _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
-            do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts
+            do_arg (_, ApplicativeArgMany { app_stmts = stmts })    = hs_lstmts stmts
+            do_arg (_, XApplicativeArg {})                          = []
     hs_stmt (LetStmt _ binds)     = hs_local_binds (unLoc binds)
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []

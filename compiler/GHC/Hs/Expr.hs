@@ -415,7 +415,7 @@ data HsExpr p
                 (HsStmtContext GhcRn)    -- The parameterisation is unimportant
                                          -- because in this context we never use
                                          -- the PatGuard or ParStmt variant
-                (XRec p [ExprLStmt p]) -- "do":one or more stmts
+                (XRec p [ExprLStmt p])   -- "do":one or more stmts
 
   -- | Syntactic list: [a,b,c,...]
   --
@@ -438,7 +438,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
       { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: XRec p (IdP p)    -- The constructor name;
+      , rcon_con_name :: XRec p (IdP p)     -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -991,6 +991,7 @@ ppr_expr (ExplicitTuple _ exprs boxity)
     ppr_tup_args []               = []
     ppr_tup_args (Present _ e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es
     ppr_tup_args (Missing _   : es) = punc es : ppr_tup_args es
+    ppr_tup_args (XTupArg {}  : es) = punc es : ppr_tup_args es
 
     punc (Present {} : _) = comma <> space
     punc (Missing {} : _) = comma
