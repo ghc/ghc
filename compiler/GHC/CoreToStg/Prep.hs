@@ -868,8 +868,10 @@ cpeApp top_env expr
                    bndr = mkLocalVar (JoinId 1) name ty id_info
                -- We need to transform the application into ANF so we must bind
                -- the continuation. However, since it might contain join points
-               -- we must join-bind it.
-             ; (bndr', rhs) <- cpeJoinPair env bndr y
+               -- we must join-bind it. We must eta expand to ensure that we meet
+               -- the required join arity.
+             ; (bndr', rhs) <- cpeJoinPair env bndr $ case etaExpandToJoinPoint 1 y of
+                                                        (bndrs, body) -> mkLams bndrs body
              ; (x_floats, x') <- cpeArg env evalDmd x arg_ty
              ; (s_floats, s') <- cpeArg env evalDmd s realWorldStatePrimTy
              ; let body = pprTrace "cpe_app" (ppr expr) $
