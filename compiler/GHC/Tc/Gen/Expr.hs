@@ -365,7 +365,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let doc   = text "The first argument of ($) takes"
              orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
-           matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
+           matchActualFunTysRho doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
@@ -381,7 +381,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
                         (tcTypeKind arg2_sigma) liftedTypeKind
            -- Ignore the evidence. arg2_sigma must have type * or #,
            -- because we know (arg2_sigma -> op_res_ty) is well-kinded
-           -- (because otherwise matchActualFunTys would fail)
+           -- (because otherwise matchActualFunTysRho would fail)
            -- So this 'unifyKind' will either succeed with Refl, or will
            -- produce an insoluble constraint * ~ #, which we'll report later.
 
@@ -415,7 +415,8 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (op', op_ty) <- tcInferRhoNC op
 
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
+                  <- matchActualFunTysRho (mk_op_msg op) fn_orig
+                                          (Just (unLoc op)) 2 op_ty
          -- You might think we should use tcInferApp here, but there is
          -- too much impedance-matching, because tcApp may return wrappers as
          -- well as type-checked arguments.
@@ -435,7 +436,8 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferRhoNC op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
+                  <- matchActualFunTysRho (mk_op_msg op) fn_orig
+                                          (Just (unLoc op)) 2 op_ty
        ; arg2' <- tcArg (unLoc op) arg2 arg2_ty 2
        ; let expr'      = SectionR x (mkLHsWrap wrap_fun op') arg2'
              act_res_ty = mkVisFunTy arg1_ty op_res_ty
@@ -454,8 +456,8 @@ tcExpr expr@(SectionL x arg1 op) res_ty
                          | otherwise                            = 2
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
-                                n_reqd_args op_ty
+           <- matchActualFunTysRho (mk_op_msg op) fn_orig
+                                   (Just (unLoc op)) n_reqd_args op_ty
        ; arg1' <- tcArg (unLoc op) arg1 arg1_ty 1
        ; let expr'      = SectionL x arg1' (mkLHsWrap wrap_fn op')
              act_res_ty = mkVisFunTys arg_tys op_res_ty
@@ -1398,8 +1400,8 @@ tcArgs fun orig_fun_ty orig_args
 
     go n so_far fun_ty (HsEValArg loc arg : args)
       = do { (wrap, arg_ty, res_ty)
-               <- matchActualFunTy herald fun_orig (Just fun)
-                                   (n_val_args, so_far) fun_ty
+               <- matchActualFunTySigma herald fun_orig (Just fun)
+                                        (n_val_args, so_far) fun_ty
            ; arg' <- tcArg fun arg arg_ty n
            ; (args', inner_res_ty) <- go (n+1) (arg_ty:so_far) res_ty args
            ; return ( addArgWrap wrap $ HsEValArg loc arg' : args'
@@ -1637,7 +1639,8 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
+           <- matchActualFunTysRho herald orig Nothing
+                                   (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->
