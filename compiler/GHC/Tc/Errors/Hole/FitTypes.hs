@@ -21,20 +21,21 @@ import GHC.Types.Name
 
 import Data.Function ( on )
 
-data TypedHole = TyH { tyHRelevantCts :: Cts
-                       -- ^ Any relevant Cts to the hole
-                     , tyHImplics :: [Implication]
-                       -- ^ The nested implications of the hole with the
-                       --   innermost implication first.
-                     , tyHCt :: Maybe Ct
-                       -- ^ The hole constraint itself, if available.
-                     }
+data TypedHole = TypedHole { th_relevant_cts :: Cts
+                           -- ^ Any relevant Cts to the hole
+                           , th_implics :: [Implication]
+                           -- ^ The nested implications of the hole with the
+                           --   innermost implication first.
+                           , th_hole :: Maybe Hole
+                           -- ^ The hole itself, if available. Only for debugging.
+                           }
 
 instance Outputable TypedHole where
-  ppr (TyH rels implics ct)
+  ppr (TypedHole { th_relevant_cts = rels
+                 , th_implics      = implics
+                 , th_hole         = hole })
     = hang (text "TypedHole") 2
-        (ppr rels $+$ ppr implics $+$ ppr ct)
-
+        (ppr rels $+$ ppr implics $+$ ppr hole)
 
 -- | HoleFitCandidates are passed to hole fit plugins and then
 -- checked whether they fit a given typed-hole.
@@ -50,9 +51,6 @@ pprHoleFitCand :: HoleFitCandidate -> SDoc
 pprHoleFitCand (IdHFCand cid) = text "Id HFC: " <> ppr cid
 pprHoleFitCand (NameHFCand cname) = text "Name HFC: " <> ppr cname
 pprHoleFitCand (GreHFCand cgre) = text "Gre HFC: " <> ppr cgre
-
-
-
 
 instance NamedThing HoleFitCandidate where
   getName hfc = case hfc of

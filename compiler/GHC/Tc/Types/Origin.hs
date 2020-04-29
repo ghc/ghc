@@ -427,7 +427,9 @@ data CtOrigin
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 
-  | HoleOrigin
+  | ExprHoleOrigin OccName   -- from an expression hole
+  | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
+  | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | BracketOrigin       -- An overloaded quotation bracket
@@ -640,7 +642,9 @@ pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
-pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
+pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
+pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
+pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO StaticOrigin          = text "a static form"
 pprCtO BracketOrigin         = text "a quotation bracket"
