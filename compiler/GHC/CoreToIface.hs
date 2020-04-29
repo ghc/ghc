@@ -623,7 +623,10 @@ toIfaceVar v
 ---------------------
 toIfaceLFInfo :: LambdaFormInfo -> IfaceLFInfo
 toIfaceLFInfo lfi = case lfi of
-    LFReEntrant _ _ arity _ _ ->
+    LFReEntrant top_lvl one_shot arity no_fvs _arg_descr ->
+      ASSERT(isTopLevel top_lvl)
+      ASSERT(one_shot == NoOneShotInfo)
+      ASSERT(no_fvs)
       IfLFReEntrant arity
     LFThunk _ _ updatable sfi mb_fun ->
       IfLFThunk updatable (toIfaceStandardFormInfo sfi) mb_fun

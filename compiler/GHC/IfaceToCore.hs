@@ -1504,6 +1504,18 @@ tcJoinInfo IfaceNotJoinPoint   = Nothing
 tcLFInfo :: IfaceLFInfo -> IfL LambdaFormInfo
 tcLFInfo lfi = case lfi of
     IfLFReEntrant rep_arity ->
+      -- LFReEntrant closures in interface files are guaranteed to
+      --
+      -- - Be top-level, as only top-level closures are exported.
+      -- - Be not one-shot, as top-level closures are never one-shot
+      -- - Have no free variables, as only non-top-level closures have free
+      --   variables
+      -- - Don't have ArgDescrs, as ArgDescr is used when generating code for
+      --   the closure
+      --
+      -- These invariants are checked when generating the iface LFInfos in
+      -- toIfaceLFInfo in CoreToIface.
+      --
       return (LFReEntrant TopLevel NoOneShotInfo rep_arity True ArgUnknown)
 
     IfLFThunk updatable sfi mb_fun ->

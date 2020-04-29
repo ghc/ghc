@@ -391,7 +391,10 @@ data IfaceIdDetails
 -- omitted in this type.
 data IfaceLFInfo
   = IfLFReEntrant !RepArity
-  | IfLFThunk !Bool !IfaceStandardFormInfo !Bool
+  | IfLFThunk
+      !Bool -- True <=> updatable
+      !IfaceStandardFormInfo
+      !Bool -- True <=> might be a function type
   | IfLFCon !Name
   | IfLFUnknown !Bool
   | IfLFUnlifted

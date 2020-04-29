@@ -40,7 +40,7 @@ updateModDetailsIdInfos _ cg_infos mod_details =
               } = mod_details
 
     -- type TypeEnv = NameEnv TyThing
-    ~type_env' = mapNameEnv (updateTyThingCafInfos type_env' cg_infos) type_env
+    ~type_env' = mapNameEnv (updateTyThingIdInfos type_env' cg_infos) type_env
     -- Not strict!
 
     !insts' = strictMap (updateInstIdInfos type_env' cg_infos) insts
@@ -71,12 +71,12 @@ updateInstIdInfos type_env cg_infos =
 -- TyThings
 --------------------------------------------------------------------------------
 
-updateTyThingCafInfos :: TypeEnv -> CgInfos -> TyThing -> TyThing
+updateTyThingIdInfos :: TypeEnv -> CgInfos -> TyThing -> TyThing
 
-updateTyThingCafInfos type_env cg_infos (AnId id) =
+updateTyThingIdInfos type_env cg_infos (AnId id) =
     AnId (updateIdUnfolding type_env (updateIdInfo cg_infos id))
 
-updateTyThingCafInfos _ _ other = other -- AConLike, ATyCon, ACoAxiom
+updateTyThingIdInfos _ _ other = other -- AConLike, ATyCon, ACoAxiom
 
 --------------------------------------------------------------------------------
 -- Unfoldings
