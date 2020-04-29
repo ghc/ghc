@@ -51,6 +51,7 @@ module GHC.Types.Unique (
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 

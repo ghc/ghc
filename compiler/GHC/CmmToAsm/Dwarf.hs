@@ -12,6 +12,7 @@ import GHC.Cmm.DebugBlock
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Platform
+import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
@@ -46,11 +47,12 @@ dwarfGen config modLoc us blocks = do
   compPath <- getCurrentDirectory
   let lowLabel = dblCLabel $ head procs
       highLabel = mkAsmTempProcEndLabel $ dblCLabel $ last procs
+      producer = dwarfStringFromString $ cProjectName ++ " " ++ cProjectVersion
       dwarfUnit = DwarfCompileUnit
         { dwChildren = map (procToDwarf config) (map stripBlocks procs)
-        , dwName = fromMaybe "" (ml_hs_file modLoc)
-        , dwCompDir = addTrailingPathSeparator compPath
-        , dwProducer = cProjectName ++ " " ++ cProjectVersion
+        , dwName = dwarfStringFromString $ fromMaybe "" (ml_hs_file modLoc)
+        , dwCompDir = dwarfStringFromString $ addTrailingPathSeparator compPath
+        , dwProducer = producer
         , dwLowLabel = pdoc platform lowLabel
         , dwHighLabel = pdoc platform highLabel
         , dwLineLabel = dwarfLineLabel
@@ -76,6 +78,9 @@ dwarfGen config modLoc us blocks = do
                      , compileUnitFooter platform unitU
                      ]
 
+  -- .debug_str section: Strings
+  let stringsSct = dwarfStringsSection platform (dwarfInfoStrings dwarfUnit)
+
   -- .debug_line section: Generated mainly by the assembler, but we
   -- need to label it
   let lineSct = dwarfLineSection platform $$
@@ -92,7 +97,7 @@ dwarfGen config modLoc us blocks = do
                | otherwise               = [DwarfARange lowLabel highLabel]
   let aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
-  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+  return (infoSct $$ stringsSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
 -- | Build an address range entry for one proc.
 -- With split sections, each proc needs its own entry, since they may get
@@ -177,7 +182,7 @@ parent, B.
 procToDwarf :: NCGConfig -> DebugBlock -> DwarfInfo
 procToDwarf config prc
   = DwarfSubprogram { dwChildren = map (blockToDwarf config) (dblBlocks prc)
-                    , dwName     = case dblSourceTick prc of
+                    , dwName     = dwarfStringFromString $ case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
                          _otherwise -> show (dblLabel prc)
                     , dwLabel    = dblCLabel prc
@@ -211,7 +216,13 @@ blockToDwarf config blk
       | otherwise                 = Nothing   -- block was optimized out
 
 tickToDwarf :: CmmTickish -> [DwarfInfo]
-tickToDwarf  (SourceNote ss _) = [DwarfSrcNote ss]
+tickToDwarf  (SourceNote ss _) =
+  [DwarfSrcNote { dwSpanFile = dwarfStringFromFastString (srcSpanFile ss)
+                , dwSpanStartLine = srcSpanStartLine ss
+                , dwSpanStartCol  = srcSpanStartCol  ss
+                , dwSpanEndLine = srcSpanEndLine ss
+                , dwSpanEndCol  = srcSpanEndCol  ss
+                }]
 tickToDwarf _ = []
 
 -- | Generates the data for the debug frame section, which encodes the

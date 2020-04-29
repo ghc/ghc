@@ -85,12 +85,14 @@ dW_CHILDREN_no, dW_CHILDREN_yes :: Word8
 dW_CHILDREN_no  = 0
 dW_CHILDREN_yes = 1
 
-dW_FORM_addr, dW_FORM_data2, dW_FORM_data4, dW_FORM_string, dW_FORM_flag,
+dW_FORM_addr, dW_FORM_data2, dW_FORM_data4,
+  dW_FORM_strp,dW_FORM_string, dW_FORM_flag,
   dW_FORM_block1, dW_FORM_ref4, dW_FORM_ref_addr, dW_FORM_flag_present :: Word
 dW_FORM_addr   = 0x01
 dW_FORM_data2  = 0x05
 dW_FORM_data4  = 0x06
 dW_FORM_string = 0x08
+dW_FORM_strp   = 0x0e
 dW_FORM_flag   = 0x0c
 dW_FORM_block1 = 0x0a
 dW_FORM_ref_addr     = 0x10
@@ -144,11 +146,13 @@ dW_OP_call_frame_cfa = 0x9c
 
 -- * Dwarf section declarations
 dwarfInfoSection, dwarfAbbrevSection, dwarfLineSection,
-  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: Platform -> SDoc
+  dwarfFrameSection, dwarfStringSection,
+  dwarfGhcSection, dwarfARangesSection :: Platform -> SDoc
 dwarfInfoSection    platform = dwarfSection platform "info"
 dwarfAbbrevSection  platform = dwarfSection platform "abbrev"
 dwarfLineSection    platform = dwarfSection platform "line"
 dwarfFrameSection   platform = dwarfSection platform "frame"
+dwarfStringSection  platform = dwarfSection platform "str"
 dwarfGhcSection     platform = dwarfSection platform "ghc"
 dwarfARangesSection platform = dwarfSection platform "aranges"
 
@@ -164,11 +168,13 @@ dwarfSection platform name =
        -> text "\t.section .debug_" <> text name <> text ",\"dr\""
 
 -- * Dwarf section labels
-dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: SDoc
+dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel,
+  dwarfStringLabel :: SDoc
 dwarfInfoLabel   = text ".Lsection_info"
 dwarfAbbrevLabel = text ".Lsection_abbrev"
 dwarfLineLabel   = text ".Lsection_line"
 dwarfFrameLabel  = text ".Lsection_frame"
+dwarfStringLabel = text ".Lsection_str"
 
 -- | Mapping of registers to DWARF register numbers
 dwarfRegNo :: Platform -> Reg -> Word8
