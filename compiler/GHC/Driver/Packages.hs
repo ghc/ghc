@@ -779,8 +779,8 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
            reqs | UnitIdArg orig_uid <- arg = collectHoles orig_uid
                 | otherwise                 = Map.empty
 
-           collectHoles uid = case splitUnitIdInsts uid of
-                (_, Just indef) ->
+           collectHoles uid = case uid of
+                IndefiniteUnitId indef ->
                   let local = [ Map.singleton
                                   (moduleName mod)
                                   (Set.singleton $ IndefModule indef mod_name)
@@ -790,7 +790,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                                 | (_, mod) <- indefUnitIdInsts indef ]
                   in Map.unionsWith Set.union $ local ++ recurse
                 -- Other types of unit identities don't have holes
-                (_, Nothing) -> Map.empty
+                DefiniteUnitId _ -> Map.empty
 
 
            uv = UnitVisibility

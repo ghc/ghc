@@ -322,8 +322,8 @@ implicitRequirements' hsc_env normal_imports
 -- INVARIANT: the UnitId is NOT a InstalledUnitId
 checkUnitId :: UnitId -> TcM ()
 checkUnitId uid = do
-    case splitUnitIdInsts uid of
-      (_, Just indef) ->
+    case uid of
+      IndefiniteUnitId indef ->
         let insts = indefUnitIdInsts indef in
         forM_ insts $ \(mod_name, mod) ->
             -- NB: direct hole instantiations are well-typed by construction
@@ -332,7 +332,7 @@ checkUnitId uid = do
                 checkUnitId (moduleUnitId mod)
                 _ <- mod `checkImplements` IndefModule indef mod_name
                 return ()
-      _ -> return () -- if it's hashed, must be well-typed
+      DefiniteUnitId _ -> return () -- if it's hashed, must be well-typed
 
 -- | Top-level driver for signature instantiation (run when compiling
 -- an @hsig@ file.)
