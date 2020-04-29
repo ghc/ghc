@@ -48,34 +48,36 @@ necessary.  The type argument gives the type of the @ei@.
 
 dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> Maybe (NonEmpty Deltas) -> DsM CoreExpr
 dsGuarded grhss rhs_ty mb_rhss_deltas = do
-    match_result <- dsGRHSs PatBindRhs grhss rhs_ty mb_rhss_deltas
+    match_result <- dsGRHSs dsLExpr PatBindRhs grhss rhs_ty mb_rhss_deltas
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-dsGRHSs :: HsMatchContext GhcRn
-        -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
+dsGRHSs :: (rhs -> DsM CoreExpr)       -- ^ How to desugar each RHS
+        -> HsMatchContext GhcRn
+        -> GRHSs GhcTc rhs             -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> Maybe (NonEmpty Deltas)     -- ^ Refined pattern match checking
                                        --   models, one for each GRHS. Defaults
                                        --   to 'initDeltas' if 'Nothing'.
         -> DsM MatchResult
-dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
+dsGRHSs ds_rhs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
   = ASSERT( notNull grhss )
     do { match_results <- case toList <$> mb_rhss_deltas of
-           Nothing          -> mapM     (dsGRHS hs_ctx rhs_ty initDeltas) grhss
+           Nothing          -> mapM     (dsGRHS ds_rhs hs_ctx rhs_ty initDeltas) grhss
            Just rhss_deltas -> ASSERT( length grhss == length rhss_deltas )
-                               zipWithM (dsGRHS hs_ctx rhs_ty) rhss_deltas grhss
+                               zipWithM (dsGRHS ds_rhs hs_ctx rhs_ty) rhss_deltas grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
-       -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
-  = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
+dsGRHS :: (rhs -> DsM CoreExpr) -> HsMatchContext GhcRn -> Type -> Deltas
+       -> LGRHS GhcTc rhs -> DsM MatchResult
+dsGRHS ds_rhs hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
+  = updPmDeltas rhs_deltas $
+    matchGuards ds_rhs (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
 
 {-
 ************************************************************************
@@ -85,17 +87,18 @@ dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
 ************************************************************************
 -}
 
-matchGuards :: [GuardStmt GhcTc]     -- Guard
+matchGuards :: (rhs -> DsM CoreExpr) -- How to desugar each RHS
+            -> [GuardStmt GhcTc]     -- Guard
             -> HsStmtContext GhcRn   -- Context
-            -> LHsExpr GhcTc         -- RHS
+            -> rhs                   -- RHS
             -> Type                  -- Type of RHS of guard
             -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what a BodyStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)
 
-matchGuards [] _ rhs _
-  = do  { core_rhs <- dsLExpr rhs
+matchGuards ds_rhs [] _ rhs _
+  = do  { core_rhs <- ds_rhs rhs
         ; return (cantFailMatchResult core_rhs) }
 
         -- BodyStmts must be guards
@@ -105,38 +108,38 @@ matchGuards [] _ rhs _
         -- NB:  The success of this clause depends on the typechecker not
         --      wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
         --      If it does, you'll get bogus overlap warnings
-matchGuards (BodyStmt _ e _ _ : stmts) ctx rhs rhs_ty
+matchGuards ds_rhs (BodyStmt _ e _ _ : stmts) ctx rhs rhs_ty
   | Just addTicks <- isTrueLHsExpr e = do
-    match_result <- matchGuards stmts ctx rhs rhs_ty
+    match_result <- matchGuards ds_rhs stmts ctx rhs rhs_ty
     return (adjustMatchResultDs addTicks match_result)
-matchGuards (BodyStmt _ expr _ _ : stmts) ctx rhs rhs_ty = do
-    match_result <- matchGuards stmts ctx rhs rhs_ty
+matchGuards ds_rhs (BodyStmt _ expr _ _ : stmts) ctx rhs rhs_ty = do
+    match_result <- matchGuards ds_rhs stmts ctx rhs rhs_ty
     pred_expr <- dsLExpr expr
     return (mkGuardedMatchResult pred_expr match_result)
 
-matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
-    match_result <- matchGuards stmts ctx rhs rhs_ty
+matchGuards ds_rhs (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
+    match_result <- matchGuards ds_rhs stmts ctx rhs rhs_ty
     return (adjustMatchResultDs (dsLocalBinds binds) match_result)
         -- NB the dsLet occurs inside the match_result
         -- Reason: dsLet takes the body expression as its argument
         --         so we can't desugar the bindings without the
         --         body expression in hand
 
-matchGuards (BindStmt _ pat bind_rhs : stmts) ctx rhs rhs_ty = do
+matchGuards ds_rhs (BindStmt _ pat bind_rhs : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
     match_var <- selectMatchVar upat
 
-    match_result <- matchGuards stmts ctx rhs rhs_ty
+    match_result <- matchGuards ds_rhs stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
     match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
                                        match_result
     pure $ adjustMatchResult (bindNonRec match_var core_rhs) match_result'
 
-matchGuards (LastStmt  {} : _) _ _ _ = panic "matchGuards LastStmt"
-matchGuards (ParStmt   {} : _) _ _ _ = panic "matchGuards ParStmt"
-matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
-matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
-matchGuards (ApplicativeStmt {} : _) _ _ _ =
+matchGuards _ (LastStmt  {} : _) _ _ _ = panic "matchGuards LastStmt"
+matchGuards _ (ParStmt   {} : _) _ _ _ = panic "matchGuards ParStmt"
+matchGuards _ (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
+matchGuards _ (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
+matchGuards _ (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
 
 {-

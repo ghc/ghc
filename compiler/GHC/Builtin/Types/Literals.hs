@@ -22,10 +22,13 @@ module GHC.Builtin.Types.Literals
 
   , arrowEnvTyCon
   , arrowEnvTy
+  , mkArrowEnvCo
   , arrowStackTupTyCon
   , arrowStackTupTy
+  , mkArrowStackTupCo
   , arrowEnvTupTyCon
   , arrowEnvTupTy
+  , mkArrowEnvTupCo
   ) where
 
 import GhcPrelude
@@ -37,9 +40,9 @@ import GHC.Tc.Utils.TcType ( TcType, tcEqType )
 -- import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
 --                          , Injectivity(..) )
 import GHC.Core.TyCon
-import GHC.Core.Coercion ( Role(..) )
+import GHC.Core.Coercion ( Role(..), CoercionN, CoercionR, mkUnbranchedAxInstCo, mkAxiomRuleCo, mkNomReflCo )
 import GHC.Tc.Types.Constraint ( Xi )
-import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn, toBranchedAxiom )
+import GHC.Core.Coercion.Axiom ( CoAxiom, CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn, Unbranched, toBranchedAxiom )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..), mkWiredInName, mkNewTyCoOcc, nameOccName )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders, alphaTyVar, alphaTy )
@@ -147,17 +150,19 @@ There are a few steps to adding a built-in type family:
 -}
 
 arrowEnvTyCon :: TyCon
-arrowEnvTyCon
-  = mkAlgTyCon name
-               (mkAnonTyConBinders VisArg tvs)
-               liftedTypeKind
-               [Representational]
-               Nothing
-               []              -- No stupid theta
-               rhs
-               (VanillaAlgTyCon (mkPrelTyConRepName name))
-               False           -- Not in GADT syntax
+arrowEnvCoAxiom :: CoAxiom Unbranched
+(arrowEnvTyCon, arrowEnvCoAxiom) = (ty_con, co_ax)
   where
+    ty_con = mkAlgTyCon name
+                        (mkAnonTyConBinders VisArg tvs)
+                        liftedTypeKind
+                        [Representational]
+                        Nothing
+                        []              -- No stupid theta
+                        rhs
+                        (VanillaAlgTyCon (mkPrelTyConRepName name))
+                        False           -- Not in GADT syntax
+
     name   = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
                arrowEnvTyConKey arrowEnvTyCon
     tvs    = [alphaTyVar]
@@ -175,6 +180,9 @@ arrowEnvTyCon
 
 arrowEnvTy :: Type -> Type
 arrowEnvTy ty = mkTyConApp arrowEnvTyCon [ty]
+
+mkArrowEnvCo :: Type -> CoercionR
+mkArrowEnvCo ty = mkUnbranchedAxInstCo Representational arrowEnvCoAxiom [ty] []
 
 arrowStackTupTyCon :: TyCon
 arrowStackTupTyCon =
@@ -211,6 +219,11 @@ axArrowStackTupDef = CoAxiomRule
       tys2 <- isPromotedListTy ty2
       pure (arrowStackTupTy ty1 === mkBoxedTupleTy tys2)
   }
+
+mkArrowStackTupCo :: [Type] -> CoercionN
+mkArrowStackTupCo stk_tys
+  = mkAxiomRuleCo axArrowStackTupDef
+                  [ mkNomReflCo $ mkPromotedListTy liftedTypeKind stk_tys ]
 
 arrowEnvTupTyCon :: TyCon
 arrowEnvTupTyCon =
@@ -274,6 +287,12 @@ axArrowEnvTupDef = CoAxiomRule
       let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty2 : stk_tys2)
       pure (arrowEnvTupTy env_ty1 stk_ty1 === rhs_ty)
   }
+
+mkArrowEnvTupCo :: Type -> [Type] -> CoercionN
+mkArrowEnvTupCo env_ty stk_tys
+  = mkAxiomRuleCo axArrowEnvTupDef
+                  [ mkNomReflCo env_ty
+                  , mkNomReflCo $ mkPromotedListTy liftedTypeKind stk_tys ]
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats

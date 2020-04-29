@@ -445,7 +445,7 @@ dsExpr (HsMultiIf res_ty alts)
   | otherwise
   = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
        ; rhss_deltas  <- checkGuardMatches IfAlt grhss
-       ; match_result <- dsGRHSs IfAlt grhss res_ty (nonEmpty rhss_deltas)
+       ; match_result <- dsGRHSs dsLExpr IfAlt grhss res_ty (nonEmpty rhss_deltas)
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where

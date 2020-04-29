@@ -1408,7 +1408,7 @@ data HsCmdTop p
   | XCmdTop !(XXCmdTop p)        -- Note [Trees that Grow] extension point
 
 data CmdTopTc
-  = CmdTopTc Type    -- Nested tuple of inputs on the command's stack
+  = CmdTopTc Type    -- Type-level list representing the command's stack
              Type    -- return type of the command
              (CmdSyntaxTable GhcTc) -- See Note [CmdSyntaxTable]
 

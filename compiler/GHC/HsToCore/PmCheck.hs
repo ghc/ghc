@@ -273,8 +273,9 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
 checkGuardMatches
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
-  -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
+  :: Outputable rhs
+  => HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  -> GRHSs GhcTc rhs              -- ^ The GRHSs to check
   -> DsM [Deltas]                 -- ^ Covered 'Deltas' for each RHS, for long
                                   --   distance info
 checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
@@ -301,9 +302,10 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
 -- Since there is at least one /grhs/ per /match/, the list of 'Deltas' is at
 -- least as long as the list of matches.
 checkMatches
-  :: DsMatchContext                  -- ^ Match context, for warnings messages
+  :: Outputable rhs
+  => DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
-  -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
+  -> [LMatch GhcTc rhs]              -- ^ List of matches
   -> DsM [Deltas]                    -- ^ One covered 'Deltas' per RHS, for long
                                      --   distance info.
 checkMatches ctxt vars matches = do
@@ -633,7 +635,7 @@ mkGrdTreeMany _    []    = Empty
 mkGrdTreeMany grds trees = foldr Guard (foldr1 Sequence trees) grds
 
 -- Translate a single match
-translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
+translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc rhs
                -> DsM GrdTree
 translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
@@ -645,7 +647,7 @@ translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grh
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
 
 -- | Translate a guarded right-hand side to a single 'GrdTree'
-translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
+translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc rhs -> DsM GrdTree
 translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
   -- _loc apparently points to the match separator that comes after the guards..
   mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs

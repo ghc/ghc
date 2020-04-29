@@ -214,7 +214,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
 
         ; arg' <- tcMonoExpr arg (mkCheckExpType arg_ty)
 
-        ; return (HsCmdArrApp fun_ty fun' arg' ho_app lr) }
+        ; return (HsCmdArrApp (cmd_arr env) fun' arg' ho_app lr) }
   where
        -- Before type-checking f, use the environment of the enclosing
        -- proc for the (-<) case.
