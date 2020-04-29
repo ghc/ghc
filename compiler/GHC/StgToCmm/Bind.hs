@@ -111,7 +111,7 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
               (_, _, fv_details) = mkVirtHeapOffsets dflags header []
         -- Don't drop the non-void args until the closure info has been made
         ; forkClosureBody (closureCodeBody True id closure_info ccs
-                                (nonVoidIds args) (length args) body fv_details)
+                                args body fv_details)
 
         ; return () }
 
@@ -358,8 +358,8 @@ mkRhsClosure dflags bndr cc fvs upd_flag args body
                 -- forkClosureBody: (a) ensure that bindings in here are not seen elsewhere
                 --                  (b) ignore Sequel from context; use empty Sequel
                 -- And compile the body
-                closureCodeBody False bndr closure_info cc (nonVoidIds args)
-                                (length args) body fv_details
+                closureCodeBody False bndr closure_info cc args
+                                body fv_details
 
         -- BUILD THE OBJECT
 --      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
@@ -436,8 +436,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
                 -> Id              -- the closure's name
                 -> ClosureInfo     -- Lots of information about this closure
                 -> CostCentreStack -- Optional cost centre attached to closure
-                -> [NonVoid Id]    -- incoming args to the closure
-                -> Int             -- arity, including void args
+                -> [Id]            -- incoming args to the closure
                 -> CgStgExpr
                 -> [(NonVoid Id, ByteOff)] -- the closure's free vars
                 -> FCode ()
@@ -452,31 +451,32 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   normal form, so there is no need to set up an update frame.
 -}
 
-closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
-  | arity == 0 -- No args i.e. thunk
+-- No args i.e. thunk
+closureCodeBody top_lvl bndr cl_info cc [] body fv_details
   = withNewTickyCounterThunk
         (isStaticClosure cl_info)
         (closureUpdReqd cl_info)
         (closureName cl_info) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
-      \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
+      \(_, node, _) -> thunkCode cl_info fv_details cc node body
    where
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info bndr cc
 
-closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
-  = -- Note: args may be [], if all args are Void
-    withNewTickyCounterFun
-        (closureSingleEntry cl_info)
-        (closureName cl_info)
-        args $ do {
+closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
+  = let nv_args = nonVoidIds args
+        arity = length args
+    in
+    -- See Note [OneShotInfo overview] in GHC.Types.Basic.
+    withNewTickyCounterFun (isOneShotBndr arg0) (closureName cl_info)
+        nv_args $ do {
 
         ; let
              lf_info  = closureLFInfo cl_info
              info_tbl = mkCmmInfo cl_info bndr cc
 
         -- Emit the main entry code
-        ; emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args $
+        ; emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl nv_args $
             \(_offset, node, arg_regs) -> do
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode bndr cl_info arg_regs
@@ -565,15 +565,15 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
 
 -----------------------------------------
 thunkCode :: ClosureInfo -> [(NonVoid Id, ByteOff)] -> CostCentreStack
-          -> LocalReg -> Int -> CgStgExpr -> FCode ()
-thunkCode cl_info fv_details _cc node arity body
+          -> LocalReg -> CgStgExpr -> FCode ()
+thunkCode cl_info fv_details _cc node body
   = do { dflags <- getDynFlags
        ; let node_points = nodeMustPointToIt dflags (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
         ; ldvEnterClosure cl_info (CmmLocal node) -- NB: Node always points when profiling
 
         -- Heap overflow check
-        ; entryHeapCheck cl_info node' arity [] $ do
+        ; entryHeapCheck cl_info node' 0 [] $ do
         { -- Overwrite with black hole if necessary
           -- but *after* the heap-overflow check
         ; tickyEnterThunk cl_info
