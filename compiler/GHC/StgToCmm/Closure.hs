@@ -48,7 +48,7 @@ module GHC.StgToCmm.Closure (
 
         -- ** Predicates
         -- These are really just functions on LambdaFormInfo
-        closureUpdReqd, closureSingleEntry,
+        closureUpdReqd,
         closureReEntrant, closureFunInfo,
         isToplevClosure,
 
@@ -201,7 +201,6 @@ argPrimRep arg = typePrimRep1 (stgArgType arg)
 data LambdaFormInfo
   = LFReEntrant         -- Reentrant closure (a function)
         TopLevelFlag    -- True if top level
-        OneShotInfo
         !RepArity       -- Arity. Invariant: always > 0
         !Bool           -- True <=> no fvs
         ArgDescr        -- Argument descriptor (should really be in ClosureInfo)
@@ -285,8 +284,7 @@ mkLFReEntrant :: TopLevelFlag    -- True of top level
 mkLFReEntrant _ _ [] _
   = pprPanic "mkLFReEntrant" empty
 mkLFReEntrant top fvs args arg_descr
-  = LFReEntrant top os_info (length args) (null fvs) arg_descr
-  where os_info = idOneShotInfo (head args)
+  = LFReEntrant top (length args) (null fvs) arg_descr
 
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
@@ -335,7 +333,7 @@ mkLFImported id
                 -- the id really does point directly to the constructor
 
   | arity > 0
-  = LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
+  = LFReEntrant TopLevel arity True (panic "arg_descr")
 
   | otherwise
   = mkLFArgument id -- Not sure of exact arity
@@ -384,9 +382,9 @@ tagForArity dflags arity
 lfDynTag :: DynFlags -> LambdaFormInfo -> DynTag
 -- Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
-lfDynTag dflags (LFCon con)                 = tagForCon dflags con
-lfDynTag dflags (LFReEntrant _ _ arity _ _) = tagForArity dflags arity
-lfDynTag _      _other                      = 0
+lfDynTag dflags (LFCon con)               = tagForCon dflags con
+lfDynTag dflags (LFReEntrant _ arity _ _) = tagForArity dflags arity
+lfDynTag _      _other                    = 0
 
 
 -----------------------------------------------------------------------------
@@ -407,11 +405,11 @@ isLFReEntrant _                = False
 -----------------------------------------------------------------------------
 
 lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
-lfClosureType (LFReEntrant _ _ arity _ argd) = Fun arity argd
-lfClosureType (LFCon con)                    = Constr (dataConTagZ con)
-                                                      (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _)       = thunkClosureType is_sel
-lfClosureType _                              = panic "lfClosureType"
+lfClosureType (LFReEntrant _ arity _ argd) = Fun arity argd
+lfClosureType (LFCon con)                  = Constr (dataConTagZ con)
+                                                    (dataConIdentity con)
+lfClosureType (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType _                            = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
 thunkClosureType (SelectorThunk off) = ThunkSelector off
@@ -431,7 +429,7 @@ nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
 -- this closure has R1 (the "Node" register) pointing to the
 -- closure itself --- the "self" argument
 
-nodeMustPointToIt _ (LFReEntrant top _ _ no_fvs _)
+nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
   =  not no_fvs          -- Certainly if it has fvs we need to point to it
   || isNotTopLevel top   -- See Note [GC recovery]
         -- For lex_profiling we also access the cost centre for a
@@ -566,7 +564,7 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
-getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
+getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
               _self_loop_info
   | n_args == 0 -- No args at all
   && not (gopt Opt_SccProfilingOn dflags)
@@ -811,11 +809,6 @@ lfUpdatable :: LambdaFormInfo -> Bool
 lfUpdatable (LFThunk _ _ upd _ _)  = upd
 lfUpdatable _ = False
 
-closureSingleEntry :: ClosureInfo -> Bool
-closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
-closureSingleEntry (ClosureInfo { closureLFInfo = LFReEntrant _ OneShotLam _ _ _}) = True
-closureSingleEntry _ = False
-
 closureReEntrant :: ClosureInfo -> Bool
 closureReEntrant (ClosureInfo { closureLFInfo = LFReEntrant {} }) = True
 closureReEntrant _ = False
@@ -824,8 +817,8 @@ closureFunInfo :: ClosureInfo -> Maybe (RepArity, ArgDescr)
 closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
 
 lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
-lfFunInfo (LFReEntrant _ _ arity _ arg_desc)  = Just (arity, arg_desc)
-lfFunInfo _                                   = Nothing
+lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
+lfFunInfo _                                 = Nothing
 
 funTag :: DynFlags -> ClosureInfo -> DynTag
 funTag dflags (ClosureInfo { closureLFInfo = lf_info })
@@ -834,9 +827,9 @@ funTag dflags (ClosureInfo { closureLFInfo = lf_info })
 isToplevClosure :: ClosureInfo -> Bool
 isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
   = case lf_info of
-      LFReEntrant TopLevel _ _ _ _ -> True
-      LFThunk TopLevel _ _ _ _     -> True
-      _other                       -> False
+      LFReEntrant TopLevel _ _ _ -> True
+      LFThunk TopLevel _ _ _ _   -> True
+      _other                     -> False
 
 --------------------------------------
 --   Label generation
