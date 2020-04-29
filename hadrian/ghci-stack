@@ -4,4 +4,4 @@ set -e
 
 # Replace newlines with spaces, as these otherwise break the ghci invocation on windows.
 GHC_FLAGS="$GHC_FLAGS $(TERM=dumb CABFLAGS=-v0 "hadrian/build-stack" tool-args -q --build-root=.hadrian_ghci --flavour=ghc-in-ghci $HADRIAN_ARGS | tr '\n\r' ' ')"
-stack exec -- ghci $GHC_FLAGS "$@" -fno-code -fwrite-interface -hidir=.hadrian_ghci/interface -O0 ghc/Main.hs +RTS -A128m
+stack exec -- ghci $GHC_FLAGS "$@" -fno-code -fwrite-interface -hidir=.hadrian_ghci/interface -O0 +RTS -A128m
