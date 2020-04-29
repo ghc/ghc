@@ -3529,6 +3529,7 @@ fFlagsDeps = [
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
   flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
+  flagSpec "diagnostics-show-contexts"        Opt_DiagnosticsShowContexts,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
   flagSpec "dmd-tx-dict-sel"                  Opt_DmdTxDictSel,
@@ -3894,6 +3895,7 @@ defaultFlags settings
 -- See Note [Updating flag description in the User's Guide]
   = [ Opt_AutoLinkPackages,
       Opt_DiagnosticsShowCaret,
+      Opt_DiagnosticsShowContexts,
       Opt_EmbedManifest,
       Opt_FlatCache,
       Opt_GenManifest,

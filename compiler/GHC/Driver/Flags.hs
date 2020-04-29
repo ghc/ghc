@@ -279,6 +279,7 @@ data GeneralFlag
                     -- instead of just the start position.
    | Opt_DeferDiagnostics
    | Opt_DiagnosticsShowCaret -- Show snippets of offending code
+   | Opt_DiagnosticsShowContexts -- Show (non-landmark) contexts
    | Opt_PprCaseAsLet
    | Opt_PprShowTicks
    | Opt_ShowHoleConstraints
@@ -522,4 +523,3 @@ data Language = Haskell98 | Haskell2010
 
 instance Outputable Language where
     ppr = text . show
-

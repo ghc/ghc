@@ -1003,6 +1003,46 @@ messages and in GHCi:
     error was detected.  This also affects the associated caret symbol that
     points at the region of code at fault.  The flag is on by default.
 
+.. ghc-flag:: -fdiagnostics-show-contexts
+    :shortdesc: Whether to show the context in which the error occured
+    :type: dynamic
+    :reverse: -fno-diagnostics-show-contexts
+    :category: verbosity
+
+    Usually given Haskell code with errors:
+
+    .. code-block:: haskell
+
+        foo :: [Int]
+        foo = take 3
+
+    GHC will print the error message along with the context of where the error
+    occured.  This can be seen in the lines starting with 'In':
+
+    .. code-block:: none
+
+        foo.hs:2:7: error:
+            • Couldn't match expected type ‘[Int]’
+                        with actual type ‘[a0] -> [a0]’
+            • Probable cause: ‘take’ is applied to too few arguments
+            In the expression: take 3
+            In an equation for ‘foo’: foo = take 3
+
+    Since the contexts, line and column number and caret diagnostics (See
+    :ghc-flag:`-fdiagnostics-show-caret`) show similar information,
+    :ghc-flag:`-fno-diagnostics-show-contexts` can be used to switch off the
+    contexts so that the error message becomes less verbose:
+
+    .. code-block:: none
+
+        foo.hs:2:7: error:
+            • Couldn't match expected type ‘[Int]’
+                          with actual type ‘[a0] -> [a0]’
+            • Probable cause: ‘take’ is applied to too few arguments
+
+    (Note that the context mentioned here has nothing to do with type-class
+    contexts.)
+
 .. ghc-flag:: -ferror-spans
     :shortdesc: Output full span in error messages
     :type: dynamic

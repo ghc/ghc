@@ -1415,18 +1415,24 @@ mkErrInfo env ctxts
 --       if dbg                -- In -dppr-debug style the output
 --          then return empty  -- just becomes too voluminous
 --          else go dbg 0 env ctxts
- = go False 0 env ctxts
+ = do { dflags <- getDynFlags
+      ; let limit =
+              if gopt Opt_DiagnosticsShowContexts dflags
+                then mAX_CONTEXTS
+                else 0              -- Disabled
+      ; go False 0 limit env ctxts
+      }
  where
-   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _ _   [] = return empty
-   go dbg n env ((is_landmark, ctxt) : ctxts)
-     | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
+   go :: Bool -> Int -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
+   go _ _ _ _   [] = return empty
+   go dbg n limit env ((is_landmark, ctxt) : ctxts)
+     | is_landmark || n < limit -- Too verbose || dbg
      = do { (env', msg) <- ctxt env
           ; let n' = if is_landmark then n else n+1
-          ; rest <- go dbg n' env' ctxts
+          ; rest <- go dbg n' limit env' ctxts
           ; return (msg $$ rest) }
      | otherwise
-     = go dbg n env ctxts
+     = go dbg n limit env ctxts
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3
