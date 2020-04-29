@@ -974,10 +974,12 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
   | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
-  = {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' body cont
+  = pprTrace "NonRec:join" (ppr bndr <+> dcolon <+> ppr (idType bndr) $$ ppr (idOccInfo bndr) ) $
+    {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' body cont
 
   | otherwise
-  = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) ([], body) cont
+  = pprTrace "NonRec:non-join" (ppr bndr) $
+    {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) ([], body) cont
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
