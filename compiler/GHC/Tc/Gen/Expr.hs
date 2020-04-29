@@ -1483,6 +1483,7 @@ tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]
 tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
+    go (L _ (XTupArg a),   _)       = noExtCon a
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
     go (L l (Present x expr), arg_ty) = do { expr' <- tcCheckExpr expr arg_ty
                                            ; return (L l (Present x expr')) }
