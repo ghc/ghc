@@ -34,7 +34,6 @@ import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Types.Var
 import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Types.Var.Set( delVarSetList )
-import GHC.Types.Name.Occurrence ( OccName )
 import GHC.Utils.Outputable
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
@@ -67,8 +66,7 @@ Canonicalization converts a simple constraint to a canonical form. It is
 unary (i.e. treats individual constraints one at a time).
 
 Constraints originating from user-written code come into being as
-CNonCanonicals (except for CHoleCans, arising from holes). We know nothing
-about these constraints. So, first:
+CNonCanonicals. We know nothing about these constraints. So, first:
 
      Classify CNonCanoncal constraints, depending on whether they
      are equalities, class predicates, or other.
@@ -136,9 +134,6 @@ canonicalize (CFunEqCan { cc_ev = ev
                         , cc_fsk    = fsk })
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
-
-canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
-  = canHole ev occ hole
 
 {-
 ************************************************************************
@@ -717,17 +712,6 @@ canIrred status ev
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
            _                     -> continueWith $
                                     mkIrredCt status new_ev } }
-
-canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
-canHole ev occ hole_sort
-  = do { let pred = ctEvPred ev
-       ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
-    do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
-                                             , cc_occ = occ
-                                             , cc_hole = hole_sort }))
-       ; stopWith new_ev "Emit insoluble hole" } }
-
 
 {- *********************************************************************
 *                                                                      *
@@ -1401,6 +1385,7 @@ can_eq_app ev s1 t1 s2 t2
   | CtDerived {} <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }
+
   | CtWanted { ctev_dest = dest } <- ev
   = do { co_s <- unifyWanted loc Nominal s1 s2
        ; let arg_loc

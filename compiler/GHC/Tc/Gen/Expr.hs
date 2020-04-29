@@ -36,7 +36,6 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntyp
 import GHC.Builtin.Names.TH( liftStringName, liftName )
 
 import GHC.Hs
-import GHC.Tc.Types.Constraint ( HoleSort(..) )
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
@@ -1405,22 +1404,21 @@ Suppose 'wurble' is not in scope, and we have
 
 Then the renamer will make (HsUnboundVar "wurble) for 'wurble',
 and the typechecker will typecheck it with tcUnboundId, giving it
-a type 'alpha', and emitting a deferred CHoleCan constraint, to
-be reported later.
+a type 'alpha', and emitting a deferred Hole, to be reported later.
 
 But then comes the visible type application. If we do nothing, we'll
 generate an immediate failure (in tc_app_err), saying that a function
 of type 'alpha' can't be applied to Bool.  That's insane!  And indeed
 users complain bitterly (#13834, #17150.)
 
-The right error is the CHoleCan, which has /already/ been emitted by
+The right error is the Hole, which has /already/ been emitted by
 tcUnboundId.  It later reports 'wurble' as out of scope, and tries to
 give its type.
 
 Fortunately in tcArgs we still have access to the function, so we can
 check if it is a HsUnboundVar.  We use this info to simply skip over
 any visible type arguments.  We've already inferred the type of the
-function, so we'll /already/ have emitted a CHoleCan constraint;
+function, so we'll /already/ have emitted a Hole;
 failing preserves that constraint.
 
 We do /not/ want to fail altogether in this case (via failM) becuase
@@ -1897,14 +1895,13 @@ tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTc)
 -- Others might simply be variables that accidentally have no binding site
 --
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
--- Id; and indeed the evidence for the CHoleCan does bind it, so it's
+-- Id; and indeed the evidence for the ExprHole does bind it, so it's
 -- not unbound any more!
 tcUnboundId rn_expr occ res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
-      ; can <- newHoleCt ExprHole ev ty
-      ; emitInsoluble can
+      ; emitNewExprHole occ ev ty
       ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
           (HsVar noExtField (noLoc ev)) ty res_ty }
 
