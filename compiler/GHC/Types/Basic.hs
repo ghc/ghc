@@ -243,13 +243,80 @@ instance Outputable Alignment where
 ************************************************************************
 -}
 
+{-
+Note [OneShotInfo overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lambda-bound Ids (and only lambda-bound Ids) may be decorated with
+one-shot info.  The idea is that if we see
+    (\x{one-shot}. e)
+it means that this lambda will only be applied once.  In particular
+that means we can float redexes under the lambda without losing
+work.  For example, consider
+    let t = expensive in
+    (\x{one-shot}. case t of { True -> ...; False -> ... })
+
+Because it's a one-shot lambda, we can safely inline t, giving
+    (\x{one_shot}. case <expensive> of of
+                       { True -> ...; False -> ... })
+
+Moving parts:
+
+* Usage analysis, performed as part of demand-analysis, finds
+  out whether functions call their argument once.  Consider
+     f g x = Just (case g x of { ... })
+
+  Here 'f' is lazy in 'g', but it guarantees to call it no
+  more than once.  So g will get a C1(U) usage demand.
+
+* Occurrence analysis propagates this usage information
+  (in the demand signature of a function) to its calls.
+  Example, given 'f' above
+     f (\x.e) blah
+
+  Since f's demand signature says it has a C1(U) usage demand on its
+  first argument, the occurrence analyser sets the \x to be one-shot.
+  This is done via the occ_one_shots field of OccEnv.
+
+* Float-in and float-out take account of one-shot-ness
+
+* Occurrence analysis doesn't set "inside-lam" for occurrences inside
+  a one-shot lambda
+
+Other notes
+
+* A one-shot lambda can use its argument many times.  To elaborate
+  the example above
+    let t = expensive in
+    (\x{one-shot}. case t of { True -> x+x; False -> x*x })
+
+  Here the '\x' is one-shot, which justifies inlining 't',
+  but x is used many times. That's absolutely fine.
+
+* It's entirely possible to have
+     (\x{one-shot}. \y{many-shot}. e)
+
+  For example
+     let t = expensive
+         g = \x -> let v = x+t in
+             \y -> x + v
+     in map (g 5) xs
+
+  Here the `\x` is a one-shot binder: `g` is applied to one argument
+  exactly once.  And because the `\x` is one-shot, it would be fine to
+  float that `let t = expensive` binding inside the `\x`.
+
+  But the `\y` is most definitely not one-shot!
+-}
+
 -- | If the 'Id' is a lambda-bound variable then it may have lambda-bound
 -- variable info. Sometimes we know whether the lambda binding this variable
--- is a \"one-shot\" lambda; that is, whether it is applied at most once.
+-- is a "one-shot" lambda; that is, whether it is applied at most once.
 --
 -- This information may be useful in optimisation, as computations may
 -- safely be floated inside such a lambda without risk of duplicating
 -- work.
+--
+-- See also Note [OneShotInfo overview] above.
 data OneShotInfo
   = NoOneShotInfo -- ^ No information
   | OneShotLam    -- ^ The lambda is applied at most once.
