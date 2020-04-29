@@ -5,7 +5,7 @@
 module GHC.Tc.Solver.Flatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
-   rewriteTyVar,
+   rewriteTyVar, flattenHole,
 
    unflattenWanteds
  ) where
@@ -825,6 +825,13 @@ flattenArgsNom ev tc tys
        ; traceTcS "flatten }" (vcat (map ppr tys'))
        ; return (tys', cos, kind_co) }
 
+-- | Flatten a type in a way suitable for a typed hole. This will
+-- flatten w.r.t. the nominal/wanted flavour and reduce type families.
+flattenHole :: CtLoc -> TcType -> TcS TcType
+flattenHole loc ty
+  = do { (xi, _) <- runFlatten FM_FlattenAll loc (Wanted WOnly) NomEq $
+                    flatten_one ty
+       ; return xi }
 
 {- *********************************************************************
 *                                                                      *

@@ -462,7 +462,7 @@ getRuleQuantCts wc
     float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints)
     float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics })
       = ( simple_yes `andCts` implic_yes
-        , WC { wc_simple = simple_no, wc_impl = implics_no })
+        , emptyWC { wc_simple = simple_no, wc_impl = implics_no })
      where
         (simple_yes, simple_no) = partitionBag (rule_quant_ct skol_tvs) simples
         (implic_yes, implics_no) = mapAccumBagL (float_implic skol_tvs)
@@ -480,8 +480,6 @@ getRuleQuantCts wc
       | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
       , not (ok_eq t1 t2)
        = False        -- Note [RULE quantification over equalities]
-      | isHoleCt ct
-      = False         -- Don't quantify over type holes, obviously
       | otherwise
       = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 

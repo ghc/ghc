@@ -14,8 +14,7 @@ module GHC.Tc.Types.Constraint (
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
         isCDictCan_Maybe, isCFunEqCan_maybe,
-        isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
+        isCNonCanonical, isWantedCt, isDerivedCt, isGivenCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
@@ -26,9 +25,11 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
+        Hole(..), HoleSort(..), isOutOfScopeHole,
+
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
-        addInsols, insolublesOnly, addSimples, addImplics,
+        addInsols, insolublesOnly, addSimples, addImplics, addHole,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
         tyCoVarsOfWCList, insolubleCt, insolubleEqCt,
         isDroppableCt, insolubleImplic,
@@ -61,9 +62,6 @@ module GHC.Tc.Types.Constraint (
         -- Pretty printing
         pprEvVarTheta,
         pprEvVars, pprEvVarWithType,
-
-        -- holes
-        HoleSort(..),
 
   )
   where
@@ -202,14 +200,6 @@ data Ct
       cc_ev  :: CtEvidence
     }
 
-  | CHoleCan {             -- See Note [Hole constraints]
-       -- Treated as an "insoluble" constraint
-       -- See Note [Insoluble constraints]
-      cc_ev   :: CtEvidence,
-      cc_occ  :: OccName,   -- The name of this hole
-      cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
-    }
-
   | CQuantCan QCInst       -- A quantified constraint
       -- NB: I expect to make more of the cases in Ct
       --     look like this, with the payload in an
@@ -230,12 +220,47 @@ instance Outputable QCInst where
   ppr (QCI { qci_ev = ev }) = ppr ev
 
 ------------
+-- | A hole stores the information needed to report diagnostics
+-- about holes in terms (unbound identifiers or underscores) or
+-- in types (also called wildcards, as used in partial type
+-- signatures)
+data Hole
+  = Hole { hole_sort :: HoleSort -- ^ What flavour of hole is this?
+         , hole_occ  :: OccName  -- ^ The name of this hole
+         , hole_ty   :: TcType   -- ^ Type of the hole
+                                 -- For expression holes: type of expr
+                                 -- For type holes: the (perhaps zonked)
+                                 --   metavariable
+         , hole_loc  :: CtLoc    -- ^ Where hole was written
+         }
+           -- For the hole_loc, we usually only want the TcLclEnv stored within.
+           -- Except when we flatten, where we need a whole location. And this
+           -- might get reported to the user if reducing type families in a
+           -- hole type loops.
+
+
 -- | Used to indicate which sort of hole we have.
-data HoleSort = ExprHole
+data HoleSort = ExprHole Id
                  -- ^ Either an out-of-scope variable or a "true" hole in an
-                 -- expression (TypedHoles)
+                 -- expression (TypedHoles).
+                 -- The 'Id' is where to store "evidence": this evidence
+                 -- will be an erroring expression for -fdefer-type-errors.
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
+
+instance Outputable Hole where
+  ppr (Hole { hole_sort = ExprHole id
+            , hole_occ  = occ
+            , hole_ty   = ty })
+    = parens $ (braces $ ppr occ <> colon <> ppr id) <+> dcolon <+> ppr ty
+  ppr (Hole { hole_sort = TypeHole
+            , hole_occ  = occ
+            , hole_ty   = ty })
+    = braces $ ppr occ <> colon <> ppr ty
+
+instance Outputable HoleSort where
+  ppr (ExprHole id) = text "ExprHole:" <> ppr id
+  ppr TypeHole      = text "TypeHole"
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
@@ -252,20 +277,8 @@ instance Outputable CtIrredStatus where
   ppr BlockedCIS   = text "(blocked)"
   ppr OtherCIS     = text "(soluble)"
 
-{- Note [Hole constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-CHoleCan constraints are used for two kinds of holes,
-distinguished by cc_hole:
-
-  * For holes in expressions
-    e.g.   f x = g _ x
-
-  * For holes in type signatures
-    e.g.   f :: _ -> _
-           f x = [x,True]
-
-Note [CIrredCan constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [CIrredCan constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CIrredCan constraints are used for constraints that are "stuck"
    - we can't solve them (yet)
    - we can't use them to solve other constraints
@@ -419,7 +432,6 @@ instance Outputable Ct where
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
          CIrredCan { cc_status = status } -> text "CIrredCan" <> ppr status
-         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
@@ -552,7 +564,6 @@ isDroppableCt ct
 
     keep_deriv
       = case ct of
-          CHoleCan {}                            -> True
           CIrredCan { cc_status = InsolubleCIS } -> keep_eq True
           _                                      -> keep_eq False
 
@@ -675,26 +686,6 @@ isCFunEqCan _ = False
 isCNonCanonical :: Ct -> Bool
 isCNonCanonical (CNonCanonical {}) = True
 isCNonCanonical _ = False
-
-isHoleCt:: Ct -> Bool
-isHoleCt (CHoleCan {}) = True
-isHoleCt _ = False
-
-isOutOfScopeCt :: Ct -> Bool
--- A Hole that does not have a leading underscore is
--- simply an out-of-scope variable, and we treat that
--- a bit differently when it comes to error reporting
-isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
-isOutOfScopeCt _ = False
-
-isExprHoleCt :: Ct -> Bool
-isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
-isExprHoleCt _ = False
-
-isTypeHoleCt :: Ct -> Bool
-isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
-isTypeHoleCt _ = False
-
 
 {- Note [Custom type errors in constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -884,24 +875,25 @@ v%************************************************************************
 data WantedConstraints
   = WC { wc_simple :: Cts              -- Unsolved constraints, all wanted
        , wc_impl   :: Bag Implication
+       , wc_holes  :: Bag Hole
     }
 
 emptyWC :: WantedConstraints
-emptyWC = WC { wc_simple = emptyBag, wc_impl = emptyBag }
+emptyWC = WC { wc_simple = emptyBag
+             , wc_impl   = emptyBag
+             , wc_holes  = emptyBag }
 
 mkSimpleWC :: [CtEvidence] -> WantedConstraints
 mkSimpleWC cts
-  = WC { wc_simple = listToBag (map mkNonCanonical cts)
-       , wc_impl = emptyBag }
+  = emptyWC { wc_simple = listToBag (map mkNonCanonical cts) }
 
 mkImplicWC :: Bag Implication -> WantedConstraints
 mkImplicWC implic
-  = WC { wc_simple = emptyBag, wc_impl = implic }
+  = emptyWC { wc_impl = implic }
 
 isEmptyWC :: WantedConstraints -> Bool
-isEmptyWC (WC { wc_simple = f, wc_impl = i })
-  = isEmptyBag f && isEmptyBag i
-
+isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_holes = holes })
+  = isEmptyBag f && isEmptyBag i && isEmptyBag holes
 
 -- | Checks whether a the given wanted constraints are solved, i.e.
 -- that there are no simple constraints left and all the implications
@@ -911,10 +903,11 @@ isSolvedWC WC {wc_simple = wc_simple, wc_impl = wc_impl} =
   isEmptyBag wc_simple && allBag (isSolvedStatus . ic_status) wc_impl
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
-andWC (WC { wc_simple = f1, wc_impl = i1 })
-      (WC { wc_simple = f2, wc_impl = i2 })
+andWC (WC { wc_simple = f1, wc_impl = i1, wc_holes = h1 })
+      (WC { wc_simple = f2, wc_impl = i2, wc_holes = h2 })
   = WC { wc_simple = f1 `unionBags` f2
-       , wc_impl   = i1 `unionBags` i2 }
+       , wc_impl   = i1 `unionBags` i2
+       , wc_holes  = h1 `unionBags` h2 }
 
 unionsWC :: [WantedConstraints] -> WantedConstraints
 unionsWC = foldr andWC emptyWC
@@ -931,11 +924,16 @@ addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
 addInsols wc cts
   = wc { wc_simple = wc_simple wc `unionBags` cts }
 
+addHole :: WantedConstraints -> Hole -> WantedConstraints
+addHole wc hole
+  = wc { wc_holes = hole `consBag` wc_holes wc }
+
 insolublesOnly :: WantedConstraints -> WantedConstraints
 -- Keep only the definitely-insoluble constraints
-insolublesOnly (WC { wc_simple = simples, wc_impl = implics })
+insolublesOnly (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
   = WC { wc_simple = filterBag insolubleCt simples
-       , wc_impl   = mapBag implic_insols_only implics }
+       , wc_impl   = mapBag implic_insols_only implics
+       , wc_holes  = filterBag isOutOfScopeHole holes }
   where
     implic_insols_only implic
       = implic { ic_wanted = insolublesOnly (ic_wanted implic) }
@@ -953,9 +951,10 @@ insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
 insolubleWC :: WantedConstraints -> Bool
-insolubleWC (WC { wc_impl = implics, wc_simple = simples })
+insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_holes = holes })
   =  anyBag insolubleCt simples
   || anyBag insolubleImplic implics
+  || anyBag isOutOfScopeHole holes  -- See Note [Insoluble holes]
 
 insolubleCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
@@ -963,7 +962,6 @@ insolubleCt :: Ct -> Bool
 --         b) that is insoluble
 --         c) and does not arise from a Given
 insolubleCt ct
-  | isHoleCt ct            = isOutOfScopeCt ct  -- See Note [Insoluble holes]
   | not (insolubleEqCt ct) = False
   | arisesFromGivens ct    = False              -- See Note [Given insolubles]
   | otherwise              = True
@@ -985,6 +983,11 @@ insolubleEqCt :: Ct -> Bool
 --               (where F is an arity-1 type function)
 insolubleEqCt (CIrredCan { cc_status = InsolubleCIS }) = True
 insolubleEqCt _                                        = False
+
+-- | Does this hole represent an "out of scope" error?
+-- See Note [Insoluble holes]
+isOutOfScopeHole :: Hole -> Bool
+isOutOfScopeHole (Hole { hole_occ = occ }) = not (startsWithUnderscore occ)
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i})
@@ -1035,7 +1038,7 @@ Hole constraints that ARE NOT treated as truly insoluble:
   a) type holes, arising from PartialTypeSignatures,
   b) "true" expression holes arising from TypedHoles
 
-An "expression hole" or "type hole" constraint isn't really an error
+An "expression hole" or "type hole" isn't really an error
 at all; it's a report saying "_ :: Int" here.  But an out-of-scope
 variable masquerading as expression holes IS treated as truly
 insoluble, so that it trumps other errors during error reporting.
@@ -1512,10 +1515,6 @@ ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
   = (ctEvFlavour ev, eq_rel)
 ctFlavourRole (CFunEqCan { cc_ev = ev })
   = (ctEvFlavour ev, NomEq)
-ctFlavourRole (CHoleCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)  -- NomEq: CHoleCans can be rewritten by
-                             -- by nominal equalities but empahatically
-                             -- not by representational equalities
 ctFlavourRole ct
   = ctEvFlavourRole (ctEvidence ct)
 
