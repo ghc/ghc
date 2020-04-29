@@ -3,8 +3,6 @@ module HoleFitPlugin where
 
 import GHC.Plugins hiding ((<>))
 
-import GHC.Tc.Errors.Hole
-
 import Data.List (stripPrefix, sortOn)
 
 import GHC.Tc.Types.Constraint
@@ -34,7 +32,7 @@ fromModule (GreHFCand gre) =
 fromModule _ = []
 
 toHoleFitCommand :: TypedHole -> String -> Maybe String
-toHoleFitCommand TyH{tyHCt = Just (CHoleCan _ h _)} str
+toHoleFitCommand (TypedHole {th_hole = Just (Hole { hole_occ = h })}) str
     = stripPrefix ("_" <> str) $ occNameString h
 toHoleFitCommand _ _ = Nothing
 

@@ -438,7 +438,7 @@ then
       newtypes.
   (b) dcs is the list of newtype constructors "skipped", every time we normalise
       a newtype to its core representation, we keep track of the source data
-      constructor. For convenienve, we also track the type we unwrap and the
+      constructor. For convenience, we also track the type we unwrap and the
       type of its field. Example: @Down 42@ => @[(Down @Int, Down, Int)]
   (c) core_ty is the rewritten type. That is,
         pmTopNormaliseType env ty_cs ty = Just (src_ty, dcs, core_ty)
