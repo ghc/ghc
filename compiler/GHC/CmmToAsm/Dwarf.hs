@@ -47,11 +47,12 @@ dwarfGen df modLoc us blocks = do
   compPath <- getCurrentDirectory
   let lowLabel = dblCLabel $ head procs
       highLabel = mkAsmTempEndLabel $ dblCLabel $ last procs
+      producer = dwarfStringFromString $ cProjectName ++ " " ++ cProjectVersion
       dwarfUnit = DwarfCompileUnit
         { dwChildren = map (procToDwarf df) (map stripBlocks procs)
         , dwName = fromMaybe "" (ml_hs_file modLoc)
-        , dwCompDir = addTrailingPathSeparator compPath
-        , dwProducer = cProjectName ++ " " ++ cProjectVersion
+        , dwCompDir = dwarfStringFromString $ addTrailingPathSeparator compPath
+        , dwProducer = producer
         , dwLowLabel = lowLabel
         , dwHighLabel = highLabel
         , dwLineLabel = dwarfLineLabel
@@ -77,6 +78,9 @@ dwarfGen df modLoc us blocks = do
                      , compileUnitFooter unitU
                      ]
 
+  -- .debug_str section: Strings
+  let stringsSct = dwarfStringsSection (dwarfInfoStrings dwarfUnit)
+
   -- .debug_line section: Generated mainly by the assembler, but we
   -- need to label it
   let lineSct = dwarfLineSection platform $$
@@ -93,7 +97,7 @@ dwarfGen df modLoc us blocks = do
                | otherwise                 = [DwarfARange lowLabel highLabel]
   let aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
-  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+  return (infoSct $$ stringsSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
 -- | Build an address range entry for one proc.
 -- With split sections, each proc needs its own entry, since they may get
@@ -178,7 +182,7 @@ parent, B.
 procToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
 procToDwarf df prc
   = DwarfSubprogram { dwChildren = map blockToDwarf (dblBlocks prc)
-                    , dwName     = case dblSourceTick prc of
+                    , dwName     = dwarfStringFromString $ case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
                          _otherwise -> showSDocDump df $ ppr $ dblLabel prc
                     , dwLabel    = dblCLabel prc
