@@ -7,7 +7,7 @@ module Haddock.Interface.Json (
 
 import GHC.Types.Basic
 import GHC.Utils.Json
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Utils.Outputable
 

@@ -45,10 +45,10 @@ import           Data.Version
 import           Control.Applicative
 import           Distribution.Verbosity
 import           GHC.Data.FastString
-import           GHC ( DynFlags, Module, moduleUnitId )
+import           GHC ( DynFlags, Module, moduleUnit )
 import           Haddock.Types
 import           Haddock.Utils
-import           GHC.Driver.Packages
+import           GHC.Unit.State
 import           System.Console.GetOpt
 import qualified Text.ParserCombinators.ReadP as RP
 
@@ -378,8 +378,8 @@ modulePackageInfo :: DynFlags
                   -> (Maybe PackageName, Maybe Data.Version.Version)
 modulePackageInfo _dflags _flags Nothing = (Nothing, Nothing)
 modulePackageInfo dflags flags (Just modu) =
-  ( optPackageName flags    <|> fmap packageName pkgDb
-  , optPackageVersion flags <|> fmap packageVersion pkgDb
+  ( optPackageName flags    <|> fmap unitPackageName pkgDb
+  , optPackageVersion flags <|> fmap unitPackageVersion pkgDb
   )
   where
-    pkgDb = lookupUnit dflags (moduleUnitId modu)
+    pkgDb = lookupUnit dflags (moduleUnit modu)

@@ -68,9 +68,8 @@ import GHC hiding (verbosity)
 import Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
 import GHC.Utils.Error
-import GHC.Driver.Packages
+import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
-import GHC.Types.Module
 import GHC.Data.FastString
 import qualified GHC.Runtime.Loader
 
@@ -294,8 +293,8 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = fmap ifaceMod (listToMaybe ifaces)
-    pkgKey           = fmap moduleUnitId pkgMod
-    pkgStr           = fmap unitIdString pkgKey
+    pkgKey           = fmap moduleUnit pkgMod
+    pkgStr           = fmap unitString pkgKey
     pkgNameVer       = modulePackageInfo dflags flags pkgMod
     pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
     sincePkg         = case sinceQual of
@@ -312,7 +311,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
       (Map.map SrcExternal extSrcMap)
       (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
 
-    pkgSrcMap = Map.mapKeys moduleUnitId extSrcMap
+    pkgSrcMap = Map.mapKeys moduleUnit extSrcMap
     pkgSrcMap'
       | Flag_HyperlinkedSource `elem` flags
       , Just k <- pkgKey
@@ -341,11 +340,11 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     -- records the *wired in* identity base.  So untranslate it
     -- so that we can service the request.
     unwire :: Module -> Module
-    unwire m = m { moduleUnitId = unwireUnitId dflags (moduleUnitId m) }
+    unwire m = m { moduleUnit = unwireUnit dflags (moduleUnit m) }
 
   reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
     let warn = hPutStrLn stderr . ("Warning: " ++)
-    case readP_to_S parseModuleId mod_str of
+    case readP_to_S parseHoleyModule mod_str of
       [(m, "")]
         | Just iface <- Map.lookup m installedMap
         -> return [iface]

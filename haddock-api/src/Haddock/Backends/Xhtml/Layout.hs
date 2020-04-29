@@ -306,7 +306,7 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice mdl' docName@(D
         -- 'mdl'' is a way of "overriding" the module. Without it, instances
         -- will point to the module defining the class/family, which is wrong.
         origMod = fromMaybe (nameModule n) mdl'
-        origPkg = moduleUnitId origMod
+        origPkg = moduleUnit origMod
 
         fname = case loc of
           RealSrcSpan l _ -> unpackFS (srcSpanFile l)

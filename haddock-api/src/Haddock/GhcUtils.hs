@@ -28,7 +28,7 @@ import GHC.Utils.FV as FV
 import GHC.Utils.Outputable ( Outputable, panic, showPpr )
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Driver.Types
 import GHC
 import GHC.Core.Class
@@ -41,7 +41,6 @@ import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Type     ( isRuntimeRepVar )
 import GHC.Builtin.Types( liftedRepDataConTyCon )
-import GHC.Hs.Utils (CollectPass(..))
 
 import           GHC.Data.StringBuffer ( StringBuffer )
 import qualified GHC.Data.StringBuffer             as S

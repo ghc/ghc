@@ -15,9 +15,9 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 import Haddock.Types ( MDoc )
 
 import GHC                 ( Name )
-import GHC.Types.Module    ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
+import GHC.Unit.Module    ( Module, moduleNameString, moduleName, moduleUnit, unitString )
 import GHC.Driver.Session  ( DynFlags )
-import GHC.Driver.Packages ( lookupUnit, sourcePackageIdString )
+import GHC.Unit.State ( lookupUnit, unitPackageIdString )
 
 import qualified Control.Applicative as A
 
@@ -29,10 +29,10 @@ mkModuleTree :: DynFlags -> Bool -> [(Module, Maybe (MDoc Name))] -> [ModuleTree
 mkModuleTree dflags showPkgs mods =
   foldr fn [] [ (mdl, splitModule mdl, modPkg mdl, modSrcPkg mdl, short) | (mdl, short) <- mods ]
   where
-    modPkg mod_ | showPkgs = Just (unitIdString (moduleUnitId mod_))
+    modPkg mod_ | showPkgs = Just (unitString (moduleUnit mod_))
                 | otherwise = Nothing
-    modSrcPkg mod_ | showPkgs = fmap sourcePackageIdString
-                                     (lookupUnit dflags (moduleUnitId mod_))
+    modSrcPkg mod_ | showPkgs = fmap unitPackageIdString
+                                     (lookupUnit dflags (moduleUnit mod_))
                    | otherwise = Nothing
     fn (m,mod_,pkg,srcPkg,short) = addToTrees mod_ m pkg srcPkg short
 

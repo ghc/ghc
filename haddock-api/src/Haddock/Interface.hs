@@ -50,7 +50,7 @@ import qualified Data.Set as Set
 import Distribution.Verbosity
 import Text.Printf
 
-import GHC.Types.Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
+import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
 import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
