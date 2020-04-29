@@ -1,8 +1,16 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module GHC.CmmToAsm.Dwarf.Types
   ( -- * Dwarf information
     DwarfInfo(..)
   , pprDwarfInfo
   , pprAbbrevDecls
+  , dwarfInfoStrings
+    -- * Dwarf Strings section
+  , DwarfString
+  , dwarfStringsSection
+  , dwarfStringFromString
+  , dwarfStringFromFastString
     -- * Dwarf address range table
   , DwarfARange(..)
   , pprDwarfARanges
@@ -27,18 +35,14 @@ import GhcPrelude
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr         ( GlobalReg(..) )
-import Encoding
 import FastString
 import Outputable
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Platform.Reg
-import GHC.Types.SrcLoc
-import Util
 
 import GHC.CmmToAsm.Dwarf.Constants
 
-import qualified Data.ByteString as BS
 import qualified Control.Monad.Trans.State.Strict as S
 import Control.Monad (zipWithM, join)
 import Data.Bits
@@ -48,18 +52,46 @@ import Data.Char
 
 import GHC.Platform.Regs
 
+-- | A string in the DWARF @.debug_str@ section.
+newtype DwarfString = DwarfString FastString
+
+dwarfStringFromString :: String -> DwarfString
+dwarfStringFromString = dwarfStringFromFastString . fsLit
+
+dwarfStringFromFastString :: FastString -> DwarfString
+dwarfStringFromFastString = DwarfString
+
+dwarfStringSymbol :: DwarfString -> SDoc
+dwarfStringSymbol (DwarfString fs) =
+    text "_dbgfs_" <> ppr (getUnique fs)
+
+debugStrSection :: SDoc
+debugStrSection = text ".debug_str"
+
+pprDwarfString :: Platform -> DwarfString -> SDoc
+pprDwarfString plat s =
+    sectionOffset plat (dwarfStringSymbol s) debugStrSection
+
+dwarfStringsSection :: [DwarfString] -> SDoc
+dwarfStringsSection xs =
+    text ".section" <+> debugStrSection $$ hcat (map string xs)
+  where
+    string :: DwarfString -> SDoc
+    string dstr@(DwarfString fstr) =
+      dwarfStringSymbol dstr <> colon $$ pprFastString fstr
+
 -- | Individual dwarf records. Each one will be encoded as an entry in
 -- the @.debug_info@ section.
 data DwarfInfo
   = DwarfCompileUnit { dwChildren :: [DwarfInfo]
-                     , dwName :: String
-                     , dwProducer :: String
-                     , dwCompDir :: String
+                     , dwName :: DwarfString
+                     , dwProducer :: DwarfString
+                     , dwCompDir :: DwarfString
                      , dwLowLabel :: CLabel
                      , dwHighLabel :: CLabel
                      , dwLineLabel :: PtrString }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
-                    , dwName :: String
+                    , dwName :: DwarfString
                     , dwLabel :: CLabel
                     , dwParent :: Maybe CLabel
                       -- ^ label of DIE belonging to the parent tick
@@ -68,8 +100,22 @@ data DwarfInfo
                , dwLabel :: CLabel
                , dwMarker :: Maybe CLabel
                }
-  | DwarfSrcNote { dwSrcSpan :: RealSrcSpan
+  | DwarfSrcNote { dwSpanFile      :: !DwarfString
+                 , dwSpanStartLine :: !Int
+                 , dwSpanStartCol  :: !Int
+                 , dwSpanEndLine   :: !Int
+                 , dwSpanEndCol    :: !Int
                  }
+
+-- | 'DwarfStrings' mentioned by the given 'DwarfInfo'.
+dwarfInfoStrings :: DwarfInfo -> [DwarfString]
+dwarfInfoStrings dwinfo =
+  case dwinfo of
+    DwarfCompileUnit {..} -> [dwName, dwProducer, dwCompDir] ++ foldMap dwarfInfoStrings dwChildren
+    DwarfSubprogram {..} -> [dwName] ++ foldMap dwarfInfoStrings dwChildren
+    DwarfBlock {..} -> foldMap dwarfInfoStrings dwChildren
+    DwarfSrcNote {..} -> [dwSpanFile]
+
 
 -- | Abbreviation codes used for encoding above records in the
 -- @.debug_info@ section.
@@ -133,7 +179,7 @@ pprAbbrevDecls platform haveDebugLine =
        , (dW_AT_high_pc, dW_FORM_addr)
        ] $$
      mkAbbrev DwAbbrGhcSrcNote dW_TAG_ghc_src_note dW_CHILDREN_no
-       [ (dW_AT_ghc_span_file, dW_FORM_string)
+       [ (dW_AT_ghc_span_file, dW_FORM_strp)
        , (dW_AT_ghc_span_start_line, dW_FORM_data4)
        , (dW_AT_ghc_span_start_col, dW_FORM_data2)
        , (dW_AT_ghc_span_end_line, dW_FORM_data4)
@@ -163,10 +209,10 @@ pprDwarfInfoOpen :: Platform -> Bool -> DwarfInfo -> SDoc
 pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowLabel
                                            highLabel lineLbl) =
   pprAbbrev DwAbbrCompileUnit
-  $$ pprString name
-  $$ pprString producer
+  $$ pprDwarfString platform name
+  $$ pprDwarfString platform producer
   $$ pprData4 dW_LANG_Haskell
-  $$ pprString compDir
+  $$ pprDwarfString platform compDir
   $$ pprWord platform (ppr lowLabel)
   $$ pprWord platform (ppr highLabel)
   $$ if haveSrc
@@ -176,7 +222,7 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label
                                     parent) = sdocWithDynFlags $ \df ->
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev abbrev
-  $$ pprString name
+  $$ pprDwarfString platform name
   $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord platform (ppr label)
@@ -199,13 +245,13 @@ pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) = sdocWithDynFlag
   $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
   $$ pprWord platform (ppr marker)
   $$ pprWord platform (ppr $ mkAsmTempEndLabel marker)
-pprDwarfInfoOpen _ _ (DwarfSrcNote ss) =
+pprDwarfInfoOpen platform _ (DwarfSrcNote {..}) =
   pprAbbrev DwAbbrGhcSrcNote
-  $$ pprString' (ftext $ srcSpanFile ss)
-  $$ pprData4 (fromIntegral $ srcSpanStartLine ss)
-  $$ pprHalf (fromIntegral $ srcSpanStartCol ss)
-  $$ pprData4 (fromIntegral $ srcSpanEndLine ss)
-  $$ pprHalf (fromIntegral $ srcSpanEndCol ss)
+  $$ pprDwarfString platform dwSpanFile
+  $$ pprData4 (fromIntegral dwSpanStartLine)
+  $$ pprHalf (fromIntegral dwSpanStartCol)
+  $$ pprData4 (fromIntegral dwSpanEndLine)
+  $$ pprHalf (fromIntegral dwSpanEndCol)
 
 -- | Close a DWARF info record with children
 pprDwarfInfoClose :: SDoc
@@ -574,12 +620,12 @@ pprString' :: SDoc -> SDoc
 pprString' str = text "\t.asciz \"" <> str <> char '"'
 
 -- | Generate a string constant. We take care to escape the string.
+pprFastString :: FastString -> SDoc
+pprFastString = pprString' . hcat . map escapeChar . unpackFS
+
+-- | Generate a string constant. We take care to escape the string.
 pprString :: String -> SDoc
-pprString str
-  = pprString' $ hcat $ map escapeChar $
-    if str `lengthIs` utf8EncodedLength str
-    then str
-    else map (chr . fromIntegral) $ BS.unpack $ bytesFS $ mkFastString str
+pprString = pprFastString . mkFastString
 
 -- | Escape a single non-unicode character
 escapeChar :: Char -> SDoc

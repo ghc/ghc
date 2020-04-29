@@ -86,12 +86,14 @@ dW_CHILDREN_no, dW_CHILDREN_yes :: Word8
 dW_CHILDREN_no  = 0
 dW_CHILDREN_yes = 1
 
-dW_FORM_addr, dW_FORM_data2, dW_FORM_data4, dW_FORM_string, dW_FORM_flag,
+dW_FORM_addr, dW_FORM_data2, dW_FORM_data4,
+  dW_FORM_strp,dW_FORM_string, dW_FORM_flag,
   dW_FORM_block1, dW_FORM_ref4, dW_FORM_ref_addr, dW_FORM_flag_present :: Word
 dW_FORM_addr   = 0x01
 dW_FORM_data2  = 0x05
 dW_FORM_data4  = 0x06
 dW_FORM_string = 0x08
+dW_FORM_strp   = 0x0e
 dW_FORM_flag   = 0x0c
 dW_FORM_block1 = 0x0a
 dW_FORM_ref_addr     = 0x10
