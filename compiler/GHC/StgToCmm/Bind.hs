@@ -467,7 +467,7 @@ closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   = -- Note: args may be [], if all args are Void
     withNewTickyCounterFun
-        (closureSingleEntry cl_info)
+        (isOneShotBndr bndr)
         (closureName cl_info)
         args $ do {
 
