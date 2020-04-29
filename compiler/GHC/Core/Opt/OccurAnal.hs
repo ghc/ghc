@@ -728,7 +728,7 @@ a right-hand side. In particular, we need to
 
   a) call 'markAllInsideLam' *unless* the binding is for a thunk, a one-shot
      lambda, or a non-recursive join point; and
-  b) call 'markAllNonTailCalled' *unless* the binding is for a join point.
+  b) call 'markAllNonTail' *unless* the binding is for a join point.
 
 Some examples, with how the free occurrences in e (assumed not to be a value
 lambda) get marked:
@@ -1605,7 +1605,7 @@ occAnalUnfolding env mb_join_arity unf
         where
           env'            = env `addInScope` bndrs
           (usage, args')  = occAnalList env' args
-          final_usage     = zapDetails (delDetailsList usage bndrs)
+          final_usage     = markAllManyNonTail (delDetailsList usage bndrs)
 
       unf -> (emptyDetails, unf)
 
@@ -1626,13 +1626,13 @@ occAnalRules env mb_join_arity bndr
               | otherwise         = rule { ru_args = args', ru_rhs = rhs' }
 
         (lhs_uds, args') = occAnalList env' args
-        lhs_uds'         = markAllMany $
+        lhs_uds'         = markAllManyNonTail $
                            lhs_uds `delDetailsList` bndrs
 
         (rhs_uds, rhs') = occAnal env' rhs
                             -- Note [Rules are extra RHSs]
                             -- Note [Rule dependency info]
-        rhs_uds' = markAllNonTailCalledIf (not exact_join) $
+        rhs_uds' = markAllNonTailIf (not exact_join) $
                    markAllMany                             $
                    rhs_uds `delDetailsList` bndrs
 
@@ -1758,7 +1758,7 @@ occAnal env (Tick tickish body)
                   -- not the end of the world.
 
   | tickish `tickishScopesLike` SoftScope
-  = (markAllNonTailCalled usage, Tick tickish body')
+  = (markAllNonTail usage, Tick tickish body')
 
   | Breakpoint _ ids <- tickish
   = (usage_lam `andUDs` foldr addManyOcc emptyDetails ids, Tick tickish body')
@@ -1769,7 +1769,7 @@ occAnal env (Tick tickish body)
   where
     !(usage,body') = occAnal env body
     -- for a non-soft tick scope, we can inline lambdas only
-    usage_lam = markAllNonTailCalled (markAllInsideLam usage)
+    usage_lam = markAllNonTail (markAllInsideLam usage)
                   -- TODO There may be ways to make ticks and join points play
                   -- nicer together, but right now there are problems:
                   --   let j x = ... in tick<t> (j 1)
@@ -1780,13 +1780,13 @@ occAnal env (Tick tickish body)
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
-    let usage1 = zapDetailsIf (isRhsEnv env) usage
+    let usage1 = markAllManyNonTailIf (isRhsEnv env) usage
           -- usage1: if we see let x = y `cast` co
           -- then mark y as 'Many' so that we don't
           -- immediately inline y again.
         usage2 = addManyOccs usage1 (coVarsOfCo co)
           -- usage2: see Note [Gather occurrences of coercion variables]
-    in (markAllNonTailCalled usage2, Cast expr' co)
+    in (markAllNonTail usage2, Cast expr' co)
     }
 
 occAnal env app@(App _ _)
@@ -1799,7 +1799,7 @@ occAnal env app@(App _ _)
 occAnal env (Lam x body)
   | isTyVar x
   = case occAnal env body of { (body_usage, body') ->
-    (markAllNonTailCalled body_usage, Lam x body')
+    (markAllNonTail body_usage, Lam x body')
     }
 
 -- For value lambdas we do a special hack.  Consider
@@ -1815,7 +1815,7 @@ occAnal env expr@(Lam _ _)
   = case occAnalLamOrRhs env bndrs body of { (usage, tagged_bndrs, body') ->
     let
         expr'       = mkLams tagged_bndrs body'
-        usage1      = markAllNonTailCalled usage
+        usage1      = markAllNonTail usage
         one_shot_gp = all isOneShotBndr tagged_bndrs
         final_usage = markAllInsideLamIf (not one_shot_gp) usage1
     in
@@ -1832,7 +1832,7 @@ occAnal env (Case scrut bndr ty alts)
     let
         alts_usage  = foldr orUDs emptyDetails alts_usage_s
         (alts_usage1, tagged_bndr) = tagLamBinder alts_usage bndr
-        total_usage = markAllNonTailCalled scrut_usage `andUDs` alts_usage1
+        total_usage = markAllNonTail scrut_usage `andUDs` alts_usage1
                         -- Alts can have tail calls, but the scrutinee can't
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
@@ -1893,7 +1893,7 @@ occAnalApp env (Var fun, args, ticks)
     all_uds = fun_uds `andUDs` final_args_uds
 
     !(args_uds, args') = occAnalArgs env args one_shots
-    !final_args_uds = markAllNonTailCalled                        $
+    !final_args_uds = markAllNonTail                        $
                       markAllInsideLamIf (isRhsEnv env && is_exp) $
                       args_uds
        -- We mark the free vars of the argument of a constructor or PAP
@@ -1923,7 +1923,7 @@ occAnalApp env (Var fun, args, ticks)
         -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
-  = (markAllNonTailCalled (fun_uds `andUDs` args_uds),
+  = (markAllNonTail (fun_uds `andUDs` args_uds),
      mkTicks ticks $ mkApps fun' args')
   where
     !(fun_uds, fun') = occAnal (addAppCtxt env args) fun
@@ -2526,7 +2526,7 @@ data UsageDetails
   = UD { ud_env       :: !OccInfoEnv
        , ud_z_many    :: ZappedSet   -- apply 'markMany' to these
        , ud_z_in_lam  :: ZappedSet   -- apply 'markInsideLam' to these
-       , ud_z_no_tail :: ZappedSet } -- apply 'markNonTailCalled' to these
+       , ud_z_no_tail :: ZappedSet } -- apply 'markNonTail' to these
   -- INVARIANT: All three zapped sets are subsets of the OccInfoEnv
 
 instance Outputable UsageDetails where
@@ -2587,28 +2587,28 @@ emptyDetails = UD { ud_env       = emptyVarEnv
 isEmptyDetails :: UsageDetails -> Bool
 isEmptyDetails = isEmptyVarEnv . ud_env
 
-markAllMany, markAllInsideLam, markAllNonTailCalled, zapDetails
+markAllMany, markAllInsideLam, markAllNonTail, markAllManyNonTail
   :: UsageDetails -> UsageDetails
 markAllMany          ud = ud { ud_z_many    = ud_env ud }
 markAllInsideLam     ud = ud { ud_z_in_lam  = ud_env ud }
-markAllNonTailCalled ud = ud { ud_z_no_tail = ud_env ud }
+markAllNonTail ud = ud { ud_z_no_tail = ud_env ud }
 
-markAllInsideLamIf, markAllNonTailCalledIf :: Bool -> UsageDetails -> UsageDetails
+markAllInsideLamIf, markAllNonTailIf :: Bool -> UsageDetails -> UsageDetails
 
 markAllInsideLamIf  True  ud = markAllInsideLam ud
 markAllInsideLamIf  False ud = ud
 
-markAllNonTailCalledIf True  ud = markAllNonTailCalled ud
-markAllNonTailCalledIf False ud = ud
+markAllNonTailIf True  ud = markAllNonTail ud
+markAllNonTailIf False ud = ud
 
 
-zapDetails = markAllMany . markAllNonTailCalled -- effectively sets to noOccInfo
+markAllManyNonTail = markAllMany . markAllNonTail -- effectively sets to noOccInfo
 
-zapDetailsIf :: Bool              -- If this is true
-             -> UsageDetails      -- Then do zapDetails on this
+markAllManyNonTailIf :: Bool              -- If this is true
+             -> UsageDetails      -- Then do markAllManyNonTail on this
              -> UsageDetails
-zapDetailsIf True  uds = zapDetails uds
-zapDetailsIf False uds = uds
+markAllManyNonTailIf True  uds = markAllManyNonTail uds
+markAllManyNonTailIf False uds = uds
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
@@ -2674,7 +2674,7 @@ doZappingByUnique (UD { ud_z_many = many
     occ1 | uniq `elemVarEnvByKey` many    = markMany occ
          | uniq `elemVarEnvByKey` in_lam  = markInsideLam occ
          | otherwise                      = occ
-    occ2 | uniq `elemVarEnvByKey` no_tail = markNonTailCalled occ1
+    occ2 | uniq `elemVarEnvByKey` no_tail = markNonTail occ1
          | otherwise                      = occ1
 
 alterZappedSets :: UsageDetails -> (ZappedSet -> ZappedSet) -> UsageDetails
@@ -2700,7 +2700,7 @@ adjustRhsUsage :: Maybe JoinArity -> RecFlag
                -> UsageDetails
 adjustRhsUsage mb_join_arity rec_flag bndrs usage
   = markAllInsideLamIf     (not one_shot)   $
-    markAllNonTailCalledIf (not exact_join) $
+    markAllNonTailIf (not exact_join) $
     usage
   where
     one_shot = case mb_join_arity of
@@ -2738,7 +2738,7 @@ tagLamBinder usage bndr
   = (usage2, bndr')
   where
         occ    = lookupDetails usage bndr
-        bndr'  = setBinderOcc (markNonTailCalled occ) bndr
+        bndr'  = setBinderOcc (markNonTail occ) bndr
                    -- Don't try to make an argument into a join point
         usage1 = usage `delDetails` bndr
         usage2 | isId bndr = addManyOccs usage1 (idUnfoldingVars bndr)
@@ -2759,7 +2759,7 @@ tagNonRecBinder lvl usage binder
      will_be_join = decideJoinPointHood lvl usage [binder]
      occ'    | will_be_join = -- must already be marked AlwaysTailCalled
                               ASSERT(isAlwaysTailCalled occ) occ
-             | otherwise    = markNonTailCalled occ
+             | otherwise    = markNonTail occ
      binder' = setBinderOcc occ' binder
      usage'  = usage `delDetails` binder
    in
@@ -2930,7 +2930,7 @@ See Invariant 2a of Note [Invariants on join points] in GHC.Core
 ************************************************************************
 -}
 
-markMany, markInsideLam, markNonTailCalled :: OccInfo -> OccInfo
+markMany, markInsideLam, markNonTail :: OccInfo -> OccInfo
 
 markMany IAmDead = IAmDead
 markMany occ     = ManyOccs { occ_tail = occ_tail occ }
@@ -2938,8 +2938,8 @@ markMany occ     = ManyOccs { occ_tail = occ_tail occ }
 markInsideLam occ@(OneOcc {}) = occ { occ_in_lam = IsInsideLam }
 markInsideLam occ             = occ
 
-markNonTailCalled IAmDead = IAmDead
-markNonTailCalled occ     = occ { occ_tail = NoTailCallInfo }
+markNonTail IAmDead = IAmDead
+markNonTail occ     = occ { occ_tail = NoTailCallInfo }
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
