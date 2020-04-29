@@ -67,7 +67,7 @@ module GHC.Types.Basic (
 
         OccInfo(..), noOccInfo, seqOccInfo, zapFragileOcc, isOneOcc,
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
-        strongLoopBreaker, weakLoopBreaker,
+        isNoOccInfo, strongLoopBreaker, weakLoopBreaker,
 
         InsideLam(..),
         OneBranch(..),
@@ -957,6 +957,10 @@ See OccurAnal Note [Weak loop breakers]
 
 noOccInfo :: OccInfo
 noOccInfo = ManyOccs { occ_tail = NoTailCallInfo }
+
+isNoOccInfo :: OccInfo -> Bool
+isNoOccInfo ManyOccs { occ_tail = NoTailCallInfo } = True
+isNoOccInfo _ = False
 
 isManyOccs :: OccInfo -> Bool
 isManyOccs ManyOccs{} = True

@@ -446,7 +446,7 @@ pprIdBndrInfo info
     lbv_info  = oneShotInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
-    has_occ   = not (isManyOccs occ_info)
+    has_occ   = not (isNoOccInfo occ_info)
     has_dmd   = not $ isTopDmd dmd_info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 
