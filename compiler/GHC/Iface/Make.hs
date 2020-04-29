@@ -99,8 +99,11 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
--- | Fully instantiate a interface
--- Adds fingerprints and potentially code generator produced information.
+-- | Fully instantiate an interface. Adds fingerprints and potentially code
+-- generator produced information.
+--
+-- CgInfos is not available when not generating code (-fno-code), or when not
+-- generating interface pragmas (-fomit-interface-pragmas).
 mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
 mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
@@ -131,7 +134,7 @@ updateDecl decls (Just CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos }) = 
       = IfaceId nm ty details $
           (if not_caffy then (HsNoCafRefs :) else id)
           (case mb_lf_info of
-             Nothing -> infos
+             Nothing -> infos -- LFInfos not available when building .cmm files
              Just lf_info -> HsLFInfo (toIfaceLFInfo lf_info) : infos)
 
     update_decl decl
