@@ -103,7 +103,8 @@ mkPartialIface hsc_env mod_details
 -- generator produced information.
 --
 -- CgInfos is not available when not generating code (-fno-code), or when not
--- generating interface pragmas (-fomit-interface-pragmas).
+-- generating interface pragmas (-fomit-interface-pragmas). See also
+-- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
 mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
 mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls

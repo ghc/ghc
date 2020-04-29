@@ -21,7 +21,11 @@ import GHC.Utils.Outputable
 
 #include "HsVersions.h"
 
--- | Update CafInfos and LFInfos of all occurences (in rules, unfoldings, class instances)
+-- | Update CafInfos and LFInfos of all occurences (in rules, unfoldings, class
+-- instances).
+--
+-- See Note [Conveying CAF-info and LFInfo between modules] in
+-- GHC.StgToCmm.Types.
 updateModDetailsIdInfos
   :: DynFlags
   -> CgInfos

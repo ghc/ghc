@@ -20,6 +20,50 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
 
+{-
+Note [Conveying CAF-info and LFInfo between modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some information about an Id is generated in the code generator, and is not
+available earlier.  Namely:
+
+* CAF info.   Code motion in Cmm or earlier phases may move references around so
+  we compute information about which bits of code refer to which CAF late in the
+  Cmm pipeline.
+
+* LambdaFormInfo. This records the details of a closure representation,
+  including
+    - the final arity (for functions)
+    - whether it is a data constructor, and if so its tag
+
+Collectively we call this CgInfo (see GHC.StgToCmm.Types).
+
+It's very useful for importing modules to have this information. We can always
+make a conservative assumption, but that is bad: e.g.
+
+* For CAF info, if we know nothing we have to assume it is a CAF which bloats
+  the SRTs of the importing module.
+
+- For data constructors, we really like having well-tagged pointers. See #14677,
+  #16559, #15155, and wiki: commentary/rts/haskell-execution/pointer-tagging
+
+So we arrange to always serialise this information into the interface file.  The
+moving parts are:
+
+* We record the CgInfo in the IdInfo of the Id.
+
+* GHC.Driver.Pipeline: the call to updateModDetailsIdInfos augments the
+  ModDetails constructed at the end of the Core pipeline, with with CgInfo
+  gleaned from the back end.  The hard work is done in GHC.Iface.UpdateIdInfos.
+
+* For ModIface we generate the final ModIface with CgInfo in
+  GHC.Iface.Make.mkFullIface.
+
+* We don't absolutely guarantee to serialise the CgInfo: we won't if you have
+  -fomit-interface-pragmas or -fno-code; and we won't read it in if you have
+  -fignore-interface-pragmas.  (We could revisit this decision.)
+-}
+
 -- | Codegen-generated Id infos, to be passed to downstream via interfaces.
 --
 -- This stuff is for optimization purposes only, they're not compulsory.
@@ -28,6 +72,8 @@ import GHC.Utils.Outputable
 -- * When LambdaFormInfo of an imported Id is not known it's safe to treat it as
 --   `LFUnknown True` (which just says "it could be anything" and we do slow
 --   entry).
+--
+-- See also Note [Conveying CAF-info and LFInfo between modules] above.
 --
 data CgInfos = CgInfos
   { cgNonCafs :: !NameSet
