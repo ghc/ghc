@@ -48,6 +48,7 @@ module GHC.Plugins
    , module GHC.Utils.Outputable
    , module GHC.Types.Unique.Supply
    , module GHC.Data.FastString
+   , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
    , -- * Getting 'Name's
      thNameToGhcName
    )
@@ -120,6 +121,8 @@ import GHC.Prelude
 import GHC.Utils.Monad  ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
+
+import GHC.Tc.Errors.Hole.FitTypes
 
 import qualified Language.Haskell.TH as TH
 

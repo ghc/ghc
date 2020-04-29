@@ -5,7 +5,7 @@
 module GHC.Tc.Solver.Flatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
-   rewriteTyVar,
+   rewriteTyVar, flattenType,
 
    unflattenWanteds
  ) where
@@ -825,6 +825,20 @@ flattenArgsNom ev tc tys
        ; traceTcS "flatten }" (vcat (map ppr tys'))
        ; return (tys', cos, kind_co) }
 
+-- | Flatten a type w.r.t. nominal equality. This is useful to rewrite
+-- a type w.r.t. any givens. It does not do type-family reduction. This
+-- will never emit new constraints. Call this when the inert set contains
+-- only givens.
+flattenType :: CtLoc -> TcType -> TcS TcType
+flattenType loc ty
+          -- More info about FM_SubstOnly in Note [Holes] in GHC.Tc.Types.Constraint
+  = do { (xi, _) <- runFlatten FM_SubstOnly loc Given NomEq $
+                    flatten_one ty
+                     -- use Given flavor so that it is rewritten
+                     -- only w.r.t. Givens, never Wanteds/Deriveds
+                     -- (Shouldn't matter, if only Givens are present
+                     -- anyway)
+       ; return xi }
 
 {- *********************************************************************
 *                                                                      *

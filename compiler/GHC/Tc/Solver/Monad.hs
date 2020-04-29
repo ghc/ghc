@@ -198,7 +198,7 @@ import GHC.Types.Unique.Set
 
 Note [WorkList priorities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A WorkList contains canonical and non-canonical items (of all flavors).
+A WorkList contains canonical and non-canonical items (of all flavours).
 Notice that each Ct now has a simplification depth. We may
 consider using this depth for prioritization as well in the future.
 
@@ -1653,8 +1653,7 @@ add_item ics item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
 
 add_item _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
-    ppr item   -- Can't be CNonCanonical, CHoleCan,
-               -- because they only land in inert_irreds
+    ppr item   -- Can't be CNonCanonical because they only land in inert_irreds
 
 bumpUnsolvedCount :: CtEvidence -> Int -> Int
 bumpUnsolvedCount ev n | isWanted ev = n+1
@@ -1895,10 +1894,6 @@ really want to rewrite the insoluble to [Int] ~ [[Int]].  Now it can
 be decomposed.  Otherwise we end up with a "Can't match [Int] ~
 [[Int]]" which is true, but a bit confusing because the outer type
 constructors match.
-
-Similarly, if we have a CHoleCan, we'd like to rewrite it with any
-Givens, to give as informative an error messasge as possible
-(#12468, #11325).
 
 Hence:
  * In the main simplifier loops in GHC.Tc.Solver (solveWanteds,
@@ -2352,8 +2347,6 @@ removeInertCt is ct =
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-    CHoleCan {}      -> panic "removeInertCt: CHoleCan"
-
 
 lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavour))
 lookupFlatCache fam_tc tys

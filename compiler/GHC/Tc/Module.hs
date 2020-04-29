@@ -2589,7 +2589,7 @@ tcRnType hsc_env flexi normalise rdr_type
                         -- kindGeneralize, below
                        solveEqualities       $
                        tcNamedWildCardBinders wcs $ \ wcs' ->
-                       do { emitNamedWildCardHoleConstraints wcs'
+                       do { mapM_ emitNamedTypeHole wcs'
                           ; tcLHsTypeUnsaturated rn_type }
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]

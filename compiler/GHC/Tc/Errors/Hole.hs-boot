@@ -5,9 +5,9 @@
 module GHC.Tc.Errors.Hole where
 
 import GHC.Tc.Types  ( TcM )
-import GHC.Tc.Types.Constraint ( Ct, Implication )
+import GHC.Tc.Types.Constraint ( Ct, Hole, Implication )
 import GHC.Utils.Outputable ( SDoc )
 import GHC.Types.Var.Env ( TidyEnv )
 
-findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Ct
+findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Hole
                   -> TcM (TidyEnv, SDoc)
