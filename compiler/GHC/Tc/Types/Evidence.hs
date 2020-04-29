@@ -383,11 +383,7 @@ hsWrapDictBinders wrap = go wrap emptyBag
    go (WpEvApp {})        acc = acc
    go (WpTyLam {})        acc = acc
    go (WpTyApp {})        acc = acc
-   go (WpLet binds)       acc = go_binds binds `unionBags` acc
-
-   go_binds (EvBinds bs)    = mapBag eb_lhs bs
-   go_binds (TcEvBinds ebv) = pprPanic "hsWrapperDictBinds" (ppr ebv)
-                              -- Should only be applied post zonking
+   go (WpLet _)           acc = acc
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,

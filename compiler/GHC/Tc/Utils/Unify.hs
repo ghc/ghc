@@ -31,7 +31,7 @@ module GHC.Tc.Utils.Unify (
   matchExpectedTyConApp,
   matchExpectedAppTy,
   matchExpectedFunTys,
-  matchActualFunTys, matchActualFunTy,
+  matchActualFunTysRho, matchActualFunTySigma,
   matchExpectedFunKind,
 
   metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
@@ -232,26 +232,27 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
 -- for example in function application
--- This function instantiates at each polytype.
-matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
-                  -> CtOrigin
-                  -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
-                  -> Arity
-                  -> TcSigmaType
-                  -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
--- If    matchActualFunTys n ty = (wrap, [t1,..,tn], res_ty)
+matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
+                     -> CtOrigin
+                     -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
+                     -> Arity
+                     -> TcSigmaType
+                     -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
+-- If    matchActualFunTysRho n ty = (wrap, [t1,..,tn], res_ty)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
 --       and res_ty is a RhoType
-matchActualFunTys herald ct_orig mb_thing n_val_args_wanted fun_ty
+-- NB: the returned type is top-instantiated; it's a RhoType
+matchActualFunTysRho herald ct_orig mb_thing n_val_args_wanted fun_ty
   = go n_val_args_wanted [] fun_ty
   where
     go 0 _ fun_ty
       = do { (wrap, rho) <- topInstantiate ct_orig fun_ty
            ; return (wrap, [], rho) }
     go n so_far fun_ty
-      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTy herald ct_orig mb_thing
-                                                               (n_val_args_wanted, so_far)
-                                                               fun_ty
+      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTySigma
+                                                 herald ct_orig mb_thing
+                                                 (n_val_args_wanted, so_far)
+                                                 fun_ty
            ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
            ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty doc
            ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
@@ -259,9 +260,9 @@ matchActualFunTys herald ct_orig mb_thing n_val_args_wanted fun_ty
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr fun_ty)
 
--- | Variant of 'matchActualFunTys' that works when supplied only part
--- (that is, to the right of some arrows) of the full function type
-matchActualFunTy
+-- | matchActualFunTySigm does looks for just one function arrow
+--   returning an uninstantiated sigma-type
+matchActualFunTySigma
   :: SDoc -- See Note [Herald for matchExpectedFunTys]
   -> CtOrigin
   -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
@@ -269,13 +270,15 @@ matchActualFunTy
                             -- types of values args to which function has
                             --   been applied already (reversed)
                             -- Both are used only for error messages)
-  -> TcSigmaType           -- Type to analyse
+  -> TcSigmaType            -- Type to analyse
   -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
 -- See Note [matchActualFunTys error handling] for all these arguments
--- If   (wrap, arg_ty, res_ty) = matchActualFunTy ... fun_ty
+
+-- If   (wrap, arg_ty, res_ty) = matchActualFunTySigma ... fun_ty
 -- then wrap :: fun_ty ~> (arg_ty -> res_ty)
 -- and NB: res_ty is an (uninstantiated) SigmaType
-matchActualFunTy herald ct_orig mb_thing err_info fun_ty
+
+matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
   = go fun_ty
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
@@ -291,19 +294,7 @@ matchActualFunTy herald ct_orig mb_thing err_info fun_ty
 -- in elsewhere).
 
   where
-    -- This function has a bizarre mechanic: it accumulates arguments on
-    -- the way down and also builds an argument list on the way up. Why:
-    -- 1. The returns args list and the accumulated args list might be different.
-    --    The accumulated args include all the arg types for the function,
-    --    including those from before this function was called. The returned
-    --    list should include only those arguments produced by this call of
-    --    matchActualFunTys
-    --
-    -- 2. The HsWrapper can be built only on the way up. It seems (more)
-    --    bizarre to build the HsWrapper but not the arg_tys.
-    --
-    -- Refactoring is welcome.
-    go :: TcSigmaType   -- the remainder of the type as we're processing
+    go :: TcSigmaType   -- The remainder of the type as we're processing
        -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
     go ty | Just ty' <- tcView ty = go ty'
 
