@@ -1522,11 +1522,11 @@ unitIdsToCheck dflags =
   nubSort $ concatMap goUnitId (explicitPackages (pkgState dflags))
  where
   goUnitId uid =
-    case splitUnitIdInsts uid of
-      (_, Just indef) ->
+    case uid of
+      IndefiniteUnitId indef ->
         let insts = indefUnitIdInsts indef
         in uid : concatMap (goUnitId . moduleUnitId . snd) insts
-      _ -> []
+      DefiniteUnitId _ -> []
 
 maybeGetIfaceDate :: DynFlags -> ModLocation -> IO (Maybe UTCTime)
 maybeGetIfaceDate dflags location

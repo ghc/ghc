@@ -400,11 +400,11 @@ compileInclude n (i, uid) = do
     -- Check if we've compiled it already
     case lookupUnit dflags uid of
         Nothing -> do
-            case splitUnitIdInsts uid of
-                (_, Just indef) ->
+            case uid of
+                IndefiniteUnitId indef ->
                     innerBkpM $ compileUnit (indefUnitIdComponentId indef)
                                             (indefUnitIdInsts indef)
-                _ -> return ()
+                DefiniteUnitId _ -> return ()
         Just _ -> return ()
 
 -- ----------------------------------------------------------------------------
