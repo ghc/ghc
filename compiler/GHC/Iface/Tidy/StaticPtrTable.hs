@@ -132,7 +132,7 @@ import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Types.Id
 import GHC.Core.Make (mkStringExprFSWith)
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable
 import GHC.Platform
@@ -211,7 +211,7 @@ sptCreateStaticBinds hsc_env this_mod binds
       info <- mkConApp staticPtrInfoDataCon <$>
             (++[srcLoc]) <$>
             mapM (mkStringExprFSWith (lift . lookupIdHscEnv))
-                 [ unitIdFS $ moduleUnitId this_mod
+                 [ unitFS $ moduleUnit this_mod
                  , moduleNameFS $ moduleName this_mod
                  ]
 
@@ -227,7 +227,7 @@ sptCreateStaticBinds hsc_env this_mod binds
 
     mkStaticPtrFingerprint :: Int -> Fingerprint
     mkStaticPtrFingerprint n = fingerprintString $ intercalate ":"
-        [ unitIdString $ moduleUnitId this_mod
+        [ unitString $ moduleUnit this_mod
         , moduleNameString $ moduleName this_mod
         , show n
         ]

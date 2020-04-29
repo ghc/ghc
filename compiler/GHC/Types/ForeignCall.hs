@@ -23,7 +23,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Basic ( SourceText, pprWithSourceText )
 
 import Data.Char
@@ -112,7 +112,7 @@ data CCallTarget
                                   -- See note [Pragma source text] in GHC.Types.Basic
         CLabelString                    -- C-land name of label.
 
-        (Maybe UnitId)              -- What package the function is in.
+        (Maybe Unit)                    -- What package the function is in.
                                         -- If Nothing, then it's taken to be in the current package.
                                         -- Note: This information is only used for PrimCalls on Windows.
                                         --       See CLabel.labelDynamic and CoreToStg.coreToStgApp

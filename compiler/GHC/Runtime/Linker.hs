@@ -39,14 +39,14 @@ import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Packages as Packages
+import GHC.Unit.State as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Data.List.SetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import GHC.Driver.Session
@@ -141,9 +141,9 @@ emptyPLS = PersistentLinkerState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = map toInstalledUnitId [rtsUnitId]
+  where init_pkgs = map toUnitId [rtsUnitId]
 
-extendLoadedPkgs :: DynLinker -> [InstalledUnitId] -> IO ()
+extendLoadedPkgs :: DynLinker -> [UnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
   modifyPLS_ dl $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
@@ -625,7 +625,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
-            -> IO ([Linkable], [InstalledUnitId])     -- ... then link these first
+            -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hsc_env hpt pls replace_osuf span mods
@@ -663,8 +663,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
                 -> UniqDSet ModuleName         -- accum. module dependencies
-                -> UniqDSet InstalledUnitId          -- accum. package dependencies
-                -> IO ([ModuleName], [InstalledUnitId]) -- result
+                -> UniqDSet UnitId          -- accum. package dependencies
+                -> IO ([ModuleName], [UnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -678,7 +678,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = moduleUnitId mod
+            pkg = moduleUnit mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
@@ -691,7 +691,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
           --
           if pkg /= this_pkg
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toInstalledUnitId pkg))
+             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
              else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
@@ -1260,13 +1260,13 @@ linkPackages' hsc_env new_pks pls = do
 
         | Just pkg_cfg <- lookupInstalledPackage pkgstate new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs (depends pkg_cfg)
+               pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
              ; linkPackage hsc_env pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (installedUnitIdFS new_pkg)))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
 linkPackage :: HscEnv -> UnitInfo -> IO ()
@@ -1275,12 +1275,12 @@ linkPackage hsc_env pkg
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic (hscInterp hsc_env)
-            dirs | is_dyn    = Packages.libraryDynDirs pkg
-                 | otherwise = Packages.libraryDirs pkg
+            dirs | is_dyn    = Packages.unitLibraryDynDirs pkg
+                 | otherwise = Packages.unitLibraryDirs pkg
 
-        let hs_libs   =  Packages.hsLibraries pkg
+        let hs_libs   =  Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as
-            -- compiler/ghci/Linker.hs + rts/Linker.c link the
+            -- GHC.Runtime.Linker + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
@@ -1294,10 +1294,10 @@ linkPackage hsc_env pkg
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
             extra_libs =
-                      (if null (Packages.extraGHCiLibraries pkg)
-                            then Packages.extraLibraries pkg
-                            else Packages.extraGHCiLibraries pkg)
-                      ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
+                      (if null (Packages.unitExtDepLibsGhc pkg)
+                            then Packages.unitExtDepLibsSys pkg
+                            else Packages.unitExtDepLibsGhc pkg)
+                      ++ [ lib | '-':'l':lib <- Packages.unitLinkerOptions pkg ]
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths dflags (platformOS platform)
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
@@ -1322,10 +1322,10 @@ linkPackage hsc_env pkg
         pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
         maybePutStr dflags
-            ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
+            ("Loading package " ++ unitPackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
-        when (packageName pkg `notElem` partOfGHCi) $ do
+        when (unitPackageName pkg `notElem` partOfGHCi) $ do
             loadFrameworks hsc_env platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
@@ -1352,7 +1352,7 @@ linkPackage hsc_env pkg
         if succeeded ok
            then maybePutStrLn dflags "done."
            else let errmsg = "unable to load package `"
-                             ++ sourcePackageIdString pkg ++ "'"
+                             ++ unitPackageIdString pkg ++ "'"
                  in throwGhcExceptionIO (InstallationError errmsg)
 
 {-
@@ -1426,8 +1426,8 @@ loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
 loadFrameworks hsc_env platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
-    fw_dirs    = Packages.frameworkDirs pkg
-    frameworks = Packages.frameworks pkg
+    fw_dirs    = Packages.unitExtDepFrameworkDirs pkg
+    frameworks = Packages.unitExtDepFrameworks pkg
 
     load fw = do  r <- loadFramework hsc_env fw_dirs fw
                   case r of

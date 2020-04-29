@@ -67,7 +67,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 import GHC.Utils.Misc
@@ -181,10 +181,10 @@ tagToClosure platform tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: Unit -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> Unit -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint pkg fun args safe
    = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe

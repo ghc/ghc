@@ -28,7 +28,7 @@ import GHC.Core.Arity   ( joinRhsArity )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
-import GHC.Types.Module( Module )
+import GHC.Unit.Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type
 

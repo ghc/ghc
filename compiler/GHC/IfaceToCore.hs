@@ -63,7 +63,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
@@ -515,7 +515,7 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { read_result <- findAndReadIface
-                                need (fst (splitModuleInsts mod)) mod
+                                need (fst (getModuleInstantiation mod)) mod
                                 True    -- Hi-boot file
 
         ; case read_result of {

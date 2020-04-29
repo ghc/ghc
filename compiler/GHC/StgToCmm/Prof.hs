@@ -39,7 +39,7 @@ import GHC.Cmm.CLabel
 import GHC.Types.CostCentre
 import GHC.Driver.Session
 import GHC.Data.FastString
-import GHC.Types.Module as Module
+import GHC.Unit.Module as Module
 import GHC.Utils.Outputable
 
 import Control.Monad
@@ -220,8 +220,8 @@ emitCostCentreDecl cc = do
                | otherwise  = zero platform
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   ; label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
-  ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
-                                        $ Module.moduleName
+  ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
+                                        $ moduleName
                                         $ cc_mod cc)
   ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
                    showPpr dflags (costCentreSrcSpan cc)

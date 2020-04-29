@@ -30,7 +30,7 @@ import GHC.Hs as Hs
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Parser.PostProcess
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
@@ -1929,8 +1929,8 @@ mk_ghc_ns TH.VarName   = OccName.varName
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
 
-mk_pkg :: TH.PkgName -> UnitId
-mk_pkg pkg = stringToUnitId (TH.pkgString pkg)
+mk_pkg :: TH.PkgName -> Unit
+mk_pkg pkg = stringToUnit (TH.pkgString pkg)
 
 mk_uniq :: Int -> Unique
 mk_uniq u = mkUniqueGrimily u

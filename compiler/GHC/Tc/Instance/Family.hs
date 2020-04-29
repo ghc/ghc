@@ -27,7 +27,7 @@ import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
 import GHC.Core.Coercion.Axiom
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Name.Reader
@@ -632,7 +632,7 @@ loadDependentFamInstModules fam_insts
 
             want_module mod  -- See Note [Home package family instances]
               | mod == this_mod = False
-              | home_fams_only  = moduleUnitId mod == moduleUnitId this_mod
+              | home_fams_only  = moduleUnit mod == moduleUnit this_mod
               | otherwise       = True
             home_fams_only = all (nameIsHomePackage this_mod . fi_fam) fam_insts
 

@@ -34,7 +34,7 @@ import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.Session
 import GHC.Data.Bag
@@ -56,7 +56,7 @@ The overall plan is this:
 
 1. Generate a binding for each module p:M
    (done in GHC.Tc.Instance.Typeable by mkModIdBindings)
-       M.$trModule :: GHC.Types.Module
+       M.$trModule :: GHC.Unit.Module
        M.$trModule = Module "p" "M"
    ("tr" is short for "type representation"; see GHC.Types)
 
@@ -205,7 +205,7 @@ mkModIdRHS mod
   = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
-                  `nlHsApp` trNameLit (unitIdFS (moduleUnitId mod))
+                  `nlHsApp` trNameLit (unitFS (moduleUnit mod))
                   `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
        }
 
@@ -265,7 +265,7 @@ todoForTyCons mod mod_id tycons = do
                        }
   where
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
-    pkg_fpr = fingerprintString $ unitIdString $ moduleUnitId mod
+    pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
 todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
 todoForExportedKindReps kinds = do

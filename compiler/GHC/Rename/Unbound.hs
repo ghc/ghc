@@ -23,7 +23,7 @@ import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)

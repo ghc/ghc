@@ -21,7 +21,7 @@ import GHC.ByteCode.Types
 import GHC.Stack.CCS
 import GHC.Core.Type
 import GHC.Hs
-import GHC.Types.Module as Module
+import GHC.Unit
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
 import GHC.Core.ConLike
@@ -181,8 +181,8 @@ writeMixEntries dflags mod count entries filename
             mod_name = moduleNameString (moduleName mod)
 
             hpc_mod_dir
-              | moduleUnitId mod == mainUnitId  = hpc_dir
-              | otherwise = hpc_dir ++ "/" ++ unitIdString (moduleUnitId mod)
+              | moduleUnit mod == mainUnitId  = hpc_dir
+              | otherwise = hpc_dir ++ "/" ++ unitString (moduleUnit mod)
 
             tabStop = 8 -- <tab> counts as a normal char in GHC's
                         -- location ranges.
@@ -1334,11 +1334,11 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
     tickboxes = ppr (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (moduleNameFS (Module.moduleName this_mod)))
+                         bytesFS (moduleNameFS (moduleName this_mod)))
     package_name = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (unitIdFS  (moduleUnitId this_mod)))
+                         bytesFS (unitFS  (moduleUnit this_mod)))
     full_name_str
-       | moduleUnitId this_mod == mainUnitId
+       | moduleUnit this_mod == mainUnitId
        = module_name
        | otherwise
        = package_name <> char '/' <> module_name

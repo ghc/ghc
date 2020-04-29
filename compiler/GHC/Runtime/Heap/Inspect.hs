@@ -48,7 +48,7 @@ import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Iface.Env
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
@@ -139,7 +139,7 @@ isThunk _             = False
 constrClosToName :: HscEnv -> GenClosure a -> IO (Either String Name)
 constrClosToName hsc_env ConstrClosure{pkg=pkg,modl=mod,name=occ} = do
    let occName = mkOccName OccName.dataName occ
-       modName = mkModule (stringToUnitId pkg) (mkModuleName mod)
+       modName = mkModule (stringToUnit pkg) (mkModuleName mod)
    Right `fmap` lookupOrigIO hsc_env modName occName
 constrClosToName _hsc_env clos =
    return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (fmap (const ()) clos)))
