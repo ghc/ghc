@@ -26,14 +26,13 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
-import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isJust, isNothing )
+import GHC.Data.Maybe   ( isNothing )
 
 import Control.Monad ( guard )
 import Data.List
@@ -209,10 +208,8 @@ cprAnal' env args (Case scrut case_bndr ty alts)
     -- head strictness.
     (scrut_ty, scrut')        = cprAnal env [] scrut
     (whnf_flag, case_bndr_ty) = forceCprTy (getStrDmd seqDmd) scrut_ty
-    -- Regardless of whether scrut had the CPR property or not, the case binder
-    -- certainly has it. See 'extendEnvForDataAlt'.
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
-    res_ty           = lubCprTypes alt_tys `bothCprType` whnf_flag
+    (alt_tys, alts')          = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
+    res_ty                    = lubCprTypes alt_tys `bothCprType` whnf_flag
 
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
@@ -501,19 +498,10 @@ nonVirgin env = env { ae_virgin = False }
 extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
 extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-  = extendSigEnv env' case_bndr (CprSig case_bndr_ty')
+  = extendSigEnv env' case_bndr (CprSig case_bndr_ty)
   where
-    tycon          = dataConTyCon dc
-    is_product     = isJust (isDataProductTyCon_maybe tycon)
-    is_sum         = isJust (isDataSumTyCon_maybe tycon)
-    case_bndr_ty'
-      | is_product || is_sum = markConCprType dc case_bndr_ty
-      -- Any of the constructors had existentials. This is a little too
-      -- conservative (after all, we only care about the particular data con),
-      -- but there is no easy way to write is_sum and this won't happen much.
-      | otherwise            = case_bndr_ty
     env'
-      | Just fields <- splitConCprTy dc case_bndr_ty'
+      | Just fields <- splitConCprTy dc case_bndr_ty
       , let ids     = filter isId bndrs
       , let cpr_tys = map (CprSig . CprType 0) fields
       = extendSigEnvList env (zipEqual "extendEnvForDataAlt" ids cpr_tys)
