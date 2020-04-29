@@ -82,26 +82,22 @@ module GHC.StgToCmm.Ticky (
   tickyHeapCheck,
   tickyStackCheck,
 
-  tickyUnknownCall, tickyDirectCall,
+  tickyDirectCall,
 
   tickyPushUpdateFrame,
   tickyUpdateFrameOmitted,
 
   tickyEnterDynCon,
-  tickyEnterStaticCon,
-  tickyEnterViaNode,
 
   tickyEnterFun,
   tickyEnterThunk,
   tickyEnterLNE,
 
   tickyUpdateBhCaf,
-  tickyBlackHole,
   tickyUnboxedTupleReturn,
   tickyReturnOldCon, tickyReturnNewCon,
 
-  tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
-  tickySlowCall, tickySlowCallPat,
+  tickySlowCall
   ) where
 
 import GHC.Prelude
@@ -275,10 +271,8 @@ tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (fsLit "UPDF_OMITTED_ctr")
 -- bump of name-specific ticky counter into. On the other hand, we can
 -- still track allocation their allocation.
 
-tickyEnterDynCon, tickyEnterStaticCon, tickyEnterViaNode :: FCode ()
-tickyEnterDynCon      = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
-tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_CON_ctr")
-tickyEnterViaNode     = ifTicky $ bumpTickyCounter (fsLit "ENT_VIA_NODE_ctr")
+tickyEnterDynCon :: FCode ()
+tickyEnterDynCon = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
 
 tickyEnterThunk :: ClosureInfo -> FCode ()
 tickyEnterThunk cl_info
@@ -297,13 +291,6 @@ tickyEnterThunk cl_info
                                    else fsLit "ENT_STATIC_THK_MANY_ctr"
         | otherwise = if updatable then fsLit "ENT_DYN_THK_SINGLE_ctr"
                                    else fsLit "ENT_DYN_THK_MANY_ctr"
-
-tickyBlackHole :: Bool{-updatable-} -> FCode ()
-tickyBlackHole updatable
-  = ifTicky (bumpTickyCounter ctr)
-  where
-    ctr | updatable = (fsLit "UPD_BH_SINGLE_ENTRY_ctr")
-        | otherwise = (fsLit "UPD_BH_UPDATABLE_ctr")
 
 tickyUpdateBhCaf :: ClosureInfo -> FCode ()
 tickyUpdateBhCaf cl_info
