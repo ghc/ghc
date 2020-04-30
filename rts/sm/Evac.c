@@ -80,16 +80,15 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
     if (gen_no < gct->evac_gen_no) {
         if (gct->eager_promotion) {
             gen_no = gct->evac_gen_no;
+        } else if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving) && deadlock_detect_gc) {
+            /* See Note [Deadlock detection under nonmoving collector]. */
+            gen_no = oldest_gen->no;
         } else {
             gct->failed_to_evac = true;
         }
     }
 
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
-        /* See Note [Deadlock detection under nonmoving collector]. */
-        if (deadlock_detect_gc)
-            gen_no = oldest_gen->no;
-
         if (gen_no == oldest_gen->no) {
             gct->copied += size;
             to = nonmovingAllocate(gct->cap, size);
