@@ -648,7 +648,7 @@
      ({ DumpRenamedAst.hs:4:8-21 }
       {ModuleName: Prelude})
      (Nothing)
-     (False)
+     (NotBoot)
      (False)
      (NotQualified)
      (True)
@@ -661,7 +661,7 @@
      ({ DumpRenamedAst.hs:5:8-16 }
       {ModuleName: Data.Kind})
      (Nothing)
-     (False)
+     (NotBoot)
      (False)
      (NotQualified)
      (False)
@@ -674,7 +674,7 @@
      ({ DumpRenamedAst.hs:7:8-16 }
       {ModuleName: Data.Kind})
      (Nothing)
-     (False)
+     (NotBoot)
      (False)
      (NotQualified)
      (False)
