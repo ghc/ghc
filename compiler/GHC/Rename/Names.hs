@@ -176,7 +176,7 @@ rnImports imports = do
     -- module to import from its implementor
     let this_mod = tcg_mod tcg_env
     let (source, ordinary) = partition is_source_import imports
-        is_source_import d = ideclSource (unLoc d)
+        is_source_import d = ideclSource (unLoc d) == IsBoot
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
@@ -323,7 +323,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) do
+    WARN( (want_boot == NotBoot) && (mi_boot iface == IsBoot), ppr imp_mod_name ) do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -334,7 +334,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf ((want_boot == IsBoot) && (mi_boot iface == NotBoot) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
@@ -460,7 +460,10 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
             -- know if any of them depended on CM.hi-boot, in
             -- which case we should do the hi-boot consistency
             -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ((moduleName imp_mod,want_boot):dep_mods deps,dep_pkgs deps,ptrust)
+            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
+            , dep_pkgs deps
+            , ptrust
+            )
 
          | otherwise =
             -- Imported module is from another package
@@ -1698,20 +1701,23 @@ qualImportItemErr rdr
   = hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
 
+pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+pprImpDeclSpec iface decl_spec =
+  quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
+    IsBoot -> text "(hi-boot interface)"
+    NotBoot -> Outputable.empty
+
 badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE GhcPs -> SDoc
 badImportItemErrStd iface decl_spec ie
-  = sep [text "Module", quotes (ppr (is_mod decl_spec)), source_import,
+  = sep [text "Module", pprImpDeclSpec iface decl_spec,
          text "does not export", quotes (ppr ie)]
-  where
-    source_import | mi_boot iface = text "(hi-boot interface)"
-                  | otherwise     = Outputable.empty
 
 badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE GhcPs
                         -> SDoc
 badImportItemErrDataCon dataType_occ iface decl_spec ie
   = vcat [ text "In module"
-             <+> quotes (ppr (is_mod decl_spec))
-             <+> source_import <> colon
+             <+> pprImpDeclSpec iface decl_spec
+             <> colon
          , nest 2 $ quotes datacon
              <+> text "is a data constructor of"
              <+> quotes dataType
@@ -1728,8 +1734,6 @@ badImportItemErrDataCon dataType_occ iface decl_spec ie
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     dataType = parenSymOcc dataType_occ (ppr dataType_occ)
-    source_import | mi_boot iface = text "(hi-boot interface)"
-                  | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE GhcPs -> [AvailInfo] -> SDoc
