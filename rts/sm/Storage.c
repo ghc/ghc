@@ -1304,6 +1304,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
         mvar->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             updateRemembSetPushClosure_(reg, old);
         }
     }
@@ -1326,6 +1327,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             updateRemembSetPushClosure(cap, old);
         }
     }
@@ -1407,6 +1409,7 @@ update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
     Capability *cap = regTableToCapability(reg);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        // See Note [Dirty flags in the non-moving collector] in NonMoving.c
         StgMVar *mvar = (StgMVar *) p;
         updateRemembSetPushClosure(cap, old_val);
         updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
