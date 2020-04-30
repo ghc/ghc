@@ -1,7 +1,9 @@
 -- | A ModSummary is a node in the compilation manager's dependency graph
 -- (ModuleGraph)
 module GHC.Unit.Module.ModSummary
-   ( ModSummary (..)
+   ( ExtendedModSummary (..)
+   , extendModSummaryNoDeps
+   , ModSummary (..)
    , ms_installed_mod
    , ms_mod_name
    , ms_imps
@@ -13,7 +15,6 @@ module GHC.Unit.Module.ModSummary
    , msObjFilePath
    , msDynObjFilePath
    , isBootSummary
-   , showModMsg
    , findTarget
    )
 where
@@ -22,9 +23,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Driver.Ppr
 import GHC.Driver.Session
-import GHC.Driver.Backend
 
 import GHC.Unit.Types
 import GHC.Unit.Module
@@ -42,7 +41,19 @@ import GHC.Utils.Outputable
 import Data.Time
 import System.FilePath
 
--- | A single node in a 'ModuleGraph'. The nodes of the module graph
+-- | Enrichment of 'ModSummary' with backpack dependencies
+data ExtendedModSummary = ExtendedModSummary
+  { emsModSummary :: ModSummary
+  , emsInstantiatedUnits :: [InstantiatedUnit]
+  -- ^ Extra backpack deps
+  -- NB: This is sometimes left empty in situations where the instantiated units
+  -- would not be used. See call sites of 'extendModSummaryNoDeps'.
+  }
+
+extendModSummaryNoDeps :: ModSummary -> ExtendedModSummary
+extendModSummaryNoDeps ms = ExtendedModSummary ms []
+
+-- | Data for a module node in a 'ModuleGraph'. Module nodes of the module graph
 -- are one of:
 --
 -- * A regular Haskell source module
@@ -53,7 +64,7 @@ data ModSummary
         ms_mod          :: Module,
           -- ^ Identity of the module
         ms_hsc_src      :: HscSource,
-          -- ^ The module source either plain Haskell or hs-boot
+          -- ^ The module source either plain Haskell, hs-boot, or hsig
         ms_location     :: ModLocation,
           -- ^ Location of the various files belonging to the module
         ms_hs_date      :: UTCTime,
@@ -150,31 +161,6 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> Bool -> ModSummary -> SDoc
-showModMsg dflags recomp mod_summary =
-   if gopt Opt_HideSourcePaths dflags
-      then text mod_str
-      else hsep $
-         [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
-         , char '('
-         , text (op $ msHsFilePath mod_summary) <> char ','
-         ] ++
-         if gopt Opt_BuildDynamicToo dflags
-            then [ text obj_file <> char ','
-                 , text dyn_file
-                 , char ')'
-                 ]
-            else [ text obj_file, char ')' ]
-  where
-    op       = normalise
-    mod      = moduleName (ms_mod mod_summary)
-    mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
-    dyn_file = op $ msDynObjFilePath mod_summary dflags
-    obj_file = case backend dflags of
-                Interpreter | recomp -> "interpreted"
-                NoBackend            -> "nothing"
-                _                    -> (op $ msObjFilePath mod_summary)
-
 findTarget :: ModSummary -> [Target] -> Maybe Target
 findTarget ms ts =
   case filter (matches ms) ts of
@@ -188,3 +174,5 @@ findTarget ms ts =
         = f == f'
     _ `matches` _
         = False
+
+
