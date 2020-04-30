@@ -1,7 +1,10 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Data.Graph.Directed (
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,
@@ -13,6 +16,7 @@ module GHC.Data.Graph.Directed (
         reachableG, reachablesG, transposeG,
         emptyG,
 
+        mapMaybeSCC,
         findCycle,
 
         -- For backwards compatibility with the simpler version of Digraph
@@ -206,6 +210,15 @@ reduceNodesIntoVerticesUniq = reduceNodesIntoVertices listToUFM (flip lookupUFM)
 *                                                                      *
 ************************************************************************
 -}
+
+-- TODO upstream to witherable package
+mapMaybeSCC :: (a -> Maybe b) -> SCC a -> Maybe (SCC b)
+mapMaybeSCC f = \case
+  AcyclicSCC a -> AcyclicSCC <$> f a
+  CyclicSCC as -> case mapMaybe f as of
+    [] -> Nothing
+    [a] -> Just $ AcyclicSCC a
+    as -> Just $ CyclicSCC as
 
 type WorkItem key payload
   = (Node key payload,  -- Tip of the path

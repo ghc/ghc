@@ -4,9 +4,11 @@
 \section[GHC.Driver.Types]{Types for the per-module compiler}
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -24,8 +26,11 @@ module GHC.Driver.Types (
         HscStatus(..),
 
         -- * ModuleGraph
-        ModuleGraph, emptyMG, mkModuleGraph, extendMG, mapMG,
-        mgModSummaries, mgElemModule, mgLookupModule,
+        ModuleGraph, WorkGraphNode(..), emptyMG, mapMG,
+        mkModuleGraph, mkModuleGraph', extendMG, extendMGInst, extendMG',
+        filterToposortToModules,
+        mgModSummaries, mgModSummaries',
+        mgElemModule, mgLookupModule,
         needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
@@ -202,6 +207,7 @@ import qualified GHC.Driver.Phases as Phase
 import GHC.Types.Basic
 import GHC.Iface.Syntax
 import GHC.Data.Maybe
+import GHC.Data.Graph.Directed ( SCC, mapMaybeSCC )
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
@@ -1152,7 +1158,7 @@ mi_free_holes iface =
 -- holes are just C.
 renameFreeHoles :: UniqDSet ModuleName -> [(ModuleName, Module)] -> UniqDSet ModuleName
 renameFreeHoles fhs insts =
-    unionManyUniqDSets (map lookup_impl (uniqDSetToList fhs))
+    unionManyUniqDSets $ map lookup_impl $ uniqDSetToList fhs
   where
     hmap = listToUFM insts
     lookup_impl mod_name
@@ -2816,14 +2822,49 @@ soExt platform
 ************************************************************************
 -}
 
--- | A ModuleGraph contains all the nodes from the home package (only).
--- There will be a node for each source module, plus a node for each hi-boot
--- module.
+-- | A '@WorkGraphNode@' is a node in the '@ModuleGraph@'.
+data WorkGraphNode
+  -- | Instantiation nodes track the instantiation of other units with the
+  -- holes (signatures) of the current package.
+  --
+  -- Longer term, I (@Ericson2314) hope to track more work this way. We could
+  -- also track the instantiation of other units with already-built (EPS not
+  -- HPT) modules. If we support recursive backpack linking (even if just
+  -- limited cyclic unit instantiations which resolve to acyclic module\/sig
+  -- instantiations). we could track those instantiations too. At some point, we
+  -- may even wish to deduplicate the implementation for hs-boot and backpack
+  -- some more, and track the "instantation" of hs-boot with real modules a
+  -- similar way.
+  --
+  -- See Note [Identity versus semantic module]. I don't yet know the specifics,
+  -- but I suspect that the invariants discussed there interplay with this plan
+  -- for more explicit instantiations.
+  = InstantiationNode InstantiatedUnit
+  -- | There is a module summary node for each module, signature, and boot module being built.
+  | ModuleNode ModSummary
+
+-- TODO what do we want here?
+instance Outputable WorkGraphNode where
+  ppr = \case
+    InstantiationNode iuid -> ppr iuid
+    ModuleNode ms -> ppr ms
+
+-- TODO deprecate and remove this.
+type ModuleGraph = WorkGraph
+
+-- | A '@WorkGraph@' contains all the nodes from the home package (only). See
+-- '@WorkGraphNode@' for information about the nodes.
+--
+-- Modules need to be compiled. hs-boots need to be typechecked before
+-- the associated "real" module so modules with {-# SOURCE #-} imports can be
+-- built. Instantiations also need to be typechecked to ensure that the module
+-- fits the signature. Substantiation typechecking is roughly comparable to the
+-- check that the module and its hs-boot agree.
 --
 -- The graph is not necessarily stored in topologically-sorted order.  Use
 -- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
-data ModuleGraph = ModuleGraph
-  { mg_mss :: [ModSummary]
+data WorkGraph = ModuleGraph
+  { mg_mss :: [WorkGraphNode]
   , mg_non_boot :: ModuleEnv ModSummary
     -- a map of all non-boot ModSummaries keyed by Modules
   , mg_boot :: ModuleSet
@@ -2846,7 +2887,9 @@ needsTemplateHaskellOrQQ mg = mg_needs_th_or_qq mg
 -- To preserve invariants 'f' can't change the isBoot status.
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
-  { mg_mss = map f mg_mss
+  { mg_mss = flip fmap mg_mss $ \case
+      InstantiationNode iuid -> InstantiationNode iuid
+      ModuleNode ms -> ModuleNode $ f ms
   , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
@@ -2854,7 +2897,10 @@ mgBootModules :: ModuleGraph -> ModuleSet
 mgBootModules ModuleGraph{..} = mg_boot
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
-mgModSummaries = mg_mss
+mgModSummaries mg = [ m | ModuleNode m <- mgModSummaries' mg ]
+
+mgModSummaries' :: ModuleGraph -> [WorkGraphNode]
+mgModSummaries' = mg_mss
 
 mgElemModule :: ModuleGraph -> Module -> Bool
 mgElemModule ModuleGraph{..} m = elemModuleEnv m mg_non_boot
@@ -2876,7 +2922,7 @@ isTemplateHaskellOrQQNonBoot ms =
 -- not an element of the ModuleGraph.
 extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} ms = ModuleGraph
-  { mg_mss = ms:mg_mss
+  { mg_mss = ModuleNode ms : mg_mss
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
@@ -2886,8 +2932,34 @@ extendMG ModuleGraph{..} ms = ModuleGraph
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
 
+extendMGInst :: ModuleGraph -> InstantiatedUnit -> ModuleGraph
+extendMGInst mg depUnitId = mg
+  { mg_mss = InstantiationNode depUnitId : mg_mss mg
+  }
+
+extendMG' :: ModuleGraph -> WorkGraphNode -> ModuleGraph
+extendMG' mg = \case
+  InstantiationNode depUnitId -> extendMGInst mg depUnitId
+  ModuleNode ms -> extendMG mg ms
+
 mkModuleGraph :: [ModSummary] -> ModuleGraph
 mkModuleGraph = foldr (flip extendMG) emptyMG
+
+mkModuleGraph' :: [WorkGraphNode] -> ModuleGraph
+mkModuleGraph' = foldr (flip extendMG') emptyMG
+
+-- | This function filters out all the instantiation nodes from a "step" of a
+-- topological sort. It's use is somewhat dubious: when '@WorkGraphNode@' was
+-- created, replacing '@ModSummary@' as the node type, it was easy to get some
+-- uses of the work graph outside of '@GhcMake@' to typecheck again by just
+-- filtering out the new nodes. But going forward, as '@InstantiationNodes@'
+-- hopefully become more useful, those use sites should be reevaluated as to
+-- whether ignoring non-module nodes is really the correct things to do.
+filterToposortToModules
+  :: [SCC WorkGraphNode] -> [SCC ModSummary]
+filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
+  InstantiationNode _ -> Nothing
+  ModuleNode node -> Just node
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:
@@ -2900,7 +2972,7 @@ data ModSummary
         ms_mod          :: Module,
           -- ^ Identity of the module
         ms_hsc_src      :: HscSource,
-          -- ^ The module source either plain Haskell or hs-boot
+          -- ^ The module source either plain Haskell, hs-boot, or hsig
         ms_location     :: ModLocation,
           -- ^ Location of the various files belonging to the module
         ms_hs_date      :: UTCTime,
@@ -2997,9 +3069,11 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
-showModMsg dflags target recomp mod_summary = showSDoc dflags $
-   if gopt Opt_HideSourcePaths dflags
+showModMsg :: DynFlags -> HscTarget -> Bool -> WorkGraphNode -> String
+showModMsg dflags _ _ (InstantiationNode indef_unit) = showSDoc dflags $
+  ppr $ instUnitInstanceOf indef_unit
+showModMsg dflags target recomp (ModuleNode mod_summary) = showSDoc dflags $
+  if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
