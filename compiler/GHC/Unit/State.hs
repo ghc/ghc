@@ -32,6 +32,7 @@ module GHC.Unit.State (
         lookupModuleInAllPackages,
         lookupModuleWithSuggestions,
         lookupPluginModuleWithSuggestions,
+        requirementMerges,
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
@@ -2054,6 +2055,20 @@ missingDependencyMsg :: Maybe UnitId -> SDoc
 missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
   = space <> parens (text "dependency of" <+> ftext (unitIdFS parent))
+
+-- | Return this list of requirement interfaces that need to be merged
+-- to form @mod_name@, or @[]@ if this is not a requirement.
+requirementMerges :: PackageState -> ModuleName -> [InstantiatedModule]
+requirementMerges pkgstate mod_name =
+    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+    where
+      -- update IndefUnitId ppr info as they may have changed since the
+      -- time the IndefUnitId was created
+      fixupModule (Module iud name) = Module iud' name
+         where
+            iud' = iud { instUnitInstanceOf = cid' }
+            cid  = instUnitInstanceOf iud
+            cid' = updateIndefUnitId pkgstate cid
 
 -- -----------------------------------------------------------------------------
 
