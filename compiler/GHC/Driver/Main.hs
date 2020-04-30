@@ -619,7 +619,7 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
-type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
+type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> WorkGraphNode -> IO ()
 
 -- | This function runs GHC's frontend with recompilation
 -- avoidance. Specifically, it checks if recompilation is needed,
@@ -642,7 +642,7 @@ hscIncrementalFrontend
     hsc_env <- getHscEnv
 
     let msg what = case mHscMessage of
-                   Just hscMessage -> hscMessage hsc_env mod_index what mod_summary
+                   Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode mod_summary)
                    Nothing -> return ()
 
         skip iface = do
@@ -891,19 +891,27 @@ oneShotMsg hsc_env recomp =
             return ()
 
 batchMsg :: Messager
-batchMsg hsc_env mod_index recomp mod_summary =
-    case recomp of
-        MustCompile -> showMsg "Compiling " ""
-        UpToDate
-            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
-            | otherwise -> return ()
-        RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+batchMsg hsc_env mod_index recomp node = case node of
+    InstantiationNode _ ->
+        case recomp of
+            MustCompile -> showMsg "Instantiating " ""
+            UpToDate
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                | otherwise -> return ()
+            RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
+    ModuleNode _ ->
+        case recomp of
+            MustCompile -> showMsg "Compiling " ""
+            UpToDate
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                | otherwise -> return ()
+            RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
     where
         dflags = hsc_dflags hsc_env
         showMsg msg reason =
             compilationProgressMsg dflags $
             (showModuleIndex mod_index ++
-            msg ++ showModMsg dflags (recompileRequired recomp) mod_summary)
+            msg ++ showModMsg dflags (recompileRequired recomp) node)
                 ++ reason
 
 --------------------------------------------------------------

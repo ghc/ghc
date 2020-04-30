@@ -236,12 +236,12 @@ check_inst sig_inst = do
 -- is something like this:
 --
 --      unit p where
---          signature A
---          signature B
---              import A
+--          signature X
+--          signature Y
+--              import Y
 --
 --      unit q where
---          dependency p[A=\<A>,B=\<B>]
+--          dependency p[X=\<A>,Y=\<B>]
 --          signature A
 --          signature B
 --
@@ -285,7 +285,7 @@ implicitRequirements hsc_env normal_imports
 
 -- Given a list of 'import M' statements in a module, figure out
 -- any extra implicit requirement imports they may have.  For
--- example, if they 'import M' and M resolves to p[A=<B>], then
+-- example, if they 'import M' and M resolves to p[A=<B>,C=D], then
 -- they actually also import the local requirement B.
 implicitRequirements' :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
