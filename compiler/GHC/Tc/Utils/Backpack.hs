@@ -58,7 +58,6 @@ import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Iface.Syntax
 import GHC.Builtin.Names
-import qualified Data.Map as Map
 
 import GHC.Driver.Finder
 import GHC.Types.Unique.DSet
@@ -229,20 +228,6 @@ check_inst sig_inst = do
 
     (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
     reportAllUnsolved (mkImplicWC implic)
-
--- | Return this list of requirement interfaces that need to be merged
--- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
-requirementMerges pkgstate mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
-    where
-      -- update IndefUnitId ppr info as they may have changed since the
-      -- time the IndefUnitId was created
-      fixupModule (Module iud name) = Module iud' name
-         where
-            iud' = iud { instUnitInstanceOf = cid' }
-            cid  = instUnitInstanceOf iud
-            cid' = updateIndefUnitId pkgstate cid
 
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
