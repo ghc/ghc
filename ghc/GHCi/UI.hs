@@ -1633,8 +1633,9 @@ chooseEditFile =
 
      graph <- GHC.getModuleGraph
      failed_graph <-
-       GHC.mkModuleGraph <$> filterM hasFailed (GHC.mgModSummaries graph)
-     let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
+       GHC.mkModuleGraph . fmap extendModSummaryNoDeps <$> filterM hasFailed (GHC.mgModSummaries graph)
+     let order g  = flattenSCCs $ filterToposortToModules $
+           GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
                       x : _ -> GHC.ml_hs_file (GHC.ms_location x)
                       _     -> Nothing
@@ -2006,8 +2007,9 @@ setContextAfterLoad keep_ctxt ms = do
   targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
         []    ->
-          let graph = GHC.mkModuleGraph ms
-              graph' = flattenSCCs (GHC.topSortModuleGraph True graph Nothing)
+          let graph = GHC.mkModuleGraph $ extendModSummaryNoDeps <$> ms
+              graph' = flattenSCCs $ filterToposortToModules $
+                GHC.topSortModuleGraph True graph Nothing
           in load_this (last graph')
         (m:_) ->
           load_this m
