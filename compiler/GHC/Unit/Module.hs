@@ -29,6 +29,8 @@ module GHC.Unit.Module
       -- * ModuleEnv
     , module GHC.Unit.Module.Env
 
+      -- * IsBootInterface and other types
+    , module GHC.Unit.Module.Boot
 
       -- * Generalization
     , getModuleInstantiation
@@ -53,6 +55,7 @@ import GHC.Prelude
 
 import GHC.Types.Unique.DSet
 import GHC.Unit.Types
+import GHC.Unit.Module.Boot
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env

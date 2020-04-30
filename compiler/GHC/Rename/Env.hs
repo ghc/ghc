@@ -1347,7 +1347,7 @@ lookupQualifiedNameGHCi rdr_name
       , is_ghci
       , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
-      = do { res <- loadSrcInterface_maybe doc mod False Nothing
+      = do { res <- loadSrcInterface_maybe doc mod NotBoot Nothing
            ; case res of
                 Succeeded iface
                   -> return [ name
