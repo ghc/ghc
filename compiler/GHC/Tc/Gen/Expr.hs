@@ -1571,7 +1571,7 @@ tcSynArgE :: CtOrigin
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
-           <- tcSkolemise GenSigCtxt sigma_ty $ \ _ rho_ty ->
+           <- tcSkolemise GenSigCtxt sigma_ty $ \ rho_ty ->
               go rho_ty syn_ty
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
@@ -1723,22 +1723,10 @@ in the other order, the extra signature in f2 is reqd.
 tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
 tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
-       ; given <- newEvVars theta
-       ; traceTc "tcExprSig: CompleteSig" $
-         vcat [ text "poly_id:" <+> ppr poly_id <+> dcolon <+> ppr (idType poly_id)
-              , text "tv_prs:" <+> ppr tv_prs ]
-
-       ; let skol_info = SigSkol ExprSigCtxt (idType poly_id) tv_prs
-             skol_tvs  = map snd tv_prs
-       ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
-                              tcExtendNameTyVarEnv tv_prs $
-                              tcCheckPolyExprNC expr tau
-
-       ; let poly_wrap = mkWpTyLams   skol_tvs
-                         <.> mkWpLams given
-                         <.> mkWpLet  ev_binds
-       ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
+    do { let poly_ty = idType poly_id
+       ; (wrap, expr') <- tcSkolemiseScoped ExprSigCtxt poly_ty $ \rho_ty ->
+                          tcCheckMonoExprNC expr rho_ty
+       ; return (mkLHsWrap wrap expr', poly_ty) }
 
 tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint

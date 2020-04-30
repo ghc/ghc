@@ -697,7 +697,7 @@ tcPolyCheck prag_fn
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; (wrap_gen, (wrap_res, matches'))
              <- setSrcSpan sig_loc $ -- Sets the binding location for the skolems
-                tcSkolemise ctxt (idType poly_id) $ \_ rho_ty ->
+                tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
                 -- Unwraps multiple layers; e.g
                 --    f :: forall a. Eq a => forall b. Ord b => blah
                 -- NB: tcSkolemise makes fresh type variables
