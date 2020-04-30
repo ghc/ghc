@@ -8,6 +8,7 @@ module GHC.Tc.Utils.Backpack (
     findExtraSigImports,
     implicitRequirements',
     implicitRequirements,
+    implicitRequirementsShallow,
     checkUnit,
     tcRnCheckUnit,
     tcRnMergeSignatures,
@@ -18,54 +19,52 @@ module GHC.Tc.Utils.Backpack (
 
 import GHC.Prelude
 
-import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
-import GHC.Unit
-import GHC.Tc.Gen.Export
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Hs
-import GHC.Types.Name.Reader
-import GHC.Tc.Utils.Monad
-import GHC.Tc.TyCl.Utils
-import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Tc.Utils.Instantiate
+import GHC.Core.InstEnv
+import GHC.Core.Multiplicity
+import GHC.Core.Type
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Driver.Finder
+import GHC.Driver.Ppr
+import GHC.Driver.Session
+import GHC.Driver.Types
+import GHC.Hs
+import GHC.Iface.Load
+import GHC.Iface.Rename
+import GHC.Iface.Syntax
 import GHC.IfaceToCore
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.TcType
+import GHC.Rename.Fixity ( lookupFixityRn )
+import GHC.Rename.Names
+import GHC.Tc.Errors
+import GHC.Tc.Gen.Export
 import GHC.Tc.Solver
+import GHC.Tc.TyCl.Utils
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Iface.Load
-import GHC.Rename.Names
-import GHC.Utils.Error
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Unify
+import GHC.Types.Avail
+import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
-import GHC.Types.Avail
+import GHC.Types.Name.Shape
 import GHC.Types.SrcLoc
-import GHC.Driver.Types
+import GHC.Types.Unique.DSet
+import GHC.Types.Var
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Utils.Error
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Core.Type
-import GHC.Core.Multiplicity
-import GHC.Data.FastString
-import GHC.Rename.Fixity ( lookupFixityRn )
-import GHC.Data.Maybe
-import GHC.Tc.Utils.Env
-import GHC.Types.Var
-import GHC.Iface.Syntax
-import qualified Data.Map as Map
-
-import GHC.Driver.Finder
-import GHC.Types.Unique.DSet
-import GHC.Types.Name.Shape
-import GHC.Tc.Errors
-import GHC.Tc.Utils.Unify
-import GHC.Iface.Rename
-import GHC.Utils.Misc
-import GHC.Unit.State
 
 import Control.Monad
 import Data.List (find)
@@ -229,19 +228,6 @@ check_inst sig_inst = do
     (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
     reportAllUnsolved (mkImplicWC implic)
 
--- | Return this list of requirement interfaces that need to be merged
--- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
-requirementMerges unit_state mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext unit_state))
-    where
-      -- update IndefUnitId ppr info as they may have changed since the
-      -- time the IndefUnitId was created
-      fixupModule (Module iud name) = Module iud' name
-         where
-            iud' = iud { instUnitInstanceOf = cid }
-            cid  = instUnitInstanceOf iud
-
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
 -- the import of the requirement, because it transitively depends on those
@@ -249,12 +235,12 @@ requirementMerges unit_state mod_name =
 -- is something like this:
 --
 --      unit p where
---          signature A
---          signature B
---              import A
+--          signature X
+--          signature Y
+--              import X
 --
 --      unit q where
---          dependency p[A=\<A>,B=\<B>]
+--          dependency p[X=\<A>,Y=\<B>]
 --          signature A
 --          signature B
 --
@@ -288,7 +274,7 @@ findExtraSigImports hsc_env hsc_src modname = do
            | mod_name <- uniqDSetToList extra_requirements ]
 
 -- A version of 'implicitRequirements'' which is more friendly
--- for "GHC.Driver.Make" and "GHC.Tc.Module".
+-- for "GHC.Tc.Module".
 implicitRequirements :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
                      -> IO [(Maybe FastString, Located ModuleName)]
@@ -298,7 +284,7 @@ implicitRequirements hsc_env normal_imports
 
 -- Given a list of 'import M' statements in a module, figure out
 -- any extra implicit requirement imports they may have.  For
--- example, if they 'import M' and M resolves to p[A=<B>], then
+-- example, if they 'import M' and M resolves to p[A=<B>,C=D], then
 -- they actually also import the local requirement B.
 implicitRequirements' :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
@@ -312,6 +298,28 @@ implicitRequirements' hsc_env normal_imports
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where home_unit = hsc_home_unit hsc_env
+
+-- | Like @implicitRequirements'@, but returns either the module name, if it is
+-- a free hole, or the instantiated unit the imported module is from, so that
+-- that instantiated unit can be processed and via the batch mod graph (rather
+-- than a transitive closure done here) all the free holes are still reachable.
+implicitRequirementsShallow
+  :: HscEnv
+  -> [(Maybe FastString, Located ModuleName)]
+  -> IO [Either ModuleName InstantiatedUnit]
+implicitRequirementsShallow hsc_env normal_imports
+  = fmap concat $
+    forM normal_imports $ \(mb_pkg, L _ imp) -> do
+        found <- findImportedModule hsc_env imp mb_pkg
+        pure $ case found of
+            Found _ mod | not (isHomeModule home_unit mod) ->
+                case moduleUnit mod of
+                    HoleUnit -> [Left $ moduleName mod]
+                    RealUnit _ -> []
+                    VirtUnit u -> [Right u]
+            _ -> []
+  where dflags = hsc_dflags hsc_env
+        home_unit = mkHomeUnitFromFlags dflags
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or

@@ -20,9 +20,12 @@
   [3 of 3] Including p[A=q3:A]
     Instantiating p[A=q3:A]
     [1 of 1] Compiling A[sig]           ( p/A.hsig, T13140.out/p/p-200ijkYDy133WhdgYYHZ24/A.o )
+  [1 of 1] Instantiating p
 [6 of 7] Processing p2
   [1 of 2] Compiling A[sig]           ( p2/A.hsig, nothing )
   [2 of 2] Compiling M                ( p2/M.hs, nothing )
 [7 of 7] Processing p3
-  [1 of 2] Compiling A[sig]           ( p3/A.hsig, nothing )
-  [2 of 2] Compiling M2               ( p3/M2.hs, nothing )
+  [1 of 4] Compiling A[sig]           ( p3/A.hsig, nothing )
+  [2 of 4] Compiling M2               ( p3/M2.hs, nothing )
+  [3 of 4] Instantiating p
+  [4 of 4] Instantiating p2
