@@ -722,22 +722,22 @@ dsCmd env_ids stk_ids res_ty (HsCmdApp _ cmd arg) = do
 -- case, lambda, and lambda case commands
 
 -- see Note [Desugaring case commands]
-dsCmd env_ids [] res_ty (HsCmdCase _ scrut matches) = do
+dsCmd env_ids stk_ids res_ty (HsCmdCase _ scrut matches) = do
   core_scrut <- dsLExpr scrut
   ([scrut_id], core_case, core_cmd, used_ids)
-    <- dsCmdMatch env_ids [] res_ty CaseAlt (Just scrut) matches
+    <- dsCmdMatch env_ids stk_ids res_ty CaseAlt (Just scrut) matches
 
   let used_ids' = used_ids `unionDVarSet`
                   (exprFreeIdsDSet core_scrut `dVarSetIntersectVarSet` env_ids)
-  lam <- matchEnvStackTup used_ids' [] $ bindNonRec scrut_id core_scrut core_case
+  lam <- matchEnvStackTup used_ids' stk_ids $ bindNonRec scrut_id core_scrut core_case
 
-  let env_ty = mkEnvStackTupTy used_ids' []
+  let env_ty = mkEnvStackTupTy used_ids' stk_ids
   pure (mkPremapArr env_ty lam core_cmd, used_ids')
 
 -- see Note [Desugaring case commands]
-dsCmd env_ids [stk_id] res_ty (HsCmdLamCase _ matches) = do
+dsCmd env_ids (stk_id:stk_ids) res_ty (HsCmdLamCase _ matches) = do
   ([scrut_id], core_case, core_cmd, used_ids)
-    <- dsCmdMatch env_ids [] res_ty CaseAlt Nothing matches
+    <- dsCmdMatch env_ids stk_ids res_ty CaseAlt Nothing matches
 
   lam <- matchEnvStackTup used_ids [stk_id] $ wrapBind scrut_id stk_id core_case
   let env_ty = mkEnvStackTupTy used_ids [stk_id]
@@ -770,15 +770,15 @@ dsCmd env_ids stk_ids res_ty cmd@(HsCmdLam _ matches) = do
 --     e2, D3 = desugar[[ D1, [], cmd2 ]]
 --     D4     = (fvs(e') ∩ D1) ∪ D2 ∪ D3
 
-dsCmd env_ids [] res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd) = do
+dsCmd env_ids stk_ids res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd) = do
   core_cond <- dsLExpr cond
-  (core_then, used_ids_then) <- dsLCmd env_ids [] res_ty then_cmd
-  (core_else, used_ids_else) <- dsLCmd env_ids [] res_ty else_cmd
+  (core_then, used_ids_then) <- dsLCmd env_ids stk_ids res_ty then_cmd
+  (core_else, used_ids_else) <- dsLCmd env_ids stk_ids res_ty else_cmd
 
-  let then_ty   = mkEnvStackTupTy used_ids_then []
-      else_ty   = mkEnvStackTupTy used_ids_else []
-      then_expr = mkLeftExpr then_ty else_ty $ mkEnvStackTup used_ids_then []
-      else_expr = mkRightExpr then_ty else_ty $ mkEnvStackTup used_ids_else []
+  let then_ty   = mkEnvStackTupTy used_ids_then stk_ids
+      else_ty   = mkEnvStackTupTy used_ids_else stk_ids
+      then_expr = mkLeftExpr then_ty else_ty $ mkEnvStackTup used_ids_then stk_ids
+      else_expr = mkRightExpr then_ty else_ty $ mkEnvStackTup used_ids_else stk_ids
 
   core_if <- case mb_fun of
     NoSyntaxExprTc -> pure $ mkIfThenElse core_cond then_expr else_expr
@@ -788,9 +788,9 @@ dsCmd env_ids [] res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd) = do
                  `dVarSetIntersectVarSet` env_ids
                  `unionDVarSet` used_ids_then
                  `unionDVarSet` used_ids_else
-  lam <- matchEnvStackTup used_ids [] core_if
+  lam <- matchEnvStackTup used_ids stk_ids core_if
 
-  let env_ty = mkEnvStackTupTy used_ids []
+  let env_ty = mkEnvStackTupTy used_ids stk_ids
   pure (mkPremapArr env_ty lam (mkChoiceArr core_then core_else), used_ids)
 
 -- --------------------------------------------------------
@@ -863,9 +863,8 @@ dsCmd env_ids stk_ids res_ty (HsCmdLet _ binds cmd) = do
 -- --------------------------------------------------------
 -- do commands
 
-dsCmd env_ids stk_ids res_ty cmd@(HsCmdDo _ (L _ stmts)) = do
-  MASSERT2( null stk_ids, ppr stk_ids $$ ppr cmd )
-  dsCmdStmts env_ids (DsDoStmts res_ty) stmts
+dsCmd env_ids [] res_ty (HsCmdDo _ (L _ stmts))
+  = dsCmdStmts env_ids (DsDoStmts res_ty) stmts
 
 -- --------------------------------------------------------
 

@@ -141,37 +141,33 @@ tc_cmd env (HsCmdPar x cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar x cmd') }
 
-tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) (stk_ty, res_ty)
-  = nullaryCmd stk_ty $
-    do  { (binds', body') <- tcLocalBinds binds         $
+tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) cmd_ty
+  = do  { (binds', body') <- tcLocalBinds binds         $
                              setSrcSpan body_loc        $
-                             tc_cmd env body (nilTy, res_ty)
+                             tc_cmd env body cmd_ty
         ; return (HsCmdLet x (L l binds') (L body_loc body')) }
 
-tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk_ty, res_ty)
-  = nullaryCmd stk_ty $ addErrCtxt (cmdCtxt in_cmd) $ do
+tc_cmd env in_cmd@(HsCmdCase x scrut matches) cmd_ty
+  = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
-      matches' <- tcCmdMatches env scrut_ty matches res_ty
+      matches' <- tcCmdMatches env cmd_ty scrut_ty matches
       return (HsCmdCase x scrut' matches')
 
 tc_cmd env in_cmd@(HsCmdLamCase x matches) (stk_ty, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (co, scrut_ty, stk_ty') <- matchConsTy stk_ty
-      nullaryCmd stk_ty' $ do
-        matches' <- tcCmdMatches env scrut_ty matches res_ty
-        return (mkHsCmdWrap (mkWpCastN co) (HsCmdLamCase x matches'))
+      matches' <- tcCmdMatches env (stk_ty', res_ty) scrut_ty matches
+      return (mkHsCmdWrap (mkWpCastN co) (HsCmdLamCase x matches'))
 
-tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) (stk_ty, res_ty) -- Ordinary 'if'
-  = nullaryCmd stk_ty $
-    do  { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
-        ; b1'   <- tcCmd env b1 (nilTy, res_ty)
-        ; b2'   <- tcCmd env b2 (nilTy, res_ty)
+tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) cmd_ty -- Ordinary 'if'
+  = do  { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
+        ; b1'   <- tcCmd env b1 cmd_ty
+        ; b2'   <- tcCmd env b2 cmd_ty
         ; return (HsCmdIf x NoSyntaxExprTc pred' b1' b2')
         }
 
-tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) (stk_ty, res_ty) -- Rebindable syntax for if
-  = nullaryCmd stk_ty $
-    do  { pred_ty <- newOpenFlexiTyVarTy
+tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) cmd_ty -- Rebindable syntax for if
+  = do  { pred_ty <- newOpenFlexiTyVarTy
         -- For arrows, need ifThenElse :: forall r. T -> r -> r -> r
         -- because we're going to apply it to the environment, not
         -- the return value.
@@ -184,8 +180,8 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) (stk_ty, res_ty) -- Rebi
                                        (mkCheckExpType r_ty) $ \ _ ->
                tcMonoExpr pred (mkCheckExpType pred_ty)
 
-        ; b1' <- tcCmd env b1 (nilTy, res_ty)
-        ; b2' <- tcCmd env b2 (nilTy, res_ty)
+        ; b1' <- tcCmd env b1 cmd_ty
+        ; b2' <- tcCmd env b2 cmd_ty
         ; return (HsCmdIf x fun' pred' b1' b2')
         }
 
@@ -290,9 +286,9 @@ tc_cmd env
 --              Do notation
 
 tc_cmd env (HsCmdDo _ (L l stmts) ) (stk_ty, res_ty)
-  = nullaryCmd stk_ty $
-    do  { stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
-        ; return (HsCmdDo res_ty (L l stmts')) }
+  = do  { co <- unifyType Nothing stk_ty nilTy -- no arguments allowed on the stack
+        ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
+        ; return (mkHsCmdWrap (mkWpCastN co) (HsCmdDo res_ty (L l stmts'))) }
 
 
 -----------------------------------------------------------------
@@ -340,25 +336,17 @@ tc_cmd _ cmd _
 -- | Typechecking for case command alternatives. Used for both
 -- 'HsCmdCase' and 'HsCmdLamCase'.
 tcCmdMatches :: CmdEnv
+             -> CmdType
              -> TcType                           -- ^ type of the scrutinee
              -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
-             -> TcType                           -- ^ type of the result
              -> TcM (MatchGroup GhcTcId (LHsCmd GhcTcId))
-tcCmdMatches env scrut_ty matches res_ty
+tcCmdMatches env (stk_ty, res_ty) scrut_ty matches
   = tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
     mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
-                              ; tcCmd env body (nilTy, res_ty') }
-
--- | Checks that the stack is '[] for commands that do not accept arguments.
-nullaryCmd :: TcType -- ^ type of the stack
-           -> TcM (HsCmd GhcTcId)
-           -> TcM (HsCmd GhcTcId)
-nullaryCmd stk_ty m = do
-  co <- unifyType Nothing stk_ty nilTy
-  mkHsCmdWrap (mkWpCastN co) <$> m
+                              ; tcCmd env body (stk_ty, res_ty') }
 
 {-
 ************************************************************************
