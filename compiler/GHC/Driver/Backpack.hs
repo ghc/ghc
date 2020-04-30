@@ -59,7 +59,8 @@ import GHC.Unit
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Finder
-import GHC.Unit.Module.ModSummary (showModMsg)
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
 
 import GHC.Linker.Types
@@ -71,6 +72,7 @@ import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.Data.ShortText as ST
 
+import Data.Either ( partitionEithers )
 import Data.List ( partition )
 import System.Exit
 import Control.Monad
@@ -81,6 +83,7 @@ import Data.Version
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -520,20 +523,29 @@ backpackProgressMsg level dflags msg =
 mkBackpackMsg :: BkpM Messager
 mkBackpackMsg = do
     level <- getBkpLevel
-    return $ \hsc_env mod_index recomp mod_summary ->
+    return $ \hsc_env mod_index recomp node ->
       let dflags = hsc_dflags hsc_env
           state = unitState dflags
           showMsg msg reason =
             backpackProgressMsg level dflags $ pprWithUnitState state $
                 showModuleIndex mod_index <>
-                msg <> showModMsg dflags (recompileRequired recomp) mod_summary
+                msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
-      in case recomp of
-            MustCompile -> showMsg (text "Compiling ") empty
-            UpToDate
-                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
-                | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
+      in case node of
+           InstantiationNode _ ->
+             case recomp of
+                 MustCompile -> showMsg (text "Instantiating ") empty
+                 UpToDate
+                     | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                     | otherwise -> return ()
+                 RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
+           ModuleNode _ ->
+             case recomp of
+               MustCompile -> showMsg (text "Compiling ") empty
+               UpToDate
+                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                 | otherwise -> return ()
+               RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
@@ -663,6 +675,8 @@ convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsCo
 hsunitModuleGraph :: HsUnit HsComponentId -> BkpM ModuleGraph
 hsunitModuleGraph unit = do
     hsc_env <- getSession
+    let dflags = hsc_dflags hsc_env
+
     let decls = hsunitBody unit
         pn = hsPackageName (unLoc (hsunitName unit))
         home_unit = hsc_home_unit hsc_env
@@ -677,16 +691,21 @@ hsunitModuleGraph unit = do
     --  2. For each hole which does not already have an hsig file,
     --  create an "empty" hsig file to induce compilation for the
     --  requirement.
-    let node_map = Map.fromList [ ((ms_mod_name n, ms_hsc_src n == HsigFile), n)
-                                | n <- nodes ]
+    let hsig_set = Set.fromList
+          [ ms_mod_name ms
+          | ExtendedModSummary { emsModSummary = ms } <- nodes
+          , ms_hsc_src ms == HsigFile
+          ]
     req_nodes <- fmap catMaybes . forM (homeUnitInstantiations home_unit) $ \(mod_name, _) ->
-        let has_local = Map.member (mod_name, True) node_map
-        in if has_local
+        if Set.member mod_name hsig_set
             then return Nothing
-            else fmap Just $ summariseRequirement pn mod_name
+            else fmap (Just . extendModSummaryNoDeps) $ summariseRequirement pn mod_name
+            -- Using extendModSummaryNoDeps here is okay because we're making a leaf node
+            -- representing a signature that can't depend on any other unit.
 
     -- 3. Return the kaboodle
-    return $ mkModuleGraph $ nodes ++ req_nodes
+    return $ mkModuleGraph' $
+      (ModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
@@ -739,14 +758,14 @@ summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
               -> Maybe (Located HsModule)
-              -> BkpM ModSummary
+              -> BkpM ExtendedModSummary
 summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
 summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
          let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
          r <- liftIO $ summariseModule hsc_env
-                         Map.empty -- GHC API recomp not supported
+                         emptyModNodeMap -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
                          True -- Target lets you disallow, but not here
@@ -766,7 +785,7 @@ hsModuleToModSummary :: PackageName
                      -> HscSource
                      -> ModuleName
                      -> Located HsModule
-                     -> BkpM ModSummary
+                     -> BkpM ExtendedModSummary
 hsModuleToModSummary pn hsc_src modname
                      hsmod = do
     let imps = hsmodImports (unLoc hsmod)
@@ -814,11 +833,15 @@ hsModuleToModSummary pn hsc_src modname
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
     let normal_imports = map convImport (implicit_imports ++ ordinary_imps)
-    required_by_imports <- liftIO $ implicitRequirements hsc_env normal_imports
+    res <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
+
+    let (implicit_sigs, inst_deps) = partitionEithers res
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
-    return ModSummary {
+    return $ ExtendedModSummary
+      { emsModSummary =
+          ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
@@ -833,7 +856,7 @@ hsModuleToModSummary pn hsc_src modname
                            -- due to merging, requirements may end up with
                            -- extra imports
                            ++ extra_sig_imports
-                           ++ required_by_imports,
+                           ++ ((,) Nothing . noLoc <$> implicit_sigs),
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
@@ -844,7 +867,9 @@ hsModuleToModSummary pn hsc_src modname
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
-        }
+          }
+      , emsInstantiatedUnits = inst_deps
+      }
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
