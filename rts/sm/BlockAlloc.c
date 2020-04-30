@@ -233,6 +233,12 @@ initGroup(bdescr *head)
       last->blocks = 0;
       last->link = head;
   }
+
+#if defined(DEBUG)
+  for (uint32_t i=0; i < head->blocks; i++) {
+      head[i].flags = 0;
+  }
+#endif
 }
 
 #if SIZEOF_VOID_P == SIZEOF_LONG
@@ -791,6 +797,12 @@ freeGroup(bdescr *p)
   // ASSERT_SM_LOCK();
 
   ASSERT(p->free != (P_)-1);
+
+#if defined(DEBUG)
+  for (uint32_t i=0; i < p->blocks; i++) {
+      p[i].flags = 0;
+  }
+#endif
 
   node = p->node;
 
