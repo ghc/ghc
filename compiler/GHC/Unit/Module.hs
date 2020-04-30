@@ -9,13 +9,14 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Unit.Module
     ( module GHC.Unit.Types
@@ -29,6 +30,8 @@ module GHC.Unit.Module
       -- * ModuleEnv
     , module GHC.Unit.Module.Env
 
+      -- * The IsBootInterface and GenWithIsBoot types
+    , module GHC.Unit.Module.Boot
 
       -- * Generalization
     , getModuleInstantiation
@@ -47,12 +50,26 @@ module GHC.Unit.Module
     , instModuleToModule
     , unitIdEq
     , installedModuleEq
+
+      -- * Boot modules
+    , ModuleNameWithIsBoot
+    , ModuleWithIsBoot
+    , GenWithIsBoot
+      ( ..
+      , ModuleNameWithIsBoot
+      , mnwib_moduleName
+      , mnwib_isBoot
+      , ModuleWithIsBoot
+      , mwib_module
+      , mwib_isBoot
+      )
     ) where
 
 import GHC.Prelude
 
 import GHC.Types.Unique.DSet
 import GHC.Unit.Types
+import GHC.Unit.Module.Boot
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env
@@ -149,3 +166,32 @@ isHoleModule _                   = False
 mkHoleModule :: ModuleName -> GenModule (GenUnit u)
 mkHoleModule = Module HoleUnit
 
+{-
+************************************************************************
+*                                                                      *
+                        Hole substitutions
+*                                                                      *
+************************************************************************
+-}
+
+type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
+
+{-# COMPLETE ModuleNameWithIsBoot #-}
+pattern ModuleNameWithIsBoot :: ModuleName -> IsBootInterface -> ModuleNameWithIsBoot
+pattern ModuleNameWithIsBoot { mnwib_moduleName
+                             , mnwib_isBoot
+                             } =
+  GenWithIsBoot { gwib_mod = mnwib_moduleName
+                , gwib_isBoot = mnwib_isBoot
+                }
+
+type ModuleWithIsBoot = GenWithIsBoot Module
+
+{-# COMPLETE ModuleWithIsBoot #-}
+pattern ModuleWithIsBoot :: Module -> IsBootInterface -> ModuleWithIsBoot
+pattern ModuleWithIsBoot { mwib_module
+                         , mwib_isBoot
+                         } =
+  GenWithIsBoot { gwib_mod = mwib_module
+                , gwib_isBoot = mwib_isBoot
+                }

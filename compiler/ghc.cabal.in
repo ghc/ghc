@@ -216,6 +216,7 @@ Library
         GHC.Unit.Subst
         GHC.Unit.Types
         GHC.Unit.Module
+        GHC.Unit.Module.Boot
         GHC.Unit.Module.Name
         GHC.Unit.Module.Location
         GHC.Unit.Module.Env

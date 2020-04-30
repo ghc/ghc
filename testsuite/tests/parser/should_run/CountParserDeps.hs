@@ -59,4 +59,4 @@ parserDeps libdir =
     mkModule = Module (stringToUnit "ghc")
 
     modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map fst $ dep_mods (mi_deps mi)
+    modDeps mi = map mnwib_moduleName $ dep_mods (mi_deps mi)
