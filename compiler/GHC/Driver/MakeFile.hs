@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -83,7 +84,8 @@ doMkDependHS srcs = do
 
     -- Sort into dependency order
     -- There should be no cycles
-    let sorted = GHC.topSortModuleGraph False module_graph Nothing
+    let sorted = filterToposortToModules $
+          GHC.topSortModuleGraph False module_graph Nothing
 
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
@@ -199,7 +201,8 @@ processDeps :: DynFlags
 
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
+    throwGhcExceptionIO $ ProgramError $
+      showSDoc dflags $ GHC.cyclicModuleErr $ fmap ModuleNode nodes
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags
@@ -365,10 +368,12 @@ dumpModCycles dflags module_graph
   | otherwise
   = putMsg dflags (hang (text "Module cycles found:") 2 pp_cycles)
   where
+    topoSort = filterToposortToModules $
+      GHC.topSortModuleGraph True module_graph Nothing
 
     cycles :: [[ModSummary]]
     cycles =
-      [ c | CyclicSCC c <- GHC.topSortModuleGraph True module_graph Nothing ]
+      [ c | CyclicSCC c <- topoSort ]
 
     pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
                         $$ pprCycle c $$ blankLine
@@ -396,8 +401,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
-          groups =
-            GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
+          groups = filterToposortToModules $
+            GHC.topSortModuleGraph True (mkModuleGraph $ all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$
