@@ -14,7 +14,7 @@
      ({ DumpParsedAst.hs:5:8-16 }
       {ModuleName: Data.Kind})
      (Nothing)
-     (False)
+     (NotBoot)
      (False)
      (NotQualified)
      (False)

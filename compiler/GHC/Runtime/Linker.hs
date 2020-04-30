@@ -68,6 +68,7 @@ import Control.Monad
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
+import Data.Function ((&))
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
 import Data.Maybe
@@ -670,21 +671,23 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
           mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
-                        loadInterface msg mod (ImportByUser False)
+                        loadInterface msg mod (ImportByUser NotBoot)
           iface <- case mb_iface of
                     Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
                     Maybes.Succeeded iface -> return iface
 
-          when (mi_boot iface) $ link_boot_mod_error mod
+          when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
 
           let
             pkg = moduleUnit mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
-            (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
-                    where is_boot (m,True)  = Left m
-                          is_boot (m,False) = Right m
+            (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
+              \ (GWIB { gwib_mod = m, gwib_isBoot = is_boot }) ->
+                m & case is_boot of
+                  IsBoot -> Left
+                  NotBoot -> Right
 
             boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)

@@ -9,6 +9,7 @@ module GHC.Unit.Module.Location
 where
 
 import GHC.Prelude
+import GHC.Unit.Types
 import GHC.Utils.Outputable
 
 -- | Module Location
@@ -54,10 +55,10 @@ addBootSuffix :: FilePath -> FilePath
 addBootSuffix path = path ++ "-boot"
 
 -- | Add the @-boot@ suffix if the @Bool@ argument is @True@
-addBootSuffix_maybe :: Bool -> FilePath -> FilePath
-addBootSuffix_maybe is_boot path
- | is_boot   = addBootSuffix path
- | otherwise = path
+addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
+addBootSuffix_maybe is_boot path = case is_boot of
+  IsBoot -> addBootSuffix path
+  NotBoot -> path
 
 -- | Add the @-boot@ suffix to all file paths associated with the module
 addBootSuffixLocn :: ModLocation -> ModLocation

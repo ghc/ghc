@@ -91,7 +91,7 @@ getImports dflags buf filename source_filename = do
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L main_loc mAIN_NAME
-                (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+                (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
                -- GHC.Prim doesn't exist physically, so don't go looking for it.
                 ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc
@@ -135,7 +135,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,
-                               ideclSource    = False,
+                               ideclSource    = NotBoot,
                                ideclSafe      = False,  -- Not a safe import
                                ideclQualified = NotQualified,
                                ideclImplicit  = True,   -- Implicit!

@@ -18,7 +18,7 @@ module GHC.Hs.ImpExp where
 
 import GHC.Prelude
 
-import GHC.Unit.Module       ( ModuleName )
+import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
@@ -83,7 +83,7 @@ data ImportDecl pass
                                  -- Note [Pragma source text] in GHC.Types.Basic
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
-      ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
+      ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
@@ -118,7 +118,7 @@ simpleImportDecl mn = ImportDecl {
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
-      ideclSource    = False,
+      ideclSource    = NotBoot,
       ideclSafe      = False,
       ideclImplicit  = False,
       ideclQualified = NotQualified,
@@ -156,10 +156,10 @@ instance OutputableBndrId p
         pp_as Nothing   = empty
         pp_as (Just a)  = text "as" <+> ppr a
 
-        ppr_imp True  = case mSrcText of
+        ppr_imp IsBoot = case mSrcText of
                           NoSourceText   -> text "{-# SOURCE #-}"
                           SourceText src -> text src <+> text "#-}"
-        ppr_imp False = empty
+        ppr_imp NotBoot = empty
 
         pp_spec Nothing             = empty
         pp_spec (Just (False, (L _ ies))) = ppr_ies ies

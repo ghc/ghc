@@ -918,7 +918,7 @@ abiHash strs = do
 
   mods <- mapM find_it strs
 
-  let get_iface modl = loadUserInterface False (text "abiHash") modl
+  let get_iface modl = loadUserInterface NotBoot (text "abiHash") modl
   ifaces <- initIfaceCheck (text "abiHash") hsc_env $ mapM get_iface mods
 
   bh <- openBinMem (3*1024) -- just less than a block

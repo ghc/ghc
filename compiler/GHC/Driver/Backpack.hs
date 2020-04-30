@@ -772,7 +772,7 @@ hsModuleToModSummary pn hsc_src modname
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
     -- Also copied from 'getImports'
-    let (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+    let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
              -- GHC.Prim doesn't exist physically, so don't go looking for it.
         ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)

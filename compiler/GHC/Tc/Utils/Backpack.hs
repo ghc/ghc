@@ -549,7 +549,7 @@ mergeSignatures
             im = fst (getModuleInstantiation m)
         in fmap fst
          . withException
-         $ findAndReadIface (text "mergeSignatures") im m False
+         $ findAndReadIface (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -842,7 +842,7 @@ mergeSignatures
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails dflags iface' False False ImportedBySystem
+                        calculateAvails dflags iface' False NotBoot ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -929,7 +929,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
 
     dflags <- getDynFlags
     let avails = calculateAvails dflags
-                    impl_iface False{- safe -} False{- boot -} ImportedBySystem
+                    impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
                             , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]
@@ -953,7 +953,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
     -- instantiation is correct.
     let sig_mod = mkModule (VirtUnit uid) mod_name
         isig_mod = fst (getModuleInstantiation sig_mod)
-    mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod False
+    mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface
         Failed err -> failWithTc $

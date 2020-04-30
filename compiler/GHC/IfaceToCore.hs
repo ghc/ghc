@@ -354,7 +354,7 @@ mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
 typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (TypeEnv, [ModDetails])
 typecheckIfacesForMerging mod ifaces tc_env_var =
   -- cannot be boot (False)
-  initIfaceLcl mod (text "typecheckIfacesForMerging") False $ do
+  initIfaceLcl mod (text "typecheckIfacesForMerging") NotBoot $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
@@ -506,7 +506,7 @@ tcHiBootIface hsc_src mod
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { hpt <- getHpt
                  ; case lookupHpt hpt (moduleName mod) of
-                      Just info | mi_boot (hm_iface info)
+                      Just info | mi_boot (hm_iface info) == IsBoot
                                 -> mkSelfBootInfo (hm_iface info) (hm_details info)
                       _ -> return NoSelfBoot }
           else do
@@ -517,7 +517,7 @@ tcHiBootIface hsc_src mod
         -- that an hi-boot is necessary due to a circular import.
         { read_result <- findAndReadIface
                                 need (fst (getModuleInstantiation mod)) mod
-                                True    -- Hi-boot file
+                                IsBoot  -- Hi-boot file
 
         ; case read_result of {
             Succeeded (iface, _path) -> do { tc_iface <- initIfaceTcRn $ typecheckIface iface
@@ -533,14 +533,15 @@ tcHiBootIface hsc_src mod
         -- disappeared.
     do  { eps <- getEps
         ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
-            Nothing -> return NoSelfBoot -- The typical case
-
-            Just (_, False) -> failWithTc moduleLoop
-                -- Someone below us imported us!
-                -- This is a loop with no hi-boot in the way
-
-            Just (_mod, True) -> failWithTc (elaborate err)
-                -- The hi-boot file has mysteriously disappeared.
+            -- The typical case
+            Nothing -> return NoSelfBoot
+            -- error cases
+            Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
+              IsBoot -> failWithTc (elaborate err)
+              -- The hi-boot file has mysteriously disappeared.
+              NotBoot -> failWithTc moduleLoop
+              -- Someone below us imported us!
+              -- This is a loop with no hi-boot in the way
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
@@ -1480,8 +1481,9 @@ tcIdInfo ignore_prags toplvl name ty info = do
     lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
-    let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
-                  | otherwise       = vanillaIdInfo
+    let init_info = if if_boot lcl_env == IsBoot
+                      then vanillaIdInfo `setUnfoldingInfo` BootUnfolding
+                      else vanillaIdInfo
 
     let needed = needed_prags info
     foldlM tcPrag init_info needed
