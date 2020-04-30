@@ -9,13 +9,13 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Unit.Module
     ( module GHC.Unit.Types
@@ -29,6 +29,8 @@ module GHC.Unit.Module
       -- * ModuleEnv
     , module GHC.Unit.Module.Env
 
+      -- * The IsBootInterface and GenWithIsBoot types
+    , module GHC.Unit.Module.Boot
 
       -- * Generalization
     , getModuleInstantiation
@@ -47,12 +49,17 @@ module GHC.Unit.Module
     , instModuleToModule
     , unitIdEq
     , installedModuleEq
+
+      -- * Boot modules
+    , ModuleNameWithIsBoot
+    , ModuleWithIsBoot
     ) where
 
 import GHC.Prelude
 
 import GHC.Types.Unique.DSet
 import GHC.Unit.Types
+import GHC.Unit.Module.Boot
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env
@@ -149,3 +156,14 @@ isHoleModule _                   = False
 mkHoleModule :: ModuleName -> GenModule (GenUnit u)
 mkHoleModule = Module HoleUnit
 
+{-
+************************************************************************
+*                                                                      *
+                        Hole substitutions
+*                                                                      *
+************************************************************************
+-}
+
+type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
+
+type ModuleWithIsBoot = GenWithIsBoot Module
