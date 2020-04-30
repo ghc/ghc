@@ -9,13 +9,13 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Unit.Module
     ( module GHC.Unit.Types
@@ -28,7 +28,6 @@ module GHC.Unit.Module
 
       -- * ModuleEnv
     , module GHC.Unit.Module.Env
-
 
       -- * Generalization
     , getModuleInstantiation
@@ -148,4 +147,3 @@ isHoleModule _                   = False
 -- | Create a hole Module
 mkHoleModule :: ModuleName -> GenModule (GenUnit u)
 mkHoleModule = Module HoleUnit
-
