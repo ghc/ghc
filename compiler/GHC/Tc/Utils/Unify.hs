@@ -14,7 +14,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
-  tcSkolemise, tcSkolemiseET,
+  tcSkolemise, tcSkolemiseScoped, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
@@ -160,7 +160,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
-      = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \_ ty' ->
+      = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \ty' ->
                                                go acc_arg_tys n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
@@ -611,7 +611,7 @@ tc_sub_type unify inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
 
        ; (sk_wrap, inner_wrap)
-           <- tcSkolemise ctxt ty_expected $ \ _ sk_rho ->
+           <- tcSkolemise ctxt ty_expected $ \ sk_rho ->
               do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
                  ; cow           <- unify rho_a sk_rho
                  ; return (mkWpCastN cow <.> wrap) }
@@ -937,49 +937,53 @@ the thinking.
 *                                                                      *
 ********************************************************************* -}
 
--- | Take an "expected type" and strip off quantifiers to expose the
--- type underneath, binding the new skolems for the @thing_inside@.
--- The returned 'HsWrapper' has type @specific_ty -> expected_ty@.
-tcSkolemise :: UserTypeCtxt -> TcSigmaType
-            -> ([TcTyVar] -> TcType -> TcM result)
-         -- ^ These are only ever used for scoped type variables.
-            -> TcM (HsWrapper, result)
-        -- ^ The expression has type: spec_ty -> expected_ty
+{- Note [Skolemisation]
+~~~~~~~~~~~~~~~~~~~~~~~
+tcSkolemise takes "expected type" and strip off quantifiers to expose the
+type underneath, binding the new skolems for the 'thing_inside'
+The returned 'HsWrapper' has type (specific_ty -> expected_ty).
+
+Note:
+
+* tcSkolemiseScoped deals specially with just the outer forall,
+  because only the outer forall has type variables that scope
+  over the body
+
+-}
+
+tcSkolemise, tcSkolemiseScoped
+    :: UserTypeCtxt -> TcSigmaType
+    -> (TcType -> TcM result)
+    -> TcM (HsWrapper, result)
+        -- ^ The wrapper has type: spec_ty ~> expected_ty
+
+tcSkolemiseScoped ctxt expected_ty thing_inside
+  = do { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
+       ; let skol_tvs  = map snd tv_prs
+             skol_info = SigSkol ctxt expected_ty tv_prs
+
+       ; (ev_binds, res)
+             <- checkConstraints skol_info skol_tvs given $
+                tcExtendNameTyVarEnv tv_prs               $
+                thing_inside rho_ty
+
+       ; return (wrap <.> mkWpLet ev_binds, res) }
 
 tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
-  = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tv_prs, given, rho') <- topSkolemise expected_ty
+  | isRhoTy expected_ty
+  = do { res <- thing_inside expected_ty
+       ; return (idHsWrapper, res) }
+  | otherwise
+  = do  { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
 
-        ; lvl <- getTcLevel
-        ; when debugIsOn $
-              traceTc "tcSkolemise" $ vcat [
-                ppr lvl,
-                text "expected_ty" <+> ppr expected_ty,
-                text "inst tyvars" <+> ppr tv_prs,
-                text "given"       <+> ppr given,
-                text "inst type"   <+> ppr rho' ]
-
-        -- Generally we must check that the "forall_tvs" haven't been constrained
-        -- The interesting bit here is that we must include the free variables
-        -- of the expected_ty.  Here's an example:
-        --       runST (newVar True)
-        -- Here, if we don't make a check, we'll get a type (ST s (MutVar s Bool))
-        -- for (newVar True), with s fresh.  Then we unify with the runST's arg type
-        -- forall s'. ST s' a. That unifies s' with s, and a with MutVar s Bool.
-        -- So now s' isn't unconstrained because it's linked to a.
-        --
-        -- However [Oct 10] now that the untouchables are a range of
-        -- TcTyVars, all this is handled automatically with no need for
-        -- extra faffing around
-
-        ; let tvs' = map snd tv_prs
+        ; let skol_tvs  = map snd tv_prs
               skol_info = SigSkol ctxt expected_ty tv_prs
 
-        ; (ev_binds, result) <- checkConstraints skol_info tvs' given $
-                                tcExtendNameTyVarEnv tv_prs $
-                                thing_inside tvs' rho'
+        ; (ev_binds, result)
+              <- checkConstraints skol_info skol_tvs given $
+                 thing_inside rho_ty
 
         ; return (wrap <.> mkWpLet ev_binds, result) }
           -- The ev_binds returned by checkConstraints is very
@@ -992,7 +996,8 @@ tcSkolemiseET :: UserTypeCtxt -> ExpSigmaType
 tcSkolemiseET _ et@(Infer {}) thing_inside
   = (idHsWrapper, ) <$> thing_inside et
 tcSkolemiseET ctxt (Check ty) thing_inside
-  = tcSkolemise ctxt ty $ \_ -> thing_inside . mkCheckExpType
+  = tcSkolemise ctxt ty $ \rho_ty ->
+    thing_inside (mkCheckExpType rho_ty)
 
 checkConstraints :: SkolemInfo
                  -> [TcTyVar]           -- Skolems

@@ -777,7 +777,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
+               <- tcSkolemise ctxt spec_ty $ \ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence

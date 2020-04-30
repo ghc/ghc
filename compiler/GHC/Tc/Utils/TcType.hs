@@ -1993,9 +1993,9 @@ isSigmaTy _                            = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                          = False
-isRhoTy (FunTy { ft_af = VisArg, ft_res = r }) = isRhoTy r
-isRhoTy _                                      = True
+isRhoTy (ForAllTy {})                = False
+isRhoTy (FunTy { ft_af = InvisArg }) = False
+isRhoTy _                            = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool
