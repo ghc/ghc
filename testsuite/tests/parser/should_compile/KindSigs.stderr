@@ -14,7 +14,7 @@
      ({ KindSigs.hs:8:8-16 }
       {ModuleName: Data.Kind})
      (Nothing)
-     (False)
+     (NotBoot)
      (False)
      (NotQualified)
      (False)
@@ -608,5 +608,3 @@
       [])))]
   (Nothing)
   (Nothing)))
-
-
