@@ -5,6 +5,8 @@
   Instantiating q
   [1 of 1] Compiling H                ( q/H.hs, bkpfail09.out/q/H.o )
 [3 of 3] Processing r
+  [1 of 3] Compiling H2[sig]          ( r/H2.hsig, nothing )
+  [2 of 3] Instantiating p
 
 Command line argument: -unit-id p[H=H]:0:0: error:
     • ‘H’ is exported by the hsig file, but not exported by the implementing module ‘q:H’
