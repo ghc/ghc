@@ -247,8 +247,8 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                     | (mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps True  (ms_srcimps node)
-        ; do_imps False (ms_imps node)
+        ; do_imps IsBoot (ms_srcimps node)
+        ; do_imps NotBoot (ms_imps node)
         }
 
 
