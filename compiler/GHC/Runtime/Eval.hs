@@ -108,6 +108,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.TyThing
 
 import GHC.Unit
+import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
@@ -1214,7 +1215,8 @@ showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
-        return (showSDoc dflags $ showModMsg dflags interpreted mod_summary)
+        -- extendModSummaryNoDeps because the message doesn't look at the deps
+        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode (extendModSummaryNoDeps mod_summary)))
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
