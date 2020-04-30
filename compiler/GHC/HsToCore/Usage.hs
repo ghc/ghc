@@ -215,9 +215,10 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
-    pNm      = moduleName (mi_module pluginModule)
-    pPkg     = moduleUnit (mi_module pluginModule)
-    deps     = map fst (dep_mods (mi_deps pluginModule))
+    pNm      = moduleName $ mi_module pluginModule
+    pPkg     = moduleUnit $ mi_module pluginModule
+    deps     = map gwib_mod $
+      dep_mods $ mi_deps pluginModule
 
     -- Lookup object file for a plugin dependency,
     -- from the same package as the plugin.
