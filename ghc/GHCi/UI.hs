@@ -54,7 +54,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
-                  hsc_dynLinker, hsc_interp )
+                  hsc_dynLinker, hsc_interp, filterToposortToModules )
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
@@ -1621,7 +1621,8 @@ chooseEditFile =
      graph <- GHC.getModuleGraph
      failed_graph <-
        GHC.mkModuleGraph <$> filterM hasFailed (GHC.mgModSummaries graph)
-     let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
+     let order g  = flattenSCCs $ filterToposortToModules $
+           GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
                       x : _ -> GHC.ml_hs_file (GHC.ms_location x)
                       _     -> Nothing
@@ -1994,7 +1995,8 @@ setContextAfterLoad keep_ctxt ms = do
   case [ m | Just m <- map (findTarget ms) targets ] of
         []    ->
           let graph = GHC.mkModuleGraph ms
-              graph' = flattenSCCs (GHC.topSortModuleGraph True graph Nothing)
+              graph' = flattenSCCs $ filterToposortToModules $
+                GHC.topSortModuleGraph True graph Nothing
           in load_this (last graph')
         (m:_) ->
           load_this m
