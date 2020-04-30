@@ -27,6 +27,7 @@
 #include "sm/Storage.h"
 #include "CNF.h"
 
+static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void mark_tso (MarkQueue *queue, StgTSO *tso);
 static void mark_stack (MarkQueue *queue, StgStack *stack);
@@ -450,10 +451,17 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
 void
 markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 {
+    if (!check_in_nonmoving_heap(p)) {
+        return;
+    }
+
     /* We should not make it here if we are doing a deadlock detect GC.
      * See Note [Deadlock detection under nonmoving collector].
+     * This is actually no longer true due to call in nonmovingScavengeOne
+     * introduced due to Note [Dirty flags in the non-moving collector]
+     * (see NonMoving.c).
      */
-    ASSERT(!deadlock_detect_gc);
+    //ASSERT(!deadlock_detect_gc);
 
     // Are we at the end of the block?
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
