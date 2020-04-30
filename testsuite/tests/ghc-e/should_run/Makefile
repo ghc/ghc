@@ -24,6 +24,9 @@ ghc-e006:
 T2228:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2228.hs </dev/null
 
+T2330:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2330.hs
+
 T2636:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2636.hs; if [ "$?" != 0 ]; then true; else false; fi
 
