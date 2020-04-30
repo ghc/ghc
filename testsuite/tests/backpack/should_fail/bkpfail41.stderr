@@ -5,7 +5,8 @@
   Instantiating i
   [1 of 1] Compiling A                ( i/A.hs, bkpfail41.out/i/A.o )
 [3 of 3] Processing r
-  [1 of 1] Compiling B[sig]           ( r/B.hsig, nothing )
+  [1 of 2] Compiling B[sig]           ( r/B.hsig, nothing )
+  [2 of 2] Instantiating p
 
 bkpfail41.bkp:10:9: error:
     • Class ‘C’ has conflicting definitions in the module
