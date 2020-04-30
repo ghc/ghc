@@ -206,7 +206,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) (stk_ty, res_ty) -- Rebi
 
 tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
   = addErrCtxt (cmdCtxt cmd) $
-    do  { arg_ty <- newOpenFlexiTyVarTy
+    do  { arg_ty <- select_arrow_scope newOpenFlexiTyVarTy
 
         ; let args_ty = arrowStackTupTy (consTy arg_ty stk_ty)
               fun_ty = mkCmdArrTy env args_ty res_ty
@@ -221,6 +221,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
        -- Local bindings, inside the enclosing proc, are not in scope
        -- inside f.  In the higher-order case (-<<), they are.
        -- See Note [Escaping the arrow scope] in GHC.Tc.Types
+    select_arrow_scope :: TcM a -> TcM a
     select_arrow_scope tc = case ho_app of
         HsHigherOrderApp -> tc
         HsFirstOrderApp  -> escapeArrowScope tc

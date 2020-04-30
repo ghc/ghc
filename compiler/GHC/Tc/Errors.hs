@@ -1485,10 +1485,14 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
 
 mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
+  | isUserSkolem ctxt tv1             -- if tv1 is a skolem and ty2 is a meta-tyvar,
+  , Just tv2 <- tcGetTyVar_maybe ty2  --   flip the equality around so that we
+  , isMetaTyVar tv2                   --   report skolem escape errors (see #18114)
+  = mkTyVarEqErr' dflags ctxt report ct (flipSwap <$> oriented) tv2 ty1
+
   | not insoluble_occurs_check   -- See Note [Occurs check wins]
-  , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-                            -- be oriented the other way round;
-                            -- see GHC.Tc.Solver.Canonical.canEqTyVarTyVar
+  , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else we would have
+                            -- flipped it around in the previous case
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- the cases below don't really apply to ReprEq (except occurs check)

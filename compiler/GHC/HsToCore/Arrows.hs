@@ -511,10 +511,10 @@ ds_arr_expr DsCmdEnv{..} expr = ds_expr <$> tidy_up_typed expr
     ds_expr (TypedArr _ _ (WrapArr wrap expr)) = wrap $ ds_expr expr
 
     -- app :: forall b c. a (a b c, b) c
-    ds_expr (TypedArr in_ty out_ty AppArr)
-      | (arrow_app_ty, _) <- tcSplitAppTy in_ty
-      , (_, in_ty') <- tcSplitAppTy arrow_app_ty
+    ds_expr expr@(TypedArr in_ty out_ty AppArr)
+      | Just (_, [_, in_ty']) <- tcSplitTyConApp_maybe in_ty
       = mkApps app_id [Type in_ty', Type out_ty]
+      | otherwise = pprPanic "ds_expr: first" $ ppr expr
 
     -- arr :: forall b c. (b -> c) -> a b c
     ds_expr (TypedArr in_ty out_ty (ArrArr expr))
