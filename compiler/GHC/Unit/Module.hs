@@ -45,6 +45,11 @@ module GHC.Unit.Module
     , ContainsModule(..)
     , unitIdEq
     , installedModuleEq
+
+      -- * Boot modules
+    , ModuleNameWithIsBoot
+    , ModuleWithIsBoot
+    , GenWithIsBoot(..)
     ) where
 
 import GHC.Prelude
