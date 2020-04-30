@@ -676,5 +676,5 @@ instance Binary a => Binary (GenWithIsBoot a) where
 
 instance Outputable a => Outputable (GenWithIsBoot a) where
   ppr (GWIB  { gwib_mod, gwib_isBoot }) = hsep $ ppr gwib_mod : case gwib_isBoot of
-    IsBoot -> []
-    NotBoot -> [text "{-# SOURCE #-}"]
+    IsBoot -> [ text "{-# SOURCE #-}" ]
+    NotBoot -> []

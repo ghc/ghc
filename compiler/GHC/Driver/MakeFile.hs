@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -186,7 +187,7 @@ processDeps :: DynFlags
             -> [ModuleName]
             -> FilePath
             -> Handle           -- Write dependencies to here
-            -> SCC ModSummary
+            -> SCC ModuleGraphNode
             -> IO ()
 -- Write suitable dependencies to handle
 -- Always:
@@ -205,9 +206,17 @@ processDeps :: DynFlags
 
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
+    throwGhcExceptionIO $ ProgramError $
+      showSDoc dflags $ GHC.cyclicModuleErr nodes
 
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
+processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode node))
+  =     -- There shouldn't be any backpack instantiations; report them as well
+    throwGhcExceptionIO $ ProgramError $
+      showSDoc dflags $
+        vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
+             , nest 2 $ ppr node ]
+
+processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode (ExtendedModSummary node _)))
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
@@ -371,10 +380,12 @@ dumpModCycles dflags module_graph
   | otherwise
   = putMsg dflags (hang (text "Module cycles found:") 2 pp_cycles)
   where
+    topoSort = filterToposortToModules $
+      GHC.topSortModuleGraph True module_graph Nothing
 
     cycles :: [[ModSummary]]
     cycles =
-      [ c | CyclicSCC c <- GHC.topSortModuleGraph True module_graph Nothing ]
+      [ c | CyclicSCC c <- topoSort ]
 
     pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
                         $$ pprCycle c $$ blankLine
@@ -402,8 +413,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
-          groups =
-            GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
+          groups = filterToposortToModules $
+            GHC.topSortModuleGraph True (mkModuleGraph $ extendModSummaryNoDeps <$> all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$

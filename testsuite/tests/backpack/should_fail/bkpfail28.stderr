@@ -3,8 +3,8 @@
 [2 of 3] Processing q
   [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
 [3 of 3] Processing r
-  [1 of 2] Compiling A[sig]           ( r/A.hsig, nothing )
-  [2 of 2] Compiling R                ( r/R.hs, nothing )
+  [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
+  [2 of 4] Compiling R                ( r/R.hs, nothing )
 
 bkpfail28.bkp:18:13: error:
     • Overlapping instances for Show (K a) arising from a use of ‘show’

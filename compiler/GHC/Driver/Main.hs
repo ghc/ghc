@@ -675,7 +675,7 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
-type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
+type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
 -- | This function runs GHC's frontend with recompilation
 -- avoidance. Specifically, it checks if recompilation is needed,
@@ -698,8 +698,9 @@ hscIncrementalFrontend
     hsc_env <- getHscEnv
 
     let msg what = case mHscMessage of
-                   Just hscMessage -> hscMessage hsc_env mod_index what mod_summary
-                   Nothing -> return ()
+          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
+          Nothing -> return ()
 
         skip iface = do
             liftIO $ msg UpToDate
@@ -1031,19 +1032,27 @@ oneShotMsg hsc_env recomp =
             return ()
 
 batchMsg :: Messager
-batchMsg hsc_env mod_index recomp mod_summary =
-    case recomp of
-        MustCompile -> showMsg (text "Compiling ") empty
-        UpToDate
-            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
-            | otherwise -> return ()
-        RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
+batchMsg hsc_env mod_index recomp node = case node of
+    InstantiationNode _ ->
+        case recomp of
+            MustCompile -> showMsg (text "Instantiating ") empty
+            UpToDate
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                | otherwise -> return ()
+            RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
+    ModuleNode _ ->
+        case recomp of
+            MustCompile -> showMsg (text "Compiling ") empty
+            UpToDate
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                | otherwise -> return ()
+            RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
     where
         dflags = hsc_dflags hsc_env
         showMsg msg reason =
             compilationProgressMsg dflags $
             (showModuleIndex mod_index <>
-            msg <> showModMsg dflags (recompileRequired recomp) mod_summary)
+            msg <> showModMsg dflags (recompileRequired recomp) node)
                 <> reason
 
 --------------------------------------------------------------

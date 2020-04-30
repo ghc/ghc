@@ -8,6 +8,7 @@ module GHC.Tc.Utils.Backpack (
     findExtraSigImports,
     implicitRequirements',
     implicitRequirements,
+    implicitRequirementsShallow,
     checkUnit,
     tcRnCheckUnit,
     tcRnMergeSignatures,
@@ -47,14 +48,14 @@ import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Deps
 
 import GHC.Tc.Gen.Export
+import GHC.Tc.Solver
 import GHC.Tc.TyCl.Utils
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Solver
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
 
 import GHC.Hs
 
@@ -85,7 +86,6 @@ import GHC.Data.Maybe
 
 import Control.Monad
 import Data.List (find)
-import qualified Data.Map as Map
 
 import {-# SOURCE #-} GHC.Tc.Module
 
@@ -247,19 +247,6 @@ check_inst sig_inst = do
     (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
     reportAllUnsolved (mkImplicWC implic)
 
--- | Return this list of requirement interfaces that need to be merged
--- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
-requirementMerges unit_state mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext unit_state))
-    where
-      -- update IndefUnitId ppr info as they may have changed since the
-      -- time the IndefUnitId was created
-      fixupModule (Module iud name) = Module iud' name
-         where
-            iud' = iud { instUnitInstanceOf = cid }
-            cid  = instUnitInstanceOf iud
-
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
 -- the import of the requirement, because it transitively depends on those
@@ -267,12 +254,12 @@ requirementMerges unit_state mod_name =
 -- is something like this:
 --
 --      unit p where
---          signature A
---          signature B
---              import A
+--          signature X
+--          signature Y
+--              import X
 --
 --      unit q where
---          dependency p[A=\<A>,B=\<B>]
+--          dependency p[X=\<A>,Y=\<B>]
 --          signature A
 --          signature B
 --
@@ -306,7 +293,7 @@ findExtraSigImports hsc_env hsc_src modname = do
            | mod_name <- uniqDSetToList extra_requirements ]
 
 -- A version of 'implicitRequirements'' which is more friendly
--- for "GHC.Driver.Make" and "GHC.Tc.Module".
+-- for "GHC.Tc.Module".
 implicitRequirements :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
                      -> IO [(Maybe FastString, Located ModuleName)]
@@ -316,7 +303,7 @@ implicitRequirements hsc_env normal_imports
 
 -- Given a list of 'import M' statements in a module, figure out
 -- any extra implicit requirement imports they may have.  For
--- example, if they 'import M' and M resolves to p[A=<B>], then
+-- example, if they 'import M' and M resolves to p[A=<B>,C=D], then
 -- they actually also import the local requirement B.
 implicitRequirements' :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
@@ -330,6 +317,28 @@ implicitRequirements' hsc_env normal_imports
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where home_unit = hsc_home_unit hsc_env
+
+-- | Like @implicitRequirements'@, but returns either the module name, if it is
+-- a free hole, or the instantiated unit the imported module is from, so that
+-- that instantiated unit can be processed and via the batch mod graph (rather
+-- than a transitive closure done here) all the free holes are still reachable.
+implicitRequirementsShallow
+  :: HscEnv
+  -> [(Maybe FastString, Located ModuleName)]
+  -> IO ([ModuleName], [InstantiatedUnit])
+implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
+ where
+  go acc [] = pure acc
+  go (accL, accR) ((mb_pkg, L _ imp):imports) = do
+    found <- findImportedModule hsc_env imp mb_pkg
+    let acc' = case found of
+          Found _ mod | not (isHomeModule (hsc_home_unit hsc_env) mod) ->
+              case moduleUnit mod of
+                  HoleUnit -> (moduleName mod : accL, accR)
+                  RealUnit _ -> (accL, accR)
+                  VirtUnit u -> (accL, u:accR)
+          _ -> (accL, accR)
+    go acc' imports
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or

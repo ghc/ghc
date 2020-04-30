@@ -2,7 +2,8 @@
   [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
   [2 of 2] Compiling B                ( p/B.hs, nothing )
 [2 of 4] Processing q
-  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+  [1 of 2] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 2] Instantiating p
 [3 of 4] Processing aimpl
   Instantiating aimpl
   [1 of 1] Compiling A                ( aimpl/A.hs, bkpfail35.out/aimpl/A.o )
