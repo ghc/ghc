@@ -10,3 +10,4 @@
     Instantiating p[A=q:A]
     [1 of 2] Compiling A[sig]           ( p/A.hsig, bkp39.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
     [2 of 2] Compiling M                ( p/M.hs, bkp39.out/p/p-HVmFlcYSefiK5n1aDP1v7x/M.o )
+  [1 of 1] Instantiating p

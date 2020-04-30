@@ -6,3 +6,4 @@
     Instantiating p[Int=base-4.13.0.0:GHC.Exts]
     [1 of 1] Including ghc-prim-0.8.0
     [1 of 1] Compiling Int[sig]         ( p/Int.hsig, bkp16.out/p/p-97PZnzqiJmd2hTwUNGdjod/Int.o )
+  [1 of 1] Instantiating p
