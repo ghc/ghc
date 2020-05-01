@@ -981,12 +981,9 @@ tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
        res_ty
   = do addModFinalizersWithLclEnv mod_finalizers
        tcExpr expr res_ty
-tcExpr (HsSpliceE _ splice)          res_ty
-  = tcSpliceExpr splice res_ty
-tcExpr e@(HsBracket _ brack)         res_ty
-  = tcTypedBracket e brack res_ty
-tcExpr e@(HsRnBracketOut _ brack ps) res_ty
-  = tcUntypedBracket e brack ps res_ty
+tcExpr (HsSpliceE _ splice)          res_ty = tcSpliceExpr splice res_ty
+tcExpr e@(HsBracket _ brack)         res_ty = tcTypedBracket e brack res_ty
+tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 
 {-
 ************************************************************************
@@ -1219,7 +1216,11 @@ tcApp expr res_ty
   = do { (fun, args, app_res_ty) <- tcInferApp expr
        ; if isTagToEnum fun
          then tcTagToEnum expr fun args app_res_ty res_ty
-         else -- The wildly common case
+              -- Done here because we have res_ty,
+              -- whereas tcInferApp does not
+         else
+
+    -- The wildly common case
     do { let expr' = applyHsArgs fun args
        ; addFunResCtxt True fun app_res_ty res_ty $
          tcWrapResult expr expr' app_res_ty res_ty } }
@@ -1232,10 +1233,10 @@ tcInferApp :: HsExpr GhcRn
 -- Also used by Module.tcRnExpr to implement GHCi :type
 tcInferApp expr
   | -- Gruesome special case for ambiguous record selectors
-    HsRecFld _ fld_lbl   <- fun
-  , Ambiguous _ lbl              <- fld_lbl  -- Still ambiguous
+    HsRecFld _ fld_lbl        <- fun
+  , Ambiguous _ lbl           <- fld_lbl  -- Still ambiguous
   , HsEValArg _ (L _ arg) : _ <- filterOut isArgPar args -- A value arg is first
-  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
+  , Just sig_ty               <- obviousSig arg  -- A type sig on the arg disambiguates
   = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name  <- disambiguateSelector lbl sig_tc_ty
        ; (tc_fun, fun_ty) <- tcInferRecSelId (Unambiguous sel_name lbl)
@@ -1259,11 +1260,7 @@ tcInferApp_finish
     -> TcM (HsExpr GhcTc, [LHsExprArgOut], TcSigmaType)
 
 tcInferApp_finish rn_fun tc_fun fun_sigma rn_args
-  = do { traceTc "tcInferApp_finish" $
-         vcat [ ppr rn_fun <+> dcolon <+> ppr fun_sigma, ppr rn_args ]
-
-       ; (tc_args, actual_res_ty) <- tcArgs rn_fun fun_sigma rn_args
-
+  = do { (tc_args, actual_res_ty) <- tcArgs rn_fun fun_sigma rn_args
        ; return (tc_fun, tc_args, actual_res_ty) }
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
