@@ -7,8 +7,7 @@ arrowfail001.hs:16:36: error:
 
 arrowfail001.hs:16:43: error:
     • Couldn't match expected type ‘a0’ with actual type ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a’ is a rigid type variable bound by
         a pattern with constructor: Bar :: forall a. Foo a => a -> Bar,
         in a case alternative
         at arrowfail001.hs:16:27-31
