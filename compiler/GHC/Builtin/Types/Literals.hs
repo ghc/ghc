@@ -50,7 +50,6 @@ import GHC.Builtin.Names
                   , typeSymbolAppendFamNameKey
                   )
 import GHC.Data.FastString
-import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
@@ -457,8 +456,8 @@ axAppendSymbol0L  = mkAxiom1 "Concat0L"
 -- The list of built-in type family axioms that GHC uses.
 -- If you define new axioms, make sure to include them in this list.
 -- See Note [Adding built-in type families]
-typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
-typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
+typeNatCoAxiomRules :: [CoAxiomRule]
+typeNatCoAxiomRules =
   [ axAddDef
   , axMulDef
   , axExpDef

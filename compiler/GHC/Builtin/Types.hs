@@ -18,6 +18,9 @@ module GHC.Builtin.Types (
 
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
+        pcDataCon,          -- used in FIXME: where is it used?
+        mkWiredInDataConName,
+
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
 
@@ -63,11 +66,17 @@ module GHC.Builtin.Types (
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
         mkListTy, mkPromotedListTy,
+        extractPromotedList, isPromotedListTy,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
         justDataCon, justDataConName, promotedJustDataCon,
+
+        -- * Either
+        eitherTyCon, mkEitherTy, eitherTyConName,
+        leftDataCon, leftDataConName,
+        rightDataCon, rightDataConName,
 
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
@@ -225,6 +234,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , word8TyCon
                 , listTyCon
                 , maybeTyCon
+                , eitherTyCon
                 , heqTyCon
                 , eqTyCon
                 , coercibleTyCon
@@ -320,6 +330,14 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
                                           nothingDataConKey nothingDataCon
 justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
+
+eitherTyConName, leftDataConName, rightDataConName :: Name
+eitherTyConName    = mkWiredInTyConName   UserSyntax dATA_EITHER (fsLit "Either")
+                                          eitherTyConKey eitherTyCon
+leftDataConName    = mkWiredInDataConName UserSyntax dATA_EITHER (fsLit "Left")
+                                          leftDataConKey leftDataCon
+rightDataConName   = mkWiredInDataConName UserSyntax dATA_EITHER (fsLit "Right")
+                                          rightDataConKey rightDataCon
 
 wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
@@ -1578,6 +1596,23 @@ nothingDataCon = pcDataCon nothingDataConName alpha_tyvar [] maybeTyCon
 justDataCon :: DataCon
 justDataCon = pcDataCon justDataConName alpha_tyvar [alphaTy] maybeTyCon
 
+-- Wired-in type Either
+
+eitherTyCon :: TyCon
+eitherTyCon = pcTyCon eitherTyConName Nothing [alphaTyVar, betaTyVar]
+                      [leftDataCon, rightDataCon]
+
+mkEitherTy :: Type -> Type -> Type
+mkEitherTy ty1 ty2 = mkTyConApp eitherTyCon [ty1, ty2]
+
+leftDataCon :: DataCon
+leftDataCon = pcDataCon leftDataConName [alphaTyVar, betaTyVar]
+                        [alphaTy] eitherTyCon
+
+rightDataCon :: DataCon
+rightDataCon = pcDataCon rightDataConName [alphaTyVar, betaTyVar]
+                         [betaTy] eitherTyCon
+
 {-
 ** *********************************************************************
 *                                                                      *
@@ -1705,7 +1740,8 @@ mkPromotedListTy k tys
 
 -- | Extract the elements of a promoted list. Panics if the type is not a
 -- promoted list
-extractPromotedList :: Type    -- ^ The promoted list
+extractPromotedList :: HasDebugCallStack
+                    => Type    -- ^ The promoted list
                     -> [Type]
 extractPromotedList tys = go tys
   where
@@ -1720,3 +1756,16 @@ extractPromotedList tys = go tys
 
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
+
+isPromotedListTy :: Type -> Maybe [Type]
+isPromotedListTy list_ty
+  | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
+  , tc `hasKey` consDataConKey
+  = (t :) <$> isPromotedListTy ts
+
+  | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
+  , tc `hasKey` nilDataConKey
+  = Just []
+
+  | otherwise
+  = Nothing

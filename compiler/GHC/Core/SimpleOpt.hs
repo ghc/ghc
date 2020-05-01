@@ -221,9 +221,15 @@ simple_opt_expr env expr
     go (Coercion co)    = Coercion (optCoercion (soe_dflags env) (getTCvSubst subst) co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      | isReflCo co' = go e
-                        | otherwise    = Cast (go e) co'
+    go (Cast e co1)     | isReflCo co' = e''
+                        | otherwise    = Cast e'' co'
                         where
+                          e'  = go e
+                          (e'', co)
+                              | Cast e'' co2 <- e'
+                              = (e'', mkTransCo co2 co1)
+                              | otherwise
+                              = (e', co1)
                           co' = optCoercion (soe_dflags env) (getTCvSubst subst) co
 
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of

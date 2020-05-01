@@ -435,9 +435,6 @@ basicKnownKeyNames
         -- The SPEC type for SpecConstr
         , specTyConName
 
-        -- The Either type
-        , eitherTyConName, leftDataConName, rightDataConName
-
         -- Plugins
         , pluginTyConName
         , frontendPluginTyConName
@@ -696,10 +693,6 @@ returnM_RDR             = nameRdrName returnMName
 bindM_RDR               = nameRdrName bindMName
 failM_RDR               = nameRdrName failMName
 
-left_RDR, right_RDR :: RdrName
-left_RDR                = nameRdrName leftDataConName
-right_RDR               = nameRdrName rightDataConName
-
 fromEnum_RDR, toEnum_RDR :: RdrName
 fromEnum_RDR            = varQual_RDR gHC_ENUM (fsLit "fromEnum")
 toEnum_RDR              = varQual_RDR gHC_ENUM (fsLit "toEnum")
@@ -930,11 +923,6 @@ ordGTDataConName     = dcQual gHC_TYPES (fsLit "GT") ordGTDataConKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
-
-eitherTyConName, leftDataConName, rightDataConName :: Name
-eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
-leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
-rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1900,6 +1888,11 @@ typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 unsafeEqualityTyConKey :: Unique
 unsafeEqualityTyConKey = mkPreludeTyConUnique 191
 
+-- Arrow notation
+arrowEnvTyConKey, arrowStackTupTyFamKey, arrowEnvTupTyFamKey :: Unique
+arrowEnvTyConKey      = mkPreludeTyConUnique 192
+arrowStackTupTyFamKey = mkPreludeTyConUnique 193
+arrowEnvTupTyFamKey   = mkPreludeTyConUnique 194
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
@@ -2073,6 +2066,9 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 113
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
 unsafeReflDataConKey      = mkPreludeDataConUnique 114
+
+arrowEnvDataConKey :: Unique
+arrowEnvDataConKey = mkPreludeDataConUnique 115
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES DataUniques 200-250
@@ -2324,6 +2320,9 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
+
+arrowEnvCoAxiomKey :: Unique
+arrowEnvCoAxiomKey = mkPreludeTyConUnique 503
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES IdUniques 200-499

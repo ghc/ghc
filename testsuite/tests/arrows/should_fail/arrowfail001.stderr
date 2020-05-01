@@ -1,6 +1,18 @@
 
-arrowfail001.hs:16:36:
-    No instance for (Foo a) arising from a use of ‘foo’
-    In the expression: foo
-    In the command: foo -< a
-    In a case alternative: Bar a -> foo -< a
+arrowfail001.hs:16:36: error:
+    • No instance for (Foo a0) arising from a use of ‘foo’
+    • In the expression: foo
+      In the command: foo -< a
+      In a case alternative: Bar a -> foo -< a
+
+arrowfail001.hs:16:43: error:
+    • Couldn't match expected type ‘a0’ with actual type ‘a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a pattern with constructor: Bar :: forall a. Foo a => a -> Bar,
+        in a case alternative
+        at arrowfail001.hs:16:27-31
+    • In the expression: a
+      In the command: foo -< a
+      In a case alternative: Bar a -> foo -< a
+    • Relevant bindings include a :: a (bound at arrowfail001.hs:16:31)

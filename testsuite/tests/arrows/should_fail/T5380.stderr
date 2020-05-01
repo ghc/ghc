@@ -22,7 +22,7 @@ T5380.hs:7:34: error:
           testB :: forall not_bool not_unit.
                    not_bool -> (() -> ()) -> () -> not_unit
         at T5380.hs:6:1-49
-      Expected type: () -> not_unit
+      Expected type: GHC.Desugar.ArrowStackTup '[()] -> not_unit
         Actual type: () -> ()
     • In the expression: f
       In the command: f -< ()
