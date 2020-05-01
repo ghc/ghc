@@ -75,8 +75,8 @@ dsBracketTc :: HsBracket GhcTc -> [PendingTcTypedSplice]
 
 dsBracketTc brack splices ev_zs zs
   = do
-      b <- do_brack brack
-      sps <- mapMaybeM do_one splices
+      (bounds_vars, body) <- do_brack brack
+      sps <- mapMaybeM (do_one bounds_vars) splices
       zss <- mapM do_one_z zs
       (ev_zss, ev_tss) <- mapAndUnzipM do_one_ev ev_zs
 
@@ -88,7 +88,7 @@ dsBracketTc brack splices ev_zs zs
       let tt_ty = mkBoxedTupleTy [intTy, ty']
 
       pprTrace "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
-        $ return $ mkCoreTup [mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty (sps ++ ev_zss), b]
+        $ return $ mkCoreTup [mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty (sps ++ ev_zss), body]
   where
     do_one_z (PendingZonkSplice n _mt e) = do
       let k = getKey (idUnique n)
@@ -133,12 +133,12 @@ dsBracketTc brack splices ev_zs zs
             return $ ( mkCoreTup [k_expr, mkCoreApps (Var ccev) [Type r, e']]
                      , mkCoreTup [kt_expr, final_t_e $ mkCoreApps (Var cc_sup) [Type r, e']] )
           _ -> pprPanic "split failed" (ppr e')
-    do_one (PendingTcSplice n e) = do
+    do_one bs (PendingTcSplice bind_env n e) = do
       let k = getKey (idUnique n)
       dflags <- getDynFlags
       let k_expr = mkIntExprInt (targetPlatform dflags) k
       untype <- dsLookupGlobalId unTypeQName
-      e' <- dsExpr (unLoc e)
+      e' <- dsSetBindEnv bs $ dsExpr (unLoc e)
       -- The type of the expression has to be Q (TExp r)
       pprTraceM "ty" (ppr $ exprType e')
       pprTraceM "e" (ppr $ e')
@@ -149,7 +149,7 @@ dsBracketTc brack splices ev_zs zs
             in return $ Just $ mkCoreTup [k_expr, mkCoreApps (Var untype) [Type rep, Type r', e']]
           _ -> return Nothing
 
-    do_brack (TExpBr _ e)  = do { MkC s <- repLE' e; return s }
+    do_brack (TExpBr _ e)  = do { (bs, MkC s) <- repLE' e; return (bs, s) }
     do_brack _ = panic "dsBracket: unexpected XBracket"
 
 {- -------------- Examples --------------------
@@ -166,12 +166,30 @@ dsBracketTc brack splices ev_zs zs
   lam (pvar x1) (f (var x1))
 -}
 
+boundVars :: CoreExpr -> VarSet
+boundVars (Lam x b)       = unitVarSet x
+boundVars (App f a)       = boundVars f `unionVarSet` boundVars a
+boundVars (Case s x ty as) = unitVarSet x `unionVarSet` boundVars s `unionVarSet` unionVarSets (map boundVarsAlt as)
+boundVars (Let b e)       = boundVarsBind b `unionVarSet` (boundVars e)
+boundVars (Cast e co)     = boundVars e
+boundVars (Tick t e)      = boundVars e
+boundVars _ = emptyVarSet
+
+boundVarsAlt :: Alt CoreBndr -> VarSet
+boundVarsAlt (_, bs, e) = mkVarSet bs `unionVarSet` boundVars e
+
+
+
+boundVarsBind (NonRec b e) = unitVarSet b `unionVarSet` boundVars e
+boundVarsBind (Rec g) = unionVarSets (map (\(b, e) -> unitVarSet b `unionVarSet` boundVars e) g)
+
+
 
 -----------------------------------------------------------------------------
 --              Expressions
 -----------------------------------------------------------------------------
 
-repLE' :: LHsExpr GhcTc -> DsM (Core String)
+repLE' :: LHsExpr GhcTc -> DsM (VarSet, Core String)
 repLE' (L loc e) = putSrcSpanDs loc (repECore e)
 
 coreStringLit :: String -> DsM (Core String)
@@ -183,7 +201,7 @@ repType ty = do
   pprTraceM "Writing type" (ppr ty)
   liftIO (writeBracket it) >>= coreStringLit
 
-repECore :: HsExpr GhcTc -> DsM (Core String)
+repECore :: HsExpr GhcTc -> DsM (VarSet, (Core String))
 repECore e = do
   {-c_e <- mkCoreLams vs <$> dsExpr e
   dflags <- getDynFlags
@@ -194,11 +212,13 @@ repECore e = do
   pprTraceM "desugared" (ppr ())
   -}
   c_e <- dsExpr e
+  let bvs = boundVars c_e
   dflags <- getDynFlags
   -- Inline Type Lets, in particular
   let c_e' = simpleOptExpr dflags c_e
   pprTraceM "c_e'" (ppr c_e $$ ppr c_e')
-  repCore c_e
+  res <- repCore c_e
+  return (bvs, res)
 
 repCore :: CoreExpr -> DsM (Core String)
 repCore c_e = repEFP c_e >>= coreStringLit
@@ -241,7 +261,8 @@ allTyFree t =  varTypeTyCoVars t
 
 repEFP :: CoreExpr -> DsM FilePath
 repEFP c_e = do
-  let ie = toIfaceExpr (allFree c_e) c_e
+  benv <- dsGetBindEnv
+  let ie = toIfaceExpr (allFree c_e `minusVarSet` benv) c_e
   pprTraceM "toIfaceExpr" (ppr ie $$ ppr (allFree c_e))
   liftIO (writeBracket ie)
 

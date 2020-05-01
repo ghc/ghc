@@ -299,7 +299,8 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
        ; expr' <- tcPolyExpr expr expected_type
-       ; return (PendingTcSplice splice_name expr') }
+       ; benv <- tcl_th_bndrs <$> getLclEnv
+       ; return (PendingTcSplice benv splice_name expr') }
   where
      meta_ty_name = case flavour of
                        UntypedExpSplice  -> expTyConName
@@ -643,7 +644,8 @@ tcNestedSplice pop_stage (TcPending ps_var  _zz_var _) splice_name expr res_ty
        ; ps <- readMutVar ps_var
        ; let splice_id = mkLocalId splice_name res_ty
        ; pprTraceM "tcNEstedSplice" (ppr res_ty $$ ppr meta_exp_ty $$ ppr splice_id)
-       ; writeMutVar ps_var (PendingTcSplice splice_id (mkHsDictLet ev expr') : ps)
+       ; benv <- tcl_th_bndrs <$> getLclEnv
+       ; writeMutVar ps_var (PendingTcSplice benv splice_id (mkHsDictLet ev expr') : ps)
 
        -- The returned expression is ignored; it's in the pending splices
        ; return (HsVar noExtField (noLoc splice_id)) }

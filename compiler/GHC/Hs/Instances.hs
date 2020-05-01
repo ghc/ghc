@@ -25,6 +25,7 @@ import GHC.Hs.Lit
 import GHC.Hs.Types
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
+import GHC.Types.Basic
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -333,6 +334,7 @@ deriving instance Data PendingRnSplice
 deriving instance Data SyntaxExprRn
 deriving instance Data SyntaxExprTc
 deriving instance                   Data PendingTcUntypedSplice
+deriving instance                   Data TopLevelFlag
 deriving instance                   Data PendingTcTypedSplice
 deriving instance                   Data PendingZonkSplice
 deriving instance                   Data PendingZonkSplice2

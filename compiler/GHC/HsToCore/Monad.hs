@@ -29,6 +29,8 @@ module GHC.HsToCore.Monad (
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
+        dsSetBindEnv, dsGetBindEnv,
+
         -- Getting and setting pattern match oracle states
         getPmDeltas, updPmDeltas,
 
@@ -85,6 +87,8 @@ import FastString
 import GHC.Types.Unique.FM ( lookupWithDefaultUFM )
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
+import GHC.Types.Basic
+import GHC.Types.Var.Set
 
 import Data.IORef
 
@@ -283,6 +287,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
                            , dsl_deltas  = initDeltas
+                           , dsl_binds_env = emptyVarSet
                            }
     in (gbl_env, lcl_env)
 
@@ -510,6 +515,12 @@ dsGetFamInstEnvs
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
+
+dsSetBindEnv :: VarSet -> DsM a -> DsM a
+dsSetBindEnv benv = updLclEnv (\env -> env { dsl_binds_env = benv })
+
+dsGetBindEnv :: DsM VarSet
+dsGetBindEnv = dsl_binds_env <$> getLclEnv
 
 -- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
 dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]

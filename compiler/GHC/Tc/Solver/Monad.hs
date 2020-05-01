@@ -2687,7 +2687,8 @@ added.  This is initialised from the innermost implication constraint.
 
 data TcSEnv
   = TcSEnv {
-      tcs_ev_binds    :: [(ThLevel, EvBindsVar)],
+      tcs_ev_binds    :: [(ThLevel, EvBindsVar)], -- Consider the sitation where we generate a LiftT constraint inside a quote, the evidence
+                                                  -- could just bring back lie_var
 
       tcs_unified     :: IORef Int,
          -- The number of unification variables we have filled

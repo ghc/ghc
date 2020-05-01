@@ -2001,7 +2001,8 @@ mkSpliceExpr sp_id id_name id = do
     else do
       newMethodFromName (OccurrenceOf id_name) THNames.liftTypedName [rep, id_ty]
   let liftExpr = (nlHsApp (noLoc lift) (nlHsVar id))
-  return (Left (PendingTcSplice sp_id liftExpr))
+  lcl <- tcl_th_bndrs <$> getLclEnv
+  return (Left (PendingTcSplice lcl sp_id liftExpr))
 
 
 {-

@@ -62,6 +62,7 @@ import Data.Maybe (isJust)
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
+import GHC.Types.Name.Env
 
 {-
 ************************************************************************
@@ -513,7 +514,7 @@ data HsExpr p
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit splices
       [PendingZonkSplice2] -- Any type splices arising from implicit type variables
-  | HsTcZonkedBracketOut 
+  | HsTcZonkedBracketOut
       (XTcBracketOut p)
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit value splices
@@ -1080,7 +1081,7 @@ ppr_expr (HsTcZonkedBracketOut _ e ps zs1 zs2) = ppr e $$ text "pending-t(zs)" <
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
-  
+
 
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
@@ -2510,7 +2511,7 @@ type PendingTcUntypedSplice = PendingTcSplice GhcRn
 type PendingTcTypedSplice = PendingTcSplice GhcTc
 
 data PendingTcSplice p
-  = PendingTcSplice (IdP p) (LHsExpr GhcTc)
+  = PendingTcSplice (NameEnv (TopLevelFlag, Int)) (IdP p) (LHsExpr GhcTc)
 
 data PendingZonkSplice
   = PendingZonkSplice (IdP GhcTc) -- Value splice point
@@ -2707,7 +2708,7 @@ instance Outputable PendingRnSplice where
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
 
 instance NamedThing (IdP p) => Outputable (PendingTcSplice p) where
-  ppr (PendingTcSplice n e) = pprPendingSplice (getName n) e
+  ppr (PendingTcSplice _env n e) = pprPendingSplice (getName n) e
 
 instance Outputable PendingZonkSplice where
   ppr (PendingZonkSplice n _t e) = pprPendingSplice (getName n) e

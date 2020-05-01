@@ -102,7 +102,6 @@ import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
-import GHC.Core
 import IOEnv
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -325,7 +324,10 @@ data DsLclEnv = DsLclEnv {
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
         -- The set of reaching values Deltas is augmented as we walk inwards,
         -- refined through each pattern match in turn
-        dsl_deltas  :: Deltas
+        dsl_deltas  :: Deltas,
+        -- This is set when desugaring a splice to ensure that any locally bound names
+        -- are desugared to use the proper uniques ie f x = $$([|| x ||])
+        dsl_binds_env :: VarSet
      }
 
 -- Inside [| |] brackets, the desugarer looks

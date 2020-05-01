@@ -777,16 +777,16 @@ zonkExpr env (HsTcUntypedBracketOut x wrap body bs)
        bs' <- mapM zonk_b bs
        return (HsTcUntypedBracketOut x wrap' body bs')
   where
-    zonk_b (PendingTcSplice n e) = do
+    zonk_b (PendingTcSplice benv n e) = do
       e' <- zonkLExpr env e
-      return (PendingTcSplice n e')
+      return (PendingTcSplice benv n e')
 
 
 zonkExpr env (HsTcTypedBracketOut x body bs zs2)
   = do pprTraceM "HsTcBracketOut" (ppr body $$ ppr bs)
        bs' <- mapM zonk_b bs
        (pairs, splices) <- unzip <$> mapMaybeM zonk_z_2 zs2
-       let vars = map (\(PendingTcSplice n' _) -> n') bs'
+       let vars = map (\(PendingTcSplice _ n' _) -> n') bs'
            env'' = extendZonkEnvWithSplices (extendZonkEnv env vars) pairs
            -- TODO: This is an approximation surely
        (zs, body') <- case body of
@@ -815,14 +815,14 @@ zonkExpr env (HsTcTypedBracketOut x body bs zs2)
           return $ Just ((tv', sp), (PendingZonkSplice sp Nothing e'))
 
 
-    zonk_b (PendingTcSplice n e) = do
+    zonk_b (PendingTcSplice bind_env n e) = do
       pprTraceM "pending" (ppr n)
       pprTraceM "pending" (ppr e)
       n' <- zonkIdBndr env n
       e' <- zonkLExpr (extendIdZonkEnv env n') e
       --pprTraceM "pending" (ppr n')
       --pprTraceM "pending" (ppr e')
-      return (PendingTcSplice n' e')
+      return (PendingTcSplice bind_env n' e')
 
     zonk_z (PendingZonkSplice n mt e) = do -- (env', n') <- zonkTyBndrX env n
                                         e' <- zonkCoreExpr env e
@@ -1707,6 +1707,7 @@ zonk_tc_ev_binds env (EvBinds bs)    = zonkEvBinds env bs
 zonkEvBindsVar :: ZonkEnv -> EvBindsVar -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBindsVar env (EvBindsVar { ebv_binds = ref })
   = do { bs <- readMutVar ref
+       ; pprTraceM "zonkEvBindsVar" (ppr bs)
        ; zonkEvBinds env (evBindMapBinds bs) }
 zonkEvBindsVar env (CoEvBindsVar {}) = return (env, emptyBag)
 
