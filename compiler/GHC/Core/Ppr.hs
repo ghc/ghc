@@ -253,6 +253,7 @@ ppr_expr add_par (Case expr var ty alts)
     ]
   where
     ppr_bndr = pprBndr CaseBind
+ppr_expr add_par (EHole h) = add_par $ sep [text "HOLE:", pprPrefixOcc (exprHoleFV h)]
 
 
 -- special cases: let ... in let ...
