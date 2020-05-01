@@ -2531,13 +2531,15 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     is_float_eq_candidate ct
       | pred <- ctPred ct
       , EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , Just tv1 <- tcGetTyVar_maybe ty1
-      , isMetaTyVar tv1
-      , not (isTyVarTyVar tv1) || isTyVarTy ty2
-      = True
+      = float_eq ty1 ty2 || float_eq ty2 ty1
       | otherwise
       = False
 
+    float_eq ty1 ty2
+      = case getTyVar_maybe ty1 of
+          Just tv1 -> isMetaTyVar tv1
+                   && (not (isTyVarTyVar tv1) || isTyVarTy ty2)
+          Nothing  -> False
 
 {- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2568,15 +2570,17 @@ Which equalities should we float?  We want to float ones where there
 is a decent chance that floating outwards will allow unification to
 happen.  In particular, float out equalities that are:
 
-* Of form (alpha ~# ty), where
+* Of form (alpha ~# ty) or (ty ~# alpha), where
    * alpha is a meta-tyvar.
    * And 'alpha' is not a TyVarTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
 
-  NB: we will never have (skol ~ alpha), with the meta-tyvar on
-  the right.  See Note [Unification variables on the left]
-  in GHC.Tc.Utils.Unify
+  NB: generally we won't see (ty ~ alpha), with alpha on the right because
+  of Note [Unification variables on the left] in GHC.Tc.Utils.Unify.
+  But if we start with (F tys ~ alpha), it will orient as (fmv ~ alpha),
+  and unflatten back to (F tys ~ alpha). So we must look for alpha on
+  the right too.  Example T4494.
 
 * Nominal.  No point in floating (alpha ~R# ty), because we do not
   unify representational equalities even if alpha is touchable.
