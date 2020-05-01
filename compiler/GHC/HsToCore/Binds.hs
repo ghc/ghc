@@ -693,20 +693,19 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
          dflags <- getDynFlags
        ; case decomposeRuleLhs dflags spec_bndrs ds_lhs of {
            Left msg -> do { warnDs NoReason msg; return Nothing } ;
-           Right (rule_bndrs, _fn, args) -> do
+           Right (rule_bndrs, _fn, rule_lhs_args) -> do
 
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
-             spec_unf  = specUnfolding dflags poly_id spec_bndrs core_app arity_decrease fn_unf
+             spec_unf  = specUnfolding dflags spec_bndrs core_app rule_lhs_args fn_unf
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
-             arity_decrease = count isValArg args - count isId spec_bndrs
 
        ; rule <- dsMkUserRule this_mod is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
-                        rule_bndrs args
+                        rule_bndrs rule_lhs_args
                         (mkVarApps (Var spec_id) spec_bndrs)
 
        ; let spec_rhs = mkLams spec_bndrs (core_app poly_rhs)

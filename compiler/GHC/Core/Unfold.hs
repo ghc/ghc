@@ -173,47 +173,47 @@ mkInlinableUnfolding dflags expr
   where
     expr' = simpleOptExpr dflags expr
 
-specUnfolding :: DynFlags -> Id -> [Var] -> (CoreExpr -> CoreExpr) -> Arity
+specUnfolding :: DynFlags
+              -> [Var] -> (CoreExpr -> CoreExpr)
+              -> [CoreArg]   -- LHS arguments in the RULE
               -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
--- specUnfolding spec_bndrs spec_app arity_decrease unf
---   = \spec_bndrs. spec_app( unf )
+-- specUnfolding spec_bndrs spec_args unf
+--   = \spec_bndrs. unf spec_args
 --
-specUnfolding dflags fn spec_bndrs spec_app arity_decrease
+specUnfolding dflags spec_bndrs spec_app rule_lhs_args
               df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
-  = ASSERT2( arity_decrease == count isId old_bndrs - count isId spec_bndrs
-           , ppr df $$ ppr spec_bndrs $$ ppr (spec_app (Var fn)) $$ ppr arity_decrease )
+  = ASSERT2( rule_lhs_args `equalLength` old_bndrs
+           , ppr df $$ ppr rule_lhs_args )
+           -- For this ASSERT see Note [DFunUnfoldings] in GHC.Core.Opt.Specialise
     mkDFunUnfolding spec_bndrs con (map spec_arg args)
-      -- There is a hard-to-check assumption here that the spec_app has
-      -- enough applications to exactly saturate the old_bndrs
       -- For DFunUnfoldings we transform
-      --       \old_bndrs. MkD <op1> ... <opn>
+      --       \obs. MkD <op1> ... <opn>
       -- to
-      --       \new_bndrs. MkD (spec_app(\old_bndrs. <op1>)) ... ditto <opn>
-      -- The ASSERT checks the value part of that
+      --       \sbs. MkD ((\obs. <op1>) spec_args) ... ditto <opn>
   where
-    spec_arg arg = simpleOptExpr dflags (spec_app (mkLams old_bndrs arg))
+    spec_arg arg = simpleOptExpr dflags $
+                   spec_app (mkLams old_bndrs arg)
                    -- The beta-redexes created by spec_app will be
                    -- simplified away by simplOptExpr
 
-specUnfolding dflags _ spec_bndrs spec_app arity_decrease
+specUnfolding dflags spec_bndrs spec_app rule_lhs_args
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                              , uf_is_top = top_lvl
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
- , UnfWhen { ug_arity     = old_arity
-           , ug_unsat_ok  = unsat_ok
-           , ug_boring_ok = boring_ok } <- old_guidance
- = let guidance = UnfWhen { ug_arity     = old_arity - arity_decrease
-                          , ug_unsat_ok  = unsat_ok
-                          , ug_boring_ok = boring_ok }
-       new_tmpl = simpleOptExpr dflags (mkLams spec_bndrs (spec_app tmpl))
-                   -- The beta-redexes created by spec_app will be
-                   -- simplified away by simplOptExpr
+ , UnfWhen { ug_arity     = old_arity } <- old_guidance
+ = mkCoreUnfolding src top_lvl new_tmpl
+                   (old_guidance { ug_arity = old_arity - arity_decrease })
+ where
+   new_tmpl = simpleOptExpr dflags $
+              mkLams spec_bndrs    $
+              spec_app tmpl  -- The beta-redexes created by spec_app
+                             -- will besimplified away by simplOptExpr
+   arity_decrease = count isValArg rule_lhs_args - count isId spec_bndrs
 
-   in mkCoreUnfolding src top_lvl new_tmpl guidance
 
-specUnfolding _ _ _ _ _ _ = noUnfolding
+specUnfolding _ _ _ _ _ = noUnfolding
 
 {- Note [Specialising unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
