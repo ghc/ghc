@@ -1,6 +1,3 @@
-Rule fired: Class op arr (BUILTIN)
-Rule fired: Class op $p1Arrow (BUILTIN)
-Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
@@ -8,14 +5,7 @@ Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op . (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op $p1Applicative (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -26,9 +16,16 @@ Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op $p1Arrow (BUILTIN)
+Rule fired: Class op . (BUILTIN)
+Rule fired: Class op $p1Monad (BUILTIN)
+Rule fired: Class op $p1Applicative (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op >>= (BUILTIN)
+Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -47,20 +44,7 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op . (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op $p1Applicative (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op . (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op $p1Applicative (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -73,6 +57,7 @@ Rule fired: Class op $p1Arrow (BUILTIN)
 Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -88,6 +73,7 @@ Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
+Rule fired: Class op arr (BUILTIN)
 Rule fired: Class op $p1Monad (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
 Rule fired: Class op . (BUILTIN)
@@ -96,19 +82,7 @@ Rule fired: Class op $p1Applicative (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op >>= (BUILTIN)
 Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
-Rule fired: Class op . (BUILTIN)
-Rule fired: Class op $p1Monad (BUILTIN)
-Rule fired: Class op $p1Applicative (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op >>= (BUILTIN)
-Rule fired: Class op pure (BUILTIN)
 Rule fired: mkRule @(_, ()) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
 Rule fired: mkRule @(_, ()) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
@@ -117,8 +91,6 @@ Rule fired: Class op fmap (BUILTIN)
 Rule fired: mkRule @((), _) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
 Rule fired: mkRule @(_, ()) (T18013a)
-Rule fired: Class op fmap (BUILTIN)
-Rule fired: mkRule @((), _) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
 Rule fired: mkRule @((), _) (T18013a)
 Rule fired: Class op fmap (BUILTIN)
@@ -129,9 +101,9 @@ Rule fired: Class op fmap (BUILTIN)
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 52, types: 106, coercions: 15, joins: 0/1}
+  = {terms: 52, types: 120, coercions: 38, joins: 0/1}
 
--- RHS size: {terms: 37, types: 87, coercions: 15, joins: 0/1}
+-- RHS size: {terms: 37, types: 101, coercions: 38, joins: 0/1}
 mapMaybeRule
   :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
 [GblId,
@@ -141,26 +113,27 @@ mapMaybeRule
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 150 30}]
 mapMaybeRule
   = \ (@a) (@b) (f :: Rule IO a b) ->
-      case f of { Rule @s t0 g ->
+      case f `cast` <Co:13> of { Rule @s1 s0 f1 ->
       let {
-        lvl :: Result s (Maybe b)
+        lvl :: Result s1 (Maybe b)
         [LclId, Unf=OtherCon []]
-        lvl = T18013a.Result @s @(Maybe b) t0 (GHC.Maybe.Nothing @b) } in
+        lvl = T18013a.Result @s1 @(Maybe b) s0 (GHC.Maybe.Nothing @b) } in
       T18013a.Rule
         @IO
         @(Maybe a)
         @(Maybe b)
-        @s
-        t0
-        ((\ (s2 :: s)
+        @s1
+        s0
+        ((\ (s2 :: s1)
             (a1 :: Maybe a)
-            (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+            (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
             case a1 of {
-              Nothing -> (# s1, lvl #);
+              Nothing -> (# s, lvl #);
               Just x ->
-                case ((g s2 x) `cast` <Co:4>) s1 of { (# ipv, ipv1 #) ->
-                case ipv1 of { Result t2 c1 ->
-                (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
+                case ((f1 s2 (x `cast` <Co:10>)) `cast` <Co:4>) s of
+                { (# ipv, ipv1 #) ->
+                case ipv1 of { Result s3 b1 ->
+                (# ipv, T18013a.Result @s1 @(Maybe b) s3 (GHC.Maybe.Just @b b1) #)
                 }
                 }
             })

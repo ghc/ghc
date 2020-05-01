@@ -7,10 +7,10 @@ T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
         at T14273.hs:5:1-49
       The type variable ‘a1’ is ambiguous
       These potential instances exist:
-        instance (Show a, Show b) => Show (Either a b)
-          -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
         ...plus 23 others
         ...plus 70 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
@@ -61,10 +61,10 @@ T14273.hs:13:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
-        instance (Show a, Show b) => Show (Either a b)
-          -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
         ...plus 23 others
         ...plus 70 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
