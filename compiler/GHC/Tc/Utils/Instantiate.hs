@@ -153,27 +153,24 @@ topSkolemise :: TcSigmaType
                     , TcRhoType )
 -- See Note [Skolemisation]
 topSkolemise ty
-  = go init_subst ty
+  = go init_subst idHsWrapper [] [] ty
   where
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
     -- Why recursive?  See Note [Skolemisation]
-    go subst ty
-      | (tvs, theta, ty') <- tcSplitSigmaTy ty
+    go subst wrap tv_prs ev_vars ty
+      | (tvs, theta, inner_ty) <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
       = do { (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
-           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
-                      <.> wrap
-                    , tv_prs1  ++ tvs_prs2
-                    , ev_vars1 ++ ev_vars2
-                    , rho ) }
+           ; go subst'
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpLams ev_vars1)
+                (tv_prs ++ (map tyVarName tvs `zip` tvs1))
+                (ev_vars ++ ev_vars1)
+                inner_ty }
 
       | otherwise
-      = return (idHsWrapper, [], [], substTy subst ty)
+      = return (wrap, tv_prs, ev_vars, substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
 -- | Instantiate all outer type variables

@@ -943,12 +943,25 @@ tcSkolemise takes "expected type" and strip off quantifiers to expose the
 type underneath, binding the new skolems for the 'thing_inside'
 The returned 'HsWrapper' has type (specific_ty -> expected_ty).
 
-Note:
+Note that for a nested type like
+   forall a. Eq a => forall b. Ord b => blah
+we still only build one implication constraint
+   forall a b. (Eq a, Ord b) => <constraints>
+This is just an optimisation, but it's why we use topSkolemise to
+build the pieces from all the layers, before making a single call
+to checkConstraints.
 
-* tcSkolemiseScoped deals specially with just the outer forall,
-  because only the outer forall has type variables that scope
-  over the body
+tcSkolemiseScoped is very similar, but differs in two ways:
 
+* It deals specially with just the outer forall, bringing those
+  type variables into lexical scope.  To my surprise, I found that
+  doing this regardless (in tcSkolemise) caused a non-trivial (1%-ish)
+  perf hit on the compiler.
+
+* It always calls checkConstraints, even if there are no skolem
+  variables at all.  Reason: there might be nested deferred errors
+  that must not be allowed to float to top level.
+  See Note [When to build an implication] below.
 -}
 
 tcSkolemise, tcSkolemiseScoped
@@ -970,9 +983,7 @@ tcSkolemiseScoped ctxt expected_ty thing_inside
        ; return (wrap <.> mkWpLet ev_binds, res) }
 
 tcSkolemise ctxt expected_ty thing_inside
-   -- We expect expected_ty to be a forall-type
-   -- If not, the call is a no-op
-  | isRhoTy expected_ty
+  | isRhoTy expected_ty  -- Short cut for common case
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
@@ -1654,7 +1665,6 @@ So we look for a positive reason to swap, using a three-step test:
 
 Note [Unification variables on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For wanteds, but not givens, swap (skolem ~ meta-tv) regardless of
 level, so that the unification variable is on the left.
 
@@ -1665,8 +1675,11 @@ level, so that the unification variable is on the left.
   so we can float the constraint and solve it.
 
 * But for Wanteds putting the unification variable on
-  the left means an easier job whene floating, and when
+  the left means an easier job when floating, and when
   reporting errors -- just fewer cases to consider.
+
+  In particular, we get better skolem-escape messages:
+  see #18114
 
 Note [Deeper level on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
