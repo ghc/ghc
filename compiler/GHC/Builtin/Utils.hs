@@ -72,6 +72,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
+import GHC.Builtin.Types.Arrows ( arrowTyCons )
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
 
@@ -135,6 +136,8 @@ knownKeyNames
       concat [ wired_tycon_kk_names funTyCon
              , concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
+
+             , concatMap wired_tycon_kk_names arrowTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps

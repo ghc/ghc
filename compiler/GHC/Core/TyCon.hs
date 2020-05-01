@@ -886,6 +886,7 @@ data TyCon
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConTyCoBinder], -- ^ Full binders
+        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -1822,6 +1823,7 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
         tyConArity    = length roles,
         tcRoles       = roles,
         tyConBinders  = binders,
+        tyConTyVars   = binderVars binders,
         tyConResKind  = res_kind,
         tyConKind     = mkTyConKind binders res_kind,
         dataCon       = con,

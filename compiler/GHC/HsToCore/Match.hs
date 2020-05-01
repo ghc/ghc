@@ -16,8 +16,8 @@ The @match@ function
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.HsToCore.Match
-   ( match, matchEquations, matchWrapper, matchSimply
-   , matchSinglePat, matchSinglePatVar
+   ( match, matchEquations, matchWrapper, matchWrapperWith
+   , matchSimply, matchSinglePat, matchSinglePatVar
    )
 where
 
@@ -713,6 +713,18 @@ matchWrapper
                                        --      f p2 q2 = ...  -- in this case
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
+matchWrapper = matchWrapperWith dsLExpr
+
+-- | Like 'matchWrapper', but accepts an additional argument, which is
+-- called to desugar each RHS. This is used by the arrow desugaring to
+-- desugar @case@ commands, which contain commands rather than expressions.
+matchWrapperWith
+  :: Outputable body
+  => (body -> DsM CoreExpr)   -- ^ How to desugar the RHSs
+  -> HsMatchContext GhcRn
+  -> Maybe (LHsExpr GhcTc)
+  -> MatchGroup GhcTc body
+  -> DsM ([Id], CoreExpr)
 
 {-
  There is one small problem with the Lambda Patterns, when somebody
@@ -738,9 +750,9 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
-                             , mg_ext = MatchGroupTc arg_tys rhs_ty
-                             , mg_origin = origin })
+matchWrapperWith ds_rhs ctxt mb_scr (MG { mg_alts = L _ matches
+                                        , mg_ext = MatchGroupTc arg_tys rhs_ty
+                                        , mg_origin = origin })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
 
@@ -784,7 +796,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
            -- The list of Deltas is empty iff we don't perform any coverage
            -- checking, in which case nonEmpty does the right thing by passing
            -- Nothing.
-           ; match_result <- dsGRHSs ctxt grhss rhs_ty (NEL.nonEmpty match_deltas)
+           ; match_result <- dsGRHSs ds_rhs ctxt grhss rhs_ty (NEL.nonEmpty match_deltas)
            ; return ( EqnInfo { eqn_pats = upats
                               , eqn_orig = FromSource
                               , eqn_rhs = match_result }

@@ -1046,7 +1046,7 @@ from further out in the ArrowCtxt that we push inwards.
 
 data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints)
+  | ArrowCtxt TcLevel LocalRdrEnv (TcRef WantedConstraints)
 
 
 ---------------------------

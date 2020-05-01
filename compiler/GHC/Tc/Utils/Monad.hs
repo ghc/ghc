@@ -571,7 +571,9 @@ withException do_this = do
 
 newArrowScope :: TcM a -> TcM a
 newArrowScope
-  = updLclEnv $ \env -> env { tcl_arrow_ctxt = ArrowCtxt (tcl_rdr env) (tcl_lie env) }
+  = updLclEnv $ \env -> env { tcl_arrow_ctxt = ArrowCtxt (tcl_tclvl env)
+                                                         (tcl_rdr env)
+                                                         (tcl_lie env) }
 
 -- Return to the stored environment (from the enclosing proc)
 escapeArrowScope :: TcM a -> TcM a
@@ -579,9 +581,10 @@ escapeArrowScope
   = updLclEnv $ \ env ->
     case tcl_arrow_ctxt env of
       NoArrowCtxt       -> env
-      ArrowCtxt rdr_env lie -> env { tcl_arrow_ctxt = NoArrowCtxt
-                                   , tcl_lie = lie
-                                   , tcl_rdr = rdr_env }
+      ArrowCtxt tclvl rdr_env lie -> env { tcl_arrow_ctxt = NoArrowCtxt
+                                         , tcl_tclvl = tclvl
+                                         , tcl_lie = lie
+                                         , tcl_rdr = rdr_env }
 
 {-
 ************************************************************************

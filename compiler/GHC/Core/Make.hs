@@ -44,6 +44,9 @@ module GHC.Core.Make (
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
 
+        -- * Constructing Either expressions
+        mkLeftExpr, mkRightExpr,
+
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
         rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
@@ -677,6 +680,22 @@ mkNothingExpr ty = mkConApp nothingDataCon [Type ty]
 mkJustExpr :: Type -> CoreExpr -> CoreExpr
 mkJustExpr ty val = mkConApp justDataCon [Type ty, val]
 
+
+{-
+************************************************************************
+*                                                                      *
+             Manipulating Either data type
+*                                                                      *
+************************************************************************
+-}
+
+-- | @'mkLeftExpr' a b e = 'Left' \@a \@b e@
+mkLeftExpr :: Type -> Type -> CoreExpr -> CoreExpr
+mkLeftExpr ty1 ty2 val = mkConApp leftDataCon [Type ty1, Type ty2, val]
+
+-- | @'mkRightExpr' a b e = 'Right' \@a \@b e@
+mkRightExpr :: Type -> Type -> CoreExpr -> CoreExpr
+mkRightExpr ty1 ty2 val = mkConApp rightDataCon [Type ty1, Type ty2, val]
 
 {-
 ************************************************************************
