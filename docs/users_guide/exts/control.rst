@@ -39,7 +39,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
 
 .. extension:: Haskell98
-    :shortdesc: Use the Haskell 2010 language variant.
+    :shortdesc: Use the Haskell 98 language variant.
 
     Compile using Haskell 98 language variant. Enables the
     following language extensions:
