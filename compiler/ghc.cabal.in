@@ -312,6 +312,7 @@ Library
         GHC.HsToCore.Coverage
         GHC.HsToCore
         GHC.HsToCore.Arrows
+        GHC.HsToCore.Arrows.Expr
         GHC.HsToCore.Binds
         GHC.HsToCore.Foreign.Call
         GHC.HsToCore.Expr
@@ -505,6 +506,7 @@ Library
         GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Flatten
         GHC.Tc.Solver.Monad
+        GHC.Builtin.Types.Arrows
         GHC.Builtin.Types.Literals
         GHC.Tc.Gen.Splice
         GHC.Core.Class

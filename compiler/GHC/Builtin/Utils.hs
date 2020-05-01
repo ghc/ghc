@@ -70,6 +70,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
 import Util
+import GHC.Builtin.Types.Arrows ( arrowTyCons )
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 
 import Control.Applicative ((<|>))
@@ -127,6 +128,7 @@ knownKeyNames
              , concatMap wired_tycon_kk_names wiredInTyCons
                -- Does not include tuples
 
+             , concatMap wired_tycon_kk_names arrowTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
 
              , map idName wiredInIds

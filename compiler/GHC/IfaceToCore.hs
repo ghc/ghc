@@ -26,6 +26,7 @@ module GHC.IfaceToCore (
 
 import GhcPrelude
 
+import GHC.Builtin.Types.Arrows(arrowCoAxiomRules)
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
@@ -1705,11 +1706,14 @@ tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name
 tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
 -- Unlike CoAxioms, which arise form user 'type instance' declarations,
 -- there are a fixed set of CoAxiomRules,
--- currently enumerated in typeNatCoAxiomRules
+-- currently enumerated in arrowCoAxiomRules and typeNatCoAxiomRules
 tcIfaceCoAxiomRule n
-  = case Map.lookup n typeNatCoAxiomRules of
+  = case Map.lookup n allCoaxiomRules of
         Just ax -> return ax
         _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
+  where
+    allCoaxiomRules = Map.fromList $ map (\x -> (coaxrName x, x)) $
+                        arrowCoAxiomRules ++ typeNatCoAxiomRules
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name

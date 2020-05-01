@@ -7,11 +7,6 @@ Desugaring arrow commands
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
@@ -19,14 +14,9 @@ module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
 import GhcPrelude
 
-import GHC.HsToCore.Match
-import GHC.HsToCore.Utils
-import GHC.HsToCore.Monad
-
 import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
                         collectLStmtsBinders, collectLStmtBinders,
                         collectStmtBinders, pprParendExpr )
-import GHC.Tc.Utils.Zonk
 import qualified GHC.Hs.Utils as HsUtils
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -37,32 +27,29 @@ import qualified GHC.Hs.Utils as HsUtils
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
                                           dsSyntaxExpr )
 
-import GHC.Tc.Utils.TcType
-import GHC.Core.Type( splitPiTy )
-import GHC.Tc.Types.Evidence
-import GHC.Core
-import GHC.Core.FVs
-import GHC.Core.Utils
-import GHC.Core.Make
-import GHC.HsToCore.Binds (dsHsWrapper)
-
-import GHC.Types.Id
-import GHC.Types.Name (nameOccName, occNameFS)
-import GHC.Core.Ppr (pprParendExpr)
-import GHC.Core.TyCon (isTupleTyCon)
-import GHC.Builtin.Types
-import GHC.Types.Basic
-import GHC.Builtin.Names
-import Outputable
-import GHC.Types.Var.Set
-import GHC.Types.SrcLoc
-import ListSetOps( assocMaybe )
 import Data.List
 import Data.Traversable (for)
-import Util
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Arrows
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Make
+import GHC.Core.Utils
+import GHC.HsToCore.Arrows.Expr
+import GHC.HsToCore.Binds (dsHsWrapper)
+import GHC.HsToCore.Match
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Utils
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Zonk
+import GHC.Types.Basic
+import GHC.Types.Id
+import GHC.Types.SrcLoc
 import GHC.Types.Unique.DSet
-
-import GHC.Builtin.Types.Literals
+import GHC.Types.Var.Set
+import Outputable
+import Util
 
 {- Note [Desugaring arrow notation: the basics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -206,79 +193,11 @@ only b) and passed to traverseA. The desugared expression is roughly:
 In the rare cases when the stack isn’t empty, it is threaded alongside
 the other values in the environment tuple. -}
 
-data DsCmdEnv = DsCmdEnv {
-  arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr }
-
 type AllEnvIds  = IdSet    -- see Note [The command environment]
 type UsedEnvIds = DIdSet   -- see Note [The command environment]
 type StackIds   = [Id]     -- see Note [The command stack]
 
-mkCmdEnv :: CmdSyntaxTable GhcTc -> DsM ([CoreBind], DsCmdEnv)
--- See Note [CmdSyntaxTable] in GHC.Hs.Expr
-mkCmdEnv tc_meths
-  = do { (meth_binds, prs) <- mapAndUnzipM mk_bind tc_meths
-
-       -- NB: Some of these lookups might fail, but that's OK if the
-       -- symbol is never used. That's why we use Maybe first and then
-       -- panic. An eager panic caused trouble in typecheck/should_compile/tc192
-       ; let the_arr_id     = assocMaybe prs arrAName
-             the_compose_id = assocMaybe prs composeAName
-             the_first_id   = assocMaybe prs firstAName
-             the_app_id     = assocMaybe prs appAName
-             the_choice_id  = assocMaybe prs choiceAName
-             the_loop_id    = assocMaybe prs loopAName
-
-           -- used as an argument in, e.g., do_premap
-       ; check_lev_poly 3 the_arr_id
-
-           -- used as an argument in, e.g., dsCmdStmt/BodyStmt
-       ; check_lev_poly 5 the_compose_id
-
-           -- used as an argument in, e.g., dsCmdStmt/BodyStmt
-       ; check_lev_poly 4 the_first_id
-
-           -- the result of the_app_id is used as an argument in, e.g.,
-           -- dsCmd/HsCmdArrApp/HsHigherOrderApp
-       ; check_lev_poly 2 the_app_id
-
-           -- used as an argument in, e.g., HsCmdIf
-       ; check_lev_poly 5 the_choice_id
-
-           -- used as an argument in, e.g., RecStmt
-       ; check_lev_poly 4 the_loop_id
-
-       ; return (meth_binds, DsCmdEnv {
-               arr_id     = Var (unmaybe the_arr_id arrAName),
-               compose_id = Var (unmaybe the_compose_id composeAName),
-               first_id   = Var (unmaybe the_first_id firstAName),
-               app_id     = Var (unmaybe the_app_id appAName),
-               choice_id  = Var (unmaybe the_choice_id choiceAName),
-               loop_id    = Var (unmaybe the_loop_id loopAName)
-             }) }
-  where
-    mk_bind (std_name, expr)
-      = do { rhs <- dsExpr expr
-           ; id <- mkSysLocalM (occNameFS (nameOccName std_name)) (exprType rhs) -- FIXME: probably shouldn’t be calling mkSysLocalM directly
-           -- no check needed; these are functions
-           ; return (NonRec id rhs, (std_name, id)) }
-
-    unmaybe Nothing name = pprPanic "mkCmdEnv" (text "Not found:" <+> ppr name)
-    unmaybe (Just id) _  = id
-
-      -- returns the result type of a pi-type (that is, a forall or a function)
-      -- Note that this result type may be ill-scoped.
-    res_type :: Type -> Type
-    res_type ty = res_ty
-      where
-        (_, res_ty) = splitPiTy ty
-
-    check_lev_poly :: Int -- arity
-                   -> Maybe Id -> DsM ()
-    check_lev_poly _     Nothing = return ()
-    check_lev_poly arity (Just id)
-      = dsNoLevPoly (nTimes arity res_type (idType id))
-          (text "In the result of the function" <+> quotes (ppr id))
-
+----------------------------------------------
 
 mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
@@ -288,263 +207,6 @@ coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
   = Case (Var scrut_var) scrut_var (exprType body)
          [(DataAlt (tupleDataCon Boxed 2), [var1, var2], body)]
-
-----------------------------------------------
-
-{- Note [Tidying arrow expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unlike most of the desugarer, arrow expressions aren’t desugared
-directly to CoreExprs but to the intermediate DsArrExpr type. This
-type represents a “mostly desugared” arrow command, but with the
-various arrow class methods yet to be filled in. This allows us to
-perform a very (very) simple optimisation pass to clean up the tree
-before going the rest of the way to a CoreExpr, which we do in dsArrExpr.
-
-Doing any optimisation in the desugarer is somewhat unorthodox, since
-even basic tidying up of desugared expressions is normally the simple
-optimiser’s job. However, there’s one simplification we really want to
-perform here, namely fusion of adjacent uses of `arr`:
-
-         (e1 >>> e2) >>> e3  ==>  e1 >>> (e2 >>> e3)     [reassociate]
-            arr f >>> arr g  ==>  arr (f >>> g)          [arr/arr]
-    arr f >>> (arr g >>> e)  ==>  arr (f >>> g) >>> e    [arr/arr/>>>]
-
-Morally, these should be RULES, which would let the optimiser take
-care of them. Indeed, if you look in Control.Arrow, you’ll find RULES
-very similar to the above rewritings! Alas, they are extremely
-fragile, since they’re defined on class ops, which are aggressively
-specialised away.
-
-Until we have a way to avoid preemption from the builtin class op
-rules, these simplifications are just too useful to pass up. Most
-importantly, they give us freedom to generate stupid
-environment-passing code (see Note [The command environment]) where we
-have confidence it will be optimised away. For example, we might have
-
-    (foo >>> arr (\(a, b) -> (b, a))) >>> arr (\(b, _) -> b) >>> bar
-
-which is quite stupid, but the optimiser can’t do anything with it on
-its own. But after our tidying, we’ll get
-
-    foo >>> arr ((\(a, b) -> (b, a)) >>> (\(b, _) -> b)) >>> bar
-
-at which point the inner lambda can be simplified further:
-
-    foo >>> arr (\(_, b) -> b) >>> bar
-
-This is all somewhat unsatisfying, since these rewritings might very
-well do good things on other code, too. But doing nothing is much
-worse: a previous incarnation of the arrow desugarer didn’t do this
-tidying but instead went to some length to avoid ever generating
-“stupid” expressions like the one above. That made the code
-significantly more difficult to read (and it still generated bad code
-sometimes). So for now we do this here, but maybe we can get rid of it
-in the future if the optimiser becomes cleverer. -}
-
--- | A “mostly desugared” arrow command, with only the skeleton of the
--- tree left to be replaced by arrow class ops. For an explanation of
--- why this exists, see Note [Tidying arrow expressions].
-data DsArrExpr
-  -- | app
-  = AppArr
-  -- | e
-  | ExprArr CoreExpr
-  -- | arr e
-  | ArrArr CoreExpr
-  -- | first e
-  | FirstArr DsTArrExpr
-  -- | loop e
-  | LoopArr DsTArrExpr
-  -- | e1 >>> e2
-  | ComposeArr DsTArrExpr DsTArrExpr
-  -- | e1 ||| e2
-  | ChoiceArr DsTArrExpr DsTArrExpr
-  -- | wrap e
-  | WrapArr (CoreExpr -> CoreExpr) DsTArrExpr
-
--- | A 'DsArrExpr' annotated with input and output types.
-data DsTArrExpr = TypedArr Type Type DsArrExpr
-
-instance Outputable DsArrExpr where
-  ppr AppArr       = text "app"
-  ppr (ExprArr e)  = pprParendExpr e
-  ppr (ArrArr e)   = parens (text "arr" <+> parens (ppr e))
-  ppr (FirstArr e) = parens (text "first" <+> parens (ppr e))
-  ppr (LoopArr e)  = parens (text "loop" <+> parens (ppr e))
-  ppr (ComposeArr e1 e2)
-    = parens $ hang (parens (ppr e1)) 2 (text ">>>" <+> parens (ppr e2))
-  ppr (ChoiceArr e1 e2)
-    = parens $ hang (parens (ppr e1)) 2 (text "|||" <+> parens (ppr e2))
-  ppr (WrapArr _ e)
-    -- This is a hack, but getting enough information here to print
-    -- something useful is annoying, and this instance is only used
-    -- for debugging, anyway.
-    = parens (text "<wrap>" <+> parens (ppr e))
-
-instance Outputable DsTArrExpr where
-  ppr (TypedArr t1 t2 e)
-    = hang (ppr e)
-         2 (dcolon <+> text "a" <+> sep [pprParendType t1, pprParendType t2])
-
--- | mkAppArr a in out = app :: a (a in out, in) out
-mkAppArr :: Type -> Type -> Type -> DsTArrExpr
-mkAppArr arrow_ty in_ty out_ty
-  = TypedArr (mkBoxedTupleTy [mkAppTys arrow_ty [in_ty, out_ty], in_ty])
-             out_ty AppArr
-
--- | mkExprArr in out e = e :: a in out
-mkExprArr :: Type -> Type -> CoreExpr -> DsTArrExpr
-mkExprArr in_ty out_ty expr = TypedArr in_ty out_ty (ExprArr expr)
-
--- | mkArrArr in out e = arr (e :: in -> out) :: a in out
-mkArrArr :: Type -> Type -> CoreExpr -> DsTArrExpr
-mkArrArr in_ty out_ty expr = TypedArr in_ty out_ty (ArrArr expr)
-
--- | mkFirstArr t e = first (e :: a in out) :: a (in, t) (out, t)
-mkFirstArr :: HasDebugCallStack => Type -> DsTArrExpr -> DsTArrExpr
-mkFirstArr snd_ty expr@(TypedArr in_ty out_ty _)
-  = TypedArr (mkBoxedTupleTy [in_ty, snd_ty])
-             (mkBoxedTupleTy [out_ty, snd_ty])
-             (FirstArr expr)
-
--- | mkLoopArr e = loop (e :: a (in, t) (out, t)) :: a in out
-mkLoopArr :: HasDebugCallStack => DsTArrExpr -> DsTArrExpr
-mkLoopArr expr@(TypedArr in_ty out_ty _)
-  | Just (pair_tc1, [in_ty', snd_ty1]) <- tcSplitTyConApp_maybe in_ty
-  , Just (pair_tc2, [out_ty', snd_ty2]) <- tcSplitTyConApp_maybe out_ty
-  = ASSERT2( isTupleTyCon pair_tc1 && isTupleTyCon pair_tc2, ppr expr )
-    ASSERT2( snd_ty1 `eqType` snd_ty2, ppr expr )
-    TypedArr in_ty' out_ty' (LoopArr expr)
-  | otherwise
-  = pprPanic "mkLoopArr" $ ppr expr
-
--- | mkComposeArr e1 e2 = ((e1 :: a in t) >>> (e2 :: a t out)) :: a in out
-mkComposeArr :: HasDebugCallStack => DsTArrExpr -> DsTArrExpr -> DsTArrExpr
-mkComposeArr expr1@(TypedArr in_ty mid_ty1 _) expr2@(TypedArr mid_ty2 out_ty _)
-  = ASSERT2( mid_ty1 `eqType` mid_ty2, ppr expr1 $$ ppr expr2 )
-    TypedArr in_ty out_ty (ComposeArr expr1 expr2)
-
--- | mkChoiceArr e1 e2
---     = ((e1 :: a in1 out) ||| (e2 :: a in2 out)) :: a (Either in1 in2) out
-mkChoiceArr :: HasDebugCallStack => DsTArrExpr -> DsTArrExpr -> DsTArrExpr
-mkChoiceArr expr1@(TypedArr in_ty1 out_ty1 _) expr2@(TypedArr in_ty2 out_ty2 _)
-  = ASSERT2( out_ty1 `eqType` out_ty2, ppr expr1 $$ ppr expr2 )
-    TypedArr (mkEitherTy in_ty1 in_ty2) out_ty1 (ChoiceArr expr1 expr2)
-
-mkWrapArr :: (CoreExpr -> CoreExpr) -> DsTArrExpr -> DsTArrExpr
-mkWrapArr wrap expr@(TypedArr in_ty out_ty _)
-  = TypedArr in_ty out_ty $ WrapArr wrap expr
-
-----------------------------------------------
--- helpers
-
--- | mkPremapArr b f g = (arr (f :: b -> c) >>> (g :: a c d)) :: a b d
-mkPremapArr :: HasDebugCallStack => Type -> CoreExpr -> DsTArrExpr -> DsTArrExpr
-mkPremapArr in_ty f_expr g_expr@(TypedArr out_ty _ _)
-  = mkComposeArr (mkArrArr in_ty out_ty f_expr) g_expr
-
-----------------------------------------------
-
-dsArrExpr :: CmdSyntaxTable GhcTc -> DsTArrExpr -> DsM CoreExpr
-dsArrExpr stx_table expr = do
-  (meth_binds, cmd_env) <- mkCmdEnv stx_table
-  mkLets meth_binds <$> ds_arr_expr cmd_env expr
-
-ds_arr_expr :: DsCmdEnv -> DsTArrExpr -> DsM CoreExpr
-ds_arr_expr DsCmdEnv{..} expr = ds_expr <$> tidy_up_typed expr
-  where
-    -- see Note [Tidying arrow expressions]
-    tidy_up_typed :: DsTArrExpr -> DsM DsTArrExpr
-    tidy_up_typed (TypedArr in_ty out_ty expr)
-      = TypedArr in_ty out_ty <$> tidy_up expr
-
-    -- see Note [Tidying arrow expressions]
-    tidy_up :: DsArrExpr -> DsM DsArrExpr
-    tidy_up AppArr        = pure AppArr
-    tidy_up (ExprArr e)   = pure $ ExprArr e
-    tidy_up (ArrArr e)    = pure $ ArrArr e
-    tidy_up (FirstArr e)  = FirstArr <$> tidy_up_typed e
-    tidy_up (LoopArr e)   = LoopArr <$> tidy_up_typed e
-    tidy_up (WrapArr w e) = WrapArr w <$> tidy_up_typed e
-    tidy_up (ChoiceArr e1 e2)
-      = ChoiceArr <$> tidy_up_typed e1 <*> tidy_up_typed e2
-
-    -- Reassociate (>>>) to the right:
-    --   (e1 >>> e2) >>> e3  ==>  e1 >>> (e2 >>> e3)
-    -- We want to do this on the way down, since it avoids doing
-    -- needless work on sequences of left-associated (>>>)s.
-    tidy_up (ComposeArr (TypedArr _ _ (ComposeArr e1 e2)) e3)
-      = tidy_up $ ComposeArr e1 (mkComposeArr e2 e3)
-    tidy_up (ComposeArr e1 e2)
-      = do e1' <- tidy_up_typed e1
-           e2' <- tidy_up_typed e2
-           tidy_up_compose e1' e2'
-
-    -- Fuses `arr` as described in Note [Tidying arrow expressions].
-    -- We do this on the way back up, *after* reassociating (>>>), since
-    -- the reassociation may uncover more opportunities for fusion.
-    -- (Indeed, that is the entire reason we reassociate at all!)
-    tidy_up_compose :: DsTArrExpr -> DsTArrExpr -> DsM DsArrExpr
-    -- arr f >>> arr g  ==>  arr (f >>> g)
-    tidy_up_compose (TypedArr t _ (ArrArr f)) (TypedArr _ _ (ArrArr g))
-      = ArrArr <$> fns_compose t f g
-
-    -- arr f >>> (arr g >>> e)  ==>  arr (f >>> g) >>> e
-    tidy_up_compose (TypedArr a _ (ArrArr f))
-                    (TypedArr _ _ (ComposeArr (TypedArr _ b (ArrArr g)) e))
-      = do h <- fns_compose a f g
-           pure $ ComposeArr (mkArrArr a b h) e
-
-    -- We could easily do more rewritings here, such as
-    --   first (arr f >>> e)  ==>  arr (first f) >>> first e
-    -- but it’s not clear that they’d actually do much, and that would
-    -- be encroaching even more on the optimiser’s responsibilities.
-    tidy_up_compose e1 e2 = pure $ ComposeArr e1 e2
-
-    -- fns_compose t f g = \(x :: t) -> g (f x)
-    fns_compose arg_ty f g = do
-      arg_id <- newSysLocalDs arg_ty
-      pure $ Lam arg_id $ mkCoreApps g [mkCoreApps f [Var arg_id]]
-
-    ds_expr :: DsTArrExpr -> CoreExpr
-    ds_expr (TypedArr _ _ (ExprArr expr)) = expr
-    ds_expr (TypedArr _ _ (WrapArr wrap expr)) = wrap $ ds_expr expr
-
-    -- app :: forall b c. a (a b c, b) c
-    ds_expr expr@(TypedArr in_ty out_ty AppArr)
-      | Just (_, [_, in_ty']) <- tcSplitTyConApp_maybe in_ty
-      = mkApps app_id [Type in_ty', Type out_ty]
-      | otherwise = pprPanic "ds_expr: first" $ ppr expr
-
-    -- arr :: forall b c. (b -> c) -> a b c
-    ds_expr (TypedArr in_ty out_ty (ArrArr expr))
-      = mkApps arr_id [Type in_ty, Type out_ty, expr]
-
-    -- first :: forall b c d. a b c -> a (b, d) (c, d)
-    ds_expr expr@(TypedArr in_ty out_ty (FirstArr expr'))
-      | Just (_, [in_ty', snd_ty]) <- tcSplitTyConApp_maybe in_ty
-      , Just (_, [out_ty', _]) <- tcSplitTyConApp_maybe out_ty
-      = mkApps first_id [Type in_ty', Type out_ty', Type snd_ty, ds_expr expr']
-      | otherwise = pprPanic "ds_expr: first" $ ppr expr
-
-    -- loop :: forall b d c. a (b, d) (c, d) -> a b c
-    ds_expr (TypedArr in_ty out_ty (LoopArr expr))
-      | TypedArr in_ty' _ _ <- expr
-      , (_, snd_ty) <- tcSplitAppTy in_ty'
-      = mkApps loop_id [Type in_ty, Type snd_ty, Type out_ty, ds_expr expr]
-
-    -- (>>>) :: forall b c d. a b c -> a c d -> a b d
-    ds_expr (TypedArr in_ty out_ty (ComposeArr expr1 expr2))
-      | TypedArr _ mid_ty _ <- expr1
-      = mkApps compose_id [ Type in_ty, Type mid_ty, Type out_ty
-                          , ds_expr expr1, ds_expr expr2 ]
-
-    -- (|||) :: forall b d c. a b d -> a c d -> a (Either b c) d
-    ds_expr (TypedArr _ out_ty (ChoiceArr expr1 expr2))
-      | TypedArr left_ty _ _ <- expr1
-      , TypedArr right_ty _ _ <- expr2
-      = mkApps choice_id [ Type left_ty, Type out_ty, Type right_ty
-                         , ds_expr expr1, ds_expr expr2 ]
 
 ----------------------------------------------
 

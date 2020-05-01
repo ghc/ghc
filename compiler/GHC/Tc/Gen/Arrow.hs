@@ -32,9 +32,8 @@ import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
 import GHC.Types.Var.Set
+import GHC.Builtin.Types.Arrows( arrowStackTupTy, arrowEnvTupTy )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types.Literals( arrowStackTupTy, arrowEnvTupTy )
-import GHC.Types.Basic( Arity )
 import GHC.Types.SrcLoc
 import Outputable
 import Util
