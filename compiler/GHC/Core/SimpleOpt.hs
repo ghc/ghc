@@ -221,10 +221,13 @@ simple_opt_expr env expr
     go (Coercion co)    = Coercion (optCoercion (soe_dflags env) (getTCvSubst subst) co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      | isReflCo co' = go e
-                        | otherwise    = Cast (go e) co'
-                        where
-                          co' = optCoercion (soe_dflags env) (getTCvSubst subst) co
+    go (Cast e co)      = case go e of
+                            -- flatten nested casts before calling the coercion optimizer;
+                            -- see #18112 (note that mkCast handles dropping Refl coercions)
+                            Cast e' co' -> mkCast e' (opt_co (mkTransCo co' co))
+                            e'          -> mkCast e' (opt_co co)
+                          where
+                            opt_co = optCoercion (soe_dflags env) (getTCvSubst subst)
 
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
