@@ -2526,20 +2526,17 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
            | otherwise                                = acc
 
     -- Identify which equalities are candidates for floating
-    -- Float out alpha ~ ty, or ty ~ alpha which might be unified outside
+    -- Float out alpha ~ ty which might be unified outside
     -- See Note [Which equalities to float]
     is_float_eq_candidate ct
       | pred <- ctPred ct
       , EqPred NomEq ty1 ty2 <- classifyPredType pred
-      = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
-          (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
-          (_, Just tv2) -> float_tv_eq_candidate tv2 ty1
-          _             -> False
-      | otherwise = False
-
-    float_tv_eq_candidate tv1 ty2  -- See Note [Which equalities to float]
-      =  isMetaTyVar tv1
-      && (not (isTyVarTyVar tv1) || isTyVarTy ty2)
+      , Just tv1 <- tcGetTyVar_maybe ty1
+      , isMetaTyVar tv1
+      , not (isTyVarTyVar tv1) || isTyVarTy ty2
+      = True
+      | otherwise
+      = False
 
 
 {- Note [Float equalities from under a skolem binding]
@@ -2571,11 +2568,15 @@ Which equalities should we float?  We want to float ones where there
 is a decent chance that floating outwards will allow unification to
 happen.  In particular, float out equalities that are:
 
-* Of form (alpha ~# ty) or (ty ~# alpha), where
+* Of form (alpha ~# ty), where
    * alpha is a meta-tyvar.
    * And 'alpha' is not a TyVarTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
+
+  NB: we will never have (skol ~ alpha), with the meta-tyvar on
+  the right.  See Note [Unification variables on the left]
+  in GHC.Tc.Utils.Unify
 
 * Nominal.  No point in floating (alpha ~R# ty), because we do not
   unify representational equalities even if alpha is touchable.
