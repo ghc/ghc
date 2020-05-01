@@ -625,7 +625,13 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 
        -- The returned expression is ignored; it's in the pending splices
-       ; return (panic "tcSpliceExpr") }
+       -- But we still return a plausible expression
+       --   (a) in case we print it in debug messages, and
+       --   (b) because we test whether it is tagToEnum in Tc.Gen.Expr.tcApp
+       ; return (HsSpliceE noExtField $
+                 HsSpliced noExtField (ThModFinalizers []) $
+                 HsSplicedExpr (unLoc expr'')) }
+
 
 tcNestedSplice _ _ splice_name _ _
   = pprPanic "tcNestedSplice: rename stage found" (ppr splice_name)
