@@ -43,7 +43,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
-import GHC.Core.Type        ( isUnliftedType )
+import GHC.Core.Type        ( isUnliftedType, isLiftedType_maybe )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Data.Maybe
@@ -431,7 +431,13 @@ cgCase scrut bndr alt_type alts
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg platform) ret_bndrs
        ; simple_scrut <- isSimpleScrut scrut alt_type
-       ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
+       ; let anyAltAllocates
+              = any ( \(_, _, rhs) -> stgExprMayBlockOrAllocate rhs ) alts
+       ; let mustHpChkInAlts = simple_scrut
+                             && up_hp_usg == 0
+                             && anyAltAllocates
+       ; let do_gc  | mustHpChkInAlts  = True
+                    | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
                     | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
@@ -450,6 +456,77 @@ cgCase scrut bndr alt_type alts
   where
     is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
     is_cmp_op _                             = False
+
+stgExprMayBlockOrAllocate :: CgStgExpr -> Bool
+stgExprMayBlockOrAllocate (StgLet _ _ _) = True
+stgExprMayBlockOrAllocate (StgLetNoEscape _ _ body)
+  = stgExprMayBlockOrAllocate body
+stgExprMayBlockOrAllocate (StgConApp dataCon args _)
+  | Just True <- isLiftedType_maybe (dataConRepType dataCon)
+  , not (null args) = True
+stgExprMayBlockOrAllocate (StgOpApp (StgPrimOp op) _ _) = primOpMayBlockOrAllocate op
+stgExprMayBlockOrAllocate (StgTick _ e) = stgExprMayBlockOrAllocate e
+stgExprMayBlockOrAllocate (StgCase scrut _ alt_type alts)
+  | stgExprMayBlockOrAllocate scrut = True
+  | not (isSimpleScrut_pure scrut alt_type) = False
+  | otherwise = any ( \(_, _, rhs) -> stgExprMayBlockOrAllocate rhs ) alts
+stgExprMayBlockOrAllocate _ = False
+
+primOpMayBlockOrAllocate :: PrimOp -> Bool
+primOpMayBlockOrAllocate p = case p of
+-- NoDuplicateOp = ... blocking?
+  NewByteArrayOp_Char -> True -- calls MAYBE_GC_N
+  NewPinnedByteArrayOp_Char  -> True -- calls MAYBE_GC_N
+  NewAlignedPinnedByteArrayOp_Char  -> True -- calls MAYBE_GC
+  ResizeMutableByteArrayOp_Char  -> True -- calls stg_newByteArrayzh
+  NewArrayOp -> True -- calls MAYBE_GC
+  CloneArrayOp  -> True -- calls cloneArray which may call MAYBE_GC
+  CloneMutableArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  FreezeArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  ThawArrayOp -> True -- calls cloneArray which may call MAYBE_GC
+  NewArrayArrayOp -> True -- calls MAYBE_GC_N
+  NewSmallArrayOp -> True -- calls MAYBE_GC
+  UnsafeThawArrayOp -> True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+  UnsafeThawSmallArrayOp -> True -- Not sure here... Calls recordMutable -> recordMutableCap -> allocBlock_lock()
+  CloneSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  CloneSmallMutableArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  FreezeSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  ThawSmallArrayOp -> True -- calls cloneSmallArray which may call MAYBE_GC
+  NewMutVarOp -> True -- calls ALLOC_PRIM_P
+  AtomicModifyMutVar2Op -> True -- calls HP_CHK_GEN_TICKY
+  AtomicModifyMutVar_Op -> True -- calls HP_CHK_GEN_TICKY
+  MkWeakOp -> True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+  AddCFinalizerToWeakOp -> True -- calls ALLOC_PRIM that calls HP_CHK_GEN_TICKY
+  FloatDecode_IntOp -> True -- calls STK_CHK_GEN_N
+  DoubleDecode_2IntOp -> True -- calls STK_CHK_GEN_N
+  DoubleDecode_Int64Op -> True -- calls STK_CHK_GEN_N
+  ForkOp -> True -- calls MAYBE_GC_P
+  ForkOnOp -> True -- calls MAYBE_GC
+  AtomicallyOp -> True -- calls MAYBE_GC_P (and STK_CHK_GEN)
+  CatchSTMOp -> True -- STK_CHK_GEN
+  CatchRetryOp -> True -- calls MAYBE_GC_PP (and STK_CHK_GEN)
+  RetryOp -> True -- calls MAYBE_GC_
+  NewTVarOp -> True -- calls ALLOC_PRIM_P
+  ReadTVarOp -> True -- calls MAYBE_GC_P.. how about stg_readTVarIO?
+  WriteTVarOp -> True -- calls MAYBE_GC_PP
+  NewMVarOp -> True -- calls ALLOC_PRIM_
+  TakeMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+  PutMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE (also is blocking)
+  ReadMVarOp -> True -- calls ALLOC_PRIM_WITH_CUSTOM_FAILURE and GC_PRIM_P (also is blocking)
+  MakeStableNameOp -> True -- calls MAYBE_GC_P
+  NewBCOOp -> True -- calls ALLOC_PRIM
+  MkApUpd0_Op -> True -- calls HP_CHK_P
+  UnpackClosureOp -> True -- calls ALLOC_PRIM_P
+  WaitReadOp -> True -- blocking
+  WaitWriteOp -> True -- blocking
+  DelayOp -> True -- blocking
+  _ -> False
+
+isSimpleScrut_pure :: CgStgExpr -> AltType -> Bool
+isSimpleScrut_pure (StgOpApp (StgPrimOp op) _ _) _ = primOpMayBlockOrAllocate op
+isSimpleScrut_pure (StgLit _) _ = True
+isSimpleScrut_pure (StgApp _ []) (PrimAlt _) = True
+isSimpleScrut_pure _  _ = False
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
