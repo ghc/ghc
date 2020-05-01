@@ -36,7 +36,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types( unitTy )
+import GHC.Builtin.Types( unitTy, mkBoxedTupleTy )
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
@@ -65,6 +65,7 @@ import GHC.Data.FastString
 import GHC.Unit.Module
 
 import GHC.Types.Basic
+import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
@@ -767,7 +768,9 @@ addTyConsToGblEnv :: [TyCon] -> TcM TcGblEnv
 --   * extend the TypeEnv with the tycons
 --   * extend the TypeEnv with their implicitTyThings
 --   * extend the TypeEnv with any default method Ids
---   * add bindings for record selectors
+--
+-- We do not add bindings for record selectors until later
+-- (see Note [Calling tcRecSelBinds]).
 addTyConsToGblEnv tyclss
   = tcExtendTyConEnv tyclss                    $
     tcExtendGlobalEnvImplicit implicit_things  $
@@ -775,7 +778,7 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; tcRecSelBinds (mkRecSelBinds tyclss) }
+       ; getGblEnv }
  where
    implicit_things = concatMap implicitTyConThings tyclss
    def_meth_ids    = mkDefaultMethodIds tyclss
@@ -854,30 +857,61 @@ tcRecSelBinds sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
 
-mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
+mkRecSelBinds :: [TyCon] -> TcM [(Id, LHsBind GhcRn)]
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = map mkRecSelBind [ (tc,fld) | tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+  = concatMapM mkRecSelAndUpd [ (tc,fld)
+                              | tc <- tycons
+                              , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
-mkRecSelBind (tycon, fl)
-  = mkOneRecordSelector all_cons (RecSelData tycon) fl
+-- | Create both a record selector and a record updater binding for a field in a
+-- TyCon.  See Note [Record updaters]
+mkRecSelAndUpd :: (TyCon, FieldLabel) -> TcM [(Id, LHsBind GhcRn)]
+mkRecSelAndUpd (tycon, fl) = do
+    -- Make fresh names x1..xN for binding all the fields in the TyCon
+    -- (including the one being updated), and a fresh name y for binding the new
+    -- value of the field being updated.
+    x_vars <- fmap mkNameEnv $ forM (tyConFieldLabels tycon) $ \fl' ->
+                  (,) (flSelector fl') <$> newSysName (mkVarOccFS (flLabel fl'))
+    y_var <- newSysName (mkVarOccFS (flLabel fl))
+    let (sel, upd) = mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var
+    return [sel, upd]
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
+    idDetails = RecSelData tycon
 
-mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
+-- | Create a record selector binding, but no updater.  This is used for fields
+-- in pattern synonyms.  See Note [No updaters for pattern synonyms]
+mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabelNoUpdater
                     -> (Id, LHsBind GhcRn)
 mkOneRecordSelector all_cons idDetails fl
-  = (sel_id, L loc sel_bind)
+  = fst $ mkRecordSelectorAndUpdater all_cons idDetails (fl { flUpdate = oops }) oops oops
+  where
+    oops = error "mkOneRecordSelector: poked a field needed only for updaters"
+
+mkRecordSelectorAndUpdater :: [ConLike] -> RecSelParent -> FieldLabel
+                           -> NameEnv Name -> Name
+                           -> ((Id, LHsBind GhcRn), (Id, LHsBind GhcRn))
+mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
+    ( mk_binding rec_details sel_name sel_ty sel_bind is_naughty
+    , mk_binding VanillaId   upd_name upd_ty upd_bind no_updater
+    )
   where
     loc      = getSrcSpan sel_name
     lbl      = flLabel fl
     sel_name = flSelector fl
+    upd_name = flUpdate fl
 
-    sel_id = mkExportedLocalId rec_details sel_name sel_ty
+    mk_binding :: IdDetails -> Name -> Type  -- What is being bound
+               -> (Name -> LHsBind GhcRn)    -- The body of the binding
+               -> Bool                       -- Should it be unit instead?
+               -> (Id, Located (HsBindLR GhcRn GhcRn))
+    mk_binding details name ty bind is_unit
+      | is_unit   = (mkExportedLocalId details name unitTy, unit_bind name)
+      | otherwise = (mkExportedLocalId details name ty, bind name)
+
     rec_details = RecSelId { sel_tycon = idDetails, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1
@@ -889,9 +923,27 @@ mkOneRecordSelector all_cons idDetails fl
     data_tvbs  = filter (\tvb -> binderVar tvb `elemVarSet` data_tv_set) $
                  conLikeUserTyVarBinders con1
     data_tv_set= tyCoVarsOfTypes inst_tys
+
+    -- See Note [Naughty record selectors] and Note [Naughty record updaters]
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
-    sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
+    no_updater = is_naughty
+                  || not (isTauTy field_ty)
+                  || not (isLiftedTypeKind (typeKind field_ty))
+
+    -- Make the types for the selector and the updater, which will look like
+    --     selector :: ctx => data_ty -> field_ty
+    --     updater  :: ctx => data_ty -> (field_ty -> data_ty, field_ty)
+    -- respectively.  Regarding the forall-bound type variables,
+    -- see Note [Polymorphic selectors].
+    sel_ty = the_ty field_ty
+    upd_ty = the_ty (mkBoxedTupleTy [ mkVisFunTyMany field_ty data_ty
+                                    , field_ty
+                                    ])
+    -- Make a type like
+    --     forall ... . ctx => data_ty -> result_ty
+    -- with the right tyvars and context for the selector/updater.
+    the_ty :: Type -> Type
+    the_ty result_ty = mkForAllTys (tyVarSpecToBinders data_tvbs) $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
@@ -899,30 +951,96 @@ mkOneRecordSelector all_cons idDetails fl
                             -- Record selectors are always typed with Many. We
                             -- could improve on it in the case where all the
                             -- fields in all the constructor have multiplicity Many.
-                          field_ty
+                          result_ty
+
+    -- Make a selector or updater binding: one alternative per constructor that
+    -- includes the field, plus a default case if necessary.
+    the_bind :: (ConLike -> [LHsRecField GhcRn (LPat GhcRn)])
+                  -- Fields to match on for this constructor
+             -> (ConLike -> LHsExpr GhcRn) -- RHS for this constructor
+             -> Name  -- Name of the bound function
+             -> LHsBind GhcRn
+    the_bind mk_rec_flds mk_expr name
+        = L loc (mkTopFunBind Generated lname alts)
+      where
+        lname = L loc name
+        alts  = map mk_match cons_w_field ++ deflt
+
+        mk_match con = mkSimpleMatch (mkPrefixFunRhs lname)
+                                     [L loc pat]
+                                     (mk_expr con)
+          where
+            pat = ConPat NoExtField (L loc (getName con)) (RecCon rec_fields)
+            rec_fields = HsRecFields { rec_flds = mk_rec_flds con
+                                     , rec_dotdot = Nothing }
 
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind = mkTopFunBind Generated sel_lname alts
+    sel_bind = the_bind (const [rec_field]) (const mk_expr)
       where
-        alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs sel_lname)
-                                           [] unit_rhs]
-             | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
-                                 [L loc (mk_sel_pat con)]
-                                 (L loc (HsVar noExtField (L loc field_var)))
-    mk_sel_pat con = ConPat NoExtField (L loc (getName con)) (RecCon rec_fields)
-    rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = noLoc (HsRecField
-                        { hsRecFieldLbl
-                           = L loc (FieldOcc sel_name
-                                     (L loc $ mkVarUnqual lbl))
-                        , hsRecFieldArg
-                           = L loc (VarPat noExtField (L loc field_var))
-                        , hsRecPun = False })
-    sel_lname = L loc sel_name
-    field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
+        rec_field = noLoc (HsRecField
+                            { hsRecFieldLbl
+                               = L loc (FieldOcc sel_name
+                                         (L loc $ mkVarUnqual lbl))
+                            , hsRecFieldArg
+                               = L loc (VarPat noExtField (L loc field_var))
+                            , hsRecPun = False })
+        field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
+        mk_expr   = L loc (HsVar noExtField (L loc field_var))
+
+    -- Make the binding:
+    --   upd (C2 { fld1 = x1, .., fldN = xN })
+    --       = (\ y -> C2 { fld1 = y, fld2 = x2, .., fldN = xN }, x1)
+    --   upd (C7 { fld1 = x1, .., fldM = xM })
+    --       = (\ y -> C7 { fld1 = y, fld3 = x3, .., fldM = xM }, x1)
+    --    where cons_w_field = [C2,C7] and fld1 is being selected/updated
+    upd_bind = the_bind mk_rec_flds mk_expr
+      where
+        -- Pattern that matches { fld1 = x1, .., fldN = xN }
+        mk_rec_flds con = rec_flds (rec_fields con pat_var)
+        pat_var = VarPat noExtField . L loc . x_var
+
+        -- RHS expression in updater binding: (\y -> C{...}, x1)
+        mk_expr con = mkLHsTupleExpr
+                          [ mk_update_fun con
+                          , L loc (HsVar noExtField (L loc (x_var fl)))
+                          ]
+
+        -- Make the first component of the pair: a function that takes a new value
+        -- for the field being updated and constructs a record with that field
+        -- updated and the others unchanged: e.g. if updating fld1 we make
+        --     \y -> C { fld1 = y, fld2 = x2, .., fldN = xN }
+        mk_update_fun con = mkHsLam
+            [L loc (VarPat noExtField (L loc y_var))]
+                (L loc (RecordCon noExtField
+                           (L loc (getName con))
+                           (rec_fields con con_var)))
+        con_var fl' = HsVar noExtField (L loc (if flSelector fl' == sel_name
+                                               then y_var
+                                               else x_var fl'))
+
+        -- Used for both pattern and record construction, to create
+        --     { fld1 = k fld1, .., fldN = k fldN }
+        -- where k gives the hsRecFieldArg for each field
+        rec_fields :: ConLike
+                   -> (FieldLabelNoUpdater -> a)
+                   -> HsRecFields GhcRn (Located a)
+        rec_fields con k = HsRecFields { rec_flds = map rec_field
+                                                        (conLikeFieldLabels con)
+                                       , rec_dotdot = Nothing }
+          where
+            rec_field fl' = L loc (HsRecField
+                                      { hsRecFieldLbl = L loc (field_occ fl')
+                                      , hsRecFieldArg = L loc (k fl')
+                                      , hsRecPun = False })
+            field_occ fl' = FieldOcc (flSelector fl')
+                                     (L loc (mkVarUnqual (flLabel fl')))
+
+        -- The x_vars NameEnv contains a fresh name for every selector name in the
+        -- TyCon, i.e. maps fldN to xN.
+        x_var :: FieldLbl upd Name -> Name
+        x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
 
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
@@ -933,6 +1051,7 @@ mkOneRecordSelector all_cons idDetails fl
                             (mkHsApp (L loc (HsVar noExtField
                                          (L loc (getName rEC_SEL_ERROR_ID))))
                                      (L loc (HsLit noExtField msg_lit)))]
+    msg_lit = HsStringPrim NoSourceText (bytesFS lbl)
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we
@@ -963,8 +1082,22 @@ mkOneRecordSelector all_cons idDetails fl
     --   scenarios, eq_subst is an empty substitution.
     inst_tys = substTyVars eq_subst univ_tvs
 
+
+-- | Make a binding of unit:
+--
+--   name :: ()
+--   name = ()
+--
+-- used for naughty record selectors and missing updaters.
+unit_bind :: Name -> LHsBind GhcRn
+unit_bind name = L loc (mkTopFunBind Generated lname alts)
+  where
+    loc      = getSrcSpan name
+    lname    = L loc name
+    alts     = [mkSimpleMatch (mkPrefixFunRhs lname) [] unit_rhs]
     unit_rhs = mkLHsTupleExpr []
-    msg_lit = HsStringPrim NoSourceText (bytesFS lbl)
+
+
 
 {-
 Note [Polymorphic selectors]
@@ -1063,6 +1196,14 @@ type (e.g. 'b' in T2).
 
 Note the need for casts in the result!
 
+All this applies to updaters (see Note [Record updaters]) as well as selectors;
+in the example above we will build this updater:
+    $upd:f:T1 :: T [a] -> (Maybe a -> T [a], Maybe a)
+
+If a GADT field has bona-fide existential tyvars that do not appear in the
+result type, the selector will be naughty (see Note [Naughty record selectors]).
+
+
 Note [Selector running example]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's OK to combine GADTs and type families.  Here's a running example:
@@ -1107,4 +1248,165 @@ Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
 To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
 when typechecking these HsBinds so that the user does not have to.
+
+
+Note [Record updaters]
+~~~~~~~~~~~~~~~~~~~~~~
+Given a datatype declaration, we generate a record selector and also a "record
+updater" for each field.  For a record type `r` containing a field type `a`, the
+updater will have type
+
+    r -> (a -> r, a)
+
+where the first component of the pair sets the field and the second component
+returns the existing value.  For example, given the data declaration
+
+    data T y = MkT { foo :: [y], bar :: Int }
+
+we generate the record updaters:
+
+    $upd:foo:MkT :: T y -> ([y] -> T y, [y])
+    $upd:foo:MkT (MkT { foo = x1, bar = x2})
+        = (\y -> MkT { foo = y, bar = x2}, x1)
+
+    $upd:bar:MkT :: T y -> (Int -> T y, Int)
+    $upd:bar:MkT (MkT { foo = x1, bar = x2 })
+        = (\y -> MkT { foo = x1, bar = y}, x2)
+
+These are used to produce instances of GHC.Records.HasField automatically as
+described in Note [HasField instances] in GHC.Tc.Instance.Class.
+
+Note that:
+
+ * The updater's OccName is prefixed with $upd: so it is never valid in user
+   code. Its Name never appears in the AvailInfo or GlobalRdrEnv; instead an
+   updater is considered to be in scope iff the corresponding field label is in
+   scope.
+
+ * The Name of each updater is stored alongside that of the selector in the
+   'FieldLabel's in each 'DataCon'.  See the notes in GHC.Types.FieldLabel.
+
+ * Renamed-syntax bindings for both a selector and an updater for each field are
+   produced by mkRecordSelectorAndUpdater; these bindings are then type-checked
+   together normally.
+
+ * We produce renamed syntax rather than attempting to generate Core terms
+   directly because the corresponding Core terms are rather complex.  This is
+   because they include the code necessary to evaluate strict fields, and to
+   pack/unpack UNPACKed fields, i.e. everything that is handled by the
+   constructor wrapper, and by dataConBoxer when desugaring pattern matching.
+   See Note [Generating updaters in advance].
+
+ * In some cases we may not be able to generate an updater and will bind its
+   name to () instead, even if we can generate the corresponding selector.  See
+   Note [Naughty record updaters].
+
+ * We could imagine generating the selector *from* the updater, i.e. build
+       $sel:foo:T r = case $upd:foo:T r of (_, x) -> x
+   but we don't do so because the updater might be naughty, and for pattern
+   synonyms will not exist at all (see Note [No updaters for pattern synonyms]).
+
+ * For GADTs, we insist that all constructors mentioning a field have the same
+   type, and reject the definition entirely if not.  Thus if the field does not
+   involve an existential (and hence is not naughty) we can make both a selector
+   and an updater (see Note [GADT record selectors]).
+
+
+Note [Naughty record updaters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are a few cases in which we cannot generate an updater for a field:
+
+1. The field has an existential tyvar, e.g.
+     data T = forall a . MkT { foo :: a }
+   This is the same as for selectors (see Note [Naughty record selectors]).
+
+2. The field is higher-rank, e.g.
+     data T = MkT { foo :: forall a . a -> a }
+   as this would require an impredicative instantiation of (,).
+
+3. The field kind is not Type, e.g.
+     data T = MkT { foo :: Addr# }
+   as this would require an ill-kinded application of (,).
+
+Every field with a naughty record selector also has a naughty record updater
+(because the condition 1 is the same for both).  However, some types will have a
+naughty updater but a regular selector (where conditions 2 or 3 apply).
+
+If any of these apply, we bind $upd:foo:MkT to (), just as a naughty record
+selector is bound to (). This means that when trying to generate a HasField
+instance, we need to check if the updater is () and if so give up.
+
+
+Note [Generating updaters in advance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We generate a selector and updater for every field when compiling a datatype
+declaration, even though this costs a bit of type-checking time.  Why don't we
+do this at HasField constraint solving time instead, at least for updaters?
+
+ * For types with bangs and unboxing, it's not entirely simple to generate the
+   selector or updater in Core form directly. The current mechanism generates
+   them in source code form and compiles it.
+
+ * Some uses of selectors and updaters will inline, but some will not, e.g.
+     f x = (x.a, x.b)  -- RecordDotSyntax notation, or
+     g x = setField @"a" x ()
+   and making a new copy of a perhaps complex updater every time seems
+   wasteful.  As soon as we have an updater that is not inlined at 2 or more
+   call sites, we win (even on compile time) vs inlining it everywhere
+
+
+Note [No updaters for pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For record pattern synonyms, we generate a selector function, but not an
+updater.  In principle it would be possible to build an updater for
+bidirectional pattern synonyms, but not for unidirectional ones.  In any case,
+the updater function is not necessary because we do not solve HasField
+constraints for fields defined by pattern synonyms.
+
+That is, given
+
+    pattern MkPair{x,y} = (x, y)
+
+you can use `x` as a "record selector" in an expression.  But the constraint
+solver will not automatically solve constraints like `HasField "x" (a, b) a`, so
+you cannot directly use expressions such as `getField @"x" (True, False)` or
+`setField @"x" p False`, and RecordDotSyntax will not natively support record
+pattern synonyms.
+
+This can be worked around by the user user manually writing an explicit
+HasField instance, such as
+
+   instance HasField "x" (a,b) a where
+      hasField (x,y) = (\x' -> (x',y), x)
+
+which will be subject to the usual rules around orphan instances and the
+restrictions on when HasField instances can be defined (as described in
+Note [Validity checking of HasField instances] in GHC.Tc.Validity).
+
+We could imagine allowing (bidirectional) record pattern synonyms to lead to
+automatic HasField constraint solving, but this potentially introduces
+incoherent HasField instances, because multiple pattern synonyms (in different
+modules) might use the same field name in the same type, and would even lead to
+e.g.
+
+    pattern Id{id} = id
+
+introducing an `id` field to *every* type!
+
+Given the possibility of incoherence, and the fact that a reasonable workaround
+exists, we do not currently solve HasField constraints for fields defined by
+pattern synonyms.  And since we do not need updaters for anything other than
+solving HasField constraints, we do not generate them for pattern synonyms.
+
+
+Note [Calling tcRecSelBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When type-checking record update bindings, we need to be able to look up the
+data constructors for the corresponding datatypes, because the constructors are
+used in the definitions.  However, for data constructors in data family
+instances, tcTyClsInstDecls adds placeholder bindings added to prevent the use
+of promotion (see Note [AFamDataCon: not promoting data family constructors] in
+GHC.Tc.Utils.Env).  Thus we cannot call tcReclSelBinds in addTyConsToGblEnv, but
+instead have to wait until tcTyClsInstDecls has completed.
+
 -}

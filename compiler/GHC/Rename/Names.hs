@@ -760,7 +760,7 @@ getLocalNonValBinders fixity_env
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
-             ; return (AvailTC main_name names flds', fld_env) }
+             ; return (AvailTC main_name names (fieldLabelsWithoutUpdaters flds'), fld_env) }
 
 
     -- Calculate the mapping from constructor names to fields, which
@@ -835,7 +835,9 @@ getLocalNonValBinders fixity_env
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM newTopSrcBinder bndrs
              ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
-             ; let avail    = AvailTC (unLoc main_name) sub_names flds'
+             ; let avail    = AvailTC (unLoc main_name)
+                                      sub_names
+                                      (fieldLabelsWithoutUpdaters flds')
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
@@ -848,7 +850,8 @@ newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
-       ; return $ qualFieldLbl { flSelector = selName } }
+       ; updName <- newTopSrcBinder $ L loc $ upd_rdr
+       ; return $ qualFieldLbl { flUpdate = updName, flSelector = selName } }
   where
     fieldOccName = occNameFS $ rdrNameOcc fld
     qualFieldLbl = mkFieldLabelOccs fieldOccName (nameOccName dc) overload_ok
@@ -860,6 +863,7 @@ newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
               -- Template Haskell] in "GHC.ThToHs" and Note [Looking up
               -- Exact RdrNames] in "GHC.Rename.Env".
           | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
+    upd_rdr = mkRdrUnqual (flUpdate qualFieldLbl)
 
 {-
 Note [Looking up family names in family instances]
@@ -1074,6 +1078,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                          , [])
 
         IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns rdr_fs ->
+          -- See Note [IEThingWith] in GHC.Hs.ImpExp for why rdr_fs is null
           ASSERT2(null rdr_fs, ppr rdr_fs) do
            (name, avail, mb_parent)
                <- lookup_name (IEThingAbs noExtField ltc) (ieWrappedName rdr_tc)
@@ -1208,9 +1213,11 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: [Either Name FieldLabel] -> [LIEWrappedName RdrName]
+lookupChildren :: forall a b .
+                  [Either Name (FieldLbl a b)]
+               -> [LIEWrappedName RdrName]
                -> MaybeErr [LIEWrappedName RdrName]   -- The ones for which the lookup failed
-                           ([Located Name], [Located FieldLabel])
+                           ([Located Name], [Located (FieldLbl a b)])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -1222,14 +1229,14 @@ lookupChildren all_kids rdr_items
   | null fails
   = Succeeded (fmap concat (partitionEithers oks))
        -- This 'fmap concat' trickily applies concat to the /second/ component
-       -- of the pair, whose type is ([Located Name], [[Located FieldLabel]])
+       -- of the pair, whose type is ([Located Name], [[Located (FieldLbl a b)]])
   | otherwise
   = Failed fails
   where
     mb_xs = map doOne rdr_items
     fails = [ bad_rdr | Failed bad_rdr <- mb_xs ]
     oks   = [ ok      | Succeeded ok   <- mb_xs ]
-    oks :: [Either (Located Name) [Located FieldLabel]]
+    oks :: [Either (Located Name) [Located (FieldLbl a b)]]
 
     doOne item@(L l r)
        = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc . ieWrappedName) r of

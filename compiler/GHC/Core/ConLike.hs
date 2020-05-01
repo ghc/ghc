@@ -32,6 +32,7 @@ import GHC.Prelude
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Utils.Outputable
+import GHC.Types.FieldLabel
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Types.Name
@@ -103,9 +104,11 @@ conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
 conLikeArity (PatSynCon pat_syn)    = patSynArity pat_syn
 
 -- | Names of fields used for selectors
-conLikeFieldLabels :: ConLike -> [FieldLabel]
-conLikeFieldLabels (RealDataCon data_con) = dataConFieldLabels data_con
-conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
+conLikeFieldLabels :: ConLike -> [FieldLabelNoUpdater]
+conLikeFieldLabels (RealDataCon data_con) =
+    fieldLabelsWithoutUpdaters (dataConFieldLabels data_con)
+conLikeFieldLabels (PatSynCon pat_syn) =
+    patSynFieldLabels pat_syn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)

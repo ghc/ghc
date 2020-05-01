@@ -30,6 +30,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
+import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
@@ -46,7 +47,7 @@ import GHC.Core.Class
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( splitAtList, fstOf3 )
+import GHC.Utils.Misc( splitAtList, fstOf3, debugIsOn )
 
 import Data.Maybe
 
@@ -608,50 +609,22 @@ matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 {-
 Note [HasField instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Suppose we have
 
     data T y = MkT { foo :: [y] }
 
-and `foo` is in scope.  Then GHC will automatically solve a constraint like
+and `foo` is in scope.  The HasField class is defined (in GHC.Records) thus:
+
+    class HasField x r a | x r -> a where
+      hasField :: r -> (a -> r, a)
+
+We want GHC to automatically solve a constraint like
 
     HasField "foo" (T Int) b
 
-by emitting a new wanted
-
-    T alpha -> [alpha] ~# T Int -> b
-
-and building a HasField dictionary out of the selector function `foo`,
-appropriately cast.
-
-The HasField class is defined (in GHC.Records) thus:
-
-    class HasField (x :: k) r a | x r -> a where
-      getField :: r -> a
-
-Since this is a one-method class, it is represented as a newtype.
-Hence we can solve `HasField "foo" (T Int) b` by taking an expression
-of type `T Int -> b` and casting it using the newtype coercion.
-Note that
-
-    foo :: forall y . T y -> [y]
-
-so the expression we construct is
-
-    foo @alpha |> co
-
-where
-
-    co :: (T alpha -> [alpha]) ~# HasField "foo" (T Int) b
-
-is built from
-
-    co1 :: (T alpha -> [alpha]) ~# (T Int -> b)
-
-which is the new wanted, and
-
-    co2 :: (T Int -> b) ~# HasField "foo" (T Int) b
-
-which can be derived from the newtype coercion.
+by building a HasField dictionary out of the updater function `$upd:foo:MKT`.
+(See Note [Record updaters] in GHC.Tc.TyCl.Utils for how updaters are built.)
 
 If `foo` is not in scope, or has a higher-rank or existentially
 quantified type, then the constraint is not solved automatically, but
@@ -659,6 +632,47 @@ may be solved by a user-supplied HasField instance.  Similarly, if we
 encounter a HasField constraint where the field is not a literal
 string, or does not belong to the type, then we fall back on the
 normal constraint solver behaviour.
+
+Note that
+
+    $upd:foo:MKT :: forall y . T y -> ([y] -> T y, [y])
+
+so we instantiate the updater's type with fresh metavariable(s) (here just one,
+namely alpha), emit new wanteds:
+
+    [W]  data_co :: T alpha ~# T Int
+    [W]  fld_co  :: [alpha] ~# b
+
+and construct the dictionary
+
+    ev :: HasField "foo" (T Int) b
+    ev = $upd:foo:MKT @alpha |> co
+
+where
+
+    co :: (T alpha -> ([alpha] -> T alpha, [alpha])) ~# HasField "foo" (T Int) b
+    co = sym nt_co ; hf_co
+
+    -- From the instantiated newtype coercion, since HasField is a single-method type class
+    nt_co :: HasField "foo" (T alpha) [alpha] ~# (T alpha -> ([alpha] -> T alpha, [alpha]))
+
+    hf_co :: HasField "foo" (T alpha) [alpha] ~# HasField "foo" (T Int) b
+    hf_co = HasField <"foo"> data_co fld_co
+
+
+Looking at the wanted T alpha ~# T Int, you might think that we could avoid
+instantiating the updater's type with fresh metavariables, and instead construct
+a substitution [Int/alpha] directly.  However this would not work for GADTs, for
+example:
+
+    data S a where
+      MkS :: { foo :: Either p q } -> S (p,q)
+
+where the updater's type is
+
+    $upd:foo:MkS :: forall p q. S (p,q) -> (Either p q -> S (p,q), Either p q)
+
+with no direct connection to the parameters of S itself.
 -}
 
 -- See Note [HasField instances]
@@ -668,50 +682,81 @@ matchHasField dflags short_cut clas tys
        ; rdr_env       <- getGlobalRdrEnv
        ; case tys of
            -- We are matching HasField {k} x r a...
-           [_k_ty, x_ty, r_ty, a_ty]
-               -- x should be a literal string
-             | Just x <- isStrLitTy x_ty
+           [k, x, r, a]
+               -- x should be a literal string (this implies k is Symbol)
+             | Just x_lit <- isStrLitTy x
                -- r should be an applied type constructor
-             , Just (tc, args) <- tcSplitTyConApp_maybe r_ty
+             , Just (tc, args) <- tcSplitTyConApp_maybe r
                -- use representation tycon (if data family); it has the fields
              , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
                -- x should be a field of r
-             , Just fl <- lookupTyConFieldLabel x r_tc
+             , Just fl <- lookupTyConFieldLabel x_lit r_tc
                -- the field selector should be in scope
              , Just gre <- lookupGRE_FieldLabel rdr_env fl
 
-             -> do { sel_id <- tcLookupId (flSelector fl)
-                   ; (tv_prs, preds, sel_ty) <- tcInstType newMetaTyVars sel_id
-
-                         -- The first new wanted constraint equates the actual
-                         -- type of the selector with the type (r -> a) within
-                         -- the HasField x r a dictionary.  The preds will
-                         -- typically be empty, but if the datatype has a
-                         -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
-
-                         -- Use the equality proof to cast the selector Id to
-                         -- type (r -> a), then use the newtype coercion to cast
-                         -- it to a HasField dictionary.
-                         mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
-                           where
-                             co = mkTcSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTcTransCo` mkTcSymCo co2
-                         mk_ev [] = panic "matchHasField.mk_ev"
-
-                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)
-                                                              tys
-
-                         tvs = mkTyVarTys (map snd tv_prs)
-
-                     -- The selector must not be "naughty" (i.e. the field
-                     -- cannot have an existentially quantified type), and
-                     -- it must not be higher-rank.
-                   ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
+             -> ASSERT( k `eqType` typeSymbolKind )
+               -- Look up the updater and instantiate its type with fresh metavars
+                do { upd_id <- tcLookupId (flUpdate fl)
+                   ; inst_upd@(_, _, upd_ty) <- tcInstType newMetaTyVars upd_id
+                     -- Do not generate an instance if the updater cannot be
+                     -- defined for the field and hence is ().  (See Note
+                     -- [Naughty record updaters] in GHC.Tc.TyCl.Utils.)
+                   ; if not (upd_ty `eqType` unitTy)
                      then do { addUsedGRE True gre
-                             ; return OneInst { cir_new_theta = theta
-                                              , cir_mk_ev     = mk_ev
-                                              , cir_what      = BuiltinInstance } }
+                             ; return $ mkHasFieldEvidence clas (x, r, a)
+                                            upd_id inst_upd }
                      else matchInstEnv dflags short_cut clas tys }
 
            _ -> matchInstEnv dflags short_cut clas tys }
+
+-- | Build the dictionary for a @HasField x r a@ constraint using its updater.
+-- See Note [HasField instances].
+mkHasFieldEvidence
+  :: Class                -- ^ HasField class
+  -> (Type, Type, Type)   -- ^ (x, r, a) type parameters of HasField constraint
+  -> Id                   -- ^ Updater Id $upd:x:...
+  -> ([(Name, TcTyVar)], TcThetaType, TcType)
+     -- ^ (tyvars, preds, rho) from instantiating the updater's type
+  -> ClsInstResult
+mkHasFieldEvidence clas (x, r, a) upd_id (tv_prs, preds, upd_ty) =
+    OneInst { cir_new_theta = theta
+            , cir_mk_ev     = mk_ev
+            , cir_what      = BuiltinInstance }
+  where
+    -- Updater types satisfy by construction
+    --     upd_ty = (data_ty -> (fld_ty -> data_ty, fld_ty))
+    -- where data_ty is the datatype and fld_ty is the field type.
+    (_, data_ty, setter_field_pair) = splitFunTy upd_ty
+    (_, [_, fld_ty]) = splitTyConApp setter_field_pair
+
+    -- Emit new wanteds in order to convert `HasField x data_ty fld_ty` (built
+    -- from the updater) into `HasField x r a` (the constraint we are solving).
+    -- The preds will typically be empty, but if the datatype has a "stupid
+    -- theta" it will be included here, as the updater quantifies over it.
+    theta = mkPrimEqPred data_ty r  -- data_co :: data_ty ~# r
+          : mkPrimEqPred fld_ty  a  -- fld_co  :: fld_ty  ~# a
+          : preds
+
+    -- Instantiate the updater Id appropriately, use the newtype coercion to
+    -- cast it to a `HasField x data_ty fld_ty` dictionary, then use the
+    -- equality witnesses to convert it to a `HasField x r a` dictionary.
+    mk_ev (data_co:fld_co:evs) =
+        evSelector upd_id (mkTyVarTys (map snd tv_prs)) evs
+            `evCast` (mkTcSymCo nt_co `mkTcTransCo` hf_co data_co fld_co)
+    mk_ev evs = pprPanic "mkHasFieldEvidence.mk_ev" (ppr evs)
+
+    -- hf_co :: HasField x data_ty fld_ty ~# HasField x r a
+    -- hf_co = HasField <x> data_co fld_co
+    hf_co data_co fld_co = mkTcTyConAppCo Representational hasFieldTyCon
+                               [ mkTcNomReflCo typeSymbolKind
+                               , mkTcNomReflCo x
+                               , evTermCoercion (EvExpr data_co)
+                               , evTermCoercion (EvExpr fld_co)
+                               ]
+
+    -- nt_co :: HasField x data_ty fld_ty ~# (data_ty -> (fld_ty -> data_ty, fld_ty))
+    nt_co = maybe (panic "mkHasFieldEvidence:nt_co") snd $
+                tcInstNewTyCon_maybe hasFieldTyCon
+                                     [typeSymbolKind, x, data_ty, fld_ty]
+
+    hasFieldTyCon = classTyCon clas

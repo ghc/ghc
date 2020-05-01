@@ -250,17 +250,25 @@ rnAvailInfo (AvailTC n ns fs) = do
     -- is.  But for the availNames they MUST be exported, so they
     -- will rename fine.
     ns' <- mapM rnIfaceGlobal ns
-    fs' <- mapM rnFieldLabel fs
+    fs' <- mapM rnFieldLabelNoUpdater fs
     case ns' ++ map flSelector fs' of
         [] -> panic "rnAvailInfoEmpty AvailInfo"
         (rep:rest) -> ASSERT2( all ((== nameModule rep) . nameModule) rest, ppr rep $$ hcat (map ppr rest) ) do
                          n' <- setNameModule (Just (nameModule rep)) n
                          return (AvailTC n' ns' fs')
 
-rnFieldLabel :: Rename FieldLabel
-rnFieldLabel (FieldLabel l b sel) = do
+rnFieldLabelNoUpdater :: Rename FieldLabelNoUpdater
+rnFieldLabelNoUpdater fl@(FieldLabel { flSelector = sel }) = do
     sel' <- rnIfaceGlobal sel
-    return (FieldLabel l b sel')
+    return (fl { flSelector = sel' })
+
+rnFieldLabel :: Rename FieldLabel
+rnFieldLabel fl@(FieldLabel { flUpdate = upd, flSelector = sel }) = do
+    -- The selector appears in the AvailInfo, so it gets renamed normally, but
+    -- the updater does not so it is a "never-exported TyThing".
+    upd' <- rnIfaceNeverExported upd
+    sel' <- rnIfaceGlobal sel
+    return (fl { flUpdate = upd', flSelector = sel' })
 
 
 
@@ -435,16 +443,22 @@ rnIfaceFamInst d = do
 rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
 rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
+-- | Is this an 'IfaceId' for a "never-exported TyThing"?
+-- See Note [rnIfaceNeverExported] and, for Typeable bindings, see
+-- Note [Grand plan for Typeable].
+isNeverExportedIfaceId :: Name -> IfaceIdDetails -> Bool
+isNeverExportedIfaceId _ IfDFunId = True
+isNeverExportedIfaceId n _        = isDefaultMethodOcc occ
+                                 || isTypeableBindOcc  occ
+                                 || isRecFldUpdOcc     occ
+  where
+    occ = occName n
+
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl d@IfaceId{} = do
-            name <- case ifIdDetails d of
-                      IfDFunId -> rnIfaceNeverExported (ifName d)
-                      _ | isDefaultMethodOcc (occName (ifName d))
-                        -> rnIfaceNeverExported (ifName d)
-                      -- Typeable bindings. See Note [Grand plan for Typeable].
-                      _ | isTypeableBindOcc (occName (ifName d))
-                        -> rnIfaceNeverExported (ifName d)
-                        | otherwise -> rnIfaceGlobal (ifName d)
+            name <- if isNeverExportedIfaceId (ifName d) (ifIdDetails d)
+                    then rnIfaceNeverExported (ifName d)
+                    else rnIfaceGlobal (ifName d)
             ty <- rnIfaceType (ifType d)
             details <- rnIfaceIdDetails (ifIdDetails d)
             info <- rnIfaceIdInfo (ifIdInfo d)

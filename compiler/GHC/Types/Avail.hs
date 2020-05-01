@@ -64,7 +64,7 @@ data AvailInfo
        Name         -- ^ The name of the type or class
        [Name]       -- ^ The available pieces of type or class,
                     -- excluding field selectors.
-       [FieldLabel] -- ^ The record fields of the type
+       [FieldLabelNoUpdater] -- ^ The record fields of the type
                     -- (see Note [Representing fields in AvailInfo]).
 
    deriving ( Eq    -- ^ Used when deciding if the interface has changed
@@ -174,7 +174,7 @@ availNonFldNames (Avail n)        = [n]
 availNonFldNames (AvailTC _ ns _) = ns
 
 -- | Fields made available by the availability information
-availFlds :: AvailInfo -> [FieldLabel]
+availFlds :: AvailInfo -> [FieldLabelNoUpdater]
 availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
 

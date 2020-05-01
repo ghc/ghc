@@ -37,6 +37,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
+import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name
@@ -1182,7 +1183,7 @@ tcConArgs con_like arg_tys penv con_args thing_inside = case con_args of
                 traceTc "find_field" (ppr pat_ty <+> ppr extras)
                 ASSERT( null extras ) (return pat_ty)
 
-      field_tys :: [(FieldLabel, Scaled TcType)]
+      field_tys :: [(FieldLabelNoUpdater, Scaled TcType)]
       field_tys = zip (conLikeFieldLabels con_like) arg_tys
           -- Don't use zipEqual! If the constructor isn't really a record, then
           -- dataConFieldLabels will be empty (and each field in the pattern

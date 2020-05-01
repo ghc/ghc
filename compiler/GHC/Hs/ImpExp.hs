@@ -226,14 +226,16 @@ data IE pass
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | IEThingWith (XIEThingWith pass)
-                (LIEWrappedName (IdP pass))
+                (LIEWrappedName (IdP pass))  -- Parent
                 IEWildcard
-                [LIEWrappedName (IdP pass)]
-                [XRec pass (FieldLbl (IdP pass))]
-        -- ^ Imported or exported Thing With given imported or exported
+                [LIEWrappedName (IdP pass)]  -- Child methods/constructors, and
+                                             -- record fields (only in parser)
+                [XRec pass (FieldLbl () (IdP pass))] -- Child record fields (after renaming)
+        -- ^ Imported or exported Thing With given imported or exported children
         --
-        -- The thing is a Class/Type and the imported or exported things are
+        -- The thing is a Class/Type and the imported or exported children are
         -- methods/constructors and record fields; see Note [IEThingWith]
+        --
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
         --                                   'GHC.Parser.Annotation.AnnClose',
         --                                   'GHC.Parser.Annotation.AnnComma',
@@ -269,18 +271,45 @@ data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
 {-
 Note [IEThingWith]
 ~~~~~~~~~~~~~~~~~~
+IEThingWith represents a parent type constructor or class together with its
+children imported or exported along with it.  There are two lists of children:
 
-A definition like
+ * [LIEWrappedName (IdP pass)] - always contains data constructors or class
+   methods, and prior to renaming contains record fields;
+
+ * [XRec pass (FieldLbl () (IdP pass))] - empty prior to renaming, then after
+   renaming contains record fields identified by their selectors.
+
+We need to store a FieldLbl, because we need the flLabel for pretty-printing the
+right field (we don't want to show the internal selector name), and we need the
+flSelector to uniquely identify the field in the renamer.  We do not need the
+updater name (see Note [Updater names] in GHC.Types.FieldLabel).
+
+For example, a definition like
 
     module M ( T(MkT, x) ) where
       data T = MkT { x :: Int }
 
-gives rise to
+gives rise to (in the parser):
 
-    IEThingWith T [MkT] [FieldLabel "x" False x)]           (without DuplicateRecordFields)
-    IEThingWith T [MkT] [FieldLabel "x" True $sel:x:MkT)]   (with    DuplicateRecordFields)
+    IEThingWith noExtField T NoIEWildcard [MkT,x] []
 
-See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details.
+but the renamer moves record fields from the general list of children to the
+list of field labels, giving one of these instead:
+
+  (without DuplicateRecordFields):
+    IEThingWith noExtField T NoIEWildcard [MkT] [FieldLabel "x" False () x]
+
+  (with DuplicateRecordFields):
+    IEThingWith noExtField T NoIEWildcard [MkT] [FieldLabel "x" True () $sel:x:MkT]
+
+See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details
+about how different FieldLabels are produced depending on the state of the
+DuplicateRecordFields extension.
+
+It might be better to move the list of field labels to the extension point, so
+that it is absent in GhcPs but present from GhcRn onwards. At the moment we
+simply maintain the invariant that the parser always produces an empty list.
 -}
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)

@@ -63,11 +63,10 @@ data PatSyn
         psArgs        :: [Type],
         psArity       :: Arity,        -- == length psArgs
         psInfix       :: Bool,         -- True <=> declared infix
-        psFieldLabels :: [FieldLabel], -- List of fields for a
-                                       -- record pattern synonym
-                                       -- INVARIANT: either empty if no
-                                       -- record pat syn or same length as
-                                       -- psArgs
+
+        -- List of fields for a record pattern synonym
+        -- INVARIANT: either empty if no record pat syn or same length as psArgs
+        psFieldLabels :: [FieldLabelNoUpdater],
 
         -- Universally-quantified type variables
         psUnivTyVars  :: [InvisTVBinder],
@@ -365,8 +364,8 @@ mkPatSyn :: Name
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
          -> Maybe (Id, Bool)     -- ^ Name of builder
-         -> [FieldLabel]         -- ^ Names of fields for
-                                 --   a record pattern synonym
+         -> [FieldLabelNoUpdater] -- ^ Names of fields for
+                                  --   a record pattern synonym
          -> PatSyn
  -- NB: The univ and ex vars are both in TyBinder form and TyVar form for
  -- convenience. All the TyBinders should be Named!
@@ -404,7 +403,7 @@ patSynArity = psArity
 patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs
 
-patSynFieldLabels :: PatSyn -> [FieldLabel]
+patSynFieldLabels :: PatSyn -> [FieldLabelNoUpdater]
 patSynFieldLabels = psFieldLabels
 
 -- | Extract the type for any given labelled field of the 'DataCon'

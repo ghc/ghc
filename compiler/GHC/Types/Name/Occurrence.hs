@@ -69,7 +69,7 @@ module GHC.Types.Name.Occurrence (
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
         mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
         mkInstTyCoOcc, mkEqPredCoOcc,
-        mkRecFldSelOcc,
+        mkRecFldSelOcc, mkRecFldUpdOcc, isRecFldUpdOcc,
         mkTyConRepOcc,
 
         -- ** Deconstruction
@@ -617,6 +617,12 @@ isTypeableBindOcc occ =
      '$':'t':'r':_ -> True  -- Module binding
      _ -> False
 
+isRecFldUpdOcc :: OccName -> Bool
+isRecFldUpdOcc occ =
+    case occNameString occ of
+      '$':'u':'p':'d':':':_ -> True
+      _ -> False
+
 mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
@@ -667,6 +673,11 @@ mkGen1R  = mk_simple_deriv tcName "Rep1_"
 -- Overloaded record field selectors
 mkRecFldSelOcc :: String -> OccName
 mkRecFldSelOcc s = mk_deriv varName "$sel" [fsLit s]
+
+-- Record field updaters
+mkRecFldUpdOcc :: String -> OccName
+mkRecFldUpdOcc s = mk_deriv varName "$upd" [fsLit s]
+
 
 mk_simple_deriv :: NameSpace -> FastString -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]

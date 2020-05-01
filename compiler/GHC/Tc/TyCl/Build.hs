@@ -27,6 +27,7 @@ import GHC.Core.PatSyn
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
@@ -176,7 +177,7 @@ buildPatSyn :: Name -> Bool
             -> ([InvisTVBinder], ThetaType) -- ^ Ex and prov
             -> [Type]                       -- ^ Argument types
             -> Type                         -- ^ Result type
-            -> [FieldLabel]                 -- ^ Field labels for
+            -> [FieldLabelNoUpdater]        -- ^ Field labels for
                                             --   a record pattern synonym
             -> PatSyn
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder

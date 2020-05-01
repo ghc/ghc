@@ -764,14 +764,16 @@ availFromGRE (GRE { gre_name = me, gre_par = parent })
                  | otherwise      -> avail   me
       FldParent p mb_lbl -> AvailTC p [] [mkFieldLabel me mb_lbl]
 
-mkFieldLabel :: Name -> Maybe FastString -> FieldLabel
+mkFieldLabel :: Name -> Maybe FastString -> FieldLabelNoUpdater
 mkFieldLabel me mb_lbl =
           case mb_lbl of
                  Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
                                         , flIsOverloaded = False
+                                        , flUpdate = ()
                                         , flSelector = me }
                  Just lbl -> FieldLabel { flLabel = lbl
                                         , flIsOverloaded = True
+                                        , flUpdate = ()
                                         , flSelector = me }
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
@@ -823,7 +825,7 @@ lookupGRE_Name :: GlobalRdrEnv -> Name -> Maybe GlobalRdrElt
 lookupGRE_Name env name
   = lookupGRE_Name_OccName env name (nameOccName name)
 
-lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLabel -> Maybe GlobalRdrElt
+lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLbl a Name -> Maybe GlobalRdrElt
 -- ^ Look for a particular record field selector in the environment, where the
 -- selector name and field label may be different: the GlobalRdrEnv is keyed on
 -- the label.  See Note [Parents for record fields] for why this happens.

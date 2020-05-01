@@ -387,6 +387,7 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
    -> TcM (TcGblEnv,            -- The full inst env
            [InstInfo GhcRn],    -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
+           [FamInst],           -- Family instances
            [DerivInfo])         -- From data family instances
 
 tcInstDecls1 inst_decls
@@ -403,6 +404,7 @@ tcInstDecls1 inst_decls
 
        ; return ( gbl_env
                 , local_infos
+                , fam_insts
                 , concat datafam_deriv_infos ) }
 
 -- | Use DerivInfo for data family instances (produced by tcInstDecls1),

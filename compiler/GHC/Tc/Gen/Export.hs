@@ -22,12 +22,12 @@ import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
-import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Utils.Misc (capitalise)
 import GHC.Data.FastString (fsLit)
 
+import GHC.Types.FieldLabel
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
@@ -376,7 +376,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie_with :: LIEWrappedName RdrName -> [LIEWrappedName RdrName]
                    -> RnM (Located Name, [LIEWrappedName Name], [Name],
-                           [Located FieldLabel])
+                           [Located FieldLabelNoUpdater])
     lookup_ie_with (L l rdr) sub_rdrs
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
              (non_flds, flds) <- lookupChildrenExport name sub_rdrs
@@ -387,7 +387,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                             , flds)
 
     lookup_ie_all :: IE GhcPs -> LIEWrappedName RdrName
-                  -> RnM (Located Name, [Name], [FieldLabel])
+                  -> RnM (Located Name, [Name], [FieldLabelNoUpdater])
     lookup_ie_all ie (L l rdr) =
           do name <- lookupGlobalOccRn $ ieWrappedName rdr
              let gres = findChildren kids_env name
@@ -417,13 +417,13 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
     addUsedKids parent_rdr kid_gres = addUsedGREs (pickGREs parent_rdr kid_gres)
 
-classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabel])
+classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabelNoUpdater])
 classifyGREs = partitionEithers . map classifyGRE
 
-classifyGRE :: GlobalRdrElt -> Either Name FieldLabel
+classifyGRE :: GlobalRdrElt -> Either Name FieldLabelNoUpdater
 classifyGRE gre = case gre_par gre of
-  FldParent _ Nothing -> Right (FieldLabel (occNameFS (nameOccName n)) False n)
-  FldParent _ (Just lbl) -> Right (FieldLabel lbl True n)
+  FldParent _ Nothing -> Right (FieldLabel (occNameFS (nameOccName n)) False () n)
+  FldParent _ (Just lbl) -> Right (FieldLabel lbl True () n)
   _                      -> Left  n
   where
     n = gre_name gre
@@ -490,7 +490,7 @@ If the module has NO main function:
 
 
 lookupChildrenExport :: Name -> [LIEWrappedName RdrName]
-                     -> RnM ([LIEWrappedName Name], [Located FieldLabel])
+                     -> RnM ( [LIEWrappedName Name], [Located FieldLabelNoUpdater] )
 lookupChildrenExport spec_parent rdr_items =
   do
     xs <- mapAndReportM doOne rdr_items
@@ -506,7 +506,7 @@ lookupChildrenExport spec_parent rdr_items =
           | otherwise = [ns]
         -- Process an individual child
         doOne :: LIEWrappedName RdrName
-              -> RnM (Either (LIEWrappedName Name) (Located FieldLabel))
+              -> RnM (Either (LIEWrappedName Name) (Located FieldLabelNoUpdater))
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n

@@ -10,4 +10,5 @@ class HasOccName name where
 
 occNameString :: OccName -> String
 mkRecFldSelOcc :: String -> OccName
+mkRecFldUpdOcc :: String -> OccName
 mkVarOccFS :: FastString -> OccName

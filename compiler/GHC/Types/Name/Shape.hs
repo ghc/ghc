@@ -188,14 +188,15 @@ substNameAvailInfo hsc_env env (AvailTC n ns fs) =
     let mb_mod = fmap nameModule (lookupNameEnv env n)
     in AvailTC (substName env n)
         <$> mapM (initIfaceLoad hsc_env . setNameModule mb_mod) ns
-        <*> mapM (setNameFieldSelector hsc_env mb_mod) fs
+        <*> mapM (setNameFieldLabel hsc_env mb_mod) fs
 
--- | Set the 'Module' of a 'FieldSelector'
-setNameFieldSelector :: HscEnv -> Maybe Module -> FieldLabel -> IO FieldLabel
-setNameFieldSelector _ Nothing f = return f
-setNameFieldSelector hsc_env mb_mod (FieldLabel l b sel) = do
+-- | Set the 'Module' of a 'FieldLabelNoUpdater'
+setNameFieldLabel :: HscEnv -> Maybe Module -> FieldLabelNoUpdater
+                  -> IO FieldLabelNoUpdater
+setNameFieldLabel _ Nothing f = return f
+setNameFieldLabel hsc_env mb_mod fl@(FieldLabel {flSelector = sel }) = do
     sel' <- initIfaceLoad hsc_env $ setNameModule mb_mod sel
-    return (FieldLabel l b sel')
+    return (fl { flSelector = sel' })
 
 {-
 ************************************************************************

@@ -26,6 +26,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -260,7 +261,7 @@ tyThingAvailInfo (ATyCon t)
         Nothing -> [AvailTC n (n : map getName dcs) flds]
              where n    = getName t
                    dcs  = tyConDataCons t
-                   flds = tyConFieldLabels t
+                   flds = fieldLabelsWithoutUpdaters (tyConFieldLabels t)
 tyThingAvailInfo (AConLike (PatSynCon p))
   = map avail ((getName p) : map flSelector (patSynFieldLabels p))
 tyThingAvailInfo t

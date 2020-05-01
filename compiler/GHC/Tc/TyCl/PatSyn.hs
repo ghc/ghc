@@ -712,6 +712,7 @@ tc_patsyn_finish lname dir is_infix lpat'
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel { flLabel = occNameFS (nameOccName name)
                                             , flIsOverloaded = False
+                                            , flUpdate = ()
                                             , flSelector = name }
              field_labels' = map mkFieldLabel field_labels
 
@@ -826,7 +827,7 @@ tcPatSynMatcher (L loc name) lpat
        ; return ((matcher_id, is_unlifted), matcher_bind) }
 
 mkPatSynRecSelBinds :: PatSyn
-                    -> [FieldLabel]  -- ^ Visible field labels
+                    -> [FieldLabelNoUpdater]  -- ^ Visible field labels
                     -> [(Id, LHsBind GhcRn)]
 mkPatSynRecSelBinds ps fields
   = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl

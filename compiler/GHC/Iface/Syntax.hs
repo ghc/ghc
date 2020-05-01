@@ -176,7 +176,7 @@ data IfaceDecl
                   ifPatReqCtxt    :: IfaceContext,
                   ifPatArgs       :: [IfaceType],
                   ifPatTy         :: IfaceType,
-                  ifFieldLabels   :: [FieldLabel] }
+                  ifFieldLabels   :: [FieldLabelNoUpdater] }
 
 -- See also 'ClassBody'
 data IfaceClassBody
@@ -265,7 +265,9 @@ data IfaceConDecl
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [(IfaceMult, IfaceType)],-- Arg types
-        ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
+        ifConFields  :: [FieldLabel], -- Field labels: we carefully serialise
+                                      -- the Names of the selector and updater,
+                                      -- so there is no doubt when deserialising
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
           -- or 1-1 corresp with arg tys
@@ -1620,7 +1622,7 @@ freeNamesIfConDecl (IfCon { ifConExTCvs  = ex_tvs, ifConCtxt = ctxt
     freeNamesIfContext ctxt &&&
     fnList freeNamesIfType (map fst arg_tys) &&& -- these are multiplicities, represented as types
     fnList freeNamesIfType (map snd arg_tys) &&&
-    mkNameSet (map flSelector flds) &&&
+    mkNameSet (concatMap (\fl -> [flSelector fl, flUpdate fl]) flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs
 

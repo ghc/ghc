@@ -1106,7 +1106,9 @@ GHC.Rename.Names.getLocalNonValBinders), so we just take the list as an
 argument, build a map and look them up.
 -}
 
-rnConDeclFields :: HsDocContext -> [FieldLabel] -> [LConDeclField GhcPs]
+rnConDeclFields :: HsDocContext
+                -> [FieldLabelNoUpdater]
+                -> [LConDeclField GhcPs]
                 -> RnM ([LConDeclField GhcRn], FreeVars)
 -- Also called from GHC.Rename.Module
 -- No wildcards can appear in record fields
@@ -1116,7 +1118,9 @@ rnConDeclFields ctxt fls fields
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
     fl_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
 
-rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
+rnField :: FastStringEnv FieldLabelNoUpdater
+        -> RnTyKiEnv
+        -> LConDeclField GhcPs
         -> RnM (LConDeclField GhcRn, FreeVars)
 rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
   = do { let new_names = map (fmap lookupField) names

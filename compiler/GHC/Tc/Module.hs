@@ -80,6 +80,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import GHC.Tc.Solver
 import GHC.Tc.TyCl
+import GHC.Tc.TyCl.Utils ( tcRecSelBinds )
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
 import GHC.Tc.Utils.Backpack
 
@@ -675,9 +676,15 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
-        ; (tcg_env, inst_infos, _deriv_binds)
+        ; (tcg_env, inst_infos, _deriv_binds, rec_sel_upd_binds)
              <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
+
+                -- Record selectors and updaters
+                -- See Note [Calling tcRecSelBinds] in GHC.Tc.TyCl.Utils
+        traceTc "Tc3a" empty ;
+        tcg_env <- tcRecSelBinds rec_sel_upd_binds ;
+        setGblEnv tcg_env $ do {
 
         -- Emit Typeable bindings
         ; tcg_env <- mkTypeableBinds
@@ -702,7 +709,7 @@ tcRnHsBootDecls hsc_src decls
               }
 
         ; setGlobalTypeEnv gbl_env type_env2
-   }}}
+   }}}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
@@ -1432,10 +1439,17 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
+        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs)
+          , rec_sel_upd_binds)
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
+
+                -- Record selectors and updaters
+                -- See Note [Calling tcRecSelBinds] in GHC.Tc.TyCl.Utils
+        traceTc "Tc3a" empty ;
+        tcg_env <- tcRecSelBinds rec_sel_upd_binds ;
+        setGblEnv tcg_env $ do {
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
         traceTc "Tc3b" empty ;
@@ -1513,7 +1527,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         addUsedGREs (bagToList fo_gres) ;
 
         return (tcg_env', tcl_env)
-    }}}}}}
+    }}}}}}}
 
 tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
 
@@ -1709,13 +1723,14 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                          [InstInfo GhcRn],    -- Source-code instance decls to
                                               -- process; contains all dfuns for
                                               -- this module
-                          HsValBinds GhcRn)   -- Supporting bindings for derived
+                          HsValBinds GhcRn,   -- Supporting bindings for derived
                                               -- instances
+                          [(Id, LHsBind GhcRn)]) -- Record selector/updater bindings
 
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, deriv_info)
+   do { (tcg_env, inst_info, deriv_info, rec_sel_upd_binds)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1729,7 +1744,7 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
               <- tcInstDeclsDeriv deriv_info deriv_decls
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
-              ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
+              ; pure (tcg_env', inst_info' ++ inst_info, val_binds, rec_sel_upd_binds)
       }}}
 
 {- *********************************************************************
