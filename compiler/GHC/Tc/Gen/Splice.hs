@@ -205,7 +205,8 @@ tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
        ; ps' <- readMutVar ps_ref
        ; pprTraceM "tcTypedBracket" (ppr ps')
        ; zz <- readMutVar zz_ref
-       ; pprTraceM "tcTypedBracket" (ppr zz)
+       ; pprTraceM "tcTypedBracket:zz" (ppr zz)
+       ; pprTraceM "tcTypedBracket:ts" (ppr ts)
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr

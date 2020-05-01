@@ -805,13 +805,14 @@ zonkExpr env (HsTcTypedBracketOut x body bs zs2)
     zonk_z_2 (PendingZonkSplice2 t e) = do
       t' <- zonkTyVarOcc env t
       sp <- mkSpliceId (typeKind t')
+      e' <- zonkCoreExpr env (evId e)
       pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
       pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
       let mtv = getTyVar_maybe t'
       case mtv of
         Nothing -> return Nothing
-        Just tv' -> 
-          return $ Just ((tv', sp), (PendingZonkSplice sp Nothing (evId e)))
+        Just tv' ->
+          return $ Just ((tv', sp), (PendingZonkSplice sp Nothing e'))
 
 
     zonk_b (PendingTcSplice n e) = do
@@ -1849,7 +1850,8 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
 
   where
     lookup_in_tv_env    -- Look up in the env just as we do for Ids
-      = pprTrace "lookup_in_tv" (ppr tv) $ case lookupVarEnv tv_env tv of
+      =  -- pprTrace "lookup_in_tv" (ppr tv) $
+        case lookupVarEnv tv_env tv of
           Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
           Just tv' -> return (mkTyVarTy tv')
 
