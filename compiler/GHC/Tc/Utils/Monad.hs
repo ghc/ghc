@@ -712,8 +712,8 @@ dumpTcRn useUserStyle dumpOpt title fmt doc = do
   printer <- getPrintUnqualified dflags
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
-              then mkUserStyle dflags printer AllTheWay
-              else mkDumpStyle dflags printer
+              then mkUserStyle printer AllTheWay
+              else mkDumpStyle printer
   liftIO $ dumpAction dflags sty dumpOpt title fmt real_doc
 
 -- | Add current location if -dppr-debug
@@ -1902,7 +1902,7 @@ failIfM msg
         ; let full_msg = (if_loc env <> colon) $$ nest 2 msg
         ; dflags <- getDynFlags
         ; liftIO (putLogMsg dflags NoReason SevFatal
-                   noSrcSpan (defaultErrStyle dflags) full_msg)
+                   noSrcSpan $ withPprStyle (defaultErrStyle dflags) full_msg)
         ; failM }
 
 --------------------
@@ -1938,8 +1938,7 @@ forkM_maybe doc thing_inside
                                              NoReason
                                              SevFatal
                                              noSrcSpan
-                                             (defaultErrStyle dflags)
-                                             msg
+                                             $ withPprStyle (defaultErrStyle dflags) msg
 
                     ; traceIf (text "} ending fork (badly)" <+> doc)
                     ; return Nothing }

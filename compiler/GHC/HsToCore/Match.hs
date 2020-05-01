@@ -859,8 +859,10 @@ matchSinglePatVar var ctx pat ty match_result
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
 
-                    -- Pattern match check warnings
-       ; checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
+       -- Pattern match check warnings
+       ; if isMatchContextPmChecked dflags FromSource ctx
+            then checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
+            else pure ()
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource

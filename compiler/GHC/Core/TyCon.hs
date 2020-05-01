@@ -2576,9 +2576,11 @@ instance Outputable TyCon where
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc) <> pp_tc
     where
-      pp_tc = getPprStyle $ \sty -> if ((debugStyle sty || dumpStyle sty) && isTcTyCon tc)
-                                    then text "[tc]"
-                                    else empty
+      pp_tc = getPprStyle $ \sty ->
+              getPprDebug $ \debug ->
+               if ((debug || dumpStyle sty) && isTcTyCon tc)
+                  then text "[tc]"
+                  else empty
 
 -- | Paints a picture of what a 'TyCon' represents, in broad strokes.
 -- This is used towards more informative error messages.

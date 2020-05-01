@@ -515,9 +515,9 @@ mkBackpackMsg = do
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
 -- to qualify packages so we can use simple names for them.
-backpackStyle :: DynFlags -> PprStyle
-backpackStyle dflags =
-    mkUserStyle dflags
+backpackStyle :: PprStyle
+backpackStyle =
+    mkUserStyle
         (QueryQualify neverQualifyNames
                       alwaysQualifyModules
                       neverQualifyPackages) AllTheWay
@@ -537,7 +537,7 @@ msgUnitId pk = do
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
         $ "Instantiating " ++ renderWithStyle
-                                (initSDocContext dflags (backpackStyle dflags))
+                                (initSDocContext dflags backpackStyle)
                                 (ppr pk)
 
 -- | Message when we include a Backpack unit.
@@ -547,7 +547,7 @@ msgInclude (i,n) uid = do
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
         $ showModuleIndex (i, n) ++ "Including " ++
-          renderWithStyle (initSDocContext dflags (backpackStyle dflags))
+          renderWithStyle (initSDocContext dflags backpackStyle)
             (ppr uid)
 
 -- ----------------------------------------------------------------------------

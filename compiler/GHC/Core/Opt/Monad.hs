@@ -779,9 +779,9 @@ msg sev reason doc
                      SevDump    -> dump_sty
                      _          -> user_sty
              err_sty  = mkErrStyle dflags unqual
-             user_sty = mkUserStyle dflags unqual AllTheWay
-             dump_sty = mkDumpStyle dflags unqual
-       ; liftIO $ putLogMsg dflags reason sev loc sty doc }
+             user_sty = mkUserStyle unqual AllTheWay
+             dump_sty = mkDumpStyle unqual
+       ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -824,5 +824,5 @@ dumpIfSet_dyn flag str fmt doc
   = do { dflags <- getDynFlags
        ; unqual <- getPrintUnqualified
        ; when (dopt flag dflags) $ liftIO $ do
-         let sty = mkDumpStyle dflags unqual
+         let sty = mkDumpStyle unqual
          dumpAction dflags sty (dumpOptionsFromFlag flag) str fmt doc }

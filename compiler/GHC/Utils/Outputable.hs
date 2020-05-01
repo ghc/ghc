@@ -64,7 +64,7 @@ module GHC.Utils.Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle, CodeStyle(..), PrintUnqualified(..),
+        PprStyle(..), CodeStyle(..), PrintUnqualified(..),
         QueryQualifyName, QueryQualifyModule, QueryQualifyPackage,
         reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
@@ -76,7 +76,7 @@ module GHC.Utils.Outputable (
         SDocContext (..), sdocWithContext,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
-        codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
+        codeStyle, userStyle, dumpStyle, asmStyle,
         qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
@@ -155,11 +155,9 @@ data PprStyle
                 -- printed without uniques.
 
   | PprDump PrintUnqualified
-                -- For -ddump-foo; less verbose than PprDebug, but more than PprUser
+                -- For -ddump-foo; less verbose than in ppr-debug mode, but more than PprUser
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
-
-  | PprDebug    -- Full debugging output
 
   | PprCode CodeStyle
                 -- Print code; either C or assembler
@@ -252,44 +250,35 @@ neverQualify  = QueryQualify neverQualifyNames
                              neverQualifyModules
                              neverQualifyPackages
 
-defaultUserStyle :: DynFlags -> PprStyle
-defaultUserStyle dflags = mkUserStyle dflags neverQualify AllTheWay
+defaultUserStyle :: PprStyle
+defaultUserStyle = mkUserStyle neverQualify AllTheWay
 
-defaultDumpStyle :: DynFlags -> PprStyle
+defaultDumpStyle :: PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
-defaultDumpStyle dflags
-   | hasPprDebug dflags = PprDebug
-   | otherwise          = PprDump neverQualify
+defaultDumpStyle = PprDump neverQualify
 
-mkDumpStyle :: DynFlags -> PrintUnqualified -> PprStyle
-mkDumpStyle dflags print_unqual
-   | hasPprDebug dflags = PprDebug
-   | otherwise          = PprDump print_unqual
+mkDumpStyle :: PrintUnqualified -> PprStyle
+mkDumpStyle print_unqual = PprDump print_unqual
 
-defaultErrStyle :: DynFlags -> PprStyle
--- Default style for error messages, when we don't know PrintUnqualified
+-- | Default style for error messages, when we don't know PrintUnqualified
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
--- NB that -dppr-debug will still get into PprDebug style
+defaultErrStyle :: DynFlags -> PprStyle
 defaultErrStyle dflags = mkErrStyle dflags neverQualify
 
 -- | Style for printing error messages
 mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkErrStyle dflags qual =
-   mkUserStyle dflags qual (PartWay (pprUserLength dflags))
+   mkUserStyle qual (PartWay (pprUserLength dflags))
 
-cmdlineParserStyle :: DynFlags -> PprStyle
-cmdlineParserStyle dflags = mkUserStyle dflags alwaysQualify AllTheWay
+cmdlineParserStyle :: PprStyle
+cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
 
-mkUserStyle :: DynFlags -> PrintUnqualified -> Depth -> PprStyle
-mkUserStyle dflags unqual depth
-   | hasPprDebug dflags = PprDebug
-   | otherwise          = PprUser unqual depth Uncoloured
+mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
+mkUserStyle unqual depth = PprUser unqual depth Uncoloured
 
 withUserStyle :: PrintUnqualified -> Depth -> SDoc -> SDoc
-withUserStyle unqual depth doc = sdocOption sdocPprDebug $ \case
-   True  -> withPprStyle PprDebug doc
-   False -> withPprStyle (PprUser unqual depth Uncoloured) doc
+withUserStyle unqual depth doc = withPprStyle (PprUser unqual depth Uncoloured) doc
 
 withErrStyle :: PrintUnqualified -> SDoc -> SDoc
 withErrStyle unqual doc =
@@ -309,7 +298,6 @@ instance Outputable PprStyle where
   ppr (PprUser {})  = text "user-style"
   ppr (PprCode {})  = text "code-style"
   ppr (PprDump {})  = text "dump-style"
-  ppr (PprDebug {}) = text "debug-style"
 
 {-
 Orthogonal to the above printing styles are (possibly) some
@@ -463,23 +451,20 @@ dumpStyle :: PprStyle -> Bool
 dumpStyle (PprDump {}) = True
 dumpStyle _other       = False
 
-debugStyle :: PprStyle -> Bool
-debugStyle PprDebug = True
-debugStyle _other   = False
-
 userStyle ::  PprStyle -> Bool
 userStyle (PprUser {}) = True
 userStyle _other       = False
 
+-- | Indicate if -dppr-debug mode is enabled
 getPprDebug :: (Bool -> SDoc) -> SDoc
-getPprDebug d = getPprStyle $ \ sty -> d (debugStyle sty)
+getPprDebug d = sdocWithContext $ \ctx -> d (sdocPprDebug ctx)
 
+-- | Says what to do with and without -dppr-debug
 ifPprDebug :: SDoc -> SDoc -> SDoc
--- ^ Says what to do with and without -dppr-debug
-ifPprDebug yes no = getPprDebug $ \ dbg -> if dbg then yes else no
+ifPprDebug yes no = getPprDebug $ \dbg -> if dbg then yes else no
 
+-- | Says what to do with -dppr-debug; without, return empty
 whenPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
--- ^ Says what to do with -dppr-debug; without, return empty
 whenPprDebug d = ifPprDebug d empty
 
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
@@ -502,13 +487,13 @@ printSDocLn ctx mode handle doc =
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
   = printSDocLn ctx PageMode handle doc
-    where ctx = initSDocContext dflags (mkUserStyle dflags unqual AllTheWay)
+    where ctx = initSDocContext dflags (mkUserStyle unqual AllTheWay)
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
   = printSDocLn ctx PageMode handle doc
-    where ctx = initSDocContext dflags (mkUserStyle dflags unqual (PartWay d))
+    where ctx = initSDocContext dflags (mkUserStyle unqual (PartWay d))
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
 -- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
@@ -533,7 +518,7 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags sdoc = renderWithStyle (initSDocContext dflags (defaultUserStyle dflags)) sdoc
+showSDoc dflags sdoc = renderWithStyle (initSDocContext dflags defaultUserStyle) sdoc
 
 -- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
 -- initialised yet.
@@ -550,13 +535,17 @@ showSDocUnqual dflags sdoc = showSDoc dflags sdoc
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 -- Allows caller to specify the PrintUnqualified to use
 showSDocForUser dflags unqual doc
- = renderWithStyle (initSDocContext dflags (mkUserStyle dflags unqual AllTheWay)) doc
+ = renderWithStyle (initSDocContext dflags (mkUserStyle unqual AllTheWay)) doc
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d = renderWithStyle (initSDocContext dflags (defaultDumpStyle dflags)) d
+showSDocDump dflags d = renderWithStyle (initSDocContext dflags defaultDumpStyle) d
 
 showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = renderWithStyle (initSDocContext dflags PprDebug) d
+showSDocDebug dflags d = renderWithStyle ctx d
+   where
+      ctx = (initSDocContext dflags defaultDumpStyle)
+               { sdocPprDebug = True
+               }
 
 renderWithStyle :: SDocContext -> SDoc -> String
 renderWithStyle ctx sdoc
@@ -579,14 +568,14 @@ showSDocDumpOneLine dflags d
  = let s = Pretty.style{ Pretty.mode = OneLineMode,
                          Pretty.lineLength = irrelevantNCols } in
    Pretty.renderStyle s $
-      runSDoc d (initSDocContext dflags (defaultDumpStyle dflags))
+      runSDoc d (initSDocContext dflags defaultDumpStyle)
 
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
 irrelevantNCols = 1
 
 isEmpty :: SDocContext -> SDoc -> Bool
-isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc (ctx {sdocStyle = PprDebug})
+isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc (ctx {sdocPprDebug = True})
 
 docToSDoc :: Doc -> SDoc
 docToSDoc d = SDoc (\_ -> d)
