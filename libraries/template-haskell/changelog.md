@@ -22,6 +22,8 @@
   * Fix Show instance for `Bytes`: we were showing the pointer value while we
     want to show the contents (#16457).
 
+  * Add `Semigroup` and `Monoid` instances for `Q` (#18123).
+
 ## 2.16.0.0 *TBA*
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and

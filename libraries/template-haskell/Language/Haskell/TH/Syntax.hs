@@ -33,6 +33,7 @@ import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Applicative (liftA2)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
@@ -205,6 +206,14 @@ instance Applicative Q where
   pure x = Q (pure x)
   Q f <*> Q x = Q (f <*> x)
   Q m *> Q n = Q (m *> n)
+
+-- | @since 2.17.0.0
+instance Semigroup a => Semigroup (Q a) where
+  (<>) = liftA2 (<>)
+
+-- | @since 2.17.0.0
+instance Monoid a => Monoid (Q a) where
+  mempty = pure mempty
 
 -----------------------------------------------------
 --
