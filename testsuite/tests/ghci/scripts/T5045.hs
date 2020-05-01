@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE Arrows, FunctionalDependencies, FlexibleContexts, 
+{-# LANGUAGE Arrows, FunctionalDependencies, FlexibleContexts,
              MultiParamTypeClasses, RecordWildCards  #-}
 
 module T5045 where
@@ -7,7 +7,7 @@ module T5045 where
 import Control.Arrow
 
 class (Control.Arrow.Arrow a') => ArrowAddReader r a a' | a -> a' where
-  elimReader :: a (e, s) b -> a' (e, (r, s)) b
+  elimReader :: a e b -> a' (e, r) b
 
 newtype ByteString = FakeByteString String
 
@@ -17,7 +17,7 @@ pathInfo = undefined
 requestMethod :: Monad m => m String
 requestMethod = undefined
 
-getInputsFPS :: Monad m => m [(String, ByteString)]  
+getInputsFPS :: Monad m => m [(String, ByteString)]
 getInputsFPS = undefined
 
 class HTTPRequest r s | r -> s where
@@ -37,9 +37,9 @@ instance HTTPRequest CGIDispatch ByteString where
     httpGetMethod = dispatchMethod
     httpGetInputs = dispatchInputs
 
-runDispatch :: (Arrow a, ArrowAddReader CGIDispatch a a', Monad m) => a b  c -> m (a' b c)  
+runDispatch :: (Arrow a, ArrowAddReader CGIDispatch a a', Monad m) => a b  c -> m (a' b c)
 runDispatch a = do
     dispatchPath <- pathInfo
     dispatchMethod <- requestMethod
     dispatchInputs <- getInputsFPS
-    return $ proc b -> (| elimReader (a -< b) |) CGIDispatch { .. }  
+    return $ proc b -> (| elimReader (a -< b) |) CGIDispatch { .. }
