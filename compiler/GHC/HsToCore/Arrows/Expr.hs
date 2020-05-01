@@ -65,8 +65,9 @@ specialised away.
 Until we have a way to avoid preemption from the builtin class op
 rules, these simplifications are just too useful to pass up. Most
 importantly, they give us freedom to generate stupid
-environment-passing code (see Note [The command environment]) where we
-have confidence it will be optimised away. For example, we might have
+environment-passing code (see Note [The command environment] in
+GHC.HsToCore.Arrows.Expr) where we have confidence it will be
+optimised away. For example, we might have
 
     (foo >>> arr (\(a, b) -> (b, a))) >>> arr (\(b, _) -> b) >>> bar
 
@@ -83,7 +84,7 @@ This is all somewhat unsatisfying, since these rewritings might very
 well do good things on other code, too. But doing nothing is much
 worse: a previous incarnation of the arrow desugarer didn’t do this
 tidying but instead went to some length to avoid ever generating
-“stupid” expressions like the one above. That made the code
+“stupid” expressions like the one above. That made the desugaring code
 significantly more difficult to read (and it still generated bad code
 sometimes). So for now we do this here, but maybe we can get rid of it
 in the future if the optimiser becomes cleverer. -}
@@ -254,6 +255,7 @@ ds_arr_expr DsArrMethods{..} expr = ds_expr <$> tidy_up_typed expr
       arg_id <- newSysLocalDs arg_ty
       pure $ Lam arg_id $ mkCoreApps g [mkCoreApps f [Var arg_id]]
 
+    -- We’re done tidying, so it’s time to do the actual codegen.
     ds_expr :: DsTArrExpr -> CoreExpr
     ds_expr (TypedArr _ _ (ExprArr expr)) = expr
     ds_expr (TypedArr _ _ (WrapArr wrap expr)) = wrap $ ds_expr expr
@@ -262,7 +264,7 @@ ds_arr_expr DsArrMethods{..} expr = ds_expr <$> tidy_up_typed expr
     ds_expr expr@(TypedArr in_ty out_ty AppArr)
       | Just (_, [_, in_ty']) <- tcSplitTyConApp_maybe in_ty
       = mkApps am_app [Type in_ty', Type out_ty]
-      | otherwise = pprPanic "ds_expr: first" $ ppr expr
+      | otherwise = pprPanic "ds_expr: app" $ ppr expr
 
     -- arr :: forall b c. (b -> c) -> a b c
     ds_expr (TypedArr in_ty out_ty (ArrArr expr))

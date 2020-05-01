@@ -54,9 +54,9 @@ dsGuarded grhss rhs_ty mb_rhss_deltas = do
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-dsGRHSs :: (rhs -> DsM CoreExpr)       -- ^ How to desugar each RHS
+dsGRHSs :: (body -> DsM CoreExpr)      -- ^ How to desugar each RHS
         -> HsMatchContext GhcRn
-        -> GRHSs GhcTc rhs             -- ^ Guarded RHSs
+        -> GRHSs GhcTc body            -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> Maybe (NonEmpty Deltas)     -- ^ Refined pattern match checking
                                        --   models, one for each GRHS. Defaults
@@ -73,8 +73,8 @@ dsGRHSs ds_rhs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: (rhs -> DsM CoreExpr) -> HsMatchContext GhcRn -> Type -> Deltas
-       -> LGRHS GhcTc rhs -> DsM MatchResult
+dsGRHS :: (body -> DsM CoreExpr) -> HsMatchContext GhcRn -> Type -> Deltas
+       -> LGRHS GhcTc body -> DsM MatchResult
 dsGRHS ds_rhs hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
   = updPmDeltas rhs_deltas $
     matchGuards ds_rhs (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
@@ -87,11 +87,11 @@ dsGRHS ds_rhs hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
 ************************************************************************
 -}
 
-matchGuards :: (rhs -> DsM CoreExpr) -- How to desugar each RHS
-            -> [GuardStmt GhcTc]     -- Guard
-            -> HsStmtContext GhcRn   -- Context
-            -> rhs                   -- RHS
-            -> Type                  -- Type of RHS of guard
+matchGuards :: (body -> DsM CoreExpr) -- How to desugar each RHS
+            -> [GuardStmt GhcTc]      -- Guard
+            -> HsStmtContext GhcRn    -- Context
+            -> body                   -- RHS
+            -> Type                   -- Type of RHS of guard
             -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what a BodyStmt means

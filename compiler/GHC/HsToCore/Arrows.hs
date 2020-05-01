@@ -90,7 +90,7 @@ When we desugar sequencing of the form
 we can determine the set of variables bound by pat1 that are used in
 cmd1 and cmd2. In the example above, b is used in `f -< b`, while a
 and c are used in `g -< (c, a + d)`. We can build an arrow that
-partitions the values into the left and write sides of a pair:
+partitions the values into the left and right sides of a pair:
 
         arr (\(a, b, c) -> (b, (a, c)))
 
@@ -118,8 +118,8 @@ then AllEnvIds will contain {a, b, c} while desugaring cmd1 and
 {a, b, c, d} while desugaring cmd2.
 
 It would be quite inefficient to actually pass around the *entire*
-local environment through the whole computation, since many of them
-may only be used in certain branches. For that reason, we also return
+local environment through the whole computation, since most variables
+will only be used in certain branches. For that reason, we also return
 the set of arrow-local variables that were actually used by each
 command, UsedEnvIds.
 
@@ -146,8 +146,8 @@ contents of the command environment are implicitly determined by the
 set of variables currently in scope, the command stack is explicitly
 manipulated in the source program.
 
-Most commands do not interact with the stack at all, and in fact they
-require that it be empty. The commands that do care about the stack are:
+Most commands do not interact with the stack at all, they just pass it
+along. The commands that do care about the stack are:
 
     * arrow application       f -< e   /   f -<< e
     * command application     cmd e
@@ -169,7 +169,7 @@ and the same idea applies to -<<. This on its own is not especially
 useful, but the main reason the stack exists is for control operators.
 Control operators use the stack to both receive arguments from the
 current environment and to pass arguments to their sub-commands. For
-example, we might have an operator such as the following:
+example, we might have an operator like the following:
 
     traverseA :: (ArrowChoice p, Traversable t)
               => p (e, a) b -> p (e, t a) (t b)
@@ -190,23 +190,13 @@ only b) and passed to traverseA. The desugared expression is roughly:
     first f >>> arr (\(cs, b) -> (b, cs))
       >>> traverseA (arr (\(b, c) -> b + c) >>> f))
 
-In the rare cases when the stack isn’t empty, it is threaded alongside
-the other values in the environment tuple. -}
+Any values currently on the stack that aren’t consumed by the current
+command are threaded alongside the other values in the environment
+tuple (see mkEnvStackTup). -}
 
 type AllEnvIds  = IdSet    -- see Note [The command environment]
 type UsedEnvIds = DIdSet   -- see Note [The command environment]
 type StackIds   = [Id]     -- see Note [The command stack]
-
-----------------------------------------------
-
-mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
-mkFailExpr ctxt ty
-  = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
-
-coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
-coreCasePair scrut_var var1 var2 body
-  = Case (Var scrut_var) scrut_var (exprType body)
-         [(DataAlt (tupleDataCon Boxed 2), [var1, var2], body)]
 
 ----------------------------------------------
 
@@ -286,6 +276,8 @@ matchEnvStackTup env_ids stk_ids body = do
 
 ----------------------------------------------
 
+-- | Desugars a @proc@ expression (aka arrow abstraction);
+-- see Note [Desugaring arrow notation: the basics].
 dsProcExpr :: LPat GhcTc -> LHsCmdTop GhcTc -> DsM CoreExpr
 dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _ res_ty stx_table) cmd)) = do
   let env_ids = mkVarSet $ collectPatBinders pat
@@ -305,6 +297,7 @@ dsLCmd :: AllEnvIds -> StackIds -> Type
 dsLCmd env_ids stk_ids res_ty cmd
   = dsCmd env_ids stk_ids res_ty (unLoc cmd)
 
+-- see Note [Desugaring arrow notation: the basics]
 dsCmd :: AllEnvIds     -- ^ see Note [The command environment]
       -> StackIds      -- ^ see Note [The command stack]
       -> Type          -- ^ return type of the command
@@ -424,12 +417,12 @@ dsCmd env_ids stk_ids res_ty cmd@(HsCmdLam _ matches) = do
 -- there are only ever exactly two branches. So we just desugar them
 -- directly rather than use dsCmdMatch.
 --
--- desugar[[ D1, [], if e then cmd1 else cmd2 ]]
+-- desugar[[ D1, s, if e then cmd1 else cmd2 ]]
 --   = arr (\(D4) -> if e' then Left (D2) else Right (D3)) >>> (e1 ||| e2)
 --   where
 --     e'     = desugar[[ D1, e ]]
---     e1, D2 = desugar[[ D1, [], cmd1 ]]
---     e2, D3 = desugar[[ D1, [], cmd2 ]]
+--     e1, D2 = desugar[[ D1, s, cmd1 ]]
+--     e2, D3 = desugar[[ D1, s, cmd2 ]]
 --     D4     = (fvs(e') ∩ D1) ∪ D2 ∪ D3
 
 dsCmd env_ids stk_ids res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd) = do
@@ -523,12 +516,10 @@ dsCmd env_ids stk_ids res_ty (HsCmdLet _ binds cmd) = do
   pure (mkPremapArr env_ty lam core_cmd, used_ids')
 
 -- --------------------------------------------------------
--- do commands
+-- miscellaneous other commands
 
 dsCmd env_ids [] res_ty (HsCmdDo _ (L _ stmts))
   = dsCmdStmts env_ids (DsDoStmts res_ty) stmts
-
--- --------------------------------------------------------
 
 dsCmd env_ids stk_ids res_ty (HsCmdPar _ cmd)
   = dsLCmd env_ids stk_ids res_ty cmd
@@ -700,12 +691,12 @@ dsCmdStmt env_ids
 
 dsCmdStmt _ stmt = pprPanic "dsCmdStmt" $ ppr stmt
 
--- --------------------------------------------------------
+-- -------------------------------------------------------------------
 
 {- Note [Desugaring case commands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case commands are particularly complicated to desugar. A case command
-looks just like a case expression, except that the RHSs are commands:
+looks just like a case expression, except the RHSs are commands:
 
     case e0 of { pat1 -> cmd1; pat2 -> cmd2; pat3 -> cmd3 }
 
@@ -713,8 +704,9 @@ The only way for an arrow to branch is to use the (|||) operator, so
 we can’t place the desugared commands directly inside the desugared
 case expression. Instead, we have to do the branching indirectly. We
 replace each RHSs of the case expression with an environment tuple
-(see Note [The command environment]), then precompose it with the tree
-of desugared commands:
+(see Note [The command environment]), then wrap it in some number of
+Left/Right constructors before passing the result to the tree of
+desugared commands:
 
     arr (\env0 -> case e0 of { pat1 -> Left (Left env1);
                                pat2 -> Left (Right env2);
@@ -809,7 +801,8 @@ dsCmdMatch env_ids stk_ids res_ty match_ctxt mb_scrut
         , mkEnvStackTupTy used_ids stk_ids
         , [mkEnvStackTup used_ids stk_ids] )
 
-    -- Builds a branch of the case tree. Each argument is a tuple of:
+    -- Builds a branch of the case tree, as described in
+    -- Note [Desugaring case commands]. Each argument is a tuple of:
     --
     --   1. A tree of desugared commands accumulated so far.
     --   2. The input type of the tree of desugared commands.
@@ -849,6 +842,18 @@ dsCmdMatch env_ids stk_ids res_ty match_ctxt mb_scrut
         fold_pairs [] = []
         fold_pairs [x] = [x]
         fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
+
+-- -------------------------------------------------------------------
+-- miscellaneous helper functions
+
+mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr ctxt ty
+  = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
+
+coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
+coreCasePair scrut_var var1 var2 body
+  = Case (Var scrut_var) scrut_var (exprType body)
+         [(DataAlt (tupleDataCon Boxed 2), [var1, var2], body)]
 
 {-
 Note [Dictionary binders in ConPatOut] See also same Note in GHC.Hs.Utils

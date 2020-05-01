@@ -713,13 +713,13 @@ matchWrapper = matchWrapperWith dsLExpr
 
 -- | Like 'matchWrapper', but accepts an additional argument, which is
 -- called to desugar each RHS. This is used by the arrow desugaring to
--- desugar @case@ commands.
+-- desugar @case@ commands, which contain commands rather than expressions.
 matchWrapperWith
-  :: Outputable rhs
-  => (rhs -> DsM CoreExpr)   -- ^ How to desugar the RHSs
+  :: Outputable body
+  => (body -> DsM CoreExpr)   -- ^ How to desugar the RHSs
   -> HsMatchContext GhcRn
   -> Maybe (LHsExpr GhcTc)
-  -> MatchGroup GhcTc rhs
+  -> MatchGroup GhcTc body
   -> DsM ([Id], CoreExpr)
 
 {-
