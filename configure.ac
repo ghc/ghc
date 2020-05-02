@@ -117,6 +117,16 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
+AC_ARG_ENABLE(asserts-all-ways,
+[AC_HELP_STRING([--enable-asserts-all-ways],
+                [Compile-in ASSERTs in all ways])],
+        EnableAssertsAllWays=YES,
+        EnableAssertsAllWays=NO
+)
+if test "$enable_asserts_all_ways" = "yes" ; then
+   AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
+fi
+
 AC_ARG_ENABLE(native-io-manager,
 [AC_HELP_STRING([--enable-native-io-manager],
                 [Enable the native I/O manager by default.])],
@@ -128,6 +138,7 @@ if test "$EnableNativeIOManager" = "YES"; then
   AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
 
 fi
+
 
 dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
 dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
