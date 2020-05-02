@@ -57,7 +57,7 @@ main = do
   libdir:_ <- getArgs
   df <- dynFlagsForPrinting libdir
   nc <- makeNc
-  (hfr, nc') <- readHieFile nc "PatTypes.hie"
+  hfr <- readHieFile (NCU (\f -> pure $ snd $ f nc)) "PatTypes.hie"
   let hf = hie_file_result hfr
   forM_ [p1,p2,p3,p4] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "
