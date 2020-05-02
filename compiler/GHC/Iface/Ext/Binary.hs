@@ -12,6 +12,7 @@ module GHC.Iface.Ext.Binary
    , HieFileResult(..)
    , hieMagic
    , hieNameOcc
+   , NameCacheUpdater(..)
    )
 where
 
@@ -33,6 +34,7 @@ import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
+import GHC.Iface.Env (NameCacheUpdater(..))
 
 import qualified Data.Array as A
 import Data.IORef
@@ -189,23 +191,23 @@ type HieHeader = (Integer, ByteString)
 -- an existing `NameCache`. Allows you to specify
 -- which versions of hieFile to attempt to read.
 -- `Left` case returns the failing header versions.
-readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader (HieFileResult, NameCache))
-readHieFileWithVersion readVersion nc file = do
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCacheUpdater -> FilePath -> IO (Either HieHeader HieFileResult)
+readHieFileWithVersion readVersion ncu file = do
   bh0 <- readBinMem file
 
   (hieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   if readVersion (hieVersion, ghcVersion)
   then do
-    (hieFile, nc') <- readHieFileContents bh0 nc
-    return $ Right (HieFileResult hieVersion ghcVersion hieFile, nc')
+    hieFile <- readHieFileContents bh0 ncu
+    return $ Right (HieFileResult hieVersion ghcVersion hieFile)
   else return $ Left (hieVersion, ghcVersion)
 
 
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`.
-readHieFile :: NameCache -> FilePath -> IO (HieFileResult, NameCache)
-readHieFile nc file = do
+readHieFile :: NameCacheUpdater -> FilePath -> IO HieFileResult
+readHieFile ncu file = do
 
   bh0 <- readBinMem file
 
@@ -219,8 +221,8 @@ readHieFile nc file = do
                     , show hieVersion
                     , "but got", show readHieVersion
                     ]
-  (hieFile, nc') <- readHieFileContents bh0 nc
-  return $ (HieFileResult hieVersion ghcVersion hieFile, nc')
+  hieFile <- readHieFileContents bh0 ncu
+  return $ HieFileResult hieVersion ghcVersion hieFile
 
 readBinLine :: BinHandle -> IO ByteString
 readBinLine bh = BS.pack . reverse <$> loop []
@@ -254,24 +256,24 @@ readHieFileHeader file bh0 = do
                         ]
       return (readHieVersion, ghcVersion)
 
-readHieFileContents :: BinHandle -> NameCache -> IO (HieFile, NameCache)
-readHieFileContents bh0 nc = do
+readHieFileContents :: BinHandle -> NameCacheUpdater -> IO HieFile
+readHieFileContents bh0 ncu = do
 
   dict  <- get_dictionary bh0
 
   -- read the symbol table so we are capable of reading the actual data
-  (bh1, nc') <- do
+  bh1 <- do
       let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
                                                (getDictFastString dict)
-      (nc', symtab) <- get_symbol_table bh1
+      symtab <- get_symbol_table bh1
       let bh1' = setUserData bh1
                $ newReadState (getSymTabName symtab)
                               (getDictFastString dict)
-      return (bh1', nc')
+      return bh1'
 
   -- load the actual data
   hiefile <- get bh1
-  return (hiefile, nc')
+  return hiefile
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
@@ -285,9 +287,9 @@ readHieFileContents bh0 nc = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
       seekBin bh1 symtab_p
-      (nc', symtab) <- getSymbolTable bh1 nc
+      symtab <- getSymbolTable bh1 ncu
       seekBin bh1 data_p'
-      return (nc', symtab)
+      return symtab
 
 putFastString :: HieDictionary -> BinHandle -> FastString -> IO ()
 putFastString HieDictionary { hie_dict_next = j_r,
@@ -309,13 +311,14 @@ putSymbolTable bh next_off symtab = do
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, SymbolTable)
-getSymbolTable bh namecache = do
+getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
+getSymbolTable bh ncu = do
   sz <- get bh
   od_names <- replicateM sz (getHieName bh)
-  let arr = A.listArray (0,sz-1) names
-      (namecache', names) = mapAccumR fromHieName namecache od_names
-  return (namecache', arr)
+  updateNameCache ncu $ \nc ->
+    let arr = A.listArray (0,sz-1) names
+        (nc', names) = mapAccumR fromHieName nc od_names
+        in (nc',arr)
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
 getSymTabName st bh = do
