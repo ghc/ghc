@@ -211,7 +211,13 @@
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
 
-#if defined(DEBUG)
+#if defined(DEBUG) || defined(USE_ASSERTS_ALL_WAYS)
+#define ASSERTS_ENABLED 1
+#else
+#undef ASSERTS_ENABLED
+#endif
+
+#if ASSERTS_ENABLED
 #define ASSERT(predicate)                       \
         if (predicate) {                        \
             /*null*/;                           \

@@ -107,7 +107,7 @@ extern "C" {
    Assertions and Debuggery
 
    CHECK(p)   evaluates p and terminates with an error if p is false
-   ASSERT(p)  like CHECK(p) if DEBUG is on, otherwise a no-op
+   ASSERT(p)  like CHECK(p) if ASSERTS_ENABLED is on, otherwise a no-op
    -------------------------------------------------------------------------- */
 
 void _assertFail(const char *filename, unsigned int linenum)
@@ -125,12 +125,22 @@ void _assertFail(const char *filename, unsigned int linenum)
         else                                    \
             barf(msg, ##__VA_ARGS__)
 
-#if !defined(DEBUG)
-#define ASSERT(predicate) /* nothing */
-#define ASSERTM(predicate,msg,...) /* nothing */
+#if defined(DEBUG) || defined(USE_ASSERTS_ALL_WAYS)
+#define ASSERTS_ENABLED 1
 #else
-#define ASSERT(predicate) CHECK(predicate)
-#define ASSERTM(predicate,msg,...) CHECKM(predicate,msg,##__VA_ARGS__)
+#undef ASSERTS_ENABLED
+#endif
+
+#if ASSERTS_ENABLED
+#define ASSERT(predicate)                       \
+    do { CHECK(predicate); } while(0)
+#define ASSERTM(predicate,msg,...)              \
+    do { CHECKM(predicate, msg, ##__VA_ARGS__); } while(0)
+#else
+#define ASSERT(predicate)                       \
+    do { (void) sizeof(predicate); } while(0)
+#define ASSERTM(predicate,msg,...)              \
+    do { (void) sizeof(predicate); (void) sizeof(msg); } while(0)
 #endif /* DEBUG */
 
 /*
