@@ -40,12 +40,14 @@ import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Core.DataCon
+import GHC.Core.Coercion.Axiom ( sfMatchFam )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import GHC.Builtin.Names ( typeableClassName )
+import GHC.Builtin.Types.Arrows ( arrowTyCons )
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -554,7 +556,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
-    tidy_cts = bagToList (mapBag (tidyCt env) simples)
+    tidy_cts = bagToList (mapBag (tidyCt env . expandArrowFams) simples)
 
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
@@ -659,6 +661,39 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
       = True
       | otherwise
       = has_gadt_match implics
+
+expandArrowFams :: Ct -> Ct
+expandArrowFams ct = ct { cc_ev = go_ev (ctEvidence ct) }
+  where
+    go_ev :: CtEvidence -> CtEvidence
+    go_ev ctev@CtGiven { ctev_pred = pred, ctev_loc = loc }
+      = ctev { ctev_pred = go pred, ctev_loc = go_loc loc }
+    go_ev ctev@CtWanted { ctev_pred = pred, ctev_loc = loc }
+      = ctev { ctev_pred = go pred, ctev_loc = go_loc loc }
+    go_ev ctev@CtDerived { ctev_pred = pred, ctev_loc = loc }
+      = ctev { ctev_pred = go pred, ctev_loc = go_loc loc }
+
+    go_loc :: CtLoc -> CtLoc
+    go_loc loc@CtLoc { ctl_origin = origin@TypeEqOrigin { uo_actual = actual
+                                                        , uo_expected = expected } }
+      = loc { ctl_origin = origin { uo_actual = go actual
+                                  , uo_expected = go expected } }
+    go_loc loc = loc
+
+    go :: Type -> Type
+    go (TyConApp tc tys)
+      | tc `elem` arrowTyCons
+      , Just ops <- isBuiltInSynFamTyCon_maybe tc
+      , Just (_, _, ty) <- sfMatchFam ops tys
+      = go ty
+      | otherwise
+      = mkTyConApp tc $ map go tys
+
+    go (AppTy ty1 ty2)    = mkAppTy (go ty1) (go ty2)
+    go (FunTy af ty1 ty2) = mkFunTy af (go ty1) (go ty2)
+    go (ForAllTy b ty)    = ForAllTy b (go ty)
+    go (CastTy ty _)      = go ty
+    go ty                 = ty
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
