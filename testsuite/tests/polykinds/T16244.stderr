@@ -1,0 +1,11 @@
+
+T16244.hs:11:18: error:
+    • Couldn't match kind ‘k1’ with ‘k’
+      ‘k1’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at T16244.hs:11:26
+      ‘k’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at T16244.hs:11:1-52
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the class declaration for ‘C’
