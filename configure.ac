@@ -117,6 +117,16 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
+AC_ARG_ENABLE(asserts-all-ways,
+[AC_HELP_STRING([--enable-asserts-all-ways],
+                [Compile-in ASSERTs in all ways])],
+        EnableAssertsAllWays=YES,
+        EnableAssertsAllWays=NO
+)
+if test "$enable_asserts_all_ways" = "yes" ; then
+   AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
+fi
+
 dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
 dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
