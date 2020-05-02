@@ -1,0 +1,8 @@
+
+T16758.hs:14:8: error:
+    • Couldn't match expected kind ‘Int’ with actual kind ‘a’
+      ‘a’ is a rigid type variable bound by
+        the class declaration for ‘C’
+        at T16758.hs:12:19
+    • In the type signature: f :: C a => a -> Int
+      In the class declaration for ‘C’

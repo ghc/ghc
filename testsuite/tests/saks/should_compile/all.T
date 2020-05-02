@@ -34,7 +34,6 @@ test('T16723', normal, compile, [''])
 test('T16724', extra_files(['T16724.hs']), ghci_script, ['T16724.script'])
 test('T16726', normal, compile, [''])
 test('T16731', normal, compile, [''])
-test('T16758', expect_broken(16758), compile, [''])
 test('T16721', normal, ghci_script, ['T16721.script'])
 test('T16756a', normal, compile, [''])
 
