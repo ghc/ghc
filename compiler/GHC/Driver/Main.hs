@@ -178,7 +178,7 @@ import Control.DeepSeq (force)
 
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
-import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 #include "HsVersions.h"
@@ -439,7 +439,7 @@ extract_renamed_stuff mod_summary tc_result = do
                     mapM_ (putMsg dflags) xs
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
-              (file', _) <- readHieFile nc out_file
+              file' <- readHieFile (NCU $ \f -> pure $ snd $ f nc) out_file
               case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg dflags $ text "Got no roundtrip errors"
