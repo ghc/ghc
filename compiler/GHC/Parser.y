@@ -1209,8 +1209,8 @@ deriv_strategy_no_via :: { LDerivStrategy GhcPs }
                                        [mj AnnNewtype $1] }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
-  : 'via' type              {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
-                                            [mj AnnVia $1] }
+  : 'via' ktype             {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
+                                       [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
   : 'stock'                     {% ajs (sL1 $1 StockStrategy)
