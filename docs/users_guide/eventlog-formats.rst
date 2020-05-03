@@ -204,7 +204,7 @@ Thread and scheduling events
    :field String: label
 
    The indicated thread has been given a label (e.g. with
-   :base-ref:`Control.Concurrent.setThreadLabel`).
+   :base-ref:`GHC.Conc.labelThread`).
 
 
 .. _gc-events:

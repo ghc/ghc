@@ -362,10 +362,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* initialise file locking, if necessary */
     initFileLocking();
 
-#if defined(DEBUG)
     /* initialise thread label table (tso->char*) */
     initThreadLabelTable();
-#endif
 
 #if defined(PROFILING)
     initProfiling();
@@ -544,10 +542,8 @@ hs_exit_(bool wait_foreign)
     /* free the stable name table */
     exitStableNameTable();
 
-#if defined(DEBUG)
     /* free the thread label table */
     freeThreadLabelTable();
-#endif
 
 #if defined(PROFILING)
     reportCCSProfiling();
