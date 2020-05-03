@@ -1,0 +1,20 @@
+
+T18071.hs:11:1: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Show (Proxy z)’ matches
+        instance forall k (s :: k). Show (Proxy s)
+          -- Defined in ‘Data.Proxy’
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the quantified constraint ‘forall (z :: k). Show (Proxy z)’
+      In the context: forall (z :: k). Show (Proxy z)
+      While checking the super-classes of class ‘ShowProxy’
+      In the class declaration for ‘ShowProxy’
+
+T18071.hs:12:10: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Show (Proxy z)’ matches
+        instance forall k (s :: k). Show (Proxy s)
+          -- Defined in ‘Data.Proxy’
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the quantified constraint ‘forall (z :: k). Show (Proxy z)’
+      In the instance declaration for ‘ShowProxy (k :: Type)’
