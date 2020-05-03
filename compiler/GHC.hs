@@ -597,8 +597,7 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  dflags'' <- liftIO $ interpretPackageEnv dflags'
-  (dflags''', preload) <- liftIO $ initPackages dflags''
+  (dflags''', preload) <- liftIO $ initPackages dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -715,7 +714,11 @@ getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 parseDynamicFlags :: MonadIO m =>
                      DynFlags -> [Located String]
                   -> m (DynFlags, [Located String], [Warn])
-parseDynamicFlags = parseDynamicFlagsCmdLine
+parseDynamicFlags dflags cmdline = do
+  (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine dflags cmdline
+  dflags2 <- liftIO $ interpretPackageEnv dflags1
+  return (dflags2, leftovers, warns)
+
 
 -- | Checks the set of new DynFlags for possibly erroneous option
 -- combinations when invoking 'setSessionDynFlags' and friends, and if
