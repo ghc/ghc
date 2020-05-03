@@ -104,8 +104,8 @@ There are a few steps to adding a built-in type family:
 * Define the type family somewhere
 
   Finally, you will need to define the type family somewhere, likely in @base@.
-  Currently, all of the built-in type families are defined in GHC.TypeLits or
-  GHC.TypeNats, so those are likely candidates.
+  Currently, all of the built-in type families are defined in GHC.Desugar,
+  GHC.TypeLits, or GHC.TypeNats, so those are likely candidates.
 
   Since the behavior of your built-in type family is specified in GHC.Builtin.Types.Literals,
   you should give an open type family definition with no instances, like so:
@@ -120,7 +120,7 @@ There are a few steps to adding a built-in type family:
   type family. For instance:
 
   - The T9181 test prints the :browse contents of GHC.TypeLits, so if you added
-    a test there, the expected output of T9181 will need to change.
+    a type there, the expected output of T9181 will need to change.
   - The TcTypeNatSimple and TcTypeSymbolSimple tests have compile-time unit
     tests, as well as TcTypeNatSimpleRun and TcTypeSymbolSimpleRun, which have
     runtime unit tests. Consider adding further unit tests to those if your

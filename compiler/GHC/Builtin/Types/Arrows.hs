@@ -19,13 +19,12 @@ import GHC.Builtin.Names ( gHC_DESUGAR
                          , arrowEnvTyConKey
                          , arrowEnvDataConKey
                          , arrowEnvCoAxiomKey
-                         , arrowStackTupTyFamKey
-                         , arrowEnvTupTyFamKey )
+                         , arrowStackTupTyConKey
+                         , arrowEnvTupTyConKey )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( mkTemplateAnonTyConBinders, alphaTyVar, alphaTy )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
-import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString ( fsLit )
@@ -33,47 +32,82 @@ import GHC.Data.Pair
 import GHC.Tc.Utils.TcType ( tcEqType )
 import GHC.Types.Name
 
+{- Note [Arrow type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module defines two wired-in type families, ArrowStackTup and
+ArrowEnvTup, both of which build tuple types from promoted lists:
+
+    type ArrowStackTup :: [Type] -> Type
+    type family ArrowStackTup stk where
+      ArrowStackTup '[]        = ()
+      ArrowStackTup '[a]       = a
+      ArrowStackTup '[a, b]    = (a, b)
+      ArrowStackTup '[a, b, c] = (a, b, c)
+      ...
+
+    type ArrowEnvTup :: Type -> [Type] -> Type
+    type family ArrowEnvTup env stk = r | r -> env, stk where
+      ArrowEnvTup env '[]        = ArrowEnv env
+      ArrowEnvTup env '[a]       = (ArrowEnv env, a)
+      ArrowEnvTup env '[a, b]    = (ArrowEnv env, a, b)
+      ArrowEnvTup env '[a, b, c] = (ArrowEnv env, a, b, c)
+      ...
+
+These type families are used to assist in typechecking arrow notation;
+see Note [Command typing] in GHC.Tc.Gen.Arrow.
+
+The definitions of these families live in GHC.Desugar, which also
+contains the definition of the ArrowEnv newtype:
+
+    newtype ArrowEnv env = ArrowEnv env
+
+This newtype’s only purpose is to allow ArrowEnvTup to be injective:
+without the wrapping its first equation would overlap with all others.
+This is crucial, since it allows information about the shape of the
+stack to propagate bidirectionally. See Note [Control operator typing]
+in GHC.Tc.Gen.Arrow for the details. -}
+
 arrowTyCons :: [TyCon]
 arrowTyCons = [arrowEnvTyCon, arrowStackTupTyCon, arrowEnvTupTyCon]
 
 arrowCoAxiomRules :: [CoAxiomRule]
 arrowCoAxiomRules = [axArrowStackTupDef, axArrowEnvTupDef]
 
+-- -------------------------------------------------------------------
+
+-- | > newtype ArrowEnv env = ArrowEnv env
+--
+-- This newtype’s sole purpose is to allow @ArrowEnvTup@ to be
+-- injective; see Note [Arrow type families].
 arrowEnvTyCon :: TyCon
-arrowEnvCoAxiom :: CoAxiom Unbranched
-(arrowEnvTyCon, arrowEnvCoAxiom) = (ty_con, co_ax)
+arrowEnvTyCon = pcNewTyCon ty_name arrowEnvDataConKey arrowEnvCoAxiomKey
+                           [alphaTyVar] alphaTy
   where
-    ty_con = mkAlgTyCon name
-                        (mkAnonTyConBinders VisArg tvs)
-                        liftedTypeKind
-                        [Representational]
-                        Nothing
-                        []              -- No stupid theta
-                        rhs
-                        (VanillaAlgTyCon (mkPrelTyConRepName name))
-                        False           -- Not in GADT syntax
-
-    name   = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
-               arrowEnvTyConKey arrowEnvTyCon
-    tvs    = [alphaTyVar]
-    rhs_ty = alphaTy
-    rhs    = NewTyCon data_con rhs_ty (tvs, rhs_ty) co_ax False
-
-    co_ax_name = mkWiredInName gHC_DESUGAR (mkNewTyCoOcc (nameOccName name))
-                   arrowEnvCoAxiomKey (ACoAxiom (toBranchedAxiom co_ax)) UserSyntax
-    co_ax      = mkNewTypeCoAxiom co_ax_name arrowEnvTyCon tvs
-                                  [Representational] rhs_ty
-
-    data_con  = pcDataCon data_name tvs [rhs_ty] arrowEnvTyCon
-    data_name = mkWiredInDataConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
-                  arrowEnvDataConKey data_con
+    ty_name   = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
+                  arrowEnvTyConKey arrowEnvTyCon
 
 mkArrowEnvTy :: Type -> Type
 mkArrowEnvTy ty = mkTyConApp arrowEnvTyCon [ty]
 
 mkArrowEnvCo :: Type -> CoercionR
-mkArrowEnvCo ty = mkUnbranchedAxInstCo Representational arrowEnvCoAxiom [ty] []
+mkArrowEnvCo ty
+  = mkUnbranchedAxInstCo Representational (newTyConCo arrowEnvTyCon) [ty] []
 
+-- -------------------------------------------------------------------
+
+-- | A wired-in type family used to convert the command stack type to
+-- a tuple in the typing rule for arrow application. Has the following
+-- infinitely-long definition:
+--
+-- > type ArrowStackTup :: [Type] -> Type
+-- > type family ArrowStackTup stk where
+-- >   ArrowStackTup '[]        = ()
+-- >   ArrowStackTup '[a]       = a
+-- >   ArrowStackTup '[a, b]    = (a, b)
+-- >   ArrowStackTup '[a, b, c] = (a, b, c)
+-- >   ...
+--
+-- Also see Note [Arrow type families].
 arrowStackTupTyCon :: TyCon
 arrowStackTupTyCon =
   mkFamilyTyCon name
@@ -85,7 +119,7 @@ arrowStackTupTyCon =
     NotInjective
   where
     name = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowStackTup")
-             arrowStackTupTyFamKey arrowStackTupTyCon
+             arrowStackTupTyConKey arrowStackTupTyCon
     tcb = BuiltInSynFamily
       { sfMatchFam      = matchFamArrowStackTup
       , sfInteractTop   = \_ _ -> []
@@ -93,7 +127,7 @@ arrowStackTupTyCon =
 
     matchFamArrowStackTup tys = do
       [stk_ty] <- pure tys
-      stk_tys <- isPromotedListTy stk_ty
+      stk_tys <- extractPromotedList_maybe stk_ty
       pure (axArrowStackTupDef, [stk_ty], mkBoxedTupleTy stk_tys)
 
 mkArrowStackTupTy :: Type -> Type
@@ -106,7 +140,7 @@ axArrowStackTupDef = CoAxiomRule
   , coaxrRole      = Nominal
   , coaxrProves    = \cs -> do
       [Pair ty1 ty2] <- pure cs
-      tys2 <- isPromotedListTy ty2
+      tys2 <- extractPromotedList_maybe ty2
       pure (mkArrowStackTupTy ty1 `Pair` mkBoxedTupleTy tys2)
   }
 
@@ -115,6 +149,22 @@ mkArrowStackTupCo stk_tys
   = mkAxiomRuleCo axArrowStackTupDef
                   [ mkNomReflCo $ mkPromotedListTy liftedTypeKind stk_tys ]
 
+-- -------------------------------------------------------------------
+
+-- | A wired-in type family used to convert the command environment
+-- and command stack types to a tuple in the typing rule for arrow
+-- control operators. Has the following infinitely-long definition:
+--
+-- > type ArrowEnvTup :: Type -> [Type] -> Type
+-- > type family ArrowEnvTup env stk = r | r -> env, stk where
+-- >   ArrowEnvTup env '[]        = ArrowEnv env
+-- >   ArrowEnvTup env '[a]       = (ArrowEnv env, a)
+-- >   ArrowEnvTup env '[a, b]    = (ArrowEnv env, a, b)
+-- >   ArrowEnvTup env '[a, b, c] = (ArrowEnv env, a, b, c)
+-- >   ...
+--
+-- Also see Note [Arrow type families] and Note [Control operator typing]
+-- in GHC.Tc.Gen.Arrow.
 arrowEnvTupTyCon :: TyCon
 arrowEnvTupTyCon =
   mkFamilyTyCon name
@@ -126,7 +176,7 @@ arrowEnvTupTyCon =
     (Injective [True, True])
   where
     name = mkWiredInTyConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnvTup")
-             arrowEnvTupTyFamKey arrowEnvTupTyCon
+             arrowEnvTupTyConKey arrowEnvTupTyCon
     tcb = BuiltInSynFamily
       { sfMatchFam      = matchFamArrowEnvTup
       , sfInteractTop   = interactTopArrowEnvTup
@@ -134,7 +184,7 @@ arrowEnvTupTyCon =
 
     matchFamArrowEnvTup tys = do
       [env_ty, stk_ty] <- pure tys
-      stk_tys <- isPromotedListTy stk_ty
+      stk_tys <- extractPromotedList_maybe stk_ty
       let rhs_ty = mkBoxedTupleTy (mkArrowEnvTy env_ty : stk_tys)
       pure (axArrowEnvTupDef, [env_ty, stk_ty], rhs_ty)
 
@@ -173,7 +223,7 @@ axArrowEnvTupDef = CoAxiomRule
   , coaxrRole      = Nominal
   , coaxrProves    = \cs -> do
       [Pair env_ty1 env_ty2, Pair stk_ty1 stk_ty2] <- pure cs
-      stk_tys2 <- isPromotedListTy stk_ty2
+      stk_tys2 <- extractPromotedList_maybe stk_ty2
       let rhs_ty = mkBoxedTupleTy (mkArrowEnvTy env_ty2 : stk_tys2)
       pure (mkArrowEnvTupTy env_ty1 stk_ty1 `Pair` rhs_ty)
   }

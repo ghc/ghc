@@ -8,6 +8,8 @@ Desugaring arrow commands
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
 #include "HsVersions.h"

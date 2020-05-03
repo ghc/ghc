@@ -16,10 +16,10 @@ module GHC.Builtin.Types (
         mkWiredInTyConName, -- This is used in GHC.Builtin.Types.Literals to define the
                             -- built-in functions for evaluation.
 
+        pcNewTyCon,         -- Used in GHC.Builtin.Types.Arrows for the ArrowEnv newtype.
+
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
-        pcDataCon,          -- used in FIXME: where is it used?
-        mkWiredInDataConName,
 
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
@@ -66,7 +66,7 @@ module GHC.Builtin.Types (
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
         mkListTy, mkPromotedListTy,
-        extractPromotedList, isPromotedListTy,
+        extractPromotedList, extractPromotedList_maybe,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -159,6 +159,7 @@ import GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
+import GHC.Core.FamInstEnv ( mkNewTypeCoAxiom )
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
@@ -553,6 +554,41 @@ pcTyCon name cType tyvars cons
                 (mkDataTyConRhs cons)
                 (VanillaAlgTyCon (mkPrelTyConRepName name))
                 False           -- Not in GADT syntax
+
+-- | Like 'pcTyCon', but for a newtype rather than a datatype. Assumes
+-- the DataCon has the same OccName as the TyCon.
+pcNewTyCon :: Name     -- ^ name of the TyCon
+           -> Unique   -- ^ known key for the DataCon
+           -> Unique   -- ^ known key for the coercion
+           -> [TyVar]  -- ^ tyvars
+           -> Type     -- ^ representation type
+           -> TyCon
+pcNewTyCon name data_key co_ax_key tvs rhs_ty = ty_con
+  where
+    ty_con = mkAlgTyCon name
+                        (mkAnonTyConBinders VisArg tvs)
+                        liftedTypeKind
+                        (map (const Representational) tvs)
+                        Nothing
+                        []              -- No stupid theta
+                        rhs
+                        (VanillaAlgTyCon (mkPrelTyConRepName name))
+                        False           -- Not in GADT syntax
+
+    rhs       = NewTyCon data_con rhs_ty (tvs, rhs_ty) co_ax False
+    data_con  = pcDataCon data_name tvs [rhs_ty] ty_con
+    data_name = mkWiredInDataConName UserSyntax
+                                     (nameModule name)
+                                     (occNameFS (nameOccName name))
+                                     data_key
+                                     data_con
+
+    co_ax_name = mkWiredInName (nameModule name)
+                               (mkNewTyCoOcc (nameOccName name))
+                               co_ax_key
+                               (ACoAxiom (toBranchedAxiom co_ax))
+                               UserSyntax
+    co_ax = mkNewTypeCoAxiom co_ax_name ty_con tvs [Representational] rhs_ty
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon n univs = pcDataConWithFixity False n univs
@@ -1757,11 +1793,11 @@ extractPromotedList tys = go tys
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
 
-isPromotedListTy :: Type -> Maybe [Type]
-isPromotedListTy list_ty
+extractPromotedList_maybe :: Type -> Maybe [Type]
+extractPromotedList_maybe list_ty
   | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
   , tc `hasKey` consDataConKey
-  = (t :) <$> isPromotedListTy ts
+  = (t :) <$> extractPromotedList_maybe ts
 
   | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
   , tc `hasKey` nilDataConKey

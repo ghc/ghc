@@ -136,7 +136,6 @@ knownKeyNames
       concat [ wired_tycon_kk_names funTyCon
              , concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
-
              , concatMap wired_tycon_kk_names arrowTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
              , map idName wiredInIds

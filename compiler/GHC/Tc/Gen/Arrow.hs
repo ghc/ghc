@@ -331,9 +331,9 @@ tcProc pat cmd exp_ty
 ************************************************************************
 -}
 
--- See Note [Arrow overview]
-type CmdType    = (CmdArgType, TcTauType)    -- cmd_type
-type CmdArgType = TcTauType                  -- carg_type, a type-level list
+-- See Note [Arrow overview] and Note [Command typing]
+type CmdType    = (CmdStkType, TcTauType)    -- (stk_ty, res_ty)
+type CmdStkType = TcTauType                  -- stk_ty, a type-level list
 
 data CmdEnv
   = CmdEnv {
@@ -431,7 +431,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
   = addErrCtxt (cmdCtxt cmd) $
     do  { arg_ty <- select_arrow_scope newOpenFlexiTyVarTy
 
-        ; let args_ty = mkArrowStackTupTy (consTy arg_ty stk_ty)
+        ; let args_ty = mkArrowStackTupTy (mkConsTy arg_ty stk_ty)
               fun_ty = mkCmdArrTy env args_ty res_ty
         ; fun' <- select_arrow_scope (tcLExpr fun (mkCheckExpType fun_ty))
 
@@ -460,7 +460,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
 tc_cmd env cmd@(HsCmdApp x fun arg) (stk_ty, res_ty)
   = addErrCtxt (cmdCtxt cmd) $
     do  { arg_ty <- newOpenFlexiTyVarTy
-        ; fun'   <- tcCmd env fun (consTy arg_ty stk_ty, res_ty)
+        ; fun'   <- tcCmd env fun (mkConsTy arg_ty stk_ty, res_ty)
         ; arg'   <- tcLExpr arg (mkCheckExpType arg_ty)
         ; return (HsCmdApp x fun' arg') }
 
@@ -658,8 +658,8 @@ tc_arr_rhs env rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
 nilTy :: Type
 nilTy = mkTyConApp promotedNilDataCon [liftedTypeKind]
 
-consTy :: Type -> Type -> Type
-consTy ty tys = mkTyConApp promotedConsDataCon [liftedTypeKind, ty, tys]
+mkConsTy :: Type -> Type -> Type
+mkConsTy ty tys = mkTyConApp promotedConsDataCon [liftedTypeKind, ty, tys]
 
 matchConsTy :: TcType -> TcM (TcCoercionN, TcType, TcType)
 matchConsTy tys = do
