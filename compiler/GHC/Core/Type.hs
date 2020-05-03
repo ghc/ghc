@@ -1857,17 +1857,19 @@ fun_kind_arg_flags = go emptyTCvSubst
                         -- something is ill-kinded. But this can happen
                         -- when printing errors. Assume everything is Required.
 
--- @isTauTy@ tests if a type has no foralls
+-- @isTauTy@ tests if a type has no foralls or (=>)
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
-isTauTy (TyVarTy _)           = True
-isTauTy (LitTy {})            = True
-isTauTy (TyConApp tc tys)     = all isTauTy tys && isTauTyCon tc
-isTauTy (AppTy a b)           = isTauTy a && isTauTy b
-isTauTy (FunTy _ a b)         = isTauTy a && isTauTy b
-isTauTy (ForAllTy {})         = False
-isTauTy (CastTy ty _)         = isTauTy ty
-isTauTy (CoercionTy _)        = False  -- Not sure about this
+isTauTy (TyVarTy _)       = True
+isTauTy (LitTy {})        = True
+isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
+isTauTy (AppTy a b)       = isTauTy a && isTauTy b
+isTauTy (FunTy af a b)    = case af of
+                              InvisArg -> False                  -- e.g., Eq a => b
+                              VisArg   -> isTauTy a && isTauTy b -- e.g., a -> b
+isTauTy (ForAllTy {})     = False
+isTauTy (CastTy ty _)     = isTauTy ty
+isTauTy (CoercionTy _)    = False  -- Not sure about this
 
 {-
 %************************************************************************

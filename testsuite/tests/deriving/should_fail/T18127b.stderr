@@ -1,0 +1,22 @@
+
+T18127b.hs:7:40: error:
+    • Can't make a derived instance of ‘Eq T1’:
+        Constructor ‘MkT1’ has a higher-rank type
+        Possible fix: use a standalone deriving declaration instead
+    • In the data declaration for ‘T1’
+
+T18127b.hs:7:44: error:
+    • Can't make a derived instance of ‘Generic T1’:
+        MkT1 must not have exotic unlifted or polymorphic arguments
+    • In the data declaration for ‘T1’
+
+T18127b.hs:8:42: error:
+    • Can't make a derived instance of ‘Eq (T2 a)’:
+        Constructor ‘MkT2’ has a higher-rank type
+        Possible fix: use a standalone deriving declaration instead
+    • In the data declaration for ‘T2’
+
+T18127b.hs:8:46: error:
+    • Can't make a derived instance of ‘Generic (T2 a)’:
+        MkT2 must not have exotic unlifted or polymorphic arguments
+    • In the data declaration for ‘T2’
