@@ -480,10 +480,10 @@ yield :: IO ()
 yield = IO $ \s ->
    case (yield# s) of s1 -> (# s1, () #)
 
-{- | 'labelThread' stores a string as identifier for this thread if
-you built a RTS with debugging support. This identifier will be used in
-the debugging output to make distinction of different threads easier
-(otherwise you only have the thread state object\'s address in the heap).
+{- | 'labelThread' stores a string as identifier for this thread. This
+identifier will be used in the debugging output to make distinction of
+different threads easier (otherwise you only have the thread state object\'s
+address in the heap). It also emits an event to the RTS eventlog.
 
 Other applications like the graphical Concurrent Haskell Debugger
 (<http://www.informatik.uni-kiel.de/~fhu/chd/>) may choose to overload

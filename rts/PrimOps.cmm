@@ -1058,9 +1058,7 @@ stg_yieldzh ()
 
 stg_labelThreadzh ( gcptr threadid, W_ addr )
 {
-#if defined(DEBUG) || defined(TRACING) || defined(DTRACE)
     ccall labelThread(MyCapability() "ptr", threadid "ptr", addr "ptr");
-#endif
     return ();
 }
 
