@@ -1,0 +1,4 @@
+
+T18130Fail.hs:11:7: error:
+    • Expected kind ‘* -> *’, but ‘(a, b)’ has kind ‘*’
+    • In the newtype declaration for ‘Par’
