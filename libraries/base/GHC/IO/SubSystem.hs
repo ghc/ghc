@@ -52,6 +52,7 @@ conditional posix _       = posix
 #endif
 
 -- | Infix version of `conditional`.
+-- posix <!> windows == conditional posix windows
 (<!>) :: a -> a -> a
 (<!>) = conditional
 

@@ -34,6 +34,7 @@
 #include "AwaitEvent.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
+#include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"
 #include "RaiseAsync.h"
@@ -635,6 +636,9 @@ schedulePreLoop(void)
 static void
 scheduleFindWork (Capability **pcap)
 {
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
+    queueIOThread();
+#endif
     scheduleStartSignalHandlers(*pcap);
 
     scheduleProcessInbox(pcap);
@@ -2570,6 +2574,14 @@ scheduleThread(Capability *cap, StgTSO *tso)
     // The thread goes at the *end* of the run-queue, to avoid possible
     // starvation of any threads already on the queue.
     appendToRunQueue(cap,tso);
+}
+
+void
+scheduleThreadNow(Capability *cap, StgTSO *tso)
+{
+    // The thread goes at the *beginning* of the run-queue,
+    // in order to execute it as soon as possible.
+    pushOnRunQueue(cap,tso);
 }
 
 void

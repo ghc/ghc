@@ -140,6 +140,8 @@ unsafeLoad (Array ref) load = do
     writeIORef ref (AC es len' cap)
     return len'
 
+-- | Reads n elements from the array and copies them
+-- to the address of the given ptr
 unsafeSplat :: Array a -> Ptr a -> Int -> IO ()
 unsafeSplat (Array ref) ptr n = do
     AC es _ cap <- readIORef ref

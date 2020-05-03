@@ -777,7 +777,6 @@ registerTimeout mgr@Manager{..} uSrelTime cb = do
     else do
       !expTime <- expirationTime mgrClock uSrelTime :: IO Q.Prio
       editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
-      wakeupIOManager
     return $ TK key
 
 -- | Update an active timeout to fire in the given number of seconds (from the
@@ -944,6 +943,10 @@ step maxDelay mgr@Manager{..} = do
 -- waiting callback table.  These events are handled by having a separate queue
 -- for orphaned callback instances that the calling thread is supposed to check
 -- before adding something to the work queue.
+--
+-- Thread safety: This function atomically replaces outstanding events with
+-- a pointer to nullReq. This means it's safe (but potentially wastefull) to
+-- have two concurrent or parallel invocations on the same array.
 processCompletion :: Manager -> Int -> Maybe Seconds -> IO (Bool, Maybe Seconds)
 processCompletion Manager{..} n delay = do
     -- If some completions are done, we need to process them and call their
