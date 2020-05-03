@@ -64,6 +64,7 @@ import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
+import qualified GHC.Core.Type as Type
 import GHC.Types.RepType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
@@ -115,16 +116,14 @@ import Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
-
 import GHC.Tc.Utils.Env (tcGetInstEnvs)
-
 import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Solver (solveWanteds)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Evidence
 import Data.Bifunctor (second)
-
 import GHC.Tc.Solver.Monad (runTcS)
+import GHC.Core.Class (classTyCon)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -1056,7 +1055,8 @@ getInstancesForType ty = withSession $ \hsc_env -> do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
-      fmap catMaybes . forM matches $ uncurry checkForExistence
+
+      fmap catMaybes . forM matches $ uncurry (checkForExistence ty)
 
 -- Parse a type string and turn any holes into skolems
 parseInstanceHead :: GhcMonad m => String -> m Type
@@ -1074,12 +1074,40 @@ getDictionaryBindings theta = do
   dictName <- newName (mkDictOcc (mkVarOcc "magic"))
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
-  let wCs = mkSimpleWC [CtDerived
-          { ctev_pred = varType dict_var
-          , ctev_loc = loc
-          }]
+
+  -- Generated a wanted constraint here because at the end of constraint
+  -- solving, most derived constraints get thrown away, which in certain
+  -- cases, notably with quantified constraints makes it impossible to rule
+  -- out instances as invalid. (See #18071)
+  let wCs = mkSimpleWC [CtWanted {
+    ctev_pred = varType dict_var,
+    ctev_dest = (EvVarDest dict_var),
+    ctev_nosh = WDeriv,
+    ctev_loc = loc
+  }]
 
   return wCs
+
+-- Find instances where the head unifies with the provided type
+findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
+findMatchingInstances ty = do
+  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+  return $ concatMap (try_cls ies) allClasses
+  where
+  {- Check that a class instance is well-kinded.
+    Since `:instances` only works for unary classes, we're looking for instances of kind
+    k -> Constraint where k is the type of the queried type.
+  -}
+  try_cls ies cls
+    | Just (arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
+    , tcIsConstraintKind res_kind
+    , Type.typeKind ty `eqType` arg_kind
+    , (matches, _, _) <- lookupInstEnv True ies cls [ty]
+    = matches
+    | otherwise
+    = []
+
 
 {-
   When we've found an instance that a query matches against, we still need to
@@ -1104,16 +1132,18 @@ getDictionaryBindings theta = do
 
 -}
 
-checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
-checkForExistence res mb_inst_tys = do
-  (tys, thetas) <- instDFunType (is_dfun res) mb_inst_tys
-
-  wanteds <- forM thetas getDictionaryBindings
-  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
+checkForExistence :: Type -> ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
+checkForExistence ty res mb_inst_tys = do
+  let cls = mkClassPred (is_cls res) [ty]
+  dict <- getDictionaryBindings cls
+  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds dict)
 
   let all_residual_constraints = bagToList $ wc_simple residuals
   let preds = map ctPred all_residual_constraints
-  if all isSatisfiablePred preds && (null $ wc_impl residuals)
+
+  (tys, _) <- instDFunType (is_dfun res) mb_inst_tys
+
+  if all isSatisfiablePred preds && (isSolvedWC residuals)
   then return . Just $ substInstArgs tys preds res
   else return Nothing
 
@@ -1148,16 +1178,6 @@ checkForExistence res mb_inst_tys = do
     in inst { is_dfun = (is_dfun inst) { varType = sigma }}
     where
     (dfun_tvs, _, cls, args) = instanceSig inst
-
--- Find instances where the head unifies with the provided type
-findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
-findMatchingInstances ty = do
-  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
-  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
-
-  concatMapM (\cls -> do
-    let (matches, _, _) = lookupInstEnv True ies cls [ty]
-    return matches) allClasses
 
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result
