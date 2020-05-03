@@ -296,7 +296,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* initialise file locking, if necessary */
     initFileLocking();
 
-#if defined(DEBUG)
+#if defined(TRACING)
     /* initialise thread label table (tso->char*) */
     initThreadLabelTable();
 #endif
@@ -465,7 +465,7 @@ hs_exit_(bool wait_foreign)
     /* free the stable name table */
     exitStableNameTable();
 
-#if defined(DEBUG)
+#if defined(TRACING)
     /* free the thread label table */
     freeThreadLabelTable();
 #endif

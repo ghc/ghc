@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(DEBUG)
+#if defined(TRACING)
 
 #if defined(THREADED_RTS)
 static Mutex threadLabels_mutex;
@@ -90,23 +90,23 @@ removeThreadLabel(StgWord key)
   RELEASE_LOCK(&threadLabels_mutex);
 }
 
-#endif /* DEBUG */
+#endif /* TRACING */
 
 void
 labelThread(Capability *cap   STG_UNUSED,
             StgTSO     *tso   STG_UNUSED,
             char       *label STG_UNUSED)
 {
-#if defined(DEBUG)
+#if defined(TRACING)
   int len;
   void *buf;
 
   /* Caveat: Once set, you can only set the thread name to "" */
   len = strlen(label)+1;
-  buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
+  buf = stgMallocBytes(len * sizeof(char), "ThreadLabels.c:labelThread()");
   strncpy(buf,label,len);
   /* Update will free the old memory for us */
   updateThreadLabel(tso->id,buf);
-#endif
+#endif /* TRACING */
   traceThreadLabel(cap, tso, label);
 }

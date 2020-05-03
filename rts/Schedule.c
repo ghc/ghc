@@ -1338,7 +1338,7 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
                   task->incall->rstat = Killed;
               }
           }
-#if defined(DEBUG)
+#if defined(TRACING)
           removeThreadLabel((StgWord)task->incall->tso->id);
 #endif
 

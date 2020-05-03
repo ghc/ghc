@@ -11,12 +11,12 @@
 
 #include "BeginPrivate.h"
 
-#if defined(DEBUG)
+#if defined(TRACING)
 void    initThreadLabelTable (void);
 void    freeThreadLabelTable (void);
 void *  lookupThreadLabel    (StgWord key);
 void    removeThreadLabel    (StgWord key);
-#endif
+#endif /* TRACING */
 void    labelThread          (Capability *cap,
                               StgTSO     *tso,
                               char       *label);
