@@ -216,6 +216,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- A new flag :ghc-flag:`-flink-rts` to enable linking the RTS when linking
+  shared libraries.
+
 
 GHCi
 ~~~~
