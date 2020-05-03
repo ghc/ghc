@@ -5,7 +5,6 @@
 module GHC.Iface.Recomp
    ( checkOldIface
    , RecompileRequired(..)
-   , recompileRequired
    , addFingerprints
    )
 where
@@ -101,10 +100,6 @@ instance Semigroup RecompileRequired where
 
 instance Monoid RecompileRequired where
   mempty = UpToDate
-
-recompileRequired :: RecompileRequired -> Bool
-recompileRequired UpToDate = False
-recompileRequired _ = True
 
 -- | Top level function to check if the version of an old interface file
 -- is equivalent to the current source file the user asked us to compile.
@@ -213,21 +208,21 @@ checkVersions hsc_env mod_summary iface
        ; if moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkOptimHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkHpcHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkMergedSignatures mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkHsig mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkHie mod_summary
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Just iface) else do {
+       ; if recomp /= UpToDate then return (recomp, Just iface) else do {
        ; recomp <- checkPlugins hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if recomp /= UpToDate then return (recomp, Nothing) else do {
 
 
        -- Source code unchanged and no errors yet... carry on
@@ -504,7 +499,7 @@ checkDependencies hsc_env summary iface
    runUntilRecompRequired []             = return (UpToDate, [])
    runUntilRecompRequired (check:checks) = do
      (recompile, value) <- check
-     if recompileRequired recompile
+     if recompile /= UpToDate
        then return (recompile, [])
        else do
          (recomp, values) <- runUntilRecompRequired checks
@@ -594,7 +589,7 @@ checkModUsage this_pkg UsageHomeModule{
 
            -- CHECK MODULE
        recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
-       if not (recompileRequired recompile)
+       if not (recompile /= UpToDate)
          then return UpToDate
          else do
 
@@ -605,7 +600,7 @@ checkModUsage this_pkg UsageHomeModule{
                  -- CHECK ITEMS ONE BY ONE
                  recompile <- checkList [ checkEntityUsage reason new_decl_hash u
                                         | u <- old_decl_hash]
-                 if recompileRequired recompile
+                 if recompile /= UpToDate
                    then return recompile     -- This one failed, so just bail out now
                    else up_to_date (text "  Great!  The bits I use are up to date")
 
@@ -679,7 +674,7 @@ checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
 -- This helper is used in two places
 checkList []             = return UpToDate
 checkList (check:checks) = do recompile <- check
-                              if recompileRequired recompile
+                              if recompile /= UpToDate
                                 then return recompile
                                 else checkList checks
 

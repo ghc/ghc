@@ -662,7 +662,7 @@ hscIncrementalFrontend
           | not always_do_basic_recompilation_check ->
              return $ Right (FrontendTypecheck tc_result, Nothing)
          _ -> do
-            (recomp_reqd, mb_checked_iface)
+            res@(recomp_reqd, mb_checked_iface)
                 <- {-# SCC "checkOldIface" #-}
                    liftIO $ checkOldIface hsc_env mod_summary
                                 source_modified mb_old_iface
@@ -671,8 +671,8 @@ hscIncrementalFrontend
             -- point, when checkOldIface reads it from the disk.
             let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
 
-            case mb_checked_iface of
-                Just iface | not (recompileRequired recomp_reqd) ->
+            case res of
+                (UpToDate, Just iface) ->
                     -- If the module used TH splices when it was last
                     -- compiled, then the recompilation check is not
                     -- accurate enough (#481) and we must ignore
@@ -902,7 +902,7 @@ batchMsg hsc_env mod_index recomp mod_summary =
             compilationProgressMsg dflags $
             (showModuleIndex mod_index ++
             msg ++ showModMsg dflags (hscTarget dflags)
-                              (recompileRequired recomp) mod_summary)
+                              (recomp /= UpToDate) mod_summary)
                 ++ reason
 
 --------------------------------------------------------------

@@ -503,7 +503,7 @@ mkBackpackMsg = do
             backpackProgressMsg level dflags $
                 showModuleIndex mod_index ++
                 msg ++ showModMsg dflags (hscTarget dflags)
-                                  (recompileRequired recomp) mod_summary
+                                  (recomp /= UpToDate) mod_summary
                     ++ reason
       in case recomp of
             MustCompile -> showMsg "Compiling " ""
