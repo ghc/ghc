@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -49,6 +50,7 @@ module GHC.StgToCmm.Utils (
 
 #include "HsVersions.h"
 
+import Control.Monad (forM)
 import GHC.Prelude
 
 import GHC.Platform
@@ -512,12 +514,13 @@ emitCmmLitSwitch scrut  branches@((lit0,_) : _) deflt = do
 
     if | isFloatType cmm_ty ->
            emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
-       | isByteArraySwitch -> emit $ mkByteArraySwitch
-           scrut' 
-           (ByteArraySwitchTargets
-             deflt_lbl
-             (M.fromList [(litByteArray lit,l) | (lit,l) <- branches_lbls])
-           )
+       | isByteArraySwitch -> do
+           targets <- forM branches_lbls $ \(lit,target) -> do
+             let !bytes = litByteArray lit
+             lbl <- newByteStringCLit bytes
+             return (ByteArraySwitchTarget bytes lbl target)
+           emit $ mkByteArraySwitch scrut'
+             (ByteArraySwitchTargets deflt_lbl targets)
            -- TODO: We should probably be a little more intelligent
            -- when handling byte arrays. Notice that in mk_discrete_switch,
            -- there's a section named SINGLETON BRANCH, NO DEFAULT. Does it

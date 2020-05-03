@@ -1,14 +1,19 @@
 {-# language BangPatterns #-}
+{-# language MagicHash #-}
+{-# language UnboxedTuples #-}
 
 module BaLitCmplTH
   ( ascii
+  , asciiToByteArray#
   ) where
 
 import Data.Char (ord)
 import Data.Word
 import Foreign.Ptr
 import Foreign.ForeignPtr
+import GHC.Exts
 import GHC.ForeignPtr
+import GHC.ST (ST(ST),runST)
 import Foreign.Storable
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Quote
@@ -33,8 +38,22 @@ asciiQuote g str
 
 type Bytes = (ForeignPtr Word8, Word, Word)
 
+data ByteArray = ByteArray { unByteArray :: ByteArray# }
+
 uncurry3 :: (a -> b -> c -> d) -> (a,b,c) -> d
 uncurry3 f (a,b,c) = f a b c
+
+asciiToByteArray# :: [Char] -> ByteArray#
+{-# noinline asciiToByteArray# #-}
+asciiToByteArray# str = unByteArray $ runST $ ST $ \s0 ->
+  let !(I# len) = length str in
+  case newByteArray# len s0 of
+    (# s1, dst #) ->
+      let go [] !ix !s = case unsafeFreezeByteArray# dst s of
+            (# s', res #) -> (# s', ByteArray res #)
+          go (C# c : cs) !ix !s = case writeCharArray# dst ix c s of
+            s' -> go cs (ix +# 1#) s'
+       in go str 0# s1
 
 ------------------------------------------------
 -- Everything below here copied from bytestring.

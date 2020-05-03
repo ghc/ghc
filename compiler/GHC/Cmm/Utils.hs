@@ -397,7 +397,6 @@ cmmMkAssign platform expr uq =
       reg = (CmmLocal (LocalReg uq ty))
   in  (CmmAssign reg expr, CmmReg reg)
 
-
 ---------------------------------------------------
 --
 --      CmmExpr predicates
