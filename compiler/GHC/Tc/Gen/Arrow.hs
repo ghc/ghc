@@ -32,7 +32,7 @@ import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
 import GHC.Types.Var.Set
-import GHC.Builtin.Types.Arrows( arrowStackTupTy, arrowEnvTupTy )
+import GHC.Builtin.Types.Arrows( mkArrowStackTupTy, mkArrowEnvTupTy )
 import GHC.Builtin.Types.Prim
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
@@ -40,37 +40,265 @@ import GHC.Utils.Misc
 
 import Control.Monad
 
-{-
-Note [Arrow overview]
+{- Note [Arrow overview]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Arrow notation (aka `proc` notation) is its own little sub-language
+with its own quirky typechecking rules. Arrows generalize functions,
+and `proc` expressions generalize lambdas. Their syntax is, naturally,
+similar to that of lambdas, with the `proc` keyword taking the place
+of the backslash:
+
+  expr  ::= ....
+         |  proc pat -> cmd        -- arrow abstraction
+
+Arrows cannot, in general, be curried, so `proc` expressions only
+accept a single argument pattern. More significantly, their bodies are
+not expressions, but *commands*.
+
+The grammar of commands is quite a lot like the grammar of
+expressions, but more restrictive. The primitive building block is
+arrow application, which applies an arrow to an argument:
+
+  cmd   ::= exp1 -< exp2           -- arrow application (first order)
+         |  exp1 -<< exp2          -- arrow application (higher order)
+
+(The difference between -< and -<< is discussed in Note [The command
+environment].) Most other commands closely resemble their expression
+counterparts and are largely self-explanatory:
+
+  cmd   ::= ....
+         |  if exp then cmd1 else cmd2
+         |  case exp of { pat1 -> cmd1; ...; patn -> cmdn }
+         |  let pat = exp in cmd
+         |  do { cstmt1; ...; cstmtn; cmd }
+
+  cstmt ::= cmd
+         |  pat <- cmd
+         |  let pat = exp
+         |  rec { cmd1; ...; cmdn }
+
+The three remaining commands are more subtle:
+
+  cmd   ::= ....
+         |  cmd exp                   -- command application
+         |  \pat -> cmd               -- command abstraction
+         |  (| exp cmd1 ... cmdn |)   -- control operator
+
+The purpose and meaning of these commands is discussed in Note [The
+command stack].
+
+Note [The command environment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although lambda expressions have a direct counterpart in core, proc
+expressions do not---they are desugared into ordinary applications of
+the Arrow class methods. This process essentially involves rewriting
+the program into point-free form. For example, the expression
+
+    proc x -> do { y -< f -< x; g -< y }
+
+is desugared into simply `f >>> g`; the intermediate x and y variables
+disappear! But this presents a problem: what if x or y appeared in one
+of the arrow expressions itself, rather than as an argument?
+
+    proc x -> do { y <- f x -< x; g -< y }
+
+As before, we’d desugar this into `f x >>> g`... but now x is unbound!
+So we reject this program as ill-formed. More precisely, we disallow
+references to “arrow-local” variables on the left side of a “-<”. (In
+fact, we don’t even consider them in scope.)
+
+Which variables are “arrow-local”? All variables bound by the proc
+argument pattern or any commands. This is quite restrictive, but it’s
+also what makes arrows useful relative to monads: the structure of an
+arrow computation doesn’t depend on the arrow’s input. Exceptions to
+this restriction implement the ArrowApply class, which provides the
+app method:
+
+    app :: ArrowApply p => p (p a b, a) b
+
+Using app, it turns out we can express the above example after all:
+
+    arr (\x -> (f x, x)) >>> app >>> g
+
+We don’t try to figure this out automatically (since that would make
+lexical scope dependent on typing!), but the programmer can request it
+explicitly using the -<< command:
+
+    proc x -> do { y <- f x -<< x; g -< y }
+
+To summarize: we treat arrow-local variables as out of scope on the
+left side of “-<”, but in scope on the left side of “-<<”.
+
+Note [The command stack]
+~~~~~~~~~~~~~~~~~~~~~~~~
+As discussed in Note [Arrow overview], the grammar of commands
+includes “command application” and “command abstraction”:
+
+  cmd   ::= ....
+         |  cmd exp        -- command application
+         |  \pat -> cmd    -- command abstraction
+
+Note that these are distinct from arrow application (i.e. `f -< e` or
+`f -<< e`) and arrow abstraction (i.e. proc expressions themselves).
+What do they mean?
+
+These commands manipulate the current *command stack*. Command
+application pushes a value onto the stack, and command abstraction
+pops one off. For example, the command
+
+    (\x -> f -< x) e
+
+is equivalent to simply `f -< e`. But how is this useful? Ordinary
+lambda expressions are valuable because lambdas are first-class
+values, but commands are syntactic forms, which can’t be passed around
+at all! This is where so-called “arrow control operators” come in:
+
+  cmd   ::= ....
+         |  (| exp cmd1 ... cmdn |)   -- control operator
+
+This syntax lifts functions on arrows into functions on *commands*.
+For example, suppose the programmer defines a mapA operator,
+an arrow analog to Control.Monad.mapM:
+
+    mapA :: ArrowChoice p
+         => p (e, a) b
+         -> p (e, [a]) [b]
+
+Using (| banana brackets |), mapA can be used in arrow notation as a
+sort of “user-defined command”:
+
+    proc (a, b) -> do
+      xs <- f -< a
+      (| mapA (\x -> g -< (x, b)) |) xs
+
+Note that the lambda passed to mapA is a command, not an expression!
+Also note that it refers to b in its body even though b is an
+arrow-local variable (see Note [The command environment]).
+
+The argument stack is the mechanism by which arrow control operators
+can receive and supply values. When an arrow control operator is
+applied, it is passed a tuple containing all the arguments currently
+on the stack. Dually, when it passes a tuple to one of its argument
+arrows, those values are pushed onto the stack.
+
+From the programmer’s point of view, this process just magically
+works, but the process by which we typecheck and desugar these
+operators is quite subtle. See Note [Control operator typing] for the
+gory details.
+
+Note [Command typing]
 ~~~~~~~~~~~~~~~~~~~~~
-Here's a summary of arrows and how they typecheck.  First, here's
-a cut-down syntax:
+Command typing judgments resemble expression typing judgments,
+extended slightly to handle the command environment and the argument
+stack. They take the following form:
 
-  expr ::= ....
-        |  proc pat -> cmd
+    G|D |-a cmd :: s --> t      -- command typing
 
-  cmd ::= cmd exp                    -- Arrow application
-       |  \pat -> cmd                -- Arrow abstraction
-       |  (| exp cmd1 ... cmdn |)    -- Arrow form, n>=0
-       |  ... -- if, case in the usual way
+The above judgment should be read as “under contexts G and D, cmd
+consumes an argument stack of type s and returns a value of type t in
+the arrow a.” For example, given the definitions
 
-  cmd_type ::= stk_ty --> type
-    -- where stk_ty has kind [Type], i.e. a type-level list of types
+    data Foo a b = ...
+    instance Category Foo where { ... }
+    instance Arrow Foo where { ... }
+    foo :: Foo String Bool
 
-Note that
- * The 'exp' in an arrow form can mention only
-   "arrow-local" variables
+we would expect the following judgment to hold:
 
- * An "arrow-local" variable is bound by an enclosing
-   cmd binding form (eg arrow abstraction)
+    G|D |-Foo (foo -< "hello") :: '[] --> Bool
 
- * A cmd_type is here written with a funny arrow "-->",
-   The bit on the left is a carg_type (command argument type)
-   which itself is a nested tuple, finishing with ()
+Some notable details of this notation:
 
- * The arrow-tail operator (e1 -< e2) means
-       (| e1 <<< arr snd |) e2
+  * G tracks the types of ordinary variables, while D tracks the types
+    of arrow-local variables (see Note [The command environment]).
 
+  * The long --> arrow is not itself a type, it’s just part of the
+    syntax of the judgment.
+
+  * s is a type-level list (a la DataKinds) containing the types of
+    all values currently on the stack (see Note [The command stack]),
+    which is important for typechecking control operators
+    (see Note [Control operator typing]).
+
+Note [Control operator typing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As alluded to in Note [The command stack], typechecking arrow control
+operators is subtle. Consider the type of the mapA command:
+
+    mapA :: ArrowChoice p
+         => p (e, a) b
+         -> p (e, [a]) [b]
+
+If mapA is used as a control operator, we have two problems:
+
+  1. The command passed to mapA is allowed to mention arrow-local
+     variables, which means that somehow we have to make sure their
+     values are passed to the desugared arrow. But mapA is an
+     arbitrary function! How do we know how to get them there?
+
+  2. When we call mapA, we pass it a value of type [a] and receive a
+     value of type a on the stack. We determine this information from
+     the tuples (e, a) and (e, [a]), but by what process? Those types
+     might be unsolved metavariables when we get our hands on them.
+
+We solve both problems with the help of a wired-in type family,
+ArrowEnvTup, which morally has the following infinitely-large definition:
+
+    newtype ArrowEnv env = ArrowEnv env
+
+    type family ArrowEnvTup env stk = r | r -> env, stk where
+      ArrowEnvTup env '[]           = ArrowEnv env
+      ArrowEnvTup env '[t1]         = (ArrowEnv env, t1)
+      ArrowEnvTup env '[t1, t2]     = (ArrowEnv env, t1, t2)
+      ArrowEnvTup env '[t1, t2, t3] = (ArrowEnv env, t1, t2, t3)
+      ...
+
+When we typecheck a control operator command like
+
+    G;D |-a (| op cmd1 ... cmdn |) :: s --> t
+
+we check op against the following type:
+
+    G |- op :: forall e. a1 (ArrowEnvTup e s1) t1
+                      -> ...
+                      -> an (ArrowEnvTup e sn) t2
+                      -> a  (ArrowEnvTup e s)  t
+
+There are several details about this worthy of note:
+
+  1. The first parameter of ArrowEnvTup is the type of the command
+     environment (see Note [The command environment]). Since it is
+     universally quantified, we can be confident that op will simply
+     pass it to each of its arguments unchanged. (The quantification
+     also keeps the representation the desugarer uses for the
+     environment opaque, so we don’t leak implementation details.)
+
+  2. Normally, checking a type against a type family would lead to
+     quite poor type inference, but ArrowEnvTup is injective! This
+     means we’ll learn information about s1 through sn from both the
+     argument commands and the type of op itself.
+
+  3. As a final detail, note that the type of the arrow can vary in
+     each argument to op. This might seem needlessly flexible, but it
+     can really matter for operators like mapErrorA:
+
+        -- | The analog to ExceptT for arrows.
+        newtype ErrorA e p a b = ErrorA (p a (Either e b))
+
+        mapErrorA :: ArrowChoice p
+                  => (e1 -> e2)
+                  -> ErrorA e1 p a b
+                  -> ErrorA e2 p a b
+
+     Most of the arrow type remains the same, but one of the type
+     parameters changes, so forcing them to all be identical would be
+     too restrictive.
+
+This strategy works well in practice, though it is rather complicated.
+The key trick is the use of the injective type family indexed over a
+type-level list, which allows knowledge about the shape of the stack
+to propagate bidirectionally, via the ordinary constraint-solving
+process. See also Note [Arrow type families] in GHC.Builtin.Types.Arrows.
 
 ************************************************************************
 *                                                                      *
@@ -203,7 +431,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (stk_ty, res_ty)
   = addErrCtxt (cmdCtxt cmd) $
     do  { arg_ty <- select_arrow_scope newOpenFlexiTyVarTy
 
-        ; let args_ty = arrowStackTupTy (consTy arg_ty stk_ty)
+        ; let args_ty = mkArrowStackTupTy (consTy arg_ty stk_ty)
               fun_ty = mkCmdArrTy env args_ty res_ty
         ; fun' <- select_arrow_scope (tcLExpr fun (mkCheckExpType fun_ty))
 
@@ -309,7 +537,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (stk_ty, res_ty)
                               -- We use alphaTyVar for 'w'
         ; let e_ty = mkInvForAllTy alphaTyVar $
                      mkVisFunTys cmd_tys $
-                     mkCmdArrTy env (arrowEnvTupTy alphaTy stk_ty) res_ty
+                     mkCmdArrTy env (mkArrowEnvTupTy alphaTy stk_ty) res_ty
         ; expr' <- tcCheckExpr expr e_ty
         ; return (HsCmdArrForm x expr' f fixity cmd_args') }
 
@@ -321,7 +549,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (stk_ty, res_ty)
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' cmd (stk_ty, res_ty)
-            ; let arg_ty = arrowEnvTupTy alphaTy stk_ty
+            ; let arg_ty = mkArrowEnvTupTy alphaTy stk_ty
             ; return (cmd', mkCmdArrTy env' arg_ty res_ty) }
 
 -----------------------------------------------------------------

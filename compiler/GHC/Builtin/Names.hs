@@ -1889,10 +1889,10 @@ unsafeEqualityTyConKey :: Unique
 unsafeEqualityTyConKey = mkPreludeTyConUnique 191
 
 -- Arrow notation
-arrowEnvTyConKey, arrowStackTupTyFamKey, arrowEnvTupTyFamKey :: Unique
+arrowEnvTyConKey, arrowStackTupTyConKey, arrowEnvTupTyConKey :: Unique
 arrowEnvTyConKey      = mkPreludeTyConUnique 192
-arrowStackTupTyFamKey = mkPreludeTyConUnique 193
-arrowEnvTupTyFamKey   = mkPreludeTyConUnique 194
+arrowStackTupTyConKey = mkPreludeTyConUnique 193
+arrowEnvTupTyConKey   = mkPreludeTyConUnique 194
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299

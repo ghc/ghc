@@ -115,7 +115,7 @@ scope. For example, if we have
     proc (a, b, c) -> { (d, e) <- cmd1; cmd2 }
 
 then AllEnvIds will contain {a, b, c} while desugaring cmd1 and
-{a, b, c, d} while desugaring cmd2.
+{a, b, c, d, e} while desugaring cmd2.
 
 It would be quite inefficient to actually pass around the *entire*
 local environment through the whole computation, since most variables
@@ -204,7 +204,7 @@ type StackIds   = [Id]     -- see Note [The command stack]
 --   >   ==> ArrowStackTup '[s1, ..., sm]
 mkStackTupTy :: StackIds -> Type
 mkStackTupTy stk_ids
-  = arrowStackTupTy $ mkPromotedListTy liftedTypeKind $ map idType stk_ids
+  = mkArrowStackTupTy $ mkPromotedListTy liftedTypeKind $ map idType stk_ids
 
 -- | > mkStackTup [y1::s1, ..., ym::sm]
 --   >   ==> (y1, ..., ym) :: ArrowStackTup '[s1, ..., sm]
@@ -216,7 +216,7 @@ mkStackTup stk_ids
 -- | > mkEnvStackTupTy {x1::t1, ..., xn::tn} [y1::s1, ..., ym::sm]
 --   >   ==> ArrowEnvTup (t1, ..., tn) '[s1, ..., sm]
 mkEnvStackTupTy :: UsedEnvIds -> StackIds -> Type
-mkEnvStackTupTy env_ids stk_ids = arrowEnvTupTy env_ty stk_ty
+mkEnvStackTupTy env_ids stk_ids = mkArrowEnvTupTy env_ty stk_ty
   where
     env_ty = mkBigCoreVarTupTy $ dVarSetElems env_ids
     stk_ty = mkPromotedListTy liftedTypeKind $ map idType stk_ids
@@ -253,9 +253,9 @@ matchEnvStackTup env_ids stk_ids body = do
   --   env_id  :: ArrowEnv (t1, ..., tn)
   --   env_id' :: (t1, ..., tn)
   -- arg_id' and env_id' aren’t used, but they are needed as case binders.
-  arg_id  <- newSysLocalDs $ arrowEnvTupTy env_ty stk_ty
-  arg_id' <- newSysLocalDs $ mkBoxedTupleTy (arrowEnvTy env_ty : stk_tys)
-  env_id  <- newSysLocalDs $ arrowEnvTy env_ty
+  arg_id  <- newSysLocalDs $ mkArrowEnvTupTy env_ty stk_ty
+  arg_id' <- newSysLocalDs $ mkBoxedTupleTy (mkArrowEnvTy env_ty : stk_tys)
+  env_id  <- newSysLocalDs $ mkArrowEnvTy env_ty
   env_id' <- newSysLocalDs $ env_ty
 
   let arg_expr = mkCastDs (Var arg_id) (mkTcSubCo $ mkArrowEnvTupCo env_ty stk_tys)

@@ -3,13 +3,13 @@ module GHC.Builtin.Types.Arrows
   , arrowCoAxiomRules
 
   , arrowEnvTyCon
-  , arrowEnvTy
+  , mkArrowEnvTy
   , mkArrowEnvCo
   , arrowStackTupTyCon
-  , arrowStackTupTy
+  , mkArrowStackTupTy
   , mkArrowStackTupCo
   , arrowEnvTupTyCon
-  , arrowEnvTupTy
+  , mkArrowEnvTupTy
   , mkArrowEnvTupCo
   ) where
 
@@ -68,8 +68,8 @@ arrowEnvCoAxiom :: CoAxiom Unbranched
     data_name = mkWiredInDataConName UserSyntax gHC_DESUGAR (fsLit "ArrowEnv")
                   arrowEnvDataConKey data_con
 
-arrowEnvTy :: Type -> Type
-arrowEnvTy ty = mkTyConApp arrowEnvTyCon [ty]
+mkArrowEnvTy :: Type -> Type
+mkArrowEnvTy ty = mkTyConApp arrowEnvTyCon [ty]
 
 mkArrowEnvCo :: Type -> CoercionR
 mkArrowEnvCo ty = mkUnbranchedAxInstCo Representational arrowEnvCoAxiom [ty] []
@@ -96,8 +96,8 @@ arrowStackTupTyCon =
       stk_tys <- isPromotedListTy stk_ty
       pure (axArrowStackTupDef, [stk_ty], mkBoxedTupleTy stk_tys)
 
-arrowStackTupTy :: Type -> Type
-arrowStackTupTy stk_ty = mkTyConApp arrowStackTupTyCon [stk_ty]
+mkArrowStackTupTy :: Type -> Type
+mkArrowStackTupTy stk_ty = mkTyConApp arrowStackTupTyCon [stk_ty]
 
 axArrowStackTupDef :: CoAxiomRule
 axArrowStackTupDef = CoAxiomRule
@@ -107,7 +107,7 @@ axArrowStackTupDef = CoAxiomRule
   , coaxrProves    = \cs -> do
       [Pair ty1 ty2] <- pure cs
       tys2 <- isPromotedListTy ty2
-      pure (arrowStackTupTy ty1 `Pair` mkBoxedTupleTy tys2)
+      pure (mkArrowStackTupTy ty1 `Pair` mkBoxedTupleTy tys2)
   }
 
 mkArrowStackTupCo :: [Type] -> CoercionN
@@ -135,7 +135,7 @@ arrowEnvTupTyCon =
     matchFamArrowEnvTup tys = do
       [env_ty, stk_ty] <- pure tys
       stk_tys <- isPromotedListTy stk_ty
-      let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty : stk_tys)
+      let rhs_ty = mkBoxedTupleTy (mkArrowEnvTy env_ty : stk_tys)
       pure (axArrowEnvTupDef, [env_ty, stk_ty], rhs_ty)
 
     interactTopArrowEnvTup [env_ty, stk_ty] rhs_ty
@@ -144,7 +144,7 @@ arrowEnvTupTyCon =
       --     stk ~ '[]
       | Just (env_tc, [env_ty']) <- splitTyConApp_maybe rhs_ty
       , env_tc == arrowEnvTyCon
-      = [ arrowEnvTy env_ty `Pair` env_ty'
+      = [ mkArrowEnvTy env_ty `Pair` env_ty'
         , stk_ty `Pair` mkPromotedListTy liftedTypeKind [] ]
 
       --     ArrowEnvTup env stk ~ (env', t1, ..., tn)
@@ -152,7 +152,7 @@ arrowEnvTupTyCon =
       --     stk ~ '[t1, ..., tn]
       | Just (tup_tc, env_ty':stk_tys) <- splitTyConApp_maybe rhs_ty
       , isBoxedTupleTyCon tup_tc
-      = [ arrowEnvTy env_ty `Pair` env_ty'
+      = [ mkArrowEnvTy env_ty `Pair` env_ty'
         , stk_ty `Pair` mkPromotedListTy liftedTypeKind stk_tys ]
 
     interactTopArrowEnvTup _ _ = []
@@ -163,8 +163,8 @@ arrowEnvTupTyCon =
       = [ env_ty1 `Pair` env_ty2, stk_ty1 `Pair` stk_ty2 ]
     interactInertArrowEnvTup _ _ _ _ = []
 
-arrowEnvTupTy :: Type -> Type -> Type
-arrowEnvTupTy env_ty stk_ty = mkTyConApp arrowEnvTupTyCon [env_ty, stk_ty]
+mkArrowEnvTupTy :: Type -> Type -> Type
+mkArrowEnvTupTy env_ty stk_ty = mkTyConApp arrowEnvTupTyCon [env_ty, stk_ty]
 
 axArrowEnvTupDef :: CoAxiomRule
 axArrowEnvTupDef = CoAxiomRule
@@ -174,8 +174,8 @@ axArrowEnvTupDef = CoAxiomRule
   , coaxrProves    = \cs -> do
       [Pair env_ty1 env_ty2, Pair stk_ty1 stk_ty2] <- pure cs
       stk_tys2 <- isPromotedListTy stk_ty2
-      let rhs_ty = mkBoxedTupleTy (arrowEnvTy env_ty2 : stk_tys2)
-      pure (arrowEnvTupTy env_ty1 stk_ty1 `Pair` rhs_ty)
+      let rhs_ty = mkBoxedTupleTy (mkArrowEnvTy env_ty2 : stk_tys2)
+      pure (mkArrowEnvTupTy env_ty1 stk_ty1 `Pair` rhs_ty)
   }
 
 mkArrowEnvTupCo :: Type -> [Type] -> CoercionN
