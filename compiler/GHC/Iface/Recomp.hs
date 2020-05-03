@@ -49,10 +49,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
---Qualified import so we can define a Semigroup instance
--- but it doesn't clash with Outputable.<>
-import qualified Data.Semigroup
-
 {-
   -----------------------------------------------
           Recompilation checking
@@ -94,13 +90,6 @@ data RecompileRequired
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
    deriving Eq
-
-instance Semigroup RecompileRequired where
-  UpToDate <> r = r
-  mc <> _       = mc
-
-instance Monoid RecompileRequired where
-  mempty = UpToDate
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False
