@@ -238,6 +238,20 @@ closureIdentity( const StgClosure *p )
             return closure_type_names[info->type];
         }
     }
+    case HEAP_BY_INFO_TABLE: {
+        const StgInfoTable *info;
+        info = get_itbl(p);
+        switch (info->type) {
+        case THUNK:
+        case THUNK_1_1:
+        case THUNK_0_2:
+        case THUNK_2_0:
+        case THUNK_1_0:
+        case THUNK_0_1:
+        case THUNK_SELECTOR:
+          return get_itbl(p);
+        default: return NULL;
+        }}
 
     default:
         barf("closureIdentity");
@@ -938,6 +952,14 @@ dumpCensus( Census *census )
             fprintf(hp_file, "%s", (char *)ctr->identity);
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
+            break;
+        case HEAP_BY_INFO_TABLE:
+            fprintf(hp_file, "%p", ctr->identity);
+            // TODO now all the types in this mode are just THUNK closures so
+            // don't really need to add any more info
+            char str[100];
+            sprintf(str, "%p", ctr->identity);
+            traceHeapProfSampleString(0, str, count * sizeof(W_));
             break;
 #if defined(PROFILING)
         case HEAP_BY_CCS:
