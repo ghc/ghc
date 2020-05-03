@@ -76,6 +76,7 @@ test('T15073', [extra_files(['T15073a.hs'])], multimod_compile_fail,
                ['T15073', '-v0'])
 test('T16181', normal, compile_fail, [''])
 test('T16923', normal, compile_fail, [''])
+test('T18127b', normal, compile_fail, [''])
 test('deriving-via-fail', normal, compile_fail, [''])
 test('deriving-via-fail2', normal, compile_fail, [''])
 test('deriving-via-fail3', normal, compile_fail, [''])
