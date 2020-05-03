@@ -1593,7 +1593,7 @@ defaultLogActionHPutStrDoc dflags h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
   = printSDoc ctx Pretty.PageMode h d
-    where ctx = initSDocContext dflags defaultDumpStyle
+    where ctx = initSDocContext dflags defaultUserStyle
 
 newtype FlushOut = FlushOut (IO ())
 
