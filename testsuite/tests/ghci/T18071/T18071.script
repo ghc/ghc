@@ -1,0 +1,6 @@
+:set -Wno-simplifiable-class-constraints
+:load T18071.hs
+-- Should report no instances since it is ill-kinded for T
+:instances T
+-- U should report a match for ShowProxy
+:instances U
