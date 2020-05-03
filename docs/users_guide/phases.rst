@@ -810,6 +810,17 @@ for example).
     when linking against this package.
     See :ref:`shared object name mangling <building-packages>` for details.
 
+.. ghc-flag:: -fshared-link-rts
+    :shortdesc: Link the runtime when generating a shared library
+    :type: dynamic
+    :category: linking
+
+    When generating shared libraries GHC does not automatically link the RTS.
+    This is to allow choosing the RTS flavour (:ghc-flag:`-threaded`,
+    :ghc-flag:`-eventlog`, etc) when generating an executable. However when the
+    shared library is the intended product it is useful to be able to reverse
+    this default. See :ref:`shared-libraries-c-api` for an usage example.
+
 .. ghc-flag:: -dynload
     :shortdesc: Selects one of a number of modes for finding shared libraries at runtime.
     :type: dynamic
