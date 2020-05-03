@@ -14,7 +14,7 @@ T3807:
 	# libraries. This is done to allow the RTS flavour to be chosen later (i.e.
 	# when linking an executable).
 	# Hence we must explicitly linking with the RTS here.
-	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version`
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -fshared-link-rts
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
 	./T3807-load
 
@@ -61,3 +61,33 @@ T5373:
 T13702:
 	'$(TEST_HC)' -v0 -dynamic -rdynamic -fPIC -pie T13702.hs
 	./T13702
+
+.PHONY: T18072
+T18072:
+	$(RM) -rf T18072/
+	mkdir T18072
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072 \
+    -dynamic -fPIC -c T18072.hs
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072 \
+    -dynamic -shared -fshared-link-rts T18072/T18072.o -o T18072/T18072.so
+	ldd T18072/T18072.so | grep libHSrts >/dev/null
+
+.PHONY: T18072debug
+T18072debug:
+	$(RM) -rf T18072debug/
+	mkdir T18072debug
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072debug \
+    -dynamic -fPIC -c T18072.hs
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072debug \
+    -dynamic -shared -fshared-link-rts -debug T18072debug/T18072.o -o T18072debug/T18072.so
+	ldd T18072debug/T18072.so | grep libHSrts | grep _debug >/dev/null
+
+.PHONY: T18072eventlog
+T18072eventlog:
+	$(RM) -rf T18072eventlog/
+	mkdir T18072eventlog
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072eventlog \
+    -dynamic -fPIC -c T18072.hs
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072eventlog \
+    -dynamic -shared -fshared-link-rts -eventlog T18072eventlog/T18072.o -o T18072eventlog/T18072.so
+	ldd T18072eventlog/T18072.so | grep libHSrts | grep _l >/dev/null

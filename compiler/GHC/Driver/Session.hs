@@ -3624,7 +3624,8 @@ fFlagsDeps = [
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
-  flagSpec "keep-cafs"                        Opt_KeepCAFs
+  flagSpec "keep-cafs"                        Opt_KeepCAFs,
+  flagSpec "shared-link-rts"                  Opt_SharedLinkRts
   ]
   ++ fHoleFlags
 
