@@ -274,6 +274,7 @@ data GeneralFlag
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode
+   | Opt_LinkRts
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,

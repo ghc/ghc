@@ -92,6 +92,8 @@ files to use the extension ``.dyn_hi``. The other requirements are the
 same as for C libraries and are described below, in particular the use
 of the flags :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared`.
 
+.. _shared-libraries-c-api:
+
 Shared libraries that export a C API
 ------------------------------------
 
@@ -115,19 +117,24 @@ the :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared` flags:
 
 .. code-block:: none
 
-    ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
+    ghc --make -dynamic -shared -fPIC -flink-rts Foo.hs -o libfoo.so
 
 As before, the :ghc-flag:`-dynamic` flag specifies that this library links
-against the shared library versions of the ``rts`` and ``base`` package. The
-:ghc-flag:`-fPIC` flag is required for all code that will end up in a shared
-library. The :ghc-flag:`-shared` flag specifies to make a shared library rather
-than a program. To make this clearer we can break this down into separate
-compilation and link steps:
+against the shared library versions of the ``base`` package.
+:ghc-flag:`-flink-rts` additionally links against the shared library version of
+the ``rts`` package (linking against the ``rts`` package is not enabled by
+default when building shared libraries). You may also omit ``-flink-rts``
+and link the RTS library into your final executable.
+
+The :ghc-flag:`-fPIC` flag is required for all code that will end up in a
+shared library. The :ghc-flag:`-shared` flag specifies to make a shared library
+rather than a program. To make this clearer we can break this down into
+separate compilation and link steps:
 
 .. code-block:: none
 
     ghc -dynamic -fPIC -c Foo.hs
-    ghc -dynamic -shared Foo.o -o libfoo.so
+    ghc -dynamic -shared -flink-rts Foo.o -o libfoo.so
 
 In principle you can use :ghc-flag:`-shared` without :ghc-flag:`-dynamic` in the
 link step. That means to statically link the runtime system and all of the base

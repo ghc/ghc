@@ -2435,7 +2435,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "shared"
         (noArg (\d -> d { ghcLink=LinkDynLib }))
   , make_ord_flag defGhcFlag "staticlib"
-        (noArg (\d -> d { ghcLink=LinkStaticLib }))
+        (noArg (\d -> setGeneralFlag' Opt_LinkRts (d { ghcLink=LinkStaticLib })))
   , make_ord_flag defGhcFlag "dynload"            (hasArg parseDynLibLoaderMode)
   , make_ord_flag defGhcFlag "dylib-install-name" (hasArg setDylibInstallName)
 
@@ -3599,7 +3599,8 @@ fFlagsDeps = [
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
-  flagSpec "keep-cafs"                        Opt_KeepCAFs
+  flagSpec "keep-cafs"                        Opt_KeepCAFs,
+  flagSpec "link-rts"                         Opt_LinkRts
   ]
   ++ fHoleFlags
 
