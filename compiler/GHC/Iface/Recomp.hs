@@ -138,24 +138,24 @@ check_old_iface
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
         getIface =
-            case maybe_iface of
-                Just _  -> do
-                    traceIf (text "We already have the old interface for" <+>
-                      ppr (ms_mod mod_summary))
-                    return maybe_iface
-                Nothing -> loadIface
+          case maybe_iface of
+            Just _  -> do
+              traceIf (text "We already have the old interface for" <+>
+                ppr (ms_mod mod_summary))
+              return maybe_iface
+            Nothing -> loadIface
 
         loadIface = do
-             let iface_path = msHiFilePath mod_summary
-             read_result <- readIface (ms_mod mod_summary) iface_path
-             case read_result of
-                 Failed err -> do
-                     traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
-                     traceHiDiffs (text "Old interface file was invalid:" $$ nest 4 err)
-                     return Nothing
-                 Succeeded iface -> do
-                     traceIf (text "Read the interface file" <+> text iface_path)
-                     return $ Just iface
+          let iface_path = msHiFilePath mod_summary
+          read_result <- readIface (ms_mod mod_summary) iface_path
+          case read_result of
+            Failed err -> do
+              traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
+              traceHiDiffs (text "Old interface file was invalid:" $$ nest 4 err)
+              return Nothing
+            Succeeded iface -> do
+              traceIf (text "Read the interface file" <+> text iface_path)
+              return $ Just iface
 
         src_changed
             | gopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
