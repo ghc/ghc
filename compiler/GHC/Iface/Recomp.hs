@@ -166,12 +166,6 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             traceHiDiffs (nest 4 $ text "Source file changed or recompilation check turned off")
 
         case src_changed of
-            -- If the source has changed and we're in interactive mode,
-            -- avoid reading an interface; just return the one we might
-            -- have been supplied with.
-            True | not (isObjectTarget $ hscTarget dflags) ->
-                return (MustCompile, maybe_iface)
-
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
