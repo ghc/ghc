@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
@@ -9,6 +10,8 @@ module GHC.Iface.Recomp
    , RecompileRequired(..)
    , needsRecompileBecause
    , recompThen
+   , MaybeValidated(..)
+   , outOfDateItemBecause
    , RecompReason (..)
    , CompileReason(..)
    , recompileRequired
@@ -124,6 +127,20 @@ data RecompileRequired
 needsRecompileBecause :: RecompReason -> RecompileRequired
 needsRecompileBecause = NeedsRecompile . RecompBecause
 
+data MaybeValidated a
+  -- | The item contained is validated to be up to date
+  = UpToDateItem a
+  -- | The item is are absent altogether or out of date, for the reason given.
+  | OutOfDateItem
+      !CompileReason
+      -- ^ the reason we need to recompile.
+      (Maybe a)
+      -- ^ The old item, if it exists
+  deriving (Functor)
+
+outOfDateItemBecause :: RecompReason -> Maybe a -> MaybeValidated a
+outOfDateItemBecause reason item = OutOfDateItem (RecompBecause reason) item
+
 data CompileReason
   -- | The .hs file has been touched, or the .o/.hi file does not exist
   = MustCompile
@@ -227,15 +244,18 @@ checkList = \case
 
 -- | Top level function to check if the version of an old interface file
 -- is equivalent to the current source file the user asked us to compile.
--- If the same, we can avoid recompilation. We return a tuple where the
--- first element is a bool saying if we should recompile the object file
--- and the second is maybe the interface file, where Nothing means to
--- rebuild the interface file and not use the existing one.
+-- If the same, we can avoid recompilation.
+--
+-- We return on the outside whether the interface file is up to date, providing
+-- evidence that is with a `ModIface`. In the case that it isn't, we may also
+-- return a found or provided `ModIface`. Why we don't always return the old
+-- one, if it exists, is unclear to me, except that I tried it and some tests
+-- failed (see #18205).
 checkOldIface
   :: HscEnv
   -> ModSummary
   -> Maybe ModIface         -- Old interface from compilation manager, if any
-  -> IO (RecompileRequired, Maybe ModIface)
+  -> IO (MaybeValidated ModIface)
 
 checkOldIface hsc_env mod_summary maybe_iface
   = do  let dflags = hsc_dflags hsc_env
@@ -251,7 +271,7 @@ check_old_iface
   :: HscEnv
   -> ModSummary
   -> Maybe ModIface
-  -> IfG (RecompileRequired, Maybe ModIface)
+  -> IfG (MaybeValidated ModIface)
 
 check_old_iface hsc_env mod_summary maybe_iface
   = let dflags = hsc_dflags hsc_env
@@ -276,18 +296,18 @@ check_old_iface hsc_env mod_summary maybe_iface
                      trace_if logger (text "Read the interface file" <+> text iface_path)
                      return $ Just iface
         check_dyn_hi :: ModIface
-                  -> IfG (RecompileRequired, Maybe a)
-                  -> IfG (RecompileRequired, Maybe a)
+                  -> IfG (MaybeValidated ModIface)
+                  -> IfG (MaybeValidated ModIface)
         check_dyn_hi normal_iface recomp_check | gopt Opt_BuildDynamicToo dflags = do
           res <- recomp_check
-          case fst res of
-            UpToDate -> do
+          case res of
+            UpToDateItem _ -> do
               maybe_dyn_iface <- liftIO $ loadIface (setDynamicNow dflags) (msDynHiFilePath mod_summary)
               case maybe_dyn_iface of
-                Nothing -> return (needsRecompileBecause MissingDynHiFile, Nothing)
+                Nothing -> return $ outOfDateItemBecause MissingDynHiFile Nothing
                 Just dyn_iface | mi_iface_hash (mi_final_exts dyn_iface)
                                     /= mi_iface_hash (mi_final_exts normal_iface)
-                  -> return (needsRecompileBecause MismatchedDynHiFile, Nothing)
+                  -> return $ outOfDateItemBecause MismatchedDynHiFile Nothing
                 Just {} -> return res
             _ -> return res
         check_dyn_hi _ recomp_check = recomp_check
@@ -305,19 +325,19 @@ check_old_iface hsc_env mod_summary maybe_iface
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
             True | not (backendProducesObject $ backend dflags) ->
-                return (NeedsRecompile MustCompile, maybe_iface)
+                return $ OutOfDateItem MustCompile maybe_iface
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
                 maybe_iface' <- liftIO $ getIface
-                return (NeedsRecompile MustCompile, maybe_iface')
+                return $ OutOfDateItem MustCompile maybe_iface'
 
             False -> do
                 maybe_iface' <- liftIO $ getIface
                 case maybe_iface' of
                     -- We can't retrieve the iface
-                    Nothing    -> return (NeedsRecompile MustCompile, Nothing)
+                    Nothing    -> return $ OutOfDateItem MustCompile Nothing
 
                     -- We have got the old iface; check its versions
                     -- even in the SourceUnmodifiedAndStable case we
@@ -340,7 +360,7 @@ check_old_iface hsc_env mod_summary maybe_iface
 checkVersions :: HscEnv
               -> ModSummary
               -> ModIface       -- Old interface
-              -> IfG (RecompileRequired, Maybe ModIface)
+              -> IfG (MaybeValidated ModIface)
 checkVersions hsc_env mod_summary iface
   = do { liftIO $ trace_hi_diffs logger
                         (text "Considering whether compilation is required for" <+>
@@ -351,20 +371,20 @@ checkVersions hsc_env mod_summary iface
        -- test case bkpcabal04!
        ; hsc_env <- getTopEnv
        ; if mi_src_hash iface /= ms_hs_hash mod_summary
-            then return (needsRecompileBecause SourceFileChanged, Nothing) else do {
+            then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
-            then return (needsRecompileBecause ThisUnitIdChanged, Nothing) else do {
+            then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
        ; recomp <- liftIO $ checkFlagHash hsc_env iface
                              `recompThen` checkOptimHash hsc_env iface
                              `recompThen` checkHpcHash hsc_env iface
                              `recompThen` checkMergedSignatures hsc_env mod_summary iface
                              `recompThen` checkHsig logger home_unit mod_summary iface
                              `recompThen` pure (checkHie dflags mod_summary)
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason Nothing ; _ -> do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Just iface) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
        ; recomp <- checkPlugins (hsc_plugins hsc_env) iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason Nothing ; _ -> do {
 
 
        -- Source code unchanged and no errors yet... carry on
@@ -382,8 +402,9 @@ checkVersions hsc_env mod_summary iface
        }
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
-       ; return (recomp, Just iface)
-    }}}}}}
+       ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
+       ; return $ UpToDateItem iface
+    }}}}}}}
   where
     logger = hsc_logger hsc_env
     dflags = hsc_dflags hsc_env

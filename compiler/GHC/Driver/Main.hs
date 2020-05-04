@@ -751,41 +751,45 @@ hscRecompStatus
     -- Save the interface that comes back from checkOldIface.
     -- In one-shot mode we don't have the old iface until this
     -- point, when checkOldIface reads it from the disk.
-    (recomp_iface_reqd, mb_checked_iface)
+    recomp_if_result
           <- {-# SCC "checkOldIface" #-}
              liftIO $ checkOldIface hsc_env mod_summary mb_old_iface
-    let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
-    case recomp_iface_reqd of
-      NeedsRecompile _ -> do
-        msg recomp_iface_reqd
-        return $ HscRecompNeeded mb_old_hash
-      UpToDate -> do
-        -- Check to see whether the expected build products already exist.
-        -- If they don't exists then we trigger recompilation.
+    case recomp_if_result of
+      OutOfDateItem reason mb_checked_iface -> do
+        msg $ NeedsRecompile reason
+        return $ HscRecompNeeded $ fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+      UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
-        (recomp_obj_reqd, mb_linkable) <-
-          case () of
-            -- No need for a linkable, we're good to go
-            _ | NoBackend <- backend lcl_dflags   -> return (UpToDate, Nothing)
-              -- Interpreter can use either already loaded bytecode or loaded object code
-              | not (backendProducesObject (backend lcl_dflags)) -> do
-                  let res = checkByteCode old_linkable
-                  case res of
-                    (_, Just{}) -> return res
-                    _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-              -- Need object files for making object files
-              | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-              | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
-        msg recomp_obj_reqd
-        case (mb_checked_iface, recomp_obj_reqd) of
-            (Just iface, UpToDate) ->
-              return $ HscUpToDate iface mb_linkable
-            _ ->
-              return $ HscRecompNeeded mb_old_hash
+        case backend lcl_dflags of
+          -- No need for a linkable, we're good to go
+          NoBackend -> do
+            msg $ UpToDate
+            return $ HscUpToDate checked_iface Nothing
+          -- Do need linkable
+          _ -> do
+            -- Check to see whether the expected build products already exist.
+            -- If they don't exists then we trigger recompilation.
+            recomp_linkable_result <- case () of
+               -- Interpreter can use either already loaded bytecode or loaded object code
+               _ | Interpreter <- backend lcl_dflags -> do
+                     let res = checkByteCode old_linkable
+                     case res of
+                       UpToDateItem _ -> pure res
+                       _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                 -- Need object files for making object files
+                 | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                 | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
+            case recomp_linkable_result of
+              UpToDateItem linkable -> do
+                msg $ UpToDate
+                return $ HscUpToDate checked_iface $ Just linkable
+              OutOfDateItem reason _ -> do
+                msg $ NeedsRecompile reason
+                return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
-checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
+checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (MaybeValidated Linkable)
 checkObjects dflags mb_old_linkable summary = do
   let
     dt_enabled  = gopt Opt_BuildDynamicToo dflags
@@ -798,11 +802,11 @@ checkObjects dflags mb_old_linkable summary = do
     -- that's there, and if it's not, regenerate both .o and
     -- .dyn_o
     checkDynamicObj k = if dt_enabled
-                          then case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
-                                      Just True -> k
-                                      _ -> return (needsRecompileBecause MissingDynObjectFile, Nothing)
-                          -- Not in dynamic-too mode
-                          else k
+      then case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
+        Just True -> k
+        _ -> return $ outOfDateItemBecause MissingDynObjectFile Nothing
+      -- Not in dynamic-too mode
+      else k
 
   checkDynamicObj $
     case (,) <$> mb_obj_date <*> mb_if_date of
@@ -811,20 +815,20 @@ checkObjects dflags mb_old_linkable summary = do
             case mb_old_linkable of
               Just old_linkable
                 | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
-                -> return $ (UpToDate, Just old_linkable)
-              _ -> (UpToDate,) . Just <$> findObjectLinkable this_mod obj_fn obj_date
-      _ -> return (needsRecompileBecause MissingObjectFile, Nothing)
+                -> return $ UpToDateItem old_linkable
+              _ -> UpToDateItem <$> findObjectLinkable this_mod obj_fn obj_date
+      _ -> return $ outOfDateItemBecause MissingObjectFile Nothing
 
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: Maybe Linkable -> (RecompileRequired, Maybe Linkable)
+checkByteCode :: Maybe Linkable -> MaybeValidated Linkable
 checkByteCode mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (isObjectLinkable old_linkable)
-      -> (UpToDate, Just old_linkable)
-    _ -> (needsRecompileBecause MissingBytecode, Nothing)
+      -> UpToDateItem old_linkable
+    _ -> outOfDateItemBecause MissingBytecode Nothing
 
 --------------------------------------------------------------
 -- Compilers
