@@ -25,6 +25,7 @@ tar            = @TarCmd@
 patch          = @PatchCmd@
 xelatex        = @XELATEX@
 makeinfo       = @MAKEINFO@
+dtrace         = @DtraceCmd@
 
 # Python 3 is required to run test driver.
 # See: https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk#L220
@@ -176,9 +177,12 @@ libdw-lib-dir       = @LibdwLibDir@
 libnuma-include-dir   = @LibNumaIncludeDir@
 libnuma-lib-dir       = @LibNumaLibDir@
 
+libsystemtap-include-dir = @LibsystemtapIncludeDir@
+
 # Optional Dependencies:
 #=======================
 
 with-libdw = @UseLibdw@
 with-libnuma = @UseLibNuma@
 have-lib-mingw-ex = @HaveLibMingwEx@
+with-dtrace = @HaveDtrace@

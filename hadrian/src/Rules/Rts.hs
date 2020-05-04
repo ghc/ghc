@@ -1,4 +1,4 @@
-module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
+module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks, needRtsProbes) where
 
 import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsContext)
 import Rules.Libffi
@@ -28,6 +28,8 @@ rtsRules = priority 3 $ do
         -- Header files
         (fmap (buildPath -/-) libffiHeaderFiles) &%> const (copyLibffiHeaders stage)
 
+        buildPath -/- "RtsProbes.h"    %> buildRtsProbes
+
         -- Static libraries.
         buildPath -/- "libCffi*.a"     %> copyLibffiStatic stage
 
@@ -35,6 +37,17 @@ rtsRules = priority 3 $ do
         buildPath -/- "libffi*.dylib*" %> copyLibffiDynamicUnix stage ".dylib"
         buildPath -/- "libffi*.so*"    %> copyLibffiDynamicUnix stage ".so"
         buildPath -/- "libffi*.dll*"   %> copyLibffiDynamicWin  stage
+
+buildRtsProbes :: FilePath -> Action ()
+buildRtsProbes out =
+    runBuilder
+        Dtrace
+        [ "-h"
+        , "-s", "rts/RtsProbes.d"
+        , "-o", out ]
+        ["rts/RtsProbes.d"]
+        [out]
+
 
 withLibffi :: Stage -> (FilePath -> FilePath -> Action a) -> Action a
 withLibffi stage action = needLibffi stage
@@ -107,6 +120,12 @@ rtsLibffiLibrary stage way = do
     suf     <- libsuf stage way
     rtsPath <- rtsBuildPath stage
     return $ rtsPath -/- "lib" ++ name ++ suf
+
+needRtsProbes :: Stage -> Action [FilePath]
+needRtsProbes stage = do
+    rtsPath      <- rtsBuildPath stage
+    withDtrace <- flag WithDtrace
+    return $ if withDtrace then [rtsPath -/- "RtsProbes.h"] else []
 
 -- | Get the libffi files bundled with the rts (header and library files).
 -- Unless using the system libffi, this needs the libffi library. It must be

@@ -189,7 +189,9 @@ parseCabalName = fmap f . Cabal.eitherParsec
 -- | Return extra library targets.
 extraTargets :: Context -> Action [FilePath]
 extraTargets context
-    | package context == rts  = needRtsLibffiTargets (Context.stage context)
+    | package context == rts  =
+        needRtsLibffiTargets (Context.stage context) <>
+        needRtsProbes (Context.stage context)
     | otherwise               = return []
 
 -- | Given a library 'Package' this action computes all of its targets. Needing
