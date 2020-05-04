@@ -18,8 +18,6 @@ types that
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Types.Basic (
-        Version, bumpVersion, initialVersion,
-
         LeftOrRight(..),
         pickLR,
 
@@ -410,22 +408,6 @@ data FunctionOrData = IsFunction | IsData
 instance Outputable FunctionOrData where
     ppr IsFunction = text "(function)"
     ppr IsData     = text "(data)"
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[Version]{Module and identifier version numbers}
-*                                                                      *
-************************************************************************
--}
-
-type Version = Int
-
-bumpVersion :: Version -> Version
-bumpVersion v = v+1
-
-initialVersion :: Version
-initialVersion = 1
 
 {-
 ************************************************************************
