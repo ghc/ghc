@@ -129,6 +129,10 @@ pprTop dflags = \case
     pprDataExterns platform lits $$
     pprWordArray dflags (isSecConstant section) lbl lits
   where
+    isSecConstant section = case sectionProtection section of
+      ReadOnlySection -> True
+      WriteProtectedSection -> True
+      _ -> False
     platform = targetPlatform dflags
 
 -- --------------------------------------------------------------------------
