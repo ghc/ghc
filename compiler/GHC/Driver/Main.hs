@@ -646,7 +646,7 @@ hscIncrementalFrontend
                    Nothing -> return ()
 
         skip iface = do
-            liftIO $ msg UpToDate
+            liftIO $ msg Nothing
             return $ Left iface
 
         compile mb_old_hash reason = do
@@ -690,7 +690,7 @@ hscIncrementalFrontend
                     case m_tc_result of
                     Nothing
                      | mi_used_th iface && not stable ->
-                        compile mb_old_hash (RecompBecause "TH")
+                        compile mb_old_hash $ Just $ RecompBecause "TH"
                     _ ->
                         skip iface
                 _ ->
@@ -884,20 +884,20 @@ genModDetails hsc_env old_iface
 oneShotMsg :: HscEnv -> RecompileRequired -> IO ()
 oneShotMsg hsc_env recomp =
     case recomp of
-        UpToDate ->
+        Nothing ->
             compilationProgressMsg (hsc_dflags hsc_env) $
                    "compilation IS NOT required"
-        _ ->
+        Just _ ->
             return ()
 
 batchMsg :: Messager
 batchMsg hsc_env mod_index recomp mod_summary =
     case recomp of
-        MustCompile -> showMsg "Compiling " ""
-        UpToDate
+        Just MustCompile -> showMsg "Compiling " ""
+        Nothing
             | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
             | otherwise -> return ()
-        RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+        Just (RecompBecause reason) -> showMsg "Compiling " (" [" ++ reason ++ "]")
     where
         dflags = hsc_dflags hsc_env
         showMsg msg reason =
