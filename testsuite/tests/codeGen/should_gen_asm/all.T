@@ -3,7 +3,8 @@ is_amd64_codegen = [
     when(unregisterised, skip),
 ]
 
-test('memcpy', is_amd64_codegen,  compile_cmp_asm, [''])
-test('memcpy-unroll', is_amd64_codegen, compile_cmp_asm, [''])
-test('memcpy-unroll-conprop', is_amd64_codegen, compile_cmp_asm, [''])
-test('memset-unroll', is_amd64_codegen, compile_cmp_asm, [''])
+test('memcpy', is_amd64_codegen,  compile_cmp_asm, ['cmm', ''])
+test('memcpy-unroll', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
+test('memcpy-unroll-conprop', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
+test('memset-unroll', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
+test('T18137', [when(opsys('darwin'), skip), only_ways(llvm_ways)], compile_grep_asm, ['hs', False, '-fllvm -split-sections'])

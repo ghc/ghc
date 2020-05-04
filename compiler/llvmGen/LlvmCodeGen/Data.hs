@@ -52,7 +52,8 @@ genLlvmData (sec, Statics lbl xs) = do
         align          = case sec of
                             Section CString _ -> Just 1
                             _                 -> Nothing
-        const          = if isSecConstant sec then Constant else Global
+        const          = if sectionProtection sec == ReadOnlySection
+                            then Constant else Global
         varDef         = LMGlobalVar label tyAlias link lmsec align const
         globDef        = LMGlobal varDef struct
 

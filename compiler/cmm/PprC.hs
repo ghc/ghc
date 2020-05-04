@@ -132,6 +132,11 @@ pprTop (CmmData section (Statics lbl lits)) =
   pprDataExterns lits $$
   pprWordArray (isSecConstant section) lbl lits
 
+isSecConstant :: Section -> Bool
+isSecConstant section = case sectionProtection section of
+  ReadOnlySection -> True
+  WriteProtectedSection -> True
+  _ -> False
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
 --
