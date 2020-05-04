@@ -506,11 +506,11 @@ mkBackpackMsg = do
                                   (recompileRequired recomp) mod_summary
                     ++ reason
       in case recomp of
-            MustCompile -> showMsg "Compiling " ""
-            UpToDate
+            Just MustCompile -> showMsg "Compiling " ""
+            Nothing
                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
                 | otherwise -> return ()
-            RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+            Just (RecompBecause reason) -> showMsg "Compiling " (" [" ++ reason ++ "]")
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
