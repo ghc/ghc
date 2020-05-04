@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "IOManager.h"
+#include "rts\OSThreads.h"
 #include "Prelude.h"
 #include <windows.h>
 
@@ -17,16 +18,22 @@
 static HANDLE io_manager_event = INVALID_HANDLE_VALUE;
 
 #define EVENT_BUFSIZ 256
+// We lock using OS_ACQUIRE_LOCK the ensure the non-threaded WINIO
+// C thread does not race with the scheduler code which can also
+// access the event queue via FFI.
 Mutex event_buf_mutex;
 StgWord32 event_buf[EVENT_BUFSIZ];
 uint32_t next_event;
 
+/*Creates the IO Managers event object.
+  Idempotent after first call.
+*/
 HANDLE
 getIOManagerEvent (void)
 {
     HANDLE hRes;
 
-    ACQUIRE_LOCK(&event_buf_mutex);
+    OS_ACQUIRE_LOCK(&event_buf_mutex);
 
     if (io_manager_event == INVALID_HANDLE_VALUE) {
         hRes = CreateEvent ( NULL, // no security attrs
@@ -42,7 +49,7 @@ getIOManagerEvent (void)
         hRes = io_manager_event;
     }
 
-    RELEASE_LOCK(&event_buf_mutex);
+    OS_RELEASE_LOCK(&event_buf_mutex);
     return hRes;
 }
 
@@ -52,7 +59,7 @@ readIOManagerEvent (void)
 {
     HsWord32 res;
 
-    ACQUIRE_LOCK(&event_buf_mutex);
+    OS_ACQUIRE_LOCK(&event_buf_mutex);
 
     if (io_manager_event != INVALID_HANDLE_VALUE) {
         if (next_event == 0) {
@@ -74,7 +81,7 @@ readIOManagerEvent (void)
         res = 0;
     }
 
-    RELEASE_LOCK(&event_buf_mutex);
+    OS_RELEASE_LOCK(&event_buf_mutex);
 
     //debugBelch("readIOManagerEvent: %d\n", res);
     return res;
@@ -83,7 +90,7 @@ readIOManagerEvent (void)
 void
 sendIOManagerEvent (HsWord32 event)
 {
-    ACQUIRE_LOCK(&event_buf_mutex);
+    OS_ACQUIRE_LOCK(&event_buf_mutex);
 
     //debugBelch("sendIOManagerEvent: %d to %p\n", event, io_manager_event);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
@@ -98,14 +105,14 @@ sendIOManagerEvent (HsWord32 event)
         }
     }
 
-    RELEASE_LOCK(&event_buf_mutex);
+    OS_RELEASE_LOCK(&event_buf_mutex);
 }
 
 void
 interruptIOManagerEvent (void)
 {
   if (is_io_mng_native_p ()) {
-    ACQUIRE_LOCK(&event_buf_mutex);
+    OS_ACQUIRE_LOCK(&event_buf_mutex);
 
     /* How expensive is this??.  */
     Capability *cap;
@@ -113,7 +120,7 @@ interruptIOManagerEvent (void)
     rts_evalIO(&cap, interruptIOManager_closure, NULL);
     rts_unlock(cap);
 
-    RELEASE_LOCK(&event_buf_mutex);
+    OS_RELEASE_LOCK(&event_buf_mutex);
   }
 }
 
@@ -130,9 +137,9 @@ ioManagerDie (void)
     // IO_MANAGER_DIE must be idempotent, as it is called
     // repeatedly by shutdownCapability().  Try conc059(threaded1) to
     // illustrate the problem.
-    ACQUIRE_LOCK(&event_buf_mutex);
+    OS_ACQUIRE_LOCK(&event_buf_mutex);
     io_manager_event = INVALID_HANDLE_VALUE;
-    RELEASE_LOCK(&event_buf_mutex);
+    OS_RELEASE_LOCK(&event_buf_mutex);
     // ToDo: wait for the IO manager to pick up the event, and
     // then release the Event and Mutex objects we've allocated.
 }
