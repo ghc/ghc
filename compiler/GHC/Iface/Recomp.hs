@@ -1,10 +1,13 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
 -- | Module for detecting if recompilation is required
 module GHC.Iface.Recomp
    ( checkOldIface
    , RecompileRequired(..)
+   , RecompileRequiredWithEvidence(..)
+   , CompileReason(..)
    , recompileRequired
    , addFingerprints
    )
@@ -101,8 +104,18 @@ Basic idea:
 
 data RecompileRequired
   = UpToDate
-       -- ^ everything is up to date, recompilation is not required
-  | MustCompile
+  | NeedsRecompile CompileReason
+
+data RecompileRequiredWithEvidence
+  = UpToDateWithEvidence ModIface
+  | NeedsRecompileWithOld
+     CompileReason
+     -- ^ the reason we need to recompile.
+     (Maybe ModIface)
+     -- ^ The old interface, if it exists, used to extract a fingerprint.
+
+data CompileReason
+  = MustCompile
        -- ^ The .hs file has been touched, or the .o/.hi file does not exist
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
@@ -111,20 +124,22 @@ data RecompileRequired
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False
-recompileRequired _ = True
+recompileRequired (NeedsRecompile _) = True
 
 -- | Top level function to check if the version of an old interface file
 -- is equivalent to the current source file the user asked us to compile.
--- If the same, we can avoid recompilation. We return a tuple where the
--- first element is a bool saying if we should recompile the object file
--- and the second is maybe the interface file, where Nothing means to
--- rebuild the interface file and not use the existing one.
+-- If the same, we can avoid recompilation.
+--
+-- We return on the outside whether the interface file is up to date, providing
+-- evidence that is with a mod iface. In the case that it isn't, we may also
+-- return a found or provided mod iface. Why we don't always return the old one, if
+-- it exists, is unclear to me, except that I tried it and some tests failed.
 checkOldIface
   :: HscEnv
   -> ModSummary
   -> SourceModified
   -> Maybe ModIface         -- Old interface from compilation manager, if any
-  -> IO (RecompileRequired, Maybe ModIface)
+  -> IO RecompileRequiredWithEvidence
 
 checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
@@ -141,7 +156,7 @@ check_old_iface
   -> ModSummary
   -> SourceModified
   -> Maybe ModIface
-  -> IfG (RecompileRequired, Maybe ModIface)
+  -> IfG RecompileRequiredWithEvidence
 
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
@@ -176,19 +191,19 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
             True | not (backendProducesObject $ backend dflags) ->
-                return (MustCompile, maybe_iface)
+                return $ NeedsRecompileWithOld MustCompile maybe_iface
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
                 maybe_iface' <- getIface
-                return (MustCompile, maybe_iface')
+                return $ NeedsRecompileWithOld MustCompile maybe_iface'
 
             False -> do
                 maybe_iface' <- getIface
                 case maybe_iface' of
                     -- We can't retrieve the iface
-                    Nothing    -> return (MustCompile, Nothing)
+                    Nothing    -> return $ NeedsRecompileWithOld MustCompile Nothing
 
                     -- We have got the old iface; check its versions
                     -- even in the SourceUnmodifiedAndStable case we
@@ -210,7 +225,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 checkVersions :: HscEnv
               -> ModSummary
               -> ModIface       -- Old interface
-              -> IfG (RecompileRequired, Maybe ModIface)
+              -> IfG RecompileRequiredWithEvidence
 checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
@@ -219,23 +234,23 @@ checkVersions hsc_env mod_summary iface
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; if not (isHomeModule home_unit (mi_module iface))
-            then return (RecompBecause "-this-unit-id changed", Nothing) else do {
+            then return $ NeedsRecompileWithOld (RecompBecause "-this-unit-id changed") Nothing else do {
        ; recomp <- checkFlagHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkOptimHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkHpcHash hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkMergedSignatures mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkHsig mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkHie mod_summary
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; if recompileRequired recomp then return (recomp, Just iface) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason (Just (mi_iface_hash . mi_final_exts $ iface)) ; _ -> do {
        ; recomp <- checkPlugins hsc_env iface
-       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
 
 
        -- Source code unchanged and no errors yet... carry on
@@ -254,8 +269,9 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
-       ; return (recomp, Just iface)
-    }}}}}}}}}}
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; return $ UpToDateWithEvidence iface
+    }}}}}}}}}}}
   where
     home_unit = hsc_home_unit hsc_env
     -- This is a bit of a hack really
@@ -301,7 +317,7 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
       -- when we have an impure plugin in the stack we have to unconditionally
       -- recompile since it might integrate all sorts of crazy IO results into
       -- its compilation output.
-      ForceRecompile    -> RecompBecause "Impure plugin forced recompilation"
+      ForceRecompile    -> NeedsRecompile $ RecompBecause "Impure plugin forced recompilation"
 
   | old_fp `elem` magic_fingerprints ||
     new_fp `elem` magic_fingerprints
@@ -313,7 +329,7 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
     -- For example when we go from ForceRecomp to NoForceRecomp
     -- recompilation is triggered since the old impure plugins could have
     -- changed the build output which is now back to normal.
-    = RecompBecause "Plugins changed"
+    = NeedsRecompile $ RecompBecause "Plugins changed"
 
   | otherwise =
     let reason = "Plugin fingerprint changed" in
@@ -321,9 +337,9 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
       -- even though a plugin is forcing recompilation the fingerprint changed
       -- which would cause recompilation anyways so we report the fingerprint
       -- change instead.
-      ForceRecompile   -> RecompBecause reason
+      ForceRecompile   -> NeedsRecompile $ RecompBecause reason
 
-      _                -> RecompBecause reason
+      _                -> NeedsRecompile $ RecompBecause reason
 
  where
    magic_fingerprints =
@@ -343,7 +359,7 @@ checkHsig mod_summary iface = do
     MASSERT( isHomeModule home_unit outer_mod )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
-        False -> return (RecompBecause "implementing module changed")
+        False -> return (NeedsRecompile $ RecompBecause "implementing module changed")
 
 -- | Check if @.hie@ file is out of date or missing.
 checkHie :: ModSummary -> IfG RecompileRequired
@@ -354,10 +370,10 @@ checkHie mod_summary = do
     pure $ case gopt Opt_WriteHie dflags of
                False -> UpToDate
                True -> case hie_date_opt of
-                           Nothing -> RecompBecause "HIE file is missing"
+                           Nothing -> NeedsRecompile $ RecompBecause "HIE file is missing"
                            Just hie_date
                                | hie_date < hs_date
-                               -> RecompBecause "HIE file is out of date"
+                               -> NeedsRecompile $ RecompBecause "HIE file is out of date"
                                | otherwise
                                -> UpToDate
 
@@ -416,7 +432,7 @@ checkMergedSignatures mod_summary iface = do
                         Just r -> sort $ map (instModuleToModule unit_state) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
-        else return (RecompBecause "signatures to merge in changed")
+        else return (NeedsRecompile $ RecompBecause "signatures to merge in changed")
 
 -- If the direct imports of this module are resolved to targets that
 -- are not among the dependencies of the previous interface file,
@@ -441,15 +457,16 @@ checkDependencies hsc_env summary iface
    checkList $
      [ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
      , do
-         (recomp, mnames_seen) <- runUntilRecompRequired $ map
+         res <- runUntilRecompRequired $ map
            checkForNewHomeDependency
            (ms_home_imps summary)
-         case recomp of
-           UpToDate -> do
+         case res of
+           Right mnames_seen -> do
              let
                seen_home_deps = Set.unions $ map Set.fromList mnames_seen
              checkIfAllOldHomeDependenciesAreSeen seen_home_deps
-           _ -> return recomp]
+           Left reason -> return $ NeedsRecompile reason
+     ]
  where
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
@@ -466,7 +483,7 @@ checkDependencies hsc_env summary iface
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
-                         return (RecompBecause reason)
+                         return (NeedsRecompile $ RecompBecause reason)
                  else
                          return UpToDate
           | otherwise
@@ -475,16 +492,22 @@ checkDependencies hsc_env summary iface
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
                            text ", which is not among previous dependencies"
-                         return (RecompBecause reason)
+                         return (NeedsRecompile $ RecompBecause reason)
                  else
                          return UpToDate
            where pkg = moduleUnit mod
-        _otherwise  -> return (RecompBecause reason)
+        _otherwise  -> return (NeedsRecompile $ RecompBecause reason)
 
    projectNonBootNames = map gwib_mod . filter ((== NotBoot) . gwib_isBoot)
    old_deps = Set.fromList
      $ projectNonBootNames prev_dep_mods
    isOldHomeDeps = flip Set.member old_deps
+   checkForNewHomeDependency
+     :: Located ModuleName
+     -> IfG (Either CompileReason [ModuleName])
+     -- ^ @Left@ means need to recompile, along with the reason why. @Right@
+     -- means don't need to recompile, along with the the list of (up-to-date)
+     -- home module dependencies.
    checkForNewHomeDependency (L _ mname) = do
      let
        mod = mkHomeModule home_unit mname
@@ -495,31 +518,29 @@ checkDependencies hsc_env summary iface
      -- membership in old home dependencies suffice because the `dep_missing`
      -- check already verified that all imported home modules are present there.
      if not (isOldHomeDeps mname)
-       then return (UpToDate, [])
-       else do
-         mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
+       then return $ Right []
+       else tryGetModIface "need mi_deps for" mod >>= \case
+         Nothing -> pure $ Left $ MustCompile
+         Just imported_iface -> do
            let mnames = mname:(map gwib_mod $ filter ((== NotBoot) . gwib_isBoot) $
                  dep_mods $ mi_deps imported_iface)
            case find (not . isOldHomeDeps) mnames of
-             Nothing -> return (UpToDate, mnames)
+             Nothing -> return $ Right mnames
              Just new_dep_mname -> do
                traceHiDiffs $
                  text "imported home module " <> quotes (ppr mod) <>
                  text " has a new dependency " <> quotes (ppr new_dep_mname)
-               return (RecompBecause reason, [])
-         return $ fromMaybe (MustCompile, []) mb_result
+               return $ Left $ RecompBecause reason
 
    -- Performs all recompilation checks in the list until a check that yields
-   -- recompile required is encountered. Returns the list of the results of
-   -- all UpToDate checks.
-   runUntilRecompRequired []             = return (UpToDate, [])
-   runUntilRecompRequired (check:checks) = do
-     (recompile, value) <- check
-     if recompileRequired recompile
-       then return (recompile, [])
-       else do
-         (recomp, values) <- runUntilRecompRequired checks
-         return (recomp, value:values)
+   -- recompile required is encountered. Returns the first reason to recompile,
+   -- on the left, or all the home modules it checked and failed to find a
+   -- reason with, on the right.
+   runUntilRecompRequired []             = pure $ Right []
+   runUntilRecompRequired (check:checks) = check >>= \case
+       Left reason -> pure $ Left reason
+       Right value -> (fmap . fmap) (value :) $
+         runUntilRecompRequired checks
 
    checkIfAllOldHomeDependenciesAreSeen seen_deps = do
      let unseen_old_deps = Set.difference
@@ -530,24 +551,18 @@ checkDependencies hsc_env summary iface
          let missing_dep = Set.elemAt 0 unseen_old_deps
          traceHiDiffs $
            text "missing old home dependency " <> quotes (ppr missing_dep)
-         return $ RecompBecause "missing old dependency"
+         return $ NeedsRecompile $ RecompBecause "missing old dependency"
        else return UpToDate
 
+-- TODO might want to inline this
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
              -> IfG RecompileRequired
-needInterface mod continue
-  = do
-      mb_recomp <- getFromModIface
-        "need version info for"
-        mod
-        continue
-      case mb_recomp of
-        Nothing -> return MustCompile
-        Just recomp -> return recomp
+needInterface mod continue = tryGetModIface "need version info for" mod >>= \case
+  Nothing -> return $ NeedsRecompile MustCompile
+  Just iface -> continue iface
 
-getFromModIface :: String -> Module -> (ModIface -> IfG a)
-              -> IfG (Maybe a)
-getFromModIface doc_msg mod getter
+tryGetModIface :: String -> Module -> IfG (Maybe ModIface)
+tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
     let doc_str = sep [text doc_msg, ppr mod]
     traceHiDiffs (text "Checking innterface for module" <+> ppr mod)
@@ -565,7 +580,7 @@ getFromModIface doc_msg mod getter
                   -- old interface file.  Don't complain: it might
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
-      Succeeded iface -> Just <$> getter iface
+      Succeeded iface -> pure $ Just iface
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
@@ -626,15 +641,15 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
     handleIO handler $ do
       new_hash <- getFileHash file
       if (old_hash /= new_hash)
-         then return recomp
+         then return $ NeedsRecompile recomp
          else return UpToDate
  where
    recomp  = RecompBecause (file ++ " changed")
    handler =
 #if defined(DEBUG)
-       \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
+       \e -> pprTrace "UsageFile" (text (show e)) $ return $ NeedsRecompile recomp
 #else
-       \_ -> return recomp -- if we can't find the file, just recompile, don't fail
+       \_ -> return $ NeedsRecompile recomp -- if we can't find the file, just recompile, don't fail
 #endif
 
 ------------------------
@@ -675,10 +690,10 @@ checkEntityUsage reason new_hash (name,old_hash)
                                                      old_hash new_hash
 
 up_to_date :: SDoc -> IfG RecompileRequired
-up_to_date  msg = traceHiDiffs msg >> return UpToDate
+up_to_date  msg = UpToDate <$ traceHiDiffs msg
 
 out_of_date :: String -> SDoc -> IfG RecompileRequired
-out_of_date reason msg = traceHiDiffs msg >> return (RecompBecause reason)
+out_of_date reason msg = NeedsRecompile (RecompBecause reason) <$ traceHiDiffs msg
 
 out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
 out_of_date_hash reason msg old_hash new_hash
