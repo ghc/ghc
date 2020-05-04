@@ -190,12 +190,22 @@ isSecConstant :: Section -> Bool
 isSecConstant (Section t _) = case t of
     Text                    -> True
     ReadOnlyData            -> True
-    RelocatableReadOnlyData -> True
+    RelocatableReadOnlyData -> False    -- See Note [Relocatable Read-Only Data]
     ReadOnlyData16          -> True
     CString                 -> True
     Data                    -> False
     UninitialisedData       -> False
     (OtherSection _)        -> False
+
+{-
+Note [Relocatable Read-Only Data]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Relocatable data are only read-only after relocation at the start of the
+program. They should be writable from the source code until then. Failure to
+do so would end up in segfaults at execution when using linkers that do not
+enforce writability of those sections, such as the gold linker.
+-}
 
 data Section = Section SectionType CLabel
 
