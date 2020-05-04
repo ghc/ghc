@@ -321,15 +321,18 @@ cprFix top_lvl orig_env str orig_pairs
 mAX_DEPTH :: Int
 mAX_DEPTH = 4
 
+-- TODO: We need the lubCpr with the initial CPR because
+--       of functions like iterate, which we would CPR
+--       multiple levels deep, thereby changing termination
+--       behavior.
+markDiverging :: CprSig -> CprSig
+markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
+
 -- | A widening operator on 'CprSig' to ensure termination of fixed-point
 -- iteration. See Note [Ensuring termination of fixed-point iteration]
 pruneSig :: Int -> CprSig -> CprSig
 pruneSig d (CprSig cpr_ty)
-  -- TODO: We need the lubCpr with the initial CPR because
-  --       of functions like iterate, which we would CPR
-  --       multiple levels deep, thereby changing termination
-  --       behavior.
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` divergeCpr) }
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
 
 unboxingStrategy :: AnalEnv -> UnboxingStrategy
 unboxingStrategy env ty dmd
@@ -387,7 +390,7 @@ cprAnalBind top_lvl env args id rhs
 
     -- See Note [Arity trimming for CPR signatures]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig  = pruneSig mAX_DEPTH $ mkCprSigForArity (idArity id) rhs_ty'
+    sig  = pruneSig mAX_DEPTH $ markDiverging $ mkCprSigForArity (idArity id) rhs_ty'
     id'  = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
            setIdCprInfo id sig
     env' = extendSigEnv env id sig
