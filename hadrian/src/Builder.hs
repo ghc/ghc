@@ -117,6 +117,7 @@ data Builder = Alex
              | Cc CcMode Stage
              | Configure FilePath
              | DeriveConstants
+             | Dtrace
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
@@ -312,6 +313,7 @@ systemBuilderPath builder = case builder of
     Configure _     -> return "configure"
     Ghc _  Stage0   -> fromKey "system-ghc"
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Dtrace          -> fromKey "dtrace"
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"

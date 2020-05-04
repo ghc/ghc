@@ -229,11 +229,15 @@ rtsPackageArgs = package rts ? do
     libdwLibraryDir   <- getSetting LibdwLibDir
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
+    libsystemtapIncludeDir   <- getSetting LibsystemtapIncludeDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
+          , flag WithDtrace ?
+            arg "-DDTRACE" <>
+            if not (null libsystemtapIncludeDir) then arg ("-I" ++ libsystemtapIncludeDir) else mempty
           , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
           , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
           , flag WithLibnuma ? if not (null libnumaIncludeDir) then arg ("-I" ++ libnumaIncludeDir) else mempty
@@ -253,6 +257,9 @@ rtsPackageArgs = package rts ? do
     let cArgs = mconcat
           [ rtsWarnings
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithDtrace ?
+            arg "-DDTRACE" <>
+            if not (null libsystemtapIncludeDir) then arg ("-I" ++ libsystemtapIncludeDir) else mempty
           , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
@@ -295,49 +302,49 @@ rtsPackageArgs = package rts ? do
             , "-DTablesNextToCode="          ++ show ghcEnableTNC
             ]
 
-          -- We're after pur performance here. So make sure fast math and
+          -- We're after pure performance here. So make sure fast math and
           -- vectorization is enabled.
           , input "**/xxhash.c" ? pure
             [ "-O3"
             , "-ffast-math"
             , "-ftree-vectorize" ]
 
-            , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
+          , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
-            , speedHack ?
-              inputs [ "**/Evac.c", "**/Evac_thr.c"
-                     , "**/Scav.c", "**/Scav_thr.c"
-                     , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
-            -- @-static@ is necessary for these bits, as otherwise the NCG
-            -- generates dynamic references.
-            , speedHack ?
-              inputs [ "**/Updates.c", "**/StgMiscClosures.c"
-                     , "**/PrimOps.c", "**/Apply.c"
-                     , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+          , speedHack ?
+            inputs [ "**/Evac.c", "**/Evac_thr.c"
+                    , "**/Scav.c", "**/Scav_thr.c"
+                    , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
+          -- @-static@ is necessary for these bits, as otherwise the NCG
+          -- generates dynamic references.
+          , speedHack ?
+            inputs [ "**/Updates.c", "**/StgMiscClosures.c"
+                    , "**/PrimOps.c", "**/Apply.c"
+                    , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
 
-            -- inlining warnings happen in Compact
-            , inputs ["**/Compact.c"] ? arg "-Wno-inline"
+          -- inlining warnings happen in Compact
+          , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
-            -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "**/StgCRun.c"
-                     , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
-            -- The above warning suppression flags are a temporary kludge.
-            -- While working on this module you are encouraged to remove it and fix
-            -- any warnings in the module. See:
-            -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
+          -- emits warnings about call-clobbered registers on x86_64
+          , inputs [ "**/StgCRun.c"
+                    , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
+          -- The above warning suppression flags are a temporary kludge.
+          -- While working on this module you are encouraged to remove it and fix
+          -- any warnings in the module. See:
+          -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag CcLlvmBackend) ?
-              inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
+          , (not <$> flag CcLlvmBackend) ?
+            inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
-              arg "-Wno-incompatible-pointer-types"
-            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
+          , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
+            arg "-Wno-incompatible-pointer-types"
+          , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
-            -- libffi's ffi.h triggers various warnings
-            , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
-              arg "-Wno-strict-prototypes"
-            , inputs ["**/Interpreter.c", "**/Adjustor.c", "**/sm/Storage.c"] ?
-              anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
+          -- libffi's ffi.h triggers various warnings
+          , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
+            arg "-Wno-strict-prototypes"
+          , inputs ["**/Interpreter.c", "**/Adjustor.c", "**/sm/Storage.c"] ?
+            anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
@@ -352,6 +359,7 @@ rtsPackageArgs = package rts ? do
             <> if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
+        , builder Dtrace ? filter ("-I" `isPrefixOf`) <$> cArgs
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure

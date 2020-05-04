@@ -20,6 +20,7 @@ data Flag = ArSupportsAtFile
           | GmpFrameworkPref
           | LeadingUnderscore
           | SolarisBrokenShld
+          | WithDtrace
           | WithLibdw
           | WithLibnuma
           | HaveLibMingwEx
@@ -39,6 +40,7 @@ flag f = do
             GmpFrameworkPref   -> "gmp-framework-preferred"
             LeadingUnderscore  -> "leading-underscore"
             SolarisBrokenShld  -> "solaris-broken-shld"
+            WithDtrace         -> "with-dtrace"
             WithLibdw          -> "with-libdw"
             WithLibnuma        -> "with-libnuma"
             HaveLibMingwEx     -> "have-lib-mingw-ex"
