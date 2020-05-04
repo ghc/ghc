@@ -83,7 +83,8 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
                             Section CString _ -> if (platformArch platform == ArchS390X)
                                                     then Just 2 else Just 1
                             _                 -> Nothing
-        const          = if isSecConstant sec then Constant else Global
+        const          = if sectionProtection sec == ReadOnlySection
+                            then Constant else Global
         varDef         = LMGlobalVar label tyAlias link lmsec align const
         globDef        = LMGlobal varDef struct
 
