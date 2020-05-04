@@ -944,8 +944,9 @@ ocGetNames_ELF ( ObjectCode* oc )
                            ) {
                            goto fail;
                        }
-                       oc->symbols[curSymbol++].name = nm;
+                       oc->symbols[curSymbol].name = nm;
                        oc->symbols[curSymbol].addr = symbol->addr;
+                       curSymbol++;
                    }
                } else {
                    /* Skip. */
