@@ -57,6 +57,8 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
 
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (runMetaCore)
+
 import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
@@ -747,9 +749,13 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 dsExpr  (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
 dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
 dsExpr (HsTcZonkedBracketOut _ x ps ev_zs zs) = GHC.HsToCore.DsMetaTc.dsBracketTc x ps ev_zs zs
+dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
+  e' <- dsLExpr e
+  res <- runMetaCore e'
+  dsSplicedD res
 dsExpr (HsSpliceE _ (HsSplicedD zs env s))
   = dsSplicedD (TExpU zs env s)
-dsExpr (HsSpliceE {})         =
+dsExpr (HsSpliceE {}) =
   pprTrace "ds_expr" (text "About to panic") $
   pprPanic "dsExpr:splice" (empty)
 

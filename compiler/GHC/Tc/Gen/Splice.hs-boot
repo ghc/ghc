@@ -5,8 +5,9 @@ module GHC.Tc.Gen.Splice where
 
 import GhcPrelude
 import GHC.Types.Name
+import GHC.Core (CoreExpr)
 import GHC.Hs.Expr ( PendingRnSplice, DelayedSplice )
-import GHC.Tc.Types( TcM , SpliceType )
+import GHC.Tc.Types( TcM , DsM, SpliceType )
 import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension      ( GhcTcId, GhcRn, GhcPs, GhcTc )
@@ -39,6 +40,9 @@ runMetaE :: LHsExpr GhcTcId -> TcM (LHsExpr GhcPs)
 runMetaP :: LHsExpr GhcTcId -> TcM (LPat GhcPs)
 runMetaT :: LHsExpr GhcTcId -> TcM (LHsType GhcPs)
 runMetaD :: LHsExpr GhcTcId -> TcM [LHsDecl GhcPs]
+
+runMetaCore :: CoreExpr
+        -> DsM TH.TExpU
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a

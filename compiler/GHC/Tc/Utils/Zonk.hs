@@ -850,8 +850,11 @@ zonkExpr env (HsTcTypedBracketOut x body bs zs2)
                        meta_ty res_ty }
                        -}
 
-zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
-  runTopSplice s >>= zonkExpr env
+zonkExpr env (HsSpliceE z (XSplice (HsSplicedT (DelayedSplice a b t e)))) = do
+  t' <- zonkTcTypeToType t
+  e' <- zonkLExpr env e
+  return (HsSpliceE z (XSplice (HsSplicedT (DelayedSplice a b t' e'))))
+--  runTopSplice s >>= zonkExpr env
 zonkExpr _env (HsSpliceE x (HsSplicedD a b c)) = return $ HsSpliceE x (HsSplicedD a b c)
 zonkExpr _ e@(HsSpliceE _ _) = pprPanic "zonkExpr: HsSpliceE" (ppr e)
 
@@ -1112,6 +1115,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
+zonkCoFn env w | pprTrace "zonkCoFn" (ppr w) False = undefined
 zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2

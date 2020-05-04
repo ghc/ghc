@@ -635,9 +635,9 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
 tcNestedSplice pop_stage (TcPending ps_var  _zz_var _) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; meta_exp_ty <- tcTExpTy res_ty
-       ; (expr', ev) <- mkSpliceImplication
-                              $ setStage pop_stage
+       ; (expr', ev) <- setStage pop_stage
                   --setConstraintVar lie_var $
+                              $ mkSpliceImplication
                               $ tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; pprTraceM "tcNestedSplice" (ppr expr')
           -- Zonk it and tie the knot of dictionary bindings
@@ -1179,6 +1179,22 @@ To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
 instance TH.Quasi DsM where
+  qTypecheck t e = do
+    ty <- dsSplicedT t
+    (_, Just res) <- initTcDsForSolver $ checkNoErrs $ do
+      let Right e' = convertToHsExpr Generated noSrcSpan e
+      pprTraceM "qTypecheck" (ppr e')
+      (e'', _) <- rnLExpr e'
+      pprTraceM "qTypecheck" (ppr e'')
+      (e''', wcs) <- captureConstraints (tcMonoExpr e'' (mkCheckExpType ty) )
+      ev <- simplifyTop wcs
+      let e'''' = mkHsDictLet (EvBinds ev) e'''
+      pprTraceM "qTypecheck" (ppr e'''')
+      return e''''
+    fp <- repEFPE (unLoc res)
+    -- Internal splices in renamed expression were dealt with a long time
+    -- ago.
+    return (TH.TExp (TH.TExpU [] [] fp))
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique

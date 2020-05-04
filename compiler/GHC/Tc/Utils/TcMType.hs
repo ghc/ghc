@@ -107,6 +107,8 @@ import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Hs.Expr
+import {-# SOURCE #-} GHC.Tc.Utils.Env
 
 -- others:
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
@@ -1051,6 +1053,13 @@ new_meta_tv_x :: MetaInfo -> TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 new_meta_tv_x info subst tv
   = do  { new_tv <- cloneAnonMetaTyVar info tv substd_kind
         ; let subst1 = extendTvSubstWithClone subst tv new_tv
+        ; st <- getStage
+        ; case st of
+            Brack st (TcPending _ zs_var _) -> do
+              v <- setStage st $ emitTypeable (mkTyVarTy new_tv)
+              zs <- readMutVar zs_var
+              writeMutVar zs_var (PendingZonkSplice2 new_tv v : zs)
+            _ -> return ()
         ; return (subst1, new_tv) }
   where
     substd_kind = substTyUnchecked subst (tyVarKind tv)

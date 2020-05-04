@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -----------------------------------------------------------------------------
 --
@@ -167,7 +168,7 @@ dsBracketTc brack splices ev_zs zs
 -}
 
 boundVars :: CoreExpr -> VarSet
-boundVars (Lam x b)       = unitVarSet x
+boundVars (Lam x b)       = unitVarSet x `unionVarSet` boundVars b
 boundVars (App f a)       = boundVars f `unionVarSet` boundVars a
 boundVars (Case s x ty as) = unitVarSet x `unionVarSet` boundVars s `unionVarSet` unionVarSets (map boundVarsAlt as)
 boundVars (Let b e)       = boundVarsBind b `unionVarSet` (boundVars e)
@@ -216,7 +217,7 @@ repECore e = do
   dflags <- getDynFlags
   -- Inline Type Lets, in particular
   let c_e' = simpleOptExpr dflags c_e
-  pprTraceM "c_e'" (ppr c_e $$ ppr c_e')
+  pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
   res <- repCore c_e
   return (bvs, res)
 
@@ -263,7 +264,7 @@ repEFP :: CoreExpr -> DsM FilePath
 repEFP c_e = do
   benv <- dsGetBindEnv
   let ie = toIfaceExpr (allFree c_e `minusVarSet` benv) c_e
-  pprTraceM "toIfaceExpr" (ppr ie $$ ppr (allFree c_e))
+  pprTraceM "toIfaceExpr" (ppr ie $$ ppr (allFree c_e) $$ ppr benv)
   liftIO (writeBracket ie)
 
 

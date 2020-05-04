@@ -616,6 +616,8 @@ toIfaceVar fvs v
 
     | isExternalName name             = IfaceExt name
     -- In the old days, expressions were always closed but not in the new days
+    -- The variables in this set are the ones which are not bound in the quotation, if it's
+    -- bound in the quotation then the IfaceLcl code path is taken.
     | v `elemVarSet` fvs              = IfaceExactLocal (getKey (nameUnique name)) (getOccFS name) (toIfaceTypeX fvs (idType v)) --IfaceLcl (getOccFS name)
     | otherwise = IfaceLcl (getOccFS name)
   where name = idName v
