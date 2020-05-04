@@ -319,21 +319,24 @@ cprFix top_lvl env str orig_pairs
           where
             (id1, rhs') = cprAnalBind top_lvl env str id rhs
             -- See Note [Ensuring termination of fixed-point iteration]
-            id2         = setIdCprInfo id1 (pruneSig mAX_DEPTH (idCprInfo id1))
+            id2         = setIdCprInfo id1 $ pruneSig mAX_DEPTH $ markDiverging $ idCprInfo id1
             env'        = extendAnalEnv env id2 (idCprInfo id2)
 
 mAX_DEPTH :: Int
 mAX_DEPTH = 4
 
+-- TODO: We need the lubCpr with the initial CPR because
+--       of functions like iterate, which we would CPR
+--       multiple levels deep, thereby changing termination
+--       behavior.
+markDiverging :: CprSig -> CprSig
+markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
+
 -- | A widening operator on 'CprSig' to ensure termination of fixed-point
 -- iteration. See Note [Ensuring termination of fixed-point iteration]
 pruneSig :: Int -> CprSig -> CprSig
 pruneSig d (CprSig cpr_ty)
-  -- TODO: We need the lubCpr with the initial CPR because
-  --       of functions like iterate, which we would CPR
-  --       multiple levels deep, thereby changing termination
-  --       behavior.
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty `lubCpr` divergeCpr) }
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
 
 unboxingStrategy :: AnalEnv -> UnboxingStrategy
 unboxingStrategy env ty dmd
@@ -388,7 +391,8 @@ cprAnalBind top_lvl env args id rhs
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
-    sig             = mkCprSigForArity (idArity id) rhs_ty'
+    -- We prune so that we discard too deep info on e.g. TyCon bindings
+    sig             = pruneSig mAX_DEPTH $ mkCprSigForArity (idArity id) rhs_ty'
     id'             = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
                       setIdCprInfo id sig
 
