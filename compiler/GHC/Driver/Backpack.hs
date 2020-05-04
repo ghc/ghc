@@ -553,21 +553,16 @@ mkBackpackMsg = do
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
-      in case node of
-        InstantiationNode _ ->
-          case recomp of
-            MustCompile -> showMsg (text "Instantiating ") empty
+          buildWord = text $ case node of
+            InstantiationNode {} -> "Instantiating "
+            ModuleNode {} -> "Compiling "
+      in case recomp of
+            NeedsRecompile reason -> showMsg buildWord $ case reason of
+                MustCompile -> empty
+                RecompBecause reason -> text " [" <> text reason <> text "]"
             UpToDate
-              | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
-              | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
-        ModuleNode _ ->
-          case recomp of
-            MustCompile -> showMsg (text "Compiling ") empty
-            UpToDate
-              | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
-              | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                | otherwise -> return ()
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
