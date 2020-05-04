@@ -46,9 +46,6 @@ module GHC.Cmm.Utils(
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
-        -- Statics
-        blankWord,
-
         -- Tagging
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
         cmmConstrTag1,
@@ -379,9 +376,6 @@ cmmNegate platform = \case
    (CmmLit (CmmInt n rep))
      -> CmmLit (CmmInt (-n) rep)
    e -> CmmMachOp (MO_S_Neg (cmmExprWidth platform e)) [e]
-
-blankWord :: Platform -> CmmStatic
-blankWord platform = CmmUninitialised (platformWordSizeInBytes platform)
 
 cmmToWord :: Platform -> CmmExpr -> CmmExpr
 cmmToWord platform e

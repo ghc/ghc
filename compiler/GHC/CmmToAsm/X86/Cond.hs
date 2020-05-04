@@ -1,7 +1,5 @@
 module GHC.CmmToAsm.X86.Cond (
         Cond(..),
-        condUnsigned,
-        condToSigned,
         condToUnsigned,
         maybeFlipCond,
         maybeInvertCond
@@ -30,22 +28,6 @@ data Cond
         | PARITY
         | NOTPARITY
         deriving Eq
-
-condUnsigned :: Cond -> Bool
-condUnsigned GU  = True
-condUnsigned LU  = True
-condUnsigned GEU = True
-condUnsigned LEU = True
-condUnsigned _   = False
-
-
-condToSigned :: Cond -> Cond
-condToSigned GU  = GTT
-condToSigned LU  = LTT
-condToSigned GEU = GE
-condToSigned LEU = LE
-condToSigned x   = x
-
 
 condToUnsigned :: Cond -> Cond
 condToUnsigned GTT = GU

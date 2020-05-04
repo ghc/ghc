@@ -93,7 +93,7 @@ import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Driver.Types
-import GHC.Types.Basic hiding ( Version {- conflicts with Packages.Version -} )
+import GHC.Types.Basic
 
 -- Collections and maps
 import GHC.Types.Var.Set

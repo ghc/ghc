@@ -82,8 +82,8 @@ module GHC.Tc.Utils.Monad(
   addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
-  addErrTc, addErrsTc,
-  addErrTcM, mkErrTcM, mkErrTc,
+  addErrTc,
+  addErrTcM,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
@@ -539,10 +539,7 @@ updateEps upd_fn = do
 -- order to avoid space leaks.
 updateEps_ :: (ExternalPackageState -> ExternalPackageState)
            -> TcRnIf gbl lcl ()
-updateEps_ upd_fn = do
-  traceIf (text "updating EPS_")
-  eps_var <- getEpsVar
-  atomicUpdMutVar' eps_var (\eps -> (upd_fn eps, ()))
+updateEps_ upd_fn = updateEps (\eps -> (upd_fn eps, ()))
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
@@ -1281,26 +1278,11 @@ addErrTc :: MsgDoc -> TcM ()
 addErrTc err_msg = do { env0 <- tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }
 
-addErrsTc :: [MsgDoc] -> TcM ()
-addErrsTc err_msgs = mapM_ addErrTc err_msgs
-
 addErrTcM :: (TidyEnv, MsgDoc) -> TcM ()
 addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
          loc  <- getSrcSpanM ;
          add_err_tcm tidy_env err_msg loc ctxt }
-
--- Return the error message, instead of reporting it straight away
-mkErrTcM :: (TidyEnv, MsgDoc) -> TcM ErrMsg
-mkErrTcM (tidy_env, err_msg)
-  = do { ctxt <- getErrCtxt ;
-         loc  <- getSrcSpanM ;
-         err_info <- mkErrInfo tidy_env ctxt ;
-         mkLongErrAt loc err_msg err_info }
-
-mkErrTc :: MsgDoc -> TcM ErrMsg
-mkErrTc msg = do { env0 <- tcInitTidyEnv
-                 ; mkErrTcM (env0, msg) }
 
 -- The failWith functions add an error message and cause failure
 

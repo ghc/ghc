@@ -314,23 +314,10 @@ runAr dflags cwd args = traceToolCommand dflags "ar" $ do
   let ar = pgm_ar dflags
   runSomethingFiltered dflags id "Ar" ar args cwd Nothing
 
-askAr :: DynFlags -> Maybe FilePath -> [Option] -> IO String
-askAr dflags mb_cwd args = traceToolCommand dflags "ar" $ do
-  let ar = pgm_ar dflags
-  runSomethingWith dflags "Ar" ar args $ \real_args ->
-    readCreateProcessWithExitCode' (proc ar real_args){ cwd = mb_cwd }
-
 runRanlib :: DynFlags -> [Option] -> IO ()
 runRanlib dflags args = traceToolCommand dflags "ranlib" $ do
   let ranlib = pgm_ranlib dflags
   runSomethingFiltered dflags id "Ranlib" ranlib args Nothing Nothing
-
-runMkDLL :: DynFlags -> [Option] -> IO ()
-runMkDLL dflags args = traceToolCommand dflags "mkdll" $ do
-  let (p,args0) = pgm_dll dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv (args0++args)
-  runSomethingFiltered dflags id "Make DLL" p args1 Nothing mb_env
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = traceToolCommand dflags "windres" $ do
