@@ -127,6 +127,12 @@ pprTop (CmmData section (Statics lbl [CmmUninitialised size])) =
 pprTop (CmmData section (Statics lbl lits)) =
   pprDataExterns lits $$
   pprWordArray (isSecConstant section) lbl lits
+  where
+    isSecConstant section = case sectionProtection section of
+      ReadOnlySection -> True
+      WriteProtectedSection -> True
+      _ -> False
+    platform = targetPlatform dflags
 
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
