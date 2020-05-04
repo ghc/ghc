@@ -869,8 +869,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
-       ; scoped_tvs  <- xoptM LangExt.ScopedTypeVariables
-       ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
+       ; (binds'', bind_fvs) <- bindSigTyVarsFV ktv_names $
               do { binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn other_sigs')) binds'
                  ; let bind_fvs = foldr (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
                                            emptyFVs binds_w_dus
@@ -878,12 +877,6 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
 
        ; return ( binds'', spec_inst_prags' ++ other_sigs'
                 , sig_fvs `plusFV` sip_fvs `plusFV` bind_fvs) }
-  where
-    -- For the method bindings in class and instance decls, we extend
-    -- the type variable environment iff -XScopedTypeVariables
-    maybe_extend_tyvar_env scoped_tvs thing_inside
-       | scoped_tvs = extendTyVarEnvFVRn ktv_names thing_inside
-       | otherwise  = thing_inside
 
 rnMethodBindLHS :: Bool -> Name
                 -> LHsBindLR GhcPs GhcPs
