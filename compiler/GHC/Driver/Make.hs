@@ -67,7 +67,7 @@ import GHC.Parser.Errors.Ppr
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
-import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
+import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
 
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed
@@ -1666,7 +1666,7 @@ upsweep_inst :: HscEnv
              -> IO ()
 upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
         case mHscMessage of
-            Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
+            Just hscMessage -> hscMessage hsc_env (mod_index, nmods) (NeedsRecompile MustCompile) (InstantiationNode iuid)
             Nothing -> return ()
         runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnit hsc_env $ VirtUnit iuid
         pure ()
