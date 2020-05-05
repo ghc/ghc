@@ -32,7 +32,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isNothing )
+import GHC.Data.Maybe   ( isJust, isNothing )
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -255,6 +255,8 @@ cprTransform env args id
     sig
       | Just con <- isDataConWorkId_maybe id  -- Data constructor
       = cprTransformDataConSig con args
+      | Just rhs <- lookupExpandableUnfolding id
+      = fst $ cprAnal env args rhs
       | isGlobalId id                         -- imported function or data con worker
       = cprTransformSig (idStrictness id) (idCprInfo id) args
       | Just sig <- lookupSigEnv env id       -- local let-bound
@@ -378,6 +380,8 @@ cprAnalBind top_lvl env args id rhs
       | stays_thunk = trimCprTy rhs_ty
       -- See Note [CPR for sum types]
       | returns_sum = trimCprTy rhs_ty
+      -- See Note [CPR for expandable unfoldings]
+      | will_expand = topCprType
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
@@ -394,6 +398,19 @@ cprAnalBind top_lvl env args id rhs
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
     returns_sum = not (isTopLevel top_lvl) && not_a_prod
+    -- See Note [CPR for expandable unfoldings]
+    will_expand = isJust (lookupExpandableUnfolding id)
+
+lookupExpandableUnfolding :: Id -> Maybe CoreExpr
+lookupExpandableUnfolding id
+  | idArity id == 0 = expandUnfolding_maybe (cprIdUnfolding id)
+  | otherwise       = Nothing
+
+cprIdUnfolding :: IdUnfoldingFun
+cprIdUnfolding id
+  -- There will only be phase 0 Simplifier runs after CprAnal
+  | isActiveIn 0 (idInlineActivation id) = idUnfolding id
+  | otherwise                            = noUnfolding
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -672,6 +689,28 @@ But what about botCpr? Consider
 fac won't have the CPR property here when we trim every thunk! But the
 assumption is that error cases are rarely entered and we are diverging anyway,
 so WW doesn't hurt.
+
+Should we also trim CPR on DataCon bindings?
+See Note [CPR for expandable unfoldings]!
+
+Note [CPR for expandable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC generates a lot of TyCon and KindRep bindings, one for each new data
+declaration. Attaching CPR signatures to each of them is quite wasteful.
+In general, DataCon application bindings
+  * Never get WW'd, so their CPR signature should be irrelevant after analysis
+  * Would need to be inlined to see their CPR
+  * Recording (Nested!) CPR on them blows up interface file sizes
+But we can't just stop giving DataCon application bindings the CPR property,
+for example
+  fac 0 = 1
+  fac n = n * fac (n-1)
+fac certainly has the CPR property and should be WW'd! But FloatOut will
+transform the first clause to
+  lvl = 1
+  fac 0 = lvl
+If lvl doesn't have the CPR property, fac won't either. So instead we keep on
+looking through *expandable* unfoldings for these arity 0 bindings.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
