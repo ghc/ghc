@@ -261,6 +261,8 @@ test('T12955', normal, makefile_test, [])
 test('T12971', [when(opsys('mingw32'), expect_broken(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
+test('T16167', exit_code(1), run_command, 
+     ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])
 # omitting hpc and profasm because they affect the
