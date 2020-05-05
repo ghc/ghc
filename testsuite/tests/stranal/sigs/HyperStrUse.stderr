@@ -6,7 +6,7 @@ HyperStrUse.f: <S(SL),1*U(1*U(U),A)><S,1*U>
 
 
 ==================== Cpr signatures ====================
-HyperStrUse.$trModule: m1
+HyperStrUse.$trModule:
 HyperStrUse.f: m1
 
 

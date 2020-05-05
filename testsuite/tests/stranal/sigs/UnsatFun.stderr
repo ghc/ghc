@@ -12,7 +12,7 @@ UnsatFun.h3: <C(S),1*C1(U)>
 
 
 ==================== Cpr signatures ====================
-UnsatFun.$trModule: m1
+UnsatFun.$trModule:
 UnsatFun.f: b
 UnsatFun.g:
 UnsatFun.g':
