@@ -833,7 +833,7 @@ instance ( a ~ GhcPass p
         [ toHie $ PS rsp scope pscope pat
         , let cscope = mkLScope pat in
             toHie $ TS (ResolvedScopes [cscope, scope, pscope])
-                       (protectSig @a cscope sig)
+                       (protectSig @a cscope undefined) -- TODO RGS: Help me wz1000!
               -- See Note [Scoping Rules for SigPat]
         ]
       XPat e -> case ghcPass @p of
@@ -1847,7 +1847,7 @@ instance ToHie (RScoped (LRuleBndr GhcRn)) where
         ]
       RuleBndrSig _ var typ ->
         [ toHie $ C (ValBind RegularBind sc Nothing) var
-        , toHie $ TS (ResolvedScopes [sc]) typ
+        , toHie $ TS (ResolvedScopes [sc]) (undefined :: LHsSigWcType GhcRn) -- TODO RGS: Help me wz1000!
         ]
 
 instance ToHie (LImportDecl GhcRn) where

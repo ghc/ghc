@@ -3338,7 +3338,7 @@ Result works fine, but it may eventually bite us.
 ********************************************************************* -}
 
 tcHsPatSigType :: UserTypeCtxt
-               -> LHsSigWcType GhcRn          -- The type signature
+               -> HsPatSigType GhcRn          -- The type signature
                -> TcM ( [(Name, TcTyVar)]     -- Wildcards
                       , [(Name, TcTyVar)]     -- The new bit of type environment, binding
                                               -- the scoped type variables
@@ -3349,10 +3349,9 @@ tcHsPatSigType :: UserTypeCtxt
 --
 -- This may emit constraints
 -- See Note [Recipe for checking a signature]
-tcHsPatSigType ctxt sig_ty
-  | HsWC { hswc_ext = sig_wcs,   hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_ext = sig_ns
-         , hsib_body = hs_ty } <- ib_ty
+tcHsPatSigType ctxt
+  (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
+        , hsps_body = hs_ty })
   = addSigCtxt ctxt hs_ty $
     do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
        ; (wcs, sig_ty)

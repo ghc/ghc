@@ -23,6 +23,7 @@ module GHC.Hs.Types (
         LHsQTyVars(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
+        HsPatSigType(..), HsPSRn(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, noLHsContext,
@@ -47,7 +48,7 @@ module GHC.Hs.Types (
 
         mkAnonWildCardTy, pprAnonWildCard,
 
-        mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
+        mkHsImplicitBndrs, mkHsWildCardBndrs, mkHsPatSigType, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
@@ -59,7 +60,7 @@ module GHC.Hs.Types (
         splitLHsForAllTyInvis, splitLHsQualTy, splitLHsSigmaTyInvis,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
-        ignoreParens, hsSigType, hsSigWcType,
+        ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
         hsTyKindSig,
         hsConDetailsArgs,
@@ -184,6 +185,18 @@ is a bit complicated.  Here's how it works.
      f :: _a -> _
   The enclosing HsWildCardBndrs binds the wildcards _a and _.
 
+* HsSigPatType describes types that appear in pattern signatures and
+  the signatures of term-level binders in RULES. Like
+  HsWildCardBndrs/HsImplicitBndrs, they track the names of wildcard
+  variables and implicitly quantified type variables. Unlike
+  HsImplicitBndrs, however, HsSigPatTypes do not obey the
+  forall-or-nothing rule. For example, in this pattern signature:
+
+    f (g :: forall a. a -> b) x = g x :: b
+
+  The type variable `b` is in scope on the RHS, even though it was
+  not explicitly quantified by the @forall@ in the pattern signature.
+
 * The explicit presence of these wrappers specifies, in the HsSyn,
   exactly where implicit quantification is allowed, and where
   wildcards are allowed.
@@ -225,13 +238,15 @@ Note carefully:
   Here _a is an ordinary forall'd binder, but (With NamedWildCards)
   _b is a named wildcard.  (See the comments in #10982)
 
-* Named wildcards are bound by the HsWildCardBndrs construct, which wraps
-  types that are allowed to have wildcards. Unnamed wildcards however are left
-  unchanged until typechecking, where we give them fresh wild tyavrs and
-  determine whether or not to emit hole constraints on each wildcard
-  (we don't if it's a visible type/kind argument or a type family pattern).
-  See related notes Note [Wildcards in visible kind application]
-  and Note [Wildcards in visible type application] in GHC.Tc.Gen.HsType
+* Named wildcards are bound by the HsWildCardBndrs (for types that obey the
+  forall-or-nothing rule) and HsPatSigType (for type signatures in patterns
+  and term-level binders in RULES), which wrap types that are allowed to have
+  wildcards. Unnamed wildcards, however are left unchanged until typechecking,
+  where we give them fresh wild tyvars and determine whether or not to emit
+  hole constraints on each wildcard (we don't if it's a visible type/kind
+  argument or a type family pattern). See related notes
+  Note [Wildcards in visible kind application] and
+  Note [Wildcards in visible type application] in GHC.Tc.Gen.HsType.
 
 * After type checking is done, we report what types the wildcards
   got unified with.
@@ -399,6 +414,30 @@ type instance XHsWC              GhcTc b = [Name]
 
 type instance XXHsWildCardBndrs  (GhcPass _) b = NoExtCon
 
+-- | Types that can appear in pattern signatures, as well as the signatures for
+-- term-level binders in RULES. This is very similar to 'HsSigWcType', but with
+-- slightly different semantics: see @Note [HsType binders]@.
+-- See also @Note [The wildcard story for types]@.
+data HsPatSigType pass
+  = HsPS { hsps_ext  :: XHsPS pass   -- ^ After renamer: 'HsPSRn'
+         , hsps_body :: LHsType pass -- ^ Main payload (the type itself)
+    }
+  | XHsPatSigType !(XXHsPatSigType pass)
+
+-- | The extension field for 'HsPatSigType', which is only used in the
+-- renamer on.
+data HsPSRn = HsPSRn
+  { hsps_nwcs    :: [Name] -- ^ Wildcard names
+  , hsps_imp_tvs :: [Name] -- ^ Implicitly quantified variable names
+  }
+  deriving Data
+
+type instance XHsPS GhcPs = NoExtField
+type instance XHsPS GhcRn = HsPSRn
+type instance XHsPS GhcTc = HsPSRn
+
+type instance XXHsPatSigType (GhcPass _) = NoExtCon
+
 -- | Located Haskell Signature Type
 type LHsSigType   pass = HsImplicitBndrs pass (LHsType pass)    -- Implicit only
 
@@ -418,6 +457,9 @@ hsSigType = hsImplicitBody
 
 hsSigWcType :: LHsSigWcType pass -> LHsType pass
 hsSigWcType sig_ty = hsib_body (hswc_body sig_ty)
+
+hsPatSigType :: HsPatSigType pass -> LHsType pass
+hsPatSigType = hsps_body
 
 dropWildCards :: LHsSigWcType pass -> LHsSigType pass
 -- Drop the wildcard part of a LHsSigWcType
@@ -450,6 +492,10 @@ mkHsImplicitBndrs x = HsIB { hsib_ext  = noExtField
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
                            , hswc_ext  = noExtField }
+
+mkHsPatSigType :: LHsType GhcPs -> HsPatSigType GhcPs
+mkHsPatSigType x = HsPS { hsps_ext  = noExtField
+                        , hsps_body = x }
 
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
@@ -1407,6 +1453,10 @@ instance Outputable thing
 instance Outputable thing
        => Outputable (HsWildCardBndrs (GhcPass p) thing) where
     ppr (HsWC { hswc_body = ty }) = ppr ty
+
+instance OutputableBndrId p
+       => Outputable (HsPatSigType (GhcPass p)) where
+    ppr (HsPS { hsps_body = ty }) = ppr ty
 
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
