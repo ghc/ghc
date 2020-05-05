@@ -319,7 +319,7 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 -- expressible explicitly, while a top level forall could (usually) be
 -- replaced with an implicit binding. Top-level foralls alone ("forall.") are
 -- therefore an indication that the user is trying to be fastidious, so
--- we can help them by not "fixing up" their unbound variables silently.
+-- we don't implicitly bind any variables.
 
 forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
