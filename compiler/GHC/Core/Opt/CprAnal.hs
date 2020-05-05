@@ -32,7 +32,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isNothing )
+import GHC.Data.Maybe   ( isJust, isNothing )
 
 import Control.Monad ( guard )
 import Data.List
