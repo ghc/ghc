@@ -661,10 +661,9 @@ matchLiftTy bind_env n args@[_k, t2]
     | Just t <- getTyVar_maybe t2
     -- Not in the env must mean it's top-level
    -- , let lvl = maybe (pprTrace "lookup failed" (ppr t $$ ppr bind_env) 1) snd (lookupNameEnv bind_env (idName t))
-    , not (isMetaTyVar t)
     , let lvl = tcTyVarThLevel t
     , pprTrace "matchLiftTy" (ppr t $$ ppr lvl $$ ppr n) True
-    , lvl <= n = return NoInstance
+    , isMetaTyVar t || (lvl <= n) = return NoInstance
     | otherwise =  do
     -- This evidence is only used for the type variable case, otherwise zonking just fills
     -- in the concrete type inside the bracket directly.
