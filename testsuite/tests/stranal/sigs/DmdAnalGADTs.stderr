@@ -9,21 +9,21 @@ DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>
 DmdAnalGADTs.g: <S,1*U>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U>
+DmdAnalGADTs.hasStrSig: <S,1*U(U)>
 
 
 
 ==================== Cpr signatures ====================
-DmdAnalGADTs.$tc'A: m1
-DmdAnalGADTs.$tc'B: m1
-DmdAnalGADTs.$tcD: m1
-DmdAnalGADTs.$trModule: m1
+DmdAnalGADTs.$tc'A:
+DmdAnalGADTs.$tc'B:
+DmdAnalGADTs.$tcD:
+DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f:
 DmdAnalGADTs.f': m1
 DmdAnalGADTs.g:
-DmdAnalGADTs.hasCPR: m1
-DmdAnalGADTs.hasStrSig:
+DmdAnalGADTs.hasCPR:
+DmdAnalGADTs.hasStrSig: m1
 
 
 
@@ -37,6 +37,6 @@ DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>
 DmdAnalGADTs.g: <S,1*U>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U>
+DmdAnalGADTs.hasStrSig: <S,1*U(U)>
 
 
