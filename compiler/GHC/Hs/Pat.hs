@@ -240,7 +240,7 @@ data Pat p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
-                    (LHsSigWcType (NoGhcTc p)) --  Signature can bind both
+                    (HsPatSigType (NoGhcTc p)) --  Signature can bind both
                                                --  kind and type vars
 
     -- ^ Pattern with a type signature

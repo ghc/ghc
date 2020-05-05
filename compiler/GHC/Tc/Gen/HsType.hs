@@ -3338,7 +3338,7 @@ Result works fine, but it may eventually bite us.
 ********************************************************************* -}
 
 tcHsPatSigType :: UserTypeCtxt
-               -> LHsSigWcType GhcRn          -- The type signature
+               -> HsPatSigType GhcRn          -- The type signature
                -> TcM ( [(Name, TcTyVar)]     -- Wildcards
                       , [(Name, TcTyVar)]     -- The new bit of type environment, binding
                                               -- the scoped type variables
@@ -3346,13 +3346,13 @@ tcHsPatSigType :: UserTypeCtxt
 -- Used for type-checking type signatures in
 -- (a) patterns           e.g  f (x::Int) = e
 -- (b) RULE forall bndrs  e.g. forall (x::Int). f x = x
+-- See Note [Pattern signature binders and scoping] in GHC.Hs.Types
 --
 -- This may emit constraints
 -- See Note [Recipe for checking a signature]
-tcHsPatSigType ctxt sig_ty
-  | HsWC { hswc_ext = sig_wcs,   hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_ext = sig_ns
-         , hsib_body = hs_ty } <- ib_ty
+tcHsPatSigType ctxt
+  (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
+        , hsps_body = hs_ty })
   = addSigCtxt ctxt hs_ty $
     do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
        ; (wcs, sig_ty)
@@ -3385,12 +3385,12 @@ tcHsPatSigType ctxt sig_ty
            ; tv   <- case ctxt of
                        RuleSigCtxt {} -> newSkolemTyVar name kind
                        _              -> newPatSigTyVar name kind
-                       -- See Note [Pattern signature binders]
+                       -- See Note [Typechecking pattern signature binders]
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
            ; return (name, tv) }
 
-{- Note [Pattern signature binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Typechecking pattern signature binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Type variables in the type environment] in GHC.Tc.Utils.
 Consider
 

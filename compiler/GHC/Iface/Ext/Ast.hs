@@ -413,35 +413,9 @@ bar (x :: forall a. a -> a) = ... -- a is not in scope here
 --   ^ a is in scope here (pattern body)
 
 bax (x :: a) = ... -- a is in scope here
-Because of HsWC and HsIB pass on their scope to their children
-we must wrap the LHsType in pattern signatures in a
-Shielded explicitly, so that the HsWC/HsIB scope is not passed
-on the the LHsType
+
+This case in handled in the instance for HsPatSigType
 -}
-
-data Shielded a = SH Scope a -- Ignores its TScope, uses its own scope instead
-
-type family ProtectedSig a where
-  ProtectedSig GhcRn = HsWildCardBndrs GhcRn (HsImplicitBndrs
-                                                GhcRn
-                                                (Shielded (LHsType GhcRn)))
-  ProtectedSig GhcTc = NoExtField
-
-class ProtectSig a where
-  protectSig :: Scope -> LHsSigWcType (NoGhcTc a) -> ProtectedSig a
-
-instance (HasLoc a) => HasLoc (Shielded a) where
-  loc (SH _ a) = loc a
-
-instance (ToHie (TScoped a)) => ToHie (TScoped (Shielded a)) where
-  toHie (TS _ (SH sc a)) = toHie (TS (ResolvedScopes [sc]) a)
-
-instance ProtectSig GhcTc where
-  protectSig _ _ = noExtField
-
-instance ProtectSig GhcRn where
-  protectSig sc (HsWC a (HsIB b sig)) =
-    HsWC a (HsIB b (SH sc sig))
 
 class HasLoc a where
   -- ^ defined so that HsImplicitBndrs and HsWildCardBndrs can
@@ -770,8 +744,6 @@ instance ( a ~ GhcPass p
          , ToHie (RContext (HsRecFields a (PScoped (LPat a))))
          , ToHie (LHsExpr a)
          , ToHie (TScoped (LHsSigWcType a))
-         , ProtectSig a
-         , ToHie (TScoped (ProtectedSig a))
          , HasType (LPat a)
          , Data (HsSplice a)
          , IsPass p
@@ -832,9 +804,12 @@ instance ( a ~ GhcPass p
       SigPat _ pat sig ->
         [ toHie $ PS rsp scope pscope pat
         , let cscope = mkLScope pat in
-            toHie $ TS (ResolvedScopes [cscope, scope, pscope])
-                       (protectSig @a cscope sig)
-              -- See Note [Scoping Rules for SigPat]
+            case ghcPass @p of
+              GhcPs -> pure []
+              GhcTc -> pure []
+              GhcRn ->
+                toHie $ TS (ResolvedScopes [cscope, scope, pscope])
+                        sig
         ]
       XPat e -> case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
@@ -855,6 +830,13 @@ instance ( a ~ GhcPass p
           go (RS fscope (L spn (HsRecField lbl pat pun))) =
             L spn $ HsRecField lbl (PS rsp scope fscope pat) pun
           scoped_fds = listScopes pscope fds
+
+instance ToHie (TScoped (HsPatSigType GhcRn)) where
+  toHie (TS sc (HsPS (HsPSRn wcs tvs) body@(L span _))) = concatM $
+      [ pure $ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) (wcs++tvs)
+      , toHie body
+      ]
+  -- See Note [Scoping Rules for SigPat]
 
 instance ( ToHie body
          , ToHie (LGRHS a body)

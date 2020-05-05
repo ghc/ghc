@@ -874,7 +874,7 @@ mkRuleBndrs :: [LRuleTyTmVar] -> [LRuleBndr GhcPs]
 mkRuleBndrs = fmap (fmap cvt_one)
   where cvt_one (RuleTyTmVar v Nothing)    = RuleBndr    noExtField v
         cvt_one (RuleTyTmVar v (Just sig)) =
-          RuleBndrSig noExtField v (mkLHsSigWcType sig)
+          RuleBndrSig noExtField v (mkHsPatSigType sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr GhcPs]
@@ -2033,7 +2033,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsWildCardPV l = return $ L l (PatBuilderPat (WildPat noExtField))
   mkHsTySigPV l b sig = do
     p <- checkLPat b
-    return $ L l (PatBuilderPat (SigPat noExtField p (mkLHsSigWcType sig)))
+    return $ L l (PatBuilderPat (SigPat noExtField p (mkHsPatSigType sig)))
   mkHsExplicitListPV l xs = do
     ps <- traverse checkLPat xs
     return (L l (PatBuilderPat (ListPat noExtField ps)))
