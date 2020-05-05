@@ -70,6 +70,7 @@ instance Binary TH.PatSynArgs
 instance Binary (TH.TExp a)
 instance Binary (TH.TExpU)
 instance Binary (TH.TTExp)
+instance Binary (TH.THRep)
 
 -- We need Binary TypeRep for serializing annotations
 

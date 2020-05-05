@@ -39,6 +39,7 @@ module Binary
 
    writeBinMem,
    readBinMem,
+   readBin,
 
    putAt, getAt,
 
@@ -95,6 +96,7 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Serialized
+import Outputable
 
 type BinArray = ForeignPtr Word8
 
@@ -247,6 +249,18 @@ readBinMem filename = do
   writeFastMutInt ix_r 0
   sz_r <- newFastMutInt
   writeFastMutInt sz_r filesize
+  return (BinMem noUserData ix_r sz_r arr_r)
+
+readBin :: ByteString -> IO BinHandle
+-- Return a BinHandle with a totally undefined State
+readBin b@(BS.PS fptr _offset sz) = do
+  pprTraceM "readBin" (text (show b))
+  arr_r <- newIORef fptr
+  ix_r <- newFastMutInt
+  -- Should this be OFFSET?
+  writeFastMutInt ix_r 0
+  sz_r <- newFastMutInt
+  writeFastMutInt sz_r sz
   return (BinMem noUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset

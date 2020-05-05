@@ -56,14 +56,19 @@ import System.IO
 import GHC.Types.Var.Set
 import GHC.Core.FVs
 import GHC.Core.SimpleOpt
+import Data.ByteString.Internal
+import qualified Data.ByteString as BS
+import GHC.Types.Literal
+
+import Foreign.ForeignPtr
+import Foreign.Ptr
+import System.IO.Unsafe
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
 dsType :: Type -> DsM CoreExpr
-dsType t = do
-  MkC r <- repType t
-  return r
+dsType t = repType t
 
 
 -----------------------------------------------------------------------------
@@ -150,7 +155,7 @@ dsBracketTc brack splices ev_zs zs
             in return $ Just $ mkCoreTup [k_expr, mkCoreApps (Var untype) [Type rep, Type r', e']]
           _ -> return Nothing
 
-    do_brack (TExpBr _ e)  = do { (bs, MkC s) <- repLE' e; return (bs, s) }
+    do_brack (TExpBr _ e)  = do { (bs, s) <- repLE' e; return (bs, s) }
     do_brack _ = panic "dsBracket: unexpected XBracket"
 
 {- -------------- Examples --------------------
@@ -190,19 +195,19 @@ boundVarsBind (Rec g) = unionVarSets (map (\(b, e) -> unitVarSet b `unionVarSet`
 --              Expressions
 -----------------------------------------------------------------------------
 
-repLE' :: LHsExpr GhcTc -> DsM (VarSet, Core String)
+repLE' :: LHsExpr GhcTc -> DsM (VarSet, CoreExpr)
 repLE' (L loc e) = putSrcSpanDs loc (repECore e)
 
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
-repType :: Type -> DsM (Core String)
+repType :: Type -> DsM CoreExpr
 repType ty = do
   let it = toIfaceTypeX (tyCoVarsOfType ty) ty
   pprTraceM "Writing type" (ppr ty)
-  liftIO (writeBracket it) >>= coreStringLit
+  liftIO (writeBracket it) >>= buildTHRep
 
-repECore :: HsExpr GhcTc -> DsM (VarSet, (Core String))
+repECore :: HsExpr GhcTc -> DsM (VarSet, CoreExpr)
 repECore e = do
   {-c_e <- mkCoreLams vs <$> dsExpr e
   dflags <- getDynFlags
@@ -221,13 +226,25 @@ repECore e = do
   res <- repCore c_e
   return (bvs, res)
 
-repCore :: CoreExpr -> DsM (Core String)
-repCore c_e = repEFP c_e >>= coreStringLit
+repCore :: CoreExpr -> DsM CoreExpr
+repCore c_e = do
+  bs <- repEFP c_e
+  buildTHRep bs
+
+buildTHRep :: ByteString -> DsM CoreExpr
+buildTHRep bs@(PS _ _ sz) = do
+  th_rep_func <- dsLookupGlobalId mkTHRepName
+  dflags <- getDynFlags
+  let sz_expr = mkIntExprInt (targetPlatform dflags) sz
+  pprTraceM "buildTHRep" (text (show bs))
+  let th_rep = mkCoreApps (Var th_rep_func) [sz_expr, (Lit (LitString bs))]
+  return th_rep
+
 
 
 repCodeCEv :: CoreExpr -> DsM CoreExpr
 repCodeCEv c_e = do
-  MkC s <- repCore c_e
+  s <- repCore c_e
   texpco <- dsLookupGlobalId unsafeTExpCoerceName
   (_,ty) <- splitFunTy . snd . splitForAllTy . snd . splitForAllTy . idType <$> dsLookupGlobalId unTypeQName
   let tu_ty = mkBoxedTupleTy [intTy, ty]
@@ -236,7 +253,7 @@ repCodeCEv c_e = do
   untype <- dsLookupGlobalId unTypeQName
   return $ mkCoreApps (Var untype) [Type liftedRepTy, Type unitTy, mkCoreApps (Var texpco) [Type liftedRepTy, Type unitTy, (mkCoreTup [mkNilExpr tt_ty, mkNilExpr tu_ty, s])]]
 
-repEFPE :: HsExpr GhcTc -> DsM FilePath
+repEFPE :: HsExpr GhcTc -> DsM ByteString
 repEFPE e = dsExpr e >>= repEFP
 
 repVar :: Id -> DsM CoreExpr
@@ -244,13 +261,13 @@ repVar ev_id =  do
   texpco <- dsLookupGlobalId unsafeTExpCoerceName
   let ie = toIfaceExpr (unitVarSet ev_id) (Var ev_id)
   fp <- liftIO (writeBracket ie)
-  MkC s <- coreStringLit fp
+  th_rep <- buildTHRep fp
   (_,ty) <- splitFunTy . snd . splitForAllTy . snd . splitForAllTy . idType <$> dsLookupGlobalId unTypeQName
   let tu_ty = mkBoxedTupleTy [intTy, ty]
   ty' <- funResultTy . funResultTy . idType <$> dsLookupGlobalId mkTTExpName
   let tt_ty = mkBoxedTupleTy [intTy, ty']
   untype <- dsLookupGlobalId unTypeQName
-  return $ mkCoreApps (Var untype) [Type liftedRepTy, Type unitTy, mkCoreApps (Var texpco) [Type liftedRepTy, Type unitTy, (mkCoreTup [mkNilExpr tt_ty, mkNilExpr tu_ty, s])]]
+  return $ mkCoreApps (Var untype) [Type liftedRepTy, Type unitTy, mkCoreApps (Var texpco) [Type liftedRepTy, Type unitTy, (mkCoreTup [mkNilExpr tt_ty, mkNilExpr tu_ty, th_rep])]]
 
 allFree :: CoreExpr -> VarSet
 allFree c_e =
@@ -260,7 +277,7 @@ allFree c_e =
 allTyFree :: Var -> VarSet
 allTyFree t =  varTypeTyCoVars t
 
-repEFP :: CoreExpr -> DsM FilePath
+repEFP :: CoreExpr -> DsM ByteString
 repEFP c_e = do
   benv <- dsGetBindEnv
   let ie = toIfaceExpr (allFree c_e `minusVarSet` benv) c_e
@@ -268,15 +285,18 @@ repEFP c_e = do
   liftIO (writeBracket ie)
 
 
-writeBracket :: (Binary b, Outputable b) => b -> IO FilePath
+writeBracket :: (Binary b, Outputable b) => b -> IO ByteString
 writeBracket e = do
   bh <- openBinMem initBinMemSize
   putWithUserData (\_ -> return ()) bh e
-  (fp, h) <- openBinaryTempFile "/tmp" "bracket"
-  pprTraceM "Writing" (ppr (fp, e))
-  hClose h
-  writeBinMem bh fp
-  return fp
+  --(fp, h) <- openBinaryTempFile "/tmp" "bracket"
+  --pprTraceM "Writing" (ppr (fp, e))
+  --hClose h
+  withBinBuffer bh (\(PS fptr off sz) -> do
+    let bs = unsafePerformIO $ withForeignPtr fptr $ \ptr ->
+               BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
+    return $! bs)
+
 
 {-
 lookupType :: Name      -- Name of type constructor (e.g. TH.ExpQ)

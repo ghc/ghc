@@ -683,7 +683,6 @@ runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
        ; pprTrace "runTopSplice" (ppr orig_expr) (return ())
        ; TH.TExpU zs env expr2 <- setStage (RunSplice modfinalizers_ref) $
                                     runMetaC zonked_q_expr
-       ; pprTraceM "RUN" (ppr expr2)
                                     {-
        ; let rn_one rdr_name =
               case isExact_maybe rdr_name of
@@ -699,7 +698,8 @@ runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
        ; traceSplice (SpliceInfo { spliceDescription = "expression"
                                  , spliceIsDecl      = False
                                  , spliceSource      = Just orig_expr
-                                 , spliceGenerated   = ppr expr2 })
+                                 -- TODO
+                                 , spliceGenerated   = ppr zonked_q_expr })
        ; return (HsSpliceE noExtField (HsSplicedD zs env' expr2)) }
 
 
@@ -1194,7 +1194,7 @@ instance TH.Quasi DsM where
     fp <- repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp (TH.TExpU [] [] fp))
+    return (TH.TExp (TH.TExpU [] [] (TH.THRep fp)))
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique
@@ -1337,7 +1337,7 @@ instance TH.Quasi TcM where
     fp <- initDsTc $ repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp (TH.TExpU [] [] fp))
+    return (TH.TExp (TH.TExpU [] [] (TH.THRep fp)))
 
 
 

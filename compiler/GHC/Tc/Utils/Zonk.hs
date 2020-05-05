@@ -84,8 +84,6 @@ import GHC.Types.Unique.FM
 import GHC.Core
 import FastString
 
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
-
 import Control.Monad
 import Data.List  ( partition )
 import Control.Arrow ( second )
@@ -1115,7 +1113,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
-zonkCoFn env w | pprTrace "zonkCoFn" (ppr w) False = undefined
+-- zonkCoFn env w | pprTrace "zonkCoFn" (ppr w) False = undefined
 zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2
@@ -1711,7 +1709,7 @@ zonk_tc_ev_binds env (EvBinds bs)    = zonkEvBinds env bs
 zonkEvBindsVar :: ZonkEnv -> EvBindsVar -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBindsVar env (EvBindsVar { ebv_binds = ref })
   = do { bs <- readMutVar ref
-       ; pprTraceM "zonkEvBindsVar" (ppr bs)
+--       ; pprTraceM "zonkEvBindsVar" (ppr bs)
        ; zonkEvBinds env (evBindMapBinds bs) }
 zonkEvBindsVar env (CoEvBindsVar {}) = return (env, emptyBag)
 

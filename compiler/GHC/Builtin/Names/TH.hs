@@ -33,7 +33,7 @@ templateHaskellNames = [
     liftStringName, liftStringTypedName,
     unTypeName,
     unTypeQName,
-    unsafeTExpCoerceName,
+    unsafeTExpCoerceName, mkTHRepName,
     mkTTExpName, codeCevidenceName,
 
     -- Lit
@@ -223,7 +223,7 @@ returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
     unsafeTExpCoerceName, liftTypedName, mkTTExpName, liftStringTypedName,
-    codeCevidenceName :: Name
+    codeCevidenceName, mkTHRepName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -240,6 +240,7 @@ mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
 unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
+mkTHRepName = thFun (fsLit "mkTHRep") mkTHRepKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
 
 mkTTExpName = thFun (fsLit "mkTTExp") mkTTExpKey
@@ -742,7 +743,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey, liftTypedIdKey, mkTTExpKey,
+    unsafeTExpCoerceIdKey, liftTypedIdKey, mkTTExpKey, mkTHRepKey,
     codeCevidenceKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
@@ -761,6 +762,7 @@ unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
 liftTypedIdKey        = mkPreludeMiscIdUnique 214
 mkTTExpKey = mkPreludeMiscIdUnique 215
 codeCevidenceKey = mkPreludeMiscIdUnique 216
+mkTHRepKey = mkPreludeMiscIdUnique 217
 
 
 -- data Lit = ...

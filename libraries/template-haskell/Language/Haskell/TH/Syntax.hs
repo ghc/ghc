@@ -52,6 +52,8 @@ import Numeric.Natural
 import Prelude
 import Foreign.ForeignPtr
 import GHC.Types (TYPE)
+import Data.ByteString.Internal
+import Data.ByteString.Unsafe(unsafePackAddressLen)
 
 -----------------------------------------------------
 --
@@ -384,24 +386,32 @@ unsafeTExpCoerce m = do { e <- m
 data TExp (a :: TYPE (r :: RuntimeRep)) =
   TExp { unType :: TExpU } deriving Generic
 
-data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], expr_str :: String } deriving (Generic, Data)
+data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], expr_str :: THRep } deriving (Generic, Data)
 
 
 --unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
-unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) . ([(Int, Q TTExp)], [(Int, Q TExpU)], String) -> Q (TExp a)
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) . ([(Int, Q TTExp)], [(Int, Q TExpU)], THRep) -> Q (TExp a)
 unsafeTExpCoerce (ts, qu, s) =
   do { qu' <- sequence (map sequence qu)
      ; ts' <- sequence (map sequence ts)
      ; return (TExp (TExpU ts' qu' s)) }
+
+newtype THRep = THRep ByteString deriving (Generic, Data)
+
+
+-- | For internal use only
+mkTHRep :: Int -> Addr# -> THRep
+mkTHRep l a = THRep (unsafePerformIO (unsafePackAddressLen l a))
+{-# NOINLINE mkTHRep #-}
 
 unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) . Q (TExp a) -> Q TExpU
 unTypeQ = fmap unType
 
 
 -- Representation of types
-data TTExp = TTExp { env_t :: [(Int, TTExp)], tstr :: String } deriving (Generic, Data)
+data TTExp = TTExp { env_t :: [(Int, TTExp)], tstr :: THRep } deriving (Generic, Data)
 
-mkTTExp :: [(Int, Q TTExp)] -> String -> Q TTExp
+mkTTExp :: [(Int, Q TTExp)] -> THRep -> Q TTExp
 mkTTExp qu s = do { qu' <- sequence (map sequence qu)
                   ; return (TTExp qu' s) }
 
@@ -1454,7 +1464,7 @@ data Bytes = Bytes
    , bytesOffset :: Word             -- ^ Offset from the pointer
    , bytesSize   :: Word             -- ^ Number of bytes
    -- Maybe someday:
-   -- , bytesAlignement  :: Word -- ^ Alignement constraint
+   -- , bytesAlignment  :: Word -- ^ Alignment constraint
    -- , bytesReadOnly    :: Bool -- ^ Shall we embed into a read-only
    --                            --   section or not
    -- , bytesInitialized :: Bool -- ^ False: only use `bytesSize` to allocate

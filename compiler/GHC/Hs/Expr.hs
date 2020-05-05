@@ -52,7 +52,7 @@ import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
-import Language.Haskell.TH.Syntax(TExpU, TTExp)
+import Language.Haskell.TH.Syntax(THRep, TExpU, TTExp)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -2426,7 +2426,7 @@ data HsSplice id
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
 --   | HsSplicedT DelayedSplice
-   | HsSplicedD [(Int, TTExp)] [(Int, TExpU)] String -- Decode this in the desugarer
+   | HsSplicedD [(Int, TTExp)] [(Int, TExpU)] THRep -- Decode this in the desugarer
    | XSplice !(XXSplice id)  -- Note [Trees that Grow] extension point
 
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
@@ -2642,7 +2642,7 @@ pprSplice (XSplice x)                   = case ghcPass @p of
 #endif
                                             GhcTc -> case x of
                                                        HsSplicedT _ -> text "Unevaluated typed splice"
-pprSplice (HsSplicedD zs env s)         = ppr (length zs) $$ ppr (length env) $$ text s
+pprSplice (HsSplicedD zs env s)         = ppr (length zs) $$ ppr (length env) $$  text "rep"
 --pprSplice (HsSplicedT {})               = text "Unevaluated typed splice"
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc

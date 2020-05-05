@@ -82,13 +82,15 @@ import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
 
 import Binary
+import FastMutInt
 import GHC.Iface.Binary
 import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Iface.Env
 
 import Data.IORef
 import GHC.Driver.Types (hsc_NC)
-import Language.Haskell.TH.Syntax(TExpU(..), TTExp(..))
+import Language.Haskell.TH.Syntax(THRep(..), TExpU(..), TTExp(..))
+import Data.ByteString.Internal (ByteString(..))
 {-
 ************************************************************************
 *                                                                      *
@@ -818,15 +820,15 @@ dsSplicedT (TTExp zs t) =
   in loadCoreType zs' t
 
 -- Load a core expr from a file
-loadCoreType :: [(Unique, TTExp)] -> String -> DsM Type
-loadCoreType zs s = do
+loadCoreType :: [(Unique, TTExp)] -> THRep -> DsM Type
+loadCoreType zs (THRep b) = do
   env <- getGblEnv
   hs_env <- env_top <$> getEnv
   nc <- liftIO $ readIORef (hsc_NC hs_env)
   let
       ncu = NCU (\f -> return $ snd (f nc))
   i <- liftIO $ do
-    bh <- readBinMem s
+    bh <- readBin b
     getWithUserData ncu bh
   dsm_envs <- getEnvs
   let (if_gbl, if_lcl) = ds_if_env env
@@ -838,21 +840,21 @@ loadCoreType zs s = do
       tcIfaceType i
 
 instance Outputable TTExp where
-  ppr (TTExp t t') = ppr t <+> ppr t'
+  ppr (TTExp t t') = ppr t <+> text "TTREP"
 
 instance Outputable TExpU where
-  ppr (TExpU t t' t'') = ppr t <+> ppr t' <+> ppr t''
+  ppr (TExpU t t' t'') = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
-loadCoreExpr :: [(Unique, TTExp)] -> [(Unique, TExpU)] -> String -> DsM CoreExpr
-loadCoreExpr zs menv s =  pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ ppr s) $ do
+loadCoreExpr :: [(Unique, TTExp)] -> [(Unique, TExpU)] -> THRep -> DsM CoreExpr
+loadCoreExpr zs menv (THRep s) =  pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
   env <- getGblEnv
   hs_env <- env_top <$> getEnv
   nc <- liftIO $ readIORef (hsc_NC hs_env)
   let
       ncu = NCU (\f -> return $ snd (f nc))
   i <- liftIO $ do
-    bh <- readBinMem s
+    bh <- readBin s
     getWithUserData ncu bh
   dsm_envs <- getEnvs
   let (if_gbl, if_lcl) = ds_if_env env
