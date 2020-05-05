@@ -419,7 +419,7 @@ tcHsTypeApp wc_ty kind
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A HsWildCardBndrs's hswc_ext now only includes /named/ wildcards, so
 any unnamed wildcards stay unchanged in hswc_body.  When called in
-tcHsTypeApp, tcCheckLHsType will call emitAnonWildCardHoleConstraint
+tcHsTypeApp, tcCheckLHsType will call emitAnonTypeHole
 on these anonymous wildcards. However, this would trigger
 error/warning when an anonymous wildcard is passed in as a visible type
 argument, which we do not want because users should be able to write
@@ -891,7 +891,7 @@ tcAnonWildCardOcc wc exp_kind
        ; warning <- woptM Opt_WarnPartialTypeSignatures
 
        ; unless (part_tysig && not warning) $
-         emitAnonWildCardHoleConstraint wc_tv
+         emitAnonTypeHole wc_tv
          -- Why the 'unless' guard?
          -- See Note [Wildcards in visible kind application]
 
@@ -911,11 +911,11 @@ x = MkT
 So we should allow '@_' without emitting any hole constraints, and
 regardless of whether PartialTypeSignatures is enabled or not. But how would
 the typechecker know which '_' is being used in VKA and which is not when it
-calls emitNamedWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
+calls emitNamedTypeHole in tcHsPartialSigType on all HsWildCardBndrs?
 The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
 but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
 And whenever we see a '@', we automatically turn on PartialTypeSignatures and
-turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
+turn off hole constraint warnings, and do not call emitAnonTypeHole
 under these conditions.
 See related Note [Wildcards in visible type application] here and
 Note [The wildcard story for types] in GHC.Hs.Types
@@ -3192,7 +3192,7 @@ tcHsPartialSigType ctxt sig_ty
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary
        -- See Note [Extra-constraint holes in partial type signatures]
-       ; emitNamedWildCardHoleConstraints wcs
+       ; mapM_ emitNamedTypeHole wcs
 
        -- Zonk, so that any nested foralls can "see" their occurrences
        -- See Note [Checking partial type signatures], in
@@ -3365,7 +3365,7 @@ tcHsPatSigType ctxt sig_ty
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
 
-        ; emitNamedWildCardHoleConstraints wcs
+        ; mapM_ emitNamedTypeHole wcs
 
           -- sig_ty might have tyvars that are at a higher TcLevel (if hs_ty
           -- contains a forall). Promote these.
