@@ -682,7 +682,7 @@ rnFamInstEqn doc atfi rhs_kvars
              -- below to report unused binder on the LHS
 
          -- Implicitly bound variables, empty if we have an explicit 'forall'.
-         -- See Note [forall-or-nothing rule].
+         -- See Note [forall-or-nothing rule] in GHC.Rename.HsType.
        ; let imp_vars = nubL $ forAllOrNothing (isJust mb_bndrs) pat_kity_vars_with_dups
        ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
 
