@@ -13,7 +13,7 @@ module GHC.Rename.HsType (
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType,
-        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsSigWcTypeScoped,
+        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -71,11 +71,11 @@ import Control.Monad      ( unless, when )
 
 {-
 These type renamers are in a separate module, rather than in (say) GHC.Rename.Module,
-to break several loop.
+to break several loops.
 
 *********************************************************
 *                                                       *
-           HsSigWcType (i.e with wildcards)
+    HsSigWcType and HsPatSigType (i.e with wildcards)
 *                                                       *
 *********************************************************
 -}
@@ -85,46 +85,77 @@ data HsSigWcTypeScoping
     -- ^ Always bind any free tyvars of the given type, regardless of whether we
     -- have a forall at the top.
     --
-    -- For pattern type sigs and rules we /do/ want to bring those type
+    -- For pattern type sigs, we /do/ want to bring those type
     -- variables into scope, even if there's a forall at the top which usually
     -- stops that happening, e.g:
     --
-    -- > \ (x :: forall a. a-> b) -> e
+    -- > \ (x :: forall a. a -> b) -> e
     --
     -- Here we do bring 'b' into scope.
+    --
+    -- RULES can also use 'AlwaysBind', such as in the following example:
+    --
+    -- > {-# RULES \"f\" forall (x :: forall a. a -> b). f x = ... b ... #-}
+    --
+    -- This only applies to RULES that do not explicitly bind their type
+    -- variables. If a RULE explicitly quantifies its type variables, then
+    -- 'NeverBind' is used instead. See also
+    -- @Note [Pattern signature binders and scoping]@ in "GHC.Hs.Types".
   | BindUnlessForall
-    -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'
+    -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'.
+    -- This is only ever used in places where the \"@forall@-or-nothing\" rule
+    -- is in effect. See @Note [forall-or-nothing rule]@.
   | NeverBind
-    -- ^ Never bind any free tyvars
+    -- ^ Never bind any free tyvars. This is used for RULES that have both
+    -- explicit type and term variable binders, e.g.:
+    --
+    -- > {-# RULES \"const\" forall a. forall (x :: a) y. const x y = x #-}
+    --
+    -- The presence of the type variable binder @forall a.@ implies that the
+    -- free variables in the types of the term variable binders @x@ and @y@
+    -- are /not/ bound. In the example above, there are no such free variables,
+    -- but if the user had written @(y :: b)@ instead of @y@ in the term
+    -- variable binders, then @b@ would be rejected for being out of scope.
+    -- See also @Note [Pattern signature binders and scoping]@ in
+    -- "GHC.Hs.Types".
 
-rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+rnHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType scoping doc sig_ty
-  = rn_hs_sig_wc_type scoping doc sig_ty $ \sig_ty' ->
-    return (sig_ty', emptyFVs)
+rnHsSigWcType doc (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
+  = rn_hs_sig_wc_type BindUnlessForall doc hs_ty $ \nwcs imp_tvs body ->
+    let ib_ty = HsIB { hsib_ext = imp_tvs, hsib_body = body  }
+        wc_ty = HsWC { hswc_ext = nwcs,    hswc_body = ib_ty } in
+    pure (wc_ty, emptyFVs)
 
-rnHsSigWcTypeScoped :: HsSigWcTypeScoping
-                    -> HsDocContext -> LHsSigWcType GhcPs
-                    -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
-                    -> RnM (a, FreeVars)
+rnHsPatSigType :: HsSigWcTypeScoping
+               -> HsDocContext -> HsPatSigType GhcPs
+               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
+               -> RnM (a, FreeVars)
 -- Used for
---   - Signatures on binders in a RULE
---   - Pattern type signatures
+--   - Pattern type signatures, which are only allowed with ScopedTypeVariables
+--   - Signatures on binders in a RULE, which are allowed even if
+--     ScopedTypeVariables isn't enabled
 -- Wildcards are allowed
--- type signatures on binders only allowed with ScopedTypeVariables
-rnHsSigWcTypeScoped scoping ctx sig_ty thing_inside
+--
+-- See Note [Pattern signature binders and scoping] in GHC.Hs.Types
+rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
-       ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
-       ; rn_hs_sig_wc_type scoping ctx sig_ty thing_inside
-       }
+       ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
+       ; rn_hs_sig_wc_type scoping ctx (hsPatSigType sig_ty) $
+         \nwcs imp_tvs body ->
+    do { let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
+             sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = body }
+       ; thing_inside sig_ty'
+       } }
 
-rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
-                  -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
+-- The workhorse for rnHsSigWcType and rnHsPatSigType.
+rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> LHsType GhcPs
+                  -> ([Name]    -- Wildcard names
+                      -> [Name] -- Implicitly bound type variable names
+                      -> LHsType GhcRn
+                      -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
--- rn_hs_sig_wc_type is used for source-language type signatures
-rn_hs_sig_wc_type scoping ctxt
-                  (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
-                  thing_inside
+rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
@@ -134,10 +165,7 @@ rn_hs_sig_wc_type scoping ctxt
                NeverBind        -> []
        ; rnImplicitBndrs implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
-       ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
-             ib_ty'  = HsIB { hsib_ext = vars
-                            , hsib_body = hs_ty' }
-       ; (res, fvs2) <- thing_inside sig_ty'
+       ; (res, fvs2) <- thing_inside wcs vars hs_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
@@ -321,8 +349,9 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 -- therefore an indication that the user is trying to be fastidious, so
 -- we don't implicitly bind any variables.
 
--- | See note Note [forall-or-nothing rule]. This tiny little function is used
--- (rather than its small body inlined) to indicate we implementing that rule.
+-- | See Note [forall-or-nothing rule]. This tiny little function is used
+-- (rather than its small body inlined) to indicate that we are implementing
+-- that rule.
 forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
@@ -1396,8 +1425,8 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 *                                                      *
 ***************************************************** -}
 
-unexpectedTypeSigErr :: LHsSigWcType GhcPs -> SDoc
-unexpectedTypeSigErr ty
+unexpectedPatSigTypeErr :: HsPatSigType GhcPs -> SDoc
+unexpectedPatSigTypeErr ty
   = hang (text "Illegal type signature:" <+> quotes (ppr ty))
        2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
 

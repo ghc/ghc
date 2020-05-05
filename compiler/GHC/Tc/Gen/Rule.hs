@@ -230,7 +230,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
         ; let id  = mkLocalId name id_ty
-                    -- See Note [Pattern signature binders] in GHC.Tc.Gen.HsType
+                    -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 
               -- The type variables scope over subsequent bindings; yuk
         ; (tyvars, tmvars) <- tcExtendNameTyVarEnv tvs $

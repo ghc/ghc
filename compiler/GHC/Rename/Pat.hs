@@ -218,9 +218,6 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
-
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
   = do { name <- newPatName name_maker rdr_name
@@ -410,9 +407,12 @@ rnPatAndThen mk (SigPat x pat sig)
   -- f ((Just (x :: a) :: Maybe a)
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~^       `a' is first bound here
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
-  = do { sig' <- rnHsSigCps sig
+  = do { sig' <- rnHsPatSigTypeAndThen sig
        ; pat' <- rnLPatAndThen mk pat
        ; return (SigPat x pat' sig' ) }
+  where
+    rnHsPatSigTypeAndThen :: HsPatSigType GhcPs -> CpsRn (HsPatSigType GhcRn)
+    rnHsPatSigTypeAndThen sig = CpsRn (rnHsPatSigType AlwaysBind PatCtx sig)
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
