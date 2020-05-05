@@ -648,7 +648,9 @@ mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> CoAxBranch
 mkCoAxBranch tvs eta_tvs cvs ax_tc lhs rhs roles loc
   = -- See Note [CoAxioms are homogeneous] in Core.Coercion.Axiom
-    ASSERT( typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs )
+    ASSERT2( typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs
+           , ppr ax_tc $$ ppr lhs $$ ppr (typeKind (mkTyConApp ax_tc lhs))
+             $$ ppr rhs $$ ppr (typeKind rhs) )
     CoAxBranch { cab_tvs     = tvs'
                , cab_eta_tvs = eta_tvs'
                , cab_cvs     = cvs'

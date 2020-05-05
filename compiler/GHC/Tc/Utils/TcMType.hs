@@ -21,7 +21,7 @@ module GHC.Tc.Utils.TcMType (
   newNamedFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newOpenFlexiTyVarTy, newOpenTypeKind,
+  newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
@@ -978,8 +978,13 @@ newOpenTypeKind
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
+  = do { tv <- newOpenFlexiTyVar
+       ; return (mkTyVarTy tv) }
+
+newOpenFlexiTyVar :: TcM TcTyVar
+newOpenFlexiTyVar
   = do { kind <- newOpenTypeKind
-       ; newFlexiTyVarTy kind }
+       ; newFlexiTyVar kind }
 
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables
