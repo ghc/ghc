@@ -15,10 +15,11 @@ module GHC.Tc.Gen.Arrow ( tcProc ) where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
-                                       , tcCheckId, tcCheckPolyExpr )
+                                       , tcCheckPolyExpr )
 
 import GHC.Hs
 import GHC.Tc.Gen.Match
+import GHC.Tc.Gen.App( tcCheckId )
 import GHC.Tc.Utils.Zonk( hsLPatType )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType

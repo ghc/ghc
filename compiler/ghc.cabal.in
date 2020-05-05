@@ -477,6 +477,7 @@ Library
         GHC.Tc.Deriv.Utils
         GHC.Tc.Utils.Env
         GHC.Tc.Gen.Expr
+        GHC.Tc.Gen.App
         GHC.Tc.Gen.Foreign
         GHC.Tc.Deriv.Generate
         GHC.Tc.Deriv.Functor

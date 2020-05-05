@@ -39,13 +39,14 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcMonoExpr, tcMonoExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
-                                       , tcCheckPolyExpr, tcCheckId )
+                                       , tcCheckPolyExpr )
 
 import GHC.Types.Basic (LexicalFixity(..))
 import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Pat
+import GHC.Tc.Gen.App
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind

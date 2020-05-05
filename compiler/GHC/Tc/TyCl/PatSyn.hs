@@ -15,8 +15,7 @@
 module GHC.Tc.TyCl.PatSyn
    ( tcPatSynDecl
    , tcPatSynBuilderBind
-   , tcPatSynBuilderOcc
-   , nonBidirectionalErr
+   , patSynBuilderOcc
    )
 where
 
@@ -884,13 +883,12 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 
-tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
--- monadic only for failure
-tcPatSynBuilderOcc ps
-  | Just (builder_id, add_void_arg) <- builder
+patSynBuilderOcc :: PatSyn -> Maybe (HsExpr GhcTcId, TcSigmaType)
+patSynBuilderOcc ps
+  | Just (builder_id, add_void_arg) <- patSynBuilder ps
   , let builder_expr = HsConLikeOut noExtField (PatSynCon ps)
         builder_ty   = idType builder_id
-  = return $
+  = Just $
     if add_void_arg
     then ( builder_expr   -- still just return builder_expr; the void# arg is added
                           -- by dsConLike in the desugarer
@@ -898,10 +896,7 @@ tcPatSynBuilderOcc ps
     else (builder_expr, builder_ty)
 
   | otherwise  -- Unidirectional
-  = nonBidirectionalErr name
-  where
-    name    = patSynName ps
-    builder = patSynBuilder ps
+  = Nothing
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
@@ -1090,11 +1085,6 @@ Any change to this ordering should make sure to change GHC.HsToCore.Expr if you
 want to avoid difficult to decipher core lint errors!
  -}
 
-
-nonBidirectionalErr :: Outputable name => name -> TcM a
-nonBidirectionalErr name = failWithTc $
-    text "non-bidirectional pattern synonym"
-    <+> quotes (ppr name) <+> text "used in an expression"
 
 -- Walk the whole pattern and for all ConPatOuts, collect the
 -- existentially-bound type variables and evidence binding variables.

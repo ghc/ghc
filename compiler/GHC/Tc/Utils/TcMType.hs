@@ -21,7 +21,7 @@ module GHC.Tc.Utils.TcMType (
   newNamedFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newOpenFlexiTyVarTy, newOpenTypeKind,
+  newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
@@ -696,7 +696,6 @@ instead of the buggous
 {-
 Note [TyVarTv]
 ~~~~~~~~~~~~
-
 A TyVarTv can unify with type *variables* only, including other TyVarTvs and
 skolems. Sometimes, they can unify with type variables that the user would
 rather keep distinct; see #11203 for an example.  So, any client of this
@@ -711,7 +710,7 @@ types (GHC Proposal 29).
 The remaining uses of newTyVarTyVars are
 * In kind signatures, see
   GHC.Tc.TyCl Note [Inferring kinds for type declarations]
-           and Note [Kind checking for GADTs]
+          and Note [Kind checking for GADTs]
 * In partial type signatures, see Note [Quantified variables in partial type signatures]
 -}
 
@@ -1012,8 +1011,13 @@ newOpenTypeKind
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
+  = do { tv <- newOpenFlexiTyVar
+       ; return (mkTyVarTy tv) }
+
+newOpenFlexiTyVar :: TcM TcTyVar
+newOpenFlexiTyVar
   = do { kind <- newOpenTypeKind
-       ; newFlexiTyVarTy kind }
+       ; newFlexiTyVar kind }
 
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables

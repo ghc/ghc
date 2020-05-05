@@ -57,7 +57,7 @@ module GHC.Tc.Utils.TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitForAllTysSameVis,
+  tcSplitForAllTys, tcSplitForAllTysSameVis, tcSplitSomeForAllTys,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
@@ -1216,10 +1216,14 @@ tcSplitForAllTys ty
 -- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
 -- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
 -- as an argument to this function.
--- All split tyvars are annotated with their argf.
 tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVarBinder], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitForAllTysSameVis supplied_argf ty
+tcSplitForAllTysSameVis supplied_argf ty
+  = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where
+    sty = splitSomeForAllTys (`sameVis` supplied_argf) ty
+
+tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
+tcSplitSomeForAllTys argf_pred ty = splitSomeForAllTys argf_pred ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
 tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)

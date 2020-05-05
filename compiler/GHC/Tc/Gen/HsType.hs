@@ -3647,7 +3647,7 @@ Here
    It must be a skolem so that that it retains its identity, and
    GHC.Tc.Errors.getSkolemInfo can thereby find the binding site for the skolem.
 
- * The type signature pattern (f :: b -> c) makes freshs meta-tyvars
+ * The type signature pattern (f :: b -> c) makes fresh meta-tyvars
    beta and gamma (TauTvs), and binds "b" :-> beta, "c" :-> gamma in the
    environment
 
@@ -3675,7 +3675,7 @@ For RULE binders, though, things are a bit different (yuk).
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
 Here this really is the binding site of the type variable so we'd like
 to use a skolem, so that we get a complaint if we unify two of them
-together.  Hence the new_tv function in tcHsPatSigType.
+together.  Hence the new_implicit_tv function in tcHsPatSigType.
 
 
 ************************************************************************

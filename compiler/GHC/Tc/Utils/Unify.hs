@@ -31,8 +31,8 @@ module GHC.Tc.Utils.Unify (
   matchExpectedTyConApp,
   matchExpectedAppTy,
   matchExpectedFunTys,
-  matchActualFunTysRho, matchActualFunTySigma,
   matchExpectedFunKind,
+  matchActualFunTy, matchActualFunTysRho,
 
   metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
 
@@ -68,11 +68,155 @@ import GHC.Driver.Session
 import GHC.Types.Basic
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Outputable as Outputable
 
 import Control.Monad
 import Control.Arrow ( second )
+
+
+{- *********************************************************************
+*                                                                      *
+              matchActualFunTys
+*                                                                      *
+********************************************************************* -}
+
+-- | matchActualFunTySigma does looks for just one function arrow
+--   returning an uninstantiated sigma-type
+matchActualFunTy
+  :: SDoc -- See Note [Herald for matchExpectedFunTys]
+  -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
+  -> (Arity, [TcSigmaType]) -- Total number of value args in the call, and
+                            -- types of values args to which function has
+                            --   been applied already (reversed)
+                            -- Both are used only for error messages)
+  -> TcRhoType              -- Type to analyse: a TcRhoType
+  -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
+-- See Note [matchActualFunTy error handling] for all these arguments
+
+-- If   (wrap, arg_ty, res_ty) = matchActualFunTySigma ... fun_ty
+-- then wrap :: fun_ty ~> (arg_ty -> res_ty)
+-- and NB: res_ty is an (uninstantiated) SigmaType
+
+matchActualFunTy herald mb_thing err_info fun_ty
+  = go fun_ty
+-- Does not allocate unnecessary meta variables: if the input already is
+-- a function, we just take it apart.  Not only is this efficient,
+-- it's important for higher rank: the argument might be of form
+--              (forall a. ty) -> other
+-- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
+-- hide the forall inside a meta-variable
+
+-- (*) Sometimes it's necessary to call matchActualFunTys with only part
+-- (that is, to the right of some arrows) of the type of the function in
+-- question. (See GHC.Tc.Gen.Expr.tcArgs.) This argument is the reversed list of
+-- arguments already seen (that is, not part of the TcSigmaType passed
+-- in elsewhere).
+
+  where
+    go :: TcSigmaType   -- The remainder of the type as we're processing
+       -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
+    go ty | Just ty' <- tcView ty = go ty'
+
+    go (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+      = ASSERT( af == VisArg )
+        return (idHsWrapper, arg_ty, res_ty)
+
+    go ty@(TyVarTy tv)
+      | isMetaTyVar tv
+      = do { cts <- readMetaTyVar tv
+           ; case cts of
+               Indirect ty' -> go ty'
+               Flexi        -> defer ty }
+
+       -- In all other cases we bale out into ordinary unification
+       -- However unlike the meta-tyvar case, we are sure that the
+       -- number of arguments doesn't match arity of the original
+       -- type, so we can add a bit more context to the error message
+       -- (cf #7869).
+       --
+       -- It is not always an error, because specialized type may have
+       -- different arity, for example:
+       --
+       -- > f1 = f2 'a'
+       -- > f2 :: Monad m => m Bool
+       -- > f2 = undefined
+       --
+       -- But in that case we add specialized type into error context
+       -- anyway, because it may be useful. See also #9605.
+    go ty = addErrCtxtM (mk_ctxt ty) (defer ty)
+
+    ------------
+    defer fun_ty
+      = do { arg_ty <- newOpenFlexiTyVarTy
+           ; res_ty <- newOpenFlexiTyVarTy
+           ; let unif_fun_ty = mkVisFunTy arg_ty res_ty
+           ; co <- unifyType mb_thing fun_ty unif_fun_ty
+           ; return (mkWpCastN co, arg_ty, res_ty) }
+
+    ------------
+    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt res_ty env = mkFunTysMsg env herald (reverse arg_tys_so_far)
+                                     res_ty n_val_args_in_call
+    (n_val_args_in_call, arg_tys_so_far) = err_info
+
+{- Note [matchActualFunTy error handling]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matchActualFunTy is made much more complicated by the
+desire to produce good error messages. Consider the application
+    f @Int x y
+In GHC.Tc.Gen.Expr.tcArgs we deal with visible type arguments,
+and then call matchActualFunTysPart for each individual value
+argument. It, in turn, must instantiate any type/dictionary args,
+before looking for an arrow type.
+
+But if it doesn't find an arrow type, it wants to generate a message
+like "f is applied to two arguments but its type only has one".
+To do that, it needs to konw about the args that tcArgs has already
+munched up -- hence passing in n_val_args_in_call and arg_tys_so_far;
+and hence also the accumulating so_far arg to 'go'.
+
+This allows us (in mk_ctxt) to construct f's /instantiated/ type,
+with just the values-arg arrows, which is what we really want
+in the error message.
+
+Ugh!
+-}
+
+-- Like 'matchExpectedFunTys', but used when you have an "actual" type,
+-- for example in function application
+matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
+                     -> CtOrigin
+                     -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
+                     -> Arity
+                     -> TcSigmaType
+                     -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
+-- If    matchActualFunTysRho n ty = (wrap, [t1,..,tn], res_ty)
+-- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
+--       and res_ty is a RhoType
+-- NB: the returned type is top-instantiated; it's a RhoType
+matchActualFunTysRho herald ct_orig mb_thing n_val_args_wanted fun_ty
+  = go n_val_args_wanted [] fun_ty
+  where
+    go n so_far fun_ty
+      | not (isRhoTy fun_ty)
+      = do { (wrap1, rho) <- topInstantiate ct_orig fun_ty
+           ; (wrap2, arg_tys, res_ty) <- go n so_far rho
+           ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
+
+    go 0 _ fun_ty = return (idHsWrapper, [], fun_ty)
+
+    go n so_far fun_ty
+      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTy
+                                                 herald mb_thing
+                                                 (n_val_args_wanted, so_far)
+                                                 fun_ty
+           ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
+           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty doc
+           ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
+      where
+        doc = text "When inferring the argument type of a function with type" <+>
+              quotes (ppr fun_ty)
+
 
 {-
 ************************************************************************
@@ -224,167 +368,27 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     ------------
     mk_ctxt :: [ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
-      = do { (env', ty) <- zonkTidyTcType env (mkVisFunTys arg_tys' res_ty)
-           ; return ( env', mk_fun_tys_msg herald ty arity) }
+      = mkFunTysMsg env herald arg_tys' res_ty arity
       where
         arg_tys' = map (checkingExpType "matchExpectedFunTys") (reverse arg_tys)
             -- this is safe b/c we're called from "go"
 
--- Like 'matchExpectedFunTys', but used when you have an "actual" type,
--- for example in function application
-matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
-                     -> CtOrigin
-                     -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
-                     -> Arity
-                     -> TcSigmaType
-                     -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
--- If    matchActualFunTysRho n ty = (wrap, [t1,..,tn], res_ty)
--- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
---       and res_ty is a RhoType
--- NB: the returned type is top-instantiated; it's a RhoType
-matchActualFunTysRho herald ct_orig mb_thing n_val_args_wanted fun_ty
-  = go n_val_args_wanted [] fun_ty
-  where
-    go 0 _ fun_ty
-      = do { (wrap, rho) <- topInstantiate ct_orig fun_ty
-           ; return (wrap, [], rho) }
-    go n so_far fun_ty
-      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTySigma
-                                                 herald ct_orig mb_thing
-                                                 (n_val_args_wanted, so_far)
-                                                 fun_ty
-           ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
-           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty doc
-           ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
-      where
-        doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr fun_ty)
 
--- | matchActualFunTySigm does looks for just one function arrow
---   returning an uninstantiated sigma-type
-matchActualFunTySigma
-  :: SDoc -- See Note [Herald for matchExpectedFunTys]
-  -> CtOrigin
-  -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
-  -> (Arity, [TcSigmaType]) -- Total number of value args in the call, and
-                            -- types of values args to which function has
-                            --   been applied already (reversed)
-                            -- Both are used only for error messages)
-  -> TcSigmaType            -- Type to analyse
-  -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
--- See Note [matchActualFunTys error handling] for all these arguments
-
--- If   (wrap, arg_ty, res_ty) = matchActualFunTySigma ... fun_ty
--- then wrap :: fun_ty ~> (arg_ty -> res_ty)
--- and NB: res_ty is an (uninstantiated) SigmaType
-
-matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
-  = go fun_ty
--- Does not allocate unnecessary meta variables: if the input already is
--- a function, we just take it apart.  Not only is this efficient,
--- it's important for higher rank: the argument might be of form
---              (forall a. ty) -> other
--- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
--- hide the forall inside a meta-variable
-
--- (*) Sometimes it's necessary to call matchActualFunTys with only part
--- (that is, to the right of some arrows) of the type of the function in
--- question. (See GHC.Tc.Gen.Expr.tcArgs.) This argument is the reversed list of
--- arguments already seen (that is, not part of the TcSigmaType passed
--- in elsewhere).
-
-  where
-    go :: TcSigmaType   -- The remainder of the type as we're processing
-       -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
-    go ty | Just ty' <- tcView ty = go ty'
-
-    go ty
-      | not (null tvs && null theta)
-      = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (wrap2, arg_ty, res_ty) <- go rho
-           ; return (wrap2 <.> wrap1, arg_ty, res_ty) }
-      where
-        (tvs, theta, _) = tcSplitSigmaTy ty
-
-    go (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
-      = ASSERT( af == VisArg )
-        return (idHsWrapper, arg_ty, res_ty)
-
-    go ty@(TyVarTy tv)
-      | isMetaTyVar tv
-      = do { cts <- readMetaTyVar tv
-           ; case cts of
-               Indirect ty' -> go ty'
-               Flexi        -> defer ty }
-
-       -- In all other cases we bale out into ordinary unification
-       -- However unlike the meta-tyvar case, we are sure that the
-       -- number of arguments doesn't match arity of the original
-       -- type, so we can add a bit more context to the error message
-       -- (cf #7869).
-       --
-       -- It is not always an error, because specialized type may have
-       -- different arity, for example:
-       --
-       -- > f1 = f2 'a'
-       -- > f2 :: Monad m => m Bool
-       -- > f2 = undefined
-       --
-       -- But in that case we add specialized type into error context
-       -- anyway, because it may be useful. See also #9605.
-    go ty = addErrCtxtM (mk_ctxt ty) (defer ty)
-
-    ------------
-    defer fun_ty
-      = do { arg_ty <- newOpenFlexiTyVarTy
-           ; res_ty <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkVisFunTy arg_ty res_ty
-           ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_ty, res_ty) }
-
-    ------------
-    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt res_ty env
-      = do { (env', ty) <- zonkTidyTcType env $
-                           mkVisFunTys (reverse arg_tys_so_far) res_ty
-           ; return (env', mk_fun_tys_msg herald ty n_val_args_in_call) }
-    (n_val_args_in_call, arg_tys_so_far) = err_info
-
-mk_fun_tys_msg :: SDoc -> TcType -> Arity -> SDoc
-mk_fun_tys_msg herald ty n_args_in_call
-  | n_args_in_call <= n_fun_args  -- Enough args, in the end
-  = text "In the result of a function call"
-  | otherwise
-  = hang (herald <+> speakNOf n_args_in_call (text "value argument") <> comma)
-       2 (sep [ text "but its type" <+> quotes (pprType ty)
-              , if n_fun_args == 0 then text "has none"
-                else text "has only" <+> speakN n_fun_args])
-  where
-    (args, _) = tcSplitFunTys ty
-    n_fun_args = length args
-
-{- Note [matchActualFunTys error handling]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-matchActualFunTysPart is made much more complicated by the
-desire to produce good error messages. Consider the application
-    f @Int x y
-In GHC.Tc.Gen.Expr.tcArgs we deal with visible type arguments,
-and then call matchActualFunTysPart for each individual value
-argument. It, in turn, must instantiate any type/dictionary args,
-before looking for an arrow type.
-
-But if it doesn't find an arrow type, it wants to generate a message
-like "f is applied to two arguments but its type only has one".
-To do that, it needs to konw about the args that tcArgs has already
-munched up -- hence passing in n_val_args_in_call and arg_tys_so_far;
-and hence also the accumulating so_far arg to 'go'.
-
-This allows us (in mk_ctxt) to construct f's /instantiated/ type,
-with just the values-arg arrows, which is what we really want
-in the error message.
-
-Ugh!
--}
+mkFunTysMsg :: TidyEnv -> SDoc -> [TcType] -> TcType -> Arity
+            -> TcM (TidyEnv, MsgDoc)
+mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
+  = do { (env', ty) <- zonkTidyTcType env $
+                       mkVisFunTys arg_tys res_ty
+       ; return (env', mk_msg ty) }
+ where
+   n_fun_args = length arg_tys
+   mk_msg ty | n_val_args_in_call <= n_fun_args  -- Enough args, in the end
+             = text "In the result of a function call"
+             | otherwise
+             = hang (herald <+> speakNOf n_val_args_in_call (text "value argument") <> comma)
+                  2 (sep [ text "but its type" <+> quotes (pprType ty)
+                         , if n_fun_args == 0 then text "has none"
+                           else text "has only" <+> speakN n_fun_args])
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
@@ -1307,8 +1311,9 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty1' <- tcView ty1 = go ty1' ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
 
-        -- Functions (or predicate functions) just check the two parts
-    go (FunTy _ fun1 arg1) (FunTy _ fun2 arg2)
+    -- Functions (t1 -> t2) just check the two parts
+    -- Do not attempt (c => t); just defer
+    go (FunTy VisArg fun1 arg1) (FunTy VisArg fun2 arg2)
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
            ; return $ mkFunCo Nominal co_l co_r }
@@ -2127,9 +2132,9 @@ metaTyVarUpdateOK dflags tv ty
 
 preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- A quick check for
---   (a) a forall type (unless -XImpredicativeTypes)
---   (b) a predicate type (unless -XImpredicativeTypes)
---   (c) a type family
+--   (a) a forall type (forall a. blah)
+--   (b) a predicate type (c => ty)
+--   (c) a type family; see Note [Prevent unification with type families]
 --   (d) a blocking coercion hole
 --   (e) an occurrence of the type variable (occurs check)
 --
@@ -2140,9 +2145,6 @@ preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 preCheck dflags ty_fam_ok tv ty
   = fast_check ty
   where
-    details          = tcTyVarDetails tv
-    impredicative_ok = canUnifyWithPolyType dflags details
-
     ok :: MetaTyVarUpdateResult ()
     ok = MTVU_OK ()
 
@@ -2157,19 +2159,12 @@ preCheck dflags ty_fam_ok tv ty
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
     fast_check (FunTy{ft_af = af, ft_arg = a, ft_res = r})
-      | InvisArg <- af
-      , not impredicative_ok   = MTVU_Bad
+      | InvisArg <- af         = MTVU_Bad
       | otherwise              = fast_check a   >> fast_check r
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
     fast_check (CoercionTy co) = fast_check_co co
-    fast_check (ForAllTy (Bndr tv' _) ty)
-       | not impredicative_ok = MTVU_Bad
-       | tv == tv'            = ok
-       | otherwise = do { fast_check_occ (tyVarKind tv')
-                        ; fast_check_occ ty }
-       -- Under a forall we look only for occurrences of
-       -- the type variable
+    fast_check (ForAllTy {})   = MTVU_Bad
 
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
@@ -2188,14 +2183,6 @@ preCheck dflags ty_fam_ok tv ty
 
     bad_tc :: TyCon -> Bool
     bad_tc tc
-      | not (impredicative_ok || isTauTyCon tc)     = True
-      | not (ty_fam_ok        || isFamFreeTyCon tc) = True
-      | otherwise                                   = False
-
-canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
-canUnifyWithPolyType dflags details
-  = case details of
-      MetaTv { mtv_info = TyVarTv }    -> False
-      MetaTv { mtv_info = TauTv }      -> xopt LangExt.ImpredicativeTypes dflags
-      _other                           -> True
-          -- We can have non-meta tyvars in given constraints
+      | not (isTauTyCon tc)                  = True
+      | not (ty_fam_ok || isFamFreeTyCon tc) = True
+      | otherwise                            = False
