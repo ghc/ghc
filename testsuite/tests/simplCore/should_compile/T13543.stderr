@@ -7,7 +7,7 @@ Foo.g: <S(SS),1*U(1*U(U),1*U(U))>
 
 
 ==================== Cpr signatures ====================
-Foo.$trModule: m1
+Foo.$trModule:
 Foo.f: m1
 Foo.g: m1
 
