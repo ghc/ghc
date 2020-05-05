@@ -7,11 +7,13 @@ data D a where
     A :: D Int
     B :: D (Int -> Int)
 
+-- Doesn't have the CPR property anymore (#18154), but an expandable unfolding.
+-- The point of this test is that f' has the CPR property.
 hasCPR :: Int
 hasCPR = 1
 
 hasStrSig :: Int -> Int
-hasStrSig x = x
+hasStrSig x = x + 1
 
 diverges :: Int
 diverges = diverges
