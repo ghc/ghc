@@ -69,6 +69,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_SF_Conv _from to -> CmmLit (CmmFloat (fromInteger x) to)
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
+      MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
 
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
@@ -76,6 +77,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
 -- Eliminate conversion NOPs
 cmmMachOpFoldM _ (MO_SS_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 cmmMachOpFoldM _ (MO_UU_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
+cmmMachOpFoldM _ (MO_XX_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 
 -- Eliminate nested conversions where possible
 cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
