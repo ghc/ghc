@@ -317,7 +317,7 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 --
 -- The idea is nested foralls express something which is only
 -- expressible explicitly, while a top level forall could (usually) be
--- replaced with an implicit binding. top-level foralls alone are
+-- replaced with an implicit binding. Top-level foralls alone ("forall.") are
 -- therefore an indication that the user is trying to be fastidious, so
 -- we can help them by not "fixing up" their unbound variables silently.
 
