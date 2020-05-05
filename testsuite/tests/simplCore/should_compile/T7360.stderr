@@ -215,8 +215,12 @@ T7360.$tc'Foo1 :: GHC.Types.TyCon
 >>>>>>> 6bb3d74323... Nested CPR
 =======
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
+<<<<<<< HEAD
          #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
 >>>>>>> 7dc0a59c86... A slew of testsuite changes
+=======
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
+>>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo1
@@ -263,8 +267,12 @@ T7360.$tc'Foo2 :: GHC.Types.TyCon
 >>>>>>> 6bb3d74323... Nested CPR
 =======
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
+<<<<<<< HEAD
          #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
 >>>>>>> 7dc0a59c86... A slew of testsuite changes
+=======
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
+>>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo2
@@ -279,8 +287,8 @@ T7360.$tc'Foo2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
 [GblId,
- Cpr=#c4(#c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *),
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
+ Cpr=#c4(#c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *),
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
  Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
@@ -322,9 +330,13 @@ T7360.$tc'Foo3 :: GHC.Types.TyCon
 >>>>>>> 6bb3d74323... Nested CPR
 =======
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
+<<<<<<< HEAD
          #c4(#c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *),
              #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *))),
 >>>>>>> 7dc0a59c86... A slew of testsuite changes
+=======
+         #c4(#c1(#c1(#, #, #, #, #, #), *), #c1(#c1(#, #, #, #, #, #), *))),
+>>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo3
