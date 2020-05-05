@@ -12,7 +12,7 @@
 
 module GHC.Tc.Utils.Instantiate (
        topSkolemise,
-       topInstantiate, topInstantiateInferred,
+       topInstantiate, instantiateSigma,
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
@@ -65,6 +65,7 @@ import GHC.Types.Name
 import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
 import GHC.Core.DataCon
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
@@ -180,66 +181,41 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- and   e :: ty
 -- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
 -- NB: always returns a rho-type, with no top-level forall or (=>)
-topInstantiate = top_instantiate True
+topInstantiate orig ty
+  | (tvs, theta, body) <- tcSplitSigmaTy ty
+  , not (null tvs && null theta)
+  = do { (_, wrap1, body1) <- instantiateSigma orig tvs theta body
 
--- | Instantiate all outer 'Inferred' binders
--- and any context. Never looks through arrows or specified type variables.
--- Used for visible type application.
-topInstantiateInferred :: CtOrigin -> TcSigmaType
-                       -> TcM (HsWrapper, TcSigmaType)
--- if    topInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
--- NB: may return a sigma-type
-topInstantiateInferred = top_instantiate False
+       -- Loop, to account for types like
+       --       forall a. Num a => forall b. Ord b => ...
+       ; (wrap2, rho) <- topInstantiate orig body1
 
-top_instantiate :: Bool   -- True  <=> instantiate *all* variables
-                          -- False <=> instantiate only the inferred ones
-                -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
-top_instantiate inst_all orig ty
-  | (binders, phi) <- tcSplitForAllVarBndrs ty
-  , (theta, rho)   <- tcSplitPhiTy phi
-  , not (null binders && null theta)
-  = do { let (inst_bndrs, leave_bndrs) = span should_inst binders
-             (inst_theta, leave_theta)
-               | null leave_bndrs = (theta, [])
-               | otherwise        = ([], theta)
-             in_scope    = mkInScopeSet (tyCoVarsOfType ty)
-             empty_subst = mkEmptyTCvSubst in_scope
-             inst_tvs    = binderVars inst_bndrs
-       ; (subst, inst_tvs') <- mapAccumLM newMetaTyVarX empty_subst inst_tvs
-       ; let inst_theta' = substTheta subst inst_theta
-             sigma'      = substTy subst (mkForAllTys leave_bndrs $
-                                          mkPhiTy leave_theta rho)
-             inst_tv_tys' = mkTyVarTys inst_tvs'
-
-       ; wrap1 <- instCall orig inst_tv_tys' inst_theta'
-       ; traceTc "Instantiating"
-                 (vcat [ text "all tyvars?" <+> ppr inst_all
-                       , text "origin" <+> pprCtOrigin orig
-                       , text "type" <+> debugPprType ty
-                       , text "theta" <+> ppr theta
-                       , text "leave_bndrs" <+> ppr leave_bndrs
-                       , text "with" <+> vcat (map debugPprType inst_tv_tys')
-                       , text "theta:" <+>  ppr inst_theta' ])
-
-       ; (wrap2, rho2) <-
-           if null leave_bndrs   -- NB: if inst_all is True then leave_bndrs = []
-
-         -- account for types like forall a. Num a => forall b. Ord b => ...
-           then top_instantiate inst_all orig sigma'
-
-         -- but don't loop if there were any un-inst'able tyvars
-           else return (idHsWrapper, sigma')
-
-       ; return (wrap2 <.> wrap1, rho2) }
+       ; return (wrap2 <.> wrap1, rho) }
 
   | otherwise = return (idHsWrapper, ty)
-  where
 
-    should_inst bndr
-      | inst_all  = True
-      | otherwise = binderArgFlag bndr == Inferred
+instantiateSigma :: CtOrigin -> [TyVar] -> TcThetaType -> TcSigmaType
+                 -> TcM ([TcTyVar], HsWrapper, TcSigmaType)
+instantiateSigma orig tvs theta body_ty
+  = do { (subst, inst_tvs) <- mapAccumLM newMetaTyVarX empty_subst tvs
+       ; let inst_theta  = substTheta subst theta
+             inst_body   = substTy subst body_ty
+             inst_tv_tys = mkTyVarTys inst_tvs
+
+       ; wrap <- instCall orig inst_tv_tys inst_theta
+       ; traceTc "Instantiating"
+                 (vcat [ text "origin" <+> pprCtOrigin orig
+                       , text "tvs"   <+> ppr tvs
+                       , text "theta" <+> ppr theta
+                       , text "type" <+> debugPprType body_ty
+                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "theta:" <+>  ppr inst_theta ])
+
+      ; return (inst_tvs, wrap, inst_body) }
+  where
+    free_tvs = tyCoVarsOfType body_ty `unionVarSet` tyCoVarsOfTypes theta
+    in_scope = mkInScopeSet (free_tvs `delVarSetList` tvs)
+    empty_subst = mkEmptyTCvSubst in_scope
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with
