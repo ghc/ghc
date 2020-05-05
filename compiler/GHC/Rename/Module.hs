@@ -957,7 +957,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; (mds', ty', fvs)
            <- rnLDerivStrategy DerivDeclCtx mds $
-              rnHsSigWcType BindUnlessForall DerivDeclCtx ty
+              rnHsSigWcType DerivDeclCtx ty
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
@@ -1028,7 +1028,7 @@ bindRuleTmVars doc tyvs vars names thing_inside
 
     go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
        (n : ns) thing_inside
-      = rnHsSigWcTypeScoped bind_free_tvs doc bsig $ \ bsig' ->
+      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
         go vars ns $ \ vars' ->
         thing_inside (L l (RuleBndrSig noExtField (L loc n) bsig') : vars')
 
