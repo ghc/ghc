@@ -593,9 +593,8 @@ instance Binary a => Binary (Levitated a) where
       _ -> pprPanic "Binary Levitated: Invalid tag" (int (fromIntegral h))
 
 instance Binary r => Binary (KnownShape r) where
-  -- Note that the ConTag is 1-indexed
-  put_ bh (Con t fs)   = do { put_ bh t; put_ bh fs}
-  get  bh = Con <$> get bh <*> get bh
+  put_ bh (Con t fs) = do { putULEB128 bh t; put_ bh fs }
+  get  bh = Con <$> getULEB128 bh <*> get bh
 
 instance Binary TerminationFlag where
   put_ bh Terminates   = put_ bh True
