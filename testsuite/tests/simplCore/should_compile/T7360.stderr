@@ -164,7 +164,7 @@ T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
 T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId,
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo1
@@ -196,7 +196,7 @@ T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo2
@@ -211,8 +211,8 @@ T7360.$tc'Foo2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
 [GblId,
- Cpr=#c4(#c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *),
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
+ Cpr=#c4(#c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *),
+         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
  Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
@@ -236,8 +236,7 @@ T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
  Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-         #c4(#c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *),
-             #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *))),
+         #c4(#c1(#c1(#, #, #, #, #, #), *), #c1(#c1(#, #, #, #, #, #), *))),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo3
