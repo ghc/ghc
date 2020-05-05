@@ -517,7 +517,7 @@ rnConPatAndThen mk con tyargs = \case
   PrefixCon pats -> do
     con' <- lookupConCps con
     tyargs' <- forM tyargs $ \t ->
-      liftCpsFV (rnHsWcType HsTypeCtx t)
+      liftCpsFV $ rnHsWcTypeBindingVars HsTypeCtx t
     pats' <- rnLPatsAndThen mk pats
     return $ ConPat 
       { pat_con_ext = noExtField

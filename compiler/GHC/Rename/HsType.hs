@@ -12,7 +12,7 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType,
+        rnHsSigType, rnHsWcType, rnHsWcTypeBindingVars,
         HsSigWcTypeScoping(..), rnHsSigWcType, rnHsSigWcTypeScoped,
         newTyVarNameRn,
         rnConDeclFields,
@@ -145,6 +145,25 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+-- Similar to rnHsWcType, but rather than requiring free variables in the type to
+-- already be in scope, we are going to require them not to be in scope,
+-- and we bind them.
+rnHsWcTypeBindingVars :: HsDocContext
+                      -> LHsWcType GhcPs
+                      -> RnM (LHsWcType GhcRn, FreeVars)
+rnHsWcTypeBindingVars ctxt (HsWC { hswc_body = hs_ty }) = do
+  rdr_env <- getLocalRdrEnv
+  let (varsInScope, varsNotInScope) =
+        partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty)
+  when (not (null varsInScope)) $ 
+    addErr . withHsDocContext ctxt $
+      text ("Type variable" ++ ['s' | not (null (drop 1 varsInScope))])
+      <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
+      <+> text "would be inappropriately shadowed."
+  (wcs, hs_ty', fvs) <- rnWcBody ctxt varsNotInScope hs_ty
+  let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
+  return (sig_ty', fvs)
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
