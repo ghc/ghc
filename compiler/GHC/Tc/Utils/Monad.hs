@@ -98,14 +98,14 @@ module GHC.Tc.Utils.Monad(
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
-  emitImplication, emitImplications, emitInsoluble,
+  emitImplication, emitImplications, emitInsoluble, emitHole,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
   pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints,
-  emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
+  emitNamedTypeHole, emitAnonTypeHole,
 
   -- * Template Haskell context
   recordThUse, recordThSpliceUse,
@@ -1569,12 +1569,11 @@ emitInsoluble ct
        ; lie_var <- getConstraintVar
        ; updTcRef lie_var (`addInsols` unitBag ct) }
 
-emitInsolubles :: Cts -> TcM ()
-emitInsolubles cts
-  | isEmptyBag cts = return ()
-  | otherwise      = do { traceTc "emitInsolubles" (ppr cts)
-                        ; lie_var <- getConstraintVar
-                        ; updTcRef lie_var (`addInsols` cts) }
+emitHole :: Hole -> TcM ()
+emitHole hole
+  = do { traceTc "emitHole" (ppr hole)
+       ; lie_var <- getConstraintVar
+       ; updTcRef lie_var (`addHole` hole) }
 
 -- | Throw out any constraints emitted by the thing_inside
 discardConstraints :: TcM a -> TcM a
@@ -1644,34 +1643,28 @@ traceTcConstraints msg
          hang (text (msg ++ ": LIE:")) 2 (ppr lie)
        }
 
-emitAnonWildCardHoleConstraint :: TcTyVar -> TcM ()
-emitAnonWildCardHoleConstraint tv
-  = do { ct_loc <- getCtLocM HoleOrigin Nothing
-       ; emitInsolubles $ unitBag $
-         CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
-                                      , ctev_loc  = ct_loc }
-                  , cc_occ = mkTyVarOcc "_"
-                  , cc_hole = TypeHole } }
-
-emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
-emitNamedWildCardHoleConstraints wcs
-  = do { ct_loc <- getCtLocM HoleOrigin Nothing
-       ; emitInsolubles $ listToBag $
-         map (do_one ct_loc) wcs }
+emitAnonTypeHole :: TcTyVar -> TcM ()
+emitAnonTypeHole tv
+  = do { ct_loc <- getCtLocM (TypeHoleOrigin occ) Nothing
+       ; let hole = Hole { hole_sort = TypeHole
+                         , hole_occ  = occ
+                         , hole_ty   = mkTyVarTy tv
+                         , hole_loc  = ct_loc }
+       ; emitHole hole }
   where
-    do_one :: CtLoc -> (Name, TcTyVar) -> Ct
-    do_one ct_loc (name, tv)
-       = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
-                                      , ctev_loc  = ct_loc' }
-                  , cc_occ = occName name
-                  , cc_hole = TypeHole }
-       where
-         real_span = case nameSrcSpan name of
-                           RealSrcSpan span _ -> span
-                           UnhelpfulSpan str -> pprPanic "emitNamedWildCardHoleConstraints"
-                                                      (ppr name <+> quotes (ftext str))
-               -- Wildcards are defined locally, and so have RealSrcSpans
-         ct_loc' = setCtLocSpan ct_loc real_span
+    occ = mkTyVarOcc "_"
+
+emitNamedTypeHole :: (Name, TcTyVar) -> TcM ()
+emitNamedTypeHole (name, tv)
+  = do { ct_loc <- setSrcSpan (nameSrcSpan name) $
+                   getCtLocM (TypeHoleOrigin occ) Nothing
+       ; let hole = Hole { hole_sort = TypeHole
+                         , hole_occ  = occ
+                         , hole_ty   = mkTyVarTy tv
+                         , hole_loc  = ct_loc }
+       ; emitHole hole }
+  where
+    occ       = nameOccName name
 
 {- Note [Constraints and errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
