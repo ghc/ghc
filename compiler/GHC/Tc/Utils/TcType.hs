@@ -31,7 +31,7 @@ module GHC.Tc.Utils.TcType (
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, sameDepthAs,
-  tcTypeLevel, tcTyVarLevel, maxTcLevel,
+  tcTypeLevel, tcTyVarLevel, tcTyVarThLevel, maxTcLevel,
   promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
   -- MetaDetails
@@ -42,7 +42,7 @@ module GHC.Tc.Utils.TcType (
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
   isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
-  metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
+  metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe, metaTyVarThLevel,
   isTouchableMetaTyVar,
   isFloatedTouchableMetaTyVar,
   findDupTyVarTvs, mkTyVarNamePairs,
@@ -367,6 +367,7 @@ data InferResult
   = IR { ir_uniq :: Unique  -- For debugging only
 
        , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in GHC.Tc.Utils.TcMType
+       , ir_th_lvl :: Int
 
        , ir_inst :: Bool
          -- True <=> deeply instantiate before returning
@@ -504,6 +505,7 @@ data TcTyVarDetails
        TcLevel    -- Level of the implication that binds it
                   -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
                   --     how this level number is used
+       Int    -- The TH level it is bound at
        Bool       -- True <=> this skolem type variable can be overlapped
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
@@ -513,12 +515,13 @@ data TcTyVarDetails
 
   | MetaTv { mtv_info  :: MetaInfo
            , mtv_ref   :: IORef MetaDetails
-           , mtv_tclvl :: TcLevel }  -- See Note [TcLevel and untouchable type variables]
+           , mtv_tclvl :: TcLevel
+           , mtv_thlvl :: Int }  -- See Note [TcLevel and untouchable type variables]
 
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
 -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
-vanillaSkolemTv = SkolemTv topTcLevel False  -- Might be instantiated
-superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely distinct type
+vanillaSkolemTv = SkolemTv topTcLevel 1 False  -- Might be instantiated
+superSkolemTv   = SkolemTv topTcLevel 1 True   -- Treat this as a completely distinct type
                   -- The choice of level number here is a bit dodgy, but
                   -- topTcLevel works in the places that vanillaSkolemTv is used
 
@@ -528,8 +531,8 @@ instance Outputable TcTyVarDetails where
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
 pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv lvl th_level True)  = text "ssk" <> colon <> ppr lvl <> colon <> ppr th_level
+pprTcTyVarDetails (SkolemTv lvl th_level False) = text "sk"  <> colon <> ppr lvl <> colon <> ppr th_level
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = ppr info <> colon <> ppr tclvl
 
@@ -695,9 +698,15 @@ tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
   = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
-          SkolemTv tv_lvl _             -> tv_lvl
+          SkolemTv tv_lvl _ _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
 
+tcTyVarThLevel :: TcTyVar -> Int
+tcTyVarThLevel tv
+  = case tcTyVarDetails tv of
+          MetaTv { mtv_thlvl = th_lvl } -> th_lvl
+          SkolemTv _ th_level _         -> th_level
+          RuntimeUnk                    -> 1
 
 tcTypeLevel :: TcType -> TcLevel
 -- Max level of any free var of the type
@@ -715,7 +724,7 @@ promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar
 promoteSkolem tclvl skol
   | tclvl < tcTyVarLevel skol
   = ASSERT( isTcTyVar skol && isSkolemTyVar skol )
-    setTcTyVarDetails skol (SkolemTv tclvl (isOverlappableTyVar skol))
+    setTcTyVarDetails skol (SkolemTv tclvl (tcTyVarThLevel skol) (isOverlappableTyVar skol))
 
   | otherwise
   = skol
@@ -729,7 +738,7 @@ promoteSkolemX tclvl subst skol
     new_skol
       | tclvl < tcTyVarLevel skol
       = setTcTyVarDetails (updateTyVarKind (substTy subst) skol)
-                          (SkolemTv tclvl (isOverlappableTyVar skol))
+                          (SkolemTv tclvl (tcTyVarThLevel skol) (isOverlappableTyVar skol))
       | otherwise
       = updateTyVarKind (substTy subst) skol
     new_subst = extendTvSubstWithClone subst skol new_skol
@@ -1017,7 +1026,7 @@ isSkolemTyVar tv
 isOverlappableTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
-        SkolemTv _ overlappable -> overlappable
+        SkolemTv _ _ overlappable -> overlappable
         _                       -> False
   | otherwise = False
 
@@ -1061,6 +1070,12 @@ metaTyVarTcLevel tv
   = case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tclvl } -> tclvl
       _ -> pprPanic "metaTyVarTcLevel" (ppr tv)
+
+metaTyVarThLevel :: TcTyVar -> Int
+metaTyVarThLevel tv
+  = case tcTyVarDetails tv of
+      MetaTv { mtv_thlvl = thlvl } -> thlvl
+      _ -> pprPanic "metaTyVarThLevel" (ppr tv)
 
 metaTyVarTcLevel_maybe :: TcTyVar -> Maybe TcLevel
 metaTyVarTcLevel_maybe tv

@@ -196,10 +196,11 @@ tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
        ; let brack' = TExpBr e (mkHsDictLet ev_binds tc_expr)
        ; meta_ty <- tcTExpTy expr_ty
        ; pprTraceM "tcTypedBracket" (ppr expr_ty)
-       ; let fvs = tyCoVarsOfTypeList expr_ty
-       ; ts <- forM fvs $ \tv ->  do
+       ; let fvs = tyCoVarsOfTypeDSet expr_ty
+       ; ts <- foldDVarSet (\tv res ->  do
                 v <- emitTypeable (mkTyVarTy tv)
-                return (PendingZonkSplice2 tv v)
+                vs <- res
+                return (PendingZonkSplice2 tv v : vs)) (return []) fvs
        ; pprTraceM "tcTypedBracket" (ppr fvs)
        ; pprTraceM "tcTypedBracket" (ppr meta_ty)
        ; ps' <- readMutVar ps_ref

@@ -115,7 +115,7 @@ getNewPred :: NewTheta -> TcPredType
 getNewPred (AtLevel _n pt) = pt
 
 getNewLeveledPred :: ThLevel -> NewTheta -> (ThLevel, TcPredType, FromCodeC)
-getNewLeveledPred n (AtLevel f pt) = 
+getNewLeveledPred n (AtLevel f pt) =
   case f of
     UseQuoteDest -> (n + 1, pt, f)
     UseEvVar -> (n, pt, f)
@@ -660,7 +660,9 @@ matchLiftTy :: HasCallStack => ThBindEnv -> ThLevel -> [Type] -> TcM ClsInstResu
 matchLiftTy bind_env n args@[_k, t2]
     | Just t <- getTyVar_maybe t2
     -- Not in the env must mean it's top-level
-    , let lvl = maybe (pprTrace "lookup failed" (ppr t $$ ppr bind_env) 1) snd (lookupNameEnv bind_env (idName t))
+   -- , let lvl = maybe (pprTrace "lookup failed" (ppr t $$ ppr bind_env) 1) snd (lookupNameEnv bind_env (idName t))
+    , not (isMetaTyVar t)
+    , let lvl = tcTyVarThLevel t
     , pprTrace "matchLiftTy" (ppr t $$ ppr lvl $$ ppr n) True
     , lvl <= n = return NoInstance
     | otherwise =  do

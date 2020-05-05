@@ -470,9 +470,10 @@ newInferExpType :: Bool -> TcM ExpType
 newInferExpType inst
   = do { u <- newUnique
        ; tclvl <- getTcLevel
+       ; th_lvl <- thLevel <$> getStage
        ; traceTc "newOpenInferExpType" (ppr u <+> ppr inst <+> ppr tclvl)
        ; ref <- newMutVar Nothing
-       ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl
+       ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl, ir_th_lvl = th_lvl
                            , ir_ref = ref, ir_inst = inst })) }
 
 -- | Extract a type out of an ExpType, if one exists. But one should always
@@ -514,10 +515,10 @@ expTypeToType (Check ty)      = return ty
 expTypeToType (Infer inf_res) = inferResultToType inf_res
 
 inferResultToType :: InferResult -> TcM Type
-inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
+inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl, ir_th_lvl = th_lvl
                       , ir_ref = ref })
-  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
-       ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
+  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl th_lvl runtimeRepTy
+       ; tau <- newMetaTyVarTyAtLevel tc_lvl th_lvl (tYPE rr)
              -- See Note [TcLevel of ExpType]
        ; writeMutVar ref (Just tau)
        ; traceTc "Forcing ExpType to be monomorphic:"
@@ -595,16 +596,17 @@ tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
 -- See Note [Skolemising type variables]
 tcInstSkolTyVarsPushLevel overlappable subst tvs
   = do { tc_lvl <- getTcLevel
+       ; th_level <- thLevel <$> getStage
        ; let pushed_lvl = pushTcLevel tc_lvl
-       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
+       ; tcInstSkolTyVarsAt pushed_lvl th_level overlappable subst tvs }
 
-tcInstSkolTyVarsAt :: TcLevel -> Bool
+tcInstSkolTyVarsAt :: TcLevel -> ThLevel -> Bool
                    -> TCvSubst -> [TyVar]
                    -> TcM (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsAt lvl overlappable subst tvs
+tcInstSkolTyVarsAt lvl th_level overlappable subst tvs
   = freshenTyCoVarsX new_skol_tv subst tvs
   where
-    details = SkolemTv lvl overlappable
+    details = SkolemTv lvl th_level overlappable
     new_skol_tv name kind = mkTcTyVar name kind details
 
 ------------------
@@ -757,7 +759,8 @@ newNamedAnonMetaTyVar tyvar_name meta_info kind
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
 newSkolemTyVar name kind
   = do { lvl <- getTcLevel
-       ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+       ; th_level <- thLevel <$> getStage
+       ; return (mkTcTyVar name kind (SkolemTv lvl th_level False)) }
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
@@ -822,9 +825,11 @@ newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
   = do { ref <- newMutVar Flexi
        ; tclvl <- getTcLevel
+       ; st <- thLevel <$> getStage
        ; return (MetaTv { mtv_info = info
                         , mtv_ref = ref
-                        , mtv_tclvl = tclvl }) }
+                        , mtv_tclvl = tclvl
+                        , mtv_thlvl = st }) }
 
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
@@ -1073,13 +1078,14 @@ new_meta_tv_x info subst tv
       -- the in-scope set is right; e.g. #12785 trips
       -- if we use substTy here
 
-newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
-newMetaTyVarTyAtLevel tc_lvl kind
+newMetaTyVarTyAtLevel :: TcLevel -> ThLevel -> TcKind -> TcM TcType
+newMetaTyVarTyAtLevel tc_lvl th_lvl kind
   = do  { ref  <- newMutVar Flexi
         ; name <- newMetaTyVarName (fsLit "p")
         ; let details = MetaTv { mtv_info  = TauTv
                                , mtv_ref   = ref
-                               , mtv_tclvl = tc_lvl }
+                               , mtv_tclvl = tc_lvl
+                               , mtv_thlvl = th_lvl }
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
 {- *********************************************************************
@@ -1797,7 +1803,7 @@ skolemiseUnboundMetaTyVar tv
         ; return final_tv }
 
   where
-    details = SkolemTv (metaTyVarTcLevel tv) False
+    details = SkolemTv (metaTyVarTcLevel tv) (metaTyVarThLevel tv) False
     check_empty tv       -- [Sept 04] Check for non-empty.
       = when debugIsOn $  -- See note [Silly Type Synonym]
         do { cts <- readMetaTyVar tv

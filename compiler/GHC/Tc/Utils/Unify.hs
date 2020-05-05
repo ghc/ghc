@@ -151,11 +151,11 @@ matchExpectedFunTys :: forall a.
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
 matchExpectedFunTys herald arity orig_ty thing_inside
   = case orig_ty of
-      Check ty -> go [] arity ty
+      Check ty -> pprTrace "matchExpectedFunTys" (ppr ty) (go [] arity ty)
       _        -> defer [] arity orig_ty
   where
     go acc_arg_tys 0 ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
+      = do { result <- thing_inside (pprTraceIt "args" $ reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
 
     go acc_arg_tys n ty
@@ -901,9 +901,9 @@ fillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
 fill_infer_result :: TcType -> InferResult -> TcM TcCoercionN
 -- If wrap = fill_infer_result t1 t2
 --    => wrap :: t1 ~> t2
-fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
+fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl, ir_th_lvl = th_lvl
                             , ir_ref = ref })
-  = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl orig_ty
+  = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl th_lvl orig_ty
 
        ; traceTc "Filling ExpType" $
          ppr u <+> text ":=" <+> ppr ty_to_fill_with
@@ -998,7 +998,7 @@ see in (2) is annoying. This was done in #17173.
 *                                                                      *
 ********************************************************************* -}
 
-promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
+promoteTcType :: TcLevel -> ThLevel -> TcType -> TcM (TcCoercion, TcType)
 -- See Note [Promoting a type]
 -- promoteTcType level ty = (co, ty')
 --   * Returns ty'  whose max level is just 'level'
@@ -1006,7 +1006,7 @@ promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
 --             and  whose kind has form TYPE rr
 --   * and co :: ty ~ ty'
 --   * and emits constraints to justify the coercion
-promoteTcType dest_lvl ty
+promoteTcType dest_lvl th_level ty
   = do { cur_lvl <- getTcLevel
        ; if (cur_lvl `sameDepthAs` dest_lvl)
          then dont_promote_it
@@ -1015,8 +1015,8 @@ promoteTcType dest_lvl ty
     promote_it :: TcM (TcCoercion, TcType)
     promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
                 -- where alpha and rr are fresh and from level dest_lvl
-      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
-           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl th_level runtimeRepTy
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl th_level (tYPE rr)
            ; let eq_orig = TypeEqOrigin { uo_actual   = ty
                                         , uo_expected = prom_ty
                                         , uo_thing    = Nothing
@@ -1131,9 +1131,10 @@ tcSkolemise ctxt expected_ty thing_inside
         ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
 
         ; lvl <- getTcLevel
-        ; when debugIsOn $
-              traceTc "tcSkolemise" $ vcat [
+        ; th_lvl <- getStage
+        ; pprTraceM "tcSkolemise" $ vcat [
                 ppr lvl,
+                ppr th_lvl,
                 text "expected_ty" <+> ppr expected_ty,
                 text "inst tyvars" <+> ppr tv_prs,
                 text "given"       <+> ppr given,

@@ -80,9 +80,12 @@ tcLetPat :: (Name -> Maybe TcId)
          -> TcM (LPat GhcTcId, a)
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = do { bind_lvl <- getTcLevel
+       ; th_lvl <- thLevel <$> getStage
        ; let ctxt = LetPat { pc_lvl    = bind_lvl
+                           , pc_th_lvl = th_lvl
                            , pc_sig_fn = sig_fn
-                           , pc_new    = no_gen }
+                           , pc_new    = no_gen
+                           }
              penv = PE { pe_lazy = True
                        , pe_ctxt = ctxt
                        , pe_orig = PatOrigin }
@@ -152,6 +155,7 @@ data PatCtxt
              -- See Note [Typing patterns in pattern bindings]
        { pc_lvl    :: TcLevel
                    -- Level of the binding group
+       , pc_th_lvl    :: Int
 
        , pc_sig_fn :: Name -> Maybe TcId
                    -- Tells the expected type
@@ -192,6 +196,7 @@ tcPatBndr :: PatEnv -> Name -> ExpSigmaType -> TcM (HsWrapper, TcId)
 -- Then coi : pat_ty ~ typeof(xp)
 --
 tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
+                                      , pc_th_lvl = th_lvl
                                       , pc_sig_fn = sig_fn
                                       , pc_new    = no_gen } })
           bndr_name exp_pat_ty
@@ -206,7 +211,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
 
   | otherwise                          -- No signature
   = do { (co, bndr_ty) <- case exp_pat_ty of
-             Check pat_ty    -> promoteTcType bind_lvl pat_ty
+             Check pat_ty    -> promoteTcType bind_lvl th_lvl pat_ty
              Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
                                 -- If we were under a constructor that bumped
                                 -- the level, we'd be in checking mode

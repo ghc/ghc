@@ -3479,7 +3479,7 @@ setWantedEvTerm (HoleDest hole) tm
 setWantedEvTerm (QuoteDest hole) (EvExpr tm)
   = fillExprHole hole tm
 setWantedEvTerm (EvVarDest _cs n ev_id) tm
-  = --pprTrace "setting" (text $ prettyCallStack cs)
+  = pprTrace "setting" (ppr n $$ ppr ev_id $$ ppr tm)
       (setEvBind (mkWantedEvBind ev_id n tm))
 
 {- Note [Yukky eq_sel for a HoleDest]
