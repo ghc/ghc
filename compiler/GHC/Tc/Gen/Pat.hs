@@ -690,7 +690,7 @@ because they won't be in scope when we do the desugaring
 -}
 
 tcPatSig :: Bool                    -- True <=> pattern binding
-         -> LHsSigWcType GhcRn
+         -> HsPatSigType GhcRn
          -> ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
                  [(Name,TcTyVar)],  -- The new bit of type environment, binding

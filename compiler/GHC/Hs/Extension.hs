@@ -685,6 +685,11 @@ type family XXHsWildCardBndrs  x b
 
 -- -------------------------------------
 
+type family XHsPS x
+type family XXHsPatSigType x
+
+-- -------------------------------------
+
 type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x

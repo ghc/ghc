@@ -2244,7 +2244,7 @@ type LRuleBndr pass = Located (RuleBndr pass)
 -- | Rule Binder
 data RuleBndr pass
   = RuleBndr (XCRuleBndr pass)  (Located (IdP pass))
-  | RuleBndrSig (XRuleBndrSig pass) (Located (IdP pass)) (LHsSigWcType pass)
+  | RuleBndrSig (XRuleBndrSig pass) (Located (IdP pass)) (HsPatSigType pass)
   | XRuleBndr !(XXRuleBndr pass)
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -2256,7 +2256,7 @@ type instance XCRuleBndr    (GhcPass _) = NoExtField
 type instance XRuleBndrSig  (GhcPass _) = NoExtField
 type instance XXRuleBndr    (GhcPass _) = NoExtCon
 
-collectRuleBndrSigTys :: [RuleBndr pass] -> [LHsSigWcType pass]
+collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
 
 pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
