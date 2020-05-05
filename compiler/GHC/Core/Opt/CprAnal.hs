@@ -21,7 +21,6 @@ import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
-import Data.List
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -33,6 +32,9 @@ import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Data.Maybe   ( isJust, isNothing )
+
+import Control.Monad ( guard )
+import Data.List
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -231,9 +233,14 @@ cprTransform env id
     sig
   where
     sig
-      | isGlobalId id                   -- imported function or data con worker
+      -- See Note [CPR for expandable unfoldings]
+      | Just rhs <- cprExpandUnfolding_maybe id
+      = fst $ cprAnal env rhs
+      -- Imported function or data con worker
+      | isGlobalId id
       = getCprSig (idCprInfo id)
-      | Just sig <- lookupSigEnv env id -- local let-bound
+      -- Local let-bound
+      | Just sig <- lookupSigEnv env id
       = getCprSig sig
       | otherwise
       = topCprType
@@ -303,6 +310,8 @@ cprAnalBind top_lvl env id rhs
       | stays_thunk = trimCprTy rhs_ty
       -- See Note [CPR for sum types]
       | returns_sum = trimCprTy rhs_ty
+      -- See Note [CPR for expandable unfoldings]
+      | will_expand = topCprType
       | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig             = mkCprSigForArity (idArity id) rhs_ty'
@@ -316,6 +325,15 @@ cprAnalBind top_lvl env id rhs
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
     returns_sum = not (isTopLevel top_lvl) && not_a_prod
+    -- See Note [CPR for expandable unfoldings]
+    will_expand = isJust (cprExpandUnfolding_maybe id)
+
+cprExpandUnfolding_maybe :: Id -> Maybe CoreExpr
+cprExpandUnfolding_maybe id = do
+  guard (idArity id == 0)
+  -- There are only phase 0 Simplifier runs after CPR analysis
+  guard (isActiveIn 0 (idInlineActivation id))
+  expandUnfolding_maybe (idUnfolding id)
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -625,6 +643,48 @@ But what about botCpr? Consider
 fac won't have the CPR property here when we trim every thunk! But the
 assumption is that error cases are rarely entered and we are diverging anyway,
 so WW doesn't hurt.
+
+Should we also trim CPR on DataCon application bindings?
+See Note [CPR for expandable unfoldings]!
+
+Note [CPR for expandable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Long static data structures (whether top-level or not) like
+
+  xs = x1 : xs1
+  xs1 = x2 : xs2
+  xs2 = x3 : xs3
+
+should not get CPR signatures, because they
+
+  * Never get WW'd, so their CPR signature should be irrelevant after analysis
+    (in fact the signature might even be harmful for that reason)
+  * Would need to be inlined/expanded to see their constructed product
+  * Recording CPR on them blows up interface file sizes and is redundant with
+    their unfolding. In case of Nested CPR, this blow-up can be quadratic!
+
+But we can't just stop giving DataCon application bindings the CPR property,
+for example
+
+  fac 0 = 1
+  fac n = n * fac (n-1)
+
+fac certainly has the CPR property and should be WW'd! But FloatOut will
+transform the first clause to
+
+  lvl = 1
+  fac 0 = lvl
+
+If lvl doesn't have the CPR property, fac won't either. But lvl doesn't have a
+CPR signature to extrapolate into a CPR transformer ('cprTransform'). So
+instead we keep on cprAnal'ing through *expandable* unfoldings for these arity
+0 bindings via 'cprExpandUnfolding_maybe'.
+
+In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
+for each data declaration. It's wasteful to attach CPR signatures to each of
+them (and intractable in case of Nested CPR).
+
+Tracked by #18154.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~

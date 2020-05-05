@@ -10,11 +10,11 @@ T17932.flags: <S(SS),1*U(1*U,1*U)>
 
 
 ==================== Cpr signatures ====================
-T17932.$tc'Options: m1
-T17932.$tc'X: m1
-T17932.$tcOptions: m1
-T17932.$tcX: m1
-T17932.$trModule: m1
+T17932.$tc'Options:
+T17932.$tc'X:
+T17932.$tcOptions:
+T17932.$tcX:
+T17932.$trModule:
 T17932.flags:
 
 
