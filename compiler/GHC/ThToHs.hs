@@ -830,7 +830,7 @@ cvtRuleBndr (RuleVar n)
 cvtRuleBndr (TypedRuleVar n ty)
   = do { n'  <- vNameL n
        ; ty' <- cvtType ty
-       ; return $ noLoc $ Hs.RuleBndrSig noExtField n' $ mkLHsSigWcType ty' }
+       ; return $ noLoc $ Hs.RuleBndrSig noExtField n' $ mkHsPatSigType ty' }
 
 ---------------------------------------------------
 --              Declarations
@@ -1307,7 +1307,7 @@ cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return
                                    $ ListPat noExtField ps'}
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPat noExtField p' (mkLHsSigWcType t') }
+                            ; return $ SigPat noExtField p' (mkHsPatSigType t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noExtField e' p'}
 

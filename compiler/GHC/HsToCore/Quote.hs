@@ -821,7 +821,7 @@ repRuleD (L loc (HsRule { rd_name = n
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
 ruleBndrNames (L _ (RuleBndr _ n))      = [unLoc n]
 ruleBndrNames (L _ (RuleBndrSig _ n sig))
-  | HsWC { hswc_body = HsIB { hsib_ext = vars }} <- sig
+  | HsPS { hsps_ext = HsPSRn { hsps_imp_tvs = vars }} <- sig
   = unLoc n : vars
 
 repRuleBndr :: LRuleBndr GhcRn -> MetaM (Core (M TH.RuleBndr))
@@ -830,7 +830,7 @@ repRuleBndr (L _ (RuleBndr _ n))
        ; rep2 ruleVarName [n'] }
 repRuleBndr (L _ (RuleBndrSig _ n sig))
   = do { MkC n'  <- lookupLBinder n
-       ; MkC ty' <- repLTy (hsSigWcType sig)
+       ; MkC ty' <- repLTy (hsPatSigType sig)
        ; rep2 typedRuleVarName [n', ty'] }
 
 repAnnD :: LAnnDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
@@ -1935,7 +1935,7 @@ repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
 repP p@(NPat _ _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
 repP (SigPat _ p t) = do { p' <- repLP p
-                         ; t' <- repLTy (hsSigWcType t)
+                         ; t' <- repLTy (hsPatSigType t)
                          ; repPsig p' t' }
 repP (SplicePat _ splice) = repSplice splice
 repP other = notHandled "Exotic pattern" (ppr other)

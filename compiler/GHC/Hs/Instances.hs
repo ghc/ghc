@@ -386,6 +386,11 @@ deriving instance (Data thing) => Data (HsWildCardBndrs GhcPs thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcRn thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcTc thing)
 
+-- deriving instance (DataIdLR p p) => Data (HsPatSigType p)
+deriving instance Data (HsPatSigType GhcPs)
+deriving instance Data (HsPatSigType GhcRn)
+deriving instance Data (HsPatSigType GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
 deriving instance Data (HsTyVarBndr GhcPs)
 deriving instance Data (HsTyVarBndr GhcRn)
