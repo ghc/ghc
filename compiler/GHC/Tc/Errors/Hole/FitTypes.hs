@@ -19,15 +19,17 @@ import GHC.Types.Id
 import GHC.Utils.Outputable
 import GHC.Types.Name
 
+import GHC.Data.Bag
+
 import Data.Function ( on )
 
-data TypedHole = TypedHole { th_relevant_cts :: Cts
+data TypedHole = TypedHole { th_relevant_cts :: Bag CtEvidence
                            -- ^ Any relevant Cts to the hole
                            , th_implics :: [Implication]
                            -- ^ The nested implications of the hole with the
                            --   innermost implication first.
                            , th_hole :: Maybe Hole
-                           -- ^ The hole itself, if available. Only for debugging.
+                           -- ^ The hole itself, if available.
                            }
 
 instance Outputable TypedHole where

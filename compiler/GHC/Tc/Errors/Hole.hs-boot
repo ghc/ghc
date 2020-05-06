@@ -6,7 +6,7 @@ module GHC.Tc.Errors.Hole where
 
 import GHC.Types.Var ( Id )
 import GHC.Tc.Types  ( TcM )
-import GHC.Tc.Types.Constraint ( Ct, CtLoc, Hole, Implication )
+import GHC.Tc.Types.Constraint ( CtLoc, Hole, Implication )
 import GHC.Utils.Outputable ( SDoc )
 import GHC.Types.Var.Env ( TidyEnv )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFit, TypedHole, HoleFitCandidate )
@@ -17,7 +17,7 @@ import Data.Bool ( Bool )
 import Data.Maybe ( Maybe )
 import Data.Int ( Int )
 
-findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Hole
+findValidHoleFits :: TidyEnv -> [Implication] -> [CtEvidence] -> Hole
                   -> TcM (TidyEnv, SDoc)
 
 tcCheckHoleFit :: TypedHole -> TcSigmaType -> TcSigmaType
@@ -37,7 +37,6 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 getHoleFitSortingAlg :: TcM HoleFitSortingAlg
 getHoleFitDispConfig :: TcM HoleFitDispConfig
 
-relevantCts :: Type -> [Ct] -> [Ct]
 zonkSubs :: TidyEnv -> [HoleFit] -> TcM (TidyEnv, [HoleFit])
 sortHoleFitsBySize :: [HoleFit] -> TcM [HoleFit]
 sortHoleFitsByGraph :: [HoleFit] -> TcM [HoleFit]

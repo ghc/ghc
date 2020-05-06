@@ -11,13 +11,20 @@ T15648.hs:23:21: error:
         legitToJank :: LegitEquality a b -> JankyEquality a b
           (bound at T15648.hs:23:1)
 
-T15648.hs:30:10: error:
-    • Couldn't match expected type: (a GHC.Prim.~# b)
-                                    -> b GHC.Prim.~# a
-                  with actual type: b GHC.Prim.~# a
-    • In the expression: unJank $ legitToJank $ mkLegit @b @a
-      In an equation for ‘ueqSym’:
-          ueqSym = unJank $ legitToJank $ mkLegit @b @a
+T15648.hs:30:33: error:
+    • Couldn't match expected type ‘a’ with actual type ‘b’
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          ueqSym :: forall a b. (a GHC.Prim.~# b) -> b GHC.Prim.~# a
+        at T15648.hs:(28,1)-(29,32)
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          ueqSym :: forall a b. (a GHC.Prim.~# b) -> b GHC.Prim.~# a
+        at T15648.hs:(28,1)-(29,32)
+    • In the second argument of ‘($)’, namely ‘mkLegit @b @a’
+      In the second argument of ‘($)’, namely
+        ‘legitToJank $ mkLegit @b @a’
+      In the expression: unJank $ legitToJank $ mkLegit @b @a
     • Relevant bindings include
         ueqSym :: (a GHC.Prim.~# b) -> b GHC.Prim.~# a
           (bound at T15648.hs:30:1)

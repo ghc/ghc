@@ -4,7 +4,7 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyDerived,
+     unifyWanted,
      makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
@@ -53,6 +53,7 @@ import Data.Maybe ( isJust, isNothing )
 import Data.List  ( zip4 )
 import GHC.Types.Basic
 
+import qualified Data.Semigroup as S
 import Data.Bifunctor ( bimap )
 import Data.Foldable ( traverse_ )
 
@@ -151,7 +152,7 @@ canClassNC ev cls tys
        ; emitWork sc_cts
        ; canClass ev cls tys False fds }
 
-  | isWanted ev
+  | CtWanted { ctev_rewriters = rewriters } <- ev
   , Just ip_name <- isCallStackPred cls tys
   , OccurrenceOf func <- ctLocOrigin loc
   -- If we're given a CallStack constraint that arose from a function
@@ -165,8 +166,9 @@ canClassNC ev cls tys
                             -- We change the origin to IPOccOrigin so
                             -- this rule does not fire again.
                             -- See Note [Overview of implicit CallStacks]
+                            -- in GHC.Tc.Types.Evidence
 
-       ; new_ev <- newWantedEvVarNC new_loc pred
+       ; new_ev <- newWantedEvVarNC new_loc rewriters pred
 
          -- Then we solve the wanted by pushing the call-site
          -- onto the newly emitted CallStack
@@ -207,7 +209,7 @@ canClass :: CtEvidence
 canClass ev cls tys pend_sc fds
   =   -- all classes do *nominal* matching
     assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
-    do { (xis, cos) <- rewriteArgsNom ev cls_tc tys
+    do { (xis, cos, rewriters) <- rewriteArgsNom ev cls_tc tys
        ; let co = mkTcTyConAppCo Nominal cls_tc cos
              xi = mkClassPred cls xis
              mk_ct new_ev = CDictCan { cc_ev = new_ev
@@ -215,7 +217,7 @@ canClass ev cls tys pend_sc fds
                                      , cc_class = cls
                                      , cc_pend_sc = pend_sc
                                      , cc_fundeps = fds }
-       ; mb <- rewriteEvidence ev xi co
+       ; mb <- rewriteEvidence rewriters ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev
                                    , ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
@@ -597,10 +599,10 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
   = assertPpr (null tvs && null theta) (ppr tvs $$ ppr theta) $
     concatMapM do_one_derived (immSuperClasses cls tys)
   where
-    loc = ctEvLoc ev
+    loc = ctEvLoc ev `updateCtLocOrigin` WantedSuperclassOrigin (ctEvPred ev)
 
     do_one_derived sc_pred
-      = do { sc_ev <- newDerivedNC loc sc_pred
+      = do { sc_ev <- newDerivedNC loc (ctEvRewriters ev) sc_pred
            ; mk_superclasses rec_clss sc_ev [] [] sc_pred }
 
 {- Note [Improvement from Ground Wanteds]
@@ -707,8 +709,8 @@ canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 canIrred ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+       ; (xi,co,rewriters) <- rewrite ev pred -- co :: xi ~ pred
+       ; rewriteEvidence rewriters ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Re-classify, in case rewriting has improved its shape
          -- Code is like the canNC, except
@@ -822,8 +824,8 @@ canForAll :: CtEvidence -> Bool -> TcS (StopOrContinue Ct)
 canForAll ev pend_sc
   = do { -- First rewrite it to apply the current substitution
          let pred = ctEvPred ev
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+       ; (xi,co,rewriters) <- rewrite ev pred -- co :: xi ~ pred
+       ; rewriteEvidence rewriters ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Now decompose into its pieces and solve it
          -- (It takes a lot less code to rewrite before decomposing.)
@@ -836,7 +838,7 @@ canForAll ev pend_sc
 solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> Bool
             -> TcS (StopOrContinue Ct)
 solveForAll ev tvs theta pred pend_sc
-  | CtWanted { ctev_dest = dest } <- ev
+  | CtWanted { ctev_dest = dest, ctev_rewriters = rewriters } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
     do { let skol_info = QuantCtxtSkol
              empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
@@ -846,7 +848,7 @@ solveForAll ev tvs theta pred pend_sc
 
        ; (lvl, (w_id, wanteds))
              <- pushLevelNoWorkList (ppr skol_info) $
-                do { wanted_ev <- newWantedEvVarNC loc $
+                do { wanted_ev <- newWantedEvVarNC loc rewriters $
                                   substTy subst pred
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
@@ -1056,9 +1058,9 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 
 -- No similarity in type structure detected. Rewrite and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = do { (xi1, co1) <- rewrite ev ps_ty1
-       ; (xi2, co2) <- rewrite ev ps_ty2
-       ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
+  = do { (xi1, co1, rewriters1) <- rewrite ev ps_ty1
+       ; (xi2, co2, rewriters2) <- rewrite ev ps_ty2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped xi1 xi2 co1 co2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 ----------------------------
@@ -1176,7 +1178,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 --  so we must proceed one binder at a time (#13879)
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
+ | CtWanted { ctev_loc = loc, ctev_dest = orig_dest, ctev_rewriters = rewriters } <- ev
  = do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
             (bndrs1, phi1) = tcSplitForAllTyVarBinders s1
             (bndrs2, phi2) = tcSplitForAllTyVarBinders s2
@@ -1200,7 +1202,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                -> TcS (TcCoercion, Cts)
             go (skol_tv:skol_tvs) subst (bndr2:bndrs2)
               = do { let tv2 = binderVar bndr2
-                   ; (kind_co, wanteds1) <- unify loc Nominal (tyVarKind skol_tv)
+                   ; (kind_co, wanteds1) <- unify loc rewriters Nominal (tyVarKind skol_tv)
                                                   (substTy subst (tyVarKind tv2))
                    ; let subst' = extendTvSubstAndInScope subst tv2
                                        (mkCastTy (mkTyVarTy skol_tv) kind_co)
@@ -1212,8 +1214,8 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             -- Done: unify phi1 ~ phi2
             go [] subst bndrs2
-              = assert (null bndrs2 )
-                unify loc (eqRelRole eq_rel) phi1' (substTyUnchecked subst phi2)
+              = assert (null bndrs2) $
+                unify loc rewriters (eqRelRole eq_rel) phi1' (substTyUnchecked subst phi2)
 
             go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
 
@@ -1232,14 +1234,14 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; stopWith ev "Discard given polytype equality" }
 
  where
-    unify :: CtLoc -> Role -> TcType -> TcType -> TcS (TcCoercion, Cts)
+    unify :: CtLoc -> RewriterSet -> Role -> TcType -> TcType -> TcS (TcCoercion, Cts)
     -- This version returns the wanted constraint rather
     -- than putting it in the work list
-    unify loc role ty1 ty2
+    unify loc rewriters role ty1 ty2
       | ty1 `tcEqType` ty2
       = return (mkTcReflCo role ty1, emptyBag)
       | otherwise
-      = do { (wanted, co) <- newWantedEq loc role ty1 ty2
+      = do { (wanted, co) <- newWantedEq loc rewriters role ty1 ty2
            ; return (co, unitBag (mkNonCanonical wanted)) }
 
 ---------------------------------
@@ -1475,7 +1477,7 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
          -- module, don't warn about it being unused.
          -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.
 
-       ; new_ev <- rewriteEqEvidence ev swapped ty1' ps_ty2
+       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped ty1' ps_ty2
                                      (mkTcSymCo co) (mkTcReflCo Representational ps_ty2)
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
   where
@@ -1498,12 +1500,12 @@ can_eq_app ev s1 t1 s2 t2
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }
 
-  | CtWanted { ctev_dest = dest } <- ev
-  = do { co_s <- unifyWanted loc Nominal s1 s2
+  | CtWanted { ctev_dest = dest, ctev_rewriters = rewriters } <- ev
+  = do { co_s <- unifyWanted rewriters loc Nominal s1 s2
        ; let arg_loc
                | isNextArgVisible s1 = loc
                | otherwise           = updateCtLocOrigin loc toInvisibleOrigin
-       ; co_t <- unifyWanted arg_loc Nominal t1 t2
+       ; co_t <- unifyWanted rewriters arg_loc Nominal t1 t2
        ; let co = mkAppCo co_s co_t
        ; setWantedEq dest co
        ; stopWith ev "Decomposed [W] AppTy" }
@@ -1551,7 +1553,7 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
-       ; new_ev <- rewriteEqEvidence ev swapped ty1 ps_ty2
+       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped ty1 ps_ty2
                                      (mkTcGReflRightCo role ty1 co1)
                                      (mkTcReflCo role ps_ty2)
        ; can_eq_nc rewritten new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
@@ -1710,7 +1712,28 @@ data families like newtypes. See also
 Note [Decomposing newtypes at representational role]. See #10534 and
 test case typecheck/should_fail/T10534.
 
-{4}: See Note [Decomposing AppTy at representational role]
+{4}: See Note [Decomposing AppTy at representational role]  "RAE": redundant?
+
+   Because type variables can stand in for newtypes, we conservatively do not
+   decompose AppTys over representational equality. Here are two examples that
+   demonstrate why we can't:
+
+   4a: newtype Phant a = MkPhant Int
+       [W] alpha Int ~R beta Bool
+
+   If we eventually solve alpha := Phant and beta := Phant, then we can solve
+   this equality by unwrapping. But it would have been disastrous to decompose
+   the wanted to produce Int ~ Bool, which is definitely insoluble.
+
+   4b: newtype Age = MkAge Int
+       [W] alpha Age ~R Maybe Int
+
+   First, a question: if we know that ty1 ~R ty2, can we conclude that
+   a ty1 ~R a ty2? Not for all a. This is precisely why we need role annotations
+   on type constructors. So, if we were to decompose, we would need to
+   decompose to [W] alpha ~R Maybe and [W] Age ~ Int. On the other hand, if we
+   later solve alpha := Maybe, then we would decompose to [W] Age ~R Int, and
+   that would be soluble.
 
 In the implementation of can_eq_nc and friends, we don't directly pattern
 match using lines like in the tables above, as those tables don't cover
@@ -1856,11 +1879,11 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
            CtDerived {}
              -> unifyDeriveds loc tc_roles tys1 tys2
 
-           CtWanted { ctev_dest = dest }
+           CtWanted { ctev_dest = dest, ctev_rewriters = rewriters }
                   -- new_locs and tc_roles are both infinite, so
                   -- we are guaranteed that cos has the same length
                   -- as tys1 and tys2
-             -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
+             -> do { cos <- zipWith4M (unifyWanted rewriters) new_locs tc_roles tys1 tys2
                    ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
            CtGiven { ctev_evar = evar }
@@ -1910,14 +1933,14 @@ canEqFailure :: CtEvidence -> EqRel
 canEqFailure ev NomEq ty1 ty2
   = canEqHardFailure ev ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
-  = do { (xi1, co1) <- rewrite ev ty1
-       ; (xi2, co2) <- rewrite ev ty2
+  = do { (xi1, co1, rewriters1) <- rewrite ev ty1
+       ; (xi2, co2, rewriters2) <- rewrite ev ty2
             -- We must rewrite the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
-       ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped xi1 xi2 co1 co2
        ; continueWith (mkIrredCt ReprEqReason new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
@@ -1926,9 +1949,9 @@ canEqHardFailure :: CtEvidence
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
-       ; (s1, co1) <- rewrite ev ty1
-       ; (s2, co2) <- rewrite ev ty2
-       ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
+       ; (s1, co1, rewriters1) <- rewrite ev ty1
+       ; (s2, co2, rewriters2) <- rewrite ev ty2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped s1 s2 co1 co2
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
 {-
@@ -2102,23 +2125,30 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
 
              lhs_co = mkTcReflCo role xi1
 
+             -- See Note [Equalities with incompatible kinds], Wrinkle (1)
+             -- This will be ignored in rewriteEqEvidence if the work item is a Given
+             rewriters = rewriterSetFromCo kind_co
+
        ; traceTcS "Hetero equality gives rise to kind equality"
            (ppr kind_co <+> dcolon <+> sep [ ppr ki2, text "~#", ppr ki1 ])
-       ; type_ev <- rewriteEqEvidence ev swapped xi1 rhs' lhs_co rhs_co
+       ; type_ev <- rewriteEqEvidence rewriters ev swapped xi1 rhs' lhs_co rhs_co
 
           -- rewriteEqEvidence carries out the swap, so we're NotSwapped any more
        ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 rhs' ps_rhs' }
   where
     emit_kind_co :: TcS CoercionN
-    emit_kind_co
-      | CtGiven { ctev_evar = evar } <- ev
-      = do { let kind_co = maybe_sym $ mkTcKindCo (mkTcCoVarCo evar)  -- :: k2 ~ k1
-           ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
-           ; emitWorkNC [kind_ev]
-           ; return (ctEvCoercion kind_ev) }
+    emit_kind_co = case ev of
+      CtGiven { ctev_evar = evar }
+        -> do { let kind_co = maybe_sym $ mkTcKindCo (mkTcCoVarCo evar)  -- :: k2 ~ k1
+              ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
+              ; emitWorkNC [kind_ev]
+              ; return (ctEvCoercion kind_ev) }
 
-      | otherwise
-      = unifyWanted kind_loc Nominal ki2 ki1
+      CtWanted { ctev_rewriters = rewriters }
+        -> unifyWanted rewriters kind_loc Nominal ki2 ki1
+
+      CtDerived {}
+        -> unifyWanted emptyRewriterSet kind_loc Nominal ki2 ki1
 
     xi1      = canEqLHSType lhs1
     loc      = ctev_loc ev
@@ -2225,7 +2255,6 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
          mapM_ (unifyDerived (ctEvLoc ev) Nominal) inj_eqns
 
        ; tclvl <- getTcLevel
-       ; dflags <- getDynFlags
        ; let tvs1 = tyCoVarsOfTypes fun_args1
              tvs2 = tyCoVarsOfTypes fun_args2
 
@@ -2236,9 +2265,9 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
                -- If we have F a ~ F (F a), we want to swap.
              swap_for_occurs
-               | cterHasNoProblem   $ checkTyFamEq dflags fun_tc2 fun_args2
+               | cterHasNoProblem   $ checkTyFamEq fun_tc2 fun_args2
                                                    (mkTyConApp fun_tc1 fun_args1)
-               , cterHasOccursCheck $ checkTyFamEq dflags fun_tc1 fun_args1
+               , cterHasOccursCheck $ checkTyFamEq fun_tc1 fun_args1
                                                    (mkTyConApp fun_tc2 fun_args2)
                = True
 
@@ -2282,10 +2311,9 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv1 rhs
-       ; dflags       <- getDynFlags
        ; if | case is_touchable of { Untouchable -> False; _ -> True }
             , cterHasNoProblem $
-                checkTyVarEq dflags tv1 rhs `cterRemoveProblem` cteTypeFamily
+                checkTyVarEq tv1 rhs `cterRemoveProblem` cteTypeFamily
             -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
 
             | otherwise
@@ -2312,8 +2340,10 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -- guaranteed that tyVarKind lhs == typeKind rhs, for (TyEq:K)
 -- (TyEq:N) is checked in can_eq_nc', and (TyEq:TV) is handled in canEqCanLHS2
 
-  = do { dflags <- getDynFlags
-       ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
+  = do {
+          -- this performs the swap if necessary
+         new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                                     lhs_ty rhs rewrite_co1 rewrite_co2
 
      -- by now, (TyEq:K) is already satisfied
        ; massert (canEqLHSKind lhs `eqType` tcTypeKind rhs)
@@ -2324,8 +2354,6 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- guarantees (TyEq:OC), (TyEq:F)
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...); this is #12593.
-     -- This next line checks also for coercion holes (TyEq:H); see
-     -- Note [Equalities with incompatible kinds]
        ; let result0 = checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
      -- type families are OK here
      -- NB: no occCheckExpand here; see Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite
@@ -2336,10 +2364,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                         NomEq  -> result0
                         ReprEq -> cterSetOccursCheckSoluble result0
 
-             reason | result `cterHasOnlyProblem` cteHoleBlocker
-                    = HoleBlockerReason (coercionHolesOfType rhs)
-                    | otherwise
-                    = NonCanonicalReason result
+             reason = NonCanonicalReason result
 
        ; if cterHasNoProblem result
          then do { traceTcS "CEqCan" (ppr lhs $$ ppr rhs)
@@ -2408,7 +2433,7 @@ rewriteCastedEquality :: CtEvidence     -- :: lhs ~ (rhs |> mco), or (rhs |> mco
                       -> TcS CtEvidence -- :: (lhs |> sym mco) ~ rhs
                                         -- result is independent of SwapFlag
 rewriteCastedEquality ev eq_rel swapped lhs rhs mco
-  = rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
+  = rewriteEqEvidence emptyRewriterSet ev swapped new_lhs new_rhs lhs_co rhs_co
   where
     new_lhs = lhs `mkCastTyMCo` sym_mco
     lhs_co  = mkTcGReflLeftMCo role lhs sym_mco
@@ -2430,78 +2455,34 @@ k2 and use this to cast. To wit, from
 
   [X] (tv :: k1) ~ (rhs :: k2)
 
-(where [X] is [G], [W], or [D]), we go to
+(where [X] is [G] or [W]), we go to
 
-  [noDerived X] co :: k2 ~ k1
-  [X]           (tv :: k1) ~ ((rhs |> co) :: k1)
-
-where
-
-  noDerived G = G
-  noDerived _ = W
-
-For reasons described in Wrinkle (2) below, we want the [X] constraint to be "blocked";
-that is, it should be put aside, and not used to rewrite any other constraint,
-until the kind-equality on which it depends (namely 'co' above) is solved.
-To achieve this
-* The [X] constraint is a CIrredCan
-* With a cc_reason of HoleBlockerReason bchs
-* Where 'bchs' is the set of "blocking coercion holes".  The blocking coercion
-  holes are the free coercion holes of [X]'s type
-* When all the blocking coercion holes in the CIrredCan are filled (solved),
-  we convert [X] to a CNonCanonical and put it in the work list.
-All this is described in more detail in Wrinkle (2).
+  [X] co :: k2 ~ k1
+  [X] (tv :: k1) ~ ((rhs |> co) :: k1)
 
 Wrinkles:
 
- (1) The noDerived step is because Derived equalities have no evidence.
-     And yet we absolutely need evidence to be able to proceed here.
-     Given evidence will use the KindCo coercion; Wanted evidence will
-     be a coercion hole. Even a Derived hetero equality begets a Wanted
-     kind equality.
+ (1) When X is W, the new type-level wanted is effectively rewritten by the
+     kind-level one. We thus include the kind-level wanted in the RewriterSet
+     for the type-level one. See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
+     This is done in canEqCanLHSHetero.
 
- (2) Though it would be sound to do so, we must not mark the rewritten Wanted
-       [W] (tv :: k1) ~ ((rhs |> co) :: k1)
-     as canonical in the inert set. In particular, we must not unify tv.
-     If we did, the Wanted becomes a Given (effectively), and then can
-     rewrite other Wanteds. But that's bad: See Note [Wanteds do not rewrite Wanteds]
-     in GHC.Tc.Types.Constraint. The problem is about poor error messages. See #11198 for
-     tales of destruction.
+ (2) If we have [W] w :: alpha ~ (rhs |> co_hole), should we unify alpha? No.
+     The problem is that the wanted w is effectively rewritten by another wanted,
+     and unifying alpha effectively promotes this wanted to a given. Doing so
+     means we lose track of the rewriter set associated with the wanted.
 
-     So, we have an invariant on CEqCan (TyEq:H) that the RHS does not have
-     any coercion holes. This is checked in checkTypeEq. Any equalities that
-     have such an RHS are turned into CIrredCans with a HoleBlockerReason. We also
-     must be sure to kick out any such CIrredCan constraints that mention coercion holes
-     when those holes get filled in, so that the unification step can now proceed.
+     On the other hand, w is perfectly suitable for rewriting, because of the
+     way we carefully track rewriter sets.
 
-     The kicking out is done in kickOutAfterFillingCoercionHole, and the inerts
-     are stored in the inert_blocked field of InertCans.
+     We thus allow w to be a CEqCan, but we prevent unification. See
+     Note [Unification preconditions] in GHC.Tc.Utils.Unify.
 
-     However, we must be careful: we kick out only when no coercion holes are
-     left. The holes in the type are stored in the HoleBlockerReason CtIrredReason.
-     The extra check that there are no more remaining holes avoids
-     needless work when rewriting evidence (which fills coercion holes) and
-     aids efficiency.
-
-     Moreover, kicking out when there are remaining unfilled holes can
-     cause a loop in the solver in this case:
-          [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
-     After canonicalisation, we discover that this equality is heterogeneous.
-     So we emit
-          [W] co_abc :: F a ~ s
-     and preserve the original as
-          [W] w2 :: (ty1 |> co_abc) ~ ty2    (blocked on co_abc)
-     Then, co_abc comes becomes the work item. It gets swapped in
-     canEqCanLHS2 and then back again in canEqTyVarFunEq. We thus get
-     co_abc := sym co_abd, and then co_abd := sym co_abe, with
-          [W] co_abe :: F a ~ s
-     This process has filled in co_abc. Suppose w2 were kicked out.
-     When it gets processed,
-     would get this whole chain going again. The solution is to
-     kick out a blocked constraint only when the result of filling
-     in the blocking coercion involves no further blocking coercions.
-     Alternatively, we could be careful not to do unnecessary swaps during
-     canonicalisation, but that seems hard to do, in general.
+     The only tricky part is that we must later indeed unify if/when the kind-level
+     wanted gets solved. This is done in kickOutAfterFillingCoercionHole,
+     which kicks out all equalities whose RHS mentions the filled-in coercion hole.
+     Note that it looks for type family equalities, too, because of the use of
+     unifyTest in canEqTyVarFunEq.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
@@ -2521,20 +2502,18 @@ Wrinkles:
      cast appears opposite a tyvar. This is implemented in the cast case
      of can_eq_nc'.
 
- (4) Reporting an error for a constraint that is blocked with HoleBlockerReason
-     is hard: what would we say to users? And we don't
-     really need to report, because if a constraint is blocked, then
-     there is unsolved wanted blocking it; that unsolved wanted will
-     be reported. We thus push such errors to the bottom of the queue
-     in the error-reporting code; they should never be printed.
+ (4) Reporting an error for a constraint that does not unify (Wrinkle (2))
+     only because of a coercion hole is hard: what would we say to users? And
+     we don't really need to report, because if a constraint is blocked, then
+     there is unsolved wanted blocking it; that unsolved wanted will be
+     reported. We thus push such errors to the bottom of the queue in the
+     error-reporting code; they should never be printed.
 
-     (4a) It would seem possible to do this filtering just based on the
-          presence of a blocking coercion hole. However, this is no good,
-          as it suppresses e.g. no-instance-found errors. We thus record
-          a CtIrredReason in CIrredCan and filter based on this status.
-          This happened in T14584. An alternative approach is to expressly
-          look for *equalities* with blocking coercion holes, but actually
-          recording the blockage in a status field seems nicer.
+     (4a) We don't want to suppress *all* errors with blocking coercion holes,
+          because this filters out e.g. instance-lookup failures (which are
+          independent of the coercion hole). This happened in T14584. Instead,
+          we look for *equalities* with blocking coercion holes. This is
+          done in the filtering of errors in reportWanteds.
 
      (4b) The error message might be printed with -fdefer-type-errors,
           so it still must exist. This is the only reason why there is
@@ -2943,7 +2922,9 @@ andWhenContinue tcs1 tcs2
            ContinueWith ct -> tcs2 ct }
 infixr 0 `andWhenContinue`    -- allow chaining with ($)
 
-rewriteEvidence :: CtEvidence   -- old evidence
+rewriteEvidence :: RewriterSet  -- See Note [Wanteds rewrite Wanteds]
+                                -- in GHC.Tc.Types.Constraint
+                -> CtEvidence   -- old evidence
                 -> TcPredType   -- new predicate
                 -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
                 -> TcS (StopOrContinue CtEvidence)
@@ -2981,7 +2962,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence old_ev@(CtDerived {}) new_pred _co
+rewriteEvidence _rewriters old_ev@(CtDerived {}) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -2991,12 +2972,13 @@ rewriteEvidence old_ev@(CtDerived {}) new_pred _co
     -- (Getting this wrong caused #7384.)
     continueWith (old_ev { ctev_pred = new_pred })
 
-rewriteEvidence old_ev new_pred co
+rewriteEvidence _rewriters old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
   = continueWith (old_ev { ctev_pred = new_pred })
 
-rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred co
-  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
+rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred co
+  = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
+    do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
        ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
@@ -3004,10 +2986,12 @@ rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred c
                                                        (ctEvRole ev)
                                                        (mkTcSymCo co))
 
-rewriteEvidence ev@(CtWanted { ctev_dest = dest
+rewriteEvidence new_rewriters
+                ev@(CtWanted { ctev_dest = dest
                              , ctev_nosh = si
-                             , ctev_loc = loc }) new_pred co
-  = do { mb_new_ev <- newWanted_SI si loc new_pred
+                             , ctev_loc = loc
+                             , ctev_rewriters = rewriters }) new_pred co
+  = do { mb_new_ev <- newWanted_SI si loc rewriters' new_pred
                -- The "_SI" variant ensures that we make a new Wanted
                -- with the same shadow-info as the existing one
                -- with the same shadow-info as the existing one (#16735)
@@ -3018,9 +3002,13 @@ rewriteEvidence ev@(CtWanted { ctev_dest = dest
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }
+  where
+    rewriters' = rewriters S.<> new_rewriters
 
 
-rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
+rewriteEqEvidence :: RewriterSet        -- See GHC.Tc.Types.Constraint
+                                        -- Note [Wanteds rewrite Wanteds]
+                  -> CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
                                         --              or orhs ~ olhs (swapped)
                   -> SwapFlag
                   -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
@@ -3042,7 +3030,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 --      w : orhs ~ olhs = sym rhs_co ; sym w1 ; lhs_co
 --
 -- It's all a form of rewwriteEvidence, specialised for equalities
-rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
+rewriteEqEvidence new_rewriters old_ev swapped nlhs nrhs lhs_co rhs_co
   | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
   = return (old_ev { ctev_pred = new_pred })
 
@@ -3057,8 +3045,11 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
-  | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
-  = do { (new_ev, hole_co) <- newWantedEq_SI si loc'
+  | CtWanted { ctev_dest = dest
+             , ctev_nosh = si
+             , ctev_rewriters = rewriters } <- old_ev
+  , let rewriters' = rewriters S.<> new_rewriters
+  = do { (new_ev, hole_co) <- newWantedEq_SI si loc' rewriters'
                                              (ctEvRole old_ev) nlhs nrhs
                -- The "_SI" variant ensures that we make a new Wanted
                -- with the same shadow-info as the existing one (#16735)
@@ -3067,7 +3058,11 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                   `mkTransCo` hole_co
                   `mkTransCo` rhs_co
        ; setWantedEq dest co
-       ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
+       ; traceTcS "rewriteEqEvidence" (vcat [ ppr old_ev
+                                            , ppr nlhs
+                                            , ppr nrhs
+                                            , ppr co
+                                            , ppr new_rewriters ])
        ; return new_ev }
 
 #if __GLASGOW_HASKELL__ <= 810
@@ -3103,32 +3098,32 @@ But where it succeeds in finding common structure, it just builds a coercion
 to reflect it.
 -}
 
-unifyWanted :: CtLoc -> Role
-            -> TcType -> TcType -> TcS Coercion
+unifyWanted :: RewriterSet -> CtLoc
+            -> Role -> TcType -> TcType -> TcS Coercion
 -- Return coercion witnessing the equality of the two types,
 -- emitting new work equalities where necessary to achieve that
 -- Very good short-cut when the two types are equal, or nearly so
 -- See Note [unifyWanted and unifyDerived]
 -- The returned coercion's role matches the input parameter
-unifyWanted loc Phantom ty1 ty2
-  = do { kind_co <- unifyWanted loc Nominal (tcTypeKind ty1) (tcTypeKind ty2)
+unifyWanted rewriters loc Phantom ty1 ty2
+  = do { kind_co <- unifyWanted rewriters loc Nominal (tcTypeKind ty1) (tcTypeKind ty2)
        ; return (mkPhantomCo kind_co ty1 ty2) }
 
-unifyWanted loc role orig_ty1 orig_ty2
+unifyWanted rewriters loc role orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
-      = do { co_s <- unifyWanted loc role s1 s2
-           ; co_t <- unifyWanted loc role t1 t2
-           ; co_w <- unifyWanted loc Nominal w1 w2
+      = do { co_s <- unifyWanted rewriters loc role s1 s2
+           ; co_t <- unifyWanted rewriters loc role t1 t2
+           ; co_w <- unifyWanted rewriters loc Nominal w1 w2
            ; return (mkFunCo role co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
-      = do { cos <- zipWith3M (unifyWanted loc)
+      = do { cos <- zipWith3M (unifyWanted rewriters loc)
                               (tyConRolesX role tc1) tys1 tys2
            ; return (mkTyConAppCo role tc1 cos) }
 
@@ -3151,7 +3146,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     bale_out ty1 ty2
        | ty1 `tcEqType` ty2 = return (mkTcReflCo role ty1)
         -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
-       | otherwise = emitNewWantedEq loc role orig_ty1 orig_ty2
+       | otherwise = emitNewWantedEq loc rewriters role orig_ty1 orig_ty2
 
 unifyDeriveds :: CtLoc -> [Role] -> [TcType] -> [TcType] -> TcS ()
 -- See Note [unifyWanted and unifyDerived]

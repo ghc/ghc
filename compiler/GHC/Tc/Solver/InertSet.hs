@@ -277,8 +277,7 @@ emptyInertCans
        , inert_safehask     = emptyDictMap
        , inert_funeqs       = emptyFunEqs
        , inert_insts        = []
-       , inert_irreds       = emptyCts
-       , inert_blocked      = emptyCts }
+       , inert_irreds       = emptyCts }
 
 emptyInert :: InertSet
 emptyInert
@@ -862,7 +861,7 @@ The idea is that
   Proof: using Definition [Can-rewrite relation], fw can't rewrite anything
          and so K0 holds.  Intuitively, since fw can't rewrite anything (Lemma (L0)),
          adding it cannot cause any loops
-  This is a common case, because Wanteds cannot rewrite Wanteds.
+  This is a common case, because Wanteds cannot rewrite Wanteds. "RAE" not so anymore!
   It's used to avoid even looking for constraint to kick out.
 
 * Lemma (L1): The conditions of the Main Theorem imply that there is no
@@ -1102,14 +1101,6 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               --     and which don't interact with others (e.g.  (c a))
               -- and insoluble predicates (e.g.  Int ~ Bool, or a ~ [a])
 
-       , inert_blocked :: Cts
-              -- Equality predicates blocked on a coercion hole.
-              -- Each Ct is a CIrredCan with cc_reason = HoleBlockerReason
-              -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-              -- wrinkle (2)
-              -- These are stored separately from inert_irreds because
-              -- they get kicked out for different reasons
-
        , inert_given_eq_lvl :: TcLevel
               -- The TcLevel of the innermost implication that has a Given
               -- equality of the sort that make a unification variable untouchable
@@ -1132,7 +1123,6 @@ instance Outputable InertCans where
           , inert_dicts = dicts
           , inert_safehask = safehask
           , inert_irreds = irreds
-          , inert_blocked = blocked
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
           , inert_insts = insts })
@@ -1149,15 +1139,13 @@ instance Outputable InertCans where
         text "Safe Haskell unsafe overlap =" <+> pprCts (dictsToBag safehask)
       , ppUnless (isEmptyCts irreds) $
         text "Irreds =" <+> pprCts irreds
-      , ppUnless (isEmptyCts blocked) $
-        text "Blocked =" <+> pprCts blocked
       , ppUnless (null insts) $
         text "Given instances =" <+> vcat (map ppr insts)
       , text "Innermost given equalities =" <+> ppr ge_lvl
       , text "Given eqs at this level =" <+> ppr given_eqs
       ]
     where
-      folder (EqualCtList eqs) rest = nonEmptyToBag eqs `andCts` rest
+      folder (EqualCtList eqs) rest = listToBag eqs `andCts` rest
 
 {- *********************************************************************
 *                                                                      *
@@ -1167,7 +1155,7 @@ instance Outputable InertCans where
 
 addTyEq :: InertEqs -> TcTyVar -> Ct -> InertEqs
 addTyEq old_eqs tv ct
-  = extendDVarEnv_C add_eq old_eqs tv (unitEqualCtList ct)
+  = extendDVarEnv_C add_eq old_eqs tv ct
   where
     add_eq old_eqs _ = addToEqualCtList ct old_eqs
 
@@ -1177,15 +1165,14 @@ addCanFunEq old_eqs fun_tc fun_args ct
   = alterTcApp old_eqs fun_tc fun_args upd
   where
     upd (Just old_equal_ct_list) = Just $ addToEqualCtList ct old_equal_ct_list
-    upd Nothing                  = Just $ unitEqualCtList ct
+    upd Nothing                  = Just ct
 
 foldTyEqs :: (Ct -> b -> b) -> InertEqs -> b -> b
 foldTyEqs k eqs z
-  = foldDVarEnv (\(EqualCtList cts) z -> foldr k z cts) z eqs
+  = foldDVarEnv (\cts z -> foldr k z cts) z eqs
 
 findTyEqs :: InertCans -> TyVar -> [Ct]
-findTyEqs icans tv = maybe [] id (fmap @Maybe equalCtListToList $
-                                  lookupDVarEnv (inert_eqs icans) tv)
+findTyEqs icans tv = concat @Maybe (lookupDVarEnv (inert_eqs icans) tv)
 
 delEq :: InertCans -> CanEqLHS -> TcType -> InertCans
 delEq ic lhs rhs = case lhs of
@@ -1205,8 +1192,42 @@ delEq ic lhs rhs = case lhs of
 findEq :: InertCans -> CanEqLHS -> [Ct]
 findEq icans (TyVarLHS tv) = findTyEqs icans tv
 findEq icans (TyFamLHS fun_tc fun_args)
-  = maybe [] id (fmap @Maybe equalCtListToList $
-                 findFunEq (inert_funeqs icans) fun_tc fun_args)
+  = concat @Maybe (findFunEq (inert_funeqs icans) fun_tc fun_args)
+
+{-# INLINE partition_eqs_container #-}
+partition_eqs_container
+  :: forall container
+   . container    -- empty container
+  -> (forall b. (EqualCtList -> b -> b) -> b -> container -> b) -- folder
+  -> (container -> CanEqLHS -> EqualCtList -> container)  -- extender
+  -> (Ct -> Bool)
+  -> container
+  -> ([Ct], container)
+partition_eqs_container empty_container fold_container extend_container pred orig_inerts
+  = fold_container folder ([], empty_container) orig_inerts
+  where
+    folder :: EqualCtList -> ([Ct], container) -> ([Ct], container)
+    folder eqs (acc_true, acc_false)
+      = (eqs_true ++ acc_true, acc_false')
+      where
+        (eqs_true, eqs_false) = partition pred eqs
+
+        acc_false'
+          | CEqCan { cc_lhs = lhs } : _ <- eqs_false
+          = extend_container acc_false lhs eqs_false
+          | otherwise
+          = acc_false
+
+partitionInertEqs :: (Ct -> Bool)   -- Ct will always be a CEqCan with a TyVarLHS
+                  -> InertEqs
+                  -> ([Ct], InertEqs)
+partitionInertEqs = partition_eqs_container emptyDVarEnv foldDVarEnv extendInertEqs
+
+-- precondition: CanEqLHS is a TyVarLHS
+extendInertEqs :: InertEqs -> CanEqLHS -> EqualCtList -> InertEqs
+extendInertEqs eqs (TyVarLHS tv) new_eqs = extendDVarEnv eqs tv new_eqs
+extendInertEqs _ other _ = pprPanic "extendInertEqs" (ppr other)
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1223,11 +1244,6 @@ addInertItem tc_lvl
     case lhs of
        TyFamLHS tc tys -> ics { inert_funeqs = addCanFunEq funeqs tc tys item }
        TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv item }
-
-addInertItem tc_lvl ics@(IC { inert_blocked = blocked })
-             item@(CIrredCan { cc_reason = HoleBlockerReason {}})
-  = updateGivenEqs tc_lvl item $  -- this item is always an equality
-    ics { inert_blocked = blocked `snocBag` item }
 
 addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
   = updateGivenEqs tc_lvl item $   -- An Irred might turn out to be an
@@ -1309,12 +1325,10 @@ kickOutRewritableLHS new_fr new_lhs
                           ((dicts_out `andCts` irs_out)
                             `extendCtsList` insts_out)
 
-    (tv_eqs_out, tv_eqs_in) = foldDVarEnv (kick_out_eqs extend_tv_eqs)
-                                          ([], emptyDVarEnv) tv_eqs
-    (feqs_out,   feqs_in)   = foldFunEqs  (kick_out_eqs extend_fun_eqs)
-                                          funeqmap ([], emptyFunEqs)
-    (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
-    (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
+    (tv_eqs_out, tv_eqs_in) = partitionInertEqs kick_out_eq tv_eqs
+    (feqs_out,   feqs_in)   = partitionFunEqs   kick_out_eq funeqmap
+    (dicts_out,  dicts_in)  = partitionDicts    kick_out_ct dictmap
+    (irs_out,    irs_in)    = partitionBag      kick_out_ct irreds
       -- Kick out even insolubles: See Note [Rewrite insolubles]
       -- Of course we must kick out irreducibles like (c a), in case
       -- we can rewrite 'c' to something more useful
@@ -1379,28 +1393,8 @@ kickOutRewritableLHS new_fr new_lhs
                   fr_may_rewrite fs
                && fr_tf_can_rewrite_ty new_tf new_tf_args role (ctPred ct)
 
-    extend_tv_eqs :: InertEqs -> CanEqLHS -> EqualCtList -> InertEqs
-    extend_tv_eqs eqs (TyVarLHS tv) cts = extendDVarEnv eqs tv cts
-    extend_tv_eqs eqs other _cts = pprPanic "extend_tv_eqs" (ppr eqs $$ ppr other)
-
-    extend_fun_eqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList
-                   -> FunEqMap EqualCtList
-    extend_fun_eqs eqs (TyFamLHS fam_tc fam_args) cts
-      = insertTcApp eqs fam_tc fam_args cts
-    extend_fun_eqs eqs other _cts = pprPanic "extend_fun_eqs" (ppr eqs $$ ppr other)
-
-    kick_out_eqs :: (container -> CanEqLHS -> EqualCtList -> container)
-                 -> EqualCtList -> ([Ct], container)
-                 -> ([Ct], container)
-    kick_out_eqs extend eqs (acc_out, acc_in)
-      = (eqs_out `chkAppend` acc_out, case listToEqualCtList eqs_in of
-            Nothing -> acc_in
-            Just eqs_in_ecl@(EqualCtList (eq1 :| _))
-                    -> extend acc_in (cc_lhs eq1) eqs_in_ecl)
-      where
-        (eqs_out, eqs_in) = partition kick_out_eq (equalCtListToList eqs)
-
     -- Implements criteria K1-K3 in Note [Extending the inert equalities]
+    kick_out_eq :: Ct -> Bool
     kick_out_eq (CEqCan { cc_lhs = lhs, cc_rhs = rhs_ty
                         , cc_ev = ev, cc_eq_rel = eq_rel })
       | not (fr_may_rewrite fs)
@@ -1433,7 +1427,7 @@ kickOutRewritableLHS new_fr new_lhs
               NomEq  -> rhs_ty `eqType` canEqLHSType new_lhs -- (K3a)
               ReprEq -> is_can_eq_lhs_head new_lhs rhs_ty    -- (K3b)
 
-    kick_out_eq ct = pprPanic "keep_eq" (ppr ct)
+    kick_out_eq ct = pprPanic "kick_out_eq" (ppr ct)
 
     is_can_eq_lhs_head (TyVarLHS tv) = go
       where

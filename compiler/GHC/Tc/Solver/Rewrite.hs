@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Tc.Solver.Rewrite(
-   rewrite, rewriteKind, rewriteArgsNom,
+   rewrite, rewriteArgsNom,
    rewriteType
  ) where
 
@@ -29,13 +29,14 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Tc.Solver.Types
+import GHC.Tc.Types    ( TcRef )
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List ( find )
 
 import Control.Arrow ( first )
 
@@ -49,9 +50,10 @@ import Control.Arrow ( first )
 -}
 
 data RewriteEnv
-  = FE { fe_loc     :: !CtLoc             -- See Note [Rewriter CtLoc]
-       , fe_flavour :: !CtFlavour
-       , fe_eq_rel  :: !EqRel             -- See Note [Rewriter EqRels]
+  = RE { re_loc       :: !CtLoc                -- See Note [Rewriter CtLoc]
+       , re_flavour   :: !CtFlavour
+       , re_eq_rel    :: !EqRel                -- See Note [Rewriter EqRels]
+       , re_rewriters :: !(TcRef RewriterSet)  -- See Note [Rewriting wanteds]
        }
 
 -- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'
@@ -83,18 +85,23 @@ liftTcS thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
 -- the rewriting operation
-runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS a
+runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS (a, RewriterSet)
 runRewriteCtEv ev
   = runRewrite (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
 
 -- Run thing_inside (which does the rewriting)
-runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS a
+-- Aslo returns the set of Wanteds which rewrote a Wanted;
+-- See Note [Rewriting wanteds]
+runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, RewriterSet)
 runRewrite loc flav eq_rel thing_inside
-  = runRewriteM thing_inside fmode
-  where
-    fmode = FE { fe_loc  = loc
-               , fe_flavour = flav
-               , fe_eq_rel = eq_rel }
+  = do { rewriters_ref <- newTcRef emptyRewriterSet
+       ; let fmode = RE { re_loc  = loc
+                        , re_flavour = flav
+                        , re_eq_rel = eq_rel
+                        , re_rewriters = rewriters_ref }
+       ; res <- runRewriteM thing_inside fmode
+       ; rewriters <- readTcRef rewriters_ref
+       ; return (res, rewriters) }
 
 traceRewriteM :: String -> SDoc -> RewriteM ()
 traceRewriteM herald doc = liftTcS $ traceTcS herald doc
@@ -105,13 +112,13 @@ getRewriteEnvField accessor
   = mkRewriteM $ \env -> return (accessor env)
 
 getEqRel :: RewriteM EqRel
-getEqRel = getRewriteEnvField fe_eq_rel
+getEqRel = getRewriteEnvField re_eq_rel
 
 getRole :: RewriteM Role
 getRole = eqRelRole <$> getEqRel
 
 getFlavour :: RewriteM CtFlavour
-getFlavour = getRewriteEnvField fe_flavour
+getFlavour = getRewriteEnvField re_flavour
 
 getFlavourRole :: RewriteM CtFlavourRole
 getFlavourRole
@@ -120,7 +127,7 @@ getFlavourRole
        ; return (flavour, eq_rel) }
 
 getLoc :: RewriteM CtLoc
-getLoc = getRewriteEnvField fe_loc
+getLoc = getRewriteEnvField re_loc
 
 checkStackDepth :: Type -> RewriteM ()
 checkStackDepth ty
@@ -131,9 +138,9 @@ checkStackDepth ty
 setEqRel :: EqRel -> RewriteM a -> RewriteM a
 setEqRel new_eq_rel thing_inside
   = mkRewriteM $ \env ->
-    if new_eq_rel == fe_eq_rel env
+    if new_eq_rel == re_eq_rel env
     then runRewriteM thing_inside env
-    else runRewriteM thing_inside (env { fe_eq_rel = new_eq_rel })
+    else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel })
 {-# INLINE setEqRel #-}
 
 -- | Make sure that rewriting actually produces a coercion (in other
@@ -143,8 +150,8 @@ noBogusCoercions :: RewriteM a -> RewriteM a
 noBogusCoercions thing_inside
   = mkRewriteM $ \env ->
     -- No new thunk is made if the flavour hasn't changed (note the bang).
-    let !env' = case fe_flavour env of
-          Derived -> env { fe_flavour = Wanted WDeriv }
+    let !env' = case re_flavour env of
+          Derived -> env { re_flavour = Wanted WDeriv }
           _       -> env
     in
     runRewriteM thing_inside env'
@@ -154,15 +161,22 @@ bumpDepth (RewriteM thing_inside)
   = mkRewriteM $ \env -> do
       -- bumpDepth can be called a lot during rewriting so we force the
       -- new env to avoid accumulating thunks.
-      { let !env' = env { fe_loc = bumpCtLocDepth (fe_loc env) }
+      { let !env' = env { re_loc = bumpCtLocDepth (re_loc env) }
       ; thing_inside env' }
+
+-- See Note [Rewriting wanteds]
+-- Precondition: the CtEvidence is a CtWanted of an equality
+recordRewriter :: CtEvidence -> RewriteM ()
+recordRewriter (CtWanted { ctev_dest = HoleDest hole })
+  = RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriterSet` hole)
+recordRewriter other = pprPanic "recordRewriter" (ppr other)
 
 {-
 Note [Rewriter EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~
 When rewriting, we need to know which equality relation -- nominal
 or representation -- we should be respecting. The only difference is
-that we rewrite variables by representational equalities when fe_eq_rel
+that we rewrite variables by representational equalities when re_eq_rel
 is ReprEq, and that we unwrap newtypes when rewriting w.r.t.
 representational equality.
 
@@ -185,6 +199,20 @@ A consequence of this is that setting the stack limits appropriately
 will be essentially impossible. So, the official recommendation if a
 stack limit is hit is to disable the check entirely. Otherwise, there
 will be baffling, unpredictable errors.
+
+Note [Rewriting wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Wanteds rewrite wanteds] tells us that wanteds rewriting wanteds
+can lead to poor error messages. But we really need wanteds to rewrite
+wanteds in order to saturate our equalities. So, we need to know when
+we have done this step (call it w-r-w), so that we can record an ancestor
+constraint. W-r-w will happen in flattenTyVar2, deeply buried within
+the flattener algorithm. And, when flattening a large type, we might
+w-r-w several times in several different places. We thus record, in the
+FlatM monad, a WRWFlag that says whether or not any w-r-w has taken place.
+
+Then, in all calls to the flattener, we check this result and record
+the ancestor constraint if necessary. We use a mutable WRWFlag for efficiency.
 
 Note [Phantoms in the rewriter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,31 +246,22 @@ changes the flavour from Derived just for this purpose.
 -}
 
 -- | See Note [Rewriting].
--- If (xi, co) <- rewrite mode ev ty, then co :: xi ~r ty
+-- If (xi, co, rewriters) <- rewrite mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@.
+-- rewriters is the set of coercion holes that have been used to rewrite
+-- See Note [Wanteds rewrite wanteds] in GHC.Tc.Types.Constraint
+-- and Note [Rewriting wanteds]
 rewrite :: CtEvidence -> TcType
-        -> TcS (Xi, TcCoercion)
+        -> TcS (Xi, TcCoercion, RewriterSet)
 rewrite ev ty
   = do { traceTcS "rewrite {" (ppr ty)
-       ; (ty', co) <- runRewriteCtEv ev (rewrite_one ty)
-       ; traceTcS "rewrite }" (ppr ty')
-       ; return (ty', co) }
-
--- specialized to rewriting kinds: never Derived, always Nominal
--- See Note [No derived kind equalities]
--- See Note [Rewriting]
-rewriteKind :: CtLoc -> CtFlavour -> TcType -> TcS (Xi, TcCoercionN)
-rewriteKind loc flav ty
-  = do { traceTcS "rewriteKind {" (ppr flav <+> ppr ty)
-       ; let flav' = case flav of
-                       Derived -> Wanted WDeriv  -- the WDeriv/WOnly choice matters not
-                       _       -> flav
-       ; (ty', co) <- runRewrite loc flav' NomEq (rewrite_one ty)
-       ; traceTcS "rewriteKind }" (ppr ty' $$ ppr co) -- co is never a panic
-       ; return (ty', co) }
+       ; ((ty', co), rewriters) <- runRewriteCtEv ev (rewrite_one ty)
+       ; traceTcS "rewrite }" (ppr ty' $$ ppr rewriters)
+       ; return (ty', co, rewriters) }
 
 -- See Note [Rewriting]
-rewriteArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
+rewriteArgsNom :: CtEvidence -> TyCon -> [TcType]
+               -> TcS ([Xi], [TcCoercion], RewriterSet)
 -- Externally-callable, hence runRewrite
 -- Rewrite a vector of types all at once; in fact they are
 -- always the arguments of type family or class, so
@@ -253,13 +272,16 @@ rewriteArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
 --
 -- For Derived constraints the returned coercion may be undefined
 -- because rewriting may use a Derived equality ([D] a ~ ty)
+--
+-- Final return value returned which Wanteds rewrote another Wanted
+-- See Note [Rewriting wanteds]
 rewriteArgsNom ev tc tys
   = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
-       ; (tys', cos, kind_co)
+       ; ((tys', cos, kind_co), rewriters)
            <- runRewriteCtEv ev (rewrite_args_tc tc Nothing tys)
        ; massert (isReflMCo kind_co)
        ; traceTcS "rewrite }" (vcat (map ppr tys'))
-       ; return (tys', cos) }
+       ; return (tys', cos, rewriters) }
 
 -- | Rewrite a type w.r.t. nominal equality. This is useful to rewrite
 -- a type w.r.t. any givens. It does not do type-family reduction. This
@@ -267,8 +289,8 @@ rewriteArgsNom ev tc tys
 -- only givens.
 rewriteType :: CtLoc -> TcType -> TcS TcType
 rewriteType loc ty
-  = do { (xi, _) <- runRewrite loc Given NomEq $
-                    rewrite_one ty
+  = do { ((xi, _), _) <- runRewrite loc Given NomEq $
+                         rewrite_one ty
                      -- use Given flavor so that it is rewritten
                      -- only w.r.t. Givens, never Wanteds/Deriveds
                      -- (Shouldn't matter, if only Givens are present
@@ -817,16 +839,14 @@ rewrite_exact_fam_app tc tys
              homogenise xi co = homogenise_result xi (co `mkTcTransCo` args_co) role kind_co
 
          -- STEP 4: try the inerts
-       ; result2 <- liftTcS $ lookupFamAppInert tc xis
        ; flavour <- getFlavour
+       ; result2 <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
        ; case result2 of
-         { Just (co, xi, fr@(_, inert_eq_rel))
+         { Just (co, xi, (inert_flavour, inert_eq_rel))
              -- co :: F xis ~ir xi
-
-             | fr `eqCanRewriteFR` (flavour, eq_rel) ->
-                 do { traceRewriteM "rewrite family application with inert"
+             -> do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr xi)
-                    ; finish True (homogenise xi downgraded_co) }
+                   ; finish (inert_flavour == Given) (homogenise xi downgraded_co) }
                -- this will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
                -- it seems easier not to weed out that special case
@@ -850,19 +870,18 @@ rewrite_exact_fam_app tc tys
       -- call this if the above attempts made progress.
       -- This recursively rewrites the result and then adds to the cache
     finish :: Bool  -- add to the cache?
+                    -- Precondition: True ==> input coercion has
+                    --                        no coercion holes
            -> (Xi, Coercion) -> RewriteM (Xi, Coercion)
     finish use_cache (xi, co)
       = do { -- rewrite the result: FINISH 1
              (fully, fully_co) <- bumpDepth $ rewrite_one xi
            ; let final_co = fully_co `mkTcTransCo` co
            ; eq_rel <- getEqRel
-           ; flavour <- getFlavour
 
              -- extend the cache: FINISH 2
-           ; when (use_cache && eq_rel == NomEq && flavour /= Derived) $
+           ; when (use_cache && eq_rel == NomEq) $
              -- the cache only wants Nominal eqs
-             -- and Wanteds can rewrite Deriveds; the cache
-             -- has only Givens
              liftTcS $ extendFamAppCache tc tys (final_co, fully)
            ; return (fully, final_co) }
     {-# INLINE finish #-}
@@ -956,31 +975,37 @@ rewrite_tyvar2 :: TcTyVar -> CtFlavourRole -> RewriteM RewriteTvResult
 rewrite_tyvar2 tv fr@(_, eq_rel)
   = do { ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
-           Just (EqualCtList (ct :| _))   -- If the first doesn't work,
-                                          -- the subsequent ones won't either
-             | CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
+           Just equal_ct_list
+             | Just ct <- find can_rewrite equal_ct_list
+             , CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
                       , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
-             , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
-             , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
-             -> do { traceRewriteM "Following inert tyvar"
-                        (ppr tv <+>
-                         equals <+>
-                         ppr rhs_ty $$ ppr ctev)
-                    ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
-                          rewrite_co  = case (ct_eq_rel, eq_rel) of
-                            (ReprEq, _rel)  -> assert (_rel == ReprEq )
-                                    -- if this ASSERT fails, then
+             -> do { let wrw = ctFlavourRole ct `wantedRewriteWanted` fr
+                   ; traceRewriteM "Following inert tyvar" $
+                        vcat [ ppr tv <+> equals <+> ppr rhs_ty
+                             , ppr ctev
+                             , text "wanted_rewrite_wanted:" <+> ppr wrw ]
+                   ; when wrw $ recordRewriter ctev
+
+                   ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
+                         rewrite_co  = case (ct_eq_rel, eq_rel) of
+                            (ReprEq, _rel)  -> assert (_rel == ReprEq)
+                                    -- if this assert fails, then
                                     -- eqCanRewriteFR answered incorrectly
                                                rewrite_co1
                             (NomEq, NomEq)  -> rewrite_co1
                             (NomEq, ReprEq) -> mkSubCo rewrite_co1
 
-                    ; return (RTRFollowed rhs_ty rewrite_co) }
+                   ; return (RTRFollowed rhs_ty rewrite_co) }
                     -- NB: ct is Derived then fmode must be also, hence
                     -- we are not going to touch the returned coercion
                     -- so ctEvCoercion is fine.
 
            _other -> return RTRNotFollowed }
+
+  where
+    can_rewrite :: Ct -> Bool
+    can_rewrite ct = ctFlavourRole ct `eqCanRewriteFR` fr
+      -- This is THE key call of eqCanRewriteFR
 
 {-
 Note [An alternative story for the inert substitution]

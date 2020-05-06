@@ -211,7 +211,7 @@ We must /not/ solve this from the Given (?x::Int, C a), because of
 the intervening binding for (?x::Int).  #14218.
 
 We deal with this by arranging that we always fail when looking up a
-tuple constraint that hides an implicit parameter. Not that this applies
+tuple constraint that hides an implicit parameter. Note that this applies
   * both to the inert_dicts (lookupInertDict)
   * and to the solved_dicts (looukpSolvedDict)
 An alternative would be not to extend these sets with such tuple
@@ -271,58 +271,65 @@ foldFunEqs = foldTcAppMap
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m tc tys val
 
+partitionFunEqs :: (Ct -> Bool)    -- Ct will always be a CEqCan with a TyFamLHS
+                -> FunEqMap EqualCtList
+                -> ([Ct], FunEqMap EqualCtList)
+partitionFunEqs
+  = partition_eqs_container emptyFunEqs (\ f z eqs -> foldFunEqs f eqs z) extendFunEqs
+
+-- precondition: CanEqLHS is a TyFamLHS
+extendFunEqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList -> FunEqMap EqualCtList
+extendFunEqs eqs (TyFamLHS tf args) new_eqs = insertTcApp eqs tf args new_eqs
+extendFunEqs _ other _ = pprPanic "extendFunEqs" (ppr other)
+
 {- *********************************************************************
 *                                                                      *
                    EqualCtList
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [EqualCtList invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [EqualCtList invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     * All are equalities
     * All these equalities have the same LHS
-    * The list is never empty
     * No element of the list can rewrite any other
-    * Derived before Wanted
 
-From the fourth invariant it follows that the list is
-   - A single [G], or
-   - Zero or one [D] or [WD], followed by any number of [W]
-
-The Wanteds can't rewrite anything which is why we put them last
+Accordingly, this list is either empty, contains one element, or
+contains a Given representational equality and a Wanted nominal one.
 -}
 
-newtype EqualCtList = MkEqualCtList (NonEmpty Ct)
-  deriving newtype Outputable
+type EqualCtList = [Ct]
   -- See Note [EqualCtList invariants]
 
--- | Pattern synonym for easy unwrapping. NB: unidirectional to
--- preserve invariants.
-pattern EqualCtList :: NonEmpty Ct -> EqualCtList
-pattern EqualCtList cts <- MkEqualCtList cts
-{-# COMPLETE EqualCtList #-}
-
-unitEqualCtList :: Ct -> EqualCtList
-unitEqualCtList ct = MkEqualCtList (ct :| [])
-
 addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
--- NB: This function maintains the "derived-before-wanted" invariant of EqualCtList,
--- but not the others. See Note [EqualCtList invariants]
-addToEqualCtList ct (MkEqualCtList old_eqs)
-  | isWantedCt ct
-  , eq1 :| eqs <- old_eqs
-  = MkEqualCtList (eq1 :| ct : eqs)
+-- See Note [EqualCtList invariants]
+addToEqualCtList ct old_eqs
+  | debugIsOn
+  = case ct of
+      CEqCan { cc_lhs = TyVarLHS tv } ->
+        let shares_lhs (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
+            shares_lhs _other                                = False
+        in
+        assert (all shares_lhs old_eqs) $
+        assert (null ([ (ct1, ct2) | ct1 <- ct : old_eqs
+                                   , ct2 <- ct : old_eqs
+                                   , let { fr1 = ctFlavourRole ct1
+                                         ; fr2 = ctFlavourRole ct2 }
+                                   , fr1 `eqCanRewriteFR` fr2 ])) $
+        (ct : old_eqs)
+
+      _ -> pprPanic "addToEqualCtList not CEqCan" (ppr ct)
+
   | otherwise
-  = MkEqualCtList (ct `cons` old_eqs)
+  = ct : old_eqs
 
+-- returns Nothing when the new list is empty, to keep the environments smaller
 filterEqualCtList :: (Ct -> Bool) -> EqualCtList -> Maybe EqualCtList
-filterEqualCtList pred (MkEqualCtList cts)
-  = fmap MkEqualCtList (nonEmpty $ NE.filter pred cts)
-
-equalCtListToList :: EqualCtList -> [Ct]
-equalCtListToList (MkEqualCtList cts) = toList cts
-
-listToEqualCtList :: [Ct] -> Maybe EqualCtList
--- NB: This does not maintain invariants other than having the EqualCtList be
--- non-empty
-listToEqualCtList cts = MkEqualCtList <$> nonEmpty cts
+filterEqualCtList pred cts
+  | null new_list
+  = Nothing
+  | otherwise
+  = Just new_list
+  where
+    new_list = filter pred cts
