@@ -75,7 +75,11 @@ import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, guard )
+import Control.Monad.Trans.Class ( lift )
+import Control.Monad.Trans.Cont ( ContT(..) )
+import Control.Monad.Trans.Writer
 import qualified Data.List.NonEmpty as NE
+import Data.Coerce
 import Data.Ratio
 
 {-
@@ -123,7 +127,9 @@ matchNameMaker ctxt = LamMk report_unused
                       _                     -> True
 
 rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsT $ rnHsSigWcTypeScoped AlwaysBind PatCtx sig
+rnHsSigCps sig = CpsT $ ContT $ WriterT
+  . rnHsSigWcTypeScoped AlwaysBind PatCtx sig
+  . coerce
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
@@ -132,23 +138,24 @@ newPatLName name_maker rdr_name@(L loc _)
 
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
-  = CpsT $ \ thing_inside ->
-        do { name <- newLocalBndrRn rdr_name
-           ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
-           ; when report_unused $ warnUnusedMatches [name] fvs
-           ; return (res, name `delFV` fvs)
-           }
+  = CpsT $ ContT $ \ thing_inside -> WriterT $ do
+      name <- newLocalBndrRn rdr_name
+      (res, fvs) <- bindLocalNames [name] $
+        runWriterT $ thing_inside name
+      when report_unused $ warnUnusedMatches [name] fvs
+      return (res, name `delFV` fvs)
 
 newPatName (LetMk is_top fix_env) rdr_name
-  = CpsT $ \ thing_inside ->
-        do { name <- case is_top of
-                       NotTopLevel -> newLocalBndrRn rdr_name
-                       TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
-                                        -- See Note [View pattern usage]
-             addLocalFixities fix_env [name] $
-             thing_inside name
-           }
+  = CpsT $ ContT $ \ thing_inside -> WriterT $ do
+      name <- case is_top of
+                NotTopLevel -> newLocalBndrRn rdr_name
+                TopLevel    -> newTopSrcBinder rdr_name
+      bindLocalNames [name]      -- Do *not* use bindLocalNameFV here
+                                 -- See Note [View pattern usage]
+        $ addLocalFixities fix_env [name]
+        $ runWriterT
+        $ thing_inside name
+
 
     -- Note: the bindLocalNames is somewhat suspicious
     --       because it binds a top-level name as a local name.
@@ -446,10 +453,11 @@ rnConPatAndThen mk con (RecCon rpats)
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
-  CpsT $ \thing -> do
-                    (r, fvs) <- thing ()
-                    checkUnusedRecordWildcard loc fvs dotdot_names
-                    return (r, fvs)
+  CpsT $ ContT $ \thing -> do
+    (r, fvs) <- listen $ thing ()
+    lift $ checkUnusedRecordWildcard loc fvs dotdot_names
+    return r
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor

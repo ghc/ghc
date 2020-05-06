@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -12,6 +13,7 @@ module GHC.Rename.Utils.CpsMonad
   ( -- CpsRn monad
     CpsT(..)
   , CpsRn
+  , unCpsRn
   , runCps
   , liftCps
   , liftCpsFV
@@ -28,7 +30,9 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
-import Control.Monad       ( ap )
+import Control.Monad.Trans.Class ( lift )
+import Control.Monad.Trans.Cont
+import Control.Monad.Trans.Writer
 
 {-
 *********************************************************
@@ -59,44 +63,46 @@ has a *left-to-right* scoping: it makes the binders in
 p1 scope over p2,p3.
 -}
 
-type CpsRn = CpsT RnM
+type CpsRn = CpsT (WriterT FreeVars RnM)
 
 newtype CpsT m b = CpsT
-  { unCpsRn :: forall r
-            .  (b -> m (r, FreeVars))
-            -> m (r, FreeVars)
+  { runCpsT :: forall r. ContT r m b
   } deriving (Functor)
         -- See Note [CpsRn monad]
 
 instance Applicative (CpsT m) where
-    pure x = CpsT $ \k -> k x
-    (<*>) = ap
+    pure x = CpsT $ pure x
+    CpsT x <*> CpsT y = CpsT $ x <*> y
 
 instance Monad (CpsT m) where
-  CpsT m >>= mk = CpsT $ \k -> m (\v -> unCpsRn (mk v) k)
+  CpsT m >>= mk = CpsT $ m >>= (\x -> runCpsT $ mk x)
+
+unCpsRn :: forall m b
+        .  CpsT (WriterT FreeVars m) b
+        -> forall r
+        .  (b -> m (r, FreeVars))
+        -> m (r, FreeVars)
+unCpsRn x k = runWriterT $ flip runContT (WriterT . k) $ runCpsT x
 
 runCps :: CpsRn a -> RnM (a, FreeVars)
-runCps (CpsT m) = m $ \r -> return (r, emptyFVs)
+runCps = runWriterT . evalContT . runCpsT
 
 liftCps :: RnM a -> CpsRn a
-liftCps rn_thing = CpsT $ \k -> rn_thing >>= k
+liftCps rn_thing = CpsT $ ContT (lift rn_thing >>=)
 
 liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
-liftCpsFV rn_thing = CpsT $ \k -> do
-  (v,fvs1) <- rn_thing
-  (r,fvs2) <- k v
-  return (r, fvs1 `plusFV` fvs2)
+liftCpsFV x = CpsT $ lift $ WriterT x
 
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
-wrapSrcSpanCps fn (L loc a) = CpsT $ \k ->
-  setSrcSpan loc $ unCpsRn (fn a) $ \v -> k (L loc v)
+wrapSrcSpanCps fn (L loc a) = CpsT $ fmap (L loc) $ mapContT
+  (WriterT . setSrcSpan loc . runWriterT)
+  (runCpsT $ fn a)
 
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
-lookupConCps con_rdr = CpsT $ \k -> do
+lookupConCps con_rdr = CpsT $ ContT $ \k -> WriterT $ do
    con_name <- lookupLocatedOccRn con_rdr
-   (r, fvs) <- k con_name
-   return (r, addOneFV fvs $ unLoc con_name)
+   runWriterT $ censor (flip addOneFV $ unLoc con_name) $ k con_name
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
 
