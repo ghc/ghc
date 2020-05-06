@@ -1,0 +1,21 @@
+Breakpoint 0 activated at T3000.hs:4:8-27
+Breakpoint 0 was already set at T3000.hs:4:8-27
+Breakpoint 1 activated at T3000S.hs:9:9-27
+Breakpoint 1 was already set at T3000S.hs:9:9-27
+Breakpoint 2 activated at T3000S.hs:12:12-23
+Breakpoint 3 activated at T3000S.hs:13:12-32
+Breakpoint 4 activated at T3000S.hs:6:18-38
+Breakpoint 5 activated at T3000S.hs:7:18-36
+[0] Main T3000.hs:4:8-27 enabled
+[1] T3000S T3000S.hs:9:9-27 enabled
+[2] T3000S T3000S.hs:12:12-23 enabled
+[3] T3000S T3000S.hs:13:12-32 enabled
+[4] T3000S T3000S.hs:6:18-38 enabled
+[5] T3000S T3000S.hs:7:18-36 enabled
+Cannot set breakpoint on ‘xyz’: ‘xyz’ not in scope
+Cannot set breakpoint on ‘sshow’: ‘sshow’ not in scope
+Cannot set breakpoint on ‘S.hidden’: ‘S.hidden’ not in scope
+Cannot set breakpoint on ‘S.hidden.nest’: ‘S.hidden’ not in scope
+Cannot set breakpoint on ‘Foo.xyz’: ‘Foo.xyz’ not in scope
+Cannot set breakpoint on ‘T3000S’: Function name is missing
+Cannot set breakpoint on ‘T3000S.xyz’: No breakpoint found for ‘xyz’ in module ‘T3000S’
