@@ -70,8 +70,16 @@ typedef struct {
     // index of first *unused* queue entry
     uint32_t head;
 
+    // MARK_QUEUE_BLOCK_ENTRIES in length.
     MarkQueueEnt entries[];
 } MarkQueueBlock;
+
+// Number of blocks to allocate for a mark queue
+#define MARK_QUEUE_BLOCKS 16
+
+// The length of MarkQueueBlock.entries
+#define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
+
 
 // How far ahead in mark queue to prefetch?
 #define MARK_PREFETCH_QUEUE_DEPTH 5
@@ -81,11 +89,11 @@ typedef struct {
  * invariants:
  *
  *  a. top == blocks->start;
- *  b. there is always a valid MarkQueueChunk, although it may be empty
+ *  b. there is always a valid MarkQueueBlock, although it may be empty
  *     (e.g. top->head == 0).
  */
 typedef struct MarkQueue_ {
-    // A singly link-list of blocks, each containing a MarkQueueChunk.
+    // A singly link-list of blocks, each containing a MarkQueueBlock.
     bdescr *blocks;
 
     // Cached value of blocks->start.
@@ -110,12 +118,6 @@ typedef struct MarkQueue_ {
 typedef struct {
     MarkQueue queue;
 } UpdRemSet;
-
-// Number of blocks to allocate for a mark queue
-#define MARK_QUEUE_BLOCKS 16
-
-// The length of MarkQueueBlock.entries
-#define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
 extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects,
               *nonmoving_compact_objects, *nonmoving_marked_compact_objects;
