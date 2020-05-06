@@ -12,7 +12,7 @@ module GHC.Types.Cpr (
     TerminationFlag (Terminates),
     Cpr, topCpr, conCpr, whnfTermCpr, divergeCpr, lubCpr, asConCpr,
     CprType (..), topCprType, whnfTermCprType, conCprType, lubCprType, lubCprTypes,
-    pruneDeepCpr, splitConCprTy, applyCprTy, abstractCprTy,
+    pruneDeepCpr, markConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
     cprTransformDataConSig, UnboxingStrategy, cprTransformSig, argCprTypesFromStrictSig,
@@ -302,6 +302,21 @@ conCprType :: ConTag -> [CprType] -> CprType
 conCprType con_tag args = CprType 0 (conCpr con_tag cprs)
   where
     cprs = extractArgCprAndTermination args
+
+markConCprType :: DataCon -> CprType -> CprType
+markConCprType dc _ty@(CprType n cpr)
+  = ASSERT2( n == 0, ppr _ty ) CprType 0 (conCpr con_tag fields)
+  where
+    con_tag   = dataConTag dc
+    wkr_arity = dataConRepArity dc
+    fields    = case cpr of
+      NoMoreCpr (Term _ (Levitate (Con t terms)))
+        | con_tag == t       -> map NoMoreCpr terms
+      NoMoreCpr (Term _ Bot) -> replicate wkr_arity (NoMoreCpr botTerm)
+      Cpr _ (Levitate (Con t cprs))
+        | con_tag == t       -> cprs
+      Cpr _ Bot              -> replicate wkr_arity botCpr
+      _                      -> replicate wkr_arity topCpr
 
 splitConCprTy :: DataCon -> CprType -> Maybe [Cpr]
 splitConCprTy dc (CprType 0 (Cpr _ l))
