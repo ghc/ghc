@@ -300,7 +300,7 @@ static StgClosure *lock_tvar(Capability *cap,
 
   IF_NONMOVING_WRITE_BARRIER_ENABLED {
       if (result)
-          updateRemembSetPushClosure(cap->upd_rem_set, result);
+          updateRemembSetPushClosure(&cap->upd_rem_set, result);
   }
   return result;
 }
@@ -327,7 +327,7 @@ static StgBool cond_lock_tvar(Capability *cap,
   result = (StgClosure *)w;
   IF_NONMOVING_WRITE_BARRIER_ENABLED {
       if (result)
-          updateRemembSetPushClosure(cap->upd_rem_set, expected);
+          updateRemembSetPushClosure(&cap->upd_rem_set, expected);
   }
   TRACE("%p : %s", trec, result ? "success" : "failure");
   return (result == expected);
