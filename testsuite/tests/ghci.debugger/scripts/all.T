@@ -109,6 +109,7 @@ test('T1620', extra_files(['T1620/', 'T1620/T1620.hs']),
               ghci_script, ['T1620.script'])
 test('T2740', normal, ghci_script, ['T2740.script'])
 test('T2950', normal, ghci_script, ['T2950.script'])
+test('T3000', normal, ghci_script, ['T3000.script'])
 
 test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
 test('T7386', normal, ghci_script, ['T7386.script'])

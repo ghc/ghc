@@ -1,2 +1,2 @@
-cannot set breakpoint on map: module GHC.Base is not interpreted
-cannot set breakpoint on map: module GHC.Base is not interpreted
+Cannot set breakpoint on ‘Data.List.map’: Module ‘GHC.Base’ is not interpreted
+Cannot set breakpoint on ‘Data.List.map’: Module ‘GHC.Base’ is not interpreted

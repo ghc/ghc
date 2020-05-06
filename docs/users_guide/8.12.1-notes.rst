@@ -161,6 +161,11 @@ GHCi
   passed as arguments: either by enclosing the file names in double quotes or by
   escaping spaces in file names with a backslash. (:ghc-ticket:`18027`)
 
+- The GHCi debugger syntax ``:break <qualified.name>`` now allows to set
+  breakpoints on all functions. The restrictions ``top-Level`` and ``exported``
+  have been removed. Hence it's now possible to use this syntax to set
+  breakpoints on functions defined in nested ``where`` or ``let`` clauses.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

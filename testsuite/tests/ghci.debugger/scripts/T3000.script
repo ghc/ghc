@@ -1,0 +1,16 @@
+:l T3000
+:break main
+:break Main.main
+:break T3000S.sshow
+:break S.sshow
+:break T3000S.hidden
+:break T3000S.sshow.nest
+:show breaks
+-- Generate some error messages
+:break xyz
+:break sshow
+:break S.hidden
+:break S.hidden.nest
+:break Foo.xyz
+:break T3000S
+:break T3000S.xyz
