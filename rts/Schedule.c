@@ -2504,7 +2504,7 @@ resumeThread (void *task_)
     incall->suspended_cap = NULL;
     // we will modify tso->_link
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
-        updateRemembSetPushClosure(cap, (StgClosure *)tso->_link);
+        updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *)tso->_link);
     }
     tso->_link = END_TSO_QUEUE;
 

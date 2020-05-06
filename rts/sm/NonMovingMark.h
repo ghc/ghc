@@ -158,6 +158,8 @@ extern MarkQueue *current_mark_queue;
 extern bdescr *upd_rem_set_block_list;
 
 
+struct MarkContext;
+
 void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
@@ -186,17 +188,14 @@ void nonmovingMarkDeadWeaks(struct MarkQueue_ *queue, StgWeak **dead_weak_ptr_li
 void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_threads);
 bool nonmovingIsAlive(StgClosure *p);
 void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w);
-void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w);
 void nonmovingAddUpdRemSetBlocks(UpdRemSet *rset);
 
-void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
+//void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
 void markQueuePushClosureGC(UpdRemSet *q, StgClosure *p);
 void markQueuePushClosure(MarkQueue *q,
-                             StgClosure *p,
-                             StgClosure **origin);
+                          StgClosure *p,
+                          StgClosure **origin);
 void markQueuePushClosure_(MarkQueue *q, StgClosure *p);
-void markQueuePushThunkSrt(MarkQueue *q, const StgInfoTable *info);
-void markQueuePushFunSrt(MarkQueue *q, const StgInfoTable *info);
 void markQueuePushArray(MarkQueue *q, const StgMutArrPtrs *array, StgWord start_index);
 void updateRemembSetPushThunkEager(Capability *cap,
                                   const StgThunkInfoTable *orig_info,
