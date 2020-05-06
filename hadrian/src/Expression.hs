@@ -26,6 +26,7 @@ import Base
 import Builder
 import Context hiding (stage, package, way)
 import Expression.Type
+import Oracles.Flag
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
@@ -98,6 +99,13 @@ stage2 = stage Stage2
 -- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
 notStage0 = notM stage0
+
+-- | Whether or not the bootstrapping compiler provides a threaded RTS. We need
+--   to know this when building stage 1, since stage 1 links against the
+--   compiler's RTS ways. See Note [Linking ghc-bin against threaded stage0 RTS]
+--   in Settings.Packages for details.
+threadedBootstrapper :: Predicate
+threadedBootstrapper = expr (flag BootstrapThreadedRts)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
