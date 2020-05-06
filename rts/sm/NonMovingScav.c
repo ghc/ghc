@@ -33,9 +33,9 @@ nonmovingScavengeOne (StgClosure *q)
             mvar->header.info = &stg_MVAR_DIRTY_info;
 
             // Note [Dirty flags in the non-moving collector] in NonMoving.c
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->head);
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->tail);
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->value);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) mvar->head);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) mvar->tail);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) mvar->value);
         } else {
             mvar->header.info = &stg_MVAR_CLEAN_info;
         }
@@ -53,8 +53,8 @@ nonmovingScavengeOne (StgClosure *q)
             tvar->header.info = &stg_TVAR_DIRTY_info;
 
             // Note [Dirty flags in the non-moving collector] in NonMoving.c
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->current_value);
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->first_watch_queue_entry);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) tvar->current_value);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) tvar->first_watch_queue_entry);
         } else {
             tvar->header.info = &stg_TVAR_CLEAN_info;
         }
@@ -178,7 +178,7 @@ nonmovingScavengeOne (StgClosure *q)
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
 
             // Note [Dirty flags in the non-moving collector] in NonMoving.c
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mv->var);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) mv->var);
         } else {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
         }
