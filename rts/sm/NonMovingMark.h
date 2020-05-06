@@ -83,6 +83,11 @@ typedef struct {
 // The length of MarkQueueBlock.entries
 #define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
+INLINE_HEADER bool markQueueBlockIsFull(MarkQueueBlock *b)
+{
+    return b->head == MARK_QUEUE_BLOCK_ENTRIES;
+}
+
 INLINE_HEADER MarkQueueBlock *markQueueBlockFromBdescr(bdescr *bd)
 {
     return (MarkQueueBlock *) bd->start;
@@ -121,13 +126,15 @@ typedef struct MarkQueue_ {
 #endif
 } MarkQueue;
 
-/* While it shares its representation with MarkQueue, UpdRemSet differs in
- * behavior when pushing; namely full chunks are immediately pushed to the
- * global update remembered set, not accumulated into a chain. We make this
- * distinction apparent in the types.
+/* The update remembered set.
+ *
+ * invariants:
+ *
+ *  a. top is a valid MarkQueueBlock (but with no chained blocks).
+ *
  */
 typedef struct {
-    MarkQueue queue;
+    MarkQueueBlock *block;
 } UpdRemSet;
 
 extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects,
@@ -177,10 +184,10 @@ void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_th
 bool nonmovingIsAlive(StgClosure *p);
 void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w);
 void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w);
-void nonmovingAddUpdRemSetBlocks(struct MarkQueue_ *rset);
+void nonmovingAddUpdRemSetBlocks(UpdRemSet *rset);
 
 void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
-void markQueuePushClosureGC(MarkQueue *q, StgClosure *p);
+void markQueuePushClosureGC(UpdRemSet *q, StgClosure *p);
 void markQueuePushClosure(MarkQueue *q,
                              StgClosure *p,
                              StgClosure **origin);
@@ -194,7 +201,13 @@ void updateRemembSetPushThunkEager(Capability *cap,
 
 INLINE_HEADER bool markQueueIsEmpty(MarkQueue *q)
 {
-    return (q->top->head == 0 && markQueueBlockBdescr(q->top)->link == NULL);
+    return q->top->head == 0 && markQueueBlockBdescr(q->top)->link == NULL;
+}
+
+INLINE_HEADER bool updRemSetIsEmpty(UpdRemSet *q)
+{
+    ASSERT(markQueueBlockBdescr(q->block)->link == NULL);
+    return q->block->head == 0;
 }
 
 #if defined(DEBUG)

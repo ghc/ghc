@@ -112,7 +112,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             //
             // See Note [Non-moving GC: Marking evacuated objects].
             if (major_gc && !deadlock_detect_gc)
-                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
+                markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) to);
             return to;
         }
     }
@@ -406,7 +406,7 @@ evacuate_large(StgPtr p)
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
 
       // See Note [Non-moving GC: Marking evacuated objects].
-      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) p);
+      markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) p);
   }
   initBdescr(bd, new_gen, new_gen->to);
 
@@ -445,7 +445,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
         // See Note [Static objects under the nonmoving collector] in Storage.c.
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
         return;
     }
 
@@ -500,7 +500,7 @@ evacuate_compact (StgPtr p)
         // we need to make sure it is added to the mark queue since the only
         // reference to it may be from the moving heap.
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) str);
         return;
     }
 
@@ -563,7 +563,7 @@ evacuate_compact (StgPtr p)
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
 
       // See Note [Non-moving GC: Marking evacuated objects].
-      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+      markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) str);
     }
     initBdescr(bd, new_gen, new_gen->to);
 
@@ -715,7 +715,7 @@ loop:
           // BF_NONMOVING. Those are moved to scavenged_large_objects list in
           // mark phase.
           if (major_gc && !deadlock_detect_gc)
-              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+              markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
           return;
       }
 
@@ -1057,7 +1057,7 @@ evacuate_BLACKHOLE(StgClosure **p)
 
     if (RTS_UNLIKELY(RELAXED_LOAD(&bd->flags) & BF_NONMOVING)) {
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
         return;
     }
 
