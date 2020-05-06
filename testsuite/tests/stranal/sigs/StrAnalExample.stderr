@@ -6,7 +6,7 @@ StrAnalExample.foo: <S,1*U>
 
 
 ==================== Cpr signatures ====================
-StrAnalExample.$trModule: m1
+StrAnalExample.$trModule:
 StrAnalExample.foo:
 
 
