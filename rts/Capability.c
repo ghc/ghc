@@ -293,7 +293,7 @@ initCapability (Capability *cap, uint32_t i)
 
     // At this point storage manager is not initialized yet, so this will be
     // initialized in initStorage().
-    cap->upd_rem_set.queue.top = NULL;
+    cap->upd_rem_set.block = NULL;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         cap->mut_lists[g] = NULL;

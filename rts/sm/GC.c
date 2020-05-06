@@ -743,7 +743,7 @@ GarbageCollect (uint32_t collect_gen,
   if (RtsFlags.GcFlags.useNonmoving) {
       RELEASE_SM_LOCK;
       for (n = 0; n < n_capabilities; n++) {
-          nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
+          nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set);
       }
       ACQUIRE_SM_LOCK;
   }
@@ -777,7 +777,7 @@ GarbageCollect (uint32_t collect_gen,
 #if !defined(THREADED_RTS)
       // In the non-threaded runtime this is the only time we push to the
       // upd_rem_set
-      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set);
 #endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
       ACQUIRE_SM_LOCK;
