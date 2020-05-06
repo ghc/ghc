@@ -66,6 +66,9 @@ INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
     return tag;
 }
 
+/*
+ * A block containing a dense array of MarkQueueEnts.
+ */
 typedef struct {
     // index of first *unused* queue entry
     uint32_t head;
@@ -80,6 +83,15 @@ typedef struct {
 // The length of MarkQueueBlock.entries
 #define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
+INLINE_HEADER MarkQueueBlock *markQueueBlockFromBdescr(bdescr *bd)
+{
+    return (MarkQueueBlock *) bd->start;
+}
+
+INLINE_HEADER bdescr *markQueueBlockBdescr(MarkQueueBlock *b)
+{
+    return Bdescr((StgPtr) b);
+}
 
 // How far ahead in mark queue to prefetch?
 #define MARK_PREFETCH_QUEUE_DEPTH 5
@@ -88,15 +100,14 @@ typedef struct {
  *
  * invariants:
  *
- *  a. top == blocks->start;
- *  b. there is always a valid MarkQueueBlock, although it may be empty
- *     (e.g. top->head == 0).
+ *  a. top is a valid chain of MarkQueueBlocks (linked through bdescr.link)
+ *     with at least one block.
  */
 typedef struct MarkQueue_ {
-    // A singly link-list of blocks, each containing a MarkQueueBlock.
-    bdescr *blocks;
-
-    // Cached value of blocks->start.
+    // A list of MarkQueueBlocks, linked together by bdescr.link (which points to the next bdescr).
+    // e.g. the next MarkQueueBlock of MarkQueue q would be
+    //
+    //     Bdescr(q->top)->link->start
     MarkQueueBlock *top;
 
     // Is this a mark queue or a capability-local update remembered set?
@@ -183,7 +194,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
 
 INLINE_HEADER bool markQueueIsEmpty(MarkQueue *q)
 {
-    return (q->blocks == NULL) || (q->top->head == 0 && q->blocks->link == NULL);
+    return (q->top->head == 0 && markQueueBlockBdescr(q->top)->link == NULL);
 }
 
 #if defined(DEBUG)

@@ -1137,8 +1137,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingGcCafs();
 #endif
 
-    ASSERT(mark_queue->top->head == 0);
-    ASSERT(mark_queue->blocks->link == NULL);
+    ASSERT(markQueueIsEmpty(mark_queue));
 
     // Update oldest_gen thread and weak lists
     // Note that we need to append these lists as a concurrent minor GC may have

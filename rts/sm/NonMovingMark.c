@@ -274,7 +274,7 @@ void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
     if (markQueueIsEmpty(rset)) return;
 
     // find the tail of the queue
-    bdescr *start = rset->blocks;
+    bdescr *start = markQueueBlockBdescr(rset->top);
     bdescr *end = start;
     while (end->link != NULL)
         end = end->link;
@@ -431,8 +431,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
             // allocate a fresh block.
             ACQUIRE_SM_LOCK;
             bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
-            bd->link = q->blocks;
-            q->blocks = bd;
+            bd->link = markQueueBlockBdescr(q->top);
             q->top = (MarkQueueBlock *) bd->start;
             q->top->head = 0;
             RELEASE_SM_LOCK;
@@ -469,8 +468,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
         // allocate a fresh block.
         ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
-        bd->link = q->blocks;
-        q->blocks = bd;
+        bd->link = markQueueBlockBdescr(q->top);
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
         RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
@@ -808,16 +806,16 @@ again:
 
     // Are we at the beginning of the block?
     if (top->head == 0) {
-        // Is this the first block of the queue?
-        if (q->blocks->link == NULL) {
+        bdescr *old_block = markQueueBlockBdescr(q->top);
+        // Is this the only block in the queue?
+        if (old_block->link == NULL) {
             // Yes, therefore queue is empty...
             MarkQueueEnt none = { .null_entry = { .p = NULL } };
             return none;
         } else {
             // No, unwind to the previous block and try popping again...
-            bdescr *old_block = q->blocks;
-            q->blocks = old_block->link;
-            q->top = (MarkQueueBlock*)q->blocks->start;
+            bdescr *new_block = old_block->link;
+            q->top = (MarkQueueBlock*) new_block->start;
             ACQUIRE_SM_LOCK;
             freeGroup(old_block); // TODO: hold on to a block to avoid repeated allocation/deallocation?
             RELEASE_SM_LOCK;
@@ -879,7 +877,6 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
 static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
-    queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
 #if MARK_PREFETCH_QUEUE_DEPTH > 0
@@ -906,13 +903,13 @@ void reset_upd_rem_set (UpdRemSet *rset)
 {
     // UpdRemSets always have one block for the mark queue. This assertion is to
     // update this code if we change that.
-    ASSERT(rset->queue.blocks->link == NULL);
+    ASSERT(markQueueBlockBdescr(rset->queue.top)->link == NULL);
     rset->queue.top->head = 0;
 }
 
 void freeMarkQueue (MarkQueue *queue)
 {
-    freeChain_lock(queue->blocks);
+    freeChain_lock(markQueueBlockBdescr(queue->top));
 }
 
 #if defined(THREADED_RTS) && defined(DEBUG)
@@ -920,7 +917,7 @@ static uint32_t
 markQueueLength (MarkQueue *q)
 {
     uint32_t n = 0;
-    for (bdescr *block = q->blocks; block; block = block->link) {
+    for (bdescr *block = markQueueBlockBdescr(q->top); block; block = block->link) {
         MarkQueueBlock *queue = (MarkQueueBlock*)block->start;
         n += queue->head;
     }
@@ -1715,9 +1712,8 @@ nonmovingMark (MarkQueue *queue)
             // Perhaps the update remembered set has more to mark...
             if (upd_rem_set_block_list) {
                 ACQUIRE_LOCK(&upd_rem_set_lock);
-                bdescr *old = queue->blocks;
-                queue->blocks = upd_rem_set_block_list;
-                queue->top = (MarkQueueBlock *) queue->blocks->start;
+                bdescr *old = markQueueBlockBdescr(queue->top);
+                queue->top = (MarkQueueBlock *) upd_rem_set_block_list->start;
                 upd_rem_set_block_list = NULL;
                 RELEASE_LOCK(&upd_rem_set_lock);
 
@@ -1966,7 +1962,7 @@ void printMarkQueueEntry (MarkQueueEnt *ent)
 void printMarkQueue (MarkQueue *q)
 {
     debugBelch("======== MARK QUEUE ========\n");
-    for (bdescr *block = q->blocks; block; block = block->link) {
+    for (bdescr *block = markQueueBlockBdescr(q->top); block; block = block->link) {
         MarkQueueBlock *queue = (MarkQueueBlock*)block->start;
         for (uint32_t i = 0; i < queue->head; ++i) {
             printMarkQueueEntry(&queue->entries[i]);
