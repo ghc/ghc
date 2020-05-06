@@ -4,8 +4,10 @@
 
 -}
 
-{-# LANGUAGE CPP, RankNTypes, TupleSections #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -291,11 +293,14 @@ Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 -}
 
 --------------------
+
 type Checker inp out =  forall r.
                           inp
                        -> PatEnv
-                       -> TcM r
-                       -> TcM (out, r)
+                       -> TcM r      -- Thing inside
+                       -> TcM ( out
+                              , r    -- Result of thing inside
+                              )
 
 tcMultiple :: Checker inp out -> Checker [inp] [out]
 tcMultiple tc_pat args penv thing_inside
@@ -324,7 +329,7 @@ tc_lpat :: LPat GhcRn
         -> TcM (LPat GhcTcId, a)
 tc_lpat (L span pat) pat_ty penv thing_inside
   = setSrcSpan span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
+    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty pat penv)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -339,29 +344,28 @@ tc_lpats penv pats tys thing_inside
                 penv thing_inside
 
 --------------------
-tc_pat  :: PatEnv
-        -> Pat GhcRn
-        -> ExpSigmaType  -- Fully refined result type
-        -> TcM a                -- Thing inside
-        -> TcM (Pat GhcTcId,    -- Translated pattern
-                a)              -- Result of thing inside
+tc_pat  :: ExpSigmaType
+        -- ^ Fully refined result type
+        -> Checker (Pat GhcRn) (Pat GhcTcId)
+        -- ^ Translated pattern
+tc_pat pat_ty ps_pat penv thing_inside = case ps_pat of
 
-tc_pat penv (VarPat x (L l name)) pat_ty thing_inside
-  = do  { (wrap, id) <- tcPatBndr penv name pat_ty
+  VarPat x (L l name) -> do
+        { (wrap, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name id thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 
-tc_pat penv (ParPat x pat) pat_ty thing_inside
-  = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+  ParPat x pat -> do
+        { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
         ; return (ParPat x pat', res) }
 
-tc_pat penv (BangPat x pat) pat_ty thing_inside
-  = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+  BangPat x pat -> do
+        { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
         ; return (BangPat x pat', res) }
 
-tc_pat penv (LazyPat x pat) pat_ty thing_inside
-  = do  { (pat', (res, pat_ct))
+  LazyPat x pat -> do
+        { (pat', (res, pat_ct))
                 <- tc_lpat pat pat_ty (makeLazy penv) $
                    captureConstraints thing_inside
                 -- Ignore refined penv', revert to penv
@@ -376,13 +380,13 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
 
         ; return (LazyPat x pat', res) }
 
-tc_pat _ (WildPat _) pat_ty thing_inside
-  = do  { res <- thing_inside
+  WildPat _ -> do
+        { res <- thing_inside
         ; pat_ty <- expTypeToType pat_ty
         ; return (WildPat pat_ty, res) }
 
-tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
-  = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+  AsPat x (L nm_loc name) pat -> do
+        { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat pat (mkCheckExpType $ idType bndr_id)
                                  penv thing_inside
@@ -397,8 +401,8 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty,
                   res) }
 
-tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
-  = do  {
+  ViewPat _ expr pat -> do
+       {
          -- We use tcInferRho here.
          -- If we have a view function with types like:
          --    blah -> forall b. burble
@@ -420,25 +424,25 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
             -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_ty)
 
          -- Check that overall pattern is more polymorphic than arg type
-        ; expr_wrap2 <- tc_sub_type penv overall_pat_ty inf_arg_ty
-            -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
+        ; expr_wrap2 <- tc_sub_type penv pat_ty inf_arg_ty
+            -- expr_wrap2 :: pat_ty "->" inf_arg_ty
 
          -- Pattern must have inf_res_ty
         ; (pat', res) <- tc_lpat pat (mkCheckExpType inf_res_ty) penv thing_inside
 
-        ; overall_pat_ty <- readExpType overall_pat_ty
+        ; pat_ty <- readExpType pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
-                                    overall_pat_ty inf_res_ty doc
+                                    pat_ty inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
-               --                (overall_pat_ty -> inf_res_ty)
+               --                (pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
-        ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
+        ; return (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
-tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
-  = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
+  SigPat _ pat sig_ty -> do
+        { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
                 -- Using tcExtendNameTyVarEnv is appropriate here
                 -- because we're not really bringing fresh tyvars into scope.
@@ -452,8 +456,8 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
 
 ------------------------
 -- Lists, tuples, arrays
-tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv pat_ty
+  ListPat Nothing pats -> do
+        { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty))
                                      pats penv thing_inside
         ; pat_ty <- readExpType pat_ty
@@ -461,8 +465,8 @@ tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
                          (ListPat (ListPatTc elt_ty Nothing) pats') pat_ty, res)
 }
 
-tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
-  = do  { tau_pat_ty <- expTypeToType pat_ty
+  ListPat (Just e) pats -> do
+        { tau_pat_ty <- expTypeToType pat_ty
         ; ((pats', res, elt_ty), e')
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
@@ -473,8 +477,8 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
 }
 
-tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
-  = do  { let arity = length pats
+  TuplePat _ pats boxity -> do
+        { let arity = length pats
               tc = tupleTyCon boxity arity
               -- NB: tupleTyCon does not flatten 1-tuples
               -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
@@ -506,8 +510,8 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
-tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
-  = do  { let tc = sumTyCon arity
+  SumPat _ pat alt arity  -> do
+        { let tc = sumTyCon arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv pat_ty
         ; -- Drop levity vars, we don't care about them here
@@ -521,13 +525,13 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat penv (ConPat NoExtField con arg_pats) pat_ty thing_inside
-  = tcConPat penv con pat_ty arg_pats thing_inside
+  ConPat NoExtField con arg_pats ->
+    tcConPat penv con pat_ty arg_pats thing_inside
 
 ------------------------
 -- Literal patterns
-tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
-  = do  { let lit_ty = hsLitType simple_lit
+  LitPat x simple_lit -> do
+        { let lit_ty = hsLitType simple_lit
         ; wrap   <- tc_sub_type penv pat_ty lit_ty
         ; res    <- thing_inside
         ; pat_ty <- readExpType pat_ty
@@ -552,8 +556,8 @@ tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
 -- where lit_ty is the type of the overloaded literal 5.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
-tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
-  = do  { let orig = LiteralOrigin over_lit
+  NPat _ (L l over_lit) mb_neg eq -> do
+        { let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType pat_ty, SynAny]
                           (mkCheckExpType boolTy) $
@@ -601,10 +605,9 @@ AST is used for the subtraction operation.
 -}
 
 -- See Note [NPlusK patterns]
-tc_pat penv (NPlusKPat _ (L nm_loc name)
-               (L loc lit) _ ge minus) pat_ty
-              thing_inside
-  = do  { pat_ty <- expTypeToType pat_ty
+  NPlusKPat _ (L nm_loc name)
+               (L loc lit) _ ge minus -> do
+        { pat_ty <- expTypeToType pat_ty
         ; let orig = LiteralOrigin lit
         ; (lit1', ge')
             <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
@@ -650,12 +653,11 @@ tc_pat penv (NPlusKPat _ (L nm_loc name)
 -- Here we get rid of it and add the finalizers to the global environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
-tc_pat penv (SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)))
-            pat_ty thing_inside
-  = do addModFinalizersWithLclEnv mod_finalizers
-       tc_pat penv pat pat_ty thing_inside
+  SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)) -> do
+       addModFinalizersWithLclEnv mod_finalizers
+       tc_pat pat_ty pat penv thing_inside
 
-tc_pat _ _other_pat _ _ = panic "tc_pat"        -- ConPatOut, SigPatOut
+  _other_pat -> panic "tc_pat"
 
 
 {-
