@@ -544,20 +544,17 @@ not False               =  True
 -- These don't really belong here, but we don't have a better place to
 -- put them
 
--- These functions have built-in rules.
-{-# NOINLINE [0] divInt# #-}
-{-# NOINLINE [0] modInt# #-}
+{-# INLINEABLE divInt# #-}
 divInt# :: Int# -> Int# -> Int#
-x# `divInt#` y#
-        -- Be careful NOT to overflow if we do any additional arithmetic
-        -- on the arguments...  the following  previous version of this
-        -- code has problems with overflow:
---    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
---    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
-    =      if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
-      else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
-      else x# `quotInt#` y#
+x `divInt#` y = ((x -# k) `quotInt#` y) -# c
+   where
+      sgn v = (v ># 0#) -# (v <# 0#)
+      !sy   = sgn y
+      !sx   = sgn x
+      !c    = (sx *# sy) <# 0#
+      !k    = sx *# c
 
+{-# NOINLINE [0] modInt# #-}
 modInt# :: Int# -> Int# -> Int#
 x# `modInt#` y#
     = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
