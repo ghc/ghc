@@ -14,6 +14,8 @@
 #include "Prelude.h"
 #include "Capability.h"
 #include "Schedule.h"
+#include "Rts.h"
+#include "ThreadLabels.h"
 
 #include <stdbool.h>
 #include <windows.h>
@@ -99,7 +101,8 @@
     `processRemoteCompletion` will process IO results invoking call backs and
    processing timer events. Once done it resets `outstanding_service_requests`
    and wakes up the IOManager thread. Which at this point becomes unblocked
-   and reenters the altertable wait state.
+   and reenters the altertable wait state. This is done by calling into
+   registerAlterableWait.
 
    As a design decision to keep this side as light as possible no bookkeeping
    is done here to track requests.  That is, this file has no way of knowing
@@ -122,29 +125,48 @@
     Note [Notifying the RTS/Haskell of completed events]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  notifyRtsOfFinishedCall can't directly create a haskell thread.
+  The C side runner can't directly create a haskell thread.
   With the current API of the haskell runtime this would be terrible
   unsound. In particular the GC assumes no heap objects are generated,
   and no heap memory is requested while it is running.
 
   To work around this the scheduler invokes queueIOThread which checks
-  if a new thread should be created. Since we only use this code path
-  in the non-threaded runtime this is safe. The scheduler is never
-  running concurrently with the GC or Mutator.
+  if a (haskell) thread should be created to process IO requests.
+  Since we only use this code path in the non-threaded runtime this
+  ensures there is only one OS thread at a time making use of the haskell
+  heap.
+
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Note [Non-Threaded IO Manager startup sequence]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Under the new IO Manager we run a bit of initialization under
+  hs_init(). The first call into actual IO manager code is a
+  invocation of startupAsyncWinIO();
+
+  There we initialize IO manager locale variables and.
+  * call ioManagerStart()
+  * Creat a thread to execute "runner"
+
+  We never truely shut down the IO Manager. While this means we
+  might block forever on the IOPort if the IO Manager is no longer
+  needed we consider this cheap compared to the complexity of
+  properly handling pausing and resuming of the manager.
 
    */
 
 /* The IOCP Handle all I/O requests are associated with for this RTS.  */
 static HANDLE completionPortHandle = INVALID_HANDLE_VALUE;
 /* Number of currently still outstanding I/O requests.  */
-uint64_t outstanding_requests = 0;
+static volatile uint64_t outstanding_requests = 0;
 /* Boolean controlling if the I/O manager is/should still be running.  */
-bool running = false;
+static bool running = false;
+
 /* Boolean to indicate whether we have outstanding I/O requests that still need
    to be processed by the I/O manager on the Haskell side.
     Set by:
-      notifyRtsOfFinishedCall (true)
-      servicedIOEntries (false)
+      notifyScheduler (true)
+      registerAlertableWait (false)
     Read by:
       runner
    */
@@ -156,38 +178,39 @@ volatile bool outstanding_service_requests = false;
     Set by:
       runner
     Read by:
-      servicedIOEntries
+      registerAlertableWait
 */
-bool queue_full = false;
+static bool queue_full = false;
 
 /* Timeout to use for the next alertable wait.  INFINITE means never timeout.
    Also see note [WINIO Timer management].  */
-DWORD timeout = INFINITE;
-DWORD WINAPI runner (LPVOID lpParam);
-HANDLE workerThread = NULL;
-DWORD workerThreadId = 0;
+static DWORD timeout = INFINITE;
+
+static HANDLE workerThread = NULL;
+static DWORD workerThreadId = 0;
 
 /* Synchronization mutex for modifying the above state variables in a thread
    safe way.  */
-SRWLOCK lock;
+static SRWLOCK wio_runner_lock;
+
 /* Conditional variable to wake the I/O manager up from a non-alertable waiting
    state.  */
-CONDITION_VARIABLE wakeEvent;
-/* Conditional variable to force the system thread to wait for a request to
+static CONDITION_VARIABLE wakeEvent;
+/* Conditional variable to force the system (haskell) thread to wait for a request to
    complete.  */
-CONDITION_VARIABLE threadIOWait;
+static CONDITION_VARIABLE threadIOWait;
 
 /* Number of callbacks to reserve slots for in ENTRIES.  This is also the
    total number of concurrent I/O requests we can handle in one go.  */
-uint32_t num_callbacks = 32;
+static uint32_t num_callbacks = 32;
 /* Buffer for I/O request information.  */
-OVERLAPPED_ENTRY *entries;
+static OVERLAPPED_ENTRY *entries;
 /* Number of I/O calls verified to have completed in the last round by the
    Haskell I/O Manager.  */
-uint32_t num_last_completed;
+static uint32_t num_last_completed;
 
 /* Notify the Haskell side of this many new finished requests */
-uint32_t num_notify;
+static uint32_t num_notify;
 
 /* Indicates to the scheduler that new work is available for processing.
     Set by:
@@ -200,17 +223,20 @@ static volatile bool canQueueIOThread;
 
 static void notifyScheduler(uint32_t num);
 
-// static void notifyRtsOfFinishedCall (uint32_t num);
+static DWORD WINAPI runner (LPVOID lpParam);
 
-/* Create and initialize the non-threaded I/O manager.  */
+/* Create and initialize the non-threaded I/O manager.
+
+   Called just once from hs_init.  */
 bool startupAsyncWinIO(void)
 {
+  ASSERT(!running);
   running = true;
   outstanding_service_requests = false;
   completionPortHandle = INVALID_HANDLE_VALUE;
   outstanding_requests = 0;
 
-  InitializeSRWLock (&lock);
+  InitializeSRWLock (&wio_runner_lock);
   InitializeConditionVariable (&wakeEvent);
   InitializeConditionVariable (&threadIOWait);
 
@@ -239,7 +265,7 @@ void shutdownAsyncWinIO(bool wait_threads)
     {
       if (wait_threads)
         {
-          AcquireSRWLockExclusive (&lock);
+          AcquireSRWLockExclusive (&wio_runner_lock);
 
           running = false;
           ioManagerWakeup ();
@@ -247,7 +273,7 @@ void shutdownAsyncWinIO(bool wait_threads)
           WakeConditionVariable (&wakeEvent);
           WakeConditionVariable (&threadIOWait);
 
-          ReleaseSRWLockExclusive (&lock);
+          ReleaseSRWLockExclusive (&wio_runner_lock);
 
           /* Now wait for the thread to actually finish.  */
           WaitForSingleObject (workerThread, INFINITE);
@@ -267,11 +293,11 @@ void shutdownAsyncWinIO(bool wait_threads)
    monitoring.  All handles are expected to be associated with this handle.  */
 void registerNewIOCPHandle (HANDLE port)
 {
-  AcquireSRWLockExclusive (&lock);
+  AcquireSRWLockExclusive (&wio_runner_lock);
 
   completionPortHandle = port;
 
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 }
 
 /* Callback hook so the Haskell part of the I/O manager can notify this manager
@@ -280,28 +306,65 @@ void registerNewIOCPHandle (HANDLE port)
 
 void completeSynchronousRequest (void)
 {
-  AcquireSRWLockExclusive (&lock);
+  AcquireSRWLockExclusive (&wio_runner_lock);
 
   WakeConditionVariable (&threadIOWait);
 
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 }
 
 
-/* Register a new I/O request that the I/O manager should handle. PORT is the
-   completion port handle that the request is associated with, MSSEC is the
-   maximum amount of time in milliseconds that an alertable wait should be done
-   for before the RTS requested to be notified of progress and NUM_REQ is the
-   total overall number of outstanding I/O requests.  */
+/* Register outstanding I/O requests that the I/O manager should handle.
 
-void registerAlertableWait (HANDLE port, DWORD mssec, uint64_t num_req)
+   This function will unblock the runner if it has been blocked in an
+   non-alertable wait. It might end an alertable wait as well but this
+   depends on the exact parameters provided.
+
+   The haskell side will call this to inform the runner either about new
+   I/O requests or to update the number of outstanding requests after
+   processing a bundle.
+
+   * has_timeout tells us if the mssec parameter is valid.
+   * MSSEC is the maximum amount of time in milliseconds that an alertable wait
+      should be done for before the haskell side requested to be notified of progress.
+   * NUM_REQ is the total overall number of outstanding I/O requests.
+   * outstanding_service indicates that there might be still a outstanding service
+     request queued and therefore we shouldn't unblock the runner quite yet.
+
+   `outstanding_service` is needed in case we cancel an IO operation. We don't want this
+   to result in two processRemoteCompletion threads being queued. As this is both harder
+   to reason about and bad for performance. So we only reset outstanding_service_requests
+   if no service is pending.
+
+   */
+
+void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service)
 {
-  bool interrupt = false;
-  bool wakeup = false;
-  AcquireSRWLockExclusive (&lock);
+  ASSERT(completionPortHandle != INVALID_HANDLE_VALUE);
+  AcquireSRWLockExclusive (&wio_runner_lock);
 
-  /* Decide if we may have to wake up the I/O manager.  */
-  wakeup = outstanding_requests == 0 && num_req > 0;
+  bool interrupt = false;
+  outstanding_requests = num_req;
+
+  if (outstanding_requests <= 0 && !has_timeout) {
+    timeout = INFINITE;
+  }
+  else if(has_timeout) {
+    timeout = mssec;
+  }
+  outstanding_service_requests = pending_service;
+
+  //Resize queue if required
+  if (queue_full)
+  {
+    num_callbacks *= 2;
+    OVERLAPPED_ENTRY *new
+      = realloc (entries,
+                  sizeof (OVERLAPPED_ENTRY) * num_callbacks);
+    if (new)
+      entries = new;
+    queue_full = false;
+  }
 
   outstanding_requests = num_req;
   /* If the new timeout is earlier than the old one we have to reschedule the
@@ -313,12 +376,16 @@ void registerAlertableWait (HANDLE port, DWORD mssec, uint64_t num_req)
       interrupt = true;
     }
 
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 
-  if (wakeup)
-    WakeConditionVariable (&wakeEvent);
-  else if (interrupt)
-    PostQueuedCompletionStatus (port, 0, 0, NULL);
+  // Since we call registerAlertableWait only after
+  // processing I/O requests it's always desireable to wake
+  // up the runner here.
+  WakeConditionVariable (&wakeEvent);
+
+  if (interrupt) {
+    PostQueuedCompletionStatus (completionPortHandle, 0, 0, NULL);
+  }
 }
 
 /* Exported callback function that will be called by the RTS to collect the
@@ -326,10 +393,10 @@ void registerAlertableWait (HANDLE port, DWORD mssec, uint64_t num_req)
    number of read entries will be returned in NUM.
 
    NOTE: This function isn't thread safe, but is intended to be called only
-         when requested to by the I/O manager via notifyRtsOfFinishedCall.  In
+         when requested by the I/O manager via notifyScheduler.  In
          that context it is thread safe as we're guaranteeing that the I/O
          manager is blocked waiting for the read to happen followed by a
-         servicedIOEntries call.   */
+         registerAlertableWait call.  */
 OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num)
 {
   *num = num_last_completed;
@@ -346,76 +413,48 @@ void awaitAsyncRequests (bool wait)
   if(queueIOThread()) {
     return;
   }
-  AcquireSRWLockExclusive (&lock);
+  AcquireSRWLockExclusive (&wio_runner_lock);
   /* We don't deal with spurious requests here, that's left up to AwaitEvent.c
      because in principle we need to check if the capability work queue is now
      not empty but we can't do that here.  Also these locks don't guarantee
      fairness, as such a request may have completed without us seeing a
      timeslice in between.  */
   if (wait && outstanding_service_requests)
-    SleepConditionVariableSRW (&threadIOWait, &lock, INFINITE, 0);
+    SleepConditionVariableSRW (&threadIOWait, &wio_runner_lock, INFINITE, 0);
 
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 }
 
 
-/* Exported function that will be called by the RTS in order to indicate that
-   the RTS has successfully finished servicing I/O request returned with
-   getOverlappedEntries.  Some of the overlapped requests may not have been
-   an I/O request so the RTS also returns the amount of REMAINING overlapped
-   entried it still expects to be processed.  */
-
-void servicedIOEntries (uint64_t remaining)
-{
-  AcquireSRWLockExclusive (&lock);
-
-  outstanding_requests = remaining;
-  if (outstanding_requests <= 0)
-    timeout = INFINITE;
-  outstanding_service_requests = false;
-
-  if (queue_full)
-  {
-    num_callbacks *= 2;
-    OVERLAPPED_ENTRY *new
-      = realloc (entries,
-                  sizeof (OVERLAPPED_ENTRY) * num_callbacks);
-    if (new)
-      entries = new;
-  }
-
-  ReleaseSRWLockExclusive (&lock);
-
-  WakeConditionVariable (&wakeEvent);
-}
 
 /* Sets `canQueueIOThread` to indicate to the scheduler that it should
    queue a new haskell thread to process IO events. */
 static void notifyScheduler(uint32_t num) {
-  AcquireSRWLockExclusive (&lock);
+  AcquireSRWLockExclusive (&wio_runner_lock);
   ASSERT(!canQueueIOThread);
   canQueueIOThread = true;
   num_notify = num;
   WakeConditionVariable(&threadIOWait);
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 }
 
 /* Queues a new haskell thread to process IO events
    if there is work to do.
-   Return true if work was queued.
+
+   Returns true if a thread/work was queued.
 
    Precond:
     Not already waiting on service requests.
    Postcond:
     outstanding_service_requests = true
     processRemoteCompletion queued.
-    IOThread blocked until processRemoteCompletion has run.
+    IO runner thread blocked until processRemoteCompletion has run.
     */
 bool queueIOThread()
 {
   bool result = false;
 #if !defined(THREADED_RTS)
-  AcquireSRWLockExclusive (&lock);
+  AcquireSRWLockExclusive (&wio_runner_lock);
   if(canQueueIOThread)
   {
       ASSERT(!outstanding_service_requests);
@@ -425,24 +464,26 @@ bool queueIOThread()
       Capability *cap = &MainCapability;
       StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                                           processRemoteCompletion_closure);
+      labelThread(cap, tso, "ProcessIOThread");
+
       ASSERT(tso);
       scheduleThreadNow (cap, tso);
       result = true;
   }
-  ReleaseSRWLockExclusive (&lock);
+  ReleaseSRWLockExclusive (&wio_runner_lock);
 #endif
   return result;
 }
 
 /* Main thread runner for the non-threaded I/O Manager.  */
 
-DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
+static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
 {
   /* The last event that was sent to the I/O manager.  */
   HsWord32 lastEvent = 0;
   while (running)
     {
-      AcquireSRWLockExclusive (&lock);
+      AcquireSRWLockExclusive (&wio_runner_lock);
 
       lastEvent = readIOManagerEvent ();
       /* Non-alertable wait.  While here we can't server any I/O requests so we
@@ -459,12 +500,15 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
              || outstanding_service_requests
              || canQueueIOThread)
         {
-          SleepConditionVariableSRW (&wakeEvent, &lock, INFINITE, 0);
+          // fprintf(stderr, "NonAlert sleep:(%x, %i, %i)\n",
+            // lastEvent, outstanding_service_requests, canQueueIOThread);
+          // fflush(stderr);
+          SleepConditionVariableSRW (&wakeEvent, &wio_runner_lock, INFINITE, 0);
           HsWord32 nextEvent = readIOManagerEvent ();
           lastEvent = nextEvent ? nextEvent : lastEvent;
         }
 
-      ReleaseSRWLockExclusive (&lock);
+      ReleaseSRWLockExclusive (&wio_runner_lock);
 
       ULONG num_removed = -1;
       ZeroMemory (entries, sizeof (entries[0]) * num_callbacks);
@@ -472,30 +516,41 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
                                        num_callbacks, &num_removed, timeout,
                                        false))
         {
+          //No completions outstanding on the haskell side.
+          //This means all returned bundles must have been
+          // processed already and hence can be ignored.
           if (outstanding_requests == 0)
             num_removed = 0;
 
           if (num_removed > 0)
             {
               queue_full = num_removed == num_callbacks;
-              notifyScheduler (num_removed);
             }
         }
       else if (WAIT_TIMEOUT == GetLastError ())
         {
           num_removed = 0;
-          notifyScheduler (num_removed);
         }
+      // We always queue a haskell thread upon returning from GetQueuedCompletionStatusEx.
+      // We only wake up if:
+      // * IO was processed, in which case we need to process the events.
+      // * A timer event was registered/timed out. We need the process expired timers
+      //   and update the timeout.
+      // * We woke up spuriously, which is quite rare.
+      // This simplifies the logic in exchange for a slim chance of redundant
+      // haskell threads if we wake up spuriously.
+      notifyScheduler (num_removed);
 
-      AcquireSRWLockExclusive (&lock);
+      AcquireSRWLockExclusive (&wio_runner_lock);
 
       if (!running)
         ExitThread (0);
 
-      ReleaseSRWLockExclusive (&lock);
+      ReleaseSRWLockExclusive (&wio_runner_lock);
     }
     return 0;
 }
+
 
 
 
