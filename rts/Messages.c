@@ -258,7 +258,7 @@ loop:
         // RELEASE to make the BQ visible, see Note [Heap memory barriers].
         RELEASE_STORE(&((StgInd*)bh)->indirectee, (StgClosure *)bq);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            updateRemembSetPushClosure(cap, (StgClosure*)p);
+            updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure*)p);
         }
         recordClosureMutated(cap,bh); // bh was mutated
 
@@ -290,7 +290,7 @@ loop:
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // We are about to overwrite bq->queue; make sure its current value
             // makes it into the update remembered set
-            updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);
+            updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure*)bq->queue);
         }
         RELAXED_STORE(&msg->link, bq->queue);
         bq->queue = msg;

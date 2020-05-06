@@ -159,7 +159,7 @@ void nonmovingMarkInitUpdRemSet(void);
 
 void init_upd_rem_set(UpdRemSet *rset);
 void reset_upd_rem_set(UpdRemSet *rset);
-void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
+void updateRemembSetPushClosure(UpdRemSet *rset, StgClosure *p);
 void updateRemembSetPushThunk(Capability *cap, StgThunk *p);
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);
 void updateRemembSetPushStack(Capability *cap, StgStack *stack);

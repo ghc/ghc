@@ -20,10 +20,10 @@ struct Capability_;
 
 /* This is called by the code generator */
 extern DLL_IMPORT_RTS
-void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
+void updateRemembSetPushClosureRegs(StgRegTable *reg, struct StgClosure_ *p);
 
 extern DLL_IMPORT_RTS
-void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
+void updateRemembSetPushThunkRegs(StgRegTable *reg, struct StgThunk_ *p);
 
 // Forward declaration for unregisterised backend.
 EF_(stg_copyArray_barrier);

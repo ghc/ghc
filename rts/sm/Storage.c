@@ -482,7 +482,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
         if (thunk_info->i.srt) {
-            updateRemembSetPushClosure(cap, GET_SRT(thunk_info));
+            updateRemembSetPushClosure(&cap->upd_rem_set, GET_SRT(thunk_info));
         }
     }
 
@@ -1311,7 +1311,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // See Note [Dirty flags in the non-moving collector] in NonMoving.c
-            updateRemembSetPushClosure_(reg, old);
+            updateRemembSetPushClosureRegs(reg, old);
         }
     }
 }
@@ -1334,7 +1334,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // See Note [Dirty flags in the non-moving collector] in NonMoving.c
-            updateRemembSetPushClosure(cap, old);
+            updateRemembSetPushClosure(&cap->upd_rem_set, old);
         }
     }
 }
@@ -1351,7 +1351,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
         RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
+            updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) tso->_link);
         }
     }
     tso->_link = target;
@@ -1364,7 +1365,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
         RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
+            updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) tso->block_info.prev);
         }
     }
     tso->block_info.prev = target;
@@ -1417,9 +1419,9 @@ update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         // See Note [Dirty flags in the non-moving collector] in NonMoving.c
         StgMVar *mvar = (StgMVar *) p;
-        updateRemembSetPushClosure(cap, old_val);
-        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
-        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail);
+        updateRemembSetPushClosure(&cap->upd_rem_set, old_val);
+        updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) mvar->head);
+        updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) mvar->tail);
     }
 }
 
