@@ -68,6 +68,8 @@ module GHC.Event.Windows (
 
 -- define DEBUG 1
 
+-- #define DEBUG_TRACE 1
+
 ##include "windows_cconv.h"
 #include <windows.h>
 #include <ntstatus.h>
@@ -270,13 +272,11 @@ foreign import ccall safe "registerNewIOCPHandle"
   registerNewIOCPHandle :: FFI.IOCP -> IO ()
 
 foreign import ccall safe "registerAlertableWait"
-  registerAlertableWait :: FFI.IOCP -> DWORD -> Word64 -> IO ()
+-- (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service);
+  c_registerAlertableWait :: Bool -> DWORD -> Word64 -> Bool -> IO ()
 
 foreign import ccall safe "getOverlappedEntries"
   getOverlappedEntries :: Ptr DWORD -> IO (Ptr OVERLAPPED_ENTRY)
-
-foreign import ccall safe "servicedIOEntries"
-  servicedIOEntries :: Word64 -> IO ()
 
 foreign import ccall safe "completeSynchronousRequest"
   completeSynchronousRequest :: IO ()
@@ -385,28 +385,33 @@ newManager = do
 {-# INLINE startIOManagerThread #-}
 -- | Starts a new I/O manager thread.
 -- For the threaded runtime it creates a pool of OS threads which stays alive
--- until they are instructed to die. For the non-threaded runtime we have a
--- single worker thread in the C runtime.
+-- until they are instructed to die.
+-- For the non-threaded runtime we have a single worker thread in
+-- the C runtime which we force to wake up instead.
 startIOManagerThread :: IO () -> IO ()
-startIOManagerThread loop = do
-  modifyMVar_ ioManagerThread $ \old -> do
-    let create = do debugIO "spawning worker threads.."
-                    t <- if threadedIOMgr
-                            then forkOS loop
-                            else forkIO loop
-                    debugIO $ "created io-manager threads."
-                    labelThread t "IOManagerThread"
-                    return (Just t)
-    debugIO $ "startIOManagerThread old=" ++ show old
-    case old of
-      Nothing -> create
-      Just t  -> do
-        s <- threadStatus t
-        case s of
-          ThreadFinished -> create
-          ThreadDied     -> create
-          _other         -> do interruptSystemManager
-                               return (Just t)
+startIOManagerThread loop
+  | not threadedIOMgr
+  = debugIO "startIOManagerThread:NonThreaded" >>
+    interruptSystemManager
+  | otherwise = do
+    modifyMVar_ ioManagerThread $ \old -> do
+      let create = do debugIO "spawning worker threads.."
+                      t <- if threadedIOMgr
+                              then forkOS loop
+                              else forkIO loop
+                      debugIO $ "created io-manager threads."
+                      labelThread t "IOManagerThread"
+                      return (Just t)
+      debugIO $ "startIOManagerThread old=" ++ show old
+      case old of
+        Nothing -> create
+        Just t  -> do
+          s <- threadStatus t
+          case s of
+            ThreadFinished -> create
+            ThreadDied     -> create
+            _other         -> do  interruptSystemManager
+                                  return (Just t)
 
 requests :: MVar Word64
 requests = unsafePerformIO $ newMVar 0
@@ -449,6 +454,9 @@ callbackArraySize = 32
 
 secondsToNanoSeconds :: Seconds -> Q.Prio
 secondsToNanoSeconds s = ceiling $ s * 1000000000
+
+secondsToMilliSeconds :: Seconds -> Word32
+secondsToMilliSeconds s = ceiling $ s * 1000
 
 nanoSecondsToSeconds :: Q.Prio -> Seconds
 nanoSecondsToSeconds n = fromIntegral n / 1000000000.0
@@ -638,8 +646,11 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              completionCB' status 0
                         when (not threadedIOMgr) $
                           do num_remaining <- outstandingRequests
-                             servicedIOEntries num_remaining
-                             completeSynchronousRequest
+                             -- Run timeouts. This way if we canceled the last
+                             -- IO Request and have no timer events waiting we
+                             -- can go into an unbounded alertable wait.
+                             delay <- runExpiredTimeouts mgr
+                             registerAlertableWait delay num_remaining True
                         return $ IOFailed Nothing
         let runner = do debugIO $ (dbg ":: waiting ") ++ " | "  ++ show lpol
                         res <- readIOPort signal `catch` cancel
@@ -786,6 +797,9 @@ updateTimeout :: Manager -> TimeoutKey -> Seconds -> IO ()
 updateTimeout mgr (TK key) relTime = do
     now <- getTime (mgrClock mgr)
     let !expTime = secondsToNanoSeconds $ now + relTime
+    -- Note: editTimeouts unconditionally wakes the IO Manager
+    --       but that is not required if the new time is after
+    --       the current time.
     editTimeouts mgr (Q.adjust (const expTime) key)
 
 -- | Unregister an active timeout.  This is a harmless no-op if the timeout is
@@ -856,6 +870,8 @@ fromTimeout (Just sec) | sec > 120  = 120000
 -- the queued I/O requests and timers.  If the I/O manager was given a command
 -- to block, shutdown or suspend than that request is honored at the end of the
 -- loop.
+--
+-- This function can be safely executed multiple times in parallel
 step :: Bool -> Manager -> IO (Bool, Maybe Seconds)
 step maxDelay mgr@Manager{..} = do
     -- Determine how long to wait the next time we block in an alertable state.
@@ -872,7 +888,7 @@ step maxDelay mgr@Manager{..} = do
     -- entering a kernel mode wait and this is free to be used.  If non-threaded
     -- then this is a no-op.
     notifyWaiting mgrThreadPool
-    n <- if threadedIOMgr
+
     -- To quote Matt Godbolts:
     -- There are some unusual edge cases you need to deal with. The
     -- GetQueuedCompletionStatus function blocks a thread until there's
@@ -915,10 +931,7 @@ step maxDelay mgr@Manager{..} = do
     -- The getQueuedCompletionStatusEx call will remove entries queued by the OS
     -- and returns the finished ones in mgrOverlappedEntries and the number of
     -- entries removed.
-            then FFI.getQueuedCompletionStatusEx mgrIOCP mgrOverlappedEntries timer
-            else do num_req <- outstandingRequests
-                    registerAlertableWait mgrIOCP timer num_req
-                    return 0
+    n <- FFI.getQueuedCompletionStatusEx mgrIOCP mgrOverlappedEntries timer
     debugIO "WinIORunning"
     -- If threaded this call informs the threadpool manager that a thread is
     -- busy.  If all threads are busy and we have not reached the maximum amount
@@ -1004,6 +1017,10 @@ processCompletion Manager{..} n delay = do
 -- completed completions.  It is mostly a wrapper around processCompletion.
 processRemoteCompletion :: IO ()
 processRemoteCompletion = do
+#if defined(DEBUG) || defined(DEBUG_TRACE)
+  tid <- myThreadId
+  labelThread tid $ "IOManagerThread-PRC" ++ show tid
+#endif
   alloca $ \ptr_n -> do
     debugIO "processRemoteCompletion :: start ()"
     -- First figure out how much work we have to do.
@@ -1015,11 +1032,20 @@ processRemoteCompletion = do
     mngr <- getSystemManager
     let arr = mgrOverlappedEntries mngr
     A.unsafeSplat arr entries n
-    _ <- processCompletion mngr n Nothing
+
+    -- Process timeouts
+    delay <- runExpiredTimeouts mngr :: IO (Maybe Seconds)
+
+    -- Process available completions
+    _ <- processCompletion mngr n delay
+
     num_left <- outstandingRequests
+
+    -- Update and potentially wake up IO Manager
     -- This call will unblock the non-threaded I/O manager.  After this it is no
     -- longer safe to use `entries` nor `completed`.
-    servicedIOEntries num_left
+    registerAlertableWait delay num_left False
+
     debugIO "WinIOBlocked"
     -- We may have been woken up due to a timer timeout.  So check for any
     -- expired timeouts. If we have processed any completions only check
@@ -1028,21 +1054,30 @@ processRemoteCompletion = do
     --
     -- When not the threaded runtime we would not have reset the timer events
     -- below.  Because of this when the request is done we have an additional
-    -- step here to reset the wait timers so the I/O manager doesn't keep
+    -- `step` here to reset the wait timers so the I/O manager doesn't keep
     -- polling at the temporary high frequency we entered.
-    if (n == 0)
-       then step True mngr >> return ()
-       else runExpiredTimeouts mngr >> return ()
     debugIO "processRemoteCompletion :: done ()"
     return ()
+
+registerAlertableWait :: Maybe Seconds -> Word64 -> Bool -> IO ()
+registerAlertableWait Nothing num_reqs pending_service =
+  c_registerAlertableWait False 0 num_reqs pending_service
+registerAlertableWait (Just delay) num_reqs pending_service =
+  c_registerAlertableWait True (secondsToMilliSeconds delay)
+                          num_reqs pending_service
 
 -- | Event loop for the Threaded I/O manager.  The one for the non-threaded
 -- I/O manager is in AsyncWinIO.c in the rts.
 io_mngr_loop :: HANDLE -> Manager -> IO ()
+io_mngr_loop _event _mgr
+  | not threadedIOMgr
+  = do  debugIO "io_mngr_loop:no-op:called in non-threaded case"
+        return ()
 io_mngr_loop _event mgr = go False
     where
       go maxDelay =
           do debugIO "io_mngr_loop:WinIORunning"
+             traceEventIO "io_mngr_loop:WinIORunning"
              (more, delay) <- step maxDelay mgr
              let !use_max_delay = not (isJust delay || more)
              debugIO "I/O manager stepping."
@@ -1052,7 +1087,7 @@ io_mngr_loop _event mgr = go False
                  _ | event_id == io_MANAGER_WAKEUP -> return False
                  _ | event_id == io_MANAGER_DIE    -> return True
                  0 -> return False -- spurious wakeup
-                 _ -> do debugIO $ "handling console event: " ++ show (event_id `shiftR` 1)
+                 _ -> do traceEventIO $ "handling console event: " ++ show (event_id `shiftR` 1)
                          start_console_handler (event_id `shiftR` 1)
                          return False
 
@@ -1061,7 +1096,6 @@ io_mngr_loop _event mgr = go False
              -- manager.  It will be woken up again when there is more to do.
              case () of
                _ | exit              -> debugIO "I/O manager shutting down."
-               _ | not threadedIOMgr -> debugIO "I/O manager single threaded halt."
                _ -> go use_max_delay
 
 
@@ -1157,8 +1191,9 @@ c_DEBUG_DUMP = return True -- scheduler `fmap` getDebugFlags
 #endif
 
 debugIO :: String -> IO ()
--- debugIO s = traceEventIO ( "debugIO :: " ++ s)
-#if defined(DEBUG)
+#if defined(DEBUG_TRACE)
+debugIO s = traceEventIO ( "winIO :: " ++ s)
+#elif defined(DEBUG)
 debugIO s
   = do debug <- c_DEBUG_DUMP
        if debug
