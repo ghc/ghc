@@ -32,9 +32,6 @@ module GHC.Rename.Pat (-- main entry points
               rnHsRecFields, HsRecFieldContext(..),
               rnHsRecUpdFields,
 
-              -- CpsRn monad
-              CpsRn, liftCps,
-
               -- Literals
               rnLit, rnOverLit,
 
@@ -61,6 +58,7 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
+import GHC.Rename.Utils.CpsMonad
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Name
@@ -76,105 +74,11 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
 {-
-*********************************************************
-*                                                      *
-        The CpsRn Monad
-*                                                      *
-*********************************************************
-
-Note [CpsRn monad]
-~~~~~~~~~~~~~~~~~~
-The CpsRn monad uses continuation-passing style to support this
-style of programming:
-
-        do { ...
-           ; ns <- bindNames rs
-           ; ...blah... }
-
-   where rs::[RdrName], ns::[Name]
-
-The idea is that '...blah...'
-  a) sees the bindings of ns
-  b) returns the free variables it mentions
-     so that bindNames can report unused ones
-
-In particular,
-    mapM rnPatAndThen [p1, p2, p3]
-has a *left-to-right* scoping: it makes the binders in
-p1 scope over p2,p3.
--}
-
-newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
-                                            -> RnM (r, FreeVars) }
-        deriving (Functor)
-        -- See Note [CpsRn monad]
-
-instance Applicative CpsRn where
-    pure x = CpsRn (\k -> k x)
-    (<*>) = ap
-
-instance Monad CpsRn where
-  (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
-
-runCps :: CpsRn a -> RnM (a, FreeVars)
-runCps (CpsRn m) = m (\r -> return (r, emptyFVs))
-
-liftCps :: RnM a -> CpsRn a
-liftCps rn_thing = CpsRn (\k -> rn_thing >>= k)
-
-liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
-liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
-                                     ; (r,fvs2) <- k v
-                                     ; return (r, fvs1 `plusFV` fvs2) })
-
-wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
--- Set the location, and also wrap it around the value returned
-wrapSrcSpanCps fn (L loc a)
-  = CpsRn (\k -> setSrcSpan loc $
-                 unCpsRn (fn a) $ \v ->
-                 k (L loc v))
-
-lookupConCps :: Located RdrName -> CpsRn (Located Name)
-lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
-                    ; (r, fvs) <- k con_name
-                    ; return (r, addOneFV fvs (unLoc con_name)) })
-    -- We add the constructor name to the free vars
-    -- See Note [Patterns are uses]
-
-{-
-Note [Patterns are uses]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  module Foo( f, g ) where
-  data T = T1 | T2
-
-  f T1 = True
-  f T2 = False
-
-  g _ = T1
-
-Arguably we should report T2 as unused, even though it appears in a
-pattern, because it never occurs in a constructed position.  See
-#7336.
-However, implementing this in the face of pattern synonyms would be
-less straightforward, since given two pattern synonyms
-
-  pattern P1 <- P2
-  pattern P2 <- ()
-
-we need to observe the dependency between P1 and P2 so that type
-checking can be done in the correct order (just like for value
-bindings). Dependencies between bindings is analyzed in the renamer,
-where we don't know yet whether P2 is a constructor or a pattern
-synonym. So for now, we do report conid occurrences in patterns as
-uses.
-
 *********************************************************
 *                                                      *
         Name makers
