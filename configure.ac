@@ -124,6 +124,9 @@ AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
 AC_ARG_VAR(LD_STAGE0, [Linker command (bootstrap)])
 AC_ARG_VAR(AR_STAGE0, [Archive command (bootstrap)])
 
+dnl RTS ways supplied by the bootstrapping compiler.
+AC_ARG_VAR(BOOTSTRAP_RTS_WAYS, [RTS ways])
+
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
@@ -151,6 +154,14 @@ if test "$WithGhc" != ""; then
   fi
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
+  BOOTSTRAPPING_GHC_INFO_FIELD([BOOTSTRAP_RTS_WAYS],[RTS ways])
+  dnl Check whether or not the bootstrapping GHC has a threaded RTS. This
+  dnl determines whether or not we can have a threaded stage 1.
+  if echo ${BOOTSTRAP_RTS_WAYS} | grep '.*thr.*' 2>&1 >/dev/null; then
+      AC_SUBST(GhcThreadedRts, YES)
+  else
+      AC_SUBST(GhcThreadedRts, NO)
+  fi
 fi
 
 dnl ** Must have GHC to build GHC
@@ -1454,6 +1465,7 @@ Configure completed successfully.
 echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
+      with threaded RTS? : $GhcThreadedRts
 "
 
 if test "x$CcLlvmBackend" = "xYES"; then

@@ -6,8 +6,9 @@ module Expression (
     expr, exprIO, arg, remove,
 
     -- ** Predicates
-    (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
-     packageOneOf, libraryPackage, builder, way, input, inputs, output, outputs,
+    (?), stage, stage0, stage1, stage2, notStage0, notUnthreadedStage0, package,
+     notPackage, packageOneOf, libraryPackage, builder, way, input, inputs,
+     output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -26,6 +27,7 @@ import Base
 import Builder
 import Context hiding (stage, package, way)
 import Expression.Type
+import Oracles.Flag
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
@@ -101,6 +103,12 @@ stage2 = stage Stage2
 -- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
 notStage0 = notM stage0
+
+notUnthreadedStage0 :: Predicate
+notUnthreadedStage0 = do
+    isZ <- stage0
+    bootThreaded <- expr (flag BootstrapThreadedRts)
+    pure ((not isZ) || bootThreaded)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate

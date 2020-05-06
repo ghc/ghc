@@ -61,7 +61,7 @@ packageArgs = do
             , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
             , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
             , (any (wayUnit Threaded) rtsWays) ?
-              notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
+              notUnthreadedStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
               ghciWithDebugger <$> flavour ?
               notStage0 ? arg "--ghc-option=-DDEBUGGER"
@@ -89,8 +89,12 @@ packageArgs = do
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
             -- executables with the threaded runtime.
-            , stage0 ? arg "-threaded"
-            , notStage0 ? ifM (ghcThreaded <$> expr flavour) (arg "threaded") (arg "-threaded") ]
+            , ifM notUnthreadedStage0
+                  (ifM (ghcThreaded <$> expr flavour)
+                       (arg "threaded")
+                       (arg "-threaded"))
+                  (arg "-threaded")
+            ]
           ]
 
         -------------------------------- ghcPkg --------------------------------
