@@ -6,8 +6,9 @@ module Expression (
     expr, exprIO, arg, remove,
 
     -- ** Predicates
-    (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
-     packageOneOf, libraryPackage, builder, way, input, inputs, output, outputs,
+    (?), stage, stage0, stage1, stage2, notStage0, threadedBootstrapper,
+     package, notPackage, packageOneOf, libraryPackage, builder, way, input,
+     inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -26,6 +27,7 @@ import Base
 import Builder
 import Context hiding (stage, package, way)
 import Expression.Type
+import Oracles.Flag
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
@@ -86,6 +88,19 @@ instance BuilderPredicate a => BuilderPredicate (FilePath -> a) where
 way :: Way -> Predicate
 way w = (w ==) <$> getWay
 
+{-
+Note [Stage Names]
+~~~~~~~~~~~~~~~~~~
+
+Code referring to specific stages can be a bit tricky. In Hadrian, the stages
+have the same names they carried in the autoconf build system, but they are
+often referred to by the stage used to construct them. For example, the stage 1
+artifacts will be placed in _build/stage0, because they are constructed by the
+stage 0 compiler. The stage predicates in this module behave the same way,
+'stage0' will return 'True' while stage 0 is being used to build the stage 1
+compiler.
+-}
+
 -- | Is the build currently in stage 0?
 stage0 :: Predicate
 stage0 = stage Stage0
@@ -101,6 +116,13 @@ stage2 = stage Stage2
 -- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
 notStage0 = notM stage0
+
+-- | Whether or not the bootstrapping compiler provides a threaded RTS. We need
+--   to know this when building stage 1, since stage 1 links against the
+--   compiler's RTS ways. See Note [Linking ghc-bin against threaded stage0 RTS]
+--   in Settings.Packages for details.
+threadedBootstrapper :: Predicate
+threadedBootstrapper = expr (flag BootstrapThreadedRts)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
