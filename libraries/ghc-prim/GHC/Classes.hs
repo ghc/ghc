@@ -540,18 +540,77 @@ not False               =  True
 -- put them
 
 -- These functions have built-in rules.
-{-# NOINLINE [0] divInt# #-}
-{-# NOINLINE [0] modInt# #-}
+{-# NOINLINE divInt# #-}
+{-# NOINLINE modInt# #-}
+
 divInt# :: Int# -> Int# -> Int#
-x# `divInt#` y#
-        -- Be careful NOT to overflow if we do any additional arithmetic
-        -- on the arguments...  the following  previous version of this
-        -- code has problems with overflow:
+x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
+   where
+      -- See Note [divInt# implementation]
+      !yn#   = y# <# 0#
+      !c0#   = (x# <# 0#) `andI#` (notI# yn#)
+      !c1#   = (x# ># 0#) `andI#` yn#
+      !bias# = c0# -# c1#
+      !hard# = c0# `orI#` c1#
+
+-- See Note [divInt# implementation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- divInt# (truncated toward zero) is implemented with quotInt# (truncated
+-- toward negative infinity). They differ when inputs x and y have different signs:
+--  - x `rem` y has the sign of x and (x `quot` y)*y + (x `rem` y) == x
+--  - x `mod` y has the sign of y and (x `div`  y)*y + (x `mod` y) == x
+--
+-- So we bias the input and the result of quotInt as follows:
+--
+--         if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
+--    else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
+--    else x# `quotInt#` y#
+--
+-- However this leads to assembly code with lots of branches (#19636) while we
+-- would like simpler code that we could inline (#18067). So we use some
+-- branchless code instead as derived below:
+--
+--         if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
+--    else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
+--    else x# `quotInt#` y#
+--
+--  ===> { Give names to constants and always use them }
+--
+--    ((x# +# bias#) `quotInt#` y#) -# hard#
+--      where
+--        (bias#,hard#)
+--          | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) = (-1#, 1#)
+--          | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) = ( 1#, 1#)
+--          | otherwise                                = ( 0#, 0#)
+--
+--  ===> { Compute bias# and hard# independently using Bool# (0#,1#) }
+--
+--    ((x# +# bias#) `quotInt#` y#) -# hard#
+--      where
+--        c0#   = (x# <# 0#) &&# (y# ># 0#)
+--        c1#   = (x# ># 0#) &&# (y# <# 0#)
+--        bias# = c0# -# c1#  -- both cases are mutually exclusive so we can subtract them
+--        hard# = c0# ||# c1# -- (we could add them too here but OR is slightly better)
+--
+--  ===> { Use yn# variable for "y# <# 0#" }
+--
+--    ((x# +# bias#) `quotInt#` y#) -# hard#
+--      where
+--        -- y# ==# 0# throws an exception so we don't need to consider it
+--        yn#   = y# <# 0#
+--        c0#   = (x# <# 0#) &&# (notI# yn#)
+--        c1#   = (x# ># 0#) &&# yn#
+--        bias# = c0# -# c1#
+--        hard# = c0# ||# c1#
+--
+--
+-- Note that we need to be careful NOT to overflow if we do any additional
+-- arithmetic on the arguments...  the following previous version of this code
+-- had problems with overflow:
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
-    =      if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
-      else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
-      else x# `quotInt#` y#
+
 
 modInt# :: Int# -> Int# -> Int#
 x# `modInt#` y#
