@@ -30,7 +30,7 @@
 static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void mark_tso (MarkQueue *queue, StgTSO *tso);
-static void mark_stack (MarkQueue *queue, StgStack *stack);
+static void mark_stack_upd_rem_set (UpdRemSet *rs, StgStack *stack);
 static void mark_PAP_payload (MarkQueue *queue,
                               StgClosure *fun,
                               StgClosure **payload,
@@ -717,7 +717,7 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
               != nonmovingMarkEpoch) {
             // We have claimed the right to mark the stack.
             debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: STACK %p", stack->sp);
-            mark_stack(&cap->upd_rem_set.queue, stack);
+            mark_stack_upd_rem_set(&cap->upd_rem_set, stack);
             finish_upd_rem_set_mark((StgClosure *) stack);
             return;
         } else {
@@ -970,29 +970,11 @@ mark_tso (MarkQueue *queue, StgTSO *tso)
 }
 
 static void
-do_push_closure (StgClosure **p, void *user)
-{
-    MarkQueue *queue = (MarkQueue *) user;
-    // TODO: Origin? need reference to containing closure
-    markQueuePushClosure_(queue, *p);
-}
-
-static void
-mark_large_bitmap (MarkQueue *queue,
-                   StgClosure **p,
-                   StgLargeBitmap *large_bitmap,
-                   StgWord size)
-{
-    walk_large_bitmap(do_push_closure, p, large_bitmap, size, queue);
-}
-
-static void
-mark_small_bitmap (MarkQueue *queue, StgClosure **p, StgWord size, StgWord bitmap)
+mark_small_bitmap (StgClosure **p, StgWord size, StgWord bitmap, walk_closures_cb cb, void *user)
 {
     while (size > 0) {
         if ((bitmap & 1) == 0) {
-            // TODO: Origin?
-            markQueuePushClosure(queue, *p, NULL);
+            cb(p, user);
         }
         p++;
         bitmap = bitmap >> 1;
@@ -1001,10 +983,11 @@ mark_small_bitmap (MarkQueue *queue, StgClosure **p, StgWord size, StgWord bitma
 }
 
 static GNUC_ATTR_HOT
-void mark_PAP_payload (MarkQueue *queue,
-                       StgClosure *fun,
+void mark_PAP_payload (StgClosure *fun,
                        StgClosure **payload,
-                       StgWord size)
+                       StgWord size,
+                       walk_closures_cb cb,
+                       void *user)
 {
     const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(fun));
     ASSERT(fun_info->i.type != PAP);
@@ -1016,22 +999,26 @@ void mark_PAP_payload (MarkQueue *queue,
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        mark_large_bitmap(queue, payload, GET_FUN_LARGE_BITMAP(fun_info), size);
+        walk_large_bitmap(cb, p, GET_FUN_LARGE_BITMAP(fun_info), size, user);
         break;
     case ARG_BCO:
-        mark_large_bitmap(queue, payload, BCO_BITMAP(fun), size);
+        walk_large_bitmap(cb, p, BCO_BITMAP(fun), size, user);
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-        mark_small_bitmap(queue, (StgClosure **) p, size, bitmap);
+        mark_small_bitmap((StgClosure **) p, size, bitmap, cb, user);
         break;
     }
 }
 
 /* Helper for mark_stack; returns next stack frame. */
 static StgPtr
-mark_arg_block (MarkQueue *queue, const StgFunInfoTable *fun_info, StgClosure **args)
+mark_arg_block (MarkQueue *queue,
+                const StgFunInfoTable *fun_info,
+                StgClosure **args,
+                walk_closures_cb cb,
+                void *user)
 {
     StgWord bitmap, size;
 
@@ -1043,14 +1030,14 @@ mark_arg_block (MarkQueue *queue, const StgFunInfoTable *fun_info, StgClosure **
         goto small_bitmap;
     case ARG_GEN_BIG:
         size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-        mark_large_bitmap(queue, (StgClosure**)p, GET_FUN_LARGE_BITMAP(fun_info), size);
+        walk_large_bitmap(cb, (StgClosure**) p, GET_FUN_LARGE_BITMAP(fun_info), size, user);
         p += size;
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
         size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-        mark_small_bitmap(queue, (StgClosure**)p, size, bitmap);
+        mark_small_bitmap((StgClosure**)p, size, bitmap, cb, user);
         p += size;
         break;
     }
@@ -1058,7 +1045,7 @@ mark_arg_block (MarkQueue *queue, const StgFunInfoTable *fun_info, StgClosure **
 }
 
 static GNUC_ATTR_HOT void
-mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
+mark_stack__ (StgPtr sp, StgPtr spBottom, walk_closure_cb trace, void *user)
 {
     ASSERT(sp <= spBottom);
 
@@ -1069,7 +1056,7 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
         {
             // See Note [upd-black-hole] in rts/Scav.c
             StgUpdateFrame *frame = (StgUpdateFrame *) sp;
-            markQueuePushClosure_(queue, frame->updatee);
+            cb(frame->updatee, user);
             sp += sizeofW(StgUpdateFrame);
             continue;
         }
@@ -1088,22 +1075,22 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             // NOTE: the payload starts immediately after the info-ptr, we
             // don't have an StgHeader in the same sense as a heap closure.
             sp++;
-            mark_small_bitmap(queue, (StgClosure **) sp, size, bitmap);
+            mark_small_bitmap((StgClosure **) sp, size, bitmap, cb, user);
             sp += size;
         }
         follow_srt:
             if (info->i.srt) {
-                markQueuePushClosure_(queue, (StgClosure*)GET_SRT(info));
+                cb((StgClosure*)GET_SRT(info), user);
             }
             continue;
 
         case RET_BCO: {
             sp++;
-            markQueuePushClosure_(queue, *(StgClosure**)sp);
+            cb(*(StgClosure**)sp, user);
             StgBCO *bco = (StgBCO *)*sp;
             sp++;
             StgWord size = BCO_BITMAP_SIZE(bco);
-            mark_large_bitmap(queue, (StgClosure **) sp, BCO_BITMAP(bco), size);
+            mark_large_bitmap((StgClosure **) sp, BCO_BITMAP(bco), size, cb, user);
             sp += size;
             continue;
         }
@@ -1115,7 +1102,7 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
 
             size = GET_LARGE_BITMAP(&info->i)->size;
             sp++;
-            mark_large_bitmap(queue, (StgClosure **) sp, GET_LARGE_BITMAP(&info->i), size);
+            mark_large_bitmap((StgClosure **) sp, GET_LARGE_BITMAP(&info->i), size, cb, user);
             sp += size;
             // and don't forget to follow the SRT
             goto follow_srt;
@@ -1126,9 +1113,9 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             StgRetFun *ret_fun = (StgRetFun *)sp;
             const StgFunInfoTable *fun_info;
 
-            markQueuePushClosure_(queue, ret_fun->fun);
+            cb(ret_fun->fun, use);
             fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-            sp = mark_arg_block(queue, fun_info, ret_fun->payload);
+            sp = mark_arg_block(fun_info, ret_fun->payload, cb, user);
             goto follow_srt;
         }
 
@@ -1136,6 +1123,33 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             barf("mark_stack: weird activation record found on stack: %d", (int)(info->i.type));
         }
     }
+}
+
+static void
+do_push_closure_upd_rem_set (StgClosure **p, void *user)
+{
+    UpdRemSet *rs = (UpdRemSet *) user;
+    updRemSetPushClosure(queue, *p);
+}
+
+static GNUC_ATTR_HOT void
+mark_stack_upd_rem_set (UpdRemSet *rs, StgStack *stack)
+{
+    mark_stack__(stack->sp, stack->stack + stack->stack_size, do_push_closure_upd_rem_set, rs);
+}
+
+static void
+do_push_closure (StgClosure **p, void *user)
+{
+    MarkQueue *queue = (MarkQueue *) user;
+    // TODO: Origin? need reference to containing closure
+    markQueuePushClosure_(queue, *p);
+}
+
+static GNUC_ATTR_HOT void
+mark_stack_ (MarkQueue *queue, StgStack *stack)
+{
+    mark_stack__(stack->sp, stack->stack + stack->stack_size, do_push_closure, queue);
 }
 
 static GNUC_ATTR_HOT void
