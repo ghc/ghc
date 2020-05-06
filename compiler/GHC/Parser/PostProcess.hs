@@ -1074,7 +1074,7 @@ checkPattern_msg msg pp = runPV_msg msg (pp >>= checkLPat)
 checkLPat :: Located (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat e@(L l _) = checkPat l e [] []
 
-checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LHsWcType GhcPs] -> [LPat GhcPs]
+checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LHsSigWcType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
@@ -1995,7 +1995,7 @@ data PatBuilder p
   = PatBuilderPat (Pat p)
   | PatBuilderPar (Located (PatBuilder p))
   | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
-  | PatBuilderAppType (Located (PatBuilder p)) (LHsWcType GhcPs)
+  | PatBuilderAppType (Located (PatBuilder p)) (LHsSigWcType GhcPs)
   | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
   | PatBuilderVar (Located RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
@@ -2028,7 +2028,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2 = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l p t = return $ L l (PatBuilderAppType p (mkHsWildCardBndrs t))
+  mkHsAppTypePV l p t = return $ L l (PatBuilderAppType p (mkHsWildCardBndrs (mkHsImplicitBndrs t)))
   mkHsIfPV l _ _ _ _ _ = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"
   mkHsDoPV l _ = addFatalError l $ text "do-notation in pattern"
   mkHsParPV l p = return $ L l (PatBuilderPar p)

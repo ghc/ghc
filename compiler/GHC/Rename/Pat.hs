@@ -509,7 +509,7 @@ rnPatAndThen mk (SplicePat _ splice)
 --------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName    -- the constructor
-                -> [LHsWcType (NoGhcTc GhcPs)]
+                -> [LHsSigWcType (NoGhcTc GhcPs)]
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
@@ -517,7 +517,7 @@ rnConPatAndThen mk con tyargs = \case
   PrefixCon pats -> do
     con' <- lookupConCps con
     tyargs' <- forM tyargs $ \t ->
-      liftCpsFV $ rnHsWcTypeBindingVars HsTypeCtx t
+      liftCpsFV $ rnHsSigWcTypeBindingVars HsTypeCtx t
     pats' <- rnLPatsAndThen mk pats
     return $ ConPat 
       { pat_con_ext = noExtField
@@ -534,7 +534,7 @@ rnConPatAndThen mk con tyargs = \case
   RecCon rpats -> do
     con' <- lookupConCps con
     tyargs' <- forM tyargs $ \t ->
-      liftCpsFV (rnHsWcType HsTypeCtx t)
+      liftCpsFV (rnHsSigWcTypeBindingVars HsTypeCtx t)
     rpats' <- rnHsRecPatsAndThen mk con' rpats
     return $ ConPat
       { pat_con_ext = noExtField
