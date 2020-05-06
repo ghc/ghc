@@ -41,7 +41,7 @@ infixr 9 `Compose`
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.
 --
--- Kinds `k1` and `k2` explicitly quantified since 4.15.0.0.
+-- Kinds `k2` and `k1` explicitly quantified since 4.15.0.0.
 type    Compose :: forall k2 k1. (k2 -> Type) -> (k1 -> k2) -> (k1 -> Type)
 newtype Compose f g a = Compose { getCompose :: f (g a) }
   deriving ( Data     -- ^ @since 4.9.0.0
