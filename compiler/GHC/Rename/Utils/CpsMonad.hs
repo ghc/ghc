@@ -10,7 +10,8 @@
 
 module GHC.Rename.Utils.CpsMonad
   ( -- CpsRn monad
-    CpsRn(..)
+    CpsT(..)
+  , CpsRn
   , runCps
   , liftCps
   , liftCpsFV
@@ -58,41 +59,44 @@ has a *left-to-right* scoping: it makes the binders in
 p1 scope over p2,p3.
 -}
 
-newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
-                                            -> RnM (r, FreeVars) }
-        deriving (Functor)
+type CpsRn = CpsT RnM
+
+newtype CpsT m b = CpsT
+  { unCpsRn :: forall r
+            .  (b -> m (r, FreeVars))
+            -> m (r, FreeVars)
+  } deriving (Functor)
         -- See Note [CpsRn monad]
 
-instance Applicative CpsRn where
-    pure x = CpsRn (\k -> k x)
+instance Applicative (CpsT m) where
+    pure x = CpsT $ \k -> k x
     (<*>) = ap
 
-instance Monad CpsRn where
-  (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
+instance Monad (CpsT m) where
+  CpsT m >>= mk = CpsT $ \k -> m (\v -> unCpsRn (mk v) k)
 
 runCps :: CpsRn a -> RnM (a, FreeVars)
-runCps (CpsRn m) = m (\r -> return (r, emptyFVs))
+runCps (CpsT m) = m $ \r -> return (r, emptyFVs)
 
 liftCps :: RnM a -> CpsRn a
-liftCps rn_thing = CpsRn (\k -> rn_thing >>= k)
+liftCps rn_thing = CpsT $ \k -> rn_thing >>= k
 
 liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
-liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
-                                     ; (r,fvs2) <- k v
-                                     ; return (r, fvs1 `plusFV` fvs2) })
+liftCpsFV rn_thing = CpsT $ \k -> do
+  (v,fvs1) <- rn_thing
+  (r,fvs2) <- k v
+  return (r, fvs1 `plusFV` fvs2)
 
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
-wrapSrcSpanCps fn (L loc a)
-  = CpsRn (\k -> setSrcSpan loc $
-                 unCpsRn (fn a) $ \v ->
-                 k (L loc v))
+wrapSrcSpanCps fn (L loc a) = CpsT $ \k ->
+  setSrcSpan loc $ unCpsRn (fn a) $ \v -> k (L loc v)
 
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
-lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
-                    ; (r, fvs) <- k con_name
-                    ; return (r, addOneFV fvs (unLoc con_name)) })
+lookupConCps con_rdr = CpsT $ \k -> do
+   con_name <- lookupLocatedOccRn con_rdr
+   (r, fvs) <- k con_name
+   return (r, addOneFV fvs $ unLoc con_name)
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
 

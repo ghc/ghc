@@ -123,7 +123,7 @@ matchNameMaker ctxt = LamMk report_unused
                       _                     -> True
 
 rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
+rnHsSigCps sig = CpsT $ rnHsSigWcTypeScoped AlwaysBind PatCtx sig
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
@@ -132,21 +132,23 @@ newPatLName name_maker rdr_name@(L loc _)
 
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
-  = CpsRn (\ thing_inside ->
+  = CpsT $ \ thing_inside ->
         do { name <- newLocalBndrRn rdr_name
            ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
-           ; return (res, name `delFV` fvs) })
+           ; return (res, name `delFV` fvs)
+           }
 
 newPatName (LetMk is_top fix_env) rdr_name
-  = CpsRn (\ thing_inside ->
+  = CpsT $ \ thing_inside ->
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
            ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
                                         -- See Note [View pattern usage]
              addLocalFixities fix_env [name] $
-             thing_inside name })
+             thing_inside name
+           }
 
     -- Note: the bindLocalNames is somewhat suspicious
     --       because it binds a top-level name as a local name.
@@ -444,10 +446,10 @@ rnConPatAndThen mk con (RecCon rpats)
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
-  CpsRn (\thing -> do
+  CpsT $ \thing -> do
                     (r, fvs) <- thing ()
                     checkUnusedRecordWildcard loc fvs dotdot_names
-                    return (r, fvs) )
+                    return (r, fvs)
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
