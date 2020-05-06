@@ -1326,6 +1326,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    setOcInitialStatus( oc );
 
    oc->fileSize          = imageSize;
+   oc->n_symbols         = 0;
    oc->symbols           = NULL;
    oc->n_sections        = 0;
    oc->sections          = NULL;
