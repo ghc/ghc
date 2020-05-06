@@ -109,7 +109,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             // However, if we are in a deadlock detection GC then we disable aging
             // so there is no need.
             if (major_gc && !deadlock_detect_gc)
-                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
+                markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) to);
             return to;
         }
     }
@@ -385,7 +385,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
         // See Note [Static objects under the nonmoving collector] in Storage.c.
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
         return;
     }
 
@@ -440,7 +440,7 @@ evacuate_compact (StgPtr p)
         // we need to make sure it is added to the mark queue since the only
         // reference to it may be from the moving heap.
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, (StgClosure *) str);
         return;
     }
 
@@ -646,7 +646,7 @@ loop:
           // BF_NONMOVING. Those are moved to scavenged_large_objects list in
           // mark phase.
           if (major_gc && !deadlock_detect_gc)
-              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+              markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
           return;
       }
 
@@ -685,7 +685,7 @@ loop:
           // we need to make sure it is added to the mark queue since the only
           // reference to it may be from the moving heap.
           if (major_gc && bd->flags & BF_NONMOVING && !deadlock_detect_gc) {
-              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+              markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
           }
           return;
       }
@@ -989,7 +989,7 @@ evacuate_BLACKHOLE(StgClosure **p)
 
     if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
         if (major_gc && !deadlock_detect_gc)
-            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set, q);
         return;
     }
 

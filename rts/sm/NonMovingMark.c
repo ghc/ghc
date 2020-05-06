@@ -265,30 +265,22 @@ static void init_mark_queue_(MarkQueue *queue);
 
 /* Transfers the given capability's update-remembered set to the global
  * remembered set.
- *
- * Really the argument type should be UpdRemSet* but this would be rather
- * inconvenient without polymorphism.
  */
-void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
+void nonmovingAddUpdRemSetBlocks(UpdRemSet *rset)
 {
-    if (markQueueIsEmpty(rset)) return;
-
-    // find the tail of the queue
-    bdescr *start = markQueueBlockBdescr(rset->top);
-    bdescr *end = start;
-    while (end->link != NULL)
-        end = end->link;
+    if (updRemSetIsEmpty(rset)) return;
 
     // add the blocks to the global remembered set
+    MarkQueueBlock *block = rset->block;
+    bdescr *bd = markQueueBlockBdescr(block);
     ACQUIRE_LOCK(&upd_rem_set_lock);
-    end->link = upd_rem_set_block_list;
-    upd_rem_set_block_list = start;
+    bd->link = upd_rem_set_block_list;
+    upd_rem_set_block_list = bd;
     RELEASE_LOCK(&upd_rem_set_lock);
 
     // Reset remembered set
     ACQUIRE_SM_LOCK;
-    init_mark_queue_(rset);
-    rset->is_upd_rem_set = true;
+    init_upd_rem_set(rset);
     RELEASE_SM_LOCK;
 }
 
@@ -303,7 +295,7 @@ void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
                "Capability %d flushing update remembered set: %d",
                cap->no, markQueueLength(&cap->upd_rem_set.queue));
     traceConcUpdRemSetFlush(cap);
-    nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
+    nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set);
     atomic_inc(&upd_rem_set_flush_count, 1);
     signalCondition(&upd_rem_set_flushed_cond);
     // After this mutation will remain suspended until nonmovingFinishFlush
@@ -423,19 +415,15 @@ STATIC_INLINE void
 push (MarkQueue *q, const MarkQueueEnt *ent)
 {
     // Are we at the end of the block?
-    if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
+    if (markQueueBlockIsFull(q->top)) {
         // Yes, this block is full.
-        if (q->is_upd_rem_set) {
-            nonmovingAddUpdRemSetBlocks(q);
-        } else {
-            // allocate a fresh block.
-            ACQUIRE_SM_LOCK;
-            bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
-            bd->link = markQueueBlockBdescr(q->top);
-            q->top = (MarkQueueBlock *) bd->start;
-            q->top->head = 0;
-            RELEASE_SM_LOCK;
-        }
+        // Allocate a fresh block.
+        ACQUIRE_SM_LOCK;
+        bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+        bd->link = markQueueBlockBdescr(q->top);
+        q->top = (MarkQueueBlock *) bd->start;
+        q->top->head = 0;
+        RELEASE_SM_LOCK;
     }
 
     q->top->entries[q->top->head] = *ent;
@@ -448,7 +436,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
  * SM_LOCK to allocate new blocks in the event that the mark queue is full.
  */
 void
-markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
+markQueuePushClosureGC (UpdRemSet *q, StgClosure *p)
 {
     if (!check_in_nonmoving_heap(p)) {
         return;
@@ -463,10 +451,11 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     //ASSERT(!deadlock_detect_gc);
 
     // Are we at the end of the block?
-    if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
+    if (markQueueBlockIsFull(q->block)) {
         // Yes, this block is full.
-        // allocate a fresh block.
+        // Allocate a fresh block.
         ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        nonmovingAddUpdRemSetBlocks(q);
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = markQueueBlockBdescr(q->top);
         q->top = (MarkQueueBlock *) bd->start;
@@ -874,6 +863,14 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
  *********************************************************/
 
 /* Must hold sm_mutex. */
+static void init_upd_rem_set (UpdRemSet *queue)
+{
+    bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+    queue->block = markQueueBlockFromBdescr(bd);
+    queue->block->head = 0;
+}
+
+/* Must hold sm_mutex. */
 static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
@@ -890,13 +887,6 @@ void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->is_upd_rem_set = false;
-}
-
-/* Must hold sm_mutex. */
-void init_upd_rem_set (UpdRemSet *rset)
-{
-    init_mark_queue_(&rset->queue);
-    rset->queue.is_upd_rem_set = true;
 }
 
 void reset_upd_rem_set (UpdRemSet *rset)
