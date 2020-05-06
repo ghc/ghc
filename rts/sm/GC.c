@@ -749,7 +749,7 @@ GarbageCollect (uint32_t collect_gen,
   }
 
   if (RtsFlags.GcFlags.forceBarrier) {
-      freeChain(gct->cap->upd_rem_set.queue.blocks);
+      freeChain(markQueueBlockBdescr(gct->cap->upd_rem_set.queue.top));
       init_upd_rem_set(&gct->cap->upd_rem_set);
   }
 

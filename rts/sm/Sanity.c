@@ -929,7 +929,7 @@ findMemoryLeak (void)
     for (i = 0; i < n_capabilities; i++) {
         markBlocks(gc_threads[i]->free_blocks);
         markBlocks(capabilities[i]->pinned_object_block);
-        markBlocks(capabilities[i]->upd_rem_set.queue.blocks);
+        markBlocks(markQueueBlockBdescr(capabilities[i]->upd_rem_set.queue.top));
     }
 
     if (RtsFlags.GcFlags.useNonmoving) {
@@ -948,8 +948,9 @@ findMemoryLeak (void)
         }
         markNonMovingSegments(nonmovingHeap.sweep_list);
         markNonMovingSegments(nonmovingHeap.free);
-        if (current_mark_queue)
-            markBlocks(current_mark_queue->blocks);
+        if (current_mark_queue) {
+            markBlocks(markQueueBlockBdescr(current_mark_queue->top));
+        }
     }
 
 #if defined(PROFILING)
@@ -1019,8 +1020,9 @@ genBlocks (generation *gen)
         ret += countAllocdCompactBlocks(nonmoving_compact_objects);
         ret += countAllocdCompactBlocks(nonmoving_marked_compact_objects);
         ret += countNonMovingHeap(&nonmovingHeap);
-        if (current_mark_queue)
-            ret += countBlocks(current_mark_queue->blocks);
+        if (current_mark_queue) {
+            ret += countBlocks(markQueueBlockBdescr(current_mark_queue->top));
+        }
     } else {
         ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
         ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
@@ -1133,7 +1135,7 @@ memInventory (bool show)
 
   // count UpdRemSet blocks
   for (i = 0; i < n_capabilities; ++i) {
-      upd_rem_set_blocks += countBlocks(capabilities[i]->upd_rem_set.queue.blocks);
+      upd_rem_set_blocks += countBlocks(markQueueBlockBdescr(capabilities[i]->upd_rem_set.queue.top));
   }
   upd_rem_set_blocks += countBlocks(upd_rem_set_block_list);
 
