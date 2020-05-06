@@ -54,7 +54,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
-                  hsc_dynLinker, hsc_interp )
+                  hsc_dynLinker, hsc_interp, emptyModBreaks )
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
@@ -3380,67 +3380,74 @@ completeIdentifier line@(left, _) =
       dflags <- GHC.getSessionDynFlags
       return (filter (w `isPrefixOf`) (map (showPpr dflags) rdrs))
 
-
-completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #17989
-    -- See Note [Tab-completion for :break]
-    -- Pif ~ Pair with Identifier name and File name
-    pifsBreaks <- pifsFromModBreaks
-    pifsInscope <- pifsInscopeByPrefix w
-    pure $ [n | (n,f) <- pifsInscope, (unQual n, f) `elem` pifsBreaks]
+-- TAB-completion for the :break command.
+-- Build and return a list of breakpoint identifiers with a given prefix.
+-- See Note [Tab-completion for :break]
+completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
+    -- bid ~ breakpoint identifier = a name of a function that is
+    --       eligible to set a breakpoint.
+    let (mod_str, _, _) = splitIdent w
+    bids_mod_breaks <- bidsFromModBreaks mod_str
+    bids_inscopes <- bidsFromInscopes
+    pure $ nub $ filter (isPrefixOf w) $ bids_mod_breaks ++ bids_inscopes
   where
-    -- Extract from the ModBreaks data all the names of top-level
-    -- functions eligible to set breakpoints, and put them
-    -- into a pair together with the filename where they are defined.
-    pifsFromModBreaks :: GhciMonad m => m [(String, FastString)]
-    pifsFromModBreaks = do
+    -- Extract all bids from ModBreaks for a given module name prefix
+    bidsFromModBreaks :: GhciMonad m => String -> m [String]
+    bidsFromModBreaks mod_pref = do
+        imods <- interpretedHomeMods
+        let pmods = filter ((isPrefixOf mod_pref) . showModule) imods
+        nonquals <- case null mod_pref of
+          -- If the prefix is empty, then for functions declared in a module
+          -- in scope, don't qualify the function name.
+          -- (eg: `main` instead of `Main.main`)
+            True -> do
+                imports <- GHC.getContext
+                pure [ m | IIModule m <- imports]
+            False -> return []
+        bidss <- mapM (bidsByModule nonquals) pmods
+        pure $ concat bidss
+
+    -- Return a list of interpreted home modules
+    interpretedHomeMods :: GhciMonad m => m [Module]
+    interpretedHomeMods = do
         graph <- GHC.getModuleGraph
-        imods <- filterM GHC.moduleIsInterpreted $
-                    ms_mod <$> GHC.mgModSummaries graph
-        topDecls <- mapM pifsFromModBreaksByModule imods
-        pure $ concat topDecls
+        let hmods = ms_mod <$> GHC.mgModSummaries graph
+        filterM GHC.moduleIsInterpreted hmods
 
-    -- Return all possible top-level pifs from the ModBreaks
-    -- for one module.
-    -- Identifiers of ModBreaks pifs are never qualified.
-    pifsFromModBreaksByModule :: GhciMonad m => Module -> m [(String, FastString)]
-    pifsFromModBreaksByModule mod = do
-        (_, locs, decls) <- getModBreak mod
-        let mbFile  = safeHead $ mapMaybe srcSpanFileName_maybe $ elems locs
-        -- The first element in `decls` is the name of the top-level function.
-        let topLvlDecls = nub $ mapMaybe safeHead $ elems decls
-        pure $ case mbFile of
-          Nothing  -> []
-          (Just file) -> zip  topLvlDecls $ repeat file
-      where
-        safeHead []      = Nothing
-        safeHead (h : _) = Just h
+    -- Return all possible bids for a given Module
+    bidsByModule :: GhciMonad m => [ModuleName] -> Module -> m [String]
+    bidsByModule nonquals mod = do
+      (_, _, decls) <- getModBreak mod
+      let bids = nub $ declPath <$> elems decls
+      pure $ case (moduleName mod) `elem` nonquals of
+              True  -> bids
+              False -> (combineModIdent (showModule mod)) <$> bids
 
-    -- Return the pifs of all identifieres (RdrNames) in scope, where
-    -- the identifier has the given prefix.
-    -- Identifiers of inscope pifs maybe qualified.
-    pifsInscopeByPrefix :: GhciMonad m => String -> m [(String, FastString)]
-    pifsInscopeByPrefix pref = do
-        dflags <- GHC.getSessionDynFlags
+    -- Extract all bids from all top-level identifiers in scope.
+    bidsFromInscopes :: GhciMonad m => m [String]
+    bidsFromInscopes = do
         rdrs <- GHC.getRdrNamesInScope
-        let strnams = (filter (pref `isPrefixOf`) (map (showPpr dflags) rdrs))
-        nams_fil <- mapM createInscopePif strnams
-        pure $ concat nams_fil
+        inscopess <- mapM createInscope $ (showSDocUnsafe . ppr) <$> rdrs
+        imods <- interpretedHomeMods
+        let topLevels = filter ((`elem` imods) . snd) $ concat inscopess
+        bidss <- mapM (addNestedDecls) topLevels
+        pure $ concat bidss
 
-    -- Return a list of pifs for a single in scope identifier
-    createInscopePif :: GhciMonad m => String -> m [(String, FastString)]
-    createInscopePif str_rdr = do
+    -- Return a list of (bid,module) for a single top-level in-scope identifier
+    createInscope :: GhciMonad m => String -> m [(String, Module)]
+    createInscope str_rdr = do
         names <- GHC.parseName str_rdr
-        let files = mapMaybe srcSpanFileName_maybe $ map nameSrcSpan names
-        pure $ zip (repeat str_rdr) files
+        pure $ zip (repeat str_rdr) $ GHC.nameModule <$> names
 
-    -- unQual "ModLev.Module.func"   ->   "func"
-    unQual :: String -> String
-    unQual qual_unqual =
-      let ixs = elemIndices '.' qual_unqual
-      in  case ixs of
-          [] -> qual_unqual
-          _  -> drop (1 + last ixs) qual_unqual
-
+    -- For every top-level identifier in scope, add the bids of the nested
+    -- declarations. See Note [ModBreaks.decls] in GHC.ByteCode.Types
+    addNestedDecls :: GhciMonad m => (String, Module) -> m [String]
+    addNestedDecls (ident, mod) = do
+        (_, _, decls) <- getModBreak mod
+        let (mod_str, topLvl, _) = splitIdent ident
+            ident_decls = filter ((topLvl ==) . head) $ elems decls
+            bids = nub $ declPath <$> ident_decls
+        pure $ map (combineModIdent mod_str) bids
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags
@@ -3523,40 +3530,33 @@ allVisibleModules dflags = listVisibleModuleNames (unitState dflags)
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
 
+
 {-
 Note [Tab-completion for :break]
---------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In tab-completion for the `:break` command, only those
 identifiers should be shown, that are accepted in the
 `:break` command. Hence these identifiers must be
 
 - defined in an interpreted module
-- top-level
-- currently in scope
 - listed in a `ModBreaks` value as a possible breakpoint.
 
 The identifiers may be qualified or unqualified.
 
-To get all possible top-level breakpoints for tab-completeion
+To get all possible top-level breakpoints for tab-completion
 with the correct qualification do:
 
-1. Build the  list called `pifsBreaks` of all pairs of
-(Identifier, module-filename) from the `ModBreaks` values.
-Here all identifiers are unqualified.
+1. Build a list called `bids_mod_breaks` of identifier names eligible
+for setting breakpoints: For every interpreted module with the
+correct module prefix read all identifier names from the `decls` field
+of the `ModBreaks` array.
 
-2. Build the list called `pifInscope` of all pairs of
-(Identifiers, module-filename) with identifiers from
-the `GlobalRdrEnv`. Take only those identifiers that are
-in scope and have the  correct prefix.
-Here the identifiers may be qualified.
+2. Build a list called `bids_inscopess` of identifiers in scope:
+Take all RdrNames in scope, and filter by interpreted modules.
+Fore each of these top-level identifiers add from the `ModBreaks`
+arrays the available identifiers of the nested functions.
 
-3. From the `pifInscope` list seclect all pairs that can be
-found in the `pifsBreaks` list, by comparing only the
-unqualified part of the identifier.
-The remaining identifiers can be used for tab-completion.
-
-This ensures, that we show only identifiers, that can be used
-in a `:break` command.
+3.) Combine both lists, filter by the given prefix, and remove duplicates.
 -}
 
 -- -----------------------------------------------------------------------------
@@ -3791,17 +3791,7 @@ breakSwitch (arg1:rest)
            [] -> do
               liftIO $ putStrLn "No modules are loaded with debugging support."
    | otherwise = do -- try parsing it as an identifier
-        wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
-        maybe_info <- GHC.getModuleInfo (GHC.nameModule name)
-        case maybe_info of
-          Nothing -> noCanDo name (ptext (sLit "cannot get module info"))
-          Just minf ->
-               ASSERT( isExternalName name )
-                    findBreakAndSet (GHC.nameModule name) $
-                       findBreakForBind name (GHC.modInfoModBreaks minf)
-       where
-          noCanDo n why = printForUser $
-                text "cannot set breakpoint on " <> ppr n <> text ": " <> why
+        breakById arg1
 
 breakByModule :: GhciMonad m => Module -> [String] -> m ()
 breakByModule md (arg1:rest)
@@ -3817,8 +3807,72 @@ breakByModuleLine md line args
         findBreakAndSet md $ maybeToList . findBreakByCoord Nothing (line, read col)
    | otherwise = breakSyntax
 
+-- Set a breakpoint for an identifier
+-- See Note [Setting Breakpoints by Id]
+breakById :: GhciMonad m => String -> m ()                          -- #3000
+breakById inp = do
+    let (mod_str, top_level, fun_str) = splitIdent inp
+        mod_top_lvl = combineModIdent mod_str top_level
+    mb_mod <- catch (lookupModuleInscope mod_top_lvl)
+                    (\(_ :: SomeException) -> lookupModuleInGraph mod_str)
+      -- If the top-level name is not in scope, `lookupModuleInscope` will
+      -- throw an exception, then lookup the module name in the module graph.
+    mb_err_msg <- validateBP mod_str fun_str mb_mod
+    case mb_err_msg of
+        Just err_msg -> printForUser $
+          text "Cannot set breakpoint on" <+> quotes (text inp)
+          <> text ":" <+> err_msg
+        Nothing -> do
+          -- No errors found, go and set the breakpoint
+          mb_mod_info  <- GHC.getModuleInfo $ fromJust mb_mod
+          let modBreaks = case mb_mod_info of
+                (Just mod_info) -> GHC.modInfoModBreaks mod_info
+                Nothing         -> emptyModBreaks
+          findBreakAndSet (fromJust mb_mod) $ findBreakForBind fun_str modBreaks
+  where
+    -- Try to lookup the module for an identifier that is in scope.
+    -- `parseName` throws an exception, if the identifier is not in scope
+    lookupModuleInscope :: GhciMonad m => String -> m (Maybe Module)
+    lookupModuleInscope mod_top_lvl = do
+        names <- GHC.parseName mod_top_lvl
+        pure $ Just $ head $ GHC.nameModule <$> names
+          -- if GHC.parseName succeeds `names` is not empty!
+          -- if it fails, the last line will not be evaluated.
+
+    -- Lookup the Module of a module name in the module graph
+    lookupModuleInGraph :: GhciMonad m => String -> m (Maybe Module)
+    lookupModuleInGraph mod_str = do
+        graph <- GHC.getModuleGraph
+        let hmods = ms_mod <$> GHC.mgModSummaries graph
+        pure $ find ((== mod_str) . showModule) hmods
+
+    -- Check validity of an identifier to set a breakpoint:
+    --  1. The module of the identifier must exist
+    --  2. the identifier must be in an interpreted module
+    --  3. the ModBreaks array for module `mod` must have an entry
+    --     for the function
+    validateBP :: GhciMonad m => String -> String -> Maybe Module
+                       -> m (Maybe SDoc)
+    validateBP mod_str fun_str Nothing = pure $ Just $ quotes (text
+        (combineModIdent mod_str (Prelude.takeWhile (/= '.') fun_str)))
+        <+> text "not in scope"
+    validateBP _ "" (Just _) = pure $ Just $ text "Function name is missing"
+    validateBP _ fun_str (Just modl) = do
+        isInterpr <- GHC.moduleIsInterpreted modl
+        (_, _, decls) <- getModBreak modl
+        mb_err_msg <- case isInterpr of
+          False -> pure $ Just $ text "Module" <+> quotes (ppr modl)
+                        <+> text "is not interpreted"
+          True -> case fun_str `elem` (declPath <$> elems decls) of
+                False -> pure $ Just $
+                   text "No breakpoint found for" <+> quotes (text fun_str)
+                   <+> "in module" <+> quotes (ppr modl)
+                True  -> pure Nothing
+        pure mb_err_msg
+
 breakSyntax :: a
-breakSyntax = throwGhcException (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
+breakSyntax = throwGhcException $ CmdLineError ("Syntax: :break [<mod>.]<func>[.<func>]\n"
+                                             ++ "        :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: GhciMonad m
                 => Module -> (TickArray -> [(Int, RealSrcSpan)]) -> m ()
@@ -3870,15 +3924,15 @@ findBreakByLine line arr
 -- The aim is to find the breakpoints for all the RHSs of the
 -- equations corresponding to a binding.  So we find all breakpoints
 -- for
---   (a) this binder only (not a nested declaration)
+--   (a) this binder only (it maybe a top-level or a nested declaration)
 --   (b) that do not have an enclosing breakpoint
-findBreakForBind :: Name -> GHC.ModBreaks -> TickArray
+findBreakForBind :: String -> GHC.ModBreaks -> TickArray
                  -> [(BreakIndex,RealSrcSpan)]
-findBreakForBind name modbreaks _ = filter (not . enclosed) ticks
+findBreakForBind str_name modbreaks _ = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
-            | (index, [n]) <- assocs (GHC.modBreaks_decls modbreaks),
-              n == occNameString (nameOccName name),
+            | (index, decls) <- assocs (GHC.modBreaks_decls modbreaks),
+              str_name == declPath decls,
               RealSrcSpan span _ <- [GHC.modBreaks_locs modbreaks ! index] ]
     enclosed (_,sp0) = any subspan ticks
       where subspan (_,sp) = sp /= sp0 &&
@@ -3921,6 +3975,22 @@ start_bold :: String
 start_bold = "\ESC[1m"
 end_bold :: String
 end_bold   = "\ESC[0m"
+
+{-
+Note [Setting Breakpoints by Id]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To set a breakpoint first check whether a ModBreaks array contains a
+breakpoint with the given function name:
+In `:break M.foo` `M` may be a module name or a local alias of an import
+statement. To lookup a breakpoint in the ModBreaks, the effective module
+name is needed. Even if a module called `M` exists, `M` may still be
+a local alias. To get the module name, parse the top-level identifier with
+`GHC.parseName`. If this succeeds, extract the module name from the
+returned value. If it fails, catch the exception and assume `M` is a real
+module name.
+
+The names of nested functions are stored in `ModBreaks.modBreaks_decls`.
+-}
 
 -----------------------------------------------------------------------------
 -- :where
@@ -4211,6 +4281,14 @@ lookupModuleName mName = GHC.lookupModule mName Nothing
 isMainUnitModule :: Module -> Bool
 isMainUnitModule m = GHC.moduleUnit m == mainUnit
 
+showModule :: Module -> String
+showModule = moduleNameString . moduleName
+
+-- Return a String with the declPath of the function of a breakpoint.
+-- See Note [Field modBreaks_decls] in GHC.ByteCode.Types
+declPath :: [String] -> String
+declPath = intercalate "."
+
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
 expandPath :: MonadIO m => String -> m String
@@ -4267,3 +4345,37 @@ clearAllTargets = discardActiveBreakPoints
                 >> GHC.setTargets []
                 >> GHC.load LoadAllTargets
                 >> pure ()
+
+-- Split up a string with an eventually qualified declaration name into 3 components
+--   1. module name
+--   2. top-level decl
+--   3. full-name of the eventually nested decl, but without module qualification
+-- eg  "foo"           = ("", "foo", "foo")
+--     "A.B.C.foo"     = ("A.B.C", "foo", "foo")
+--     "M.N.foo.bar"   = ("M.N", "foo", "foo.bar")
+splitIdent :: String -> (String, String, String)
+splitIdent [] = ("", "", "")
+splitIdent inp@(a : _)
+    | (isUpper a) = case fixs of
+        []            -> (inp, "", "")
+        (i1 : [] )    -> (upto i1, from i1, from i1)
+        (i1 : i2 : _) -> (upto i1, take (i2 - i1 - 1) (from i1), from i1)
+    | otherwise = case ixs of
+        []            -> ("", inp, inp)
+        (i1 : _)      -> ("", upto i1, inp)
+  where
+    ixs = elemIndices '.' inp        -- indices of '.' in whole input
+    fixs = dropWhile isNextUc ixs    -- indices of '.' in function names              --
+    isNextUc ix = isUpper $ safeInp !! (ix+1)
+    safeInp = inp ++ " "
+    upto i = take i inp
+    from i = drop (i + 1) inp
+
+-- Qualify an identifier name with a module name
+-- combineModIdent "A" "foo"  =  "A.foo"
+-- combineModIdent ""  "foo"  =  "foo"
+combineModIdent :: String -> String -> String
+combineModIdent mod ident
+          | null mod   = ident
+          | null ident = mod
+          | otherwise  = mod ++ "." ++ ident
