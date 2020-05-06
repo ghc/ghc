@@ -748,11 +748,6 @@ GarbageCollect (uint32_t collect_gen,
       ACQUIRE_SM_LOCK;
   }
 
-  if (RtsFlags.GcFlags.forceBarrier) {
-      freeChain(markQueueBlockBdescr(gct->cap->upd_rem_set.queue.top));
-      init_upd_rem_set(&gct->cap->upd_rem_set);
-  }
-
   // Mark and sweep the oldest generation.
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
