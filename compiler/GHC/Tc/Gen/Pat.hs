@@ -647,11 +647,11 @@ AST is used for the subtraction operation.
 -- Here we get rid of it and add the finalizers to the global environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
-  SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)) -> do
+  SplicePat _ splice -> case splice of
+    (HsSpliced _ mod_finalizers (HsSplicedPat pat)) -> do
        addModFinalizersWithLclEnv mod_finalizers
        tc_pat pat_ty pat penv thing_inside
-
-  _other_pat -> panic "tc_pat"
+    _ -> panic "invalid splice in splice pat"
 
 
 {-
