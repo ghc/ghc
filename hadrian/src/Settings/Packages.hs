@@ -53,10 +53,15 @@ packageArgs = do
             , arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-            , notM ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-            , notM ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
+            -- When building stage 1 or later, use thread-safe RTS functions if
+            -- the configuration calls for a threaded GHC.
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
+            -- When building stage 1, use thread-safe RTS functions if the
+            -- bootstrapping (stage 0) compiler provides a threaded RTS way.
+            , stage0 ? threadedBootstrapper ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
               ghcEnableTablesNextToCode ?
               notM (flag GhcUnregisterised) ?
@@ -85,10 +90,27 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo"
-            -- the 'threaded' flag is True by default, but
-            -- let's record explicitly that we link all ghc
-            -- executables with the threaded runtime.
-            , arg "threaded" ] ]
+            -- Note [Linking ghc-bin against threaded stage0 RTS]
+            -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            -- We must maintain the invariant that GHCs linked with '-threaded'
+            -- are built with '-optc=-DTHREADED_RTS', otherwise we'll end up
+            -- with a GHC that can use the threaded runtime, but contains some
+            -- non-thread-safe functions. See
+            -- https://gitlab.haskell.org/ghc/ghc/issues/18024 for an example of
+            -- the sort of issues this can cause.
+            , ifM stage0
+                  -- We build a threaded stage 1 if the bootstrapping compiler
+                  -- supports it.
+                  (ifM threadedBootstrapper
+                       (arg "threaded")
+                       (arg "-threaded"))
+                  -- We build a threaded stage N, N>1 if the configuration calls
+                  -- for it.
+                  (ifM (ghcThreaded <$> expr flavour)
+                       (arg "threaded")
+                       (arg "-threaded"))
+            ]
+          ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
