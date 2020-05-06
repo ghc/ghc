@@ -85,10 +85,24 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo"
-            -- the 'threaded' flag is True by default, but
-            -- let's record explicitly that we link all ghc
-            -- executables with the threaded runtime.
-            , arg "threaded" ] ]
+            -- Note [Linking ghc-bin against threaded stage0 RTS]
+            -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            -- We must maintain the invariant that GHCs linked with '-threaded'
+            -- are built with '-optc=-DTHREADED_RTS', otherwise we'll end up
+            -- with a GHC that can use the threaded runtime, but contains some
+            -- non-thread-safe functions. See
+            -- https://gitlab.haskell.org/ghc/ghc/issues/18024 for an example of
+            -- the sort of issues this can cause.
+            , ifM stage0
+                  -- We build a threaded stage 1 if the bootstrapping compiler
+                  -- supports it.
+                  (ifM threadedBootstrapper
+                       (arg "threaded")
+                       (arg "-threaded"))
+                  -- We build a threaded stage N.
+                  (arg "threaded")
+            ]
+          ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
