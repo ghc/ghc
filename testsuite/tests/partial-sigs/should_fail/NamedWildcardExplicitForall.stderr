@@ -17,23 +17,11 @@ NamedWildcardExplicitForall.hs:10:8: error:
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: bar :: _a -> _a
 
-NamedWildcardExplicitForall.hs:13:26: error:
-    • Found type wildcard ‘_b’ standing for ‘Bool’
-      To use the inferred type, enable PartialTypeSignatures
-    • In the type signature: baz :: forall _a. _a -> _b -> (_a, _b)
-
-NamedWildcardExplicitForall.hs:14:12: error:
-    • Couldn't match expected type ‘_a’ with actual type ‘Bool’
-      ‘_a’ is a rigid type variable bound by
-        the inferred type of baz :: _a -> Bool -> (_a, Bool)
-        at NamedWildcardExplicitForall.hs:13:15-16
-    • In the expression: not x
-      In the expression: (not x, not y)
-      In an equation for ‘baz’: baz x y = (not x, not y)
-    • Relevant bindings include
-        x :: _a (bound at NamedWildcardExplicitForall.hs:14:5)
-        baz :: _a -> Bool -> (_a, Bool)
-          (bound at NamedWildcardExplicitForall.hs:14:1)
+NamedWildcardExplicitForall.hs:14:1: error:
+    Can't quantify over ‘_a’
+      bound by the partial type signature:
+        baz :: forall _a. _a -> _b -> (_a, _b)
+      ‘_a’ should really be ‘Bool’
 
 NamedWildcardExplicitForall.hs:16:8: error:
     • Found type wildcard ‘_a’ standing for ‘Bool’

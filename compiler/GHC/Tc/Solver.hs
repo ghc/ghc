@@ -1,4 +1,4 @@
-
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
@@ -29,7 +29,7 @@ module GHC.Tc.Solver(
 import GHC.Prelude
 
 import GHC.Data.Bag
-import GHC.Core.Class ( Class, classKey, classTyCon )
+import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Tc.Utils.Instantiate
 import GHC.Data.List.SetOps
@@ -48,7 +48,9 @@ import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Instance.FunDeps   ( oclose, instFD )
 import GHC.Core.Predicate
+import GHC.Core.TyCon
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -56,6 +58,7 @@ import GHC.Builtin.Types ( liftedRepTy, manyDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Types.Unique.Set
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit )
@@ -66,6 +69,8 @@ import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import GHC.Data.Maybe     ( mapMaybe, maybeToList )
+import qualified Data.Semigroup as S
 
 {-
 *********************************************************************************
@@ -1003,9 +1008,28 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                               -- NB: must include derived errors in this test,
                               --     hence "incl_derivs"
              wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
-             quant_pred_candidates
-               | definite_error = []
-               | otherwise      = ctsPreds (approximateWC False wanted_transformed)
+             (quant_ct_candidates, residual_wc, did_fds_combine)
+               | definite_error = (emptyBag, wanted_transformed, mempty)
+               | otherwise      = approximateWC False wanted_transformed
+
+       -- See Note [Simplifying the approximated WC]
+       ; (quant_pred_candidates, final_residual_wc) <- case did_fds_combine of
+           NoCombinationYet _ -> do { traceTc "skipping simplifying the approximated WC"
+                                              (ppr quant_ct_candidates)
+                                    ; return ( ctsPreds quant_ct_candidates
+                                             , wanted_transformed ) }
+           YesFDsCombined
+             -> do { traceTc "simplifying approximateWC {" (ppr quant_ct_candidates)
+                   ; _ <- promoteTyVarSet (tyCoVarsOfCts quant_ct_candidates)
+                     -- this promotion re-establishes WantedInv of
+                     -- Note [TcLevel invariants] in GHC.Tc.Utils.TcType.
+
+                   ; simplified_wc <- setTcLevel rhs_tclvl $
+                                      runTcSWithEvBinds ev_binds_var $
+                                      solveSimpleWanteds quant_ct_candidates
+                   ; traceTc "simplifying approximateWC }" (ppr simplified_wc)
+                   ; return ( ctsPreds (wc_simple simplified_wc)
+                            , residual_wc `andWC` simplified_wc ) }
 
        -- Decide what type variables and constraints to quantify
        -- NB: quant_pred_candidates is already fully zonked
@@ -1020,7 +1044,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- Now emit the residual constraint
        ; emitResidualConstraints rhs_tclvl ev_binds_var
                                  name_taus co_vars qtvs bound_theta_vars
-                                 wanted_transformed
+                                 final_residual_wc
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
@@ -1213,6 +1237,58 @@ If the monomorphism restriction does not apply, then we quantify as follows:
   qtvs. We have to zonk the constraints first, so they "see" the
   freshly created skolems.
 
+Note [Lift equality constraints when quantifying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can't quantify over a constraint (t1 ~# t2) because that isn't a
+predicate type; see Note [Types for coercions, predicates, and evidence]
+in GHC.Core.TyCo.Rep.
+
+So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
+to Coercible.
+
+This tiresome lifting is the reason that pick_me (in
+pickQuantifiablePreds) returns a Maybe rather than a Bool.
+
+Note [Inheriting implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+
+        f x = (x::Int) + ?y
+
+where f is *not* a top-level binding.
+From the RHS of f we'll get the constraint (?y::Int).
+There are two types we might infer for f:
+
+        f :: Int -> Int
+
+(so we get ?y from the context of f's definition), or
+
+        f :: (?y::Int) => Int -> Int
+
+At first you might think the first was better, because then
+?y behaves like a free variable of the definition, rather than
+having to be passed at each call site.  But of course, the WHOLE
+IDEA is that ?y should be passed at each call site (that's what
+dynamic binding means) so we'd better infer the second.
+
+BOTTOM LINE: when *inferring types* you must quantify over implicit
+parameters, *even if* they don't mention the bound type variables.
+Reason: because implicit parameters, uniquely, have local instance
+declarations. See pickQuantifiablePreds.
+
+Note [Quantifying over equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
+Doing so may simply postpone a type error from the function definition site to
+its call site.  (At worst, imagine (Int ~ Bool)).
+
+However, consider this
+         forall a. (F [a] ~ Int) => blah
+Should we quantify over the (F [a] ~ Int).  Perhaps yes, because at the call
+site we will know 'a', and perhaps we have instance  F [Bool] = Int.
+So we *do* quantify over a type-family equality where the arguments mention
+the quantified variables.
+
 -}
 
 decideQuantification
@@ -1304,7 +1380,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
                          tyCoVarsOfTypes candidates
                -- We need to grab all the non-quantifiable tyvars in the
-               -- candidates so that we can grow this set to find other
+               -- types so that we can grow this set to find other
                -- non-quantifiable tyvars. This can happen with something
                -- like
                --    f x y = ...
@@ -1317,18 +1393,24 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
 
-             eq_constraints = filter isEqPrimPred candidates
-             mono_tvs2      = growThetaTyVars eq_constraints mono_tvs1
+               -- mono_tvs1 is now the set of variables from an outer scope
+               -- (that's mono_tvs0) and the set of covars, closed over kinds.
+               -- Given this set of variables we know we will not quantify,
+               -- we want to find any other variables that are determined by this
+               -- set, by functional dependencies or equalities. We thus use
+               -- oclose to find all further variables determined by this root
+               -- set. "RAE" update comments
+
+             mono_tvs2 = oclose candidates mono_tvs1
 
              constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
-                               (growThetaTyVars eq_constraints
-                                               (tyCoVarsOfTypes no_quant)
+                               (oclose candidates (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2)
                                `delVarSetList` psig_qtvs
              -- constrained_tvs: the tyvars that we are not going to
              -- quantify solely because of the monomorphism restriction
              --
-             -- (`minusVarSet` mono_tvs2`): a type variable is only
+             -- (`minusVarSet` mono_tvs2): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
              --   free in the environment (#13785)
              --
@@ -1352,7 +1434,6 @@ decideMonoTyVars infer_mode name_taus psigs candidates
            , text "mono_tvs0 =" <+> ppr mono_tvs0
            , text "no_quant =" <+> ppr no_quant
            , text "maybe_quant =" <+> ppr maybe_quant
-           , text "eq_constraints =" <+> ppr eq_constraints
            , text "mono_tvs =" <+> ppr mono_tvs
            , text "co_vars =" <+> ppr co_vars ]
 
@@ -1383,6 +1464,21 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                     , text (if isSingleton name_taus then "it" else "them")
                     , text "a type signature"])
 
+{- "RAE"
+-------------------
+growMonoTyVars :: [PredType]   -- candidates
+               -> TyVarSet     -- original mono vars
+               -> TyVarSet     -- all mono vars
+-- given the candidates and a seed set of mono tyvars, grows the
+-- set of mono tyvars. The expanded set includes all tyvars that are
+-- determined by the seeds, or transitively by other tyvars determined
+-- by the seeds. However, there is a catch: we must use only predicates
+-- that we will not, in the end, want to quantify over. Because we
+-- don't quantify over equalities, this set initially includes just
+-- equalities, but we also include any non-equalities whose free variables
+-- are all mono (as these will not be quantified over).
+-}
+
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
                          -> TyCoVarSet
@@ -1410,10 +1506,9 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
                              (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
        ; let some_default = or default_kvs || or default_tvs
 
-       ; case () of
-           _ | some_default -> simplify_cand candidates
-             | any_promoted -> mapM TcM.zonkTcType candidates
-             | otherwise    -> return candidates
+       ; if | some_default -> simplify_cand candidates
+            | any_promoted -> mapM TcM.zonkTcType candidates
+            | otherwise    -> return candidates
        }
   where
     default_one poly_kinds is_kind_var tv
@@ -1485,6 +1580,81 @@ decideQuantifiedTyVars name_taus psigs candidates
        ; quantifyTyVars dvs_plus }
 
 ------------------
+-- | When inferring types, should we quantify over a given predicate?
+-- Generally true of classes; generally false of equality constraints.
+-- Equality constraints that mention quantified type variables and
+-- implicit variables complicate the story. See Notes
+-- [Inheriting implicit parameters] and [Quantifying over equality constraints]
+pickQuantifiablePreds
+  :: TyVarSet           -- Quantifying over these
+  -> TcThetaType        -- Proposed constraints to quantify
+  -> TcThetaType        -- A subset that we can actually quantify
+-- This function decides whether a particular constraint should be
+-- quantified over, given the type variables that are being quantified
+pickQuantifiablePreds qtvs theta
+  = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
+                             -- -XFlexibleContexts: see #10608, #10351
+         -- flex_ctxt <- xoptM Opt_FlexibleContexts
+    mapMaybe (pick_me flex_ctxt) theta
+  where
+    pick_me flex_ctxt pred
+      = case classifyPredType pred of
+
+          ClassPred cls tys
+            | Just {} <- isCallStackPred cls tys
+              -- NEVER infer a CallStack constraint.  Otherwise we let
+              -- the constraints bubble up to be solved from the outer
+              -- context, or be defaulted when we reach the top-level.
+              -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+            -> Nothing
+
+            | isIPClass cls
+            -> Just pred -- See note [Inheriting implicit parameters]
+
+            | pick_cls_pred flex_ctxt cls tys
+            -> Just pred
+
+          EqPred eq_rel ty1 ty2
+            | quantify_equality eq_rel ty1 ty2
+            , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
+              -- boxEqPred: See Note [Lift equality constraints when quantifying]
+            , pick_cls_pred flex_ctxt cls tys
+            -> Just (mkClassPred cls tys)
+
+          IrredPred ty
+            | tyCoVarsOfType ty `intersectsVarSet` qtvs
+            -> Just pred
+
+          _ -> Nothing
+
+
+    pick_cls_pred flex_ctxt cls tys
+      = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
+        && (checkValidClsArgs flex_ctxt cls tys)
+           -- Only quantify over predicates that checkValidType
+           -- will pass!  See #10351.
+        && (no_fixed_dependencies cls tys) -- "RAE": comment this line
+
+    no_fixed_dependencies cls tys
+      = and [ qtvs `intersectsVarSet` tyCoVarsOfTypes fd_lhs_tys
+            | fd <- cls_fds
+            , let (fd_lhs_tys, _) = instFD fd cls_tvs tys ]
+      where
+        (cls_tvs, cls_fds) = classTvsFds cls
+
+
+    -- See Note [Quantifying over equality constraints]
+    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
+    quantify_equality ReprEq _   _   = True
+
+    quant_fun ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, tys) | isTypeFamilyTyCon tc
+                         -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
+          _ -> False
+
+
+------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
 -- See Note [Growing the tau-tvs using constraints]
 growThetaTyVars theta tcvs
@@ -1493,7 +1663,7 @@ growThetaTyVars theta tcvs
   where
     seed_tcvs = tcvs `unionVarSet` tyCoVarsOfTypes ips
     (ips, non_ips) = partition isIPLikePred theta
-                         -- See Note [Inheriting implicit parameters] in GHC.Tc.Utils.TcType
+                         -- See Note [Inheriting implicit parameters]
 
     mk_next :: VarSet -> VarSet -- Maps current set to newly-grown ones
     mk_next so_far = foldr (grow_one so_far) emptyVarSet non_ips
@@ -1528,7 +1698,7 @@ quantify over all type variables that are
  * not forced to be monomorphic (mono_tvs),
    for example by being free in the environment.
 
-However, in the case of a partial type signature, be doing inference
+However, in the case of a partial type signature, we are doing inference
 *in the presence of a type signature*. For example:
    f :: _ -> a
    f x = ...
@@ -1542,7 +1712,7 @@ sure to quantify over them.  This leads to several wrinkles:
      f :: _ -> Maybe a
      f x = True && x
   The inferred type of 'f' is f :: Bool -> Bool, but there's a
-  left-over error of form (HoleCan (Maybe a ~ Bool)).  The error-reporting
+  left-over error of form (Maybe a ~ Bool).  The error-reporting
   machine expects to find a binding site for the skolem 'a', so we
   add it to the quantified tyvars.
 
@@ -2331,23 +2501,41 @@ defaultTyVarTcS the_tv
   | otherwise
   = return False  -- the common case
 
-approximateWC :: Bool -> WantedConstraints -> Cts
+approximateWC :: Bool -> WantedConstraints -> (Cts, WantedConstraints, DidFDsCombine)
+-- Second return value is the depleted wc
+-- Third return value is YesFDsCombined <=> multiple constraints for the same fundep floated
+-- See Note [Simplifying the approximated WC]
 -- Postcondition: Wanted or Derived Cts
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
 approximateWC float_past_equalities wc
   = float_wc emptyVarSet wc
   where
-    float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
-    float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = filterBag (is_floatable trapping_tvs) simples `unionBags`
-        concatMapBag (float_implic trapping_tvs) implics
-    float_implic :: TcTyCoVarSet -> Implication -> Cts
+    float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints, DidFDsCombine)
+    float_wc trapping_tvs old_wc@(WC { wc_simple = simples, wc_impl = implics })
+      = ( floated_from_simple `unionBags` floated_from_implics
+        , old_wc { wc_simple = cannot_float_simple
+                 , wc_impl   = new_implics }
+        , NoCombinationYet (mkUniqSet floated_fd_classes) S.<> fds_combined_from_implics )
+      where
+        (floated_from_simple, cannot_float_simple)
+          = partitionBag (is_floatable trapping_tvs) simples
+        floated_fd_classes
+          = [ cls
+            | one_floater <- bagToList floated_from_simple
+            , (cls, _) <- maybeToList $ getClassPredTys_maybe (ctPred one_floater)
+            , classHasFds cls ]
+        (floated_from_implics, new_implics, fds_combined_from_implics)
+          = foldMap (float_implic trapping_tvs) implics
+            -- should this be foldMap'?
+
+    float_implic :: TcTyCoVarSet -> Implication -> (Cts, Bag Implication, DidFDsCombine)
     float_implic trapping_tvs imp
       | float_past_equalities || ic_given_eqs imp /= MaybeGivenEqs
-      = float_wc new_trapping_tvs (ic_wanted imp)
-      | otherwise   -- Take care with equalities
-      = emptyCts    -- See (1) under Note [ApproximateWC]
+      = let (floaters, new_wc, fds_combined) = float_wc new_trapping_tvs (ic_wanted imp) in
+        (floaters, unitBag $ imp { ic_wanted = new_wc }, fds_combined)
+      | otherwise                          -- Take care with equalities
+      = (emptyCts, unitBag imp, mempty)    -- See (1) under Note [ApproximateWC]
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
 
@@ -2355,6 +2543,21 @@ approximateWC float_past_equalities wc
        | isGivenCt ct     = False
        | insolubleEqCt ct = False
        | otherwise        = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
+
+data DidFDsCombine
+  = NoCombinationYet (UniqSet Class)
+      -- set of classes that have at least one constraint
+      -- INVARIANT: each class has at least one FD
+  | YesFDsCombined
+
+instance Semigroup DidFDsCombine where
+  NoCombinationYet set1 <> NoCombinationYet set2
+    | disjointUniqSets set1 set2 = NoCombinationYet (set1 `unionUniqSets` set2)
+
+  _ <> _ = YesFDsCombined
+
+instance Monoid DidFDsCombine where
+  mempty = NoCombinationYet emptyUniqSet
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -2415,6 +2618,50 @@ you want.  So I simply removed the extra code to implement the
 contamination stuff.  There was zero effect on the testsuite (not even #8155).
 ------ End of historical note -----------
 
+Note [Simplifying the approximated WC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+  class C a b | a -> b
+
+and we are running simplifyInfer over
+
+  forall[2] x. () => [W] C a beta1[1]
+  forall[2] y. () => [W] C a beta2[1]
+
+These are two implication constraints, both of which contain a
+wanted for the class C. Neither constraint mentions the bound
+skolem. We might imagine that these constraint could thus float
+out of their implications and then interact, causing beta1 to unify
+with beta2.
+
+Unifying these is important. Without doing so, then we might infer
+a type like (C a b1, C a b2) => a -> a, which will fail to pass the
+ambiguity check, which will say (rightly) that it cannot unify b1
+with b2, as required by the fundep interactions. This happens in
+the parsec library, and in test case typecheck/should_compile/FloatFDs.
+
+The solution is to run the simplifier *again* after running approximateWC.
+This will interact the C a betaX inerts and indeed unify beta1 := beta2
+before quantification.
+
+Here are the details:
+
+1. Because the re-simplification happens only for the reason of
+   interacting fundeps, we do it only when we observe two constraints
+   from the same class floated out of two different implications.
+   This logic is contained within approximateWC, in its third return value.
+   This is just an optimization to avoid walking over the constraints
+   unnecessarily. It should be possible to skip this without changing
+   correctness.
+
+2. The residual constraint emitted from simplifyInfer must include
+   any constraints not floated out in approximateWC, but also must
+   include the constraints left after the second simplification described
+   in this Note. Yet we don't want duplicates, which could lead to
+   duplicate error messages. We thus carefully compute the depleted
+   WantedConstraints in approximateWC. The two WantedConstraints are
+   cobined in the call to mkResidualConstraints in simplifyInfer.
 
 Note [DefaultTyVar]
 ~~~~~~~~~~~~~~~~~~~
@@ -2543,7 +2790,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     , defaultable_tyvar tv
     , defaultable_classes (map sndOf3 group) ]
   where
-    simples                = approximateWC True wanteds
+    (simples, _, _)        = approximateWC True wanteds
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 
@@ -2617,8 +2864,12 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
            ; let loc = mkGivenLoc tc_lvl UnkSkol lcl_env
-           ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
-                                wanteds
+           ; wanted_evs <- sequence [ newWantedEvVarNC loc rewriters pred'
+                                    | wanted <- wanteds
+                                    , CtWanted { ctev_pred = pred
+                                               , ctev_rewriters = rewriters }
+                                        <- return (ctEvidence wanted)
+                                    , let pred' = substTy subst pred ]
            ; fmap isEmptyWC $
              solveSimpleWanteds $ listToBag $
              map mkNonCanonical wanted_evs }
