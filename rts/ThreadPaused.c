@@ -245,7 +245,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
             IF_NONMOVING_WRITE_BARRIER_ENABLED {
-                updateRemembSetPushClosure(cap, (StgClosure *) bh);
+                updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) bh);
             }
 
 #if defined(THREADED_RTS)

@@ -729,11 +729,11 @@
       SymI_HasProto(stg_isMutableByteArrayPinnedzh)                     \
       SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasProto(stg_resizzeMutableByteArrayzh)                      \
-      SymI_HasProto(stg_shrinkSmallMutableArrayzh)                       \
+      SymI_HasProto(stg_shrinkSmallMutableArrayzh)                      \
       SymI_HasProto(newSpark)                                           \
-      SymI_HasProto(updateRemembSetPushThunk)                             \
-      SymI_HasProto(updateRemembSetPushThunk_)                            \
-      SymI_HasProto(updateRemembSetPushClosure_)                          \
+      SymI_HasProto(updateRemembSetPushThunk)                           \
+      SymI_HasProto(updateRemembSetPushThunkRegs)                       \
+      SymI_HasProto(updateRemembSetPushClosureRegs)                     \
       SymI_HasProto(performGC)                                          \
       SymI_HasProto(performMajorGC)                                     \
       SymI_HasProto(prog_argc)                                          \

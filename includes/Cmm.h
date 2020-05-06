@@ -899,5 +899,5 @@
 // A useful helper for pushing a pointer to the update remembered set.
 #define updateRemembSetPushPtr(p)                                    \
     IF_NONMOVING_WRITE_BARRIER_ENABLED {                             \
-      ccall updateRemembSetPushClosure_(BaseReg "ptr", p "ptr");     \
+      ccall updateRemembSetPushClosureRegs(BaseReg "ptr", p "ptr");     \
     }

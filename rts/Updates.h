@@ -53,7 +53,7 @@
     bd = Bdescr(p1);                                            \
     if (bdescr_gen_no(bd) != 0 :: bits16) {                     \
       IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
-        ccall updateRemembSetPushThunk_(BaseReg, p1 "ptr");     \
+        ccall updateRemembSetPushThunkRegs(BaseReg, p1 "ptr");  \
       }                                                         \
       recordMutableCap(p1, TO_W_(bdescr_gen_no(bd)));           \
       TICK_UPD_OLD_IND();                                       \

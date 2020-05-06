@@ -639,22 +639,44 @@ void updateRemembSetPushThunkEager(Capability *cap,
     }
 }
 
-void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
+void updateRemembSetPushThunkRegs(StgRegTable *reg, StgThunk *p)
 {
     updateRemembSetPushThunk(regTableToCapability(reg), p);
 }
 
-inline void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
+STATIC_INLINE void updateRemembSetPushClosure_(UpdRemSet *rs, StgClosure *p)
+{
+    if (markQueueBlockIsFull(rs->block)) {
+        // Yes, this block is full.
+        // Allocate a fresh block.
+        ACQUIRE_SM_LOCK;
+        nonmovingAddUpdRemSetBlocks(rs);
+        bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+        bd->link = markQueueBlockBdescr(rs->block);
+        rs->block = (MarkQueueBlock *) bd->start;
+        rs->block->head = 0;
+        RELEASE_SM_LOCK;
+    }
+
+    MarkQueueEnt ent = {
+        .mark_closure = {
+            .p = TAG_CLOSURE(MARK_CLOSURE, UNTAG_CLOSURE(p)),
+            .origin = NULL,
+        }
+    };
+    markQueueBlockPush(rs->block, &ent);
+}
+
+void updateRemembSetPushClosure(UpdRemSet *rs, StgClosure *p)
 {
     if (check_in_nonmoving_heap(p)) {
-        MarkQueue *queue = &cap->upd_rem_set.queue;
-        push_closure(queue, p, NULL);
+        updateRemembSetPushClosure_(rs, p);
     }
 }
 
-void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p)
+void updateRemembSetPushClosureRegs(StgRegTable *reg, struct StgClosure_ *p)
 {
-    updateRemembSetPushClosure(regTableToCapability(reg), p);
+    updateRemembSetPushClosure(&regTableToCapability(reg)->upd_rem_set, p);
 }
 
 STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
