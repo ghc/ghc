@@ -63,6 +63,15 @@ ghc_stage2_MORE_HC_OPTS += -threaded
 ghc_stage3_MORE_HC_OPTS += -threaded
 endif
 
+# If stage 0 supplies a threaded RTS, we can use it for stage 1.
+# See Note [Linking ghc-bin against threaded stage0 RTS] in
+# hadrian/src/Settings/Packages.hs for details.
+ifeq "$(GhcThreadedRts)" "YES"
+ghc_stage1_MORE_HC_OPTS += -threaded
+else
+ghc_stage1_CONFIGURE_OPTS += -f-threaded
+endif
+
 ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_PROGRAM_WAY = p
 endif
