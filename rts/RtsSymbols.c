@@ -345,7 +345,6 @@
 #define RTS_USER_SIGNALS_SYMBOLS             \
    SymI_HasProto(registerNewIOCPHandle)      \
    SymI_HasProto(getOverlappedEntries)       \
-   SymI_HasProto(servicedIOEntries)          \
    SymI_HasProto(completeSynchronousRequest) \
    SymI_HasProto(registerAlertableWait)      \
    SymI_HasProto(ioManagerWakeup)            \
