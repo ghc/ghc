@@ -79,6 +79,8 @@ ghc-major-version     = @GhcMajVersion@
 ghc-minor-version     = @GhcMinVersion@
 ghc-patch-level       = @GhcPatchLevel@
 
+bootstrap-threaded-rts      = @GhcThreadedRts@
+
 supports-this-unit-id = @SUPPORTS_THIS_UNIT_ID@
 
 project-name          = @ProjectName@
