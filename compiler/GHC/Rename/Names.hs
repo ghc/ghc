@@ -448,7 +448,7 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
       ptrust = trust == Sf_Trustworthy || trust_pkg
 
       (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | pkg == thisPackage dflags =
+         | pkg == homeUnit dflags =
             -- Imported module is from the home package
             -- Take its dependent modules and add imp_mod itself
             -- Take its dependent packages unchanged

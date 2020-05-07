@@ -171,9 +171,9 @@ withBkpSession cid insts deps session_type do_this = do
         hscTarget   = case session_type of
                         TcSession -> HscNothing
                         _ -> hscTarget dflags,
-        thisUnitIdInsts_ = Just insts,
-        thisComponentId_ = Just cid,
-        thisUnitId =
+        homeUnitInstantiations = insts,
+        homeUnitInstanceOfId   = Just cid,
+        homeUnitId =
             case session_type of
                 TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
@@ -312,7 +312,7 @@ buildUnit session cid insts lunit = do
             unitPackageId = PackageId compat_fs,
             unitPackageName = compat_pn,
             unitPackageVersion = makeVersion [],
-            unitId = toUnitId (thisPackage dflags),
+            unitId = toUnitId (homeUnit dflags),
             unitComponentName = Nothing,
             unitInstanceOf = cid,
             unitInstantiations = insts,
@@ -652,7 +652,7 @@ hsunitModuleGraph dflags unit = do
     --  requirement.
     let node_map = Map.fromList [ ((ms_mod_name n, ms_hsc_src n == HsigFile), n)
                                 | n <- nodes ]
-    req_nodes <- fmap catMaybes . forM (thisUnitIdInsts dflags) $ \(mod_name, _) ->
+    req_nodes <- fmap catMaybes . forM (homeUnitInstantiations dflags) $ \(mod_name, _) ->
         let has_local = Map.member (mod_name, True) node_map
         in if has_local
             then return Nothing
