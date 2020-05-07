@@ -169,7 +169,7 @@ One way to improve this is to either:
 -}
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
-  = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
+  = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
     LookupFound _ pkg -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
@@ -215,6 +215,7 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
+    pkgs     = pkgState dflags
     pNm      = moduleName $ mi_module pluginModule
     pPkg     = moduleUnit $ mi_module pluginModule
     deps     = map gwib_mod $

@@ -396,13 +396,13 @@ addPackage pkg = do
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
-    let dflags = hsc_dflags hsc_env
+    let pkgs = pkgState (hsc_dflags hsc_env)
     msgInclude (i, n) uid
     -- Check if we've compiled it already
     case uid of
       HoleUnit   -> return ()
       RealUnit _ -> return ()
-      VirtUnit i -> case lookupUnit dflags uid of
+      VirtUnit i -> case lookupUnit pkgs uid of
         Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
         Just _  -> return ()
 
