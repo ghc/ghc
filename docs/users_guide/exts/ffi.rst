@@ -1027,7 +1027,7 @@ Pinned Byte Arrays
 A pinned byte array is one that the garbage collector is not allowed
 to move. Consequently, it has a stable address that can be safely
 requested with ``byteArrayContents#``. There are a handful of
-primitive functions in :ghc-prim-ref:`GHC.Prim <GHC-Prim.html>`
+primitive functions in :ghc-prim-ref:`GHC.Prim.`
 used to enforce or check for pinnedness: ``isByteArrayPinned#``,
 ``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
 byte array can be pinned as a result of three possible causes:
