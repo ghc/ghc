@@ -1556,9 +1556,9 @@ lookupNaturalSDataConName dflags hsc_env = case integerLibrary dflags of
 -- | Helper for 'lookupMkIntegerName', 'lookupIntegerSDataConName'
 guardIntegerUse :: DynFlags -> IO a -> IO a
 guardIntegerUse dflags act
-  | thisPackage dflags == primUnitId
+  | homeUnit dflags == primUnitId
   = return $ panic "Can't use Integer in ghc-prim"
-  | thisPackage dflags == integerUnitId
+  | homeUnit dflags == integerUnitId
   = return $ panic "Can't use Integer in integer-*"
   | otherwise = act
 
@@ -1568,11 +1568,11 @@ guardIntegerUse dflags act
 -- literals in `base`. If we do, we get interface loading error for GHC.Natural.
 guardNaturalUse :: DynFlags -> IO a -> IO a
 guardNaturalUse dflags act
-  | thisPackage dflags == primUnitId
+  | homeUnit dflags == primUnitId
   = return $ panic "Can't use Natural in ghc-prim"
-  | thisPackage dflags == integerUnitId
+  | homeUnit dflags == integerUnitId
   = return $ panic "Can't use Natural in integer-*"
-  | thisPackage dflags == baseUnitId
+  | homeUnit dflags == baseUnitId
   = return $ panic "Can't use Natural in base"
   | otherwise = act
 
