@@ -836,7 +836,6 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 
 SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 {
-    (void)dependent; // TODO
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
 
     ASSERT(symhash != NULL);
@@ -876,9 +875,6 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
         return loadSymbol(lbl, pinfo);
     }
 }
-
-
-
 #endif /* OBJFORMAT_PEi386 */
 
 /*

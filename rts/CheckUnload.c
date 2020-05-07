@@ -537,6 +537,35 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
 }
 #endif
 
+static bool
+check_dependent_referenced(void *data, StgWord key, const void *value STG_UNUSED)
+{
+    ObjectCode *oc = (ObjectCode*)key;
+    bool *any_referenced = (bool*)data;
+
+    if (oc->referenced) {
+        *any_referenced = true;
+        // Stop
+        return false;
+    } else {
+        // Continue
+        return true;
+    }
+}
+
+static bool
+oc_referenced(ObjectCode *oc)
+{
+    if (oc->referenced) {
+        return true;
+    }
+
+    bool any_referenced = false;
+    iterHashTable(oc->dependents, &any_referenced, check_dependent_referenced);
+
+    return any_referenced;
+}
+
 //
 // Check whether we can unload any object code.  This is called at the
 // appropriate point during a GC, where all the heap data is nice and
@@ -608,7 +637,7 @@ void checkUnload (StgClosure *static_objects)
   ObjectCode *next = NULL;
   for (ObjectCode *oc = unloaded_objects; oc; oc = next) {
       next = oc->next;
-      if (oc->referenced == 0) {
+      if (oc_referenced(oc) == false) {
           if (prev == NULL) {
               unloaded_objects = oc->next;
           } else {
