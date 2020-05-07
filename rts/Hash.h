@@ -19,7 +19,7 @@ typedef struct strhashtable StrHashTable;
  * `const` so that calling function can mutate what the pointer points to if it
  * needs to.
  */
-HashTable * allocHashTable    ( void );
+HashTable * allocHashTable  ( void );
 void        insertHashTable ( HashTable *table, StgWord key, const void *data );
 void *      lookupHashTable ( const HashTable *table, StgWord key );
 void *      removeHashTable ( HashTable *table, StgWord key, const void *data );
