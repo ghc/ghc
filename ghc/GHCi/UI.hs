@@ -57,7 +57,7 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
                   hsc_dynLinker, hsc_interp )
 import GHC.Unit.Module
 import GHC.Types.Name
-import GHC.Unit.State ( unitIsTrusted, unsafeGetUnitInfo, getInstalledPackageDetails,
+import GHC.Unit.State ( unitIsTrusted, unsafeLookupUnit, getInstalledPackageDetails,
                              listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
@@ -2359,7 +2359,7 @@ isSafeModule m = do
 
     packageTrusted dflags md
         | isHomeModule dflags md = True
-        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit md)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit dflags (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
