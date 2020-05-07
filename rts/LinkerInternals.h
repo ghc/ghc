@@ -190,6 +190,11 @@ typedef struct _ObjectCode {
     Symbol_t *symbols;
     int    n_symbols;
 
+    /* Set of ObjectCode* that depends on this ObjectCode. When unloading this
+     * object code we check whether these are unreferenced. If not then we can't
+     * unload it. */
+    HashTable *dependents;
+
     /* ptr to mem containing the object file image */
     char*      image;
 
@@ -315,8 +320,9 @@ int ghciInsertSymbolTable(
     HsBool weak,
     ObjectCode *owner);
 
-/* lock-free version of lookupSymbol */
-SymbolAddr* lookupSymbol_ (SymbolName* lbl);
+/* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
+ * dependent to the owner of the symbol. */
+SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent);
 
 extern StrHashTable *symhash;
 
