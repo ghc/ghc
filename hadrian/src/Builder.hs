@@ -289,6 +289,9 @@ instance H.Builder Builder where
                     unit $ cmd' [Cwd output] [path]        buildArgs
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
+
+                Dtrace -> cmd' echo [path] buildArgs [ "-o", output ] [ "-s", input ]
+
                 _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
