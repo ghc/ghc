@@ -1,3 +1,4 @@
+# Tests unloading an object file which is in use in a thread.
 test('T16525b',
      [extra_files(['A.hs']),
       when(compiler_debugged(), extra_run_opts('+RTS -DS -RTS'))],
