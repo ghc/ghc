@@ -61,6 +61,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Unit.Module
+import GHC.Unit.State
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -172,7 +173,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
-       ; this_uid <- fmap thisPackage getDynFlags
+       ; this_uid <- fmap homeUnit getDynFlags
        ; checkSynCycles this_uid tyclss tyclds
        ; traceTc "Done synonym cycle check" (ppr tyclss)
 
@@ -4024,7 +4025,7 @@ checkValidDataCon dflags existential_ok tc con
       -- when we actually fill in the abstract type.  As such, don't
       -- warn in this case (it gives users the wrong idea about whether
       -- or not UNPACK on abstract types is supported; it is!)
-      , unitIsDefinite (thisPackage dflags)
+      , homeUnitIsDefinite dflags
       = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
       where
         is_strict = case strict_mark of
