@@ -74,7 +74,7 @@ flushFinderCaches :: HscEnv -> IO ()
 flushFinderCaches hsc_env =
   atomicModifyIORef' fc_ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
-        this_pkg = thisPackage (hsc_dflags hsc_env)
+        this_pkg = homeUnit (hsc_dflags hsc_env)
         fc_ref = hsc_FC hsc_env
         is_ext mod _ | not (moduleUnit mod `unitIdEq` this_pkg) = True
                      | otherwise = False
@@ -135,7 +135,7 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if moduleUnit mod `unitIdEq` thisPackage dflags
+    in if moduleUnit mod `unitIdEq` homeUnit dflags
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
@@ -245,7 +245,7 @@ modLocationCache hsc_env mod do_this = do
 
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
-  let iuid = thisUnitId dflags
+  let iuid = homeUnitId dflags
   in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
@@ -253,7 +253,7 @@ addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc = do
   let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
-  return (mkModule (thisPackage (hsc_dflags hsc_env)) mod_name)
+  return (mkHomeModule (hsc_dflags hsc_env) mod_name)
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
 uncacheModule hsc_env mod_name = do
@@ -279,7 +279,7 @@ findHomeModule hsc_env mod_name = do
       }
  where
   dflags = hsc_dflags hsc_env
-  uid = thisPackage dflags
+  uid    = homeUnit dflags
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
@@ -678,7 +678,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, pkg /= thisPackage dflags
+                | Just pkg <- mb_pkg, pkg /= homeUnit dflags
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
@@ -794,7 +794,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (pkg `unitIdEq` thisPackage dflags)
+                | Just pkg <- mb_pkg, not (pkg `unitIdEq` homeUnit dflags)
                 -> not_found_in_package pkg files
 
                 | null files

@@ -64,6 +64,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Unit.Module
+import GHC.Unit.State
 import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Driver.Finder
@@ -401,7 +402,7 @@ loadInterface doc_str mod from
   -- Hole modules get special treatment
   = do dflags <- getDynFlags
        -- Redo search for our local hole module
-       loadInterface doc_str (mkModule (thisPackage dflags) (moduleName mod)) from
+       loadInterface doc_str (mkHomeModule dflags (moduleName mod)) from
   | otherwise
   = withTimingSilentD (text "loading interface") (pure ()) $
     do  {       -- Read the state
@@ -619,7 +620,7 @@ is_external_sig dflags iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    moduleUnit (mi_module iface) /= thisPackage dflags
+    moduleUnit (mi_module iface) /= homeUnit dflags
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -642,7 +643,7 @@ computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     dflags <- getDynFlags
     case getModuleInstantiation mod0 of
-        (imod, Just indef) | not (unitIsDefinite (thisPackage dflags)) -> do
+        (imod, Just indef) | homeUnitIsIndefinite dflags -> do
             r <- findAndReadIface doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
@@ -728,7 +729,7 @@ wantHiBootFile dflags eps mod from
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
   where
-    this_package = thisPackage dflags == moduleUnit mod
+    this_package = homeUnit dflags == moduleUnit mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
@@ -927,7 +928,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if moduleUnit mod `unitIdEq` thisPackage dflags &&
+                       if moduleUnit mod `unitIdEq` homeUnit dflags &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
