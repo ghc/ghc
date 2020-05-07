@@ -59,7 +59,8 @@ module GHC.Unit.State (
         pprPackages,
         pprPackagesSimple,
         pprModuleMap,
-        isIndefinite,
+        homeUnitIsIndefinite,
+        homeUnitIsDefinite,
     )
 where
 
@@ -387,7 +388,7 @@ emptyUnitInfoMap = UnitInfoMap emptyUDFM emptyUniqSet
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnit :: DynFlags -> Unit -> Maybe UnitInfo
-lookupUnit dflags = lookupUnit' (isIndefinite dflags) (unitInfoMap (pkgState dflags))
+lookupUnit dflags = lookupUnit' (homeUnitIsIndefinite dflags) (unitInfoMap (pkgState dflags))
 
 -- | A more specialized interface, which takes a boolean specifying
 -- whether or not to look for on-the-fly renamed interfaces, and
@@ -485,7 +486,7 @@ initPackages dflags = withTiming dflags
         <- mkPackageState dflags pkg_dbs []
   return (dflags{ pkgDatabase = Just read_pkg_dbs,
                   pkgState = pkg_state,
-                  thisUnitIdInsts_ = insts },
+                  homeUnitInstantiations = insts },
           preload)
   where
     forcePkgDb (dflags, _) = unitInfoMap (pkgState dflags) `seq` ()
@@ -676,10 +677,15 @@ applyTrustFlag dflags prec_map unusable pkgs flag =
          Left ps       -> trustFlagErr dflags flag ps
          Right (ps,qs) -> return (distrustAllUnits ps ++ qs)
 
--- | A little utility to tell if the 'thisPackage' is indefinite
+-- | A little utility to tell if the home unit is indefinite
 -- (if it is not, we should never use on-the-fly renaming.)
-isIndefinite :: DynFlags -> Bool
-isIndefinite dflags = not (unitIsDefinite (thisPackage dflags))
+homeUnitIsIndefinite :: DynFlags -> Bool
+homeUnitIsIndefinite dflags = not (homeUnitIsDefinite dflags)
+
+-- | A little utility to tell if the home unit is definite
+-- (if it is, we should never use on-the-fly renaming.)
+homeUnitIsDefinite :: DynFlags -> Bool
+homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
 
 applyPackageFlag
    :: DynFlags
@@ -1322,7 +1328,7 @@ mkPackageState
     -> [PreloadUnitId]              -- preloaded packages
     -> IO (PackageState,
            [PreloadUnitId],         -- new packages to preload
-           Maybe [(ModuleName, Module)])
+           [(ModuleName, Module)])
 
 mkPackageState dflags dbs preload0 = do
 {-
@@ -1538,7 +1544,7 @@ mkPackageState dflags dbs preload0 = do
       -- (NB: since this is only relevant for base/rts it doesn't matter
       -- that thisUnitIdInsts_ is not wired yet)
       --
-      preload3 = ordNub $ filter (/= thisPackage dflags)
+      preload3 = ordNub $ filter (/= homeUnit dflags)
                         $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
@@ -1564,7 +1570,7 @@ mkPackageState dflags dbs preload0 = do
     unwireMap = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ],
     requirementContext = req_ctx
     }
-  let new_insts = fmap (map (fmap (upd_wired_in_mod wired_map))) (thisUnitIdInsts_ dflags)
+  let new_insts = map (fmap (upd_wired_in_mod wired_map)) (homeUnitInstantiations dflags)
   return (pstate, new_dep_preload, new_insts)
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
@@ -1659,7 +1665,7 @@ mkModuleNameProvidersMap dflags pkg_db vis_map =
     hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
 
     pk = mkUnit pkg
-    unit_lookup uid = lookupUnit' (isIndefinite dflags) pkg_db uid
+    unit_lookup uid = lookupUnit' (homeUnitIsIndefinite dflags) pkg_db uid
                         `orElse` pprPanic "unit_lookup" (ppr uid)
 
     exposed_mods = unitExposedModules pkg
@@ -1968,10 +1974,10 @@ getPreloadPackagesAnd dflags pkgids0 =
                   -- An indefinite package will have insts to HOLE,
                   -- which is not a real package. Don't look it up.
                   -- Fixes #14525
-                  if isIndefinite dflags
+                  if homeUnitIsIndefinite dflags
                     then []
                     else map (toUnitId . moduleUnit . snd)
-                             (thisUnitIdInsts dflags)
+                             (homeUnitInstantiations dflags)
       state   = pkgState dflags
       pkg_map = unitInfoMap state
       preload = preloadPackages state
