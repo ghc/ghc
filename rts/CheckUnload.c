@@ -584,7 +584,8 @@ void checkUnload (StgClosure *static_objects)
   OCSectionIndices *s_indices = buildOCSectionIndices(unloaded_objects);
   // Mark every unloadable object as unreferenced initially
   for (ObjectCode *oc = unloaded_objects; oc; oc = oc->next) {
-      debugBelch("Checking whether to unload %" PATH_FMT "\n", oc->fileName);
+      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
+                                  oc->fileName));
       oc->referenced = false;
   }
 
@@ -643,10 +644,12 @@ void checkUnload (StgClosure *static_objects)
           } else {
               prev->next = oc->next;
           }
-          debugBelch("Unloading object file %" PATH_FMT "\n", oc->fileName);
+          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
+                                      oc->fileName));
           freeObjectCode(oc);
       } else {
-          debugBelch("Object file still in use: %" PATH_FMT "\n", oc->fileName);
+          IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                                      PATH_FMT "\n", oc->fileName));
           prev = oc;
       }
   }
