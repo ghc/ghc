@@ -36,7 +36,7 @@ fingerprintDynFlags :: DynFlags -> Module
 fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
     let mainis   = if mainModIs == this_mod then Just mainFunIs else Nothing
                       -- see #5878
-        -- pkgopts  = (thisPackage dflags, sort $ packageFlags dflags)
+        -- pkgopts  = (homeUnit dflags, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell
         -- oflags   = sort $ filter filterOFlags $ flags dflags
 
