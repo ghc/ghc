@@ -1,0 +1,14 @@
+:set -fobject-code
+:load A
+import Control.Concurrent
+import Control.Monad
+_ <- forkIO $ forever $ threadDelay 1000000 >> print (map (\a -> a*a) [a])
+:l []
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
