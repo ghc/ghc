@@ -425,6 +425,7 @@ Library
         GHC.Rename.HsType
         GHC.Rename.Fixity
         GHC.Rename.Utils
+        GHC.Rename.Utils.CpsMonad
         GHC.Rename.Unbound
         GHC.Core.Opt.Monad
         GHC.Core.Opt.CSE
