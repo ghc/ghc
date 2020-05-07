@@ -52,12 +52,13 @@ import Data.Ord              ( comparing )
 import GHC.Driver.Session (Language(..))
 import GHC hiding ( NoLink, moduleInfo,LexicalFixity(..) )
 import GHC.Types.Name
+import GHC.Unit.State
 
 --------------------------------------------------------------------------------
 -- * Generating HTML documentation
 --------------------------------------------------------------------------------
 
-ppHtml :: DynFlags
+ppHtml :: UnitState
        -> String                       -- ^ Title
        -> Maybe String                 -- ^ Package
        -> [Interface]
@@ -77,7 +78,7 @@ ppHtml :: DynFlags
        -> Bool                         -- ^ Also write Quickjump index
        -> IO ()
 
-ppHtml dflags doctitle maybe_package ifaces reexported_ifaces odir prologue
+ppHtml state doctitle maybe_package ifaces reexported_ifaces odir prologue
         themes maybe_mathjax_url maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode
         pkg qual debug withQuickjump = do
@@ -86,7 +87,7 @@ ppHtml dflags doctitle maybe_package ifaces reexported_ifaces odir prologue
     visible i = OptHide `notElem` ifaceOptions i
 
   when (isNothing maybe_contents_url) $
-    ppHtmlContents dflags odir doctitle maybe_package
+    ppHtmlContents state odir doctitle maybe_package
         themes maybe_mathjax_url maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces ++ reexported_ifaces)
         False -- we don't want to display the packages in a single-package contents
@@ -258,7 +259,7 @@ moduleInfo iface =
 
 
 ppHtmlContents
-   :: DynFlags
+   :: UnitState
    -> FilePath
    -> String
    -> Maybe String
@@ -272,14 +273,14 @@ ppHtmlContents
    -> Maybe Package  -- ^ Current package
    -> Qualification  -- ^ How to qualify names
    -> IO ()
-ppHtmlContents dflags odir doctitle _maybe_package
+ppHtmlContents state odir doctitle _maybe_package
   themes mathjax_url maybe_index_url
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug pkg qual = do
-  let tree = mkModuleTree dflags showPkgs
+  let tree = mkModuleTree state showPkgs
          [(instMod iface, toInstalledDescription iface)
          | iface <- ifaces
          , not (instIsSig iface)]
-      sig_tree = mkModuleTree dflags showPkgs
+      sig_tree = mkModuleTree state showPkgs
          [(instMod iface, toInstalledDescription iface)
          | iface <- ifaces
          , instIsSig iface]
