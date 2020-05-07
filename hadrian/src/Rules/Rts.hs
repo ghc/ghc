@@ -1,4 +1,4 @@
-module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
+module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks, rtsProbesStub) where
 
 import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsContext)
 import Rules.Libffi
@@ -27,8 +27,8 @@ rtsRules = priority 3 $ do
         let buildPath = root -/- buildDir (rtsContext stage)
 
         -- Dtrace
-        buildPath -/- "RtsProbes.h"    %> buildRtsProbes stage DtraceHeader
-        buildPath -/- "RtsProbes.o"    %> buildRtsProbes stage DtraceStub
+        buildPath -/- "RtsProbes.h" %> buildRtsProbes stage DtraceHeader
+        buildPath -/- "RtsProbes.o" %> buildRtsProbes stage DtraceStub
 
         -- Libffi
         -- Header files
@@ -45,6 +45,18 @@ rtsRules = priority 3 $ do
 buildRtsProbes :: Stage -> DtraceMode -> FilePath -> Action ()
 buildRtsProbes stage what out =
     build (target (rtsContext stage) (Dtrace what) ["rts/RtsProbes.d"] [out])
+
+rtsProbesStub :: Stage -> Action [FilePath]
+rtsProbesStub stage = do
+    withDtrace <- flag WithDtrace
+    okTargetOs <- anyTargetOs ["linux", "solaris2", "freebsd"]
+    if withDtrace && okTargetOs
+        then do
+            buildPath <- rtsBuildPath stage
+            let obj = buildPath -/- "RtsProbes.o"
+            need [obj]
+            return [obj]
+        else return []
 
 
 withLibffi :: Stage -> (FilePath -> FilePath -> Action a) -> Action a

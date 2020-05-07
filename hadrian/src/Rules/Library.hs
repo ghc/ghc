@@ -11,6 +11,7 @@ import Expression hiding (way, package, stage)
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
+import Rules.Rts (rtsProbesStub)
 import Rules.Register
 import Target
 import Utilities
@@ -131,10 +132,11 @@ cObjects context = do
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the
--- 'Context' is @integer-gmp@.
+-- 'Context' is @integer-gmp@ or @rts@.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
     | package context == integerGmp = gmpObjects (stage context)
+    | package context == rts        = rtsProbesStub (stage context)
     | otherwise                     = return []
 
 -- | Return all the object files to be put into the library we're building for
