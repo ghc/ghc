@@ -94,10 +94,9 @@ data RecompileRequiredWithEvidence
   = UpToDateWithEvidence ModIface
   | NeedsRecompileWithOld
      CompileReason
+     -- ^ the reason we need to recompile.
      (Maybe ModIface)
-     -- ^ The old interface, used to extract a fingerprint. One would think the
-     -- presence/absence of this would be purely for diagnostics, but that is in
-     -- fact not the case. TODO fix this.
+     -- ^ The old interface, used to extract a fingerprint.
 
 data CompileReason
   = MustCompile
@@ -220,6 +219,13 @@ checkVersions hsc_env mod_summary iface = fmap uneither $ runExceptT $ do
   -- test case bkpcabal04!
   when (moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)) $
     throwE (RecompBecause "-this-unit-id changed", Nothing)
+  -- TODO(@Ericson2314): Why can't these all be 'Just iface'? I think they
+  -- should be but there were a few tiny tests failures when tried. Perhaps
+  -- they could be made to work a different way.
+  --
+  -- If we do make them all `Just _`, we can not only remove the `Maybe`, but
+  -- also not even bother to return an iface at all, since it is always the
+  -- same one passed into the function.
   throw_recomp Nothing $ checkFlagHash hsc_env iface
   throw_recomp Nothing $ checkOptimHash hsc_env iface
   throw_recomp Nothing $ checkHpcHash hsc_env iface
