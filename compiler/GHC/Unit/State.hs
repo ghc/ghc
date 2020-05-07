@@ -25,7 +25,7 @@ module GHC.Unit.State (
         lookupPackageName,
         improveUnit,
         searchPackageId,
-        unsafeGetUnitInfo,
+        unsafeLookupUnit,
         getInstalledPackageDetails,
         displayUnitId,
         listVisibleModuleNames,
@@ -424,11 +424,11 @@ extendUnitInfoMap (UnitInfoMap pkg_map closure) new_pkgs
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
-unsafeGetUnitInfo :: HasDebugCallStack => DynFlags -> Unit -> UnitInfo
-unsafeGetUnitInfo dflags pid =
+unsafeLookupUnit :: HasDebugCallStack => DynFlags -> Unit -> UnitInfo
+unsafeLookupUnit dflags pid =
     case lookupUnit dflags pid of
       Just config -> config
-      Nothing -> pprPanic "unsafeGetUnitInfo" (ppr pid)
+      Nothing -> pprPanic "unsafeLookupUnit" (ppr pid)
 
 lookupInstalledPackage :: PackageState -> UnitId -> Maybe UnitInfo
 lookupInstalledPackage pkgstate uid = lookupInstalledPackage' (unitInfoMap pkgstate) uid
