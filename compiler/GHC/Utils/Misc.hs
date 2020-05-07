@@ -29,7 +29,7 @@ module GHC.Utils.Misc (
         unzipWith,
 
         mapFst, mapSnd, chkAppend,
-        mapAndUnzip, mapAndUnzip3, mapAccumL2,
+        mapAndUnzip, mapAndUnzip3,
         filterOut, partitionWith,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
@@ -443,12 +443,6 @@ zipAndUnzip (a:as) (b:bs)
     in
     (a:rs1, b:rs2)
 zipAndUnzip _ _ = ([],[])
-
-mapAccumL2 :: (s1 -> s2 -> a -> (s1, s2, b)) -> s1 -> s2 -> [a] -> (s1, s2, [b])
-mapAccumL2 f s1 s2 xs = (s1', s2', ys)
-  where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
-                                                       (s1', s2', y) -> ((s1', s2'), y))
-                                     (s1, s2) xs
 
 -- | @atLength atLen atEnd ls n@ unravels list @ls@ to position @n@. Precisely:
 --

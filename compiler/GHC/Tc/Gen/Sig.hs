@@ -634,7 +634,6 @@ to connect the two, something like
 This wrapper is put in the TcSpecPrag, in the ABExport record of
 the AbsBinds.
 
-
         f :: (Eq a, Ix b) => a -> b -> Bool
         {-# SPECIALISE f :: (Ix p, Ix q) => Int -> (p,q) -> Bool #-}
         f = <poly_rhs>
@@ -661,8 +660,6 @@ Note that
 
   * The RHS of f_spec, <poly_rhs> has a *copy* of 'binds', so that it
     can fully specialise it.
-
-
 
 From the TcSpecPrag, in GHC.HsToCore.Binds we generate a binding for f_spec and a RULE:
 
@@ -702,14 +699,14 @@ Some wrinkles
 
   So we simply do this:
     - Generate a constraint to check that the specialised type (after
-      skolemiseation) is equal to the instantiated function type.
+      skolemisation) is equal to the instantiated function type.
     - But *discard* the evidence (coercion) for that constraint,
       so that we ultimately generate the simpler code
           f_spec :: Int -> F Int
           f_spec = <f rhs> Int dNumInt
 
           RULE: forall d. f Int d = f_spec
-      You can see this discarding happening in
+      You can see this discarding happening in tcSpecPrag
 
 3. Note that the HsWrapper can transform *any* function with the right
    type prefix
