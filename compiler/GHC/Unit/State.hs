@@ -405,16 +405,6 @@ lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
    VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
 
-{-
--- | Find the indefinite package for a given 'IndefUnitId'.
--- The way this works is just by fiat'ing that every indefinite package's
--- unit key is precisely its component ID; and that they share uniques.
-lookupIndefUnitId :: PackageState -> IndefUnitId -> Maybe UnitInfo
-lookupIndefUnitId pkgstate (IndefUnitId cid_fs) = lookupUDFM pkg_map cid_fs
-  where
-    UnitInfoMap pkg_map = unitInfoMap pkgstate
--}
-
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
 lookupPackageName :: PackageState -> PackageName -> Maybe IndefUnitId
