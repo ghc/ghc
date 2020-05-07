@@ -310,7 +310,7 @@ warnUnusedPackages = do
         pit = eps_PIT eps
 
     let loadedPackages
-          = map (unsafeGetUnitInfo dflags)
+          = map (unsafeLookupUnit dflags)
           . nub . sort
           . map moduleUnit
           . moduleEnvKeys
