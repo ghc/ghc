@@ -470,7 +470,7 @@ lint-libs:
     # to use the "native" iconv embedded in libc as suggested by the
     # porting guide [1].
     # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
-    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
+    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --enable-dtrace"
     GHC_VERSION: "8.10.1"
     CABAL_INSTALL_VERSION: "3.2.0.0"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
@@ -561,7 +561,7 @@ release-x86_64-freebsd:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi --enable-dtrace"
     HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
@@ -616,7 +616,7 @@ release-x86_64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi --enable-dtrace"
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
@@ -803,6 +803,7 @@ nightly-i386-linux-deb9:
   variables:
     TEST_ENV: "x86_64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb9-linux.tar.xz"
+    CONFIGURE_ARGS: ""
   cache:
     key: linux-x86_64-deb9-$CACHE_REV
 
@@ -905,6 +906,7 @@ validate-x86_64-linux-deb9-dwarf:
   variables:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
+    CONFIGURE_ARGS: ""
   cache:
     key: linux-x86_64-deb10-$CACHE_REV
 
@@ -1053,6 +1055,7 @@ nightly-x86_64-linux-alpine:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
+    CONFIGURE_ARGS: ""
   cache:
     key: linux-x86_64-centos7-$CACHE_REV
 
@@ -1073,6 +1076,7 @@ release-x86_64-linux-centos7:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
+    CONFIGURE_ARGS: ""
   cache:
     key: linux-x86_64-fedora27-$CACHE_REV
   artifacts:
