@@ -1,11 +1,11 @@
-module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks, needRtsProbes) where
+module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
 
 import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsContext)
 import Rules.Libffi
 import Hadrian.Utilities
 import Settings.Builders.Common
-import Hadrian.Builder
-import Hadrian.Target
+import Utilities
+import Target
 
 -- | This rule has priority 3 to override the general rule for generating shared
 -- library files (see Rules.Library.libraryRules).
@@ -23,14 +23,16 @@ rtsRules = priority 3 $ do
             (addRtsDummyVersion $ takeFileName rtsLibFilePath')
             rtsLibFilePath'
 
-    -- Libffi
     forM_ [Stage1 ..] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
 
+        -- Dtrace
+        buildPath -/- "RtsProbes.h"    %> buildRtsProbes stage DtraceHeader
+        buildPath -/- "RtsProbes.o"    %> buildRtsProbes stage DtraceStub
+
+        -- Libffi
         -- Header files
         (fmap (buildPath -/-) libffiHeaderFiles) &%> const (copyLibffiHeaders stage)
-
-        buildPath -/- "RtsProbes.h"    %> buildRtsProbes stage
 
         -- Static libraries.
         buildPath -/- "libCffi*.a"     %> copyLibffiStatic stage
@@ -40,15 +42,9 @@ rtsRules = priority 3 $ do
         buildPath -/- "libffi*.so*"    %> copyLibffiDynamicUnix stage ".so"
         buildPath -/- "libffi*.dll*"   %> copyLibffiDynamicWin  stage
 
-buildRtsProbes :: Stage -> FilePath -> Action ()
-buildRtsProbes stage out =
-    build
-        (target
-            (rtsContext stage)
-            Dtrace
-            ["rts/RtsProbes.d"]
-            [out])
-        (getArgs <> arg "-h")
+buildRtsProbes :: Stage -> DtraceMode -> FilePath -> Action ()
+buildRtsProbes stage what out =
+    build (target (rtsContext stage) (Dtrace what) ["rts/RtsProbes.d"] [out])
 
 
 withLibffi :: Stage -> (FilePath -> FilePath -> Action a) -> Action a
@@ -122,12 +118,6 @@ rtsLibffiLibrary stage way = do
     suf     <- libsuf stage way
     rtsPath <- rtsBuildPath stage
     return $ rtsPath -/- "lib" ++ name ++ suf
-
-needRtsProbes :: Stage -> Action [FilePath]
-needRtsProbes stage = do
-    rtsPath      <- rtsBuildPath stage
-    withDtrace <- flag WithDtrace
-    return $ if withDtrace then [rtsPath -/- "RtsProbes.h"] else []
 
 -- | Get the libffi files bundled with the rts (header and library files).
 -- Unless using the system libffi, this needs the libffi library. It must be
