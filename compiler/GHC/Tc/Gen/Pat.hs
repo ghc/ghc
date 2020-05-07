@@ -52,6 +52,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Core.Type (splitForAllTys)
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -864,14 +865,6 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
         = dataConFullSig data_con
       header = L con_span (RealDataCon data_con)
 
-      specifiedTyVarBinders = do
-        Bndr v flag <- dataConUserTyVarBinders data_con
-        case flag of
-          Specified -> [v]
-          Inferred -> []
-          Required -> pprPanic "tcDataConPat" $
-            text "Required TyVar binder in data constructor not yet supported"
-
     -- Instantiate the constructor type variables [a->ty]
     -- This may involve doing a family-instance coercion,
     -- and building a wrapper
@@ -897,6 +890,22 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
       -- pat_ty' /= pat_ty iff coi /= IdCo
 
       arg_tys' = substTys tenv arg_tys
+
+  -- get user vars
+  let specifiedTyVarBinders = do
+        Bndr v flag <- dataConUserTyVarBinders data_con
+        case flag of
+          Specified -> [v]
+          Inferred -> []
+          Required -> pprPanic "tcDataConPat" $
+            text "Required TyVar binder in data constructor not yet supported"
+
+  (nonUserVarWrapper, remaining_user_data_con_ty) <-
+    topInstantiateInferred PatOrigin $ dataConUserType data_con
+
+  () <- splitForAllTys remaining_user_data_con_ty
+
+  userTenv' <- instTyVarsWith PatOrigin specifiedTyVarBinders $ dataConUserType data_con
 
   let -- zip through invisible argument patterns, extending the name environment
       -- with variables bound by each one in turn.
