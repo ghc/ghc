@@ -157,8 +157,6 @@
 
 /* The IOCP Handle all I/O requests are associated with for this RTS.  */
 static HANDLE completionPortHandle = INVALID_HANDLE_VALUE;
-/* Number of currently still outstanding I/O requests.  */
-static volatile uint64_t outstanding_requests = 0;
 /* Boolean controlling if the I/O manager is/should still be running.  */
 static bool running = false;
 
@@ -234,7 +232,6 @@ bool startupAsyncWinIO(void)
   running = true;
   outstanding_service_requests = false;
   completionPortHandle = INVALID_HANDLE_VALUE;
-  outstanding_requests = 0;
 
   InitializeSRWLock (&wio_runner_lock);
   InitializeConditionVariable (&wakeEvent);
@@ -328,10 +325,10 @@ void completeSynchronousRequest (void)
    * MSSEC is the maximum amount of time in milliseconds that an alertable wait
       should be done for before the haskell side requested to be notified of progress.
    * NUM_REQ is the total overall number of outstanding I/O requests.
-   * outstanding_service indicates that there might be still a outstanding service
+   * pending_service indicates that there might be still a outstanding service
      request queued and therefore we shouldn't unblock the runner quite yet.
 
-   `outstanding_service` is needed in case we cancel an IO operation. We don't want this
+   `pending_service` is needed in case we cancel an IO operation. We don't want this
    to result in two processRemoteCompletion threads being queued. As this is both harder
    to reason about and bad for performance. So we only reset outstanding_service_requests
    if no service is pending.
@@ -344,9 +341,8 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
   AcquireSRWLockExclusive (&wio_runner_lock);
 
   bool interrupt = false;
-  outstanding_requests = num_req;
 
-  if (outstanding_requests <= 0 && !has_timeout) {
+  if (num_req == 0 && !has_timeout) {
     timeout = INFINITE;
   }
   else if(has_timeout) {
@@ -366,7 +362,6 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
     queue_full = false;
   }
 
-  outstanding_requests = num_req;
   /* If the new timeout is earlier than the old one we have to reschedule the
      wait.  Do this by interrupting the current operation and setting the new
      timeout, since it must be the shortest one in the queue.  */
@@ -510,18 +505,12 @@ static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
 
       ReleaseSRWLockExclusive (&wio_runner_lock);
 
-      ULONG num_removed = -1;
+      ULONG num_removed = 0;
       ZeroMemory (entries, sizeof (entries[0]) * num_callbacks);
       if (GetQueuedCompletionStatusEx (completionPortHandle, entries,
                                        num_callbacks, &num_removed, timeout,
                                        false))
         {
-          //No completions outstanding on the haskell side.
-          //This means all returned bundles must have been
-          // processed already and hence can be ignored.
-          if (outstanding_requests == 0)
-            num_removed = 0;
-
           if (num_removed > 0)
             {
               queue_full = num_removed == num_callbacks;
@@ -532,13 +521,16 @@ static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
           num_removed = 0;
         }
       // We always queue a haskell thread upon returning from GetQueuedCompletionStatusEx.
-      // We only wake up if:
+      // We only return from GetQueuedCompletionStatusEx if:
       // * IO was processed, in which case we need to process the events.
       // * A timer event was registered/timed out. We need the process expired timers
       //   and update the timeout.
       // * We woke up spuriously, which is quite rare.
-      // This simplifies the logic in exchange for a slim chance of redundant
-      // haskell threads if we wake up spuriously.
+      // This simplifies the logic in exchange for a *very* small chance of redundant
+      // haskell threads. A redundant thread would be queued if:
+      // * We wake up spuriously
+      // * All returned results have been canceled already.
+      // It's not realistic nor worthwhile to check for these edge cases so we don't.
       notifyScheduler (num_removed);
 
       AcquireSRWLockExclusive (&wio_runner_lock);
@@ -550,6 +542,7 @@ static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     }
     return 0;
 }
+
 
 
 
