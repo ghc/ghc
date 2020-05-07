@@ -401,16 +401,6 @@ lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
    VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
 
-{-
--- | Find the indefinite package for a given 'IndefUnitId'.
--- The way this works is just by fiat'ing that every indefinite package's
--- unit key is precisely its component ID; and that they share uniques.
-lookupIndefUnitId :: PackageState -> IndefUnitId -> Maybe UnitInfo
-lookupIndefUnitId pkgstate (IndefUnitId cid_fs) = lookupUDFM pkg_map cid_fs
-  where
-    UnitInfoMap pkg_map = unitInfoMap pkgstate
--}
-
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
 lookupPackageName :: PackageState -> PackageName -> Maybe IndefUnitId
@@ -1020,19 +1010,6 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
         pkgstate = pkgState dflags
-
-        -- this is old: we used to assume that if there were
-        -- multiple versions of wired-in packages installed that
-        -- they were mutually exclusive.  Now we're assuming that
-        -- you have one "main" version of each wired-in package
-        -- (the latest version), and the others are backward-compat
-        -- wrappers that depend on this one.  e.g. base-4.0 is the
-        -- latest, base-3.0 is a compat wrapper depending on base-4.0.
-        {-
-        deleteOtherWiredInPackages pkgs = filterOut bad pkgs
-          where bad p = any (p `matches`) wired_in_unitids
-                      && package p `notElem` map fst wired_in_ids
-        -}
 
         wiredInMap :: Map WiredUnitId WiredUnitId
         wiredInMap = Map.fromList
