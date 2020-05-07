@@ -359,7 +359,9 @@ rtsPackageArgs = package rts ? do
             <> if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
-        , builder Dtrace ? filter ("-I" `isPrefixOf`) <$> cArgs
+        , builder Dtrace ?
+          arg "-C" <>
+          (filter ("-I" `isPrefixOf`) <$> cArgs)
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure

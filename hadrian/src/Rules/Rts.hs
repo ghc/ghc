@@ -4,6 +4,8 @@ import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsConte
 import Rules.Libffi
 import Hadrian.Utilities
 import Settings.Builders.Common
+import Hadrian.Builder
+import Hadrian.Target
 
 -- | This rule has priority 3 to override the general rule for generating shared
 -- library files (see Rules.Library.libraryRules).
@@ -28,7 +30,7 @@ rtsRules = priority 3 $ do
         -- Header files
         (fmap (buildPath -/-) libffiHeaderFiles) &%> const (copyLibffiHeaders stage)
 
-        buildPath -/- "RtsProbes.h"    %> buildRtsProbes
+        buildPath -/- "RtsProbes.h"    %> buildRtsProbes stage
 
         -- Static libraries.
         buildPath -/- "libCffi*.a"     %> copyLibffiStatic stage
@@ -38,15 +40,15 @@ rtsRules = priority 3 $ do
         buildPath -/- "libffi*.so*"    %> copyLibffiDynamicUnix stage ".so"
         buildPath -/- "libffi*.dll*"   %> copyLibffiDynamicWin  stage
 
-buildRtsProbes :: FilePath -> Action ()
-buildRtsProbes out =
-    runBuilder
-        Dtrace
-        [ "-h"
-        , "-s", "rts/RtsProbes.d"
-        , "-o", out ]
-        ["rts/RtsProbes.d"]
-        [out]
+buildRtsProbes :: Stage -> FilePath -> Action ()
+buildRtsProbes stage out =
+    build
+        (target
+            (rtsContext stage)
+            Dtrace
+            ["rts/RtsProbes.d"]
+            [out])
+        (getArgs <> arg "-h")
 
 
 withLibffi :: Stage -> (FilePath -> FilePath -> Action a) -> Action a
