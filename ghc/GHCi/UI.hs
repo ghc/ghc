@@ -2359,7 +2359,7 @@ isSafeModule m = do
 
     packageTrusted dflags md
         | isHomeModule dflags md = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit dflags (moduleUnit md)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (pkgState dflags) (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
