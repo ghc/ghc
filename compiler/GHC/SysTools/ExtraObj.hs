@@ -55,7 +55,7 @@ mkExtraObj dflags extn xs
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
                     ++ map (FileOption "-I")
-                            (unitIncludeDirs $ unsafeGetUnitInfo dflags rtsUnitId)
+                            (unitIncludeDirs $ unsafeLookupUnit dflags rtsUnitId)
 
       -- When compiling assembler code, we drop the usual C options, and if the
       -- compiler is Clang, we add an extra argument to tell Clang to ignore
