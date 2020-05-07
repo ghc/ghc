@@ -650,8 +650,8 @@ AST is used for the subtraction operation.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
   SplicePat _ splice -> case splice of
     (HsSpliced _ mod_finalizers (HsSplicedPat pat)) -> do
-       addModFinalizersWithLclEnv mod_finalizers
-       tc_pat pat_ty penv pat thing_inside
+      { addModFinalizersWithLclEnv mod_finalizers
+      ; tc_pat pat_ty penv pat thing_inside }
     _ -> panic "invalid splice in splice pat"
 
 
