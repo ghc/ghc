@@ -49,7 +49,7 @@ module GHC.StgToCmm.Monad (
         getModuleName,
 
         -- ideally we wouldn't export these, but some other modules access internal state
-        getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags, getThisPackage,
+        getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags,
 
         -- more localised access to monad state
         CgIdInfo(..),
@@ -473,9 +473,6 @@ instance HasDynFlags FCode where
 
 getPlatform :: FCode Platform
 getPlatform = targetPlatform <$> getDynFlags
-
-getThisPackage :: FCode Unit
-getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
