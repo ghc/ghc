@@ -656,7 +656,7 @@ discardIC hsc_env
     | nameIsFromExternalPackage this_pkg old_name = old_name
     | otherwise = ic_name empty_ic
     where
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
     old_name = ic_name old_ic
 
 -- | If there is no -o option, guess the name of target executable
@@ -1193,7 +1193,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
     let home_src_imps = map unLoc $ ms_home_srcimps mod
 
     -- All the textual imports of this module.
-    let textual_deps = Set.fromList $ mapFst (mkModule (thisPackage lcl_dflags)) $
+    let textual_deps = Set.fromList $ mapFst (mkHomeModule lcl_dflags) $
                             zip home_imps     (repeat NotBoot) ++
                             zip home_src_imps (repeat IsBoot)
 
@@ -2188,7 +2188,7 @@ enableCodeGenForTH =
       hscTarget dflags == HscNothing &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
-      not (isIndefinite dflags)
+      homeUnitIsDefinite dflags
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs unboxed tuples. We enable codegen to
@@ -2525,12 +2525,12 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
-        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (thisUnitIdInsts dflags))) $
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations dflags))) $
             let suggested_instantiated_with =
                     hcat (punctuate comma $
                         [ ppr k <> text "=" <> ppr v
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
-                                : thisUnitIdInsts dflags)
+                                : homeUnitInstantiations dflags)
                         ])
             in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
