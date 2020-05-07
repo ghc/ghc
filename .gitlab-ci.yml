@@ -291,7 +291,7 @@ hadrian-ghc-in-ghci:
     # to use the "native" iconv embedded in libc as suggested by the
     # porting guide [1].
     # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
-    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
+    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --enable-dtrace"
     GHC_VERSION: 8.10.1
     CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
@@ -374,7 +374,7 @@ validate-x86_64-darwin:
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: "--with-intree-gmp"
+    CONFIGURE_ARGS: "--with-intree-gmp --enable-dtrace"
     TEST_ENV: "x86_64-darwin"
     BUILD_FLAVOUR: "perf"
   after_script:
@@ -399,7 +399,7 @@ validate-x86_64-darwin:
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: --with-intree-gmp
+    CONFIGURE_ARGS: "--with-intree-gmp --enable-dtrace"
     TEST_ENV: "x86_64-darwin-hadrian"
     FLAVOUR: "validate"
   script:
