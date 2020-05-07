@@ -50,12 +50,14 @@ mkExtraObj dflags extn xs
                     else asmOpts ccInfo)
       return oFile
     where
+      pkgs = pkgState dflags
+
       -- Pass a different set of options to the C compiler depending one whether
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
                     ++ map (FileOption "-I")
-                            (unitIncludeDirs $ unsafeLookupUnit dflags rtsUnitId)
+                            (unitIncludeDirs $ unsafeLookupUnit pkgs rtsUnitId)
 
       -- When compiling assembler code, we drop the usual C options, and if the
       -- compiler is Clang, we add an extra argument to tell Clang to ignore

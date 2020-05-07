@@ -1955,8 +1955,9 @@ with some holes, we should try to give the user some more useful information.
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
 mkPrintUnqualified dflags env = QueryQualify qual_name
                                              (mkQualModule dflags)
-                                             (mkQualPackage dflags)
+                                             (mkQualPackage pkgs)
   where
+  pkgs = pkgState dflags
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre
@@ -2022,32 +2023,30 @@ mkQualModule dflags mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllPackages dflags (moduleName mod)
+     where lookup = lookupModuleInAllPackages (pkgState dflags) (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
 -- with a unit id if the package ID would be ambiguous.
-mkQualPackage :: DynFlags -> QueryQualifyPackage
-mkQualPackage dflags uid
+mkQualPackage :: PackageState -> QueryQualifyPackage
+mkQualPackage pkgs uid
      | uid == mainUnitId || uid == interactiveUnitId
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
      | Just pkgid <- mb_pkgid
-     , searchPackageId (pkgState dflags) pkgid `lengthIs` 1
+     , searchPackageId pkgs pkgid `lengthIs` 1
         -- this says: we are given a package pkg-0.1@MMM, are there only one
         -- exposed packages whose package ID is pkg-0.1?
      = False
      | otherwise
      = True
-     where mb_pkgid = fmap unitPackageId (lookupUnit dflags uid)
+     where mb_pkgid = fmap unitPackageId (lookupUnit pkgs uid)
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.
-pkgQual :: DynFlags -> PrintUnqualified
-pkgQual dflags = alwaysQualify {
-        queryQualifyPackage = mkQualPackage dflags
-    }
+pkgQual :: PackageState -> PrintUnqualified
+pkgQual pkgs = alwaysQualify { queryQualifyPackage = mkQualPackage pkgs }
 
 {-
 ************************************************************************

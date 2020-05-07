@@ -307,10 +307,11 @@ warnUnusedPackages = do
     eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
+        state  = pkgState dflags
         pit = eps_PIT eps
 
     let loadedPackages
-          = map (unsafeLookupUnit dflags)
+          = map (unsafeLookupUnit state)
           . nub . sort
           . map moduleUnit
           . moduleEnvKeys

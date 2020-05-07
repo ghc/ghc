@@ -359,7 +359,13 @@ data PackageState = PackageState {
   -- and @r[C=<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
-  requirementContext :: Map ModuleName [InstantiatedModule]
+  requirementContext :: Map ModuleName [InstantiatedModule],
+
+  -- | Indicate if we can instantiate units on-the-fly.
+  --
+  -- This should only be true when we are type-checking an indefinite unit.
+  -- See Note [About units] in GHC.Unit.
+  allowVirtualUnits :: !Bool
   }
 
 emptyPackageState :: PackageState
@@ -371,7 +377,8 @@ emptyPackageState = PackageState {
     explicitPackages = [],
     moduleNameProvidersMap = Map.empty,
     pluginModuleNameProvidersMap = Map.empty,
-    requirementContext = Map.empty
+    requirementContext = Map.empty,
+    allowVirtualUnits = False
     }
 
 -- | Package database
@@ -387,12 +394,12 @@ emptyUnitInfoMap :: UnitInfoMap
 emptyUnitInfoMap = UnitInfoMap emptyUDFM emptyUniqSet
 
 -- | Find the unit we know about with the given unit id, if any
-lookupUnit :: DynFlags -> Unit -> Maybe UnitInfo
-lookupUnit dflags = lookupUnit' (homeUnitIsIndefinite dflags) (unitInfoMap (pkgState dflags))
+lookupUnit :: PackageState -> Unit -> Maybe UnitInfo
+lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 
 -- | A more specialized interface, which takes a boolean specifying
 -- whether or not to look for on-the-fly renamed interfaces, and
--- just a 'UnitInfoMap' rather than a 'DynFlags' (so it can
+-- just a 'UnitInfoMap' rather than a 'PackageState' (so it can
 -- be used while we're initializing 'DynFlags'
 lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
 lookupUnit' False (UnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
@@ -424,11 +431,11 @@ extendUnitInfoMap (UnitInfoMap pkg_map closure) new_pkgs
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
-unsafeLookupUnit :: HasDebugCallStack => DynFlags -> Unit -> UnitInfo
-unsafeLookupUnit dflags pid =
-    case lookupUnit dflags pid of
-      Just config -> config
-      Nothing -> pprPanic "unsafeLookupUnit" (ppr pid)
+unsafeLookupUnit :: HasDebugCallStack => PackageState -> Unit -> UnitInfo
+unsafeLookupUnit pkgs pid =
+    case lookupUnit pkgs pid of
+      Just info -> info
+      Nothing   -> pprPanic "unsafeLookupUnit" (ppr pid)
 
 lookupInstalledPackage :: PackageState -> UnitId -> Maybe UnitInfo
 lookupInstalledPackage pkgstate uid = lookupInstalledPackage' (unitInfoMap pkgstate) uid
@@ -1559,17 +1566,22 @@ mkPackageState dflags dbs preload0 = do
     FormatText
     (pprModuleMap mod_map)
 
-  -- Force pstate to avoid leaking the dflags0 passed to mkPackageState
-  let !pstate = PackageState{
-    preloadPackages     = dep_preload,
-    explicitPackages    = explicit_pkgs,
-    unitInfoMap            = pkg_db,
-    moduleNameProvidersMap  = mod_map,
-    pluginModuleNameProvidersMap = mkModuleNameProvidersMap dflags pkg_db plugin_vis_map,
-    packageNameMap          = pkgname_map,
-    unwireMap = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ],
-    requirementContext = req_ctx
-    }
+  -- Force pstate to avoid leaking the dflags passed to mkPackageState
+  let !pstate = PackageState
+         { preloadPackages              = dep_preload
+         , explicitPackages             = explicit_pkgs
+         , unitInfoMap                  = pkg_db
+         , moduleNameProvidersMap       = mod_map
+         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap dflags pkg_db plugin_vis_map
+         , packageNameMap               = pkgname_map
+         , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
+         , requirementContext           = req_ctx
+
+           -- when the home unit is indefinite, it means we are type-checking it
+           -- only (not producing any code). Hence we can use virtual units
+           -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
+         , allowVirtualUnits            = homeUnitIsIndefinite dflags
+         }
   let new_insts = map (fmap (upd_wired_in_mod wired_map)) (homeUnitInstantiations dflags)
   return (pstate, new_dep_preload, new_insts)
 
@@ -1842,14 +1854,14 @@ getPackageFrameworks dflags pkgs = do
 
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
-lookupModuleInAllPackages :: DynFlags
+lookupModuleInAllPackages :: PackageState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllPackages dflags m
-  = case lookupModuleWithSuggestions dflags m Nothing of
+lookupModuleInAllPackages pkgs m
+  = case lookupModuleWithSuggestions pkgs m Nothing of
       LookupFound a b -> [(a,b)]
       LookupMultiple rs -> map f rs
-        where f (m,_) = (m, expectJust "lookupModule" (lookupUnit dflags
+        where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
                                                          (moduleUnit m)))
       _ -> []
 
@@ -1872,28 +1884,26 @@ data LookupResult =
 data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
-lookupModuleWithSuggestions :: DynFlags
+lookupModuleWithSuggestions :: PackageState
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions dflags
-  = lookupModuleWithSuggestions' dflags
-        (moduleNameProvidersMap (pkgState dflags))
+lookupModuleWithSuggestions pkgs
+  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
 
-lookupPluginModuleWithSuggestions :: DynFlags
+lookupPluginModuleWithSuggestions :: PackageState
                                   -> ModuleName
                                   -> Maybe FastString
                                   -> LookupResult
-lookupPluginModuleWithSuggestions dflags
-  = lookupModuleWithSuggestions' dflags
-        (pluginModuleNameProvidersMap (pkgState dflags))
+lookupPluginModuleWithSuggestions pkgs
+  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
 
-lookupModuleWithSuggestions' :: DynFlags
+lookupModuleWithSuggestions' :: PackageState
                             -> ModuleNameProvidersMap
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions' dflags mod_map m mb_pn
+lookupModuleWithSuggestions' pkgs mod_map m mb_pn
   = case Map.lookup m mod_map of
         Nothing -> LookupNotFound suggestions
         Just xs ->
@@ -1920,7 +1930,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
             | otherwise
             -> (x:hidden_pkg, hidden_mod, unusable, exposed)
 
-    unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
+    unit_lookup p = lookupUnit pkgs p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
     mod_unit = unit_lookup . moduleUnit
 
     -- Filters out origins which are not associated with the given package
@@ -1945,15 +1955,12 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
                 }
       where go pkg = pn == fsPackageName pkg
 
-    suggestions
-      | gopt Opt_HelpfulErrors dflags =
-           fuzzyLookup (moduleNameString m) all_mods
-      | otherwise = []
+    suggestions = fuzzyLookup (moduleNameString m) all_mods
 
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- Map.toList (moduleNameProvidersMap (pkgState dflags))
+        | (m, e) <- Map.toList (moduleNameProvidersMap pkgs)
         , suggestion <- map (getSuggestion m) (Map.toList e)
         ]
     getSuggestion name (mod, origin) =

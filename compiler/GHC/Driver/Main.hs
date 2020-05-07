@@ -1159,21 +1159,22 @@ hscCheckSafe' m l = do
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
+                    state = pkgState dflags
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkWarnMsg dflags l (pkgQual dflags)
+                        $ mkWarnMsg dflags l (pkgQual state)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
+                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package (" <> ppr (moduleUnit m)
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
+                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1192,7 +1193,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomeModule dflags m = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit dflags (moduleUnit m)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (pkgState dflags) (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1215,11 +1216,12 @@ checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     dflags <- getDynFlags
     let errors = S.foldr go [] pkgs
+        state  = pkgState dflags
         go pkg acc
-            | unitIsTrusted $ getInstalledPackageDetails (pkgState dflags) pkg
+            | unitIsTrusted $ getInstalledPackageDetails state pkg
             = acc
             | otherwise
-            = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
+            = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual state)
                      $ text "The package (" <> ppr pkg <> text ") is required" <>
                        text " to be trusted but it isn't!"
     case errors of
