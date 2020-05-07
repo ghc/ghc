@@ -225,10 +225,10 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    libdwIncludeDir   <- getSetting LibdwIncludeDir
-    libdwLibraryDir   <- getSetting LibdwLibDir
-    libnumaIncludeDir <- getSetting LibnumaIncludeDir
-    libnumaLibraryDir <- getSetting LibnumaLibDir
+    libdwIncludeDir          <- getSetting LibdwIncludeDir
+    libdwLibraryDir          <- getSetting LibdwLibDir
+    libnumaIncludeDir        <- getSetting LibnumaIncludeDir
+    libnumaLibraryDir        <- getSetting LibnumaLibDir
     libsystemtapIncludeDir   <- getSetting LibsystemtapIncludeDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
