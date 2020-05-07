@@ -479,6 +479,27 @@ mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn)
     }
 }
 
+void
+iterHashTable(HashTable *table, void *data, IterHashFn fn)
+{
+    /* The last bucket with something in it is table->max + table->split - 1 */
+    long segment = (table->max + table->split - 1) / HSEGSIZE;
+    long index = (table->max + table->split - 1) % HSEGSIZE;
+
+    while (segment >= 0) {
+        while (index >= 0) {
+            for (HashList *hl = table->dir[segment][index]; hl != NULL; hl = hl->next) {
+                if (!fn(data, hl->key, hl->data)) {
+                    return;
+                }
+            }
+            index--;
+        }
+        segment--;
+        index = HSEGSIZE - 1;
+    }
+}
+
 /* -----------------------------------------------------------------------------
  * When we initialize a hash table, we set up the first segment as well,
  * initializing all of the first segment's hash buckets to NULL.
