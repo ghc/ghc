@@ -655,7 +655,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
 
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter

@@ -1593,7 +1593,7 @@ The details are a bit tricky though:
    in the Home Package Table (HPT).  When you say :load, that's when we
    extend the HPT.
 
- * The 'thisPackage' field of DynFlags is *not* set to 'interactive'.
+ * The 'homeUnitId' field of DynFlags is *not* set to 'interactive'.
    It stays as 'main' (or whatever -this-unit-id says), and is the
    package to which :load'ed modules are added to.
 
@@ -1603,7 +1603,7 @@ The details are a bit tricky though:
    call to initTc in initTcInteractive, which in turn get the module
    from it 'icInteractiveModule' field of the interactive context.
 
-   The 'thisPackage' field stays as 'main' (or whatever -this-unit-id says.
+   The 'homeUnitId' field stays as 'main' (or whatever -this-unit-id says.
 
  * The main trickiness is that the type environment (tcg_type_env) and
    fixity envt (tcg_fix_env), now contain entities from all the
@@ -1848,11 +1848,11 @@ shadowed_by ids = shadowed
     shadowed id = getOccName id `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
 
+-- | Set the 'DynFlags.homeUnitId' to 'interactive'
 setInteractivePackage :: HscEnv -> HscEnv
--- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
    = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { thisUnitId = toUnitId interactiveUnitId } }
+                { homeUnitId = toUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -2013,7 +2013,7 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 -- is only one exposed package which exports this module, don't qualify.
 mkQualModule :: DynFlags -> QueryQualifyModule
 mkQualModule dflags mod
-     | moduleUnit mod == thisPackage dflags = False
+     | isHomeModule dflags mod = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod
@@ -2305,7 +2305,7 @@ lookupType dflags hpt pte name
   where
     mod = ASSERT2( isExternalName name, ppr name )
           if isHoleName name
-            then mkModule (thisPackage dflags) (moduleName (nameModule name))
+            then mkHomeModule dflags (moduleName (nameModule name))
             else nameModule name
 
 -- | As 'lookupType', but with a marginally easier-to-use interface

@@ -250,7 +250,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
 
     used_mods    = moduleEnvKeys ent_map
     dir_imp_mods = moduleEnvKeys direct_imports

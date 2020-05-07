@@ -166,7 +166,7 @@ mkIfaceTc hsc_env safe_mode mod_details
           let pluginModules =
                 map lpModule (cachedPlugins (hsc_dflags hsc_env))
           deps <- mkDependencies
-                    (thisUnitId (hsc_dflags hsc_env))
+                    (homeUnitId (hsc_dflags hsc_env))
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used

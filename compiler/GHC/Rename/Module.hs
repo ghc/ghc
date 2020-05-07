@@ -373,8 +373,8 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let unitId = thisPackage $ hsc_dflags topEnv
-             spec'      = patchForeignImport unitId spec
+       ; let unitId = homeUnit $ hsc_dflags topEnv
+             spec'  = patchForeignImport unitId spec
 
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'

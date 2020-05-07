@@ -212,7 +212,7 @@ checkVersions hsc_env mod_summary iface
        -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; if moduleUnit (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
+       ; if moduleUnit (mi_module iface) /= homeUnit (hsc_dflags hsc_env)
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -250,7 +250,7 @@ checkVersions hsc_env mod_summary iface
        ; return (recomp, Just iface)
     }}}}}}}}}}
   where
-    this_pkg = thisPackage (hsc_dflags hsc_env)
+    this_pkg = homeUnit (hsc_dflags hsc_env)
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
@@ -332,7 +332,7 @@ checkHsig mod_summary iface = do
     dflags <- getDynFlags
     let outer_mod = ms_mod mod_summary
         inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( moduleUnit outer_mod == thisPackage dflags )
+    MASSERT( moduleUnit outer_mod == homeUnit dflags )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -447,7 +447,7 @@ checkDependencies hsc_env summary iface
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
 
-   this_pkg = thisPackage (hsc_dflags hsc_env)
+   this_pkg = homeUnit (hsc_dflags hsc_env)
 
    dep_missing (mb_pkg, L _ mod) = do
      find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
@@ -1348,7 +1348,7 @@ mkHashFun
         -> (Name -> IO Fingerprint)
 mkHashFun hsc_env eps name
   | isHoleModule orig_mod
-  = lookup (mkModule (thisPackage dflags) (moduleName orig_mod))
+  = lookup (mkHomeModule dflags (moduleName orig_mod))
   | otherwise
   = lookup orig_mod
   where
