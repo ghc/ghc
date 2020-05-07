@@ -341,7 +341,7 @@ rnIfaceGlobal n = do
             -- went from <A> to <B>.
             let m'' = if isHoleModule m'
                         -- Pull out the local guy!!
-                        then mkModule (thisPackage dflags) (moduleName m')
+                        then mkHomeModule dflags (moduleName m')
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''

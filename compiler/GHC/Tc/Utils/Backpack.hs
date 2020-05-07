@@ -309,7 +309,7 @@ implicitRequirements' hsc_env normal_imports
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
-            Found _ mod | thisPackage dflags /= moduleUnit mod ->
+            Found _ mod | not (isHomeModule dflags mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where dflags = hsc_dflags hsc_env
@@ -731,7 +731,7 @@ mergeSignatures
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((Module iuid _), ireq_iface) ->
         tcRnModIface (instUnitInsts iuid) (Just nsubst) ireq_iface
-    lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
+    lcl_iface <- tcRnModIface (homeUnitInstantiations dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
     -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
@@ -753,7 +753,7 @@ mergeSignatures
     let infos = zip ifaces detailss
 
     -- Test for cycles
-    checkSynCycles (thisPackage dflags) (typeEnvTyCons type_env) []
+    checkSynCycles (homeUnit dflags) (typeEnvTyCons type_env) []
 
     -- NB on type_env: it contains NO dfuns.  DFuns are recorded inside
     -- detailss, and given a Name that doesn't correspond to anything real.  See
@@ -1000,9 +1000,13 @@ instantiateSignature = do
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
-    MASSERT( moduleUnit outer_mod == thisPackage dflags )
+    MASSERT( isHomeModule dflags outer_mod )
+    MASSERT( isJust (homeUnitInstanceOfId dflags) )
+    let uid  = fromJust (homeUnitInstanceOfId dflags)
+        -- we need to fetch the most recent ppr infos from the unit
+        -- database because we might have modified it
+        uid' = updateIndefUnitId (pkgState dflags) uid
     inner_mod `checkImplements`
         Module
-            (mkInstantiatedUnit (thisComponentId dflags)
-                                (thisUnitIdInsts dflags))
+            (mkInstantiatedUnit uid' (homeUnitInstantiations dflags))
             (moduleName outer_mod)

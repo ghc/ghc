@@ -379,7 +379,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
-  let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
+  let src = text "int" <+> ppr (mkHomeModule dflags mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
                   (empty_stub, Nothing, Nothing)
@@ -1312,7 +1312,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
                        ++ (if platformOS platform == OSMinGW32 &&
-                              thisPackage dflags == baseUnitId
+                              homeUnit dflags == baseUnitId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
 
