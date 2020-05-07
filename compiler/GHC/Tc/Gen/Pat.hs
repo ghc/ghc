@@ -453,7 +453,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 -- Lists, tuples, arrays
   ListPat Nothing pats -> do
         { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv pat_ty
-        ; (pats', res) <- tcMultiple (\p -> tc_lpat (mkCheckExpType elt_ty) p)
+        ; (pats', res) <- tcMultiple (tc_lpat $ mkCheckExpType elt_ty)
                                      penv pats thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat coi
@@ -466,7 +466,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
                  \ [elt_ty] ->
-                 do { (pats', res) <- tcMultiple (\p -> tc_lpat (mkCheckExpType elt_ty) p)
+                 do { (pats', res) <- tcMultiple (tc_lpat $ mkCheckExpType elt_ty)
                                                  penv pats thing_inside
                     ; return (pats', res, elt_ty) }
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
