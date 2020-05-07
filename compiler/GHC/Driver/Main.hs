@@ -1192,7 +1192,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomeModule dflags m = True
-        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit m)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit dflags (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
