@@ -54,6 +54,14 @@ module GHC.Exts
         -- * Overloaded string literals
         IsString(..),
 
+        -- * CString
+        unpackCString#,
+        unpackAppendCString#,
+        unpackFoldrCString#,
+        unpackCStringUtf8#,
+        unpackNBytes#,
+        cstringLength#,
+
         -- * Debugging
         breakpoint, breakpointCond,
 

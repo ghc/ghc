@@ -73,7 +73,7 @@ import GHC.Generics (K1(..))
 -- 'Data.Functor.Compose.Compose' are from "Data.Functor.Identity" and
 -- "Data.Functor.Compose".
 --
--- Some simple examples are 'Either' and '(,)':
+-- Some simple examples are 'Either' and @(,)@:
 --
 -- > instance Bitraversable Either where
 -- >   bitraverse f _ (Left x) = Left <$> f x
@@ -101,6 +101,25 @@ class (Bifunctor t, Bifoldable t) => Bitraversable t where
   --
   -- For a version that ignores the results, see 'bitraverse_'.
   --
+  -- ==== __Examples__
+  --
+  -- Basic usage:
+  --
+  -- >>> bitraverse listToMaybe (find odd) (Left [])
+  -- Nothing
+  --
+  -- >>> bitraverse listToMaybe (find odd) (Left [1, 2, 3])
+  -- Just (Left 1)
+  --
+  -- >>> bitraverse listToMaybe (find odd) (Right [4, 5])
+  -- Just (Right 5)
+  --
+  -- >>> bitraverse listToMaybe (find odd) ([1, 2, 3], [4, 5])
+  -- Just (1,5)
+  --
+  -- >>> bitraverse listToMaybe (find odd) ([], [4, 5])
+  -- Nothing
+  --
   -- @since 4.10.0.0
   bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> t a b -> f (t c d)
   bitraverse f g = bisequenceA . bimap f g
@@ -123,6 +142,19 @@ bimapM = bitraverse
 -- the results, see 'bisequence_'.
 --
 -- @'bisequence' ≡ 'bitraverse' 'id' 'id'@
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> bisequence (Just 4, Nothing)
+-- Nothing
+--
+-- >>> bisequence (Just 4, Just 5)
+-- Just (4,5)
+--
+-- >>> bisequence ([1, 2, 3], [4, 5])
+-- [(1,4),(1,5),(2,4),(2,5),(3,4),(3,5)]
 --
 -- @since 4.10.0.0
 bisequence :: (Bitraversable t, Applicative f) => t (f a) (f b) -> f (t a b)
@@ -169,6 +201,25 @@ instance Bitraversable (K1 i) where
 -- | 'bifor' is 'bitraverse' with the structure as the first argument. For a
 -- version that ignores the results, see 'bifor_'.
 --
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> bifor (Left []) listToMaybe (find even)
+-- Nothing
+--
+-- >>> bifor (Left [1, 2, 3]) listToMaybe (find even)
+-- Just (Left 1)
+--
+-- >>> bifor (Right [4, 5]) listToMaybe (find even)
+-- Just (Right 4)
+--
+-- >>> bifor ([1, 2, 3], [4, 5]) listToMaybe (find even)
+-- Just (1,4)
+--
+-- >>> bifor ([], [4, 5]) listToMaybe (find even)
+-- Nothing
+--
 -- @since 4.10.0.0
 bifor :: (Bitraversable t, Applicative f)
       => t a b -> (a -> f c) -> (b -> f d) -> f (t c d)
@@ -186,6 +237,13 @@ biforM = bifor
 -- of type @a@ and using the given actions to compute new elements for the
 -- structure.
 --
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> bimapAccumL (\acc bool -> (acc + 1, show bool)) (\acc string -> (acc * 2, reverse string)) 3 (True, "foo")
+-- (8,("True","oof"))
+--
 -- @since 4.10.0.0
 bimapAccumL :: Bitraversable t => (a -> b -> (a, c)) -> (a -> d -> (a, e))
             -> a -> t b d -> (a, t c e)
@@ -193,9 +251,16 @@ bimapAccumL f g s t
   = runStateL (bitraverse (StateL . flip f) (StateL . flip g) t) s
 
 -- | The 'bimapAccumR' function behaves like a combination of 'bimap' and
--- 'bifoldl'; it traverses a structure from right to left, threading a state
+-- 'bifoldr'; it traverses a structure from right to left, threading a state
 -- of type @a@ and using the given actions to compute new elements for the
 -- structure.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> bimapAccumR (\acc bool -> (acc + 1, show bool)) (\acc string -> (acc * 2, reverse string)) 3 (True, "foo")
+-- (7,("True","oof"))
 --
 -- @since 4.10.0.0
 bimapAccumR :: Bitraversable t => (a -> b -> (a, c)) -> (a -> d -> (a, e))
