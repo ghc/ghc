@@ -361,7 +361,7 @@ rtsPackageArgs = package rts ? do
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Dtrace ?
           arg "-C" <>
-          (filter ("-I" `isPrefixOf`) <$> cArgs)
+          (filter ("-I" `isPrefixOf`) <$> cArgs <> arg "-Iincludes")
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure
