@@ -182,14 +182,14 @@ findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
 findExposedPackageModule hsc_env mod_name mb_pkg
   = findLookupResult hsc_env
   $ lookupModuleWithSuggestions
-        (hsc_dflags hsc_env) mod_name mb_pkg
+        (pkgState (hsc_dflags hsc_env)) mod_name mb_pkg
 
 findExposedPluginPackageModule :: HscEnv -> ModuleName
                                -> IO FindResult
 findExposedPluginPackageModule hsc_env mod_name
   = findLookupResult hsc_env
   $ lookupPluginModuleWithSuggestions
-        (hsc_dflags hsc_env) mod_name Nothing
+        (pkgState (hsc_dflags hsc_env)) mod_name Nothing
 
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
@@ -226,12 +226,15 @@ findLookupResult hsc_env r = case r of
                           , fr_mods_hidden = []
                           , fr_unusables = unusables'
                           , fr_suggestions = [] })
-     LookupNotFound suggest ->
+     LookupNotFound suggest -> do
+       let suggest'
+             | gopt Opt_HelpfulErrors (hsc_dflags hsc_env) = suggest
+             | otherwise = []
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden = []
                        , fr_mods_hidden = []
                        , fr_unusables = []
-                       , fr_suggestions = suggest })
+                       , fr_suggestions = suggest' })
 
 modLocationCache :: HscEnv -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
 modLocationCache hsc_env mod do_this = do
@@ -669,6 +672,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
+    pkgs = pkgState dflags
     more_info
       = case find_result of
             NoPackage pkg
@@ -723,11 +727,11 @@ cantFindErr cannot_find _ dflags mod_name find_result
         <> dot $$ pkg_hidden_hint uid
     pkg_hidden_hint uid
      | gopt Opt_BuildingCabalPackage dflags
-        = let pkg = expectJust "pkg_hidden" (lookupUnit dflags uid)
+        = let pkg = expectJust "pkg_hidden" (lookupUnit pkgs uid)
            in text "Perhaps you need to add" <+>
               quotes (ppr (unitPackageName pkg)) <+>
               text "to the build-depends in your .cabal file."
-     | Just pkg <- lookupUnit dflags uid
+     | Just pkg <- lookupUnit pkgs uid
          = text "You can run" <+>
            quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
            text "to expose it." $$
