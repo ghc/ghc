@@ -2053,7 +2053,7 @@ keepPackageImports = filterM is_pkg_import
          = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
-                Right m -> return (not (isHomeModule m))
+                Right m -> return (not (isMainUnitModule m))
         where
           mod_name = unLoc (ideclName d)
 
@@ -2358,7 +2358,7 @@ isSafeModule m = do
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | thisPackage dflags == moduleUnit md = True
+        | isHomeModule dflags md = True
         | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
@@ -4205,8 +4205,8 @@ lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
-isHomeModule :: Module -> Bool
-isHomeModule m = GHC.moduleUnit m == mainUnitId
+isMainUnitModule :: Module -> Bool
+isMainUnitModule m = GHC.moduleUnit m == mainUnitId
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
@@ -4230,7 +4230,7 @@ wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
    dflags <- getDynFlags
-   when (GHC.moduleUnit modl /= thisPackage dflags) $
+   unless (isHomeModule dflags modl) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $
