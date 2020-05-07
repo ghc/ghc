@@ -45,14 +45,13 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity( arityErr )
 import GHC.Core.TyCo.Ppr ( pprTyVars )
-import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Core.TyCo.Rep ( Type(..), TyBinder(..), TyCoBinder(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
 import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
-import GHC.Core.Type (splitForAllTys)
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -71,7 +70,6 @@ import Control.Monad
 import Control.Arrow  ( second )
 import Control.Monad  ( when )
 import Data.Data (showConstr, toConstr, gmapQ, Data(..), Typeable, cast)
-import Data.Bifunctor ( first )
 
 -- | Generic show: an alternative to \"deriving Show\"
 gshow :: Data a => a -> String
@@ -891,46 +889,74 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
 
       arg_tys' = substTys tenv arg_tys
 
-  -- get user vars
-  let specifiedTyVarBinders = do
-        Bndr v flag <- dataConUserTyVarBinders data_con
-        case flag of
-          Specified -> [v]
-          Inferred -> []
-          Required -> pprPanic "tcDataConPat" $
-            text "Required TyVar binder in data constructor not yet supported"
-
   (nonUserVarWrapper, remaining_user_data_con_ty) <-
     topInstantiateInferred PatOrigin $ dataConUserType data_con
 
-  () <- splitForAllTys remaining_user_data_con_ty
+  let (nonInferredTyVarBinders, remaining_user_data_con_ty') = tcSplitPiTys remaining_user_data_con_ty
 
-  userTenv' <- instTyVarsWith PatOrigin specifiedTyVarBinders $ dataConUserType data_con
+  --userTenv' <- instTyVarsWith PatOrigin specifiedTyVarBinders $ dataConUserType data_con
 
   let -- zip through invisible argument patterns, extending the name environment
       -- with variables bound by each one in turn.
       zipInvisPats :: [LHsSigWcType (NoGhcTc GhcRn)]
-                   -> [TyVar]
-                   -> TcM [(LHsSigWcType (NoGhcTc GhcRn), TyVar)]
-      zipInvisPats [] _ = pure []
-      zipInvisPats (_ : _) [] = failWithTc $
-          text "Too many visible type arguments to data constructor" <+> ppr data_con
-      zipInvisPats (arg : args) (var : vars) = ((arg, var) :) <$> zipInvisPats args vars
+                   -> [Type]
+                   -> [TyBinder]
+                   -> TcM [( Either Type (LHsSigWcType (NoGhcTc GhcRn))
+                           , TyBinder
+                           )]
+      zipInvisPats _ [] (_ : _) = failWithTc $
+        text "Too few regular argument patterns toy data constructor" <+> ppr data_con
+      zipInvisPats remaining_at remaining_reg [] = case (remaining_at, remaining_reg) of
+        ([], []) -> pure []
+        _ -> failWithTc $
+            text "Too many" <+> x <+> text "argument patterns to data constructor" <+> ppr data_con
+          where x = text $ case (remaining_at, remaining_reg) of
+                      ([], []) -> panic "impossible"
+                      ((_ : _), (_ : _)) -> "@ and regular"
+                      ([], (_ : _)) -> "regular"
+                      ((_ : _), []) -> "@"
+      zipInvisPats _ _ (Anon InvisArg _ : _) = failWithTc $
+        text "Shouldn't be constraint in the middle of constructor type" <+> ppr data_con
+      zipInvisPats invis_args (vis_arg_ty : vis_arg_tys) (Anon VisArg var : vars) =
+        ((Left vis_arg_ty, Anon VisArg var) :) <$> zipInvisPats invis_args vis_arg_tys vars
+      zipInvisPats _ _ (Named (Bndr _ Required) : _) = failWithTc $
+        text "forall -> not yet implemented for data constructors" <+> ppr data_con
+      zipInvisPats _ _ (Named (Bndr _ Inferred) : _) = failWithTc $
+        text "Inferred variables should have already been removed" <+> ppr data_con
+      zipInvisPats [] vis_arg_tys (Named (Bndr _ Specified) : vars) =
+        -- OK to skip @ pattern
+        zipInvisPats [] vis_arg_tys vars
+      zipInvisPats (invis_arg : invis_args) vis_arg_tys (Named var@(Bndr _ Specified) : vars) =
+        ((Right invis_arg, Named var) :) <$> zipInvisPats invis_args vis_arg_tys vars
 
-  invisPairs <- zipInvisPats type_args specifiedTyVarBinders
+  invisPairs <- zipInvisPats type_args arg_tys' nonInferredTyVarBinders
 
   let -- Iterate through the visible type arguments, extending the name environment
       -- with variables bound by each one in turn.
-      extendNamesByTyApp :: Checker (LHsSigWcType (NoGhcTc GhcRn), TyVar) HsWrapper
-      extendNamesByTyApp (arg, var) _penv thing_inside' = do
-        (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
-        tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
-          w <- tcSubTypePat AppOrigin TypeAppCtxt (Check arg_ty) (TyVarTy var)
+      extendNamesByTyApp :: Checker
+        (Either Type (LHsSigWcType (NoGhcTc GhcRn)), TyBinder)
+        HsWrapper
+      extendNamesByTyApp x _penv thing_inside' = case x of
+        (Left _, _) -> do
+          -- will be checked below, we don't do interleaved visible and invisible yet
           v <- thing_inside'
-          return (w, v)
+          return (mempty, v)
+        (Right arg, data_con_quantifer_step) -> do
+          let ty = case data_con_quantifer_step of
+                Named (Bndr var _) -> TyVarTy var
+                Anon _ ty          -> ty
+          (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
+          tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
+            w <- tcSubTypePat AppOrigin TypeAppCtxt (Check arg_ty) ty
+            v <- thing_inside'
+            return (w, v)
 
-  let tcBody = (fmap . first) mconcat $ tcMultiple extendNamesByTyApp invisPairs penv $
-        tcConArgs (RealDataCon data_con) arg_tys' arg_pats penv thing_inside
+  let tcBody = do
+        (wrappers, (ret_wrapper, res)) <- tcMultiple extendNamesByTyApp invisPairs penv $ do
+          ret_wrapper <- tcSubTypePat AppOrigin TypeAppCtxt (Check remaining_user_data_con_ty') pat_ty
+          res <- tcConArgs (RealDataCon data_con) arg_tys' arg_pats penv thing_inside
+          pure (ret_wrapper, res)
+        pure (nonUserVarWrapper <.> mconcat wrappers <.> ret_wrapper, res)
 
   traceTc "tcConPat" (vcat [ ppr con_name
                            , pprTyVars univ_tvs
