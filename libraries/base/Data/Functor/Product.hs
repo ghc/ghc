@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 -----------------------------------------------------------------------------
@@ -88,7 +89,10 @@ instance (Foldable f, Foldable g) => Foldable (Product f g) where
     foldMap f (Pair x y) = foldMap f x `mappend` foldMap f y
 
 -- | @since 4.9.0.0
-instance (Traversable f, Traversable g) => Traversable (Product f g) where
+instance (Traversable t1, Traversable t2) => Traversable (Product t1 t2) where
+    traverse :: Applicative f
+             => (a -> f b)
+             -> (Product t1 t2 a -> f (Product t1 t2 b))
     traverse f (Pair x y) = liftA2 Pair (traverse f x) (traverse f y)
 
 -- | @since 4.9.0.0
