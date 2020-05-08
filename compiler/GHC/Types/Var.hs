@@ -104,6 +104,9 @@ import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 
+import Data.Bifunctor
+import Data.Bifoldable
+import Data.Bitraversable
 import Data.Data
 
 {-
@@ -521,6 +524,16 @@ is all about surface syntax. Therefore, they are kept as separate data types.
 --   * IfaceType.IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
 data VarBndr var argf = Bndr var argf
   deriving( Data )
+
+instance Bifunctor VarBndr where
+  bimap f g (Bndr x y) = Bndr (f x) (g y)
+
+instance Bifoldable VarBndr where
+  bifoldMap = bifoldMapDefault
+
+instance Bitraversable VarBndr where
+  bitraverse f g (Bndr x y) = Bndr <$> f x <*> g y
+
 
 -- | Variable Binder
 --
