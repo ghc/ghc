@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 -----------------------------------------------------------------------------
@@ -89,6 +90,9 @@ instance (Foldable f, Foldable g) => Foldable (Product f g) where
 
 -- | @since 4.9.0.0
 instance (Traversable f, Traversable g) => Traversable (Product f g) where
+    traverse :: Applicative h
+             => (a -> h b)
+             -> (Product f g a -> h (Product f g b))
     traverse f (Pair x y) = liftA2 Pair (traverse f x) (traverse f y)
 
 -- | @since 4.9.0.0
