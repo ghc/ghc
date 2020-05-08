@@ -255,11 +255,14 @@ about it!
 * FFunTy is the data constructor, meaning "full function type".
 
 * The function type constructor (->) has kind
-     (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> Type LiftedRep
+     (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> Type LiftedRep
   mkTyConApp ensure that we convert a saturated application
     TyConApp (->) [r1,r2,t1,t2] into FunTy t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
   from 't1' and 't2'.
+
+* For the time being its RuntimeRep quantifiers are left
+  inferred. This is to allow for it to evolve.
 
 * The ft_af field says whether or not this is an invisible argument
      VisArg:   t1 -> t2    Ordinary function type
