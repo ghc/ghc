@@ -898,7 +898,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
     let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty
     -- substitute both sides with fresh metavars
     (userTenv, nonInferredTyVarBinders) <- mapAccumLM
-      (rebuildTyCoBinderX cloneTyVarTyVar) emptyTCvSubst bndrs
+      (rebuildTyCoBinderX newPatSigTyVar) emptyTCvSubst bndrs
     pure (nonInferredTyVarBinders, substTy userTenv res_ty)
 
   let -- zip through invisible argument patterns, extending the name environment
