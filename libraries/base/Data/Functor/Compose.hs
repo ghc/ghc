@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
@@ -108,6 +109,9 @@ instance (Foldable f, Foldable g) => Foldable (Compose f g) where
 
 -- | @since 4.9.0.0
 instance (Traversable f, Traversable g) => Traversable (Compose f g) where
+    traverse :: Applicative h
+             => (a -> h b)
+             -> (Compose f g a -> h (Compose f g b))
     traverse f (Compose t) = Compose <$> traverse (traverse f) t
 
 -- | @since 4.9.0.0
