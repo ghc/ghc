@@ -292,7 +292,9 @@ tidyCoAxBndrsForUser init_env tcvs
 Note [Function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Remember that
-  (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
+  (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
+whose `RuntimeRep' arguments are intentionally marked inferred to
+avoid type application.
 
 Hence
   FunCo r co1 co2 :: (s1->t1) ~r (s2->t2)
