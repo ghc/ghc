@@ -1016,7 +1016,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
                 -- Re TypeFamilies see also #7156
 
       given <- newEvVars theta'
-      (ev_binds, (wrap, (arg_pats', res)))
+      (ev_binds, (bodyWrap, (arg_pats', res)))
            <- checkConstraints skol_info ex_tvs' given $
               tcBody
 
@@ -1032,7 +1032,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
                 , cpt_wrap  = idHsWrapper
                 }
               }
-      return (mkHsWrapPat wrap res_pat pat_ty, res)
+      return (mkHsWrapPat (bodyWrap <.> wrap) res_pat pat_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
