@@ -1986,7 +1986,7 @@ tcTagToEnum expr fun args app_res_ty res_ty
          check_enumeration ty' rep_tc
        ; let val_arg = dropWhile (not . isHsValArg) args
              rep_ty  = mkTyConApp rep_tc rep_args
-             fun'    = mkHsWrap (WpTyApp rep_ty) fun
+             fun'    = mkHsWrap (wrapperFromStep $ WpTyApp rep_ty) fun
              expr'   = applyHsArgs fun' val_arg
              df_wrap = mkWpCastR (mkTcSymCo coi)
        ; return (mkHsWrap df_wrap expr') }}}}}

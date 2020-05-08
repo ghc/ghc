@@ -6,10 +6,10 @@ Pattern Matching Coverage Checking.
 
 {-# LANGUAGE CPP            #-}
 {-# LANGUAGE GADTs          #-}
+{-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE MultiWayIf     #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
-{-# LANGUAGE MultiWayIf     #-}
-{-# LANGUAGE LambdaCase     #-}
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
@@ -45,7 +45,9 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
-import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
+import GHC.Tc.Types.Evidence
+  ( HsWrapperStep(..), isIdHsWrapper
+  , stepFromWrapper )
 import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
@@ -445,8 +447,11 @@ translatePat fam_insts x pat = case pat of
   -- Generally the translation is
   -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
   XPat (CoPat wrapper p _ty)
-    | isIdHsWrapper wrapper                   -> translatePat fam_insts x p
-    | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts x p
+    | isIdHsWrapper wrapper
+      -> translatePat fam_insts x p
+    | Just (WpCast co) <- stepFromWrapper wrapper
+    , isReflexiveCo co
+      -> translatePat fam_insts x p
     | otherwise -> do
         (y, grds) <- translatePatV fam_insts p
         wrap_rhs_y <- dsHsWrapper wrapper

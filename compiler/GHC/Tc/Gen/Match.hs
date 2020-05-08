@@ -518,7 +518,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                              poly_arg_ty `mkVisFunTy` poly_res_ty
 
        ; using' <- tcCheckExpr using using_poly_ty
-       ; let final_using = fmap (mkHsWrap (WpTyApp tup_ty)) using'
+       ; let final_using = fmap (mkHsWrap (wrapperFromStep $ WpTyApp tup_ty)) using'
 
              -- 'stmts' returns a result of type (m1_ty tuple_ty),
              -- typically something like [(Int,Bool,Int)]
@@ -704,7 +704,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
 
        ; using' <- tcCheckExpr using using_poly_ty
-       ; let final_using = fmap (mkHsWrap (WpTyApp tup_ty)) using'
+       ; let final_using = fmap (mkHsWrap (wrapperFromStep $ WpTyApp tup_ty)) using'
 
        --------------- Building the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId

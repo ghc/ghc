@@ -4,9 +4,11 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -85,7 +87,9 @@ import GHC.Core
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
 
 import Control.Monad
+import Control.Monad.Trans.State
 import Data.List  ( partition )
+import Data.Tuple ( swap )
 import Control.Arrow ( second )
 
 {-
@@ -1037,27 +1041,32 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
-zonkCoFn env WpHole   = return (env, WpHole)
-zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
-                                    ; (env2, c2') <- zonkCoFn env1 c2
-                                    ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
-                                     ; (env2, c2') <- zonkCoFn env1 c2
-                                     ; t1'         <- zonkTcTypeToTypeX env2 t1
-                                     ; return (env2, WpFun c1' c2' t1' d) }
-zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; return (env, WpCast co') }
-zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
-                                 ; return (env', WpEvLam ev') }
-zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg
-                                 ; return (env, WpEvApp arg') }
-zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
-                              do { (env', tv') <- zonkTyBndrX env tv
-                                 ; return (env', WpTyLam tv') }
-zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
-                                 ; return (env, WpTyApp ty') }
-zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
-                                 ; return (env1, WpLet bs') }
+zonkCoFn env0 items0 = fmap swap $ runStateT (gos items0) env0
+  where
+    gos :: HsWrapper -> StateT ZonkEnv TcM HsWrapper
+    gos = fmap HsWrapper . traverse go . unHsWrapper
+
+    go :: HsWrapperStep -> StateT ZonkEnv TcM HsWrapperStep
+    go = \case
+      WpFun c1 c2 t1 d -> do
+        c1' <- gos c1
+        c2' <- gos c2
+        t1' <- liftWith zonkTcTypeToTypeX t1
+        return $ WpFun c1' c2' t1' d
+      WpCast co   -> WpCast <$> liftWith zonkCoToCo co
+      WpEvLam ev  -> WpEvLam <$> liftWith' zonkEvBndrX ev
+      WpEvApp arg -> WpEvApp <$> liftWith zonkEvTerm arg
+      WpTyLam tv -> do
+        MASSERT( isImmutableTyVar tv )
+        WpTyLam <$> liftWith' zonkTyBndrX tv
+      WpTyApp ty  -> WpTyApp <$> liftWith zonkTcTypeToTypeX ty
+      WpLet bs    -> WpLet <$> liftWith' zonkTcEvBinds bs
+
+    liftWith :: (ZonkEnv -> t -> TcM a) -> t -> StateT ZonkEnv TcM a
+    liftWith f x = StateT $ \env -> (,) <$> f env x <*> pure env
+
+    liftWith' :: (ZonkEnv -> t -> TcM (ZonkEnv, a)) -> t -> StateT ZonkEnv TcM a
+    liftWith' f x = StateT $ \env -> swap <$> f env x
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
