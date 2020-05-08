@@ -906,38 +906,42 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
       --
       -- TODO(@Ericson2314) teach the arity error thing about visibility so we
       -- can abstract over this and have nicer messages.
-      zipInvisPats :: [LHsSigWcType (NoGhcTc GhcRn)]
-                   -> [Type]
+      zipInvisPats :: [Either (LHsSigWcType (NoGhcTc GhcRn)) Type]
                    -> [TyBinder]
                    -> TcM [( Either Type (LHsSigWcType (NoGhcTc GhcRn))
                            , TyBinder
                            )]
-      zipInvisPats _ [] (_ : _) = failWithTc $
-        text "Too few regular argument patterns toy data constructor" <+> ppr data_con
-      zipInvisPats remaining_at remaining_reg [] = case (remaining_at, remaining_reg) of
-        ([], []) -> pure []
-        _ -> failWithTc $
-            text "Too many" <+> x <+> text "argument patterns to data constructor" <+> ppr data_con
-          where x = text $ case (remaining_at, remaining_reg) of
-                      ([], []) -> panic "impossible"
-                      ((_ : _), (_ : _)) -> "@ and regular"
-                      ([], (_ : _)) -> "regular"
-                      ((_ : _), []) -> "@"
-      zipInvisPats _ _ (Anon InvisArg _ : _) = failWithTc $
-        text "Shouldn't be constraint in the middle of constructor type" <+> ppr data_con
-      zipInvisPats invis_args (vis_arg_ty : vis_arg_tys) (Anon VisArg ty : vars) =
-        ((Left vis_arg_ty, Anon VisArg ty) :) <$> zipInvisPats invis_args vis_arg_tys vars
-      zipInvisPats _ _ (Named (Bndr _ Required) : _) = failWithTc $
-        text "forall -> not yet implemented for data constructors" <+> ppr data_con
-      zipInvisPats _ _ (Named (Bndr _ Inferred) : _) = failWithTc $
-        text "Inferred variables should have already been removed" <+> ppr data_con
-      zipInvisPats [] vis_arg_tys (Named (Bndr _ Specified) : vars) =
-        -- OK to skip @ pattern
-        zipInvisPats [] vis_arg_tys vars
-      zipInvisPats (invis_arg : invis_args) vis_arg_tys (Named var@(Bndr _ Specified) : vars) =
-        ((Right invis_arg, Named var) :) <$> zipInvisPats invis_args vis_arg_tys vars
+      zipInvisPats [] [] = pure []
+      zipInvisPats _ (Named (Bndr _ Required) : _) = failWithTc $
+        text "forall -> not yet implemented for data constructors"
+      zipInvisPats _ (Named (Bndr _ Inferred) : _) = failWithTc $
+        text "Inferred variables should have already been removed"
+      zipInvisPats _ (Anon InvisArg _ : _) = failWithTc $
+        text "Shouldn't be constraint in the middle of constructor type"
+      zipInvisPats [] (Anon VisArg _ : _) = failWithTc $
+        text "Too few regular argument patterns to data constructor"
+      zipInvisPats (Left pat : _) (Anon VisArg _ : _) = failWithTc $
+        text "Extra optional argument pattern" <+> ppr pat <+> text "when next required arg needs matching"
+      zipInvisPats (Left pat : _) [] = failWithTc $
+        text "Extra optional argument pattern" <+> ppr pat <+> text "when no args left to match"
+      zipInvisPats (Right pat : _) [] = failWithTc $
+        text "Extra required argument pattern" <+> ppr pat <+> text "when no args left to match"
+      zipInvisPats (Right req_arg_ty : args) (Anon VisArg ty : vars) =
+        ((Left req_arg_ty, Anon VisArg ty) :) <$> zipInvisPats args vars
+      zipInvisPats [] (Named (Bndr _ Specified) : vars) =
+        -- OK to skip @ arg in middle of arg pats
+        zipInvisPats [] vars
+      zipInvisPats args@(Right _ : _) (Named (Bndr _ Specified) : vars) =
+        -- OK to skip @ arg at end of arg pats
+        zipInvisPats args vars
+      zipInvisPats (Left spec_arg : args) (Named var@(Bndr _ Specified) : vars) =
+        ((Right spec_arg, Named var) :) <$> zipInvisPats args vars
 
-  invisPairs <- zipInvisPats type_args arg_tys' nonInferredTyVarBinders
+  -- When required and specified args are intermixed, we'll just put in the list
+  -- of both. For now, we concat them in order.
+  invisPairs <- zipInvisPats (fmap Left type_args ++ fmap Right arg_tys') nonInferredTyVarBinders
+
+  traceTc "tcConPat_0" $ ppr $ invisPairs
 
   let -- Iterate through the visible type arguments, extending the name environment
       -- with variables bound by each one in turn.
