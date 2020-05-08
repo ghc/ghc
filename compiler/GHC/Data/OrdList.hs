@@ -4,26 +4,31 @@
 
 
 -}
-{-# LANGUAGE DeriveFunctor #-}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Provide trees (of instructions), so that lists of instructions can be
 -- appended in linear time.
 module GHC.Data.OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
-        headOL,
+        headOL, unConsOL, unSnocOL, viewSingle,
         mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
-        strictlyEqOL, strictlyOrdOL
+        strictlyEqOL, strictlyOrdOL, strictlyZipWith
 ) where
 
 import GHC.Prelude
+import GHC.Exts (IsList (..))
+import Data.Data
 import Data.Foldable
+import qualified Data.Semigroup as Semigroup
 
 import GHC.Utils.Outputable
 
-import qualified Data.Semigroup as Semigroup
 
 infixl 5  `appOL`
 infixl 5  `snocOL`
@@ -37,7 +42,7 @@ data OrdList a
   | Snoc (OrdList a) a
   | Two (OrdList a) -- Invariant: non-empty
         (OrdList a) -- Invariant: non-empty
-  deriving (Functor)
+  deriving (Data, Functor)
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
@@ -51,6 +56,13 @@ instance Monoid (OrdList a) where
   mconcat = concatOL
 
 instance Foldable OrdList where
+  foldMap f = \case
+    None -> mempty
+    One a -> f a
+    Many as -> foldMap f as
+    Cons a as -> f a Semigroup.<> foldMap f as
+    Snoc as a -> foldMap f as Semigroup.<> f a
+    Two as bs -> foldMap f as Semigroup.<> foldMap f bs
   foldr   = foldrOL
   foldl'  = foldlOL
   toList  = fromOL
@@ -59,6 +71,11 @@ instance Foldable OrdList where
 
 instance Traversable OrdList where
   traverse f xs = toOL <$> traverse f (fromOL xs)
+
+instance IsList (OrdList a) where
+  type Item (OrdList a) = a
+  fromList = toOL
+  toList = fromOL
 
 nilOL    :: OrdList a
 isNilOL  :: OrdList a -> Bool
@@ -70,6 +87,8 @@ appOL    :: OrdList a   -> OrdList a -> OrdList a
 concatOL :: [OrdList a] -> OrdList a
 headOL   :: OrdList a   -> a
 lastOL   :: OrdList a   -> a
+unConsOL :: OrdList a -> Maybe (a, OrdList a)
+unSnocOL :: OrdList a -> Maybe (OrdList a, a)
 lengthOL :: OrdList a   -> Int
 
 nilOL        = None
@@ -78,19 +97,23 @@ snocOL as   b    = Snoc as b
 consOL a    bs   = Cons a bs
 concatOL aas = foldr appOL None aas
 
-headOL None        = panic "headOL"
-headOL (One a)     = a
-headOL (Many as)   = head as
-headOL (Cons a _)  = a
-headOL (Snoc as _) = headOL as
-headOL (Two as _)  = headOL as
+headOL = maybe (panic "headOL") fst . unConsOL
 
-lastOL None        = panic "lastOL"
-lastOL (One a)     = a
-lastOL (Many as)   = last as
-lastOL (Cons _ as) = lastOL as
-lastOL (Snoc _ a)  = a
-lastOL (Two _ as)  = lastOL as
+unConsOL None           = Nothing
+unConsOL (One a)        = Just (a, None)
+unConsOL (Many ~(a:as)) = Just (a, toOL as)
+unConsOL (Cons a as)    = Just (a, as)
+unConsOL (Snoc as _)    = unConsOL as
+unConsOL (Two as _)     = unConsOL as
+
+lastOL = maybe (panic "headOL") snd . unSnocOL
+
+unSnocOL None        = Nothing
+unSnocOL (One a)     = Just (None, a)
+unSnocOL (Many as)   = Just (toOL $ init as, last as)
+unSnocOL (Cons _ as) = unSnocOL as
+unSnocOL (Snoc as a) = Just (as, a)
+unSnocOL (Two _ as)  = unSnocOL as
 
 lengthOL None        = 0
 lengthOL (One _)     = 1
@@ -101,6 +124,19 @@ lengthOL (Two as bs) = length as + length bs
 
 isNilOL None = True
 isNilOL _    = False
+
+-- | @Just@ if there is only a single item in the list. This is O(1) unlike
+-- other accessors which would do needless work in our @Nothing@ case.
+viewSingle :: OrdList a -> Maybe a
+viewSingle = \case
+  None        -> Nothing
+  One a       -> Just a
+  Many as     -> Just $ head as
+  Cons a None -> Just a
+  Cons _ _    -> Nothing
+  Snoc None a -> Just a
+  Snoc _ _    -> Nothing
+  Two _ _     -> Nothing
 
 None  `appOL` b     = b
 a     `appOL` None  = a
@@ -189,4 +225,14 @@ strictlyOrdOL (Two _ _)    _          = LT
 strictlyOrdOL (Many as)   (Many bs)   = compare as bs
 strictlyOrdOL (Many _ )   _           = GT
 
-
+-- | Zip to ord lists relying on them having the same structure not just the
+-- same length
+strictlyZipWith :: (a -> b -> c) -> OrdList a -> OrdList b -> OrdList c
+strictlyZipWith f x y = case (x, y) of
+  (None, None) -> None
+  (One a, One b) -> One $ f a b
+  (Many as, Many bs) -> Many $ zipWith f as bs          -- Invariant: non-empty
+  (Cons a as, Cons b bs) -> Cons (f a b) (strictlyZipWith f as bs)
+  (Snoc as a, Snoc bs b) -> Snoc (strictlyZipWith f as bs) (f a b)
+  (Two a0 a1, Two b0 b1) -> Two (strictlyZipWith f a0 b0) (strictlyZipWith f a1 b1)
+  (_, _) -> None

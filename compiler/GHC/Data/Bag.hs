@@ -36,6 +36,8 @@ import Data.Data
 import Data.Maybe( mapMaybe )
 import Data.List ( partition, mapAccumL )
 import qualified Data.Foldable as Foldable
+import qualified Data.Semigroup as Semigroup
+
 
 infixr 3 `consBag`
 infixl 3 `snocBag`
@@ -46,6 +48,14 @@ data Bag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag [a]             -- INVARIANT: the list is non-empty
   deriving (Functor)
+
+instance Semigroup (Bag a) where
+  (<>) = unionBags
+
+instance Monoid (Bag a) where
+  mempty = emptyBag
+  mappend = (Semigroup.<>)
+  mconcat = unionManyBags
 
 emptyBag :: Bag a
 emptyBag = EmptyBag
