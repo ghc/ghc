@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstancesSigs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -153,7 +155,7 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Map each element of a structure to an action, evaluate these actions
     -- from left to right, and collect the results. For a version that ignores
     -- the results see 'Data.Foldable.traverse_'.
-    traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+    traverse :: Applicative f => (a -> f b) -> (t a -> f (t b))
     {-# INLINE traverse #-}  -- See Note [Inline default methods]
     traverse f = sequenceA . fmap f
 
@@ -167,7 +169,7 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Map each element of a structure to a monadic action, evaluate
     -- these actions from left to right, and collect the results. For
     -- a version that ignores the results see 'Data.Foldable.mapM_'.
-    mapM :: Monad m => (a -> m b) -> t a -> m (t b)
+    mapM :: Monad m => (a -> m b) -> (t a -> m (t b))
     {-# INLINE mapM #-}  -- See Note [Inline default methods]
     mapM = traverse
 
@@ -223,77 +225,96 @@ Solution: add an INLINE pragma on the default method:
 
 -- | @since 2.01
 instance Traversable Maybe where
+    traverse :: Applicative f => (a -> f b) -> (Maybe a -> f (Maybe b))
     traverse _ Nothing = pure Nothing
     traverse f (Just x) = Just <$> f x
 
 -- | @since 2.01
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
+    traverse :: Applicative f => (a -> f b) -> ([a] -> f [b])
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = liftA2 (:) (f x) ys
 
 -- | @since 4.9.0.0
 instance Traversable NonEmpty where
-  traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
+    traverse :: Applicative f => (a -> f b) -> (NonEmpty a -> f (NonEmpty b))
+    traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
 
 -- | @since 4.7.0.0
 instance Traversable (Either a) where
+    traverse :: Applicative f => (b -> f c) -> (Either a b -> f (Either a c))
     traverse _ (Left x) = pure (Left x)
     traverse f (Right y) = Right <$> f y
 
 -- | @since 4.7.0.0
 instance Traversable ((,) a) where
+    traverse :: Applicative f => (b -> f c) -> ((a, b) -> f (a, c))
     traverse f (x, y) = (,) x <$> f y
 
 -- | @since 2.01
 instance Ix i => Traversable (Array i) where
-    traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
+    traverse :: Applicative f => (a -> f b) -> (Array i a -> f (Array i b))
+    traverse f arr = listArray (bounds arr) <$> traverse f (elems arr)
 
 -- | @since 4.7.0.0
 instance Traversable Proxy where
+    traverse :: Applicative f => (a -> f b) -> (Proxy a -> f (Proxy b))
     traverse _ _ = pure Proxy
     {-# INLINE traverse #-}
+    sequenceA :: Applicative f => Proxy (f a) -> f (Proxy a)
     sequenceA _ = pure Proxy
     {-# INLINE sequenceA #-}
+    mapM :: Monad m => (a -> m b) -> (Proxy a -> m (Proxy b))
     mapM _ _ = pure Proxy
     {-# INLINE mapM #-}
+    sequence :: Monad m => Proxy (m a) -> m (Proxy a)
     sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
 -- | @since 4.7.0.0
 instance Traversable (Const m) where
+    traverse :: Applicative f => (a -> f b) -> (Const m a -> f (Const m b))
     traverse _ (Const m) = pure $ Const m
 
 -- | @since 4.8.0.0
 instance Traversable Dual where
+    traverse :: Applicative f => (a -> f b) -> (Dual a -> f (Dual b))
     traverse f (Dual x) = Dual <$> f x
 
 -- | @since 4.8.0.0
 instance Traversable Sum where
+    traverse :: Applicative f => (a -> f b) -> (Sum a -> f (Sum b))
     traverse f (Sum x) = Sum <$> f x
 
 -- | @since 4.8.0.0
 instance Traversable Product where
+    traverse :: Applicative f => (a -> f b) -> (Product a -> f (Product b))
     traverse f (Product x) = Product <$> f x
 
 -- | @since 4.8.0.0
 instance Traversable First where
-    traverse f (First x) = First <$> traverse f x
+    traverse :: Applicative f => (a -> f b) -> (First a -> f (First b))
+    traverse f (First x) = First <$> traverse @Maybe f x
 
 -- | @since 4.8.0.0
 instance Traversable Last where
-    traverse f (Last x) = Last <$> traverse f x
+    traverse :: Applicative f => (a -> f b) -> (Last a -> f (Last b))
+    traverse f (Last x) = Last <$> traverse @Maybe f x
 
 -- | @since 4.12.0.0
-instance (Traversable f) => Traversable (Alt f) where
+instance Traversable t => Traversable (Alt t) where
+    traverse :: Applicative f => (a -> f b) -> (Alt t a -> f (Alt t b))
     traverse f (Alt x) = Alt <$> traverse f x
 
 -- | @since 4.12.0.0
-instance (Traversable f) => Traversable (Ap f) where
+instance Traversable t => Traversable (Ap t) where
+    traverse :: Applicative g => (a -> g b) -> (Ap f a -> g (Ap f b))
     traverse f (Ap x) = Ap <$> traverse f x
 
 -- | @since 4.9.0.0
 instance Traversable ZipList where
+    traverse :: Applicative f => (a -> f b) -> (ZipList a -> f (ZipList b))
     traverse f (ZipList x) = ZipList <$> traverse f x
 
 -- | @since 4.9.0.0
@@ -303,12 +324,16 @@ deriving instance Traversable Identity
 -- Instances for GHC.Generics
 -- | @since 4.9.0.0
 instance Traversable U1 where
+    traverse :: Applicative f => (a -> f b) -> (U1 a -> f (U1 b))
     traverse _ _ = pure U1
     {-# INLINE traverse #-}
+    sequenceA :: Applicative f => U1 (f a) -> f (U1 a)
     sequenceA _ = pure U1
     {-# INLINE sequenceA #-}
+    mapM :: Monad m => (a -> m b) -> (U1 a -> m (U1 b))
     mapM _ _ = pure U1
     {-# INLINE mapM #-}
+    sequence :: Monad m => U1 (m a) -> m (U1 a)
     sequence _ = pure U1
     {-# INLINE sequence #-}
 
@@ -319,22 +344,22 @@ deriving instance Traversable V1
 deriving instance Traversable Par1
 
 -- | @since 4.9.0.0
-deriving instance Traversable f => Traversable (Rec1 f)
+deriving instance Traversable t => Traversable (Rec1 t)
 
 -- | @since 4.9.0.0
 deriving instance Traversable (K1 i c)
 
 -- | @since 4.9.0.0
-deriving instance Traversable f => Traversable (M1 i c f)
+deriving instance Traversable t => Traversable (M1 i c t)
 
 -- | @since 4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :+: g)
+deriving instance (Traversable t1, Traversable t2) => Traversable (t1 :+: t2)
 
 -- | @since 4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :*: g)
+deriving instance (Traversable t1, Traversable t2) => Traversable (t1 :*: t2)
 
 -- | @since 4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :.: g)
+deriving instance (Traversable t1, Traversable t2) => Traversable (t1 :.: t2)
 
 -- | @since 4.9.0.0
 deriving instance Traversable UAddr
@@ -398,7 +423,7 @@ fmapDefault :: forall t a b . Traversable t
             => (a -> b) -> t a -> t b
 {-# INLINE fmapDefault #-}
 -- See Note [Function coercion] in Data.Functor.Utils.
-fmapDefault = coerce (traverse :: (a -> Identity b) -> t a -> Identity (t b))
+fmapDefault = coerce (traverse @t @Identity @a @b)
 
 -- | This function may be used as a value for `Data.Foldable.foldMap`
 -- in a `Foldable` instance.
@@ -410,4 +435,4 @@ foldMapDefault :: forall t m a . (Traversable t, Monoid m)
                => (a -> m) -> t a -> m
 {-# INLINE foldMapDefault #-}
 -- See Note [Function coercion] in Data.Functor.Utils.
-foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
+foldMapDefault = coerce (traverse @t @(Const m) @a @())
