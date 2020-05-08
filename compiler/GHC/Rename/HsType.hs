@@ -152,8 +152,9 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
 -- and we bind them.
 rnHsSigWcTypeBindingVars :: HsDocContext
                          -> LHsSigWcType GhcPs
-                         -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcTypeBindingVars ctxt = \case
+                         -> (LHsSigWcType GhcRn -> RnM (r, FreeVars))
+                         -> RnM (r, FreeVars)
+rnHsSigWcTypeBindingVars ctxt sigType thing_inside = case sigType of
   (HsWC { hswc_body = HsIB { hsib_body = hs_ty' } }) -> do
     rdr_env <- getLocalRdrEnv
     let (varsInScope, varsNotInScope) =
@@ -171,7 +172,8 @@ rnHsSigWcTypeBindingVars ctxt = \case
             , hswc_body = HsIB
               { hsib_ext = ibVars
               , hsib_body = hs_ty } }
-      return (sig_ty, fvs)
+      (res, fvs') <- thing_inside sig_ty
+      return (res, fvs `plusFV` fvs')
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
