@@ -11,9 +11,10 @@ lower levels it is preserved with @let@/@letrec@s).
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -357,7 +358,7 @@ dsAbsBinds dflags tyvars dicts exports
          return (ABE { abe_ext   = noExtField
                      , abe_poly  = global
                      , abe_mono  = local
-                     , abe_wrap  = WpHole
+                     , abe_wrap  = idHsWrapper
                      , abe_prags = SpecPrags [] })
 
 -- | This is where we apply INLINE and INLINABLE pragmas. All we need to
@@ -1110,31 +1111,34 @@ So for now, we ban them altogether as requested by #13290. See also #7398.
 -}
 
 dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
-dsHsWrapper WpHole            = return $ \e -> e
-dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
-dsHsWrapper (WpEvLam ev)      = return $ Lam ev
-dsHsWrapper (WpTyLam tv)      = return $ Lam tv
-dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
-                                   ; return (mkCoreLets bs) }
-dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
-                                   ; w2 <- dsHsWrapper c2
-                                   ; return (w1 . w2) }
- -- See comments on WpFun in GHC.Tc.Types.Evidence for an explanation of what
- -- the specification of this clause is
-dsHsWrapper (WpFun c1 c2 t1 doc)
-                              = do { x  <- newSysLocalDsNoLP t1
-                                   ; w1 <- dsHsWrapper c1
-                                   ; w2 <- dsHsWrapper c2
-                                   ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
-                                         arg     = w1 (Var x)
-                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
-                                   ; if ok
-                                     then return (\e -> (Lam x (w2 (app e arg))))
-                                     else return id }  -- this return is irrelevant
-dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
-                                return $ \e -> mkCastDs e co
-dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
-                                   ; return (\e -> App e core_tm) }
+dsHsWrapper (HsWrapper steps) = fmap (foldr (.) id) $
+  traverse dsHsWrapperStep steps
+
+dsHsWrapperStep :: HsWrapperStep -> DsM (CoreExpr -> CoreExpr)
+dsHsWrapperStep = \case
+  WpTyApp ty      -> return $ \e -> App e (Type ty)
+  WpEvLam ev      -> return $ Lam ev
+  WpTyLam tv      -> return $ Lam tv
+  WpLet ev_binds  -> do
+    bs <- dsTcEvBinds ev_binds
+    return $ mkCoreLets bs
+  -- See comments on WpFun in GHC.Tc.Types.Evidence for an explanation of what
+  -- the specification of this clause is
+  WpFun c1 c2 t1 doc -> do
+    x  <- newSysLocalDsNoLP t1
+    w1 <- dsHsWrapper c1
+    w2 <- dsHsWrapper c2
+    let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+        arg     = w1 (Var x)
+    (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
+    if ok
+      then return (\e -> (Lam x (w2 (app e arg))))
+      else return id  -- this return is irrelevant
+  WpCast co       -> ASSERT(coercionRole co == Representational)
+                     return $ \e -> mkCastDs e co
+  WpEvApp tm      -> do
+    core_tm <- dsEvTerm tm
+    return $ \e -> App e core_tm
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]

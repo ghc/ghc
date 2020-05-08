@@ -1,12 +1,18 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 
 module GHC.Tc.Types.Evidence (
 
-  -- * HsWrapper
-  HsWrapper(..),
+  -- * HsWrappery
+  HsWrapper(..), HsWrapperStep(..),
+  wrapperFromStep, stepFromWrapper,
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper,
@@ -77,6 +83,7 @@ import GHC.Core.FVs   ( exprSomeFreeVars )
 
 import GHC.Utils.Misc
 import GHC.Data.Bag
+import GHC.Data.OrdList
 import qualified Data.Data as Data
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
@@ -188,16 +195,24 @@ maybeTcSubCo ReprEq = mkTcSubCo
 ************************************************************************
 -}
 
-data HsWrapper
-  = WpHole                      -- The identity coercion
+-- | A defunctionalized transformation on Core expressions.
+--
+-- On one hand, we want concatenation to be fast. On the other, we don't want
+-- the exact concatenation order to be observable as it would violate
+-- associativity. A great way to have our cake and it two is to use OrdList,
+-- which has O(1) concatenation but is abstract.
+--
+-- (wrap1 <.> wrap2)[e] = wrap1[ wrap2[ e ]]
+--
+-- Hence  (\a. []) <.> (\b. []) = (\a b. [])
+-- But    ([] a)   <.> ([] b)   = ([] b a)
+newtype HsWrapper = HsWrapper
+  { unHsWrapper :: OrdList HsWrapperStep
+  } deriving (Data.Data)
+    deriving newtype (Semigroup, Monoid)
 
-  | WpCompose HsWrapper HsWrapper
-       -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
-       --
-       -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
-       -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
-
-  | WpFun HsWrapper HsWrapper TcType SDoc
+data HsWrapperStep
+  = WpFun HsWrapper HsWrapper TcType SDoc
        -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -227,9 +242,7 @@ data HsWrapper
 
 -- Cannot derive Data instance because SDoc is not Data (it stores a function).
 -- So we do it manually:
-instance Data.Data HsWrapper where
-  gfoldl _ z WpHole             = z WpHole
-  gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
+instance Data.Data HsWrapperStep where
   gfoldl k z (WpFun a1 a2 a3 _) = z wpFunEmpty `k` a1 `k` a2 `k` a3
   gfoldl k z (WpCast a1)        = z WpCast `k` a1
   gfoldl k z (WpEvLam a1)       = z WpEvLam `k` a1
@@ -239,18 +252,14 @@ instance Data.Data HsWrapper where
   gfoldl k z (WpLet a1)         = z WpLet `k` a1
 
   gunfold k z c = case Data.constrIndex c of
-                    1 -> z WpHole
-                    2 -> k (k (z WpCompose))
-                    3 -> k (k (k (z wpFunEmpty)))
-                    4 -> k (z WpCast)
-                    5 -> k (z WpEvLam)
-                    6 -> k (z WpEvApp)
-                    7 -> k (z WpTyLam)
-                    8 -> k (z WpTyApp)
+                    1 -> k (k (k (z wpFunEmpty)))
+                    2 -> k (z WpCast)
+                    3 -> k (z WpEvLam)
+                    4 -> k (z WpEvApp)
+                    5 -> k (z WpTyLam)
+                    6 -> k (z WpTyApp)
                     _ -> k (z WpLet)
 
-  toConstr WpHole          = wpHole_constr
-  toConstr (WpCompose _ _) = wpCompose_constr
   toConstr (WpFun _ _ _ _) = wpFun_constr
   toConstr (WpCast _)      = wpCast_constr
   toConstr (WpEvLam _)     = wpEvLam_constr
@@ -261,36 +270,21 @@ instance Data.Data HsWrapper where
 
   dataTypeOf _ = hsWrapper_dataType
 
--- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
--- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
--- and @c@ aren't @WpHole@:
---
--- > (a <> b) <> c ?= a <> (b <> c)
---
--- ==>
---
--- > (a `WpCompose` b) `WpCompose` c /= @ a `WpCompose` (b `WpCompose` c)
---
--- However these two associations are are "semantically equal" in the sense
--- that they produce equal functions when passed to
--- @GHC.HsToCore.Binds.dsHsWrapper@.
-instance S.Semigroup HsWrapper where
-  (<>) = (<.>)
+wrapperFromStep :: HsWrapperStep -> HsWrapper
+wrapperFromStep = HsWrapper . unitOL
 
-instance Monoid HsWrapper where
-  mempty = WpHole
+stepFromWrapper :: HsWrapper -> Maybe HsWrapperStep
+stepFromWrapper (HsWrapper steps) = viewSingle steps
 
 hsWrapper_dataType :: Data.DataType
 hsWrapper_dataType
   = Data.mkDataType "HsWrapper"
-      [ wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr
+      [ wpFun_constr, wpCast_constr
       , wpEvLam_constr, wpEvApp_constr, wpTyLam_constr, wpTyApp_constr
       , wpLet_constr]
 
-wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr, wpEvLam_constr,
+wpFun_constr, wpCast_constr, wpEvLam_constr,
   wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr :: Data.Constr
-wpHole_constr    = mkHsWrapperConstr "WpHole"
-wpCompose_constr = mkHsWrapperConstr "WpCompose"
 wpFun_constr     = mkHsWrapperConstr "WpFun"
 wpCast_constr    = mkHsWrapperConstr "WpCast"
 wpEvLam_constr   = mkHsWrapperConstr "WpEvLam"
@@ -302,13 +296,11 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapperStep
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
-WpHole <.> c = c
-c <.> WpHole = c
-c1 <.> c2    = c1 `WpCompose` c2
+(<.>) = (S.<>)
 
 mkWpFun :: HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
@@ -316,23 +308,25 @@ mkWpFun :: HsWrapper -> HsWrapper
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
+mkWpFun (HsWrapper x) (HsWrapper y) = go x y
+  where
+    go []           []           _  _  _ = HsWrapper $ []
+    go []           [WpCast co2] t1 _  _ = HsWrapper $ [WpCast $ mkTcFunCo Representational (mkTcRepReflCo t1) co2]
+    go [WpCast co1] []           _  t2 _ = HsWrapper $ [WpCast $ mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2)]
+    go [WpCast co1] [WpCast co2] _  _  _ = HsWrapper $ [WpCast $ mkTcFunCo Representational (mkTcSymCo co1) co2]
+    go co1          co2          t1 _  d = HsWrapper $ [WpFun (HsWrapper co1) (HsWrapper co2) t1 d]
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
-  | isTcReflCo co = WpHole
+  | isTcReflCo co = idHsWrapper
   | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
-                    WpCast co
+                    wrapperFromStep (WpCast co)
 
 mkWpCastN :: TcCoercionN -> HsWrapper
 mkWpCastN co
-  | isTcReflCo co = WpHole
+  | isTcReflCo co = idHsWrapper
   | otherwise     = ASSERT2(tcCoercionRole co == Nominal, ppr co)
-                    WpCast (mkTcSubCo co)
+                    wrapperFromStep (WpCast $ mkTcSubCo co)
     -- The mkTcSubCo converts Nominal to Representational
 
 mkWpTyApps :: [Type] -> HsWrapper
@@ -352,23 +346,22 @@ mkWpLams ids = mk_co_lam_fn WpEvLam ids
 
 mkWpLet :: TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case
-mkWpLet (EvBinds b) | isEmptyBag b = WpHole
-mkWpLet ev_binds                   = WpLet ev_binds
+mkWpLet (EvBinds b) | isEmptyBag b = idHsWrapper
+mkWpLet ev_binds                   = wrapperFromStep $ WpLet ev_binds
 
-mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
-mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as
+mk_co_lam_fn :: (a -> HsWrapperStep) -> [a] -> HsWrapper
+mk_co_lam_fn f as = HsWrapper $ foldr (\x wrap -> f x `consOL` wrap) [] as
 
-mk_co_app_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
+mk_co_app_fn :: (a -> HsWrapperStep) -> [a] -> HsWrapper
 -- For applications, the *first* argument must
 -- come *last* in the composition sequence
-mk_co_app_fn f as = foldr (\x wrap -> wrap <.> f x) WpHole as
+mk_co_app_fn f as = HsWrapper $ foldr (\x wrap -> wrap `snocOL` f x) [] as
 
 idHsWrapper :: HsWrapper
-idHsWrapper = WpHole
+idHsWrapper = HsWrapper nilOL
 
 isIdHsWrapper :: HsWrapper -> Bool
-isIdHsWrapper WpHole = True
-isIdHsWrapper _      = False
+isIdHsWrapper = isNilOL . unHsWrapper
 
 hsWrapDictBinders :: HsWrapper -> Bag DictId
 -- ^ Identifies the /lambda-bound/ dictionaries of an 'HsWrapper'. This is used
@@ -379,12 +372,10 @@ hsWrapDictBinders :: HsWrapper -> Bag DictId
 -- either superclasses of lambda-bound ones, or (extremely numerous) results of
 -- binding Wanted dictionaries.  We definitely don't want all those cluttering
 -- up the Given dictionaries for pattern-match overlap checking!
-hsWrapDictBinders wrap = go wrap
+hsWrapDictBinders = foldMap go . unHsWrapper
  where
    go (WpEvLam dict_id)   = unitBag dict_id
-   go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
-   go (WpFun _ w _ _)     = go w
-   go WpHole              = emptyBag
+   go (WpFun _ w _ _)     = hsWrapDictBinders w
    go (WpCast  {})        = emptyBag
    go (WpEvApp {})        = emptyBag
    go (WpTyLam {})        = emptyBag
@@ -394,17 +385,17 @@ hsWrapDictBinders wrap = go wrap
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
 -- stopping as soon as you get to a non-lambda binder
-collectHsWrapBinders wrap = go wrap []
+collectHsWrapBinders = gos
   where
     -- go w ws = collectHsWrapBinders (w <.> w1 <.> ... <.> wn)
-    go :: HsWrapper -> [HsWrapper] -> ([Var], HsWrapper)
+    go :: HsWrapperStep -> HsWrapper -> ([Var], HsWrapper)
     go (WpEvLam v)       wraps = add_lam v (gos wraps)
     go (WpTyLam v)       wraps = add_lam v (gos wraps)
-    go (WpCompose w1 w2) wraps = go w1 (w2:wraps)
-    go wrap              wraps = ([], foldl' (<.>) wrap wraps)
+    go wrap              wraps = ([], HsWrapper $ consOL wrap $ unHsWrapper wraps)
 
-    gos []     = ([], WpHole)
-    gos (w:ws) = go w ws
+    gos (HsWrapper w) = case unConsOL w of
+      Nothing -> gos $ idHsWrapper
+      Just (w, ws) -> go w $ HsWrapper ws
 
     add_lam v (vs,w) = (v:vs, w)
 
@@ -932,16 +923,17 @@ pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
 --    it's in a position that needs parens for a non-atomic thing
 pprHsWrapper wrap pp_thing_inside
   = sdocOption sdocPrintTypecheckerElaboration $ \case
-      True  -> help pp_thing_inside wrap False
+      True  -> helps pp_thing_inside wrap False
       False -> pp_thing_inside False
   where
-    help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
+    helps :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
+    helps it = foldr (flip help) it . unHsWrapper
+
+    help :: (Bool -> SDoc) -> HsWrapperStep -> Bool -> SDoc
     -- True  <=> appears in function application position
     -- False <=> appears as body of let or lambda
-    help it WpHole             = it
-    help it (WpCompose f1 f2)  = help (help it f2) f1
     help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
-                                              help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
+                                              helps (\_ -> it True <+> helps (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]

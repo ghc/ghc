@@ -59,6 +59,7 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( isGenerated, il_value, fl_value )
+import GHC.Data.OrdList ( strictlyZipWith )
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -1100,15 +1101,16 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- Coarser notions of equality are possible
     -- (e.g., reassociating compositions,
     --        equating different ways of writing a coercion)
-    wrap WpHole WpHole = True
-    wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) = wrap w1 w1' && wrap w2 w2'
-    wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
-    wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
-    wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'
+    wrap (HsWrapper x) (HsWrapper y) = and $ strictlyZipWith wrapOne x y
+
+    wrapOne :: HsWrapperStep -> HsWrapperStep -> Bool
+    wrapOne (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) = wrap w1 w1' && wrap w2 w2'
+    wrapOne (WpCast co)       (WpCast co')        = co `eqCoercion` co'
+    wrapOne (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
+    wrapOne (WpTyApp t)       (WpTyApp t')        = eqType t t'
     -- Enhancement: could implement equality for more wrappers
     --   if it seems useful (lams and lets)
-    wrap _ _ = False
+    wrapOne _ _ = False
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
