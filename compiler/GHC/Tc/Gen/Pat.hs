@@ -998,7 +998,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
           -- dictionary binders from theta'
           _ -> substTheta tenv (eqSpecPreds eq_spec ++ theta)
     mapM newEvVar theta'
-  (ev_binds, (wrap, (arg_pats', res))) <- do
+  (ev_binds, (bodyWrap, (arg_pats', res))) <- do
     let skol_info = PatSkol (RealDataCon data_con) mc
         mc = case pe_ctxt penv of
           LamPat mc -> mc
@@ -1017,7 +1017,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
             , cpt_wrap  = idHsWrapper
             }
         }
-  return (mkHsWrapPat wrap res_pat pat_ty, res)
+  return (mkHsWrapPat (wrap <.> bodyWrap) res_pat pat_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
