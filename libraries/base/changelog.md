@@ -19,6 +19,10 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
+  * Make `allocaBytesAligned` and `alloca` throw an IOError when the
+    alignment is not a power-of-two. The underlying primop
+    `newAlignedPinnedByteArray#` actually always assumed this but we didn't
+    document this fact in the user facing API until now.
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
