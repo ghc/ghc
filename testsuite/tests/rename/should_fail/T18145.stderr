@@ -1,0 +1,6 @@
+
+T18145.hs:10:44: error: Not in scope: type variable ‘a’
+
+T18145.hs:14:41: error: Not in scope: type variable ‘a’
+
+T18145.hs:17:41: error: Not in scope: type variable ‘a’
