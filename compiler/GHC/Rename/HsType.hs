@@ -128,10 +128,11 @@ rn_hs_sig_wc_type scoping ctxt
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-             implicit_bndrs = case scoping of
-               AlwaysBind       -> tv_rdrs
-               BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) tv_rdrs
-               NeverBind        -> []
+       -- Cannot avoid work based on choice because we always need wildcards
+       ; implicit_bndrs <- case scoping of
+           AlwaysBind       -> pure tv_rdrs
+           BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) $ pure tv_rdrs
+           NeverBind        -> pure []
        ; rnImplicitBndrs implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
@@ -301,8 +302,9 @@ rnHsSigType :: HsDocContext
 -- that cannot have wildcards
 rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
-       ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs (forAllOrNothing (isLHsForAllTy hs_ty) vars) $ \ vars ->
+       ; vars0 <- forAllOrNothing (isLHsForAllTy hs_ty) $
+           extractFilteredRdrTyVarsDups hs_ty
+       ; rnImplicitBndrs vars0 $ \ vars ->
     do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
 
        ; return ( HsIB { hsib_ext = vars
@@ -329,11 +331,11 @@ forAllOrNothing :: Bool
                 --  we do not want to bring 'b' into scope, hence True
                 -- But   f :: a -> b
                 --  we want to bring both 'a' and 'b' into scope, hence False
-                -> FreeKiTyVarsWithDups
+                -> TcM FreeKiTyVarsWithDups
                 -- ^ Free vars of the type
-                -> FreeKiTyVarsWithDups
-forAllOrNothing True  _   = []
-forAllOrNothing False fvs = fvs
+                -> TcM FreeKiTyVarsWithDups
+forAllOrNothing True  _        = pure []
+forAllOrNothing False calc_fvs = calc_fvs
 
 
 rnImplicitBndrs :: FreeKiTyVarsWithDups
