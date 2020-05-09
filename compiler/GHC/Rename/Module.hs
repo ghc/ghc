@@ -59,7 +59,7 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -664,7 +664,9 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 
 rnFamInstEqn :: HsDocContext
              -> AssocTyFamInfo
-             -> [Located RdrName]    -- Kind variables from the equation's RHS
+             -> [Located RdrName]
+             -- ^ Kind variables from the equation's RHS to be implicitly bound
+             -- if no explicit forall.
              -> FamInstEqn GhcPs rhs
              -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
              -> RnM (FamInstEqn GhcRn rhs', FreeVars)
@@ -683,20 +685,36 @@ rnFamInstEqn doc atfi rhs_kvars
              -- Use the "...Dups" form because it's needed
              -- below to report unused binder on the LHS
 
-         -- Implicitly bound variables, empty if we have an explicit 'forall'.
-         -- See Note [forall-or-nothing rule] in GHC.Rename.HsType.
-       ; let imp_vars = nubL $ forAllOrNothing (isJust mb_bndrs) pat_kity_vars_with_dups
-       ; imp_var_names <- mapM (newTyVarNameRn mb_cls) imp_vars
-
        ; let bndrs = fromMaybe [] mb_bndrs
-             bnd_vars = map hsLTyVarLocName bndrs
-             payload_kvars = filterOut (`elemRdr` (bnd_vars ++ imp_vars)) rhs_kvars
-             -- Make sure to filter out the kind variables that were explicitly
-             -- bound in the type patterns.
-       ; payload_kvar_names <- mapM (newTyVarNameRn mb_cls) payload_kvars
 
-         -- all names not bound in an explicit forall
-       ; let all_imp_var_names = imp_var_names ++ payload_kvar_names
+         -- all_imp_vars represent the implicitly bound type variables. This is
+         -- empty if we have an explicit `forall` (see
+         -- Note [forall-or-nothing rule] in GHC.Rename.HsType), which means
+         -- ignoring:
+         --
+         -- - pat_kity_vars_with_dups, the variables mentioned in the LHS of
+         --   the equation, and
+         -- - rhs_kvars, the kind variables mentioned in an outermost kind
+         --   signature on the RHS of the equation. (See
+         --   Note [Implicit quantification in type synonyms] in
+         --   GHC.Rename.HsType for why these are implicitly quantified in the
+         --   absence of an explicit forall).
+         --
+         -- For example:
+         --
+         -- @
+         -- type family F a b
+         -- type instance forall a b c. F [(a, b)] c = a -> b -> c
+         --   -- all_imp_vars = []
+         -- type instance F [(a, b)] c = a -> b -> c
+         --   -- all_imp_vars = [a, b, c]
+         -- @
+       ; all_imp_vars <- forAllOrNothing (isJust mb_bndrs) $
+           -- No need to filter out explicit binders (the 'mb_bndrs = Just
+           -- explicit_bndrs' case) because there must be none if we're going
+           -- to implicitly bind anything, per the previous comment.
+           nubL $ pat_kity_vars_with_dups ++ rhs_kvars
+       ; all_imp_var_names <- mapM (newTyVarNameRn mb_cls) all_imp_vars
 
              -- All the free vars of the family patterns
              -- with a sensible binding location
@@ -2096,14 +2114,14 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See #14808.
-              free_tkvs = extractHsTvBndrs explicit_tkvs $
-                          extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
+        ; implicit_bndrs <- forAllOrNothing explicit_forall
+            $ extractHsTvBndrs explicit_tkvs
+            $ extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
 
-              ctxt    = ConDeclCtx new_names
+        ; let ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
 
-        ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
-        ; rnImplicitBndrs (forAllOrNothing explicit_forall free_tkvs) $ \ implicit_tkvs ->
+        ; rnImplicitBndrs implicit_bndrs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
