@@ -4,5 +4,5 @@ rn046.hs:2:1: warning: [-Wunused-imports (in -Wextra)]
       except perhaps to import instances from ‘Data.List’
     To import instances alone, use: import Data.List()
 
-rn046.hs:3:1: warning: [-Wunused-imports (in -Wextra)]
+rn046.hs:3:19: warning: [-Wunused-imports (in -Wextra)]
     The import of ‘ord’ from module ‘Data.Char’ is redundant
