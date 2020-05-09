@@ -965,6 +965,17 @@ FP_CHECK_FUNC([GetModuleFileName],
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
+AC_CHECK_FUNC(
+  [sched_getaffinity],[
+    #include <sched.h>
+    #include <errno.h>
+    static cpu_set_t mask;
+  ],[
+    CPU_ZERO(&mask);
+    sched_getaffinity(0, SIZEOF(mask), &mask);
+    if (errno == ENOSYS)
+      return 1;
+  ])
 
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
