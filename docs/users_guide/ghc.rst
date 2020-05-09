@@ -379,3 +379,8 @@ Copyright
 
 Copyright 2015. The University Court of the University of Glasgow.
 All rights reserved.
+
+See also
+--------
+
+https://www.haskell.org/ghc     the GHC homepage
