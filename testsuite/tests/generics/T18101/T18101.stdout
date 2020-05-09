@@ -1,0 +1,13 @@
+(Rep (List Int)) :: * -> *
+= D1
+    ('MetaData "List" "T18101" "main" 'False)
+    (C1
+       ('MetaCons ":*" ('InfixI 'RightAssociative 5) 'False)
+       (S1
+          ('MetaSel
+             'Nothing 'NoSourceUnpackedness 'NoSourceStrictness 'DecidedLazy)
+          (Rec0 Int)
+        :*: S1
+              ('MetaSel
+                 'Nothing 'NoSourceUnpackedness 'NoSourceStrictness 'DecidedLazy)
+              (Rec0 (List Int))))

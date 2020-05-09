@@ -1,0 +1,5 @@
+:load T18101
+:set -XStandaloneDeriving -XDeriveGeneric -XFlexibleInstances
+import GHC.Generics
+deriving instance Generic (List Int)
+:kind! (Rep (List Int))
