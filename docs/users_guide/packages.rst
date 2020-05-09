@@ -1061,6 +1061,13 @@ extra indirection).
    its output in place of ⟨GHCVersion⟩. See also :ref:`options-codegen`
    on how object files must be prepared for shared object linking.
 
+-  When building a shared library, care must be taken to ensure that the
+   resulting object is named appropriately. In particular, GHC expects the
+   name of a shared object to have the form ``libHS<unit id>.<ext>`` where
+   *unit id* is the unit ID given during compilation via the
+   :ghc-flag:`-package-id ⟨unit-id⟩` flag and *ext* is the host system's
+   usual file extension for shared objects.
+
 To compile a module which is to be part of a new package, use the
 ``-package-name`` (to identify the name of the package) and
 ``-library-name`` (to identify the version and the version hashes of its

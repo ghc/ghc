@@ -807,7 +807,8 @@ for example).
 
     When creating shared objects for Haskell packages, the shared object
     must be named properly, so that GHC recognizes the shared object
-    when linked against this package. See shared object name mangling.
+    when linking against this package.
+    See :ref:`shared object name mangling <building-packages>` for details.
 
 .. ghc-flag:: -dynload
     :shortdesc: Selects one of a number of modes for finding shared libraries at runtime.
