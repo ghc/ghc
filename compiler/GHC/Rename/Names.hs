@@ -1495,9 +1495,15 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | null unused
   = return ()
 
+  -- Only one import is unused
+  | Just (_, L _ imports) <- ideclHiding decl
+  , length unused == 1
+  , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
+  = addWarnAt (Reason flag) loc msg2
+
   -- Some imports are unused
   | otherwise
-  = addWarnAt (Reason flag) loc  msg2
+  = addWarnAt (Reason flag) loc msg2
 
   where
     msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant
