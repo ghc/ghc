@@ -1277,16 +1277,17 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
 
+-- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
-traceInline dflags inline_id str doc result
- | Just prefix <- inlineCheck dflags
- =  if prefix `isPrefixOf` occNameString (getOccName inline_id)
-      then traceAction dflags str doc result
-      else result
- | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
- = traceAction dflags str doc result
- | otherwise
- = result
+traceInline dflags inline_id str doc result =
+  | enable    = traceAction dflags str doc result
+  | otherwise = result
+  where
+    enable
+      | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+      = True
+      | Just prefix <- inlineCheck dflags
+      = prefix `isPrefixOf` occNameString (getOccName inline_id)
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
