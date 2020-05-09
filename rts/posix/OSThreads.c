@@ -240,26 +240,50 @@ forkOS_createThread ( HsStablePtr entry )
 
 void freeThreadingResources (void) { /* nothing */ }
 
+// Get the number of logical CPU cores available to us. Note that this is
+// different from the number of physical cores (see #14781).
 uint32_t
 getNumberOfProcessors (void)
 {
     static uint32_t nproc = 0;
 
     if (nproc == 0) {
-#if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
-        nproc = sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
-        nproc = sysconf(_SC_NPROCESSORS_CONF);
-#elif defined(darwin_HOST_OS)
+#if defined(HAVE_SCHED_GETAFFINITY)
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        if (sched_getaffinity(0, sizeof(mask), &mask) == 0) {
+            for (int i = 0; i < CPU_SETSIZE; i++) {
+                if (CPU_ISSET(i, &mask))
+                    nproc++;
+            }
+            return nproc;
+        }
+#endif
+
+#if defined(darwin_HOST_OS)
         size_t size = sizeof(uint32_t);
-        if(sysctlbyname("hw.logicalcpu",&nproc,&size,NULL,0) != 0) {
+        if (sysctlbyname("machdep.cpu.thread_count",&nproc,&size,NULL,0) != 0) {
+            if (sysctlbyname("hw.logicalcpu",&nproc,&size,NULL,0) != 0) {
+                if (sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
+                    nproc = 1;
+            }
+        }
+#elif defined(freebsd_HOST_OS)
+        cpuset_t mask;
+        CPU_ZERO(&mask);
+        if(cpuset_getaffinity(CPU_LEVEL_CPUSET, CPU_WHICH_PID, -1, sizeof(mask), &mask) == 0) {
+            return CPU_COUNT(&mask);
+        } else {
+            size_t size = sizeof(uint32_t);
             if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
                 nproc = 1;
         }
-#elif defined(freebsd_HOST_OS)
-        size_t size = sizeof(uint32_t);
-        if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
-            nproc = 1;
+#elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
+        // N.B. This is the number of physical processors.
+        nproc = sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
+        // N.B. This is the number of physical processors.
+        nproc = sysconf(_SC_NPROCESSORS_CONF);
 #else
         nproc = 1;
 #endif
