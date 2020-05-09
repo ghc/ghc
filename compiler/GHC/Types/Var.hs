@@ -404,8 +404,13 @@ data ArgFlag = Invisible Specificity
   deriving (Eq, Ord, Data)
   -- (<) on ArgFlag means "is less visible than"
 
+-- | Whether an 'Invisible' argument may appear in source Haskell.
 data Specificity = InferredSpec
+                   -- ^ the argument may not appear in source Haskell, it is
+                   -- only inferred.
                  | SpecifiedSpec
+                   -- ^ the argument may appear in source Haskell, but isn't
+                   -- required.
   deriving (Eq, Ord, Data)
 
 pattern Inferred, Specified :: ArgFlag
