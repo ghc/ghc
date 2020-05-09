@@ -2,14 +2,6 @@
 
 ## 4.15.0.0 *TBA*
 
-  * `Const` (`Data.Functor.Const`), `Compose` (`Data.Functor.Compose`),
-    `Product` (`Data.Functor.Product`), `Sum` (`Data.Functor.Sum`), `Coercion`
-    and `TestCoercion` (`Data.Type.Coercion`), `(:~:)` and `TestEquality`
-    (`Data.Type.Equality`); `UAddr`, `UChar`, `UDouble` `UFloat`, `UInt`,
-    `UWord`, `Rec0`, `D1`, `C1`, `S1`, `Datatype`, `Constructor`, `Selector`
-    (`GHC.Generics`) now use specified quantification, allowing the use of
-    visible kind application.
-
   * `openFile` now calls the `open` system call with an `interruptible` FFI
     call, ensuring that the call can be interrupted with `SIGINT` on POSIX
     systems.
