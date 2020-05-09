@@ -349,13 +349,13 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
             val0 = metric.baseline.perfStat.value
             val1 = metric.stat.value
             rel = 100 * (val1 - val0) / val0
-            print("{space:24}  {herald:40}  {value:15.3f}  [{direction} {rel:2.1f}%]".format(
+            print("{space:24}  {herald:40}  {value:15.3f}  [{direction}, {rel:2.1f}%]".format(
                 space = "",
                 herald = "(baseline @ HEAD~{depth})".format(
                     depth = metric.baseline.commitDepth),
                 value = val0,
                 direction = metric.change,
-                rel = abs(rel)
+                rel = rel
             ))
 
 # First collect all the tests to be run
