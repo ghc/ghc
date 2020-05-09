@@ -114,6 +114,9 @@ Runtime system
   in the process's affinity mask, making GHC's behavior more predictable in
   containerized settings (:ghc-ticket:`14781`).
 
+- Support for Windows Vista has been dropped. GHC-compiled programs now require
+  Windows 7 or later.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

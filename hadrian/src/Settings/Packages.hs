@@ -462,4 +462,4 @@ rtsWarnings = mconcat
 -- and also centralizes the versioning.
 -- | Minimum supported Windows version.
 windowsVersion :: String
-windowsVersion = "0x06000100"
+windowsVersion = "0x06010000"

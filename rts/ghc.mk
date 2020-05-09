@@ -25,7 +25,7 @@ rts_VERSION = 1.0
 # If we're compiling on windows, enforce that we only support Vista SP1+
 # Adding this here means it doesn't have to be done in individual .c files
 # and also centralizes the versioning.
-rts_WINVER = 0x06000100
+rts_WINVER = 0x06010000
 
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
