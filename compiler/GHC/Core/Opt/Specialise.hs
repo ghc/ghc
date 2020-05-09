@@ -1362,6 +1362,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     inl_prag  = idInlinePragma fn
     inl_act   = inlinePragmaActivation inl_prag
     is_local  = isLocalId fn
+    is_dfun   = isDFunId fn
 
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
@@ -1384,22 +1385,34 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     spec_call :: SpecInfo                         -- Accumulating parameter
               -> CallInfo                         -- Call instance
               -> SpecM SpecInfo
-    spec_call spec_acc@(rules_acc, pairs_acc, uds_acc) (CI { ci_key = call_args })
+    spec_call spec_acc@(rules_acc, pairs_acc, uds_acc) _ci@(CI { ci_key = call_args })
       = -- See Note [Specialising Calls]
-        do { ( useful, rhs_env2, leftover_bndrs
+        do { let all_call_args | is_dfun   = call_args ++ repeat UnspecArg
+                               | otherwise = call_args
+                               -- See Note [Specialising DFuns]
+           ; ( useful, rhs_env2, leftover_bndrs
              , rule_bndrs, rule_lhs_args
-             , spec_bndrs, dx_binds, spec_args) <- specHeader env rhs_bndrs call_args
+             , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
+
+--           ; pprTrace "spec_call" (vcat [ text "call info: " <+> ppr _ci
+--                                        , text "useful:    " <+> ppr useful
+--                                        , text "rule_bndrs:" <+> ppr rule_bndrs
+--                                        , text "lhs_args:  " <+> ppr rule_lhs_args
+--                                        , text "spec_bndrs:" <+> ppr spec_bndrs1
+--                                        , text "spec_args: " <+> ppr spec_args
+--                                        , text "dx_binds:  " <+> ppr dx_binds
+--                                        , text "rhs_env2:  " <+> ppr (se_subst rhs_env2)
+--                                        , ppr dx_binds ]) $
+--             return ()
 
            ; dflags <- getDynFlags
            ; if not useful  -- No useful specialisation
                 || already_covered dflags rules_acc rule_lhs_args
              then return spec_acc
-             else -- pprTrace "spec_call" (vcat [ ppr _call_info, ppr fn, ppr rhs_dict_ids
-                  --                           , text "rhs_env2" <+> ppr (se_subst rhs_env2)
-                  --                           , ppr dx_binds ]) $
+             else
         do { -- Run the specialiser on the specialised RHS
              -- The "1" suffix is before we maybe add the void arg
-           ; (spec_rhs1, rhs_uds) <- specLam rhs_env2 (spec_bndrs ++ leftover_bndrs) rhs_body
+           ; (spec_rhs1, rhs_uds) <- specLam rhs_env2 (spec_bndrs1 ++ leftover_bndrs) rhs_body
            ; let spec_fn_ty1 = exprType spec_rhs1
 
                  -- Maybe add a void arg to the specialised function,
@@ -1407,14 +1420,13 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                  -- See Note [Specialisations Must Be Lifted]
                  -- C.f. GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs
                  add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
-                 (spec_rhs, spec_fn_ty, rule_rhs_args)
-                   | add_void_arg = ( Lam        voidArgId  spec_rhs1
-                                    , mkVisFunTy voidPrimTy spec_fn_ty1
-                                    , voidPrimId : spec_bndrs)
-                   | otherwise   = (spec_rhs1, spec_fn_ty1, spec_bndrs)
+                 (spec_bndrs, spec_rhs, spec_fn_ty)
+                   | add_void_arg = ( voidPrimId : spec_bndrs1
+                                    , Lam        voidArgId  spec_rhs1
+                                    , mkVisFunTy voidPrimTy spec_fn_ty1)
+                   | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
 
-                 arity_decr      = count isValArg rule_lhs_args - count isId rule_rhs_args
-                 join_arity_decr = length rule_lhs_args - length rule_rhs_args
+                 join_arity_decr = length rule_lhs_args - length spec_bndrs
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
                                  = Just (orig_join_arity - join_arity_decr)
                                  | otherwise
@@ -1449,7 +1461,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                                   (idName fn)
                                   rule_bndrs
                                   rule_lhs_args
-                                  (mkVarApps (Var spec_fn) rule_rhs_args)
+                                  (mkVarApps (Var spec_fn) spec_bndrs)
 
                 spec_rule
                   = case isJoinId_maybe fn of
@@ -1472,15 +1484,15 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags fn spec_bndrs spec_app arity_decr fn_unf)
-
-                spec_app e = e `mkApps` spec_args
+                  = (inl_prag, specUnfolding dflags spec_bndrs (`mkApps` spec_args)
+                                             rule_lhs_args fn_unf)
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
                 --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
                 -- Copy InlinePragma information from the parent Id.
                 -- So if f has INLINE[1] so does spec_fn
+                arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
                 spec_f_w_arity = spec_fn `setIdArity`      max 0 (fn_arity - arity_decr)
                                          `setInlinePragma` spec_inl_prag
                                          `setIdUnfolding`  spec_unf
@@ -1498,8 +1510,19 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
 
-{- Note [Specialisation Must Preserve Sharing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Specialising DFuns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DFuns have a special sort of unfolding (DFunUnfolding), and these are
+hard to specialise a DFunUnfolding to give another DFunUnfolding
+unless the DFun is fully applied (#18120).  So, in the case of DFunIds
+we simply extend the CallKey with trailing UnspecArgs, so we'll
+generate a rule that completely saturates the DFun.
+
+There is an ASSERT that checks this, in the DFunUnfolding case of
+GHC.Core.Unfold.specUnfolding.
+
+Note [Specialisation Must Preserve Sharing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a function:
 
     f :: forall a. Eq a => a -> blah
@@ -2089,7 +2112,7 @@ isSpecDict _             = False
 --      -- Specialised function helpers
 --    , [c, i, x]
 --    , [dShow1 = $dfShow dShowT2]
---    , [T1, T2, dEqT1, dShow1]
+--    , [T1, T2, c, i, dEqT1, dShow1]
 --    )
 specHeader
      :: SpecEnv
@@ -2106,12 +2129,13 @@ specHeader
 
                 -- RULE helpers
               , [OutBndr]    -- Binders for the RULE
-              , [CoreArg]    -- Args for the LHS of the rule
+              , [OutExpr]    -- Args for the LHS of the rule
 
                 -- Specialised function helpers
               , [OutBndr]    -- Binders for $sf
               , [DictBind]   -- Auxiliary dictionary bindings
               , [OutExpr]    -- Specialised arguments for unfolding
+                             -- Same length as "args for LHS of rule"
               )
 
 -- We want to specialise on type 'T1', and so we must construct a substitution

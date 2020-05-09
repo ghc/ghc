@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
-        nubL, elemRdr
+        forAllOrNothing, nubL, elemRdr
   ) where
 
 import GHC.Prelude
@@ -80,14 +80,22 @@ to break several loop.
 *********************************************************
 -}
 
-data HsSigWcTypeScoping = AlwaysBind
-                          -- ^ Always bind any free tyvars of the given type,
-                          --   regardless of whether we have a forall at the top
-                        | BindUnlessForall
-                          -- ^ Unless there's forall at the top, do the same
-                          --   thing as 'AlwaysBind'
-                        | NeverBind
-                          -- ^ Never bind any free tyvars
+data HsSigWcTypeScoping
+  = AlwaysBind
+    -- ^ Always bind any free tyvars of the given type, regardless of whether we
+    -- have a forall at the top.
+    --
+    -- For pattern type sigs and rules we /do/ want to bring those type
+    -- variables into scope, even if there's a forall at the top which usually
+    -- stops that happening, e.g:
+    --
+    -- > \ (x :: forall a. a-> b) -> e
+    --
+    -- Here we do bring 'b' into scope.
+  | BindUnlessForall
+    -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'
+  | NeverBind
+    -- ^ Never bind any free tyvars
 
 rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
@@ -96,12 +104,6 @@ rnHsSigWcType scoping doc sig_ty
     return (sig_ty', emptyFVs)
 
 rnHsSigWcTypeScoped :: HsSigWcTypeScoping
-                       -- AlwaysBind: for pattern type sigs and rules we /do/ want
-                       --             to bring those type variables into scope, even
-                       --             if there's a forall at the top which usually
-                       --             stops that happening
-                       -- e.g  \ (x :: forall a. a-> b) -> e
-                       -- Here we do bring 'b' into scope
                     -> HsDocContext -> LHsSigWcType GhcPs
                     -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                     -> RnM (a, FreeVars)
@@ -126,11 +128,11 @@ rn_hs_sig_wc_type scoping ctxt
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-             bind_free_tvs = case scoping of
-                               AlwaysBind       -> True
-                               BindUnlessForall -> not (isLHsForAllTy hs_ty)
-                               NeverBind        -> False
-       ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
+             implicit_bndrs = case scoping of
+               AlwaysBind       -> tv_rdrs
+               BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) tv_rdrs
+               NeverBind        -> []
+       ; rnImplicitBndrs implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
              ib_ty'  = HsIB { hsib_ext = vars
@@ -300,36 +302,54 @@ rnHsSigType :: HsDocContext
 rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
+       ; rnImplicitBndrs (forAllOrNothing (isLHsForAllTy hs_ty) vars) $ \ vars ->
     do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
 
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
                 , fvs ) } }
 
-rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
-                           -- E.g.  f :: forall a. a->b
-                           --  we do not want to bring 'b' into scope, hence False
-                           -- But   f :: a -> b
-                           --  we want to bring both 'a' and 'b' into scope
+-- Note [forall-or-nothing rule]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Free variables in signatures are usually bound in an implicit
+-- 'forall' at the beginning of user-written signatures. However, if the
+-- signature has an explicit forall at the beginning, this is disabled.
+--
+-- The idea is nested foralls express something which is only
+-- expressible explicitly, while a top level forall could (usually) be
+-- replaced with an implicit binding. Top-level foralls alone ("forall.") are
+-- therefore an indication that the user is trying to be fastidious, so
+-- we don't implicitly bind any variables.
+
+-- | See note Note [forall-or-nothing rule]. This tiny little function is used
+-- (rather than its small body inlined) to indicate we implementing that rule.
+forAllOrNothing :: Bool
+                -- ^ True <=> explicit forall
+                -- E.g.  f :: forall a. a->b
+                --  we do not want to bring 'b' into scope, hence True
+                -- But   f :: a -> b
+                --  we want to bring both 'a' and 'b' into scope, hence False
                 -> FreeKiTyVarsWithDups
-                                   -- Free vars of hs_ty (excluding wildcards)
-                                   -- May have duplicates, which is
-                                   -- checked here
+                -- ^ Free vars of the type
+                -> FreeKiTyVarsWithDups
+forAllOrNothing True  _   = []
+forAllOrNothing False fvs = fvs
+
+
+rnImplicitBndrs :: FreeKiTyVarsWithDups
+                -- ^ Surface-syntax free vars that we will implicitly bind.
+                -- May have duplicates, which is checked here
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs bind_free_tvs
-                fvs_with_dups
+rnImplicitBndrs implicit_vs_with_dups
                 thing_inside
-  = do { let fvs = nubL fvs_with_dups
-             real_fvs | bind_free_tvs = fvs
-                      | otherwise     = []
+  = do { let implicit_vs = nubL implicit_vs_with_dups
 
        ; traceRn "rnImplicitBndrs" $
-         vcat [ ppr fvs_with_dups, ppr fvs, ppr real_fvs ]
+         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
        ; loc <- getSrcSpanM
-       ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_fvs
+       ; vars <- mapM (newLocalBndrRn . L loc . unLoc) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -1624,7 +1644,7 @@ extractHsTyRdrTyVarsDups ty
 --     Note [Ordering of implicit variables] and
 --     Note [Implicit quantification in type synonyms].
 extractHsTyRdrTyVarsKindVars :: LHsType GhcPs -> FreeKiTyVarsNoDups
-extractHsTyRdrTyVarsKindVars (unLoc -> ty) =
+extractHsTyRdrTyVarsKindVars (L _ ty) =
   case ty of
     HsParTy _ ty -> extractHsTyRdrTyVarsKindVars ty
     HsKindSig _ _ ki -> extractHsTyRdrTyVars ki
@@ -1652,12 +1672,12 @@ extractHsTyVarBndrsKVs tv_bndrs
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [Located RdrName]
-extractRdrKindSigVars (L _ resultSig)
-  | KindSig _ k                          <- resultSig = extractHsTyRdrTyVars k
-  | TyVarSig _ (L _ (KindedTyVar _ _ k)) <- resultSig = extractHsTyRdrTyVars k
-  | otherwise =  []
+extractRdrKindSigVars (L _ resultSig) = case resultSig of
+  KindSig _ k                          -> extractHsTyRdrTyVars k
+  TyVarSig _ (L _ (KindedTyVar _ _ k)) -> extractHsTyRdrTyVars k
+  _ -> []
 
--- Get type/kind variables mentioned in the kind signature, preserving
+-- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order and without duplicates:
 --
 --  * data T a (b :: k1) :: k2 -> k1 -> k2 -> Type   -- result: [k2,k1]
@@ -1740,7 +1760,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
     tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
 
-extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
+extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVarsWithDups
 -- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
