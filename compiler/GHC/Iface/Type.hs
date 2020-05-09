@@ -15,10 +15,10 @@ This module defines interface types and binders
 {-# LANGUAGE LambdaCase #-}
 
 #if !MIN_VERSION_GLASGOW_HASKELL(8,10,0,0)
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
-#endif
+{-# OPTIONS_GHC -Wincomplete-patterns #-}
   -- N.B. This can be dropped once GHC 8.8 can be dropped as a
   -- bootstrap compiler.
+#endif
 
 module GHC.Iface.Type (
         IfExtName, IfLclName,
