@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples,
-             ScopedTypeVariables #-}
+             ScopedTypeVariables, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -60,12 +60,15 @@ module Foreign.Marshal.Alloc (
   finalizerFree
 ) where
 
+import Data.Bits                ( Bits, (.&.) )
 import Data.Maybe
 import Foreign.C.Types          ( CSize(..) )
 import Foreign.Storable         ( Storable(sizeOf,alignment) )
 import Foreign.ForeignPtr       ( FinalizerPtr )
 import GHC.IO.Exception
+import GHC.Num
 import GHC.Real
+import GHC.Show
 import GHC.Ptr
 import GHC.Base
 
@@ -159,7 +162,22 @@ allocaBytes (I# size) action = IO $ \ s0 ->
 -- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
 allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
-allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
+allocaBytesAligned !_size !align _action
+    | not $ isPowerOfTwo align =
+      ioError $
+        IOError Nothing InvalidArgument
+          "allocaBytesAligned"
+          ("alignment (="++show align++") must be a power of two!")
+          Nothing Nothing
+  where
+    isPowerOfTwo :: (Bits i, Integral i) => i -> Bool
+    isPowerOfTwo x = x .&. (x-1) == 0
+allocaBytesAligned !size !align action =
+    allocaBytesAlignedAndUnchecked size align action
+{-# INLINABLE allocaBytesAligned #-}
+
+allocaBytesAlignedAndUnchecked :: Int -> Int -> (Ptr a -> IO b) -> IO b
+allocaBytesAlignedAndUnchecked (I# size) (I# align) action = IO $ \ s0 ->
      case newAlignedPinnedByteArray# size align s0 of { (# s1, mbarr# #) ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
      let addr = Ptr (byteArrayContents# barr#) in
@@ -169,7 +187,7 @@ allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
      (# s4, r #)
   }}}}}
 -- See Note [NOINLINE for touch#]
-{-# NOINLINE allocaBytesAligned #-}
+{-# NOINLINE allocaBytesAlignedAndUnchecked #-}
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
 -- to the size needed to store values of type @b@.  The returned pointer
