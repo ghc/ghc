@@ -1,7 +1,7 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
     -- e.g. identity/left, identity/right, association;  see #10528
@@ -20,7 +20,7 @@
 
 module Control.Category where
 
-import qualified GHC.Base (id, (.))
+import qualified GHC.Base (id,(.))
 import Data.Type.Coercion
 import Data.Type.Equality
 import Data.Coerce (coerce)
