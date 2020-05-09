@@ -403,6 +403,10 @@ defFullHelpText =
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, editor, stop]\n" ++
   "   :showi language             show language flags for interactive evaluation\n" ++
+  "\n" ++
+  " The User's Guide has more information. An online copy can be found here:\n" ++
+  "\n" ++
+  "   https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/ghci.html\n" ++
   "\n"
 
 findEditor :: IO String
