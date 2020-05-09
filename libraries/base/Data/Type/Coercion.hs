@@ -1,16 +1,14 @@
-{-# LANGUAGE DeriveGeneric            #-}
-{-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE MagicHash                #-}
-{-# LANGUAGE NoImplicitPrelude        #-}
-{-# LANGUAGE PolyKinds                #-}
-{-# LANGUAGE RankNTypes               #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE StandaloneDeriving       #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE TypeApplications         #-}
-{-# LANGUAGE TypeFamilies             #-}
-{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE PolyKinds           #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE MagicHash           #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -49,10 +47,9 @@ import GHC.Base
 -- To use this equality in practice, pattern-match on the @Coercion a b@ to get out
 -- the @Coercible a b@ instance, and then use 'coerce' to apply it.
 --
--- @since 4.7.0.0. Kind `k` explicitly quantified since 4.15.0.0.
-type Coercion :: forall k. k -> k -> Type
+-- @since 4.7.0.0
 data Coercion a b where
-  Coercion :: Coercible @k a b => Coercion @k a b
+  Coercion :: Coercible a b => Coercion a b
 
 -- with credit to Conal Elliott for 'ty', Erik Hesselink & Martijn van
 -- Steenbergen for 'type-equality', Edward Kmett for 'eq', and Gabor Greif
@@ -81,13 +78,13 @@ repr :: (a Eq.:~: b) -> Coercion a b
 repr Eq.Refl = Coercion
 
 -- | @since 4.7.0.0
-deriving instance Eq (Coercion a b)
+deriving instance Eq   (Coercion a b)
 
 -- | @since 4.7.0.0
 deriving instance Show (Coercion a b)
 
 -- | @since 4.7.0.0
-deriving instance Ord (Coercion a b)
+deriving instance Ord  (Coercion a b)
 
 -- | @since 4.7.0.0
 deriving instance Coercible a b => Read (Coercion a b)
@@ -105,13 +102,9 @@ deriving instance Coercible a b => Bounded (Coercion a b)
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
---
--- Kind `k` explicitly quantified since 4.15.0.0.
-type  TestCoercion :: forall k. (k -> Type) -> Constraint
-class TestCoercion (f :: k -> Type) where
+class TestCoercion f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
-  testCoercion :: forall (a :: k) (b :: k).
-    f a -> f b -> Maybe (Coercion @k a b)
+  testCoercion :: f a -> f b -> Maybe (Coercion a b)
 
 -- | @since 4.7.0.0
 instance TestCoercion ((Eq.:~:) a) where
