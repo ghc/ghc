@@ -2096,7 +2096,6 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
 
-        ; traceRn "rnConDecl" (ppr names $$ ppr implicit_bndrs $$ ppr explicit_forall)
         ; rnImplicitBndrs implicit_bndrs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
