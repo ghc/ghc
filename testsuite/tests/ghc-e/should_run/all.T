@@ -9,6 +9,8 @@ test('ghc-e006', req_interp, makefile_test, ['ghc-e006'])
 test('T2228',
      [req_interp, when(ghc_dynamic(), expect_broken(7298))],
      makefile_test, ['T2228'])
+test('T2330', req_interp, makefile_test, ['T2330'])
+test('T2330b', req_interp, makefile_test, ['T2330b'])
 test('T2636', req_interp, makefile_test, ['T2636'])
 test('T3890', req_interp, makefile_test, ['T3890'])
 test('T7299', req_interp, makefile_test, ['T7299'])
