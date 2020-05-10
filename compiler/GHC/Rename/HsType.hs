@@ -335,14 +335,14 @@ forAllOrNothing :: Outputable var
                 -> RnM [var]
                 -- ^ Free vars of the type
                 -> RnM [var]
-forAllOrNothing has_outer_forall calc_fvs = do
-  traceRn "forAllOrNothing - has_outer_forall" $ ppr has_outer_forall
-  case has_outer_forall of
-    True -> pure []
-    False -> do
-      fvs <- calc_fvs
-      traceRn "forAllOrNothing - implicit binders" $ ppr fvs
-      pure fvs
+forAllOrNothing has_outer_forall calc_fvs = case has_outer_forall of
+  True -> do
+    traceRn "forAllOrNothing" $ text "has explicit outer forall"
+    pure []
+  False -> do
+    fvs <- calc_fvs
+    traceRn "forAllOrNothing" $ text "no explicit forall. implicit binders:" <+> ppr fvs
+    pure fvs
 
 rnImplicitBndrs :: FreeKiTyVarsWithDups
                 -- ^ Surface-syntax free vars that we will implicitly bind.
