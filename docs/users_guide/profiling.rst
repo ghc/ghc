@@ -738,11 +738,11 @@ following RTS options select which break-down to use:
 
 .. rts-flag:: -ho
 
-    *Requires* :ghc-flag:`-prof`, implies :rts-flag:`-hO`. Break down the
-    graph by sharing structure of "root" objects specified by the program
-    using :base-ref:`GHC.Profiling.setHeapProfilingRoots`. A band
-    represents the total size of all closures exclusively reachable from
-    the set of roots mentioned in it's label.
+    *Requires* :ghc-flag:`-prof`. Break down the graph by sharing structure
+    of "root" objects specified by the program using
+    :base-ref:`GHC.Profiling.setHeapProfilingRoots`. A band represents the
+    total size of all closures exclusively reachable from the set of roots
+    mentioned in it's label.
 
     This profiling mode is described in more detail in :ref:`root-prof` below.
 
@@ -980,11 +980,9 @@ set of closures the program is interested in. Closures are considered
 during profiling only when they are reachable from at least one of the
 specified roots.
 
-.. NOTE:: The number of roots is currently limited to 20 to keep the
-   implementation simple. If you have a compelling use-case that requires
-   more roots do feel free to open an issue on the GHC bug tracker about
-   this.
-
+.. NOTE:: The number of roots is limited to the number of bits in a Word on
+          the current platform, minus one. So 31 on 32-bit- and 63 on
+          64-bit platforms.
 
 Restricting heap profiles by roots
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1034,9 +1032,9 @@ total size of all closures in each group.
 
 It does this by traversing the heap starting from the roots, while
 decorating each closure with a set of roots it has been reached from so
-far. Every time a closure is newly reached from a root we add the closure's
-size to a global counter for the bin corresponding to the new set of roots
-and subtract the size from the old bin if applicable.
+far. At the end of the traversal the heap profiler linearly scans over
+every live closure on Haskell heap and accounts the size of each closure
+into a counter corresponding to the set of roots it was reached from.
 
 Take the following simple example ::
 
