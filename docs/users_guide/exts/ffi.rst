@@ -332,7 +332,7 @@ so that the `throwTo` Haskell exception can be raised there.
 
 If the foreign code simply retries the system call directly without returning
 back to Haskell, then the intended effect of `interruptible` disappears
-and functions like `timeout` will not work.
+and functions like :base-ref:`System.Timeout.timeout` will not work.
 
 Finally, after the ``interruptible`` foreign call returns into Haskell, the
 Haskell code should allow exceptions to be raised
