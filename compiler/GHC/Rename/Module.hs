@@ -685,12 +685,11 @@ rnFamInstEqn doc atfi rhs_kvars
 
          -- Implicitly bound variables, empty if we have an explicit 'forall'.
          -- See Note [forall-or-nothing rule] in GHC.Rename.HsType.
-       ; all_imp_var_names <- forAllOrNothing (isJust mb_bndrs) $ do
-           let bnd_vars = map hsLTyVarLocName bndrs
-           -- Make sure to filter out the kind variables that were explicitly
-           -- bound in the type patterns.
-           mapM (newTyVarNameRn mb_cls) $ nubL $ filterFreeVarsToBind
-             bnd_vars pat_kity_vars_with_dups rhs_kvars
+       ; all_imp_vars <- forAllOrNothing (isJust mb_bndrs) $ pure $
+         -- no need to filter out explicit binders because there must be none if
+         -- we're going to implicitly bind anything.
+         nubL $ pat_kity_vars_with_dups ++ rhs_kvars
+       ; all_imp_var_names <- mapM (newTyVarNameRn mb_cls) all_imp_vars
 
              -- All the free vars of the family patterns
              -- with a sensible binding location

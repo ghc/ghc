@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
-        forAllOrNothing, nubL, filterFreeVarsToBind
+        forAllOrNothing, nubL
   ) where
 
 import GHC.Prelude
@@ -325,16 +325,15 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 
 -- | See note Note [forall-or-nothing rule]. This tiny little function is used
 -- (rather than its small body inlined) to indicate we implementing that rule.
-forAllOrNothing :: Outputable var
-                => Bool
+forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
                 --  we do not want to bring 'b' into scope, hence True
                 -- But   f :: a -> b
                 --  we want to bring both 'a' and 'b' into scope, hence False
-                -> RnM [var]
+                -> RnM FreeKiTyVarsWithDups
                 -- ^ Free vars of the type
-                -> RnM [var]
+                -> RnM FreeKiTyVarsWithDups
 forAllOrNothing has_outer_forall calc_fvs = case has_outer_forall of
   True -> do
     traceRn "forAllOrNothing" $ text "has explicit outer forall"
@@ -1787,7 +1786,7 @@ nubL = nubBy eqLocated
 filterFreeVarsToBind :: FreeKiTyVars
                      -- ^ Explicitly bound here
                      -> FreeKiTyVarsWithDups
-                     -- ^ Potential implicit binders from binder
+                     -- ^ Potential implicit binders
                      -> FreeKiTyVarsWithDups
                      -- ^ Potential implicit binders from body
                      -> FreeKiTyVarsWithDups
