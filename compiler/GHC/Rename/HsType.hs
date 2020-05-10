@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
-        forAllOrNothing, nubL, elemRdr
+        forAllOrNothing, nubL, filterFreeVarsToBind
   ) where
 
 import GHC.Prelude
@@ -64,7 +64,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List          ( nubBy, partition, (\\) )
+import Data.List          ( nubBy, partition )
 import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
@@ -325,15 +325,16 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 
 -- | See note Note [forall-or-nothing rule]. This tiny little function is used
 -- (rather than its small body inlined) to indicate we implementing that rule.
-forAllOrNothing :: Bool
+forAllOrNothing :: Outputable var
+                => Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
                 --  we do not want to bring 'b' into scope, hence True
                 -- But   f :: a -> b
                 --  we want to bring both 'a' and 'b' into scope, hence False
-                -> RnM FreeKiTyVarsWithDups
+                -> RnM [var]
                 -- ^ Free vars of the type
-                -> RnM FreeKiTyVarsWithDups
+                -> RnM [var]
 forAllOrNothing has_outer_forall calc_fvs = do
   traceRn "forAllOrNothing - has_outer_forall" $ ppr has_outer_forall
   case has_outer_forall of
@@ -825,21 +826,19 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, kv_occs, implicit_kvs :: [Located RdrName]
+             bndrs, implicit_kvs :: [Located RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             kv_occs      = nubL (bndr_kv_occs ++ body_kv_occs)
-                                 -- Make sure to list the binder kvs before the
-                                 -- body kvs, as mandated by
-                                 -- Note [Ordering of implicit variables]
-             implicit_kvs = filter_occs bndrs kv_occs
+             implicit_kvs = nubL $ filterFreeVarsToBind bndrs bndr_kv_occs body_kv_occs
              del          = deleteBys eqLocated
-             all_bound_on_lhs = null ((body_kv_occs `del` bndrs) `del` bndr_kv_occs)
+             body_remaining = (body_kv_occs `del` bndrs) `del` bndr_kv_occs
+             all_bound_on_lhs = null body_remaining
 
        ; traceRn "checkMixedVars3" $
-           vcat [ text "kv_occs" <+> ppr kv_occs
-                , text "bndrs"   <+> ppr hs_tv_bndrs
+           vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
                 , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
-                , text "wubble" <+> ppr ((kv_occs \\ bndrs) \\ bndr_kv_occs)
+                , text "body_kv_occs"   <+> ppr body_kv_occs
+                , text "implicit_kvs"   <+> ppr implicit_kvs
+                , text "body_remaining" <+> ppr body_remaining
                 ]
 
        ; implicit_kv_nms <- mapM (newTyVarNameRn mb_assoc) implicit_kvs
@@ -850,17 +849,6 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
                               , hsq_explicit  = rn_bndrs })
                       all_bound_on_lhs } }
-
-  where
-    filter_occs :: [Located RdrName]   -- Bound here
-                -> [Located RdrName]   -- Potential implicit binders
-                -> [Located RdrName]   -- Final implicit binders
-    -- Filter out any potential implicit binders that are either
-    -- already in scope, or are explicitly bound in the same HsQTyVars
-    filter_occs bndrs occs
-      = filterOut is_in_scope occs
-      where
-        is_in_scope locc = locc `elemRdr` bndrs
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -890,7 +878,7 @@ Then:
 * Order is not important in these lists.  All we are doing is
   bring Names into scope.
 
-Finally, you may wonder why filter_occs removes in-scope variables
+Finally, you may wonder why filterFreeVarsToBind removes in-scope variables
 from bndr/body_kv_occs.  How can anything be in scope?  Answer:
 HsQTyVars is /also/ used (slightly oddly) for Haskell-98 syntax
 ConDecls
@@ -1760,7 +1748,7 @@ extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs]
 --     'e' is a free kind variable
 extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
   | null tv_bndrs = body_vars ++ acc_vars
-  | otherwise = filterOut (`elemRdr` tv_bndr_rdrs) (bndr_vars ++ body_vars) ++ acc_vars
+  | otherwise = filterFreeVarsToBind tv_bndr_rdrs bndr_vars body_vars ++ acc_vars
     -- NB: delete all tv_bndr_rdrs from bndr_vars as well as body_vars.
     -- See Note [Kind variable scoping]
   where
@@ -1794,5 +1782,19 @@ extract_tv tv acc =
 nubL :: Eq a => [Located a] -> [Located a]
 nubL = nubBy eqLocated
 
-elemRdr :: Located RdrName -> [Located RdrName] -> Bool
-elemRdr x = any (eqLocated x)
+-- | Filter out any potential implicit binders that are either
+-- already in scope, or are explicitly bound in the binder.
+filterFreeVarsToBind :: FreeKiTyVars
+                     -- ^ Explicitly bound here
+                     -> FreeKiTyVarsWithDups
+                     -- ^ Potential implicit binders from binder
+                     -> FreeKiTyVarsWithDups
+                     -- ^ Potential implicit binders from body
+                     -> FreeKiTyVarsWithDups
+                     -- ^ Final implicit binders
+filterFreeVarsToBind bndrs occs_bndr occs_body
+  = filterOut is_in_scope $ occs_bndr ++ occs_body
+    -- Make sure to list the binder kvs before the body kvs, as mandated by
+    -- Note [Ordering of implicit variables]
+  where
+    is_in_scope locc = any (eqLocated locc) bndrs

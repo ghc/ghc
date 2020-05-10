@@ -59,7 +59,7 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, filterOut, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -685,15 +685,12 @@ rnFamInstEqn doc atfi rhs_kvars
 
          -- Implicitly bound variables, empty if we have an explicit 'forall'.
          -- See Note [forall-or-nothing rule] in GHC.Rename.HsType.
-       ; all_imp_vars <- forAllOrNothing (isJust mb_bndrs) $ do
-           let
-             imp_vars_lhs = nubL pat_kity_vars_with_dups
-             bnd_vars = map hsLTyVarLocName bndrs
-             -- Make sure to filter out the kind variables that were explicitly
-             -- bound in the type patterns.
-             imp_vars_rhs = filterOut (`elemRdr` (bnd_vars ++ imp_vars_lhs)) rhs_kvars
-           pure $ imp_vars_lhs ++ imp_vars_rhs
-       ; all_imp_var_names <- mapM (newTyVarNameRn mb_cls) all_imp_vars
+       ; all_imp_var_names <- forAllOrNothing (isJust mb_bndrs) $ do
+           let bnd_vars = map hsLTyVarLocName bndrs
+           -- Make sure to filter out the kind variables that were explicitly
+           -- bound in the type patterns.
+           mapM (newTyVarNameRn mb_cls) $ nubL $ filterFreeVarsToBind
+             bnd_vars pat_kity_vars_with_dups rhs_kvars
 
              -- All the free vars of the family patterns
              -- with a sensible binding location
