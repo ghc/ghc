@@ -36,7 +36,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mAX_PTR_TAG )
+import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -77,9 +77,9 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   info <- getCgIdInfo a
   let amode = idInfoToAmode info
   tag_reg <- assignTemp $ cmmConstrTag1 dflags amode
-  result_reg <- newTemp (bWord dflags)
+  result_reg <- newTemp (bWord platform)
   let tag = CmmReg $ CmmLocal tag_reg
-      is_tagged = cmmNeWord platform tag (zeroExpr dflags)
+      is_tagged = cmmNeWord platform tag (zeroExpr platform)
       is_too_big_tag = cmmEqWord platform tag (cmmTagMask dflags)
   -- Here we will first check the tag bits of the pointer we were given;
   -- if this doesn't work then enter the closure and use the info table
