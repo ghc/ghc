@@ -274,11 +274,11 @@ data IdInfo
 -- | Encodes arities, OneShotInfo, CafInfo and LevityInfo.
 -- From least-significant to most-significant bits:
 --
--- - 1 bit for OneShotInfo
--- - 1 bit for CafInfo
--- - 1 bit for LevityInfo
--- - 30 bits for call arity info
--- - 30 bits for arity info
+-- - Bit   0   (1):  OneShotInfo
+-- - Bit   1   (1):  CafInfo
+-- - Bit   2   (1):  LevityInfo
+-- - Bits  3-32(30): Call Arity info
+-- - Bits 33-62(30): Arity info
 --
 newtype BitField = BitField Word64
 
