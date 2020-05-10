@@ -74,7 +74,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    that declaration splices are not allowed anywhere except at top level
    (outside any other declarations).
 
-   The ``Q`` monad is a monad defined in ``Language.Haskell.TH.Syntax`` which
+   The ``Q`` monad is a monad defined in :th-ref:`Language.Haskell.TH.Syntax.` which
    supports several useful operations during code generation such as reporting
    errors or looking up identifiers in the environment.
 
@@ -92,9 +92,10 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    -  ``[p| ... |]``, where the "..." is a pattern; the quotation has
       type ``Quote m => m Pat``.
 
-   The ``Quote`` type class is the minimal interface necessary to implement
-   the desugaring of quotations. The ``Q`` monad is an instance of ``Quote`` but
-   contains many more operations which are not needed for defining quotations.
+   The ``Quote`` type class (:th-ref:`Language.Haskell.TH.Syntax.Quote`) is
+   the minimal interface necessary to implement the desugaring of quotations.
+   The ``Q`` monad is an instance of ``Quote`` but contains many more
+   operations which are not needed for defining quotations.
 
    See :ref:`pts-where` for using partial type signatures in quotations.
 
