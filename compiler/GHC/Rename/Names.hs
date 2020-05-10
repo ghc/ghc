@@ -1498,7 +1498,7 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | null unused
   = return ()
 
-  -- Only one import is unused, with `SrcSpan` covering only the unsed item instead of
+  -- Only one import is unused, with `SrcSpan` covering only the unused item instead of
   -- the whole import statement
   | Just (_, L _ imports) <- ideclHiding decl
   , length unused == 1
