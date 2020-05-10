@@ -554,8 +554,9 @@ delAssoc :: (Uniquable a)
 delAssoc a m
         | Just aSet     <- lookupUFM  m a
         , m1            <- delFromUFM m a
-        = nonDetFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
-          -- It's OK to use nonDetFoldUFM here because deletion is commutative
+        = nonDetStrictFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
+          -- It's OK to use a non-deterministic fold here because deletion is
+          -- commutative
 
         | otherwise     = m
 

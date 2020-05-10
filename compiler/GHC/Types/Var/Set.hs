@@ -23,7 +23,7 @@ module GHC.Types.Var.Set (
         sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
         pluralVarSet, pprVarSet,
-        nonDetFoldVarSet,
+        nonDetStrictFoldVarSet,
 
         -- * Deterministic Var set types
         DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
@@ -36,7 +36,9 @@ module GHC.Types.Var.Set (
         intersectDVarSet, dVarSetIntersectVarSet,
         intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
-        minusDVarSet, foldDVarSet, filterDVarSet, mapDVarSet,
+        minusDVarSet,
+        nonDetStrictFoldDVarSet,
+        filterDVarSet, mapDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
@@ -152,8 +154,11 @@ allVarSet = uniqSetAll
 mapVarSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 mapVarSet = mapUniqSet
 
-nonDetFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
-nonDetFoldVarSet = nonDetFoldUniqSet
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
+nonDetStrictFoldVarSet = nonDetStrictFoldUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet
@@ -290,8 +295,11 @@ minusDVarSet = minusUniqDSet
 dVarSetMinusVarSet :: DVarSet -> VarSet -> DVarSet
 dVarSetMinusVarSet = uniqDSetMinusUniqSet
 
-foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
-foldDVarSet = foldUniqDSet
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
+nonDetStrictFoldDVarSet = nonDetStrictFoldUniqDSet
 
 anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool
 anyDVarSet p = anyUDFM p . getUniqDSet

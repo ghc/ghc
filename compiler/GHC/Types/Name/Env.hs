@@ -140,7 +140,7 @@ delFromNameEnv x y      = delFromUFM x y
 delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
 anyNameEnv f x          = foldUFM ((||) . f) False x
-disjointNameEnv x y     = isNullUFM (intersectUFM x y)
+disjointNameEnv x y     = disjointUFM x y
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 

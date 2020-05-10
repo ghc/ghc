@@ -12,7 +12,7 @@ module GHC.Types.Name.Set (
         emptyNameSet, unitNameSet, mkNameSet, unionNameSet, unionNameSets,
         minusNameSet, elemNameSet, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, filterNameSet,
-        intersectsNameSet, intersectNameSet,
+        intersectsNameSet, disjointNameSet, intersectNameSet,
         nameSetAny, nameSetAll, nameSetElemsStable,
 
         -- * Free variables
@@ -65,6 +65,7 @@ delListFromNameSet :: NameSet -> [Name] -> NameSet
 filterNameSet      :: (Name -> Bool) -> NameSet -> NameSet
 intersectNameSet   :: NameSet -> NameSet -> NameSet
 intersectsNameSet  :: NameSet -> NameSet -> Bool
+disjointNameSet    :: NameSet -> NameSet -> Bool
 -- ^ True if there is a non-empty intersection.
 -- @s1 `intersectsNameSet` s2@ doesn't compute @s2@ if @s1@ is empty
 
@@ -81,10 +82,11 @@ elemNameSet       = elementOfUniqSet
 delFromNameSet    = delOneFromUniqSet
 filterNameSet     = filterUniqSet
 intersectNameSet  = intersectUniqSets
+disjointNameSet   = disjointUniqSets
 
 delListFromNameSet set ns = foldl' delFromNameSet set ns
 
-intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
+intersectsNameSet s1 s2 = not (s1 `disjointNameSet` s2)
 
 nameSetAny :: (Name -> Bool) -> NameSet -> Bool
 nameSetAny = uniqSetAny

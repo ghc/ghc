@@ -1012,9 +1012,10 @@ Note [Representation of function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Functions (e.g. Int -> Char) can be thought of as being applications
-of funTyCon (known in Haskell surface syntax as (->)),
+of funTyCon (known in Haskell surface syntax as (->)), (note that
+`RuntimeRep' quantifiers are left inferred)
 
-    (->) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    (->) :: forall {r1 :: RuntimeRep} {r2 :: RuntimeRep}
                    (a :: TYPE r1) (b :: TYPE r2).
             a -> b -> Type
 
@@ -2115,7 +2116,7 @@ isValidJoinPointType arity ty
   where
     valid_under tvs arity ty
       | arity == 0
-      = isEmptyVarSet (tvs `intersectVarSet` tyCoVarsOfType ty)
+      = tvs `disjointVarSet` tyCoVarsOfType ty
       | Just (t, ty') <- splitForAllTy_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | Just (_, res_ty) <- splitFunTy_maybe ty

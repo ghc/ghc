@@ -15,7 +15,7 @@ module GHC.Types.Var.Env (
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv,
-        minusVarEnv, intersectsVarEnv,
+        minusVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
@@ -33,7 +33,7 @@ module GHC.Types.Var.Env (
         extendDVarEnv, extendDVarEnv_C,
         extendDVarEnvList,
         lookupDVarEnv, elemDVarEnv,
-        isEmptyDVarEnv, foldDVarEnv,
+        isEmptyDVarEnv, foldDVarEnv, nonDetStrictFoldDVarEnv,
         mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
@@ -472,7 +472,6 @@ restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
-intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 plusMaybeVarEnv_C :: (a -> a -> Maybe a) -> VarEnv a -> VarEnv a -> VarEnv a
@@ -502,7 +501,6 @@ plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
-intersectsVarEnv e1 e2 = not (isEmptyVarEnv (e1 `intersectUFM` e2))
 plusVarEnv       = plusUFM
 plusVarEnvList   = plusUFMList
 lookupVarEnv     = lookupUFM
@@ -574,6 +572,12 @@ lookupDVarEnv = lookupUDFM
 
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
+nonDetStrictFoldDVarEnv = nonDetStrictFoldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
 mapDVarEnv = mapUDFM

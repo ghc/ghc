@@ -83,7 +83,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set   ( nonDetFoldUniqSet )
+import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
@@ -1469,8 +1469,8 @@ isFunction (_, AnnLam b e) | isId b    = True
 isFunction _                           = False
 
 countFreeIds :: DVarSet -> Int
-countFreeIds = nonDetFoldUDFM add 0 . getUniqDSet
-  -- It's OK to use nonDetFoldUDFM here because we're just counting things.
+countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
+  -- It's OK to use nonDetStrictFoldUDFM here because we're just counting things.
   where
     add :: Var -> Int -> Int
     add v n | isId v    = n+1
@@ -1581,12 +1581,14 @@ placeJoinCeiling le@(LE { le_ctxt_lvl = lvl })
 
 maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
 maxFvLevel max_me env var_set
-  = foldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+  = nonDetStrictFoldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+    -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
 maxFvLevel' :: (Var -> Bool) -> LevelEnv -> TyCoVarSet -> Level
 -- Same but for TyCoVarSet
 maxFvLevel' max_me env var_set
-  = nonDetFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
+  = nonDetStrictFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
+    -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
 maxIn :: (Var -> Bool) -> LevelEnv -> InVar -> Level -> Level
 maxIn max_me (LE { le_lvl_env = lvl_env, le_env = id_env }) in_var lvl

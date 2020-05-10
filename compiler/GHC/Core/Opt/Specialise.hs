@@ -1141,7 +1141,7 @@ specCase env scrut' case_bndr [(con, args, rhs)]
     is_flt_sc_arg var =  isId var
                       && not (isDeadBinder var)
                       && isDictTy var_ty
-                      && not (tyCoVarsOfType var_ty `intersectsVarSet` arg_set)
+                      && tyCoVarsOfType var_ty `disjointVarSet` arg_set
        where
          var_ty = idType var
 
@@ -2431,8 +2431,8 @@ unionCallInfoSet (CIS f calls1) (CIS _ calls2) =
 
 callDetailsFVs :: CallDetails -> VarSet
 callDetailsFVs calls =
-  nonDetFoldUDFM (unionVarSet . callInfoFVs) emptyVarSet calls
-  -- It's OK to use nonDetFoldUDFM here because we forget the ordering
+  nonDetStrictFoldUDFM (unionVarSet . callInfoFVs) emptyVarSet calls
+  -- It's OK to use nonDetStrictFoldUDFM here because we forget the ordering
   -- immediately by converting to a nondeterministic set.
 
 callInfoFVs :: CallInfoSet -> VarSet
@@ -2745,7 +2745,7 @@ filterCalls (CIS fn call_bag) dbs
        = extendVarSetList so_far (bindersOf bind)
        | otherwise = so_far
 
-    ok_call (CI { ci_fvs = fvs }) = not (fvs `intersectsVarSet` dump_set)
+    ok_call (CI { ci_fvs = fvs }) = fvs `disjointVarSet` dump_set
 
 ----------------------
 splitDictBinds :: Bag DictBind -> IdSet -> (Bag DictBind, Bag DictBind, IdSet)
@@ -2776,7 +2776,7 @@ deleteCallsMentioning :: VarSet -> CallDetails -> CallDetails
 deleteCallsMentioning bs calls
   = mapDVarEnv (ciSetFilter keep_call) calls
   where
-    keep_call (CI { ci_fvs = fvs }) = not (fvs `intersectsVarSet` bs)
+    keep_call (CI { ci_fvs = fvs }) = fvs `disjointVarSet` bs
 
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bs
