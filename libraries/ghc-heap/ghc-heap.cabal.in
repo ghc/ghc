@@ -39,3 +39,4 @@ library
                     GHC.Exts.Heap.InfoTable.Types
                     GHC.Exts.Heap.InfoTableProf
                     GHC.Exts.Heap.Utils
+                    GHC.Exts.Heap.FFIClosures
