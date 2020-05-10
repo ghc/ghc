@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVarsDup,
-        forAllOrNothing, nubL, filterFreeVarsToBind
+        forAllOrNothing, nubL
   ) where
 
 import GHC.Prelude
