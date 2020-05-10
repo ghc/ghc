@@ -327,7 +327,7 @@ Windows systems
     to return with the error ``ERROR_OPERATION_ABORTED``.
 
 Once the system call is successfully interrupted, the surrounding
-code must return control out of the `foreign import`, back into Haskell code,
+code must return control out of the ``foreign import``, back into Haskell code,
 so that the ``throwTo`` Haskell exception can be raised there.
 
 If the foreign code simply retries the system call directly without returning
