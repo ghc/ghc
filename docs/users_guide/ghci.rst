@@ -7,23 +7,25 @@ Using GHCi
    single: GHCi
    single: interpreter
    single: interactive
-   single: Hugs
    single: Foreign Function Interface; GHCi support
    single: FFI; GHCi support
 
-GHCi [1]_ is GHC's interactive environment, in which Haskell expressions
-can be interactively evaluated and programs can be interpreted. If
-you're familiar with `Hugs <http://www.haskell.org/hugs/>`__, then
-you'll be right at home with GHCi. However, GHCi also has support for
-interactively loading compiled code, as well as supporting all [2]_ the
-language extensions that GHC provides. GHCi also includes an interactive
+GHCi [1]_ is GHC's interactive environment that includes an interactive
 debugger (see :ref:`ghci-debugger`).
+
+GHCi can
+
+- interactively evaluate Haskell expressions
+- interpret Haskell programs
+- load GHC-compiled modules.
+
+At the moment GHCi supports most of GHC's language extensions.
+
 
 .. [1]
    The "i" stands for “Interactive”
 
-.. [2]
-   except ``foreign export``, at the moment
+
 
 
 .. _ghci-introduction:
