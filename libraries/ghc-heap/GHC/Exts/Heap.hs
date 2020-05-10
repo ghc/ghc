@@ -290,7 +290,7 @@ getClosureX get_closure_raw x = do
             unless (length pts == 6) $
                 fail $ "Expected 6 ptr arguments to TSO, found "
                         ++ show (length pts)
-            pure $ TSOClosure 
+            pure $ TSOClosure
                 { info = itbl
                 , _link = (pts !! 0)
                 , global_link = (pts !! 1)
@@ -298,7 +298,7 @@ getClosureX get_closure_raw x = do
                 , trec = (pts !! 3)
                 , blocked_exceptions = (pts !! 4)
                 , bq = (pts !! 5)
-                } 
+                }
         STACK -> do
             unless (length pts >= 1) $
                 fail $ "Expected at least 1 ptr argument to STACK, found "

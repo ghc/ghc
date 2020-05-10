@@ -262,7 +262,7 @@ data GenClosure b
 
   -- TODO: There are many more fields in a TSO closure which
   -- are not yet implemented
-  
+
   -- | StgTSO
   | TSOClosure
       { info :: !StgInfoTable
