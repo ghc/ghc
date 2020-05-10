@@ -262,9 +262,16 @@ data GenClosure b
 
   -- TODO: There are many more fields in a TSO closure which
   -- are not yet implemented
+
+  -- | StgTSO
   | TSOClosure
       { info :: !StgInfoTable
-      , tsoStack :: !b
+      , _link :: !b
+      , global_link :: !b
+      , tsoStack :: !b -- ^ stackobj from StgTSO
+      , trec :: !b
+      , blocked_exceptions :: !b
+      , bq :: !b
       }
 
   | StackClosure
