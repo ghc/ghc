@@ -58,6 +58,7 @@ import GHC.Exts.Heap.InfoTableProf
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
+import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
 import Data.Bits
@@ -66,11 +67,21 @@ import GHC.Exts
 import GHC.Int
 import GHC.Word
 
+import Foreign
+
 #include "ghcconfig.h"
 
 class HasHeapRep (a :: TYPE rep) where
-    getClosureDataX :: (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
-                      -> a -> IO (GenClosure b)
+
+    -- | Decode a closure to it's heap representation ('GenClosure').
+    -- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
+    -- containing a thunk or an evaluated heap object. Outside it can be a
+    -- 'Word' for "raw" usage of pointers.
+    getClosureDataX ::
+        (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
+        -- ^ Helper function to get info table, memory and pointers of the closure
+        -> a -- ^ Closure to decode
+        -> IO (GenClosure b) -- Heap representation of the closure
 
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
     getClosureDataX = getClosureX
@@ -112,7 +123,11 @@ amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
     where g (I# i#) = case indexArray# arr# i# of
                           (# e #) -> f e
 
-
+-- | Takes any value (closure) as parameter and returns a tuple of:
+-- * A 'Ptr' to the info table
+-- * The memory of the closure as @[Word]@
+-- * Pointers of the closure's @struct@ (in C code) in a @[Box]@.
+-- The pointers are collected in @Heap.c@.
 getClosureRaw :: a -> IO (Ptr StgInfoTable, [Word], [Box])
 getClosureRaw x = do
     case unpackClosure# x of
@@ -287,30 +302,57 @@ getClosureX get_closure_raw x = do
                 , link = pts !! 4
                 }
         TSO -> do
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 ptr argument to TSO, found "
+            unless (length pts == 6) $
+                fail $ "Expected 6 ptr arguments to TSO, found "
                         ++ show (length pts)
-            pure $ TSOClosure itbl (pts !! 0)
-        STACK -> do
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 ptr argument to STACK, found "
-                        ++ show (length pts)
-            let splitWord = rawWds !! 0
-            pure $ StackClosure itbl
-#if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
-#else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-#endif
-                (pts !! 0)
-                []
 
+            allocaArray (length wds) (\ptr -> do
+                pokeArray ptr wds
+
+                fields <- FFIClosures.peekTSOFields ptr
+
+                pure $ TSOClosure
+                    { info = itbl
+                    , _link = (pts !! 0)
+                    , global_link = (pts !! 1)
+                    , tsoStack = (pts !! 2)
+                    , trec = (pts !! 3)
+                    , blocked_exceptions = (pts !! 4)
+                    , bq = (pts !! 5)
+                    , what_next = FFIClosures.tso_what_next fields
+                    , why_blocked = FFIClosures.tso_why_blocked fields
+                    , flags = FFIClosures.tso_flags fields
+                    , threadId = FFIClosures.tso_threadId fields
+                    , saved_errno = FFIClosures.tso_saved_errno fields
+                    , tso_dirty = FFIClosures.tso_dirty fields
+                    , alloc_limit = FFIClosures.tso_alloc_limit fields
+                    , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                    }
+                )
+        STACK -> do
+            unless (length pts == 1) $
+                fail $ "Expected 1 ptr argument to STACK, found "
+                        ++ show (length pts)
+
+            allocaArray (length wds) (\ptr -> do
+                pokeArray ptr wds
+
+                fields <- FFIClosures.peekStackFields ptr
+
+                pure $ StackClosure
+                    { info = itbl
+                    , size = FFIClosures.stack_size fields
+                    , stack_dirty = FFIClosures.stack_dirty fields
+                    , stackPointer = (pts !! 0)
+                    , stack  = FFIClosures.stack fields
+#if __GLASGOW_HASKELL__ >= 811
+                    , stack_marking = FFIClosures.stack_marking fields
+#endif
+                    }
+                )
         _ ->
             pure $ UnsupportedClosure itbl
 
 -- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
-
