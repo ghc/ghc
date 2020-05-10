@@ -79,12 +79,15 @@ Language
 * GHC now consistently does eager instantiation during type inference.
   As a consequence, visible type application (VTA) now only works when
   the head of the application is:
+
   * A variable
   * An expression with a type signature
-  For example `(let x = blah in id) @Bool True` no longer typechecks.
-  You should write `let x = blah in id @Bool True` instead.
 
-  This change prepares the way for Quick Look impredicativity.
+  For example ``(let x = blah in id) @Bool True`` no longer typechecks.
+  You should write ``let x = blah in id @Bool True`` instead.
+
+  This change prepares the way for `Quick Look impredicativity
+  <https://gitlab.haskell.org/ghc/ghc/issues/18126>`_.
 
 * GHC now allows users to manually define the specificity of type variable
   binders. By marking a variable with braces ``{tyvar}`` or ``{tyvar :: kind}``,
@@ -110,31 +113,33 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
- - Implement the Overloaded Quotations proposal (#246). The type of all quotation
-   forms have now been generalised in terms of a minimal interface necessary for the
-   implementation rather than the overapproximation of the ``Q`` monad.
+- Implement the `Overloaded Quotations proposal (#246) <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0246-overloaded-bracket.rst>`_.
+  The type of all quotation forms have now been generalised in terms of a
+  minimal interface necessary (the ``Quote`` type class) for the
+  implementation rather than the overapproximation of the ``Q`` monad.
 
- - Template Haskell quotes now handle fixity declarations in ``let`` and
-   ``where`` bindings properly. Previously, such fixity declarations would
-   be dropped when quoted due to a Template Haskell bug.
+- Template Haskell quotes now handle fixity declarations in ``let`` and
+  ``where`` bindings properly. Previously, such fixity declarations would
+  be dropped when quoted due to a Template Haskell bug.
 
- - The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
-   splices do not lead directly to compile-time evaluation. (!2288)
+- The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
+  splices do not lead directly to compile-time evaluation. (Merge request
+  `!2288 <https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2288>`_)
 
 Arrow notation
 ~~~~~~~~~~~~~~
 
- - When combined with :extension:`Arrows`, the :extension:`LambdaCase` extension
-   now additionally allows ``\case`` syntax to be used as a command in ``proc``
-   notation.
+- When combined with :extension:`Arrows`, the :extension:`LambdaCase` extension
+  now additionally allows ``\case`` syntax to be used as a command in ``proc``
+  notation.
 
- - When combined with :extension:`Arrows`, the effects of the
-   :extension:`BlockArguments` extension now also apply to applications of
-   arrow control operators in ``(|`` banana brackets ``|)``: ::
+- When combined with :extension:`Arrows`, the effects of the
+  :extension:`BlockArguments` extension now also apply to applications of
+  arrow control operators in ``(|`` banana brackets ``|)``: ::
 
-     (| untilA (increment -< x + y) do
-          within 0.5 -< x
-          ... |)
+    (| untilA (increment -< x + y) do
+         within 0.5 -< x
+         ... |)
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -142,28 +147,28 @@ Arrow notation
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
- - The type of the ``getAnnotations`` function has changed to better reflect
-   the fact that it returns two different kinds of annotations, those on
-   names and those on modules: ::
+- The type of the ``getAnnotations`` function has changed to better reflect
+  the fact that it returns two different kinds of annotations, those on
+  names and those on modules: ::
 
-      getAnnotations :: Typeable a
-                     => ([Word8] -> a) -> ModGuts
-                     -> CoreM (ModuleEnv [a], NameEnv [a])
+     getAnnotations :: Typeable a
+                    => ([Word8] -> a) -> ModGuts
+                    -> CoreM (ModuleEnv [a], NameEnv [a])
 
- - The meaning of the ``hs_fixds`` field of ``HsGroup`` has changed slightly.
-   It now only contains fixity signatures defined for top-level declarations
-   and class methods defined *outside* of the class itself. Previously,
-   ``hs_fixds`` would also contain fixity signatures for class methods defined
-   *inside* the class, such as the fixity signature for ``m`` in the following
-   example: ::
+- The meaning of the ``hs_fixds`` field of ``HsGroup`` has changed slightly.
+  It now only contains fixity signatures defined for top-level declarations
+  and class methods defined *outside* of the class itself. Previously,
+  ``hs_fixds`` would also contain fixity signatures for class methods defined
+  *inside* the class, such as the fixity signature for ``m`` in the following
+  example: ::
 
-     class C a where
-       infixl 4 `m`
-       m :: a -> a -> a
+    class C a where
+      infixl 4 `m`
+      m :: a -> a -> a
 
-   If you wish to attain the previous behavior of ``hs_fixds``, use the new
-   ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
-   signatures, including those for class methods defined inside classes.
+  If you wish to attain the previous behavior of ``hs_fixds``, use the new
+  ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
+  signatures, including those for class methods defined inside classes.
 
 - The ``Exception`` module was boiled down acknowledging the existence of
   the ``exceptions`` dependency. In particular, the ``ExceptionMonad``
@@ -196,7 +201,7 @@ for further change information.
     libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
     libraries/directory/directory.cabal:     Dependency of ``ghc`` library
-    libraries/exceptions/exceptions.cabal:   Dependency of ``haskeline`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
     libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
     compiler/ghc.cabal:                      The compiler itself
     libraries/ghci/ghci.cabal:               The REPL interface
