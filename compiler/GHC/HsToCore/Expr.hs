@@ -756,9 +756,9 @@ dsExpr (HsTcZonkedBracketOut _ (w, ex, pss) x ps ev_zs zs) = do
 dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
   e' <- dsLExpr e
   res <- runMetaCore e'
-  dsSplicedD res
+  dsSplicedD (Just $ ppr e) res
 dsExpr (HsSpliceE _ (HsSplicedD tu))
-  = dsSplicedD tu
+  = dsSplicedD Nothing tu
 dsExpr (HsSpliceE {}) =
   pprTrace "ds_expr" (text "About to panic") $
   pprPanic "dsExpr:splice" (empty)
@@ -811,12 +811,12 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
     then panic "dsExpr:HsPragTick"
     else dsLExpr expr
 
-dsSplicedD :: TExpU -> DsM CoreExpr
-dsSplicedD (TExpU zs env evs e) = do
+dsSplicedD :: Maybe SDoc -> TExpU -> DsM CoreExpr
+dsSplicedD before (TExpU zs env evs e) = do
       let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
           zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
           evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] b)) evs
-      loadCoreExpr zs' (es ++ evs') e
+      loadCoreExpr before zs' (es ++ evs') e
 
 dsSplicedT :: TTExp -> DsM Type
 dsSplicedT (TTExp zs t) =
@@ -850,8 +850,8 @@ instance Outputable TExpU where
   ppr (TExpU t t' t'' _) = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
-loadCoreExpr :: [(Unique, TTExp)] -> [(Unique, TExpU)] -> THRep -> DsM CoreExpr
-loadCoreExpr zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
+loadCoreExpr :: Maybe SDoc -> [(Unique, TTExp)] -> [(Unique, TExpU)] -> THRep -> DsM CoreExpr
+loadCoreExpr before zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
   env <- getGblEnv
   hs_env <- env_top <$> getEnv
   nc <- liftIO $ readIORef (hsc_NC hs_env)
@@ -866,10 +866,29 @@ loadCoreExpr zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst
                        , if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
                        , if_dsm_env  = Just dsm_envs }
   --pprTrace "loadCoreExpr" (ppr i) (return ())
-  setEnvs (if_gbl, if_lcl') $
+  res <-
+    setEnvs (if_gbl, if_lcl') $
     --pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
       tcIfaceExpr i
+  forM_ before $ \bdoc -> traceSplice bdoc (ppr res)
+  return res
 
+
+traceSplice :: SDoc -> SDoc -> DsM ()
+traceSplice before after = do
+       { loc <- getSrcSpanDs
+       ; dflags <- getDynFlags
+       ; when (dopt Opt_D_dump_splices dflags) (pprTraceM "Splice Dump" (spliceDebugDoc loc))
+       }
+
+  where
+    -- `-ddump-splices`
+    spliceDebugDoc :: SrcSpan -> SDoc
+    spliceDebugDoc loc
+      = let code = nest 2 before : ending
+            ending = [ text "======>", nest 2 after ]
+        in  hang (ppr loc <> colon <+> text "Splicing expr")
+               2 (sep code)
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr

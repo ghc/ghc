@@ -1316,7 +1316,7 @@ tcIfaceExpr (IfaceSplice n)
                       if_envs <- getEnvs
                       let ds_gbl' = ds_gbl { ds_if_env = if_envs }
                       setEnvs (ds_gbl', ds_lcl) $
-                        dsSplicedD mm
+                        dsSplicedD Nothing mm
 
                      Nothing -> error "Must be desugaring to run a splice"
         Nothing -> error "out of scope"
