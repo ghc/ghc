@@ -12,7 +12,7 @@ module GHC.Types.Cpr (
     TerminationFlag (Terminates),
     Cpr, topCpr, conCpr, whnfTermCpr, divergeCpr, lubCpr, asConCpr,
     CprType (..), topCprType, whnfTermCprType, conCprType, lubCprType, lubCprTypes,
-    pruneDeepCpr, markConCprType, splitConCprTy, applyCprTy, abstractCprTy,
+    pruneDeepCpr, markOptimisticConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
     cprTransformDataConSig, UnboxingStrategy, cprTransformSig, argCprTypesFromStrictSig,
@@ -28,6 +28,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Driver.Session
 import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -83,8 +84,17 @@ pruneKnownShape _       0     _            = Top
 pruneKnownShape prune_r depth (Con t args) = Levitate (Con t   (map (prune_r (depth - 1)) args))
 
 ---------------
--- * Termination
+-- * Optimism
 
+data Optimism
+  = Conservative
+  | Optimistic
+  deriving Eq
+
+lubOptimism :: Optimism -> Optimism -> Optimism
+lubOptimism Optimistic   _            = Optimistic
+lubOptimism _            Optimistic   = Optimistic
+lubOptimism Conservative Conservative = Conservative
 
 ----------------
 -- * Termination
@@ -172,7 +182,7 @@ seqTerm (Term _ l) = seqLevitated (seqKnownShape seqTerm) l
 -- * Cpr
 
 data Cpr
-  = Cpr !TerminationFlag !(Levitated (KnownShape Cpr))
+  = Cpr !Optimism !TerminationFlag !(Levitated (KnownShape Cpr))
   | NoMoreCpr_ !Termination
   deriving Eq
 
@@ -186,13 +196,13 @@ pattern NoMoreCpr t <- (NoMoreCpr_ t)
 {-# COMPLETE Cpr, NoMoreCpr #-}
 
 botCpr :: Cpr
-botCpr = Cpr Terminates Bot
+botCpr = Cpr Conservative Terminates Bot
 
 topCpr :: Cpr
-topCpr = Cpr MightDiverge Top
+topCpr = Cpr Conservative MightDiverge Top
 
 whnfTermCpr :: Cpr
-whnfTermCpr = Cpr Terminates Top
+whnfTermCpr = Cpr Conservative Terminates Top
 
 -- | Used as
 --
@@ -204,41 +214,45 @@ whnfTermCpr = Cpr Terminates Top
 -- assume that returned tuple components terminate rapidly and construct a
 -- product.
 divergeCpr :: Cpr
-divergeCpr = Cpr MightDiverge Bot
+divergeCpr = Cpr Conservative MightDiverge Bot
 
 conCpr :: ConTag -> [Cpr] -> Cpr
-conCpr t fs = Cpr Terminates (Levitate (Con t fs))
+conCpr t fs = Cpr Conservative Terminates (Levitate (Con t fs))
+
+optimisticConCpr :: ConTag -> [Cpr] -> Cpr
+optimisticConCpr t fs = Cpr Optimistic Terminates (Levitate (Con t fs))
 
 -- | Forget encoded CPR info, but keep termination info.
 forgetCpr :: Cpr -> Termination
 forgetCpr (NoMoreCpr t) = t
-forgetCpr (Cpr tf l_sh) = Term tf (normTermShape (liftLevitated go l_sh))
+forgetCpr (Cpr _ tf l_sh) = Term tf (normTermShape (liftLevitated go l_sh))
   where
     go (Con t fields) = Levitate (Con t (map forgetCpr fields))
 
 lubCpr :: Cpr -> Cpr -> Cpr
-lubCpr (Cpr tf1 l_sh1) (Cpr tf2 l_sh2)
-  = Cpr (lubTermFlag tf1 tf2)
+lubCpr (Cpr op1 tf1 l_sh1) (Cpr op2 tf2 l_sh2)
+  = Cpr (lubOptimism op1 op2)
+        (lubTermFlag tf1 tf2)
         (lubLevitated (lubKnownShape lubCpr) l_sh1 l_sh2)
 lubCpr cpr1            cpr2
   = NoMoreCpr (lubTerm (forgetCpr cpr1) (forgetCpr cpr2))
 
 trimCpr :: Cpr -> Cpr
-trimCpr cpr@(Cpr _ Bot) = cpr -- don't trim away bottom (we didn't do so before Nested CPR) TODO: Explain; CPR'ing for the error case
-trimCpr cpr             = NoMoreCpr (forgetCpr cpr)
+trimCpr cpr@(Cpr _ _ Bot) = cpr -- don't trim away bottom (we didn't do so before Nested CPR) TODO: Explain; CPR'ing for the error case
+trimCpr cpr               = NoMoreCpr (forgetCpr cpr)
 
 pruneDeepCpr :: Int -> Cpr -> Cpr
-pruneDeepCpr depth (Cpr tf (Levitate sh)) = Cpr tf (pruneKnownShape pruneDeepCpr depth sh)
-pruneDeepCpr depth (NoMoreCpr t)          = NoMoreCpr (pruneDeepTerm depth t)
-pruneDeepCpr _     cpr                    = cpr
+pruneDeepCpr depth (Cpr op tf (Levitate sh)) = Cpr op tf (pruneKnownShape pruneDeepCpr depth sh)
+pruneDeepCpr depth (NoMoreCpr t)             = NoMoreCpr (pruneDeepTerm depth t)
+pruneDeepCpr _     cpr                       = cpr
 
 asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
-asConCpr (Cpr tf (Levitate (Con t fields)))
+asConCpr (Cpr _ tf (Levitate (Con t fields)))
   | Terminates <- tf = Just (t, fields)
 asConCpr _           = Nothing
 
 seqCpr :: Cpr -> ()
-seqCpr (Cpr _ l)     = seqLevitated (seqKnownShape seqCpr) l
+seqCpr (Cpr _ _ l)   = seqLevitated (seqKnownShape seqCpr) l
 seqCpr (NoMoreCpr t) = seqTerm t
 
 ------------
@@ -303,9 +317,9 @@ conCprType con_tag args = CprType 0 (conCpr con_tag cprs)
   where
     cprs = extractArgCprAndTermination args
 
-markConCprType :: DataCon -> CprType -> CprType
-markConCprType dc _ty@(CprType n cpr)
-  = ASSERT2( n == 0, ppr _ty ) CprType 0 (conCpr con_tag fields)
+markOptimisticConCprType :: DataCon -> CprType -> CprType
+markOptimisticConCprType dc _ty@(CprType n cpr)
+  = ASSERT2( n == 0, ppr _ty ) CprType 0 (optimisticConCpr con_tag fields)
   where
     con_tag   = dataConTag dc
     wkr_arity = dataConRepArity dc
@@ -313,13 +327,13 @@ markConCprType dc _ty@(CprType n cpr)
       NoMoreCpr (Term _ (Levitate (Con t terms)))
         | con_tag == t       -> map NoMoreCpr terms
       NoMoreCpr (Term _ Bot) -> replicate wkr_arity (NoMoreCpr botTerm)
-      Cpr _ (Levitate (Con t cprs))
+      Cpr _ _ (Levitate (Con t cprs))
         | con_tag == t       -> cprs
-      Cpr _ Bot              -> replicate wkr_arity botCpr
+      Cpr _ _ Bot            -> replicate wkr_arity botCpr
       _                      -> replicate wkr_arity topCpr
 
 splitConCprTy :: DataCon -> CprType -> Maybe [Cpr]
-splitConCprTy dc (CprType 0 (Cpr _ l))
+splitConCprTy dc (CprType 0 (Cpr _ _ l))
   | Bot <- l
   = Just (replicate (dataConRepArity dc) botCpr)
   | Levitate (Con t fields) <- l
@@ -349,6 +363,22 @@ ensureCprTyArity n ty@(CprType m _)
 
 trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty cpr) = CprType arty (trimCpr cpr)
+
+zonkOptimisticCprTy :: Int -> CprType -> CprType
+zonkOptimisticCprTy max_depth (CprType arty cpr)
+  = CprType arty (zonk max_depth cpr)
+  where
+    -- | The Int is the amount of "fuel" left; when it reaches 0, we no longer
+    -- turn OptimisticCpr into Cpr, but into NoMoreCpr.
+    zonk :: Int -> Cpr -> Cpr
+    zonk n (Cpr op tf sh)
+      | n > 0 || op == Conservative
+      = Cpr Conservative tf (liftLevitated (Levitate . zonk_sh (n-1)) sh)
+    zonk _ cpr
+      = NoMoreCpr (forgetCpr cpr)
+
+    zonk_sh :: Int -> KnownShape Cpr -> KnownShape Cpr
+    zonk_sh n (Con t fields) = Con t (map (zonk n) fields)
 
 -- | Abusing the Monoid instance of 'Semigroup.Any' to track a
 -- 'TerminationFlag'.
@@ -380,9 +410,9 @@ forceCprTyM arg_str ty = go (toStrDmd arg_str) ty
       abstractCprTy <$> go (swap (peelStrCall str)) (applyCprTy ty)
 
 forceCprM :: ArgStr -> Cpr -> TerminationM Cpr
-forceCprM Lazy      t             = return t
-forceCprM arg_str   (NoMoreCpr t) = NoMoreCpr <$> forceTermM arg_str t
-forceCprM (Str str) (Cpr tf l_sh) = do
+forceCprM Lazy      t                = return t
+forceCprM arg_str   (NoMoreCpr t)    = NoMoreCpr <$> forceTermM arg_str t
+forceCprM (Str str) (Cpr op tf l_sh) = do
   -- 1. discharge head strictness by noting the term flag
   noteTermFlag tf
   -- 2. discharge *nested* strictness on available nested info
@@ -409,7 +439,7 @@ forceCprM (Str str) (Cpr tf l_sh) = do
 #endif
       fields' <- zipWithM forceCprM args fields
       return (Levitate (Con fIRST_TAG fields'))
-  return (Cpr Terminates l_sh')
+  return (Cpr op Terminates l_sh')
 
 forceTermM :: ArgStr -> Termination -> TerminationM Termination
 forceTermM Lazy      t              = return t
@@ -455,7 +485,7 @@ bothCprType ct MightDiverge = ct { ct_cpr = shallowDivCpr (ct_cpr ct) }
 
 shallowDivCpr :: Cpr -> Cpr
 shallowDivCpr (NoMoreCpr (Term _ l_sh)) = NoMoreCpr (Term MightDiverge l_sh)
-shallowDivCpr (Cpr _ l_sh)              = Cpr MightDiverge l_sh
+shallowDivCpr (Cpr op _ l_sh)           = Cpr op MightDiverge l_sh
 
 seqCprType :: CprType -> ()
 seqCprType (CprType _ cpr) = seqCpr cpr
@@ -465,14 +495,18 @@ seqCprType (CprType _ cpr) = seqCpr cpr
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
 -- to unleash. See Note [Understanding DmdType and StrictSig] in "GHC.Types.Demand"
+-- INVARIANT: The wrapped CprType never has 'OptimisticCpr' somewhere.
 newtype CprSig = CprSig { getCprSig :: CprType }
   deriving (Eq, Binary)
 
 -- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
 -- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
 -- "GHC.Types.Demand"
-mkCprSigForArity :: Arity -> CprType -> CprSig
-mkCprSigForArity arty ty = CprSig (ensureCprTyArity arty ty)
+mkCprSigForArity :: DynFlags -> Arity -> CprType -> CprSig
+mkCprSigForArity dflags arty
+  = CprSig
+  . ensureCprTyArity arty
+  . zonkOptimisticCprTy (caseBinderCprDepth dflags)
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
@@ -575,15 +609,19 @@ instance Outputable Termination where
     Bot            -> text "(#..)"
     Levitate shape -> ppr shape
 
+instance Outputable Optimism where
+  ppr Optimistic   = char '?'
+  ppr Conservative = empty
+
 instance Outputable Cpr where
   ppr (NoMoreCpr t)          = ppr t
   -- I like it better without the special case
   -- ppr (Cpr MightDiverge Top) = empty
   -- ppr (Cpr Terminates   Bot) = char 'b'
-  ppr (Cpr tf l)             = ppr tf <> case l of
+  ppr (Cpr op tf l)          = ppr tf <> case l of
     Top            -> empty
     Bot            -> char 'b'
-    Levitate shape -> char 'c' <> ppr shape
+    Levitate shape -> char 'c' <> ppr op <> ppr shape
 
 instance Outputable CprType where
   ppr (CprType arty cpr) = ppr arty <+> ppr cpr
@@ -620,17 +658,28 @@ instance Binary TerminationFlag where
       then pure Terminates
       else pure MightDiverge
 
+-- | In practice, we should never need to serialise an 'Optimistic' because of
+-- the invariant attached to 'CprSig'.
+instance Binary Optimism where
+  put_ bh Conservative = put_ bh True
+  put_ bh Optimistic   = put_ bh False
+  get  bh = do
+    b <- get bh
+    if b
+      then pure Conservative
+      else pure Optimistic
+
 instance Binary Termination where
   put_ bh (Term tf l) = put_ bh tf >> put_ bh l
   get  bh = Term <$> get bh <*> get bh
 
 instance Binary Cpr where
-  put_ bh (Cpr tf l)    = put_ bh True  >> put_ bh tf >> put_ bh l
+  put_ bh (Cpr op tf l) = put_ bh True >> put_ bh op >> put_ bh tf >> put_ bh l
   put_ bh (NoMoreCpr t) = put_ bh False >> put_ bh t
   get  bh = do
     b <- get bh
     if b
-      then Cpr <$> get bh <*> get bh
+      then Cpr <$> get bh <*> get bh <*> get bh
       else NoMoreCpr <$> get bh
 
 instance Binary CprType where
