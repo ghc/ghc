@@ -266,12 +266,16 @@ data GenClosure b
   -- | StgTSO
   | TSOClosure
       { info :: !StgInfoTable
+      -- pointers
       , _link :: !b
       , global_link :: !b
       , tsoStack :: !b -- ^ stackobj from StgTSO
       , trec :: !b
       , blocked_exceptions :: !b
       , bq :: !b
+      -- values
+      , threadId :: Word64
+      , alloc_limit :: Int64
       }
 
   | StackClosure
