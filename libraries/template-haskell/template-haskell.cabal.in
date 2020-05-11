@@ -59,6 +59,7 @@ Library
         base        >= 4.11 && < 4.15,
         ghc-boot-th == @ProjectVersionMunged@,
         ghc-prim,
+        bytestring,
         pretty      == 1.1.*
 
     ghc-options: -Wall
