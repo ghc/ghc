@@ -60,12 +60,15 @@ module Foreign.Marshal.Alloc (
   finalizerFree
 ) where
 
+import Data.Bits                ( Bits, (.&.) )
 import Data.Maybe
 import Foreign.C.Types          ( CSize(..) )
 import Foreign.Storable         ( Storable(sizeOf,alignment) )
 import Foreign.ForeignPtr       ( FinalizerPtr )
 import GHC.IO.Exception
+import GHC.Num
 import GHC.Real
+import GHC.Show
 import GHC.Ptr
 import GHC.Base
 
@@ -150,7 +153,25 @@ allocaBytes (I# size) action = IO $ \ s0 ->
 -- See Note [NOINLINE for touch#]
 {-# NOINLINE allocaBytes #-}
 
+-- |@'allocaBytesAligned' size align f@ executes the computation @f@,
+-- passing as argument a pointer to a temporarily allocated block of memory
+-- of @size@ bytes and aligned to @align@ bytes. The value of @align@ must
+-- be a power of two.
+--
+-- The memory is freed when @f@ terminates (either normally or via an
+-- exception), so the pointer passed to @f@ must /not/ be used after this.
+--
 allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
+allocaBytesAligned _size align _action
+    | not $ isPowerOfTwo align =
+      ioError $
+        IOError Nothing InvalidArgument
+          "allocaBytesAligned"
+          ("alignment (="++show align++") must be a power of two!")
+          Nothing Nothing
+  where
+    isPowerOfTwo :: (Bits i, Integral i) => i -> Bool
+    isPowerOfTwo x = x .&. (x-1) == 0
 allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
      case newAlignedPinnedByteArray# size align s0 of { (# s1, mbarr# #) ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->

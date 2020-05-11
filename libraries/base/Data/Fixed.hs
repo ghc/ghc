@@ -1,9 +1,7 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -43,7 +41,6 @@ module Data.Fixed
 import Data.Data
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.Read
-import Data.Kind (Type, Constraint)
 import Text.ParserCombinators.ReadPrec
 import Text.Read.Lex
 
@@ -64,8 +61,7 @@ mod' n d = n - (fromInteger f) * d where
     f = div' n d
 
 -- | The type parameter should be an instance of 'HasResolution'.
-type    Fixed :: forall k. k -> Type
-newtype Fixed a = MkFixed Integer
+newtype Fixed (a :: k) = MkFixed Integer
         deriving ( Eq  -- ^ @since 2.01
                  , Ord -- ^ @since 2.01
                  )
@@ -84,8 +80,7 @@ instance (Typeable k,Typeable a) => Data (Fixed (a :: k)) where
     dataTypeOf _ = tyFixed
     toConstr _ = conMkFixed
 
-type  HasResolution :: forall k. k -> Constraint
-class HasResolution a where
+class HasResolution (a :: k) where
     resolution :: p a -> Integer
 
 -- | For example, @Fixed 1000@ will give you a 'Fixed' with a resolution of 1000.
