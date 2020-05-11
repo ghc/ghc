@@ -501,15 +501,23 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
                 break;
             }
 
-            case COMPACT_NFDATA:
+            case TREC_CHUNK:
             {
-                barf("searchHeapBlocks: COMPACT_NFDATA");
+                StgTRecChunk *tc = ((StgTRecChunk *) p);
+                TRecEntry *e = &(tc -> entries[0]);
+                checkAddress(addrs, tc->prev_chunk, s_indices);
+                for (W_ i = 0; i < tc -> next_entry_idx; i ++, e++) {
+                    checkAddress(addrs, e->tvar, s_indices);
+                    checkAddress(addrs, e->expected_value, s_indices);
+                    checkAddress(addrs, e->new_value, s_indices);
+                }
+                size = sizeofW(StgTRecChunk);
                 break;
             }
 
-            case TREC_CHUNK:
+            case COMPACT_NFDATA:
             {
-                barf("searchHeapBlocks: TREC_CHUNK");
+                barf("searchHeapBlocks: COMPACT_NFDATA");
                 break;
             }
 
