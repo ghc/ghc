@@ -13,6 +13,7 @@ import GHC.Driver.Session    ( DynFlags )
 import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Name.Set
 import GHC.Utils.Outputable hiding ( (<>) )
 import qualified GHC.Utils.Outputable as O
 import GHC.Types.SrcLoc
@@ -119,19 +120,23 @@ getEvidenceTreesAtPoint hf refmap point =
      ]
 
 getEvidenceTree :: RefMap a -> Name -> Maybe (Tree.Tree (EvidenceInfo a))
-getEvidenceTree refmap var = do
-  xs <- M.lookup (Right var) refmap
-  (sp,dets) <- find (any isEvidenceBind . identInfo . snd) xs
-  typ <- identType dets
-  let
-    (evdets,concat -> children) = unzip $ do
-      det <- S.toList $ identInfo dets
-      case det of
-        EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
-          pure ((src,scp,spn),mapMaybe (getEvidenceTree refmap) xs)
-        EvidenceVarBind src scp spn -> pure ((src,scp,spn),[])
-        _ -> []
-  pure $ Tree.Node (EvidenceInfo var sp typ evdets) children
+getEvidenceTree refmap var = go emptyNameSet var
+  where
+    go seen var
+      | var `elemNameSet` seen = Nothing
+      | otherwise = do
+          xs <- M.lookup (Right var) refmap
+          (sp,dets) <- find (any isEvidenceBind . identInfo . snd) xs
+          typ <- identType dets
+          let
+            (evdets,concat -> children) = unzip $ do
+              det <- S.toList $ identInfo dets
+              case det of
+                EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
+                  pure ((src,scp,spn),mapMaybe (go $ extendNameSet seen var) xs)
+                EvidenceVarBind src scp spn -> pure ((src,scp,spn),[])
+                _ -> []
+          pure $ Tree.Node (EvidenceInfo var sp typ evdets) children
 
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go

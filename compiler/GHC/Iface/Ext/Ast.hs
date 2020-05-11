@@ -18,6 +18,8 @@ Main functions for .hie file generation
 
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
 
+import GHC.Utils.Outputable(ppr)
+
 import GHC.Prelude
 
 import GHC.Types.Avail            ( Avails )
@@ -49,6 +51,7 @@ import GHC.Types.Unique
 import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
 import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -222,12 +225,23 @@ addUnlocatedEvBind var ci = do
                           var (var,S.singleton ci)
       }
 
-getUnlocatedEvBinds :: HieM (NodeIdentifiers Type)
-getUnlocatedEvBinds = do
+getUnlocatedEvBinds :: FastString -> HieM (NodeIdentifiers Type,[HieAST Type])
+getUnlocatedEvBinds file = do
   binds <- gets unlocated_ev_binds
-  let go (n,ci) = (Right (varName n), IdentifierDetails (Just $ varType n) ci)
-  let elts = M.fromList $ map go $ dVarEnvElts binds
-  pure elts
+  let elts = dVarEnvElts binds
+
+      mkNodeInfo (n,ci) = (Right (varName n), IdentifierDetails (Just $ varType n) ci)
+
+      go e@(v,_) (xs,ys) = case nameSrcSpan $ varName v of
+        RealSrcSpan spn _
+          | srcSpanFile spn == file ->
+            let node = Node (NodeInfo mempty [] $ M.fromList [mkNodeInfo e]) spn []
+              in (xs,node:ys)
+        _ -> (mkNodeInfo e : xs,ys)
+
+      (nis,asts) = foldr go ([],[]) elts
+
+  pure $ (M.fromList nis, asts)
 
 initState :: HieState
 initState = HieState emptyNameEnv emptyDVarEnv
@@ -295,8 +309,8 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs =
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
-    let spanFile children = case children of
-          [] -> mkRealSrcSpan (mkRealSrcLoc "" 1 1) (mkRealSrcLoc "" 1 1)
+    let spanFile file children = case children of
+          [] -> realSrcLocSpan (mkRealSrcLoc file 1 1)
           _ -> mkRealSrcSpan (realSrcSpanStart $ nodeSpan $ head children)
                              (realSrcSpanEnd   $ nodeSpan $ last children)
 
@@ -307,21 +321,29 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs =
           , exps
           ]
 
-        modulify xs' = do
-          let xs = mergeSortAsts xs'
-          let span = spanFile xs
+        modulify file xs' = do
+
           top_ev_asts <-
             toHie $ EvBindContext ModuleScope Nothing
-                  $ L (RealSrcSpan span Nothing) $ EvBinds ev_bs
-          uloc_evs <- getUnlocatedEvBinds
-          let moduleInfo = (simpleNodeInfo "Module" "Module")
-                              {nodeIdentifiers = uloc_evs}
-          let moduleNode = Node moduleInfo span []
-          case mergeSortAsts $ moduleNode : top_ev_asts ++ xs of
-            [x] -> return x
-            _ -> panic "enrichHie: mergeSortAsts returned more than one result"
+                  $ L (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Nothing)
+                  $ EvBinds ev_bs
 
-    asts' <- mapM modulify
+          (uloc_evs,more_ev_asts) <- getUnlocatedEvBinds file
+
+          let xs = mergeSortAsts $ xs' ++ top_ev_asts ++ more_ev_asts
+              span = spanFile file xs
+
+              moduleInfo = (simpleNodeInfo "Module" "Module")
+                              {nodeIdentifiers = uloc_evs}
+
+              moduleNode = Node moduleInfo span []
+
+          case mergeSortAsts $ moduleNode : xs of
+            [x] -> return x
+            xs -> panicDoc "enrichHie: mergeSortAsts returned more than one result" (ppr $ map nodeSpan xs)
+
+    asts' <- sequence
+          $ M.mapWithKey modulify
           $ M.fromListWith (++)
           $ map (\x -> (srcSpanFile (nodeSpan x),[x])) flat_asts
 
