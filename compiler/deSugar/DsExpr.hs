@@ -331,26 +331,47 @@ Then we get
 That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
 
-Operator sections.  At first it looks as if we can convert
-\begin{verbatim}
-        (expr op)
-\end{verbatim}
-to
-\begin{verbatim}
-        \x -> op expr x
-\end{verbatim}
+
+Note [Desugaring operator sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At first it looks as if we can convert
+
+    (expr `op`)
+
+naively to
+
+    \x -> op expr x
 
 But no!  expr might be a redex, and we can lose laziness badly this
 way.  Consider
-\begin{verbatim}
-        map (expr op) xs
-\end{verbatim}
-for example.  So we convert instead to
-\begin{verbatim}
-        let y = expr in \x -> op y x
-\end{verbatim}
-If \tr{expr} is actually just a variable, say, then the simplifier
-will sort it out.
+
+    map (expr `op`) xs
+
+for example. If expr were a redex then eta-expanding naively would
+result in multiple evaluations where the user might only have expected one.
+
+So we convert instead to
+
+    let y = expr in \x -> op y x
+
+Also, note that we must do this for both right and (perhaps surprisingly) left
+sections. Why are left sections necessary? Consider the program (found in #18151),
+
+    seq (True `undefined`) ()
+
+according to the Haskell Report this should reduce to () (as it specifies
+desugaring via eta expansion). However, if we fail to eta expand we will rather
+bottom. Consequently, we must eta expand even in the case of a left section.
+
+If `expr` is actually just a variable, say, then the simplifier
+will inline `y`, eliminating the redundant `let`.
+
+Note that this works even in the case that `expr` is unlifted. In this case
+bindNonRec will automatically do the right thing, giving us:
+
+    case expr of y -> (\x -> op y x)
+
+See #18151.
 -}
 
 ds_expr _ e@(OpApp _ e1 op e2)
@@ -359,17 +380,35 @@ ds_expr _ e@(OpApp _ e1 op e2)
        ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
                       (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
 
-ds_expr _ (SectionL _ expr op)       -- Desugar (e !) to ((!) e)
-  = do { op' <- dsLExpr op
-       ; dsWhenNoErrs (dsLExprNoLP expr)
-                      (\expr' -> mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr') }
+-- dsExpr (SectionL op expr)  ===  (expr `op`)  ~>  \y -> op expr y
+--
+-- See Note [Desugaring operator sections].
+-- N.B. this also must handle postfix operator sections due to -XPostfixOperators.
+ds_expr _ e@(SectionL _ expr op) = do
+    core_op <- dsLExpr op
+    x_core <- dsLExpr expr
+    case splitFunTys (exprType core_op) of
+      -- Binary operator section
+      (x_ty:y_ty:_, _) -> do
+        dsWhenNoErrs
+          (mapM newSysLocalDsNoLP [x_ty, y_ty])
+          (\[x_id, y_id] ->
+            bindNonRec x_id x_core
+            $ Lam y_id (mkCoreAppsDs (text "sectionl" <+> ppr e)
+                                     core_op [Var x_id, Var y_id]))
 
--- dsLExpr (SectionR op expr)   -- \ x -> op x expr
+      -- Postfix operator section
+      (_:_, _) -> do
+        return $ mkCoreAppDs (text "sectionl" <+> ppr e) core_op x_core
+
+      _ -> pprPanic "dsExpr(SectionL)" (ppr e)
+
+-- dsExpr (SectionR op expr)  === (`op` expr)  ~>  \x -> op x expr
+--
+-- See Note [Desugaring operator sections].
 ds_expr _ e@(SectionR _ op expr) = do
     core_op <- dsLExpr op
-    -- for the type of x, we need the type of op's 2nd argument
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
-        -- See comment with SectionL
     y_core <- dsLExpr expr
     dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
                  (\[x_id, y_id] -> bindNonRec y_id y_core $
