@@ -399,9 +399,23 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 -- | The @(->)@ type constructor.
 --
 -- @
--- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
---         TYPE rep1 -> TYPE rep2 -> *
+-- (->) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--         TYPE rep1 -> TYPE rep2 -> Type
 -- @
+--
+-- The runtime representations quantification is left inferred. This
+-- means they cannot be specified with @-XTypeApplications@.
+--
+-- This is a deliberate choice to allow future extensions to the
+-- function arrow. To allow visible application a type synonym can be
+-- defined:
+--
+-- @
+-- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+--             TYPE rep1 -> TYPE rep2 -> Type
+-- type Arr = (->)
+-- @
+--
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
