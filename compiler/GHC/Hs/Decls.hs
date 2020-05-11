@@ -1538,7 +1538,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_doc = doc })
   = sep $ concat
       [ [ppr_mbDoc doc]
-      , maybeToList $ flip (pprHsForAll ForallInvis) cxt <$> ex_tvs
+      , maybe [] (\tvs -> [pprHsForAll ForallInvis tvs cxt]) ex_tvs
       , [ppr_details args]
       ]
   where
