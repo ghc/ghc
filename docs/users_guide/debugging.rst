@@ -301,7 +301,7 @@ subexpression elimination pass.
     Rules are filtered by the user provided string, a rule is kept if a prefix
     of its name matches the string.
     The pass then checks whether any of these rules could apply to
-    the program but which didn't file for some reason. For example, specifying
+    the program but which didn't fire for some reason. For example, specifying
     ``-drule-check=SPEC`` will check whether there are any applications which
     might be subject to a rule created by specialisation.
 
