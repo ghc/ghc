@@ -4,17 +4,10 @@ module GHC.Exts.Heap.FFIClosures where
 
 import Prelude
 import Foreign
-import Foreign.Ptr
-import Data.Int
-
-import GHC.Exts.Heap.Closures
 
 peekStgThreadID :: Ptr a -> IO Word64
-peekStgThreadID ptr = do
-    id <- (#peek struct StgTSO_, id) ptr
-    return id
+peekStgThreadID ptr = (#peek struct StgTSO_, id) ptr
+
 
 peekAllocLimit :: Ptr a -> IO Int64
-peekAllocLimit ptr = do
-    alloc_limit <- (#peek struct StgTSO_, alloc_limit) ptr
-    return alloc_limit
+peekAllocLimit ptr = (#peek struct StgTSO_, alloc_limit) ptr
