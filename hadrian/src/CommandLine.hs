@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    cmdProgressInfo, cmdConfigure, cmdCompleteSetting, cmdNoCapture,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -29,7 +29,8 @@ data CommandLineArgs = CommandLineArgs
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
     , docTargets     :: DocTargets
-    , completeStg    :: Maybe String }
+    , completeStg    :: Maybe String
+    , noCapture      :: Bool }
     deriving (Eq, Show)
 
 -- | Default values for 'CommandLineArgs'.
@@ -43,7 +44,8 @@ defaultCommandLineArgs = CommandLineArgs
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
     , docTargets     = Set.fromList [minBound..maxBound]
-    , completeStg    = Nothing }
+    , completeStg    = Nothing
+    , noCapture      = False }
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
@@ -102,6 +104,9 @@ readBuildRoot ms =
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
+
+readNoCapture :: Either String (CommandLineArgs -> CommandLineArgs)
+readNoCapture = Right $ \flags -> flags { noCapture = True }
 
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
@@ -239,6 +244,8 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
+    , Option [] ["no-capture"] (NoArg readNoCapture)
+      "Prevent Shake from capturing stdout or stderr in anticipation of builder failures"
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
@@ -338,6 +345,9 @@ lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs
+
+cmdNoCapture :: Action Bool
+cmdNoCapture = noCapture <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
