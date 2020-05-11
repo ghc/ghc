@@ -107,7 +107,7 @@ So currently we have
 
 cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram dflags fam_envs binds = do
-  let env            = emptyAnalEnv fam_envs
+  let env            = emptyAnalEnv dflags fam_envs
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
@@ -207,8 +207,6 @@ cprAnal' env args (Case scrut case_bndr ty alts)
     -- head strictness.
     (scrut_ty, scrut')        = cprAnal env [] scrut
     (whnf_flag, case_bndr_ty) = forceCprTy (getStrDmd seqDmd) scrut_ty
-    -- Regardless of whether scrut had the CPR property or not, the case binder
-    -- certainly has it. See 'extendEnvForDataAlt'.
     (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
     res_ty           = lubCprTypes alt_tys `bothCprType` whnf_flag
 
@@ -395,7 +393,8 @@ cprAnalBind top_lvl env args id rhs
 
     -- See Note [Arity trimming for CPR signatures]
     -- We prune so that we discard too deep info on e.g. TyCon bindings
-    sig             = pruneSig mAX_DEPTH $ mkCprSigForArity (idArity id) rhs_ty'
+    dflags          = ae_dflags env
+    sig             = pruneSig mAX_DEPTH $ mkCprSigForArity dflags (idArity id) rhs_ty'
     id'             = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
                       setIdCprInfo id sig
 
@@ -456,6 +455,8 @@ data AnalEnv
   , ae_virgin :: Bool
   -- ^ True only on every first iteration in a fixed-point
   -- iteration. See Note [Initialising strictness] in "DmdAnal"
+  , ae_dflags :: DynFlags
+  -- ^ For 'caseBinderCprDepth'.
   , ae_fam_envs :: FamInstEnvs
   -- ^ Needed when expanding type families and synonyms of product types.
   }
@@ -468,11 +469,12 @@ instance Outputable AnalEnv where
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
-emptyAnalEnv :: FamInstEnvs -> AnalEnv
-emptyAnalEnv fam_envs
+emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
+emptyAnalEnv dflags fam_envs
   = AE
   { ae_sigs = emptyVarEnv
   , ae_virgin = True
+  , ae_dflags = dflags
   , ae_fam_envs = fam_envs
   }
 
@@ -506,7 +508,7 @@ extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
     is_product     = isJust (isDataProductTyCon_maybe tycon)
     is_sum         = isJust (isDataSumTyCon_maybe tycon)
     case_bndr_ty'
-      | is_product || is_sum = markConCprType dc case_bndr_ty
+      | is_product || is_sum = markOptimisticConCprType dc case_bndr_ty
       -- Any of the constructors had existentials. This is a little too
       -- conservative (after all, we only care about the particular data con),
       -- but there is no easy way to write is_sum and this won't happen much.
