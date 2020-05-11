@@ -19,7 +19,7 @@ GHCi can
 - interpret Haskell programs
 - load GHC-compiled modules.
 
-At the moments GHCi supports all GHC's language extensions except  ``foreign export``.
+At the moment GHCi supports all GHC's language extensions except  ``foreign export``.
 
 
 .. [1]
