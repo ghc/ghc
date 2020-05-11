@@ -28,6 +28,7 @@ import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
 
 import Base
+import {-# SOURCE #-} CommandLine
 import Context
 import Oracles.Flag
 import Packages
@@ -216,7 +217,7 @@ instance H.Builder Builder where
             needBuilder builder
             path <- H.builderPath builder
             need [path]
-            Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]
+            Stdout stdout <- cmd' [] path ["--no-user-package-db", "field", input, "depends"]
             return stdout
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
@@ -233,7 +234,7 @@ instance H.Builder Builder where
                 echo = EchoStdout (verbosity >= Loud)
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
-                    Stdout stdout <- cmd' [path] buildArgs
+                    Stdout stdout <- cmd' [] path buildArgs
                     writeFileChanged output stdout
             case builder of
                 Ar Pack _ -> do
@@ -241,54 +242,54 @@ instance H.Builder Builder where
                     if useTempFile then runAr                path buildArgs
                                    else runArWithoutTempFile path buildArgs
 
-                Ar Unpack _ -> cmd' echo [Cwd output] [path] buildArgs
+                Ar Unpack _ -> cmd' [echo, Cwd output] path buildArgs
 
-                Autoreconf dir -> cmd' echo [Cwd dir] ["sh", path] buildArgs
+                Autoreconf dir -> cmd' [echo, Cwd dir] "sh" (path:buildArgs)
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath
                     let env = AddEnv "CONFIG_SHELL" bash
-                    cmd' echo env [Cwd dir] ["sh", path] buildOptions buildArgs
+                    cmd' (echo:env:Cwd dir:buildOptions) "sh" (path:buildArgs)
 
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
                     stdin <- readFile' input
-                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
+                    Stdout stdout <- cmd' [Stdin stdin] path buildArgs
                     writeFileChanged output stdout
 
                 GhcPkg Copy _ -> do
-                    Stdout pkgDesc <- cmd' [path]
+                    Stdout pkgDesc <- cmd' [] path
                       [ "--expand-pkgroot"
                       , "--no-user-package-db"
                       , "describe"
                       , input -- the package name
                       ]
-                    cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
+                    cmd' [Stdin pkgDesc] path (buildArgs ++ ["-"])
 
                 GhcPkg Unregister _ -> do
-                    Exit _ <- cmd' echo [path] (buildArgs ++ [input])
+                    Exit _ <- cmd' [echo] path (buildArgs ++ [input])
                     return ()
 
                 HsCpp    -> captureStdout
 
-                Make dir -> cmd' echo path ["-C", dir] buildArgs
+                Make dir -> cmd' [echo] path ("-C":dir:buildArgs)
 
                 Makeinfo -> do
-                  cmd' echo [path] "--no-split" [ "-o", output] [input]
+                  cmd' [echo] path ["--no-split", "-o", output, input]
 
                 Xelatex -> do
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] ["makeindex"] (input -<.> "idx")
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
+                    unit $ cmd' [Cwd output] path        buildArgs
+                    unit $ cmd' [Cwd output] path        buildArgs
+                    unit $ cmd' [Cwd output] path        buildArgs
+                    unit $ cmd' [Cwd output] "makeindex" [input -<.> "idx"]
+                    unit $ cmd' [Cwd output] path        buildArgs
+                    unit $ cmd' [Cwd output] path        buildArgs
 
-                Tar _ -> cmd' buildOptions echo [path] buildArgs
-                _  -> cmd' echo [path] buildArgs
+                Tar _ -> cmd' (echo:buildOptions) path buildArgs
+                _  -> cmd' [echo] path buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
@@ -368,9 +369,12 @@ applyPatch dir patch = do
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
-    quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
+    quietly $ cmd' [Cwd dir, FileStdin file] path ["-p0"]
 
 -- | Wrapper for 'cmd' that makes sure we include both stdout and stderr in
 --   Shake's output when any of our builder commands fail.
-cmd' :: (Partial, CmdArguments args) => args :-> Action r
-cmd' = cmd [WithStderr True, WithStdout True]
+cmd' :: (Partial, CmdResult r) => [CmdOption] -> String -> [String] -> Action r
+cmd' opts c args = do
+  doCapture <- not <$> cmdNoCapture
+  let fixedOpts = [WithStderr doCapture, WithStdout docapture]
+  cmd fixedOpts opts [c] args
