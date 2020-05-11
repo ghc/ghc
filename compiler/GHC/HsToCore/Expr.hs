@@ -338,26 +338,25 @@ Then we get
 That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
 
+
+Note [Desugaring operator sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Operator sections.  At first it looks as if we can convert
-\begin{verbatim}
-        (expr op)
-\end{verbatim}
+    (expr op)
 to
-\begin{verbatim}
-        \x -> op expr x
-\end{verbatim}
+    \x -> op expr x
 
 But no!  expr might be a redex, and we can lose laziness badly this
 way.  Consider
-\begin{verbatim}
-        map (expr op) xs
-\end{verbatim}
-for example.  So we convert instead to
-\begin{verbatim}
-        let y = expr in \x -> op y x
-\end{verbatim}
+    map (expr op) xs
+for example.
+
+So we convert instead to
+    let y = expr in \x -> op y x
 If \tr{expr} is actually just a variable, say, then the simplifier
 will sort it out.
+
+See #18151.
 -}
 
 dsExpr e@(OpApp _ e1 op e2)
@@ -366,17 +365,24 @@ dsExpr e@(OpApp _ e1 op e2)
        ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
                       (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
 
-dsExpr (SectionL _ expr op)       -- Desugar (e !) to ((!) e)
-  = do { op' <- dsLExpr op
-       ; dsWhenNoErrs (dsLExprNoLP expr)
-                      (\expr' -> mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr') }
+-- dsExpr (SectionL op expr)  ===  (expr `op`)  ~>  \y -> op expr y
+--
+-- See Note [Desugaring operator sections]
+dsExpr (SectionL _ expr op) = do
+    core_op <- dsLExpr op
+    let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
+    x_core <- dsLExpr expr
+    dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
+                 (\[x_id, y_id] -> bindNonRec x_id x_core $
+                                   Lam y_id (mkCoreAppsDs (text "sectionl" <+> ppr e)
+                                                          core_op [Var x_id, Var y_id]))
 
--- dsLExpr (SectionR op expr)   -- \ x -> op x expr
+-- dsExpr (SectionR op expr)  === (`op` expr)  ~>  \x -> op x expr
+--
+-- See Note [Desugaring operator sections]
 dsExpr e@(SectionR _ op expr) = do
     core_op <- dsLExpr op
-    -- for the type of x, we need the type of op's 2nd argument
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
-        -- See comment with SectionL
     y_core <- dsLExpr expr
     dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
                  (\[x_id, y_id] -> bindNonRec y_id y_core $
