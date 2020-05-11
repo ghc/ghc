@@ -826,7 +826,7 @@ HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
  * lookup a symbol in the hash table
  */
 #if defined(OBJFORMAT_PEi386)
-SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
     (void)dependent; // TODO
     ASSERT_LOCK_HELD(&linker_mutex);
@@ -835,7 +835,7 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 
 #else
 
-SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
     ASSERT_LOCK_HELD(&linker_mutex);
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
@@ -912,7 +912,9 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
 SymbolAddr* lookupSymbol( SymbolName* lbl )
 {
     ACQUIRE_LOCK(&linker_mutex);
-    SymbolAddr* r = lookupSymbol_(lbl, NULL);
+    // NULL for "don't add dependent". When adding a dependency we call
+    // lookupDependentSymbol directly.
+    SymbolAddr* r = lookupDependentSymbol(lbl, NULL);
     if (!r) {
         errorBelch("^^ Could not load '%s', dependency unresolved. "
                    "See top entry above.\n", lbl);

@@ -320,7 +320,7 @@ int ghciInsertSymbolTable(
 
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
  * dependent to the owner of the symbol. */
-SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent);
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
 
 extern StrHashTable *symhash;
 
