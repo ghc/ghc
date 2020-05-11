@@ -829,6 +829,7 @@ HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 {
     (void)dependent; // TODO
+    ASSERT_LOCK_HELD(&linker_mutex);
     return lookupSymbol_PEi386(lbl);
 }
 
@@ -836,6 +837,7 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 
 SymbolAddr* lookupSymbol_ (SymbolName* lbl, ObjectCode *dependent)
 {
+    ASSERT_LOCK_HELD(&linker_mutex);
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
 
     ASSERT(symhash != NULL);
