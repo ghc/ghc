@@ -2133,6 +2133,7 @@ zonkCtEvidence ctev@(CtWanted { ctev_pred = pred, ctev_dest = dest })
                        EvVarDest cs n ev -> EvVarDest cs n $ setVarType ev pred'
                          -- necessary in simplifyInfer
                        HoleDest h   -> HoleDest h
+                       QuoteDest h  -> QuoteDest h
        ; return (ctev { ctev_pred = pred', ctev_dest = dest' }) }
 zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
