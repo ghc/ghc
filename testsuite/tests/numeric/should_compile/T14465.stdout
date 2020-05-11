@@ -82,10 +82,8 @@ plusOne :: Natural -> Natural
 [GblId,
  Arity=1,
  Str=<S,U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once] :: Natural) -> plusNatural n M.minusOne1}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
 plusOne = \ (n :: Natural) -> plusNatural n M.minusOne1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

@@ -1,9 +1,9 @@
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------

@@ -2,14 +2,6 @@
 
 ## 4.15.0.0 *TBA*
 
-  * `Const` (`Data.Functor.Const`), `Compose` (`Data.Functor.Compose`),
-    `Product` (`Data.Functor.Product`), `Sum` (`Data.Functor.Sum`), `Coercion`
-    and `TestCoercion` (`Data.Type.Coercion`), `(:~:)` and `TestEquality`
-    (`Data.Type.Equality`); `UAddr`, `UChar`, `UDouble` `UFloat`, `UInt`,
-    `UWord`, `Rec0`, `D1`, `C1`, `S1`, `Datatype`, `Constructor`, `Selector`
-    (`GHC.Generics`) now use specified quantification, allowing the use of
-    visible kind application.
-
   * `openFile` now calls the `open` system call with an `interruptible` FFI
     call, ensuring that the call can be interrupted with `SIGINT` on POSIX
     systems.
@@ -19,6 +11,10 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
+  * Make `allocaBytesAligned` and `alloca` throw an IOError when the
+    alignment is not a power-of-two. The underlying primop
+    `newAlignedPinnedByteArray#` actually always assumed this but we didn't
+    document this fact in the user facing API until now.
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1

@@ -10,6 +10,7 @@ Haskell. [WDP 94/11])
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BinaryLiterals #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -104,6 +105,9 @@ import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Utils.Misc
+
+import Data.Word
+import Data.Bits
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -242,19 +246,11 @@ pprIdDetails other     = brackets (pp other)
 -- too big.
 data IdInfo
   = IdInfo {
-        arityInfo       :: !ArityInfo,
-        -- ^ 'Id' arity, as computed by 'GHC.Core.Arity'. Specifies how many
-        -- arguments this 'Id' has to be applied to before it doesn any
-        -- meaningful work.
         ruleInfo        :: RuleInfo,
         -- ^ Specialisations of the 'Id's function which exist.
         -- See Note [Specialisations and RULES in IdInfo]
         unfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
-        cafInfo         :: CafInfo,
-        -- ^ 'Id' CAF info
-        oneShotInfo     :: OneShotInfo,
-        -- ^ Info about a lambda-bound variable, if the 'Id' is one
         inlinePragInfo  :: InlinePragma,
         -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
@@ -267,13 +263,102 @@ data IdInfo
         -- freshly allocated constructor.
         demandInfo      :: Demand,
         -- ^ ID demand information
-        callArityInfo   :: !ArityInfo,
-        -- ^ How this is called. This is the number of arguments to which a
-        -- binding can be eta-expanded without losing any sharing.
-        -- n <=> all calls have at least n arguments
-        levityInfo      :: LevityInfo
-        -- ^ when applied, will this Id ever have a levity-polymorphic type?
+        bitfield        :: {-# UNPACK #-} !BitField
+        -- ^ Bitfield packs CafInfo, OneShotInfo, arity info, LevityInfo, and
+        -- call arity info in one 64-bit word. Packing these fields reduces size
+        -- of `IdInfo` from 12 words to 7 words and reduces residency by almost
+        -- 4% in some programs.
+        --
+        -- See documentation of the getters for what these packed fields mean.
     }
+
+-- | Encodes arities, OneShotInfo, CafInfo and LevityInfo.
+-- From least-significant to most-significant bits:
+--
+-- - Bit   0   (1):  OneShotInfo
+-- - Bit   1   (1):  CafInfo
+-- - Bit   2   (1):  LevityInfo
+-- - Bits  3-32(30): Call Arity info
+-- - Bits 33-62(30): Arity info
+--
+newtype BitField = BitField Word64
+
+emptyBitField :: BitField
+emptyBitField = BitField 0
+
+bitfieldGetOneShotInfo :: BitField -> OneShotInfo
+bitfieldGetOneShotInfo (BitField bits) =
+    if testBit bits 0 then OneShotLam else NoOneShotInfo
+
+bitfieldGetCafInfo :: BitField -> CafInfo
+bitfieldGetCafInfo (BitField bits) =
+    if testBit bits 1 then NoCafRefs else MayHaveCafRefs
+
+bitfieldGetLevityInfo :: BitField -> LevityInfo
+bitfieldGetLevityInfo (BitField bits) =
+    if testBit bits 2 then NeverLevityPolymorphic else NoLevityInfo
+
+bitfieldGetCallArityInfo :: BitField -> ArityInfo
+bitfieldGetCallArityInfo (BitField bits) =
+    fromIntegral (bits `shiftR` 3) .&. ((1 `shiftL` 30) - 1)
+
+bitfieldGetArityInfo :: BitField -> ArityInfo
+bitfieldGetArityInfo (BitField bits) =
+    fromIntegral (bits `shiftR` 33)
+
+bitfieldSetOneShotInfo :: OneShotInfo -> BitField -> BitField
+bitfieldSetOneShotInfo info (BitField bits) =
+    case info of
+      NoOneShotInfo -> BitField (clearBit bits 0)
+      OneShotLam -> BitField (setBit bits 0)
+
+bitfieldSetCafInfo :: CafInfo -> BitField -> BitField
+bitfieldSetCafInfo info (BitField bits) =
+    case info of
+      MayHaveCafRefs -> BitField (clearBit bits 1)
+      NoCafRefs -> BitField (setBit bits 1)
+
+bitfieldSetLevityInfo :: LevityInfo -> BitField -> BitField
+bitfieldSetLevityInfo info (BitField bits) =
+    case info of
+      NoLevityInfo -> BitField (clearBit bits 2)
+      NeverLevityPolymorphic -> BitField (setBit bits 2)
+
+bitfieldSetCallArityInfo :: ArityInfo -> BitField -> BitField
+bitfieldSetCallArityInfo info bf@(BitField bits) =
+    ASSERT(info < 2^(30 :: Int) - 1)
+    bitfieldSetArityInfo (bitfieldGetArityInfo bf) $
+    BitField ((fromIntegral info `shiftL` 3) .|. (bits .&. 0b111))
+
+bitfieldSetArityInfo :: ArityInfo -> BitField -> BitField
+bitfieldSetArityInfo info (BitField bits) =
+    ASSERT(info < 2^(30 :: Int) - 1)
+    BitField ((fromIntegral info `shiftL` 33) .|. (bits .&. ((1 `shiftL` 33) - 1)))
+
+-- Getters
+
+-- | When applied, will this Id ever have a levity-polymorphic type?
+levityInfo :: IdInfo -> LevityInfo
+levityInfo = bitfieldGetLevityInfo . bitfield
+
+-- | Info about a lambda-bound variable, if the 'Id' is one
+oneShotInfo :: IdInfo -> OneShotInfo
+oneShotInfo = bitfieldGetOneShotInfo . bitfield
+
+-- | 'Id' arity, as computed by 'GHC.Core.Arity'. Specifies how many arguments
+-- this 'Id' has to be applied to before it doesn any meaningful work.
+arityInfo :: IdInfo -> ArityInfo
+arityInfo = bitfieldGetArityInfo . bitfield
+
+-- | 'Id' CAF info
+cafInfo :: IdInfo -> CafInfo
+cafInfo = bitfieldGetCafInfo . bitfield
+
+-- | How this is called. This is the number of arguments to which a binding can
+-- be eta-expanded without losing any sharing. n <=> all calls have at least n
+-- arguments
+callArityInfo :: IdInfo -> ArityInfo
+callArityInfo = bitfieldGetCallArityInfo . bitfield
 
 -- Setters
 
@@ -294,14 +379,20 @@ setUnfoldingInfo info uf
     info { unfoldingInfo = uf }
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
-setArityInfo      info ar  = info { arityInfo = ar  }
+setArityInfo info ar =
+    info { bitfield = bitfieldSetArityInfo ar (bitfield info) }
+
 setCallArityInfo :: IdInfo -> ArityInfo -> IdInfo
-setCallArityInfo info ar  = info { callArityInfo = ar  }
+setCallArityInfo info ar =
+    info { bitfield = bitfieldSetCallArityInfo ar (bitfield info) }
+
 setCafInfo :: IdInfo -> CafInfo -> IdInfo
-setCafInfo        info caf = info { cafInfo = caf }
+setCafInfo info caf =
+    info { bitfield = bitfieldSetCafInfo caf (bitfield info) }
 
 setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo
-setOneShotInfo      info lb = {-lb `seq`-} info { oneShotInfo = lb }
+setOneShotInfo info lb =
+    info { bitfield = bitfieldSetOneShotInfo lb (bitfield info) }
 
 setDemandInfo :: IdInfo -> Demand -> IdInfo
 setDemandInfo info dd = dd `seq` info { demandInfo = dd }
@@ -316,18 +407,19 @@ setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
   = IdInfo {
-            cafInfo             = vanillaCafInfo,
-            arityInfo           = unknownArity,
             ruleInfo            = emptyRuleInfo,
             unfoldingInfo       = noUnfolding,
-            oneShotInfo         = NoOneShotInfo,
             inlinePragInfo      = defaultInlinePragma,
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
             cprInfo             = topCprSig,
-            callArityInfo       = unknownArity,
-            levityInfo          = NoLevityInfo
+            bitfield            = bitfieldSetCafInfo vanillaCafInfo $
+                                  bitfieldSetArityInfo unknownArity $
+                                  bitfieldSetCallArityInfo unknownArity $
+                                  bitfieldSetOneShotInfo NoOneShotInfo $
+                                  bitfieldSetLevityInfo NoLevityInfo $
+                                  emptyBitField
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
@@ -638,12 +730,12 @@ instance Outputable LevityInfo where
 setNeverLevPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
 setNeverLevPoly info ty
   = ASSERT2( not (resultIsLevPoly ty), ppr ty )
-    info { levityInfo = NeverLevityPolymorphic }
+    info { bitfield = bitfieldSetLevityInfo NeverLevityPolymorphic (bitfield info) }
 
 setLevityInfoWithType :: IdInfo -> Type -> IdInfo
 setLevityInfoWithType info ty
   | not (resultIsLevPoly ty)
-  = info { levityInfo = NeverLevityPolymorphic }
+  = info { bitfield = bitfieldSetLevityInfo NeverLevityPolymorphic (bitfield info) }
   | otherwise
   = info
 
