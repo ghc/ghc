@@ -58,6 +58,7 @@ import GHC.Exts.Heap.InfoTableProf
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
+import GHC.Exts.Heap.FFIClosures
 
 import Control.Monad
 import Data.Bits
@@ -65,6 +66,8 @@ import GHC.Arr
 import GHC.Exts
 import GHC.Int
 import GHC.Word
+
+import Foreign
 
 #include "ghcconfig.h"
 
@@ -290,6 +293,18 @@ getClosureX get_closure_raw x = do
             unless (length pts == 6) $
                 fail $ "Expected 6 ptr arguments to TSO, found "
                         ++ show (length pts)
+
+            threadId' <- allocaArray (length wds) (\ptr -> do
+                pokeArray ptr wds
+                id <- peekStgThreadID ptr
+                return id
+                )
+            alloc_limit' <- allocaArray (length wds) (\ptr -> do
+                pokeArray ptr wds
+                alloc_limit <- peekAllocLimit ptr
+                return alloc_limit
+                )
+
             pure $ TSOClosure
                 { info = itbl
                 , _link = (pts !! 0)
@@ -298,6 +313,8 @@ getClosureX get_closure_raw x = do
                 , trec = (pts !! 3)
                 , blocked_exceptions = (pts !! 4)
                 , bq = (pts !! 5)
+                , threadId = threadId'
+                , alloc_limit = alloc_limit'
                 }
         STACK -> do
             unless (length pts >= 1) $
