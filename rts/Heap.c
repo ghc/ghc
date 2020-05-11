@@ -223,6 +223,13 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
 
             ASSERT((StgClosure *)((StgTSO *)closure)->bq != NULL);
             ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->bq;
+
+            int threadId = ((StgTSO *)closure)->id;
+            debugBelch("threadId : %u", threadId);
+
+            int alloc_limit = ((StgTSO *)closure)->alloc_limit;
+            debugBelch("alloc_limit : %d", alloc_limit);
+
             break;
         case STACK:
             ptrs[nptrs++] = (StgClosure *)((StgStack *)closure)->sp;
