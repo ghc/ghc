@@ -625,6 +625,7 @@ addTickHsExpr (HsPragE x p e) =
 addTickHsExpr e@(HsBracket     {})   = return e
 addTickHsExpr e@(HsTcUntypedBracketOut  {}) = return e
 addTickHsExpr e@(HsTcTypedBracketOut  {}) = return e
+addTickHsExpr e@(HsTcZonkedBracketOut  {}) = return e
 addTickHsExpr e@(HsRnBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {})      = return e
 addTickHsExpr (HsProc x pat cmdtop) =

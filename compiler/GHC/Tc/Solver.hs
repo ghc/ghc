@@ -1743,7 +1743,7 @@ mkCodeCGivens lvl is = do
   ccClass <- wrapErrTcS (expectJust "mkCodeCGivens" . tyConClass_maybe <$> tcLookupTyCon codeCTyConName)
   let dmap = inert_dicts (inert_cans is)
       gs = findDictsByClass dmap lvl ccClass
-  pprTraceM "gs" (ppr gs)
+--  pprTraceM "gs" (ppr gs)
   let do_one ct = do
         let ct_ev = ctEvidence ct
         let (_, [body]) = splitTyConApp (ctPred ct)

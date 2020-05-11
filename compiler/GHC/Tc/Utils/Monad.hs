@@ -1773,7 +1773,7 @@ addModFinalizersWithLclEnv mod_finalizers
          (lcl_env, mod_finalizers) : fins
 
 -- Used in TcExpr and TcHsType
-checkThLocalIdX :: Id -> (Name -> Id -> TcM (Either PendingTcTypedSplice PendingZonkSplice2))
+checkThLocalIdX :: Id -> (Name -> Id -> TcM (Either (PendingTcUntypedSplice, PendingTcTypedSplice) PendingZonkSplice2))
                 -> Name -> Id -> TcM Id
 checkThLocalIdX sp_id mk_expr n id
   = do  { mb_local_use <- getStageAndBindLevel n
@@ -1785,7 +1785,7 @@ checkThLocalIdX sp_id mk_expr n id
                                -- no cross-stage link
     }
 
-checkCrossStageLifting :: (Name -> Id -> TcM (Either PendingTcTypedSplice PendingZonkSplice2))
+checkCrossStageLifting :: (Name -> Id -> TcM (Either (PendingTcUntypedSplice, PendingTcTypedSplice) PendingZonkSplice2))
                        -> Id -> TopLevelFlag -> Name -> Id -> ThStage -> TcM Id
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do

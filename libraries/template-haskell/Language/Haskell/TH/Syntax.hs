@@ -384,17 +384,18 @@ unsafeTExpCoerce m = do { e <- m
 
 
 data TExp (a :: TYPE (r :: RuntimeRep)) =
-  TExp { unType :: TExpU } deriving Generic
+  TExp { unType :: Exp
+       , typedRep :: TExpU } deriving Generic
 
-data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], expr_str :: THRep } deriving (Generic, Data)
+data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], ev :: [(Int, THRep)], expr_str :: THRep } deriving (Generic, Data)
 
 
 --unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
-unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) . ([(Int, Q TTExp)], [(Int, Q TExpU)], THRep) -> Q (TExp a)
-unsafeTExpCoerce (ts, qu, s) =
-  do { qu' <- sequence (map sequence qu)
-     ; ts' <- sequence (map sequence ts)
-     ; return (TExp (TExpU ts' qu' s)) }
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp, [(Int, TTExp)], [(Int, m TExpU)], [(Int, THRep)],  THRep) -> m (TExp a)
+unsafeTExpCoerce (e, ts, qu, evs, s) =
+  do { e' <- e
+     ; qu' <- sequence (map sequence qu)
+     ; return (TExp e' (TExpU ts qu' evs s)) }
 
 newtype THRep = THRep ByteString deriving (Generic, Data)
 
@@ -404,16 +405,18 @@ mkTHRep :: Int -> Addr# -> THRep
 mkTHRep l a = THRep (unsafePerformIO (unsafePackAddressLen l a))
 {-# NOINLINE mkTHRep #-}
 
-unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) . Q (TExp a) -> Q TExpU
+unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m Exp
 unTypeQ = fmap unType
+
+unTypeQT :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m TExpU
+unTypeQT = fmap typedRep
 
 
 -- Representation of types
 data TTExp = TTExp { env_t :: [(Int, TTExp)], tstr :: THRep } deriving (Generic, Data)
 
-mkTTExp :: [(Int, Q TTExp)] -> THRep -> Q TTExp
-mkTTExp qu s = do { qu' <- sequence (map sequence qu)
-                  ; return (TTExp qu' s) }
+mkTTExp :: [(Int, TTExp)] -> THRep -> TTExp
+mkTTExp qu s = TTExp qu s
 
 
 {- Note [Role of TExp]

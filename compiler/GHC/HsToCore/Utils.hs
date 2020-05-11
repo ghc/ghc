@@ -480,7 +480,7 @@ There are a few subtleties in the desugaring of `seq`:
 -}
 
 -- NB: Make sure the argument is not levity polymorphic
-mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreAppDs  :: HasCallStack => SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
@@ -493,7 +493,7 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic
-mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreAppsDs :: HasCallStack => SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr

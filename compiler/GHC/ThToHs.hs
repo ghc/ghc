@@ -65,7 +65,7 @@ import System.IO.Unsafe
 --              The external interface
 convertEnv :: Origin -> SrcSpan -> TExp a
                       -> Either MsgDoc TExpU
-convertEnv o loc (TExp u) =
+convertEnv o loc (TExp _ u) =
   initCvt o loc $ do
     return u
 

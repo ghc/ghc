@@ -51,7 +51,7 @@ module GHC.Tc.Solver.Monad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setLclEnv,
-    getTcEvBindsVar, getCurTcEvBindsVar, getTcLevel,
+    getTcEvBindsVar, getCurTcEvBindsVar, getTcLevel, readyTcEvBindsVar,
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
     tcLookupClass, tcLookupId,
 
@@ -3094,6 +3094,13 @@ updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
 getCurTcEvBindsVar :: TcS EvBindsVar
 getCurTcEvBindsVar = TcS (return . snd . head . tcs_ev_binds)
 
+readyTcEvBindsVar :: ThLevel -> TcS Bool
+readyTcEvBindsVar th = do
+  bv <- TcS (return . tcs_ev_binds)
+  case lookup th bv of
+    Just {} -> return True
+    Nothing -> return False
+
 getTcEvBindsVar :: HasCallStack => ThLevel -> TcS EvBindsVar
 getTcEvBindsVar n = do
   bv <- TcS (return . tcs_ev_binds)
@@ -3479,7 +3486,7 @@ setWantedEvTerm (HoleDest hole) tm
 setWantedEvTerm (QuoteDest hole) (EvExpr tm)
   = fillExprHole hole tm
 setWantedEvTerm (EvVarDest _cs n ev_id) tm
-  = pprTrace "setting" (ppr n $$ ppr ev_id $$ ppr tm)
+  = --pprTrace "setting" (ppr n $$ ppr ev_id $$ ppr tm)
       (setEvBind (mkWantedEvBind ev_id n tm))
 
 {- Note [Yukky eq_sel for a HoleDest]

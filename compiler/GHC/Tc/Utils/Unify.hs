@@ -151,11 +151,11 @@ matchExpectedFunTys :: forall a.
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
 matchExpectedFunTys herald arity orig_ty thing_inside
   = case orig_ty of
-      Check ty -> pprTrace "matchExpectedFunTys" (ppr ty) (go [] arity ty)
+      Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
     go acc_arg_tys 0 ty
-      = do { result <- thing_inside (pprTraceIt "args" $ reverse acc_arg_tys) (mkCheckExpType ty)
+      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
 
     go acc_arg_tys n ty
@@ -1132,6 +1132,7 @@ tcSkolemise ctxt expected_ty thing_inside
 
         ; lvl <- getTcLevel
         ; th_lvl <- getStage
+        {-
         ; pprTraceM "tcSkolemise" $ vcat [
                 ppr lvl,
                 ppr th_lvl,
@@ -1139,6 +1140,7 @@ tcSkolemise ctxt expected_ty thing_inside
                 text "inst tyvars" <+> ppr tv_prs,
                 text "given"       <+> ppr given,
                 text "inst type"   <+> ppr rho' ]
+                -}
 
         -- Generally we must check that the "forall_tvs" haven't been constrained
         -- The interesting bit here is that we must include the free variables

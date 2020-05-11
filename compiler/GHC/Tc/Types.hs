@@ -966,7 +966,7 @@ data PendingStuff
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
   | TcPending                     -- Typechecking the inside of a typed bracket
-      (TcRef [PendingTcTypedSplice])   --   Accumulate pending splices here
+      (TcRef [(PendingTcUntypedSplice, PendingTcTypedSplice)])   --   Accumulate pending splices here
       (TcRef [PendingZonkSplice2])
       QuoteWrapper                -- A type variable and evidence variable
                                   -- for the overall monad of

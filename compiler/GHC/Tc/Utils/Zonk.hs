@@ -775,16 +775,18 @@ zonkExpr env (HsTcUntypedBracketOut x wrap body bs)
        bs' <- mapM zonk_b bs
        return (HsTcUntypedBracketOut x wrap' body bs')
   where
-    zonk_b (PendingTcSplice benv n e) = do
+    zonk_b (PendingTcSplice n e) = do
       e' <- zonkLExpr env e
-      return (PendingTcSplice benv n e')
+      return (PendingTcSplice n e')
 
 
-zonkExpr env (HsTcTypedBracketOut x body bs zs2)
-  = do pprTraceM "HsTcBracketOut" (ppr body $$ ppr bs)
+zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
+  = do --pprTraceM "HsTcBracketOut" (ppr body $$ ppr bs)
        bs' <- mapM zonk_b bs
+       wrap' <- zonkQuoteWrap env w
+       u_ps' <- mapM zonk_u_b u_ps
        (pairs, splices) <- unzip <$> mapMaybeM zonk_z_2 zs2
-       let vars = map (\(PendingTcSplice _ n' _) -> n') bs'
+       let vars = map (\(PendingTcSplice n' _) -> n') bs'
            env'' = extendZonkEnvWithSplices (extendZonkEnv env vars) pairs
            -- TODO: This is an approximation surely
        (zs, body') <- case body of
@@ -798,14 +800,17 @@ zonkExpr env (HsTcTypedBracketOut x body bs zs2)
        --pprTraceM "zonkExpr:zs" (ppr tzs)
        --pprTraceM "zonkExpr:zs'" (ppr bs)
        --pprTraceM "zonkExpr:zs''" (ppr bs')
-       return (HsTcZonkedBracketOut x body' bs' zs' splices)
+       return (HsTcZonkedBracketOut x (wrap', b, u_ps') body' bs' zs' splices)
   where
+    zonk_u_b (PendingTcSplice n e) = do
+      e' <- zonkLExpr env e
+      return (PendingTcSplice n e')
     zonk_z_2 (PendingZonkSplice2 t e) = do
       t' <- zonkTyVarOcc env t
       sp <- mkSpliceId (typeKind t')
       e' <- zonkCoreExpr env (evId e)
-      pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
-      pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
+      --pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
+     -- pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
       let mtv = getTyVar_maybe t'
       case mtv of
         Nothing -> return Nothing
@@ -813,14 +818,14 @@ zonkExpr env (HsTcTypedBracketOut x body bs zs2)
           return $ Just ((tv', sp), (PendingZonkSplice sp Nothing e'))
 
 
-    zonk_b (PendingTcSplice bind_env n e) = do
-      pprTraceM "pending" (ppr n)
-      pprTraceM "pending" (ppr e)
+    zonk_b (PendingTcSplice n e) = do
+      --pprTraceM "pending" (ppr n)
+      --pprTraceM "pending" (ppr e)
       n' <- zonkIdBndr env n
       e' <- zonkLExpr (extendIdZonkEnv env n') e
       --pprTraceM "pending" (ppr n')
       --pprTraceM "pending" (ppr e')
-      return (PendingTcSplice bind_env n' e')
+      return (PendingTcSplice n' e')
 
     zonk_z (PendingZonkSplice n mt e) = do -- (env', n') <- zonkTyBndrX env n
                                         e' <- zonkCoreExpr env e
@@ -853,7 +858,7 @@ zonkExpr env (HsSpliceE z (XSplice (HsSplicedT (DelayedSplice a b t e)))) = do
   e' <- zonkLExpr env e
   return (HsSpliceE z (XSplice (HsSplicedT (DelayedSplice a b t' e'))))
 --  runTopSplice s >>= zonkExpr env
-zonkExpr _env (HsSpliceE x (HsSplicedD a b c)) = return $ HsSpliceE x (HsSplicedD a b c)
+zonkExpr _env (HsSpliceE x d) = return $ HsSpliceE x d
 zonkExpr _ e@(HsSpliceE _ _) = pprPanic "zonkExpr: HsSpliceE" (ppr e)
 
 zonkExpr env (OpApp fixity e1 op e2)

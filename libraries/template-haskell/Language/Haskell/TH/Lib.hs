@@ -350,6 +350,6 @@ instance LiftT a where
 #else
 typecheck :: forall r (a :: TYPE r) . LiftT a => Exp -> Q (TExp a)
 typecheck e = do
-  t <- (liftTyCl @_ @a)
+  let t = (liftTyCl @_ @a)
   Q (qTypecheck t e)
 #endif

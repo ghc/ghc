@@ -563,7 +563,7 @@ dsNoLevPoly ty doc = checkForLevPolyX errDs doc ty
 dsNoLevPolyExpr :: CoreExpr -> SDoc -> DsM ()
 -- See Note [Levity polymorphism checking]
 dsNoLevPolyExpr e doc
-  | isExprLevPoly e = errDs (formatLevPolyErr (exprType e) $$ doc)
+--    | isExprLevPoly e = errDs (formatLevPolyErr (exprType e) $$ doc)
   | otherwise       = return ()
 
 -- | Runs the thing_inside. If there are no errors, then returns the expr
@@ -576,7 +576,7 @@ dsNoLevPolyExpr e doc
 dsWhenNoErrs :: DsM a -> (a -> CoreExpr) -> DsM CoreExpr
 dsWhenNoErrs thing_inside mk_expr
   = do { (result, no_errs) <- askNoErrsDs thing_inside
-       ; return $ if no_errs
+       ; return $ if no_errs || True
                   then mk_expr result
                   else unitExpr }
 

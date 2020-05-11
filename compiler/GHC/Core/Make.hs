@@ -147,7 +147,7 @@ mkCoreApps fun args
 -- to the other
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in GHC.Core
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp :: HasCallStack => SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreApp s fun arg
   = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
@@ -157,13 +157,13 @@ mkCoreApp s fun arg
 -- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in GHC.Core
-mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped :: HasCallStack => SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
 mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
 mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
-  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr (exprType fun) $$ ppr arg $$ d $$ ppr fun_ty )
     (mkValApp fun arg arg_ty res_ty, res_ty)
   where
     (arg_ty, res_ty) = splitFunTy fun_ty

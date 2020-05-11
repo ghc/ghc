@@ -1902,7 +1902,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Prepare for codegen -}
          ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
-         ; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
+         --; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
          -- I have no idea how these ever worked, top-level splices have always contained
          -- the same free type variables that these link checks complain about.
 --         ; lintInteractiveExpr "hscCompileExpr-s" hsc_env simpl_expr

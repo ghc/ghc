@@ -1039,7 +1039,7 @@ mkWrapperName what nameBase
 
 emitTypeable :: Type -> TcM EvVar
 emitTypeable t = do
-  pprTraceM "EMITTING" (ppr t)
+  --pprTraceM "EMITTING" (ppr t)
   typeableClass <- tcLookupTyCon liftTClassName
  -- cc_tycon <- tcLookupTyCon codeCTyConName
   emitWantedEvVar StaticOrigin $

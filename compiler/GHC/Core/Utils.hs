@@ -1517,11 +1517,11 @@ it's applied only to dictionaries.
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
 
-exprOkForSpeculation, exprOkForSideEffects :: CoreExpr -> Bool
+exprOkForSpeculation, exprOkForSideEffects :: HasCallStack => CoreExpr -> Bool
 exprOkForSpeculation = expr_ok primOpOkForSpeculation
 exprOkForSideEffects = expr_ok primOpOkForSideEffects
 
-expr_ok :: (PrimOp -> Bool) -> CoreExpr -> Bool
+expr_ok :: HasCallStack => (PrimOp -> Bool) -> CoreExpr -> Bool
 expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
@@ -1562,7 +1562,7 @@ expr_ok primop_ok other_expr
         _       -> False
 
 -----------------------------
-app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
+app_ok :: HasCallStack => (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId new_type ->  not new_type

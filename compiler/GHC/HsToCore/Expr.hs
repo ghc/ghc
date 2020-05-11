@@ -82,7 +82,6 @@ import Control.Monad
 import Data.List.NonEmpty ( nonEmpty )
 
 import Binary
-import FastMutInt
 import GHC.Iface.Binary
 import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Iface.Env
@@ -90,7 +89,6 @@ import GHC.Iface.Env
 import Data.IORef
 import GHC.Driver.Types (hsc_NC)
 import Language.Haskell.TH.Syntax(THRep(..), TExpU(..), TTExp(..))
-import Data.ByteString.Internal (ByteString(..))
 {-
 ************************************************************************
 *                                                                      *
@@ -333,8 +331,9 @@ dsExpr (HsLamCase _ matches)
 
 dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
+       -- ; pprTraceM "fun'" (ppr fun $$ ppr fun')
        ; dsWhenNoErrs (dsLExprNoLP arg)
-                      (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
+                      (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e $$ ppr (exprType fun')) fun' arg') }
 
 dsExpr (HsAppType _ e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
@@ -633,6 +632,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
+
   where
     ds_field :: LHsRecUpdField GhcTc -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
@@ -750,13 +750,15 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 dsExpr  (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
 dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
-dsExpr (HsTcZonkedBracketOut _ x ps ev_zs zs) = GHC.HsToCore.DsMetaTc.dsBracketTc x ps ev_zs zs
+dsExpr (HsTcZonkedBracketOut _ (w, ex, pss) x ps ev_zs zs) = do
+  exp <- GHC.HsToCore.Quote.dsBracket (Just w) ex pss
+  GHC.HsToCore.DsMetaTc.dsBracketTc exp w x ps ev_zs zs
 dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
   e' <- dsLExpr e
   res <- runMetaCore e'
   dsSplicedD res
-dsExpr (HsSpliceE _ (HsSplicedD zs env s))
-  = dsSplicedD (TExpU zs env s)
+dsExpr (HsSpliceE _ (HsSplicedD tu))
+  = dsSplicedD tu
 dsExpr (HsSpliceE {}) =
   pprTrace "ds_expr" (text "About to panic") $
   pprPanic "dsExpr:splice" (empty)
@@ -787,6 +789,7 @@ dsExpr (HsBinTick _ ixT ixF e) = do
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
+dsExpr e = pprPanic "other" (ppr e)
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
@@ -809,10 +812,11 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
     else dsLExpr expr
 
 dsSplicedD :: TExpU -> DsM CoreExpr
-dsSplicedD (TExpU zs env e) = do
+dsSplicedD (TExpU zs env evs e) = do
       let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
           zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
-      loadCoreExpr zs' es e
+          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] b)) evs
+      loadCoreExpr zs' (es ++ evs') e
 
 dsSplicedT :: TTExp -> DsM Type
 dsSplicedT (TTExp zs t) =
@@ -834,20 +838,20 @@ loadCoreType zs (THRep b) = do
   let (if_gbl, if_lcl) = ds_if_env env
       if_lcl' = if_lcl { if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
                        , if_dsm_env  = Just dsm_envs }
-  pprTrace "loadCoreExpr" (ppr i) (return ())
+  --pprTrace "loadCoreExpr" (ppr i) (return ())
   setEnvs (if_gbl, if_lcl') $
-    pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
+    --pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
       tcIfaceType i
 
 instance Outputable TTExp where
   ppr (TTExp t t') = ppr t <+> text "TTREP"
 
 instance Outputable TExpU where
-  ppr (TExpU t t' t'') = ppr t <+> ppr t' <+> text "TREP"
+  ppr (TExpU t t' t'' _) = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
 loadCoreExpr :: [(Unique, TTExp)] -> [(Unique, TExpU)] -> THRep -> DsM CoreExpr
-loadCoreExpr zs menv (THRep s) =  pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
+loadCoreExpr zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
   env <- getGblEnv
   hs_env <- env_top <$> getEnv
   nc <- liftIO $ readIORef (hsc_NC hs_env)
@@ -861,9 +865,9 @@ loadCoreExpr zs menv (THRep s) =  pprTrace "LOADING" (ppr (map (getKey . fst) zs
       if_lcl' = if_lcl { if_meta_env = addListToUFM_Directly (if_meta_env if_lcl) menv
                        , if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
                        , if_dsm_env  = Just dsm_envs }
-  pprTrace "loadCoreExpr" (ppr i) (return ())
+  --pprTrace "loadCoreExpr" (ppr i) (return ())
   setEnvs (if_gbl, if_lcl') $
-    pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
+    --pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)
       tcIfaceExpr i
 
 
@@ -1137,10 +1141,10 @@ mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
 
 dsHsVar :: Id -> DsM CoreExpr
 dsHsVar var
-  | let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = do { levPolyPrimopErr (ppr var) ty bad_tys
-       ; return unitExpr }  -- return something eminently safe
+--  | let bad_tys = badUseOfLevPolyPrimop var ty
+--  , not (null bad_tys)
+ -- = do { levPolyPrimopErr (ppr var) ty bad_tys
+ --      ; return unitExpr }  -- return something eminently safe
 
   | otherwise
   = return (varToCoreExpr var)   -- See Note [Desugaring vars]

@@ -511,11 +511,13 @@ data HsExpr p
 
   | HsTcTypedBracketOut
       (XTcBracketOut p)
+      (QuoteWrapper, HsBracket GhcRn, [PendingTcUntypedSplice]) -- This is the HsTcUntypedBracketOut
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit splices
       [PendingZonkSplice2] -- Any type splices arising from implicit type variables
   | HsTcZonkedBracketOut
       (XTcBracketOut p)
+      (QuoteWrapper, HsBracket GhcRn, [PendingTcUntypedSplice]) -- This is the HsTcUntypedBracketOut
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit value splices
       [PendingZonkSplice] -- Splices coming from evidence
@@ -1074,10 +1076,10 @@ ppr_expr (HsRnBracketOut _ e []) = ppr e
 ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
 ppr_expr (HsTcUntypedBracketOut _ _wrap e []) = ppr e
 ppr_expr (HsTcUntypedBracketOut _ _wrap e ps) = ppr e $$ text "pending-u(tc)" <+> ppr ps
-ppr_expr (HsTcTypedBracketOut _ e [] []) = ppr e
-ppr_expr (HsTcTypedBracketOut _ e ps zs2) = ppr e $$ text "pending-t(tc)" <+> ppr ps <+> ppr zs2
-ppr_expr (HsTcZonkedBracketOut _ e [] [] []) = ppr e
-ppr_expr (HsTcZonkedBracketOut _ e ps zs1 zs2) = ppr e $$ text "pending-t(zs)" <+> ppr ps <+> ppr zs1 <+> ppr zs2
+ppr_expr (HsTcTypedBracketOut _ _ e [] []) = ppr e
+ppr_expr (HsTcTypedBracketOut _ _ e ps zs2) = ppr e $$ text "pending-t(tc)" <+> ppr ps <+> ppr zs2
+ppr_expr (HsTcZonkedBracketOut _ _ e [] [] []) = ppr e
+ppr_expr (HsTcZonkedBracketOut _ _ e ps zs1 zs2) = ppr e $$ text "pending-t(zs)" <+> ppr ps <+> ppr zs1 <+> ppr zs2
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
@@ -2426,7 +2428,7 @@ data HsSplice id
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
 --   | HsSplicedT DelayedSplice
-   | HsSplicedD [(Int, TTExp)] [(Int, TExpU)] THRep -- Decode this in the desugarer
+   | HsSplicedD TExpU -- Decode this in the desugarer
    | XSplice !(XXSplice id)  -- Note [Trees that Grow] extension point
 
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
@@ -2511,7 +2513,7 @@ type PendingTcUntypedSplice = PendingTcSplice GhcRn
 type PendingTcTypedSplice = PendingTcSplice GhcTc
 
 data PendingTcSplice p
-  = PendingTcSplice (NameEnv (TopLevelFlag, Int)) (IdP p) (LHsExpr GhcTc)
+  = PendingTcSplice (IdP p) (LHsExpr GhcTc)
 
 data PendingZonkSplice
   = PendingZonkSplice (IdP GhcTc) -- Value splice point
@@ -2642,7 +2644,7 @@ pprSplice (XSplice x)                   = case ghcPass @p of
 #endif
                                             GhcTc -> case x of
                                                        HsSplicedT _ -> text "Unevaluated typed splice"
-pprSplice (HsSplicedD zs env s)         = ppr (length zs) $$ ppr (length env) $$  text "rep"
+pprSplice (HsSplicedD texpu)         = ppr "THREP"
 --pprSplice (HsSplicedT {})               = text "Unevaluated typed splice"
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
@@ -2708,7 +2710,7 @@ instance Outputable PendingRnSplice where
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
 
 instance NamedThing (IdP p) => Outputable (PendingTcSplice p) where
-  ppr (PendingTcSplice _env n e) = pprPendingSplice (getName n) e
+  ppr (PendingTcSplice n e) = pprPendingSplice (getName n) e
 
 instance Outputable PendingZonkSplice where
   ppr (PendingZonkSplice n _t e) = pprPendingSplice (getName n) e

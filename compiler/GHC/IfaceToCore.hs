@@ -1309,7 +1309,7 @@ tcIfaceExpr (IfaceSplice n)
   = do
       lcl_env <- getLclEnv
       let il = if_meta_env lcl_env
-      pprTraceM "il" (ppr (nonDetKeysUFM il))
+      --pprTraceM "il" (ppr (nonDetKeysUFM il))
       case lookupUFM_Directly il (mkUniqueGrimily n) of
         Just mm -> case if_dsm_env lcl_env of
                      Just (ds_gbl, ds_lcl) -> do

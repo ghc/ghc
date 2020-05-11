@@ -179,40 +179,41 @@ tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
        ; zz_ref <- newMutVar []
 
        -- Make a new type variable for the type of the overall quote
-      -- ; m_var <- mkTyVarTy <$> mkMetaTyVar
+       ; m_var <- mkTyVarTy <$> mkMetaTyVar
        -- Make sure the type variable satisfies Quote
-      -- ; ev_var <- emitQuoteWanted m_var
+       ; ev_var <- emitQuoteWanted m_var
        -- Bundle them together so they can be used in GHC.HsToCore.Quote for desugaring
        -- brackets.
-      -- ; let wrapper = QuoteWrapper ev_var m_var
+       ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
        ; ((tc_expr, expr_ty), ev_binds) <- mkQuoteImplication $
-                                setStage (Brack cur_stage (TcPending ps_ref zz_ref undefined)) $
+                                setStage (Brack cur_stage (TcPending ps_ref zz_ref wrapper)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
        ; let brack' = TExpBr e (mkHsDictLet ev_binds tc_expr)
-       ; meta_ty <- tcTExpTy expr_ty
-       ; pprTraceM "tcTypedBracket" (ppr expr_ty)
+       ; meta_ty <- tcTExpTy m_var expr_ty
+       --; pprTraceM "tcTypedBracket" (ppr expr_ty)
        ; let fvs = tyCoVarsOfTypeDSet expr_ty
        ; ts <- foldDVarSet (\tv res ->  do
                 v <- emitTypeable (mkTyVarTy tv)
                 vs <- res
                 return (PendingZonkSplice2 tv v : vs)) (return []) fvs
-       ; pprTraceM "tcTypedBracket" (ppr fvs)
-       ; pprTraceM "tcTypedBracket" (ppr meta_ty)
-       ; ps' <- readMutVar ps_ref
-       ; pprTraceM "tcTypedBracket" (ppr ps')
+       --; pprTraceM "tcTypedBracket" (ppr fvs)
+       --; pprTraceM "tcTypedBracket" (ppr meta_ty)
+       ; (ups, ps') <- unzip <$> readMutVar ps_ref
+       -- ; pprTraceM "tcTypedBracket" (ppr ps')
        ; zz <- readMutVar zz_ref
-       ; pprTraceM "tcTypedBracket:zz" (ppr zz)
-       ; pprTraceM "tcTypedBracket:ts" (ppr ts)
+       --; pprTraceM "tcTypedBracket:zz" (ppr zz)
+       --; pprTraceM "tcTypedBracket:ts" (ppr ts)
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp ((nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcTypedBracketOut noExtField brack' ps' (zz ++ ts)))))
+                       (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
+                                        (nlHsTyApp texpco [rep, expr_ty]))
+                                      (noLoc (HsTcTypedBracketOut noExtField (wrapper, brack, ups) brack' ps' (zz ++ ts)))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -300,8 +301,7 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
        ; expr' <- tcPolyExpr expr expected_type
-       ; benv <- tcl_th_bndrs <$> getLclEnv
-       ; return (PendingTcSplice benv splice_name expr') }
+       ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
                        UntypedExpSplice  -> expTyConName
@@ -311,13 +311,12 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 
 ---------------
 -- Takes a m and tau and returns the type m (TExp tau)
-tcTExpTy :: TcType -> TcM TcType
-tcTExpTy exp_ty
+tcTExpTy :: TcType -> TcType -> TcM TcType
+tcTExpTy m_tau exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
-       ; q <- tcLookupTyCon qTyConName
        ; texp <- tcLookupTyCon tExpTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkTyConApp q [mkTyConApp texp [rep, exp_ty]]) }
+       ; return (mkAppTy m_tau (mkTyConApp texp [rep, exp_ty])) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -633,20 +632,23 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var  _zz_var _) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var  _zz_var q@(QuoteWrapper _ m_tau)) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
-       ; meta_exp_ty <- tcTExpTy res_ty
+       ; meta_exp_ty <- tcTExpTy m_tau res_ty
        ; (expr', ev) <- setStage pop_stage
                   --setConstraintVar lie_var $
                               $ mkSpliceImplication
                               $ tcMonoExpr expr (mkCheckExpType meta_exp_ty)
-       ; pprTraceM "tcNestedSplice" (ppr expr')
+       --; pprTraceM "tcNestedSplice" (ppr expr')
           -- Zonk it and tie the knot of dictionary bindings
        ; ps <- readMutVar ps_var
        ; let splice_id = mkLocalId splice_name res_ty
-       ; pprTraceM "tcNEstedSplice" (ppr res_ty $$ ppr meta_exp_ty $$ ppr splice_id)
-       ; benv <- tcl_th_bndrs <$> getLclEnv
-       ; writeMutVar ps_var (PendingTcSplice benv splice_id (mkHsDictLet ev expr') : ps)
+       --; pprTraceM "tcNEstedSplice" (ppr res_ty $$ ppr meta_exp_ty $$ ppr splice_id)
+       ; untypeq <- tcLookupId unTypeQName
+       ; let rep = getRuntimeRep res_ty
+       ; let expr'' = mkHsApp (mkLHsWrap (applyQuoteWrapper q)
+                                (nlHsTyApp untypeq [rep, res_ty])) expr'
+       ; writeMutVar ps_var ((PendingTcSplice splice_name (mkHsDictLet ev expr''), PendingTcSplice splice_id (mkHsDictLet ev expr')) : ps)
 
        -- The returned expression is ignored; it's in the pending splices
        ; return (HsVar noExtField (noLoc splice_id)) }
@@ -661,9 +663,12 @@ tcTopSplice expr res_ty
          res_ty <- expTypeToType res_ty
        ; q_type <- tcMetaTy qTyConName
        -- Top level splices must still be of type Q (TExp a)
-       ; meta_exp_ty <- tcTExpTy res_ty
-       ; q_expr <- tcTopSpliceExpr Typed $
-                          tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+       ; meta_exp_ty <- tcTExpTy q_type res_ty
+       ; q_expr <- tcTopSpliceExpr Typed $ do
+                          res <- tcMonoExpr expr (mkCheckExpType meta_exp_ty)
+                          --unTypeQT <- noLoc <$> newMethodFromName StaticOrigin unTypeQTName [getRuntimeRep res_ty, res_ty, q_type]
+--                          return (nlHsApp unTypeQT res)
+                          return res
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
@@ -682,7 +687,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
        ; modfinalizers_ref <- newTcRef []
          -- Run the expression
        ; pprTrace "runTopSplice" (ppr orig_expr) (return ())
-       ; TH.TExpU zs env expr2 <- setStage (RunSplice modfinalizers_ref) $
+       ; r <- setStage (RunSplice modfinalizers_ref) $
                                     runMetaC zonked_q_expr
                                     {-
        ; let rn_one rdr_name =
@@ -690,7 +695,6 @@ runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
                         Just n -> n
                         Nothing -> error "I made this"
                         -}
-       ; let env' = env
        ; mod_finalizers <- readTcRef modfinalizers_ref
        ; addModFinalizersWithLclEnv $ ThModFinalizers mod_finalizers
        -- We use orig_expr here and not q_expr when tracing as a call to
@@ -701,7 +705,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr _res_ty q_expr)
                                  , spliceSource      = Just orig_expr
                                  -- TODO
                                  , spliceGenerated   = ppr zonked_q_expr })
-       ; return (HsSpliceE noExtField (HsSplicedD zs env' expr2)) }
+       ; return (HsSpliceE noExtField (HsSplicedD r)) }
 
 
 {-
@@ -755,7 +759,7 @@ mkTHImplication info thing_inside = do
   ; lvl <- tcl_tclvl <$> getLclEnv
   ; th_lvl <- thLevel <$> getStage
   ; (implics, ev_binds) <- buildImplicationFor lvl (info th_lvl) [] [] wanted
-  ; pprTraceM "mkSpliceImplication" (ppr wanted)
+  --; pprTraceM "mkSpliceImplication" (ppr wanted)
   ; emitImplications implics
   ; return (result, ev_binds) }
 
@@ -1180,6 +1184,9 @@ To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
 instance TH.Quasi DsM where
+  qNewName s = do { u <- newUnique
+                  ; let i = toInteger (getKey u)
+                  ; return (TH.mkNameU s i) }
   qTypecheck t e = do
     ty <- dsSplicedT t
     (_, Just res) <- initTcDsForSolver $ checkNoErrs $ do
@@ -1195,7 +1202,7 @@ instance TH.Quasi DsM where
     fp <- repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp (TH.TExpU [] [] (TH.THRep fp)))
+    return (TH.TExp e (TH.TExpU [] [] [] (TH.THRep fp)))
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique
@@ -1338,7 +1345,7 @@ instance TH.Quasi TcM where
     fp <- initDsTc $ repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp (TH.TExpU [] [] (TH.THRep fp)))
+    return (TH.TExp e (TH.TExpU [] [] [] (TH.THRep fp)))
 
 
 

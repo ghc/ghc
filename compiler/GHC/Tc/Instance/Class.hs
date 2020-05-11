@@ -177,7 +177,8 @@ matchGlobalInst dflags short_cut n clas tys
   | clas `hasKey` THNames.codeCTyConKey = matchCodeC tys
   | clas `hasKey` THNames.liftTClassKey = do
       lcl <- tcl_th_bndrs <$> getLclEnv
-      pprTrace "level" (ppr n) $ matchLiftTy lcl n tys
+      --pprTrace "level" (ppr n) $
+      matchLiftTy lcl n tys
   | otherwise = matchTopGlobalInst dflags short_cut clas tys
 
 matchTopGlobalInst :: DynFlags -> Bool -> Class -> [Type] -> TcM ClsInstResult
@@ -662,8 +663,10 @@ matchLiftTy bind_env n args@[_k, t2]
     -- Not in the env must mean it's top-level
    -- , let lvl = maybe (pprTrace "lookup failed" (ppr t $$ ppr bind_env) 1) snd (lookupNameEnv bind_env (idName t))
     , let lvl = tcTyVarThLevel t
-    , pprTrace "matchLiftTy" (ppr t $$ ppr lvl $$ ppr n) True
+    --, pprTrace "matchLiftTy" (ppr t $$ ppr lvl $$ ppr n) True
     , isMetaTyVar t || (lvl <= n) = return NoInstance
+    | let fvs = fvVarList (tyCoFVsOfType t2)
+    , any isCoVar fvs = return NoInstance
     | otherwise =  do
     -- This evidence is only used for the type variable case, otherwise zonking just fills
     -- in the concrete type inside the bracket directly.
@@ -672,9 +675,10 @@ matchLiftTy bind_env n args@[_k, t2]
     let liftTTyCon = classTyCon liftTClass
         dc = classDataCon liftTClass
         -- Don't generate recursive dict for single ty var if we're solving it
-        fvs = if isTyVarTy t2 then [] else fvVarList (tyCoFVsOfType t2)
+    let fvs = if isTyVarTy t2 then [] else fvVarList (tyCoFVsOfType t2)
         mkLTPred t = mkTyConApp liftTTyCon [idType t, mkTyVarTy t]
         new_preds = map mkLTPred fvs
+
 
     let mk_one_splice v = do
           sp_name <- newSysName (mkTyVarOcc "$splice")
@@ -685,8 +689,9 @@ matchLiftTy bind_env n args@[_k, t2]
     ev <- initDsTc $ do
             pairs <- mapM mk_one_splice fvs
             -- Replace free variables with splices
+            --pprTraceM "matchLiftTy-b" (ppr t2 $$ ppr pairs)
             let t2' = substTy (mkTvSubstPrs (map snd pairs)) t2
-            pprTraceM "matchLiftTy-b-a" (ppr t2 $$ ppr t2')
+            --pprTraceM "matchLiftTy-b-a" (ppr t2 $$ ppr t2')
             str <- dsType t2'
 
             dflags <- getDynFlags
@@ -699,10 +704,11 @@ matchLiftTy bind_env n args@[_k, t2]
                 mk_l_expr evs = mkListExpr rty (splice_pairs evs)
             return $ \evs' -> (mkCoreApps (Var mkTTExp) [mk_l_expr evs', str])
 
-    pprTraceM "matchLiftTy" (ppr args
-                            $$ ppr new_preds)
+    --pprTraceM "matchLiftTy" (ppr args
+    --                        $$ ppr new_preds)
     return (OneInst { cir_new_theta = map sameLevel new_preds -- map sameLevel new_preds
-                    , cir_mk_ev = \evs' -> pprTraceIt "matchLiftTy" $ evDataConApp dc args [ev evs', unitExpr]
+                    , cir_mk_ev = \evs' -> --pprTraceIt "matchLiftTy" $
+                                            evDataConApp dc args [ev evs', unitExpr]
                     , cir_what = BuiltinInstance })
 matchLiftTy _env _n args = pprPanic "matchLiftTy" (ppr args)
 

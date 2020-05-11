@@ -395,7 +395,7 @@ rnSplice (HsTypedSplice x hasParen splice_name expr)
   = do  { -- checkTH expr "Template Haskell typed splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc splice_name)
-        ; pprTraceM "rnSplice" (ppr n')
+        --; pprTraceM "rnSplice" (ppr n')
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsTypedSplice x hasParen n' expr', fvs) }
 

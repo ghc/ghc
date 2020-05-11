@@ -32,7 +32,7 @@ templateHaskellNames = [
     mkNameSName,
     liftStringName, liftStringTypedName,
     unTypeName,
-    unTypeQName,
+    unTypeQName,unTypeQTName,
     unsafeTExpCoerceName, mkTHRepName,
     mkTTExpName, codeCevidenceName,
 
@@ -157,11 +157,11 @@ templateHaskellNames = [
     patQTyConName, funDepTyConName, decsQTyConName,
     ruleBndrTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
-    overlapTyConName, derivClauseTyConName, derivStrategyTyConName, codeCTyConName,
+    overlapTyConName, derivClauseTyConName, derivStrategyTyConName, codeCTyConName, tExpUTyConName, thRepTyConName,
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
-thSyn, thLib, qqLib :: Module
+thSyn, thLib, qqLib, liftLib :: Module
 thSyn = mkTHModule (fsLit "Language.Haskell.TH.Syntax")
 thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib.Internal")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
@@ -172,7 +172,7 @@ mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
 
 libFun, libTc, libCls
   , thFun, thTc, thCls, thCon
-  , qqFun :: FastString -> Unique -> Name
+  , qqFun, liftTc, liftFun, liftCls :: FastString -> Unique -> Name
 libFun = mk_known_key_name varName  thLib
 libTc  = mk_known_key_name tcName   thLib
 liftTc  = mk_known_key_name tcName   liftLib
@@ -199,7 +199,7 @@ qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
     tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
-    tExpUTyConName, codeCTyConName :: Name
+    tExpUTyConName, codeCTyConName, thRepTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -216,6 +216,7 @@ predTyConName          = thTc (fsLit "Pred")           predTyConKey
 tExpTyConName          = thTc (fsLit "TExp")           tExpTyConKey
 tExpUTyConName         = thTc (fsLit "TExpU")           tExpUTyConKey
 codeCTyConName         = libTc (fsLit "CodeC")          codeCTyConKey
+thRepTyConName         = thTc (fsLit "THRep")          thRepTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 
@@ -223,7 +224,7 @@ returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
     unsafeTExpCoerceName, liftTypedName, mkTTExpName, liftStringTypedName,
-    codeCevidenceName, mkTHRepName :: Name
+    codeCevidenceName, mkTHRepName, unTypeQTName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -239,6 +240,7 @@ mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
 unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
+unTypeQTName    = thFun (fsLit "unTypeQT")    unTypeQTIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 mkTHRepName = thFun (fsLit "mkTHRep") mkTHRepKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
@@ -655,7 +657,7 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
     roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey,
     overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey,
-    tExpUTyConKey, codeCTyConKey :: Unique
+    tExpUTyConKey, codeCTyConKey, thRepTyConKey :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -690,6 +692,7 @@ derivStrategyTyConKey  = mkPreludeTyConUnique 235
 decsTyConKey            = mkPreludeTyConUnique 236
 tExpUTyConKey            = mkPreludeTyConUnique 237
 codeCTyConKey          =  mkPreludeTyConUnique 238
+thRepTyConKey          = mkPreludeTyConUnique 239
 
 {- *********************************************************************
 *                                                                      *
@@ -744,7 +747,7 @@ returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
     unsafeTExpCoerceIdKey, liftTypedIdKey, mkTTExpKey, mkTHRepKey,
-    codeCevidenceKey :: Unique
+    codeCevidenceKey, unTypeQTIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -763,6 +766,7 @@ liftTypedIdKey        = mkPreludeMiscIdUnique 214
 mkTTExpKey = mkPreludeMiscIdUnique 215
 codeCevidenceKey = mkPreludeMiscIdUnique 216
 mkTHRepKey = mkPreludeMiscIdUnique 217
+unTypeQTIdKey         = mkPreludeMiscIdUnique 218
 
 
 -- data Lit = ...

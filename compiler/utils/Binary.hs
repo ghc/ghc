@@ -254,7 +254,7 @@ readBinMem filename = do
 readBin :: ByteString -> IO BinHandle
 -- Return a BinHandle with a totally undefined State
 readBin b@(BS.PS fptr _offset sz) = do
-  pprTraceM "readBin" (text (show b))
+  --pprTraceM "readBin" (text (show b))
   arr_r <- newIORef fptr
   ix_r <- newFastMutInt
   -- Should this be OFFSET?

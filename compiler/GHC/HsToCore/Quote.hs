@@ -164,7 +164,7 @@ dsBracket wrap brack splices
 
 
     new_bit = mkNameEnv [(getName n, DsSplice (unLoc e))
-                        | PendingTcSplice _ n e <- splices]
+                        | PendingTcSplice n e <- splices]
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM n ; return e1 }
     do_brack (ExpBr _ e)   = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }

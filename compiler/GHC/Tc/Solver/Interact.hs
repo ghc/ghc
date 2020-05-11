@@ -493,7 +493,12 @@ interactWithInertsStage wi
              CTyEqCan  {} -> interactTyVarEq ics wi
              CFunEqCan {} -> interactFunEq   ics wi
              CIrredCan {} -> interactIrred   ics wi
-             CDictCan  {} -> interactDict    ics wi
+             CDictCan {}  -> do { inerts <- getTcSInerts
+                                ; ready <- readyTcEvBindsVar (ctEvLevel (cc_ev wi))
+                                --; pprTraceM "inertStage" (ppr ready $$ ppr wi)
+                                ; if ready 
+                                    then interactDict ics wi
+                                    else continueWith wi }
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CHoleCan are put straight into inert_frozen, so never get here
                 -- CNonCanonical have been canonicalised
@@ -1824,7 +1829,10 @@ topReactionsStage work_item
   = do { traceTcS "doTopReact" (ppr work_item)
        ; case work_item of
            CDictCan {}  -> do { inerts <- getTcSInerts
-                              ; doTopReactDict inerts work_item }
+                              ; ready <- readyTcEvBindsVar (ctEvLevel (cc_ev work_item))
+                              ; if ready || isQuoteDest (cc_ev work_item)
+                                  then doTopReactDict inerts work_item
+                                  else continueWith work_item }
            CFunEqCan {} -> doTopReactFunEq work_item
            CIrredCan {} -> doTopReactOther work_item
            CTyEqCan {}  -> doTopReactOther work_item
@@ -2376,7 +2384,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 
-chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
+chooseInstance :: HasCallStack => Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
 chooseInstance work_item
                (OneInst { cir_new_theta = theta
                         , cir_what      = what
@@ -2403,6 +2411,7 @@ chooseInstance work_item
           do { let theta_lvls = --pprTraceIt "new_theta"
                                   (map (getNewLeveledPred n) theta)
              ; evc_vars <- mapM (uncurry3 (newWantedWithStage loc)) theta_lvls
+             --; pprTraceM "finish" (pprCtLoc loc)
              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
              ; emitWorkNC (freshGoals evc_vars)
              ; stopWith ev "Dict/Top (solved wanted)" } }

@@ -298,7 +298,7 @@ emitWantedEvVar origin ty
                              , ctev_nosh = WDeriv
                              , ctev_loc  = loc
                              , ctev_stage = thLevel st }
-       ; pprTraceM "emitWanted" (ppr ctev)
+       --; pprTraceM "emitWanted" (ppr ctev)
        ; emitSimple $ mkNonCanonical ctev
        ; return new_cv }
 
@@ -387,6 +387,7 @@ unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
 checkCoercionHole cv co
+{-
   | debugIsOn
   = do { cv_ty <- zonkTcType (varType cv)
                   -- co is already zonked, but cv might not be
@@ -396,6 +397,7 @@ checkCoercionHole cv co
                    ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
                                             , ppr cv_ty ]) )
          co }
+         -}
   | otherwise
   = return co
 
@@ -2403,8 +2405,8 @@ checkForLevPolyX :: Monad m
                  => (SDoc -> m ())  -- how to report an error
                  -> SDoc -> Type -> m ()
 checkForLevPolyX add_err extra ty
-  | isTypeLevPoly ty
-  = add_err (formatLevPolyErr ty $$ extra)
+ --  isTypeLevPoly ty
+ -- = add_err (formatLevPolyErr ty $$ extra)
   | otherwise
   = return ()
 

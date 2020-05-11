@@ -48,7 +48,7 @@ module GHC.Tc.Types.Constraint (
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
-        ctEvRole,
+        ctEvRole, isQuoteDest,
 
         wrapType,
 
@@ -1448,6 +1448,12 @@ isGiven _ = False
 isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
+
+
+isQuoteDest :: CtEvidence -> Bool
+isQuoteDest (CtWanted { ctev_dest = QuoteDest _ } ) = True
+isQuoteDest _ = False
+
 
 
 {-

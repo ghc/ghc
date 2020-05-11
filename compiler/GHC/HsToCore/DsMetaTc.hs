@@ -19,7 +19,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module GHC.HsToCore.DsMetaTc( dsBracketTc, dsType, repEFPE, repVar, repCore, Core(MkC), repCodeCEv ) where
+module GHC.HsToCore.DsMetaTc( dsBracketTc, dsType, repEFPE, repCore, Core(MkC), repCodeCEv ) where
 
 #include "HsVersions.h"
 
@@ -38,6 +38,8 @@ import GHC.Builtin.Names.TH
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Builtin.Types
+import GHC.HsToCore.Monad
+import {-# SOURCE #-} GHC.HsToCore.Binds
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils
@@ -63,6 +65,7 @@ import GHC.Types.Literal
 import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
+import GHC.Tc.Types.Evidence
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
@@ -72,29 +75,35 @@ dsType t = repType t
 
 
 -----------------------------------------------------------------------------
-dsBracketTc :: HsBracket GhcTc -> [PendingTcTypedSplice]
-                               -> [PendingZonkSplice]
-                               -> [PendingZonkSplice]
-                               -> DsM CoreExpr
+dsBracketTc :: CoreExpr -- This is a CoreExpr representing an Exp
+            -> QuoteWrapper
+            -> HsBracket GhcTc
+            -> [PendingTcTypedSplice]
+            -> [PendingZonkSplice]
+            -> [PendingZonkSplice]
+            -> DsM CoreExpr
 -- Returns a CoreExpr of type String which can be deserialised to get an
 -- IfaceExpr.
 
-dsBracketTc brack splices ev_zs zs
+dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
   = do
       (bounds_vars, body) <- do_brack brack
       sps <- mapMaybeM (do_one bounds_vars) splices
       zss <- mapM do_one_z zs
       (ev_zss, ev_tss) <- mapAndUnzipM do_one_ev ev_zs
 
+      q_w <- dsHsWrapper (applyQuoteWrapper q)
       -- thname <- lookupType nameTyConName
---      ty <- return stringTy --lookupType tExpUTyConName
-      (_,ty) <- splitFunTy . snd . splitForAllTy . snd . splitForAllTy . idType <$> dsLookupGlobalId unTypeQName
+      u_ty <- dsLookupTyCon tExpUTyConName
+      let ty = mkAppTy m_tau (mkTyConApp u_ty [])
       let tu_ty = mkBoxedTupleTy [intTy, ty]
       ty' <- funResultTy . funResultTy . idType <$> dsLookupGlobalId mkTTExpName
       let tt_ty = mkBoxedTupleTy [intTy, ty']
+      th_rep_tc <- dsLookupTyCon thRepTyConName
+      let thRepTy = mkBoxedTupleTy [intTy, mkTyConApp th_rep_tc []]
 
-      pprTrace "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
-        $ return $ mkCoreTup [mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty (sps ++ ev_zss), body]
+      --pprTraceM "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
+      return $ mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, body]
   where
     do_one_z (PendingZonkSplice n _mt e) = do
       let k = getKey (idUnique n)
@@ -105,7 +114,7 @@ dsBracketTc brack splices ev_zs zs
       --untype <- dsLookupGlobalId unTypeQName
       --e' <- dsExpr (unLoc e)
       -- The type of the expression has to be Q (TExp r)
-      pprTraceM "do_one_z" (ppr (exprType e))
+--      pprTraceM "do_one_z" (ppr (exprType e))
       {-
       case splitTyConApp (exprType e) of
           (ty, [r]) -> let (ty', [r']) = splitTyConApp r
@@ -113,7 +122,7 @@ dsBracketTc brack splices ev_zs zs
           _ -> return Nothing
       -}
       let (_, [k, a]) = splitTyConApp (exprType e)
-      pprTraceM "do_one_z" (ppr a $$  ppr k)
+      --pprTraceM "do_one_z" (ppr a $$  ppr k)
       return $ mkCoreTup [k_expr, mkCoreApps (Var lift_id) [Type k, Type a, e]]
     do_one_ev (PendingZonkSplice n (Just t) e) = do
       let k = getKey (idUnique n)
@@ -123,8 +132,8 @@ dsBracketTc brack splices ev_zs zs
           kt_expr = mkIntExprInt (targetPlatform dflags) kt
       e' <- return e
       -- The type of the expression has to be Q (TExp r)
-      pprTraceM "ty" (ppr $ exprType e')
-      pprTraceM "e" (ppr $ e')
+      --pprTraceM "ty" (ppr $ exprType e')
+      --pprTraceM "e" (ppr $ e')
       ccev <- dsLookupGlobalId codeCevidenceName
       Just cc_class <- tyConClass_maybe <$> dsLookupTyCon codeCTyConName
       let cc_sup = classSCSelId cc_class 0
@@ -139,20 +148,20 @@ dsBracketTc brack splices ev_zs zs
             return $ ( mkCoreTup [k_expr, mkCoreApps (Var ccev) [Type r, e']]
                      , mkCoreTup [kt_expr, final_t_e $ mkCoreApps (Var cc_sup) [Type r, e']] )
           _ -> pprPanic "split failed" (ppr e')
-    do_one bs (PendingTcSplice bind_env n e) = do
+    do_one bs (PendingTcSplice n e) = do
       let k = getKey (idUnique n)
       dflags <- getDynFlags
       let k_expr = mkIntExprInt (targetPlatform dflags) k
-      untype <- dsLookupGlobalId unTypeQName
+      untype <- dsLookupGlobalId unTypeQTName
       e' <- dsSetBindEnv bs $ dsExpr (unLoc e)
       -- The type of the expression has to be Q (TExp r)
-      pprTraceM "ty" (ppr $ exprType e')
-      pprTraceM "e" (ppr $ e')
+      --pprTraceM "ty" (ppr $ exprType e')
+      --pprTraceM "e" (ppr $ e')
       --let e'' = simpleOptExpr dflags e'
-      case splitTyConApp (exprType e') of
-          (ty, [r]) | ty `hasKey` qTyConKey ->
-            let (_ty', [rep, r']) = splitTyConApp r
-            in return $ Just $ mkCoreTup [k_expr, mkCoreApps (Var untype) [Type rep, Type r', e']]
+      case splitAppTy (exprType e') of
+          (_ty, r)  ->
+            let (_ty', [rep, r']) = splitAppTys r
+            in return $ Just $ mkCoreTup [k_expr, mkCoreApps (Var untype) [Type rep, Type r', Type m_tau, Var ev_var, e']]
           _ -> return Nothing
 
     do_brack (TExpBr _ e)  = do { (bs, s) <- repLE' e; return (bs, s) }
@@ -204,7 +213,7 @@ coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 repType :: Type -> DsM CoreExpr
 repType ty = do
   let it = toIfaceTypeX (tyCoVarsOfType ty) ty
-  pprTraceM "Writing type" (ppr ty)
+  --pprTraceM "Writing type" (ppr ty)
   liftIO (writeBracket it) >>= buildTHRep
 
 repECore :: HsExpr GhcTc -> DsM (VarSet, CoreExpr)
@@ -222,7 +231,7 @@ repECore e = do
   dflags <- getDynFlags
   -- Inline Type Lets, in particular
   let c_e' = simpleOptExpr dflags c_e
-  pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
+  --pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
   res <- repCore c_e
   return (bvs, res)
 
@@ -236,7 +245,7 @@ buildTHRep bs@(PS _ _ sz) = do
   th_rep_func <- dsLookupGlobalId mkTHRepName
   dflags <- getDynFlags
   let sz_expr = mkIntExprInt (targetPlatform dflags) sz
-  pprTraceM "buildTHRep" (text (show bs))
+  --pprTraceM "buildTHRep" (text (show bs))
   let th_rep = mkCoreApps (Var th_rep_func) [sz_expr, (Lit (LitString bs))]
   return th_rep
 
@@ -245,29 +254,10 @@ buildTHRep bs@(PS _ _ sz) = do
 repCodeCEv :: CoreExpr -> DsM CoreExpr
 repCodeCEv c_e = do
   s <- repCore c_e
-  texpco <- dsLookupGlobalId unsafeTExpCoerceName
-  (_,ty) <- splitFunTy . snd . splitForAllTy . snd . splitForAllTy . idType <$> dsLookupGlobalId unTypeQName
-  let tu_ty = mkBoxedTupleTy [intTy, ty]
-  ty' <- funResultTy . funResultTy . idType <$> dsLookupGlobalId mkTTExpName
-  let tt_ty = mkBoxedTupleTy [intTy, ty']
-  untype <- dsLookupGlobalId unTypeQName
-  return $ mkCoreApps (Var untype) [Type liftedRepTy, Type unitTy, mkCoreApps (Var texpco) [Type liftedRepTy, Type unitTy, (mkCoreTup [mkNilExpr tt_ty, mkNilExpr tu_ty, s])]]
+  return s
 
 repEFPE :: HsExpr GhcTc -> DsM ByteString
 repEFPE e = dsExpr e >>= repEFP
-
-repVar :: Id -> DsM CoreExpr
-repVar ev_id =  do
-  texpco <- dsLookupGlobalId unsafeTExpCoerceName
-  let ie = toIfaceExpr (unitVarSet ev_id) (Var ev_id)
-  fp <- liftIO (writeBracket ie)
-  th_rep <- buildTHRep fp
-  (_,ty) <- splitFunTy . snd . splitForAllTy . snd . splitForAllTy . idType <$> dsLookupGlobalId unTypeQName
-  let tu_ty = mkBoxedTupleTy [intTy, ty]
-  ty' <- funResultTy . funResultTy . idType <$> dsLookupGlobalId mkTTExpName
-  let tt_ty = mkBoxedTupleTy [intTy, ty']
-  untype <- dsLookupGlobalId unTypeQName
-  return $ mkCoreApps (Var untype) [Type liftedRepTy, Type unitTy, mkCoreApps (Var texpco) [Type liftedRepTy, Type unitTy, (mkCoreTup [mkNilExpr tt_ty, mkNilExpr tu_ty, th_rep])]]
 
 allFree :: CoreExpr -> VarSet
 allFree c_e =
@@ -281,7 +271,7 @@ repEFP :: CoreExpr -> DsM ByteString
 repEFP c_e = do
   benv <- dsGetBindEnv
   let ie = toIfaceExpr (allFree c_e `minusVarSet` benv) c_e
-  pprTraceM "toIfaceExpr" (ppr ie $$ ppr (allFree c_e) $$ ppr benv)
+  --pprTraceM "toIfaceExpr" (ppr ie $$ ppr (allFree c_e) $$ ppr benv)
   liftIO (writeBracket ie)
 
 

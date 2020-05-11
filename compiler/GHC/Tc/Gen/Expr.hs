@@ -36,7 +36,7 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
-import GHC.Builtin.Names.TH as THNames ( liftStringTypedName, liftTypedName)
+import GHC.Builtin.Names.TH as THNames (liftName, liftStringName,  liftStringTypedName, liftTypedName)
 
 import GHC.Hs
 import GHC.Tc.Types.Constraint ( HoleSort(..) )
@@ -1983,7 +1983,7 @@ polySpliceErr id
 --------------------------------------
 
 -- Construct the expression for `lift x`
-mkSpliceExpr :: Id -> Name -> Id -> TcM (Either PendingTcTypedSplice a)
+mkSpliceExpr :: Id -> Name -> Id -> TcM (Either (PendingTcUntypedSplice, PendingTcTypedSplice) a)
 mkSpliceExpr sp_id id_name id = do
   let id_ty = idType id
       rep = getRuntimeRep id_ty
@@ -1993,16 +1993,20 @@ mkSpliceExpr sp_id id_name id = do
   -- 'x' as the splice proxy name.  I don't know how to
   -- solve this, and it's probably unimportant, so I'm
   -- just going to flag an error for now
-  lift <- if isStringTy id_ty
+  (u_lift, lift) <- if isStringTy id_ty
     then do
       sid <- tcLookupId THNames.liftStringTypedName
+      u_sid <- tcLookupId THNames.liftStringName
       -- See Note [Lifting strings]
-      return (HsVar noExtField (noLoc sid))
+      return ( (HsVar noExtField (noLoc u_sid), HsVar noExtField (noLoc sid)))
     else do
-      newMethodFromName (OccurrenceOf id_name) THNames.liftTypedName [rep, id_ty]
+      ty <- newMethodFromName (OccurrenceOf id_name) THNames.liftTypedName [rep, id_ty]
+      u_ty <- newMethodFromName (OccurrenceOf id_name) THNames.liftName [rep, id_ty]
+      return (u_ty, ty)
+  let u_liftExpr = (nlHsApp (noLoc u_lift) (nlHsVar id))
   let liftExpr = (nlHsApp (noLoc lift) (nlHsVar id))
   lcl <- tcl_th_bndrs <$> getLclEnv
-  return (Left (PendingTcSplice lcl sp_id liftExpr))
+  return (Left ((PendingTcSplice id_name u_liftExpr, PendingTcSplice sp_id liftExpr)))
 
 
 {-

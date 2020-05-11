@@ -188,7 +188,7 @@ idUnique :: Id -> Unique
 idUnique  = Var.varUnique
 
 idType   :: Id -> Kind
-idType    = Var.varType
+idType   i = Var.varType i
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName

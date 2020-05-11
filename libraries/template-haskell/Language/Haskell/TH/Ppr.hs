@@ -43,10 +43,10 @@ class Ppr a where
     ppr_list = vcat . map ppr
 
 instance Ppr (TExp a) where
-  ppr (TExp m) = ppr m
+  ppr (TExp _e m) = ppr m
 
 instance Ppr TExpU where
-  ppr (TExpU zs es e) = ppr e $$ vcat (map ppr es) $$ vcat (map ppr zs)
+  ppr (TExpU zs es evs e) = ppr e $$ vcat (map ppr es) $$ vcat (map ppr zs)
 
 instance Ppr THRep where
   ppr (THRep _t) = text "THREP"

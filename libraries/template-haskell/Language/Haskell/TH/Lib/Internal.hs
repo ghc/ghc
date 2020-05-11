@@ -973,11 +973,11 @@ thisModule = do
 -- one instance per kind but one instance per type as we just create the
 -- representation directly from the type.
 class LiftT (t :: k) where
-  liftTyCl :: Q TTExp -- A CoreTyWrapper
+  liftTyCl :: TTExp -- A CoreTyWrapper
   m2 :: ()
 
 class LiftT c => CodeC (c :: Constraint) where
-  codeCevidence :: Q TExpU
+  codeCevidence :: THRep
 
 
 data CoreTyWrapper where
