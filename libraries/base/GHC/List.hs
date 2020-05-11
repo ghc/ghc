@@ -277,10 +277,10 @@ to list-producing functions abstracted over cons and nil. Here we call them
 FB functions because their names usually end with 'FB'. It's a good idea to
 inline FB functions because:
 
-* They are higher-order functions and therefore benefits from inlining.
+* They are higher-order functions and therefore benefit from inlining.
 
 * When the final consumer is a left fold, inlining the FB functions is the only
-  way to make arity expansion to happen. See Note [Left fold via right fold].
+  way to make arity expansion happen. See Note [Left fold via right fold].
 
 For this reason we mark all FB functions INLINE [0]. The [0] phase-specifier
 ensures that calls to FB functions can be written back to the original form
