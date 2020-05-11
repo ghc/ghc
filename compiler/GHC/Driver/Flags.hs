@@ -194,6 +194,7 @@ data GeneralFlag
    | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
    | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
    | Opt_CprAnal
+   | Opt_CaseBinderCpr             -- ^ Optimistically give returned case binders the CPR property
    | Opt_WorkerWrapper
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
