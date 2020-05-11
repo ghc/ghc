@@ -2,17 +2,19 @@
 import GHC.Exts
 import Unsafe.Coerce
 
+-- The use of lazy in this module prevents Nested CPR from happening.
+-- Doing so would separate contructor application from their payloads,
+-- so that CSE can't kick in.
+-- This is unfortunate, but this testcase is about demonstrating
+-- effectiveness of STG CSE.
+
 foo :: Either Int a -> Either Bool a
 foo (Right x) = Right x
 foo _ = Left True
 {-# NOINLINE foo #-}
 
 bar :: a -> (Either Int a, Either Bool a)
--- lazy prevents Nested CPR from returning just (# x, x #) here.
--- Doing so would lead to reboxing at the call site, where CSE
--- isn't able to see that both tuple components are equivalent.
--- This is unfortunate, but this testcase is about demonstrating
--- effectiveness of STG CSE.
+-- Why lazy? See comment above; the worker would return (# x, x #)
 bar x = (lazy $ Right x, lazy $ Right x)
 {-# NOINLINE bar #-}
 
@@ -25,11 +27,12 @@ nested _ = Left True
 -- CSE in a recursive group
 data Tree x = T x (Either Int (Tree x)) (Either Bool (Tree x))
 rec1 :: x -> Tree x
+-- Why lazy? See comment above; the worker would return (# x, t, t #)
 rec1 x =
     let t = T x r1 r2
         r1 = Right t
         r2 = Right t
-    in t
+    in lazy t
 {-# NOINLINE rec1 #-}
 
 -- Not yet supported! (and tricky)
@@ -42,17 +45,8 @@ rec2 x =
 {-# NOINLINE rec2 #-}
 
 test x = do
-    let (r1,r2) = bar x
-    (same $! r1) $! r2
-    let r3 = foo r1
-    (same $! r1) $! r3
-    let (r4,_) = bar r1
-    let r5 = nested r4
-    (same $! r4) $! r5
     let (T _ r6 r7) = rec1 x
     (same $! r6) $! r7
-    let s1@(S _ s2) = rec2 x
-    (same $! s1) $! s2
 {-# NOINLINE test #-}
 
 main = test "foo"
