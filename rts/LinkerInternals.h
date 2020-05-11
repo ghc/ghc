@@ -188,9 +188,9 @@ typedef struct _ObjectCode {
     Symbol_t *symbols;
     int    n_symbols;
 
-    /* Set of ObjectCode* that depends on this ObjectCode. When unloading this
-     * object code we check whether these are unreferenced. If not then we can't
-     * unload it. */
+    /* Set of ObjectCode* (HashTable with NULL values) that depends on this
+     * ObjectCode. When unloading this object code we check whether these are
+     * unreferenced. If not then we can't unload it. */
     HashTable *dependents;
 
     /* ptr to mem containing the object file image */

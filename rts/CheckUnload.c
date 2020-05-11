@@ -337,6 +337,9 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
             const StgInfoTable *info = get_itbl(c);
             uint32_t size;
 
+            // NOTE: This call could be omitted for info tables that we know
+            // can't be created by GHCi, e.g. MUT_VARs, ARR_WORDs etc. I'm not
+            // sure if it's worth optimizing this.
             checkAddress(addrs, info, s_indices);
 
             // NOTE: No need to check SRTs below because we can't refer to a

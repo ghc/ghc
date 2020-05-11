@@ -1279,14 +1279,6 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
 
-#if defined(DEBUG)
-    W_ keys[1000];
-    int n_keys = keysHashTable(oc->dependents, keys, 1000);
-    for (int i = 0; i < n_keys; ++i) {
-        debugBelch("dep %d: %p\n", i, (void*)keys[i]);
-    }
-#endif
-
     freeHashTable(oc->dependents, NULL);
 
     stgFree(oc);
