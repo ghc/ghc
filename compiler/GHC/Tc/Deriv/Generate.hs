@@ -592,8 +592,8 @@ gen_Enum_binds loc tycon = do
       [ succ_enum      dflags
       , pred_enum      dflags
       , to_enum        dflags
-      , enum_from      dflags
-      , enum_from_then dflags
+      , enum_from      dflags -- [0 ..]
+      , enum_from_then dflags -- [0, 1 ..]
       , from_enum      dflags
       ]
     aux_binds = listToBag $ map DerivAuxBind
