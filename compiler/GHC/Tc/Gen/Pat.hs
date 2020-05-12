@@ -888,6 +888,37 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside = 
 
       arg_tys' = substTys tenv arg_tys
 
+  (nonUserVarWrapper, remaining_user_data_con_ty) <-
+    topInstantiateInferred PatOrigin $ dataConUserType data_con
+
+  (nonInferredTyVarBinders, data_con_subst_user_ret_ty) <- do
+    -- split out pi telescope.
+    let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty
+    -- substitute both sides with fresh metavars
+    (userTenv, nonInferredTyVarBinders) <- mapAccumLM
+      (rebuildTyCoBinderX cloneTyVarTyVar) emptyTCvSubst bndrs
+    pure (nonInferredTyVarBinders, substTy userTenv res_ty)
+
+  let -- Iterate through the visible type arguments, extending the name environment
+      -- with variables bound by each one in turn.
+      extendNamesByTyApp :: Checker
+        (Either Type (LHsSigWcType (NoGhcTc GhcRn)), TyBinder)
+        HsWrapper
+      extendNamesByTyApp _penv x thing_inside' = case x of
+        (Left _, _) -> do
+          -- will be checked below, we don't do interleaved visible and invisible yet
+          v <- thing_inside'
+          return (mempty, v)
+        (Right arg, data_con_quantifer_step) -> do
+          (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
+          tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
+            let ty = case data_con_quantifer_step of
+                  Named (Bndr var _) -> TyVarTy var
+                  Anon _ ty          -> ty
+            c <- unifyType Nothing arg_ty ty
+            v <- thing_inside'
+            return (mkWpCastN c, v)
+
   let tcBody = tcConArgs (RealDataCon data_con) arg_tys' penv arg_pats thing_inside
 
   traceTc "tcConPat" (vcat [ ppr con_name
