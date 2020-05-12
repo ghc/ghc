@@ -345,7 +345,7 @@ findPackageModule hsc_env mod = do
         pkg_id = moduleUnit mod
         pkgstate = pkgState dflags
   --
-  case lookupInstalledPackage pkgstate pkg_id of
+  case lookupUnitId pkgstate pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
