@@ -12,8 +12,6 @@ module GHC.Unit.Info
    , mkUnitPprInfo
 
    , mkUnit
-   , expandedUnitInfoId
-   , definiteUnitInfoId
 
    , PackageId(..)
    , PackageName(..)
@@ -160,16 +158,6 @@ mkUnit p =
     if unitIsIndefinite p
         then mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
         else RealUnit (Definite (unitId p))
-
-expandedUnitInfoId :: UnitInfo -> Unit
-expandedUnitInfoId p =
-    mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
-
-definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
-definiteUnitInfoId p =
-    if unitIsIndefinite p
-       then Nothing
-       else Just (Definite (unitId p))
 
 -- | Create a UnitPprInfo from a UnitInfo
 mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
