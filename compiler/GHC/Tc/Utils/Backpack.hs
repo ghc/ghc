@@ -568,7 +568,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = getInstalledPackageDetails pkgstate (indefUnit inst_uid)
+                        pkg = unsafeLookupUnitId pkgstate (indefUnit inst_uid)
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
