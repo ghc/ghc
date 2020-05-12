@@ -366,7 +366,7 @@ buildUnit session cid insts lunit = do
 
 compileExe :: LHsUnit HsComponentId -> BkpM ()
 compileExe lunit = do
-    msgUnitId mainUnitId
+    msgUnitId mainUnit
     let deps_w_rns = hsunitDeps False (unLoc lunit)
         deps = map fst deps_w_rns
         -- no renaming necessary
