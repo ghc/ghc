@@ -18,6 +18,7 @@
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
 #include "sm/HeapUtils.h"
+#include "sm/CNF.h"
 
 //
 // Code that we unload may be referenced from:
@@ -320,6 +321,212 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
     }
 }
 
+static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
+        OCSectionIndices *s_indices)
+{
+    while (p < end) {
+        StgClosure *c = (StgClosure*)p;
+        const StgInfoTable *info = get_itbl(c);
+        uint32_t size;
+
+        // NOTE: This call could be omitted for info tables that we know
+        // can't be created by GHCi, e.g. MUT_VARs, ARR_WORDs etc. I'm not
+        // sure if it's worth optimizing this.
+        checkAddress(addrs, info, s_indices);
+
+        // NOTE: No need to check SRTs below because we can't refer to a
+        // dynamically loaded object from SRTs.
+
+        switch (info->type) {
+
+        case CONSTR:
+        case CONSTR_1_0:
+        case CONSTR_0_1:
+        case CONSTR_2_0:
+        case CONSTR_1_1:
+        case CONSTR_0_2:
+        case CONSTR_NOCAF:
+        case FUN:
+        case FUN_1_0:
+        case FUN_0_1:
+        case FUN_1_1:
+        case FUN_0_2:
+        case FUN_2_0:
+        case FUN_STATIC: // TODO: skip this?
+        case PRIM:
+        case MUT_PRIM:
+        case MVAR_CLEAN:
+        case MVAR_DIRTY:
+        case MUT_VAR_CLEAN:
+        case MUT_VAR_DIRTY:
+        case TVAR:
+        case BCO:
+        case BLOCKING_QUEUE:
+        {
+            for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
+                checkAddress(addrs, c->payload[i], s_indices);
+            }
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case THUNK:
+        case THUNK_1_0:
+        case THUNK_0_1:
+        case THUNK_2_0:
+        case THUNK_1_1:
+        case THUNK_0_2:
+        case THUNK_SELECTOR:
+        case THUNK_STATIC: // TODO: skip this?
+        {
+            StgThunk *thunk = (StgThunk*)c;
+            for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
+                checkAddress(addrs, thunk->payload[i], s_indices);
+            }
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case ARR_WORDS:
+        {
+            size = arr_words_sizeW((StgArrBytes*)c);
+            break;
+        }
+
+        case MUT_ARR_PTRS_CLEAN:
+        case MUT_ARR_PTRS_DIRTY:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
+        {
+            StgMutArrPtrs *a = (StgMutArrPtrs*)c;
+            for (W_ i = 0; i < a->ptrs; ++i) {
+                checkAddress(addrs, a->payload[i], s_indices);
+            }
+            size = mut_arr_ptrs_sizeW(a);
+            break;
+        }
+
+        case SMALL_MUT_ARR_PTRS_CLEAN:
+        case SMALL_MUT_ARR_PTRS_DIRTY:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+        {
+            StgSmallMutArrPtrs *a = (StgSmallMutArrPtrs*)c;
+            for (W_ i = 0; i < a->ptrs; ++i) {
+                checkAddress(addrs, a->payload[i], s_indices);
+            }
+            size = small_mut_arr_ptrs_sizeW(a);
+            break;
+        }
+
+        case TSO:
+        {
+            StgTSO *tso = (StgTSO*)c;
+
+            if (tso->bound != NULL) {
+                checkAddress(addrs, tso->bound->tso, s_indices);
+            }
+
+            checkAddress(addrs, tso->blocked_exceptions, s_indices);
+            checkAddress(addrs, tso->bq, s_indices);
+            checkAddress(addrs, tso->trec, s_indices);
+            checkAddress(addrs, tso->stackobj, s_indices);
+            checkAddress(addrs, tso->_link, s_indices);
+            checkAddress(addrs, tso->block_info.closure, s_indices);
+
+            size = sizeofW(StgTSO);
+            break;
+        }
+
+        case STACK:
+        {
+            StgStack *stack = (StgStack*)c;
+            searchStackChunk(addrs, stack->sp, stack->stack + stack->stack_size, s_indices);
+            size = stack_sizeW(stack);
+            break;
+        }
+
+        case WEAK:
+        {
+            StgWeak *w = (StgWeak*)c;
+            checkAddress(addrs, w->value, s_indices);
+            checkAddress(addrs, w->key, s_indices);
+            checkAddress(addrs, w->finalizer, s_indices);
+            checkAddress(addrs, w->cfinalizers, s_indices);
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case AP_STACK:
+        {
+            StgAP_STACK *ap = (StgAP_STACK*)c;
+            checkAddress(addrs, ap->fun, s_indices);
+            searchStackChunk(addrs, (StgPtr)ap->payload, (StgPtr)ap->payload + ap->size, s_indices);
+            size = ap_stack_sizeW(ap);
+            break;
+        }
+
+        case PAP:
+        {
+            StgPAP *pap = (StgPAP*)c;
+            checkAddress(addrs, pap->fun, s_indices);
+            search_PAP_payload(addrs, pap->fun, pap->payload, pap->n_args, s_indices);
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case AP:
+        {
+            StgAP *ap = (StgAP*)c;
+            checkAddress(addrs, ap->fun, s_indices);
+            search_PAP_payload(addrs, ap->fun, ap->payload, ap->n_args, s_indices);
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case IND:
+        case IND_STATIC: // TODO: skip this?
+        case BLACKHOLE:
+        {
+            checkAddress(addrs, ((StgInd*)c)->indirectee, s_indices);
+            size = closure_sizeW(c);
+            break;
+        }
+
+        case TREC_CHUNK:
+        {
+            StgTRecChunk *tc = ((StgTRecChunk *) p);
+            TRecEntry *e = &(tc -> entries[0]);
+            checkAddress(addrs, tc->prev_chunk, s_indices);
+            for (W_ i = 0; i < tc -> next_entry_idx; i ++, e++) {
+                checkAddress(addrs, e->tvar, s_indices);
+                checkAddress(addrs, e->expected_value, s_indices);
+                checkAddress(addrs, e->new_value, s_indices);
+            }
+            size = sizeofW(StgTRecChunk);
+            break;
+        }
+
+        case COMPACT_NFDATA:
+        {
+            StgCompactNFData *str = (StgCompactNFData*)c;
+            for (StgCompactNFDataBlock *block = compactGetFirstBlock(str); block; block = block->next) {
+                bdescr *bd = Bdescr((P_)block);
+                StgPtr start = bd->start + sizeofW(StgCompactNFDataBlock);
+                searchHeapBlock(addrs, start, bd->free, s_indices);
+            }
+            size = sizeofW(StgCompactNFData);
+            break;
+        }
+
+        default:
+            barf("searchHeapBlocks: %d", info->type);
+        }
+
+        p += size;
+    }
+}
+
 static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
         OCSectionIndices *s_indices)
 {
@@ -331,202 +538,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
             continue;
         }
 
-        StgPtr p = bd->start;
-        while (p < bd->free) {
-            StgClosure *c = (StgClosure*)p;
-            const StgInfoTable *info = get_itbl(c);
-            uint32_t size;
-
-            // NOTE: This call could be omitted for info tables that we know
-            // can't be created by GHCi, e.g. MUT_VARs, ARR_WORDs etc. I'm not
-            // sure if it's worth optimizing this.
-            checkAddress(addrs, info, s_indices);
-
-            // NOTE: No need to check SRTs below because we can't refer to a
-            // dynamically loaded object from SRTs.
-
-            switch (info->type) {
-
-            case CONSTR:
-            case CONSTR_1_0:
-            case CONSTR_0_1:
-            case CONSTR_2_0:
-            case CONSTR_1_1:
-            case CONSTR_0_2:
-            case CONSTR_NOCAF:
-            case FUN:
-            case FUN_1_0:
-            case FUN_0_1:
-            case FUN_1_1:
-            case FUN_0_2:
-            case FUN_2_0:
-            case FUN_STATIC: // TODO: skip this?
-            case PRIM:
-            case MUT_PRIM:
-            case MVAR_CLEAN:
-            case MVAR_DIRTY:
-            case MUT_VAR_CLEAN:
-            case MUT_VAR_DIRTY:
-            case TVAR:
-            case BCO:
-            case BLOCKING_QUEUE:
-            {
-                for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
-                    checkAddress(addrs, c->payload[i], s_indices);
-                }
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case THUNK:
-            case THUNK_1_0:
-            case THUNK_0_1:
-            case THUNK_2_0:
-            case THUNK_1_1:
-            case THUNK_0_2:
-            case THUNK_SELECTOR:
-            case THUNK_STATIC: // TODO: skip this?
-            {
-                StgThunk *thunk = (StgThunk*)c;
-                for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
-                    checkAddress(addrs, thunk->payload[i], s_indices);
-                }
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case ARR_WORDS:
-            {
-                size = arr_words_sizeW((StgArrBytes*)c);
-                break;
-            }
-
-            case MUT_ARR_PTRS_CLEAN:
-            case MUT_ARR_PTRS_DIRTY:
-            case MUT_ARR_PTRS_FROZEN_CLEAN:
-            case MUT_ARR_PTRS_FROZEN_DIRTY:
-            {
-                StgMutArrPtrs *a = (StgMutArrPtrs*)c;
-                for (W_ i = 0; i < a->ptrs; ++i) {
-                    checkAddress(addrs, a->payload[i], s_indices);
-                }
-                size = mut_arr_ptrs_sizeW(a);
-                break;
-            }
-
-            case SMALL_MUT_ARR_PTRS_CLEAN:
-            case SMALL_MUT_ARR_PTRS_DIRTY:
-            case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
-            case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-            {
-                StgSmallMutArrPtrs *a = (StgSmallMutArrPtrs*)c;
-                for (W_ i = 0; i < a->ptrs; ++i) {
-                    checkAddress(addrs, a->payload[i], s_indices);
-                }
-                size = small_mut_arr_ptrs_sizeW(a);
-                break;
-            }
-
-            case TSO:
-            {
-                StgTSO *tso = (StgTSO*)c;
-
-                if (tso->bound != NULL) {
-                    checkAddress(addrs, tso->bound->tso, s_indices);
-                }
-
-                checkAddress(addrs, tso->blocked_exceptions, s_indices);
-                checkAddress(addrs, tso->bq, s_indices);
-                checkAddress(addrs, tso->trec, s_indices);
-                checkAddress(addrs, tso->stackobj, s_indices);
-                checkAddress(addrs, tso->_link, s_indices);
-                checkAddress(addrs, tso->block_info.closure, s_indices);
-
-                size = sizeofW(StgTSO);
-                break;
-            }
-
-            case STACK:
-            {
-                StgStack *stack = (StgStack*)c;
-                searchStackChunk(addrs, stack->sp, stack->stack + stack->stack_size, s_indices);
-                size = stack_sizeW(stack);
-                break;
-            }
-
-            case WEAK:
-            {
-                StgWeak *w = (StgWeak*)c;
-                checkAddress(addrs, w->value, s_indices);
-                checkAddress(addrs, w->key, s_indices);
-                checkAddress(addrs, w->finalizer, s_indices);
-                checkAddress(addrs, w->cfinalizers, s_indices);
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case AP_STACK:
-            {
-                StgAP_STACK *ap = (StgAP_STACK*)c;
-                checkAddress(addrs, ap->fun, s_indices);
-                searchStackChunk(addrs, (StgPtr)ap->payload, (StgPtr)ap->payload + ap->size, s_indices);
-                size = ap_stack_sizeW(ap);
-                break;
-            }
-
-            case PAP:
-            {
-                StgPAP *pap = (StgPAP*)c;
-                checkAddress(addrs, pap->fun, s_indices);
-                search_PAP_payload(addrs, pap->fun, pap->payload, pap->n_args, s_indices);
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case AP:
-            {
-                StgAP *ap = (StgAP*)c;
-                checkAddress(addrs, ap->fun, s_indices);
-                search_PAP_payload(addrs, ap->fun, ap->payload, ap->n_args, s_indices);
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case IND:
-            case IND_STATIC: // TODO: skip this?
-            case BLACKHOLE:
-            {
-                checkAddress(addrs, ((StgInd*)c)->indirectee, s_indices);
-                size = closure_sizeW(c);
-                break;
-            }
-
-            case TREC_CHUNK:
-            {
-                StgTRecChunk *tc = ((StgTRecChunk *) p);
-                TRecEntry *e = &(tc -> entries[0]);
-                checkAddress(addrs, tc->prev_chunk, s_indices);
-                for (W_ i = 0; i < tc -> next_entry_idx; i ++, e++) {
-                    checkAddress(addrs, e->tvar, s_indices);
-                    checkAddress(addrs, e->expected_value, s_indices);
-                    checkAddress(addrs, e->new_value, s_indices);
-                }
-                size = sizeofW(StgTRecChunk);
-                break;
-            }
-
-            case COMPACT_NFDATA:
-            {
-                barf("searchHeapBlocks: COMPACT_NFDATA");
-                break;
-            }
-
-            default:
-                barf("searchHeapBlocks: %d", info->type);
-            }
-
-            p += size;
-        }
+        searchHeapBlock(addrs, bd->start, bd->free, s_indices);
     }
 }
 
