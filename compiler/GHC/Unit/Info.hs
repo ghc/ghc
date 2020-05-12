@@ -153,11 +153,19 @@ pprUnitInfo GenericUnitInfo {..} =
   where
     field name body = text name <> colon <+> nest 4 body
 
+-- | Make a `Unit` from a `UnitInfo`
+--
+-- If the unit is definite, make a `RealUnit` from `unitId` field.
+--
+-- If the unit is indefinite, make a `VirtUnit` from `unitInstanceOf` and
+-- `unitInstantiations` fields. Note that in this case we don't keep track of
+-- `unitId`. It can be retrieved later with "improvement", i.e. matching on
+-- `unitInstanceOf/unitInstantiations` fields (see Note [About units] in
+-- GHC.Unit).
 mkUnit :: UnitInfo -> Unit
-mkUnit p =
-    if unitIsIndefinite p
-        then mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
-        else RealUnit (Definite (unitId p))
+mkUnit p
+   | unitIsIndefinite p = mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
+   | otherwise          = RealUnit (Definite (unitId p))
 
 -- | Create a UnitPprInfo from a UnitInfo
 mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
