@@ -899,62 +899,48 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside = 
                            , ppr ctxt_res_tys
                            , ppr arg_tys'
                            , ppr arg_pats ])
-  if null ex_tvs && null eq_spec && null theta
-    then do
-      -- The common case; no class bindings etc
-      -- (see Note [Arrows and patterns])
-      (arg_pats', res) <- tcBody
-      let res_pat = ConPat
-            { pat_con = header
-            , pat_args = arg_pats'
-            , pat_con_ext = ConPatTc
-              { cpt_tvs = [], cpt_dicts = []
-              , cpt_binds = emptyTcEvBinds
-              , cpt_arg_tys = ctxt_res_tys
-              , cpt_wrap = idHsWrapper
-              }
+  when (not $ null ex_tvs && null eq_spec && null theta) $ do
+    -- Ensure we have enough extensions for the general case, with
+    -- existential, and local equality constraints
+    let no_equalities = null eq_spec && not (any isEqPred theta)
+
+    gadts_on    <- xoptM LangExt.GADTs
+    families_on <- xoptM LangExt.TypeFamilies
+    checkTc (no_equalities || gadts_on || families_on)
+              (text "A pattern match on a GADT requires the" <+>
+               text "GADTs or TypeFamilies language extension")
+              -- #2905 decided that a *pattern-match* of a GADT
+              -- should require the GADT language flag.
+              -- Re TypeFamilies see also #7156
+
+  given <- do
+    let theta'     = case (eq_spec, theta) of
+          -- Special case because of paranoia about peformance as we delete
+          -- a large Haskell 98 happy path. Please try removing this.
+          ([], []) -> []
+          -- Order is *important* as we generate the list of
+          -- dictionary binders from theta'
+          _ -> substTheta tenv (eqSpecPreds eq_spec ++ theta)
+    mapM newEvVar theta'
+  (ev_binds, (arg_pats', res)) <- do
+    let skol_info = PatSkol (RealDataCon data_con) mc
+        mc = case pe_ctxt penv of
+          LamPat mc -> mc
+          LetPat {} -> PatBindRhs
+    checkConstraints skol_info ex_tvs' given tcBody
+
+  let res_pat = ConPat
+        { pat_con = header
+        , pat_args = arg_pats'
+        , pat_con_ext = ConPatTc
+            { cpt_tvs   = ex_tvs'
+            , cpt_dicts = given
+            , cpt_binds = ev_binds
+            , cpt_arg_tys = ctxt_res_tys
+            , cpt_wrap  = idHsWrapper
             }
-
-      return (mkHsWrapPat wrap res_pat pat_ty, res)
-
-    else do
-      -- The general case, with existential,
-      -- and local equality constraints
-      let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
-                         -- order is *important* as we generate the list of
-                         -- dictionary binders from theta'
-          no_equalities = null eq_spec && not (any isEqPred theta)
-          skol_info = PatSkol (RealDataCon data_con) mc
-          mc = case pe_ctxt penv of
-                 LamPat mc -> mc
-                 LetPat {} -> PatBindRhs
-
-      gadts_on    <- xoptM LangExt.GADTs
-      families_on <- xoptM LangExt.TypeFamilies
-      checkTc (no_equalities || gadts_on || families_on)
-                (text "A pattern match on a GADT requires the" <+>
-                 text "GADTs or TypeFamilies language extension")
-                -- #2905 decided that a *pattern-match* of a GADT
-                -- should require the GADT language flag.
-                -- Re TypeFamilies see also #7156
-
-      given <- newEvVars theta'
-      (ev_binds, (arg_pats', res))
-           <- checkConstraints skol_info ex_tvs' given $
-              tcBody
-
-      let res_pat = ConPat
-              { pat_con   = header
-              , pat_args  = arg_pats'
-              , pat_con_ext = ConPatTc
-                { cpt_tvs   = ex_tvs'
-                , cpt_dicts = given
-                , cpt_binds = ev_binds
-                , cpt_arg_tys = ctxt_res_tys
-                , cpt_wrap  = idHsWrapper
-                }
-              }
-      return (mkHsWrapPat wrap res_pat pat_ty, res)
+        }
+  return (mkHsWrapPat wrap res_pat pat_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
