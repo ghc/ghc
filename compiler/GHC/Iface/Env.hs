@@ -7,11 +7,14 @@ module GHC.Iface.Env (
         externaliseName,
         lookupIfaceTop,
         lookupOrig, lookupOrigIO, lookupOrigNameCache, extendNameCache,
-        newIfaceName, newIfaceNames,
+        newIfaceName, newIfaceNameUnique, newIfaceNames,
         extendIfaceIdEnv, extendIfaceTyVarEnv,
         tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
         lookupIfaceTyVar, extendIfaceEnvs,
         setNameModule,
+
+        extendIntIfaceEnv,
+
 
         ifaceExportNames,
 
@@ -37,6 +40,10 @@ import GHC.Iface.Type
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
+import qualified Data.Map as M
+import GHC.Types.Unique
+import qualified Data.IntMap as I
+import Control.Applicative ((<|>))
 
 import Outputable
 import Data.List     ( partition )
@@ -221,12 +228,13 @@ setNameModule (Just m) n =
 ************************************************************************
 -}
 
-tcIfaceLclId :: FastString -> IfL Id
-tcIfaceLclId occ
+tcIfaceLclId :: Maybe Int -> FastString  -> IfL Id
+tcIfaceLclId n occ
   = do  { lcl <- getLclEnv
-        ; case (lookupFsEnv (if_id_env lcl) occ) of
-            Just ty_var -> return ty_var
-            Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
+        ; case (n >>= flip lookup (if_binder_env lcl) >>= flip I.lookup (if_int_env lcl))
+                 <|> (lookupFsEnv (if_id_env lcl) occ) of
+                Just b  -> return b
+                Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
         }
 
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
@@ -236,6 +244,12 @@ extendIfaceIdEnv ids thing_inside
               ; pairs   = [(occNameFS (getOccName id), id) | id <- ids] }
         ; setLclEnv (env { if_id_env = id_env' }) thing_inside }
 
+extendIntIfaceEnv :: Id -> IfL a -> IfL a
+extendIntIfaceEnv name thing_inside
+  = do  { env <- getLclEnv
+        ; let { i = getKey (getUnique name)
+              ; int_env' = I.insert i name (if_int_env env)  }
+        ; setLclEnv (env { if_int_env = int_env' }) thing_inside }
 
 tcIfaceTyVar :: FastString -> IfL TyVar
 tcIfaceTyVar occ
@@ -251,7 +265,7 @@ lookupIfaceTyVar (occ, _)
         ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
-lookupIfaceVar (IfaceIdBndr (occ, _))
+lookupIfaceVar (IfaceIdBndr (occ,_, _))
   = do  { lcl <- getLclEnv
         ; return (lookupFsEnv (if_id_env lcl) occ) }
 lookupIfaceVar (IfaceTvBndr (occ, _))
@@ -286,10 +300,13 @@ lookupIfaceTop :: OccName -> IfL Name
 lookupIfaceTop occ
   = do  { env <- getLclEnv; lookupOrig (if_mod env) occ }
 
-newIfaceName :: OccName -> IfL Name
+newIfaceName :: OccName  -> IfL Name
 newIfaceName occ
   = do  { uniq <- newUnique
         ; return $! mkInternalName uniq occ noSrcSpan }
+
+newIfaceNameUnique :: OccName -> Unique -> IfL Name
+newIfaceNameUnique occ unique = return $! mkInternalName unique occ noSrcSpan 
 
 newIfaceNames :: [OccName] -> IfL [Name]
 newIfaceNames occs

@@ -88,7 +88,7 @@ dsBracketTc :: CoreExpr -- This is a CoreExpr representing an Exp
 dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
   = do
       (bounds_vars, body) <- do_brack brack
-      sps <- mapMaybeM (do_one bounds_vars) splices
+      sps <- mapMaybeM (do_one (dVarSetToVarSet bounds_vars)) splices
       zss <- mapM do_one_z zs
       (ev_zss, ev_tss) <- mapAndUnzipM do_one_ev ev_zs
 
@@ -102,8 +102,12 @@ dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
       th_rep_tc <- dsLookupTyCon thRepTyConName
       let thRepTy = mkBoxedTupleTy [intTy, mkTyConApp th_rep_tc []]
 
+      dflags <- getDynFlags
+      let mkKExpr = mkIntExprInt (targetPlatform dflags)
+          bids = map (mkKExpr . getKey . getUnique) (dVarSetElems bounds_vars)
+
       --pprTraceM "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
-      return $ mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, body]
+      return $ mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, mkListExpr intTy bids, body]
   where
     do_one_z (PendingZonkSplice n _mt mn e) = do
       let k = getKey (idUnique n)
@@ -171,36 +175,23 @@ dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
     do_brack (TExpBr _ e)  = do { (bs, s) <- repLE' e; return (bs, s) }
     do_brack _ = panic "dsBracket: unexpected XBracket"
 
-{- -------------- Examples --------------------
 
-  [| \x -> x |]
-====>
-  gensym (unpackString "x"#) `bindQ` \ x1::String ->
-  lam (pvar x1) (var x1)
-
-
-  [| \x -> $(f [| x |]) |]
-====>
-  gensym (unpackString "x"#) `bindQ` \ x1::String ->
-  lam (pvar x1) (f (var x1))
--}
-
-boundVars :: CoreExpr -> VarSet
-boundVars (Lam x b)       = unitVarSet x `unionVarSet` boundVars b
-boundVars (App f a)       = boundVars f `unionVarSet` boundVars a
-boundVars (Case s x ty as) = unitVarSet x `unionVarSet` boundVars s `unionVarSet` unionVarSets (map boundVarsAlt as)
-boundVars (Let b e)       = boundVarsBind b `unionVarSet` (boundVars e)
+boundVars :: CoreExpr -> DVarSet
+boundVars (Lam x b)       = unitDVarSet x `unionDVarSet` boundVars b
+boundVars (App f a)       = boundVars f `unionDVarSet` boundVars a
+boundVars (Case s x ty as) = unitDVarSet x `unionDVarSet` boundVars s `unionDVarSet` unionDVarSets (map boundVarsAlt as)
+boundVars (Let b e)       = boundVarsBind b `unionDVarSet` (boundVars e)
 boundVars (Cast e co)     = boundVars e
 boundVars (Tick t e)      = boundVars e
-boundVars _ = emptyVarSet
+boundVars _ = emptyDVarSet
 
-boundVarsAlt :: Alt CoreBndr -> VarSet
-boundVarsAlt (_, bs, e) = mkVarSet bs `unionVarSet` boundVars e
+boundVarsAlt :: Alt CoreBndr -> DVarSet
+boundVarsAlt (_, bs, e) = mkDVarSet bs `unionDVarSet` boundVars e
 
 
 
-boundVarsBind (NonRec b e) = unitVarSet b `unionVarSet` boundVars e
-boundVarsBind (Rec g) = unionVarSets (map (\(b, e) -> unitVarSet b `unionVarSet` boundVars e) g)
+boundVarsBind (NonRec b e) = unitDVarSet b `unionDVarSet` boundVars e
+boundVarsBind (Rec g) = unionDVarSets (map (\(b, e) -> unitDVarSet b `unionDVarSet` boundVars e) g)
 
 
 
@@ -208,7 +199,7 @@ boundVarsBind (Rec g) = unionVarSets (map (\(b, e) -> unitVarSet b `unionVarSet`
 --              Expressions
 -----------------------------------------------------------------------------
 
-repLE' :: LHsExpr GhcTc -> DsM (VarSet, CoreExpr)
+repLE' :: LHsExpr GhcTc -> DsM (DVarSet, CoreExpr)
 repLE' (L loc e) = putSrcSpanDs loc (repECore e)
 
 coreStringLit :: String -> DsM (Core String)
@@ -220,7 +211,7 @@ repType ty = do
   --pprTraceM "Writing type" (ppr ty)
   liftIO (writeBracket it) >>= buildTHRep
 
-repECore :: HsExpr GhcTc -> DsM (VarSet, CoreExpr)
+repECore :: HsExpr GhcTc -> DsM (DVarSet, CoreExpr)
 repECore e = do
   {-c_e <- mkCoreLams vs <$> dsExpr e
   dflags <- getDynFlags
@@ -235,7 +226,7 @@ repECore e = do
   dflags <- getDynFlags
   -- Inline Type Lets, in particular
   let c_e' = simpleOptExpr dflags c_e
-  --pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
+  pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
   res <- repCore c_e
   return (bvs, res)
 

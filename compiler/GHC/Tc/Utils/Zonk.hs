@@ -813,7 +813,7 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
       --pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
       --pprTraceM "splice_key" (ppr t')
       let fvs = fvVarList (tyCoFVsOfType t')
-      --pprTraceM "zonk_z_2" (ppr fvs)
+      pprTraceM "zonk_z_2" (ppr t' $$ ppr fvs)
       sp_points <- forM (zip [0..] fvs) $ \(k, v) -> do
                       sp <- mkSpliceId (idType v)
                       return ((v, sp), PendingZonkSplice sp Nothing (Just k) e')

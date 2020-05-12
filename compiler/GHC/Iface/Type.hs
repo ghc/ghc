@@ -100,21 +100,21 @@ data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
-type IfaceIdBndr  = (IfLclName, IfaceType)
+type IfaceIdBndr  = (IfLclName, Int, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
 ifaceTvBndrName (n,_) = n
 
 ifaceIdBndrName :: IfaceIdBndr -> IfLclName
-ifaceIdBndrName (n,_) = n
+ifaceIdBndrName (n,_,_) = n
 
 ifaceBndrName :: IfaceBndr -> IfLclName
 ifaceBndrName (IfaceTvBndr bndr) = ifaceTvBndrName bndr
 ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
 
 ifaceBndrType :: IfaceBndr -> IfaceType
-ifaceBndrType (IfaceIdBndr (_, t)) = t
+ifaceBndrType (IfaceIdBndr (_,_, t)) = t
 ifaceBndrType (IfaceTvBndr (_, t)) = t
 
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
@@ -731,7 +731,7 @@ pprIfaceLamBndr (b, IfaceNoOneShot) = ppr b
 pprIfaceLamBndr (b, IfaceOneShot)   = ppr b <> text "[OneShot]"
 
 pprIfaceIdBndr :: IfaceIdBndr -> SDoc
-pprIfaceIdBndr (name, ty) = parens (ppr name <+> dcolon <+> ppr ty)
+pprIfaceIdBndr (name, n,ty) = parens (ppr name <+> dcolon <+> ppr ty <+> ppr n)
 
 {- Note [Suppressing binder signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1009,8 +1009,8 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
     go _ _ ty@(IfaceCoercionTy {}) = ty
 
     go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
-    go_ifacebndr subs (Bndr (IfaceIdBndr (n, t)) argf)
-      = Bndr (IfaceIdBndr (n, go True subs t)) argf
+    go_ifacebndr subs (Bndr (IfaceIdBndr (n, u, t)) argf)
+      = Bndr (IfaceIdBndr (n, u,go True subs t)) argf
     go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
       = Bndr (IfaceTvBndr (n, go True subs t)) argf
 
@@ -1564,9 +1564,9 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) kind_co co')
+    split_co (IfaceForAllCo (IfaceTvBndr (name,_)) kind_co co')
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
-    split_co (IfaceForAllCo (IfaceIdBndr (name, _)) kind_co co')
+    split_co (IfaceForAllCo (IfaceIdBndr (name,u, _)) kind_co co')
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 

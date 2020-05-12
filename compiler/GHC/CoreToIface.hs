@@ -120,6 +120,7 @@ toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
 toIfaceIdBndrX fr covar = ( occNameFS (getOccName covar)
+                          , getKey (getUnique covar)
                           , toIfaceTypeX fr (varType covar)
                           )
 
@@ -619,7 +620,9 @@ toIfaceVar fvs v
     -- The variables in this set are the ones which are not bound in the quotation, if it's
     -- bound in the quotation then the IfaceLcl code path is taken.
     | v `elemVarSet` fvs              = IfaceExactLocal (getKey (nameUnique name)) (getOccFS name) (toIfaceTypeX fvs (idType v)) --IfaceLcl (getOccFS name)
-    | otherwise = IfaceLcl (getOccFS name)
+    | otherwise =
+        --pprTrace "IfaceLcl" (ppr name $$ ppr (getOccFS name) $$ ppr fvs)
+        (IfaceLcl (getKey (getUnique name)) (getOccFS name))
   where name = idName v
 
 isSpliceVar :: Name -> Maybe Int

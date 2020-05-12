@@ -484,7 +484,8 @@ ifaceDeclFingerprints hash decl
 -}
 
 data IfaceExpr
-  = IfaceLcl    IfLclName
+  = IfaceLcl    Int IfLclName -- The Int tells us exactly which binder the name is bound to. It could be substituted when loadCoreExpr loads the TH quote to
+                              -- a fresh dynamically bound unique.
   | IfaceExt    IfExtName
   | IfaceSplice Int                     -- A splice point
   | IfaceExactLocal Int IfLclName IfaceType      -- A local name from TH
@@ -1288,7 +1289,7 @@ pprParendIfaceExpr = pprIfaceExpr parens
 -- an atomic value (e.g. function args)
 pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
-pprIfaceExpr _       (IfaceLcl v)       = ppr v
+pprIfaceExpr _       (IfaceLcl n v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
 pprIfaceExpr _       (IfaceExactLocal u fs t) = brackets (ppr u <+> ppr fs <+> ppr t)
 pprIfaceExpr _       (IfaceSplice n)    = ppr n
@@ -1646,7 +1647,7 @@ freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
     -- kinds can have Names inside, because of promotion
 
 freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
-freeNamesIfIdBndr (_fs,k ) = freeNamesIfKind k
+freeNamesIfIdBndr (_fs,_,k ) = freeNamesIfKind k
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo = fnList freeNamesItem
@@ -2209,8 +2210,9 @@ instance Binary IfaceUnfolding where
 
 
 instance Binary IfaceExpr where
-    put_ bh (IfaceLcl aa) = do
+    put_ bh (IfaceLcl n aa) = do
         putByte bh 0
+        put_ bh n
         put_ bh aa
     put_ bh (IfaceType ab) = do
         putByte bh 1
@@ -2273,8 +2275,9 @@ instance Binary IfaceExpr where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> do aa <- get bh
-                    return (IfaceLcl aa)
+            0 -> do n <- get bh
+                    aa <- get bh
+                    return (IfaceLcl n aa)
             1 -> do ab <- get bh
                     return (IfaceType ab)
             2 -> do ab <- get bh
@@ -2529,7 +2532,7 @@ instance NFData IfaceUnfolding where
 
 instance NFData IfaceExpr where
   rnf = \case
-    IfaceLcl nm -> rnf nm
+    IfaceLcl n nm -> rnf nm
     IfaceExt nm -> rnf nm
     IfaceType ty -> rnf ty
     IfaceCo co -> rnf co

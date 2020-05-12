@@ -3,7 +3,7 @@
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
              GADTs, UnboxedTuples, UnboxedSums, TypeInType,
-             Trustworthy, AllowAmbiguousTypes, PolyKinds #-}
+             Trustworthy, AllowAmbiguousTypes, PolyKinds, TupleSections #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
@@ -264,6 +264,16 @@ class Monad m => Quote m where
 instance Quote Q where
   newName s = Q (qNewName s)
 
+-- | Very hacky, used for now in TTH generation of
+-- fresh binders.
+freshInt :: Quote m => m Int
+freshInt = do
+  n <- newName "fresh"
+  case n of
+    (Name _ (NameU u)) -> return (fromIntegral u)
+    _ -> error "ha"
+
+
 -----------------------------------------------------
 --
 --              The TExp type
@@ -387,15 +397,16 @@ data TExp (a :: TYPE (r :: RuntimeRep)) =
   TExp { unType :: Exp
        , typedRep :: TExpU } deriving Generic
 
-data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], ev :: [(Int, THRep)], expr_str :: THRep } deriving (Generic, Data)
+data TExpU = TExpU { tenv :: [(Int, TTExp)], env :: [(Int, TExpU)], ev :: [(Int, THRep)], expr_renamed :: [(Int, Int)], expr_str :: THRep } deriving (Generic, Data)
 
 
 --unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
-unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp, [(Int, TTExp)], [(Int, m TExpU)], [(Int, THRep)],  THRep) -> m (TExp a)
-unsafeTExpCoerce (e, ts, qu, evs, s) =
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp, [(Int, TTExp)], [(Int, m TExpU)], [(Int, THRep)],  [Int], THRep) -> m (TExp a)
+unsafeTExpCoerce (e, ts, qu, evs, bound_vars, s) =
   do { e' <- e
      ; qu' <- sequence (map sequence qu)
-     ; return (TExp e' (TExpU ts qu' evs s)) }
+     ; renamed_vars <- mapM (\n -> (n,) <$> freshInt) bound_vars
+     ; return (TExp e' (TExpU ts qu' evs renamed_vars s)) }
 
 newtype THRep = THRep ByteString deriving (Generic, Data)
 

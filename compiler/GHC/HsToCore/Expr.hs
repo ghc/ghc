@@ -812,11 +812,11 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
     else dsLExpr expr
 
 dsSplicedD :: Maybe SDoc -> TExpU -> DsM CoreExpr
-dsSplicedD before (TExpU zs env evs e) = do
+dsSplicedD before (TExpU zs env evs subst e) = do
       let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
           zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
-          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] b)) evs
-      loadCoreExpr before zs' (es ++ evs') e
+          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] [] b)) evs
+      loadCoreExpr before zs' (es ++ evs') subst e
 
 dsSplicedT :: TTExp -> DsM Type
 dsSplicedT (TTExp zs t) =
@@ -847,11 +847,11 @@ instance Outputable TTExp where
   ppr (TTExp t t') = ppr t <+> text "TTREP"
 
 instance Outputable TExpU where
-  ppr (TExpU t t' t'' _) = ppr t <+> ppr t' <+> text "TREP"
+  ppr (TExpU t t' sub t'' _) = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
-loadCoreExpr :: Maybe SDoc -> [(Unique, TTExp)] -> [(Unique, TExpU)] -> THRep -> DsM CoreExpr
-loadCoreExpr before zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
+loadCoreExpr :: Maybe SDoc -> [(Unique, TTExp)] -> [(Unique, TExpU)] -> [(Int, Int)] -> THRep -> DsM CoreExpr
+loadCoreExpr before zs menv subst (THRep s) = do --pprTrace "LOADING" (ppr (map (getKey . fst) zs) $$ ppr menv $$ text (show s)) $ do
   env <- getGblEnv
   hs_env <- env_top <$> getEnv
   nc <- liftIO $ readIORef (hsc_NC hs_env)
@@ -864,8 +864,9 @@ loadCoreExpr before zs menv (THRep s) = do --pprTrace "LOADING" (ppr (map (getKe
   let (if_gbl, if_lcl) = ds_if_env env
       if_lcl' = if_lcl { if_meta_env = addListToUFM_Directly (if_meta_env if_lcl) menv
                        , if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
+                       , if_binder_env = subst ++ (if_binder_env if_lcl)
                        , if_dsm_env  = Just dsm_envs }
-  --pprTrace "loadCoreExpr" (ppr i) (return ())
+  pprTrace "loadCoreExpr" (ppr subst) (return ())
   res <-
     setEnvs (if_gbl, if_lcl') $
     --pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)

@@ -611,7 +611,7 @@ rnIfaceUnfolding (IfDFunUnfold bs ops)
     = IfDFunUnfold <$> rnIfaceBndrs bs <*> mapM rnIfaceExpr ops
 
 rnIfaceExpr :: Rename IfaceExpr
-rnIfaceExpr (IfaceLcl name) = pure (IfaceLcl name)
+rnIfaceExpr (IfaceLcl n name) = pure (IfaceLcl n name)
 rnIfaceExpr (IfaceExactLocal u name ty) = IfaceExactLocal u name <$> rnIfaceType ty
 rnIfaceExpr (IfaceExt gbl) = IfaceExt <$> rnIfaceGlobal gbl
 rnIfaceExpr (IfaceType ty) = IfaceType <$> rnIfaceType ty

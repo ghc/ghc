@@ -186,6 +186,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
+import qualified Data.IntMap as I
 
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
@@ -1890,7 +1891,9 @@ mkIfLclEnv mod loc boot
                                 if_id_env  = emptyFsEnv,
                                 if_dsm_env = Nothing,
                                 if_meta_env = emptyVarEnv,
-                                if_ty_meta_env = emptyVarEnv }
+                                if_ty_meta_env = emptyVarEnv,
+                                if_binder_env = [],
+                                if_int_env = I.empty }
 
 -- | Run an 'IfG' (top-level interface monad) computation inside an existing
 -- 'TcRn' (typecheck-renaming monad) computation by initializing an 'IfGblEnv'

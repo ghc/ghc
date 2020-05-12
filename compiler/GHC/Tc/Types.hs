@@ -121,6 +121,7 @@ import GHC.Driver.Session
 import Outputable
 import ListSetOps
 import Fingerprint
+import FastString
 import Util
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
@@ -136,11 +137,14 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
+import qualified Data.Map as M
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
 
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
+
+import qualified Data.IntMap as I
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -285,7 +289,9 @@ data IfLclEnv
         if_id_env  :: FastStringEnv Id,         -- Nested id binding
         if_dsm_env :: Maybe (DsGblEnv, DsLclEnv),
         if_meta_env :: UniqFM TH.TExpU,
-        if_ty_meta_env :: UniqFM TH.TTExp
+        if_ty_meta_env :: UniqFM TH.TTExp,
+        if_binder_env :: [(Int, Int)], -- ^ A mapping from binders to a new dynamic int
+        if_int_env :: I.IntMap Id
     }
 
 {-

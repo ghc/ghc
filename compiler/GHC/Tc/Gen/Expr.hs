@@ -1984,9 +1984,9 @@ addLiftT :: Id -> TcM ()
 addLiftT i = do
   let t = fvVarList (tyCoFVsOfType (idType i))
   b <- getStage
-  pprTraceM "addLiftT" (ppr i $$ ppr t)
   case b of
     Brack st (TcPending _ zs_var _) -> forM_ @[] t $ \v -> do
+      pprTraceM "addLiftT" (ppr i $$ ppr t)
       ev <- setStage st $ emitTypeable (mkTyVarTy v)
       zs <- readMutVar zs_var
       writeMutVar zs_var (PendingZonkSplice2 v ev : zs)

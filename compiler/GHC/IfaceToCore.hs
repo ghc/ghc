@@ -924,8 +924,8 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
           -- below is always guaranteed to succeed.
         ; user_tv_bndrs <- mapM (\(Bndr bd vis) ->
                                    case bd of
-                                     IfaceIdBndr (name, _) ->
-                                       Bndr <$> tcIfaceLclId name <*> pure vis
+                                     IfaceIdBndr (name, u, _) ->
+                                       Bndr <$> tcIfaceLclId (Just u) name <*> pure vis
                                      IfaceTvBndr (name, _) ->
                                        Bndr <$> tcIfaceTyVar name <*> pure vis)
                                 user_bndrs
@@ -1269,7 +1269,7 @@ tcIfaceCo = go
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 
     go_var :: FastString -> IfL CoVar
-    go_var = tcIfaceLclId
+    go_var = tcIfaceLclId Nothing
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
@@ -1294,8 +1294,8 @@ tcIfaceExpr (IfaceCo co)
 tcIfaceExpr (IfaceCast expr co)
   = Cast <$> tcIfaceExpr expr <*> tcIfaceCo co
 
-tcIfaceExpr (IfaceLcl name)
-  = Var <$> tcIfaceLclId name
+tcIfaceExpr (IfaceLcl n name)
+  = Var <$> tcIfaceLclId (Just n) name
 
 tcIfaceExpr (IfaceExactLocal u fs ty)
   = do {
@@ -1788,12 +1788,28 @@ tcIfaceImplicit n = do
 -}
 
 bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
-bindIfaceId (fs, ty) thing_inside
-  = do  { name <- newIfaceName (mkVarOccFS fs)
+bindIfaceId (fs, u, ty) thing_inside
+  = do  { mu <-checkForDynamicUnique u
+        ; (name, k) <- case mu of
+            Just du -> do
+              n <- pprTrace "Using dynamically bound u" (ppr du) $ newIfaceNameUnique (mkVarOccFS fs) du
+              return (n, extendIntIfaceEnv)
+            Nothing -> do
+              r <- newIfaceName (mkVarOccFS fs)
+              return (r, \i -> extendIfaceIdEnv [i])
         ; ty' <- tcIfaceType ty
         ; let id = mkLocalIdOrCoVar name ty'
           -- We should not have "OrCoVar" here, this is a bug (#17545)
-        ; extendIfaceIdEnv [id] (thing_inside id) }
+        ; k id (thing_inside id) }
+
+
+checkForDynamicUnique :: Int -> IfL (Maybe Unique)
+checkForDynamicUnique i = do
+  b <- if_binder_env <$> getLclEnv
+  return (mkUniqueGrimily <$> lookup i b)
+
+
+
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
 bindIfaceIds [] thing_inside = thing_inside []
