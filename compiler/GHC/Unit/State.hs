@@ -442,17 +442,25 @@ searchPackageId :: PackageState -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
                                (listUnitInfoMap pkgstate)
 
--- | Extends the package configuration map with a list of package configs.
-extendUnitInfoMap
-   :: UnitInfoMap -> [UnitInfo] -> UnitInfoMap
-extendUnitInfoMap (UnitInfoMap pkg_map closure) new_pkgs
-  = UnitInfoMap (foldl' add pkg_map new_pkgs) closure
-    -- We also add the expanded version of the mkUnit, so that
-    -- 'improveUnit' can find it.
+-- | Create a Map UnitId UnitInfo
+--
+-- For each instantiated unit, we add two map keys:
+--    * the real unit id
+--    * the virtual unit id made from its instantiation
+--
+-- We do the same thing for fully indefinite units (which are "instantiated"
+-- with module holes).
+--
+mkUnitInfoMap :: [UnitInfo] -> UnitInfoMap
+mkUnitInfoMap infos
+  = UnitInfoMap (foldl' add emptyUDFM infos) emptyUniqSet
   where
    mkVirt      p = mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
-   add pkg_map p = addToUDFM (addToUDFM pkg_map (mkVirt p) p)
-                                  (unitId p) p
+   add pkg_map p
+      | not (null (unitInstantiations p))
+      = addToUDFM (addToUDFM pkg_map (mkVirt p) p) (unitId p) p
+      | otherwise
+      = addToUDFM pkg_map (unitId p) p
 
 -- | Get a list of entries from the package database.  NB: be careful with
 -- this function, although all packages in this map are "visible", this
@@ -1410,7 +1418,7 @@ mkPackageState dflags dbs preload0 = do
   -- or not packages are visible or not)
   pkgs1 <- foldM (applyTrustFlag dflags prec_map unusable)
                  (Map.elems pkg_map2) (reverse (trustFlags dflags))
-  let prelim_pkg_db = extendUnitInfoMap emptyUnitInfoMap pkgs1
+  let prelim_pkg_db = mkUnitInfoMap pkgs1
 
   --
   -- Calculate the initial set of units from package databases, prior to any package flags.
@@ -1476,7 +1484,7 @@ mkPackageState dflags dbs preload0 = do
   -- package arguments we need to key against the old versions.
   --
   (pkgs2, wired_map) <- findWiredInPackages dflags prec_map pkgs1 vis_map2
-  let pkg_db = extendUnitInfoMap emptyUnitInfoMap pkgs2
+  let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
