@@ -1218,7 +1218,7 @@ checkPkgTrust pkgs = do
     let errors = S.foldr go [] pkgs
         state  = pkgState dflags
         go pkg acc
-            | unitIsTrusted $ getInstalledPackageDetails state pkg
+            | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual state)
