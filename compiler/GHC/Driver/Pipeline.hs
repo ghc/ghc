@@ -515,7 +515,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- not extra_libraries or -l things from the command line.
         let pkgstate = pkgState dflags
         let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
-                          | Just c <- map (lookupInstalledPackage pkgstate) pkg_deps,
+                          | Just c <- map (lookupUnitId pkgstate) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
@@ -1312,7 +1312,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
                        ++ (if platformOS platform == OSMinGW32 &&
-                              homeUnit dflags == baseUnitId
+                              homeUnitId dflags == baseUnitId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
 
@@ -2223,7 +2223,7 @@ getGhcVersionPathName dflags = do
   candidates <- case ghcVersionFile dflags of
     Just path -> return [path]
     Nothing -> (map (</> "ghcversion.h")) <$>
-               (getPackageIncludePath dflags [toUnitId rtsUnitId])
+               (getPackageIncludePath dflags [rtsUnitId])
 
   found <- filterM doesFileExist candidates
   case found of

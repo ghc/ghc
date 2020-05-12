@@ -377,7 +377,7 @@ cmmtop  :: { CmmParse () }
         | cmmdata                       { $1 }
         | decl                          { $1 }
         | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do lits <- sequence $6;
                       staticClosure pkg $3 $5 (map getLit lits) }
 
@@ -398,7 +398,7 @@ cmmdata :: { CmmParse () }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    return (mkCmmDataLabel pkg $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
@@ -455,14 +455,14 @@ maybe_body :: { CmmParse () }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do   newFunctionName $1 pkg
                         return (mkCmmCodeLabel pkg $1, Nothing, []) }
 
 
         | 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, closure type, description, type
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
@@ -478,7 +478,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           ty   = Fun 0 (ArgSpec (fromIntegral $15))
@@ -496,7 +496,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $13 $15
                           ty  = Constr (fromIntegral $9)  -- Tag
@@ -515,7 +515,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
                           ty  = ThunkSelector (fromIntegral $5)
@@ -529,7 +529,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
                 -- closure type (no live regs)
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do let prof = NoProfilingInfo
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
                       return (mkCmmRetLabel pkg $3,
@@ -540,7 +540,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
                 -- closure type, live regs
-                {% liftP . withHomeUnit $ \pkg ->
+                {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let platform = targetPlatform dflags
                       live <- sequence $7
@@ -583,9 +583,9 @@ importName
         | 'CLOSURE' NAME
         { ($2, mkForeignLabel $2 Nothing ForeignLabelInExternalPackage IsData) }
 
-        -- A label imported with an explicit packageId.
+        -- A label imported with an explicit UnitId.
         | STRING NAME
-        { ($2, mkCmmCodeLabel (fsToUnit (mkFastString $1)) $2) }
+        { ($2, mkCmmCodeLabel (UnitId (mkFastString $1)) $2) }
 
 
 names   :: { [FastString] }
@@ -1163,7 +1163,7 @@ profilingInfo dflags desc_str ty_str
     then NoProfilingInfo
     else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
 
-staticClosure :: Unit -> FastString -> FastString -> [CmmLit] -> CmmParse ()
+staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
        let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []

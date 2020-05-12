@@ -180,7 +180,7 @@ writeMixEntries dflags mod count entries filename
             mod_name = moduleNameString (moduleName mod)
 
             hpc_mod_dir
-              | moduleUnit mod == mainUnitId  = hpc_dir
+              | moduleUnit mod == mainUnit  = hpc_dir
               | otherwise = hpc_dir ++ "/" ++ unitString (moduleUnit mod)
 
             tabStop = 8 -- <tab> counts as a normal char in GHC's
@@ -1337,7 +1337,7 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
     package_name = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (unitFS  (moduleUnit this_mod)))
     full_name_str
-       | moduleUnit this_mod == mainUnitId
+       | moduleUnit this_mod == mainUnit
        = module_name
        | otherwise
        = package_name <> char '/' <> module_name

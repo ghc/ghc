@@ -143,7 +143,7 @@ emptyPLS = PersistentLinkerState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = map toUnitId [rtsUnitId]
+  where init_pkgs = [rtsUnitId]
 
 extendLoadedPkgs :: DynLinker -> [UnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
@@ -1261,7 +1261,7 @@ linkPackages' hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupInstalledPackage pkgstate new_pkg
+        | Just pkg_cfg <- lookupUnitId pkgstate new_pkg
         = do {  -- Link dependents first
                pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself

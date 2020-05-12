@@ -170,7 +170,7 @@ thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib.Internal")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
+mkTHModule m = mkModule thUnit (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name varName  thLib

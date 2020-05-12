@@ -86,7 +86,7 @@ mkDependencies iuid pluginModules
 
           raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert (toUnitId thUnitId) raw_pkgs
+          pkgs | th_used   = Set.insert thUnitId raw_pkgs
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.

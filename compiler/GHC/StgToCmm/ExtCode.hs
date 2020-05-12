@@ -61,7 +61,7 @@ data Named
         = VarN CmmExpr          -- ^ Holds CmmLit(CmmLabel ..) which gives the label type,
                                 --      eg, RtsLabel, ForeignLabel, CmmLabel etc.
 
-        | FunN   Unit           -- ^ A function name from this package
+        | FunN   UnitId         -- ^ A function name from this unit
         | LabelN BlockId        -- ^ A blockid of some code or data.
 
 -- | An environment of named things.
@@ -165,7 +165,7 @@ newLabel name = do
 -- | Add add a local function to the environment.
 newFunctionName
         :: FastString   -- ^ name of the function
-        -> Unit         -- ^ package of the current module
+        -> UnitId       -- ^ package of the current module
         -> ExtCode
 
 newFunctionName name pkg = addDecl name (FunN pkg)
@@ -204,7 +204,7 @@ lookupName name = do
   return $
      case lookupUFM env name of
         Just (VarN e)   -> e
-        Just (FunN pkg) -> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
+        Just (FunN uid) -> CmmLit (CmmLabel (mkCmmCodeLabel uid       name))
         _other          -> CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId name))
 
 

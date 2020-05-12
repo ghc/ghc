@@ -57,8 +57,8 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
                   hsc_dynLinker, hsc_interp )
 import GHC.Unit.Module
 import GHC.Types.Name
-import GHC.Unit.State ( unitIsTrusted, unsafeLookupUnit, getInstalledPackageDetails,
-                             listVisibleModuleNames, pprFlag )
+import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
+                          listVisibleModuleNames, pprFlag )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
@@ -2364,7 +2364,7 @@ isSafeModule m = do
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg = unitIsTrusted $ getInstalledPackageDetails pkgstate pkg
+        where part pkg = unitIsTrusted $ unsafeLookupUnitId pkgstate pkg
               pkgstate = pkgState dflags
 
 -----------------------------------------------------------------------------
@@ -4207,7 +4207,7 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isMainUnitModule :: Module -> Bool
-isMainUnitModule m = GHC.moduleUnit m == mainUnitId
+isMainUnitModule m = GHC.moduleUnit m == mainUnit
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)

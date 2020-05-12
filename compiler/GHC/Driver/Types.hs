@@ -1852,7 +1852,7 @@ shadowed_by ids = shadowed
 setInteractivePackage :: HscEnv -> HscEnv
 setInteractivePackage hsc_env
    = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { homeUnitId = toUnitId interactiveUnitId } }
+                { homeUnitId = interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -2030,7 +2030,7 @@ mkQualModule dflags mod
 -- with a unit id if the package ID would be ambiguous.
 mkQualPackage :: PackageState -> QueryQualifyPackage
 mkQualPackage pkgs uid
-     | uid == mainUnitId || uid == interactiveUnitId
+     | uid == mainUnit || uid == interactiveUnit
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
