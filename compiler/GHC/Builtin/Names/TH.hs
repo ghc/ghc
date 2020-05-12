@@ -34,7 +34,7 @@ templateHaskellNames = [
     unTypeName,
     unTypeQName,unTypeQTName,
     unsafeTExpCoerceName, mkTHRepName,
-    mkTTExpName, codeCevidenceName,
+    mkTTExpName, codeCevidenceName, selTTExpName,
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
@@ -224,7 +224,7 @@ returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
     unsafeTExpCoerceName, liftTypedName, mkTTExpName, liftStringTypedName,
-    codeCevidenceName, mkTHRepName, unTypeQTName :: Name
+    codeCevidenceName, mkTHRepName, unTypeQTName, selTTExpName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -244,6 +244,7 @@ unTypeQTName    = thFun (fsLit "unTypeQT")    unTypeQTIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 mkTHRepName = thFun (fsLit "mkTHRep") mkTHRepKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
+selTTExpName = thFun (fsLit "selTTExp") selTTExpIdKey
 
 mkTTExpName = thFun (fsLit "mkTTExp") mkTTExpKey
 codeCevidenceName = libFun (fsLit "codeCevidence") codeCevidenceKey
@@ -747,7 +748,7 @@ returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
     unsafeTExpCoerceIdKey, liftTypedIdKey, mkTTExpKey, mkTHRepKey,
-    codeCevidenceKey, unTypeQTIdKey :: Unique
+    codeCevidenceKey, unTypeQTIdKey, selTTExpIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -767,7 +768,7 @@ mkTTExpKey = mkPreludeMiscIdUnique 215
 codeCevidenceKey = mkPreludeMiscIdUnique 216
 mkTHRepKey = mkPreludeMiscIdUnique 217
 unTypeQTIdKey         = mkPreludeMiscIdUnique 218
-
+selTTExpIdKey = mkPreludeMiscIdUnique 219
 
 -- data Lit = ...
 charLIdKey, stringLIdKey, integerLIdKey, intPrimLIdKey, wordPrimLIdKey,

@@ -105,7 +105,7 @@ dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
       --pprTraceM "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
       return $ mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, body]
   where
-    do_one_z (PendingZonkSplice n _mt e) = do
+    do_one_z (PendingZonkSplice n _mt mn e) = do
       let k = getKey (idUnique n)
       dflags <- getDynFlags
       let k_expr = mkIntExprInt (targetPlatform dflags) k
@@ -123,8 +123,12 @@ dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
       -}
       let (_, [k, a]) = splitTyConApp (exprType e)
       --pprTraceM "do_one_z" (ppr a $$  ppr k)
-      return $ mkCoreTup [k_expr, mkCoreApps (Var lift_id) [Type k, Type a, e]]
-    do_one_ev (PendingZonkSplice n (Just t) e) = do
+      selTT <- dsLookupGlobalId selTTExpName
+      let wrap = case mn of
+                    Nothing -> id
+                    Just n -> \e -> mkCoreApps (Var selTT) [mkIntExprInt (targetPlatform dflags) n, e]
+      return $ mkCoreTup [k_expr, wrap (mkCoreApps (Var lift_id) [Type k, Type a, e])]
+    do_one_ev (PendingZonkSplice n (Just t) _ e) = do
       let k = getKey (idUnique n)
           kt = getKey (getUnique t)
       dflags <- getDynFlags

@@ -418,6 +418,21 @@ data TTExp = TTExp { env_t :: [(Int, TTExp)], tstr :: THRep } deriving (Generic,
 mkTTExp :: [(Int, TTExp)] -> THRep -> TTExp
 mkTTExp qu s = TTExp qu s
 
+-- | From TTExp evidence get the evidence for the kth type variable in ltr
+-- order. This recurses into the splices as well to find potentially nested
+-- evidence.
+--
+-- selTTExp 0 (<a>) = <a>
+-- selTTexp 0 ((<a>, <b>)) = <a>
+selTTExp :: Int -> TTExp -> TTExp
+selTTExp i e = flattenTTExp e !! i
+
+-- Could also morally return a THRep but this just makes our
+-- lives in core simpler
+flattenTTExp :: TTExp -> [TTExp]
+flattenTTExp t@(TTExp [] _) = [t]
+flattenTTExp (TTExp ts _) = concatMap (flattenTTExp . snd) ts
+
 
 {- Note [Role of TExp]
 ~~~~~~~~~~~~~~~~~~~~~~

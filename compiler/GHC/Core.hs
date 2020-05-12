@@ -285,7 +285,7 @@ fillExprHole (CExprHole _v hole) e =  liftIO (writeIORef hole (Just e))
 readExprHole :: (Outputable b, MonadIO m) => CExprHole b -> m (Expr b)
 readExprHole (CExprHole v hole) = do
   res <- liftIO (expectJust "readExprHole" <$> readIORef hole)
-  pprTraceM "Read from expr hole" (ppr v)
+  --pprTraceM "Read from expr hole" (ppr v)
   return res
 
 

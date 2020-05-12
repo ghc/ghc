@@ -54,6 +54,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names
+import GHC.Builtin.Names.TH
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -83,6 +84,7 @@ import Util
 import GHC.Types.Unique.FM
 import GHC.Core
 import FastString
+import FV
 
 import Control.Monad
 import Data.List  ( partition )
@@ -785,7 +787,7 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
        bs' <- mapM zonk_b bs
        wrap' <- zonkQuoteWrap env w
        u_ps' <- mapM zonk_u_b u_ps
-       (pairs, splices) <- unzip <$> mapMaybeM zonk_z_2 zs2
+       (pairs, splices) <- unzip . concat <$> mapM zonk_z_2 zs2
        let vars = map (\(PendingTcSplice n' _) -> n') bs'
            env'' = extendZonkEnvWithSplices (extendZonkEnv env vars) pairs
            -- TODO: This is an approximation surely
@@ -796,10 +798,9 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
        zs' <- mapM zonk_z zs
        --pprTraceM "zonkExpr:zs" (ppr zs)
        --pprTraceM "zonkExpr:zs" (ppr (pairs, splices))
-       --pprTraceM "zonkExpr:zs" (ppr ev_tzs)
-       --pprTraceM "zonkExpr:zs" (ppr tzs)
        --pprTraceM "zonkExpr:zs'" (ppr bs)
-       --pprTraceM "zonkExpr:zs''" (ppr bs')
+      -- pprTraceM "zonkExpr:zs''" (ppr bs')
+      -- pprTraceM "zonkExpr:zs" (ppr body')
        return (HsTcZonkedBracketOut x (wrap', b, u_ps') body' bs' zs' splices)
   where
     zonk_u_b (PendingTcSplice n e) = do
@@ -810,12 +811,14 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
       sp <- mkSpliceId (typeKind t')
       e' <- zonkCoreExpr env (evId e)
       --pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
-     -- pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
-      let mtv = getTyVar_maybe t'
-      case mtv of
-        Nothing -> return Nothing
-        Just tv' ->
-          return $ Just ((tv', sp), (PendingZonkSplice sp Nothing e'))
+      --pprTraceM "splice_key" (ppr t')
+      let fvs = fvVarList (tyCoFVsOfType t')
+      --pprTraceM "zonk_z_2" (ppr fvs)
+      sp_points <- forM (zip [0..] fvs) $ \(k, v) -> do
+                      sp <- mkSpliceId (idType v)
+                      return ((v, sp), PendingZonkSplice sp Nothing (Just k) e')
+      let normal = ((t, sp), (PendingZonkSplice sp Nothing Nothing e'))
+      return (normal : sp_points)
 
 
     zonk_b (PendingTcSplice n e) = do
@@ -827,9 +830,9 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
       --pprTraceM "pending" (ppr e')
       return (PendingTcSplice n' e')
 
-    zonk_z (PendingZonkSplice n mt e) = do -- (env', n') <- zonkTyBndrX env n
+    zonk_z (PendingZonkSplice n mt mn e) = do -- (env', n') <- zonkTyBndrX env n
                                         e' <- zonkCoreExpr env e
-                                        return (PendingZonkSplice n mt e')
+                                        return (PendingZonkSplice n mt mn e')
 
 
     zonkBracket env' e =
@@ -1738,7 +1741,7 @@ zonkEvBind _env bind@(EvBind { eb_lhs = var, eb_rhs = EvSplice t (EvExpr e) } ) 
       zs <- readTcRef z_var
       sp_id <- newSysLocalId (mkFastString "$splice") t
       sp_ty_id <- newMetaTyVarName (mkFastString "$splice")
-      writeTcRef z_var (PendingZonkSplice sp_id (Just sp_ty_id) e : zs)
+      writeTcRef z_var (PendingZonkSplice sp_id (Just sp_ty_id) Nothing e : zs)
       let var' = setVarType var (mkTyVarTy $ mkTyVar sp_ty_id constraintKind)
       return $ bind { eb_lhs = var', eb_rhs = EvExpr (Var sp_id)}
     _ -> pprPanic "EvSplice" (ppr st $$ ppr e)
@@ -1847,12 +1850,15 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
       SkolemTv {}    -> lookup_in_tv_env
       RuntimeUnk {}  -> lookup_in_tv_env
       MetaTv { mtv_ref = ref }
-        -> do { mtv_env <- readTcRef mtv_env_ref
+        -> do { case lookupVarEnv tv_env tv of
+                  Just res -> return (mkTyVarTy res)
+                  Nothing -> do {
+              ; mtv_env <- readTcRef mtv_env_ref
                 -- See Note [Sharing when zonking to Type]
               ; case lookupVarEnv mtv_env tv of
                   --Just ty -> pprTrace "CACHED" (ppr tv <+> ppr ty) (return ty)
                   _ -> do { mtv_details <- readTcRef ref
-                          ; zonk_meta mtv_env ref mtv_details } }
+                          ; zonk_meta mtv_env ref mtv_details } } }
   | otherwise
   = lookup_in_tv_env
 

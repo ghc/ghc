@@ -2518,6 +2518,7 @@ data PendingTcSplice p
 data PendingZonkSplice
   = PendingZonkSplice (IdP GhcTc) -- Value splice point
                       (Maybe (IdP GhcRn)) -- type splice point
+                      (Maybe Int)
                       (EvExpr)
 
 data PendingZonkSplice2 = PendingZonkSplice2 TyVar -- Type the evidence came from, in the zonker substitute these type variables for a new splice point.
@@ -2713,7 +2714,7 @@ instance NamedThing (IdP p) => Outputable (PendingTcSplice p) where
   ppr (PendingTcSplice n e) = pprPendingSplice (getName n) e
 
 instance Outputable PendingZonkSplice where
-  ppr (PendingZonkSplice n _t e) = pprPendingSplice (getName n) e
+  ppr (PendingZonkSplice n _t mn e) = pprPendingSplice (getName n) e <+> ppr mn
 
 {-
 ************************************************************************
