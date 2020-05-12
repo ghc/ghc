@@ -9,9 +9,9 @@ Test.t2: <S,1*U(U)><S,1*U(U)>
 
 
 ==================== Cpr signatures ====================
-Test.$tc'MkT: m1
-Test.$tcT: m1
-Test.$trModule: m1
+Test.$tc'MkT:
+Test.$tcT:
+Test.$trModule:
 Test.t: m1
 Test.t2: m1
 
