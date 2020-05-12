@@ -302,7 +302,14 @@ data Arg a b = Arg
   , Generic1 -- ^ @since 4.9.0.0
   )
 
+-- |
+-- >>> Min (Arg 0 ()) <> Min (Arg 1 ())
+-- Min {getMin = Arg 0 ()}
 type ArgMin a b = Min (Arg a b)
+
+-- |
+-- >>> Max (Arg 0 ()) <> Max (Arg 1 ())
+-- Max {getMax = Arg 1 ()}
 type ArgMax a b = Max (Arg a b)
 
 -- | @since 4.9.0.0
