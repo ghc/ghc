@@ -62,6 +62,16 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+
+   , primUnit
+   , integerUnit
+   , baseUnit
+   , rtsUnit
+   , thUnit
+   , mainUnit
+   , thisGhcUnit
+   , interactiveUnit
+
    , isInteractiveModule
    , wiredInUnitIds
 
@@ -162,7 +172,7 @@ pprModule mod@(Module p n)  = getPprStyle doc
  where
   doc sty
     | codeStyle sty =
-        (if p == mainUnitId
+        (if p == mainUnit
                 then empty -- never qualify the main package in code
                 else ztext (zEncodeFS (unitFS p)) <> char '_')
             <> pprModuleName n
@@ -612,27 +622,38 @@ For `integer-gmp`/`integer-simple` we also change the base name to
 See Note [The integer library] in "GHC.Builtin.Names".
 -}
 
-integerUnitId, primUnitId,
-  baseUnitId, rtsUnitId,
-  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: Unit
-primUnitId        = fsToUnit (fsLit "ghc-prim")
-integerUnitId     = fsToUnit (fsLit "integer-wired-in")
-   -- See Note [The integer library] in "GHC.Builtin.Names"
-baseUnitId        = fsToUnit (fsLit "base")
-rtsUnitId         = fsToUnit (fsLit "rts")
-thUnitId          = fsToUnit (fsLit "template-haskell")
-thisGhcUnitId     = fsToUnit (fsLit "ghc")
-interactiveUnitId = fsToUnit (fsLit "interactive")
+integerUnitId, primUnitId, baseUnitId, rtsUnitId,
+  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
+
+integerUnit, primUnit, baseUnit, rtsUnit,
+  thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
+
+primUnitId        = UnitId (fsLit "ghc-prim")
+integerUnitId     = UnitId (fsLit "integer-wired-in")
+baseUnitId        = UnitId (fsLit "base")
+rtsUnitId         = UnitId (fsLit "rts")
+thisGhcUnitId     = UnitId (fsLit "ghc")
+interactiveUnitId = UnitId (fsLit "interactive")
+thUnitId          = UnitId (fsLit "template-haskell")
+
+thUnit            = RealUnit (Definite thUnitId)
+primUnit          = RealUnit (Definite primUnitId)
+integerUnit       = RealUnit (Definite integerUnitId)
+baseUnit          = RealUnit (Definite baseUnitId)
+rtsUnit           = RealUnit (Definite rtsUnitId)
+thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
+interactiveUnit   = RealUnit (Definite interactiveUnitId)
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainUnitId      = fsToUnit (fsLit "main")
+mainUnitId = UnitId (fsLit "main")
+mainUnit = RealUnit (Definite mainUnitId)
 
 isInteractiveModule :: Module -> Bool
-isInteractiveModule mod = moduleUnit mod == interactiveUnitId
+isInteractiveModule mod = moduleUnit mod == interactiveUnit
 
-wiredInUnitIds :: [Unit]
+wiredInUnitIds :: [UnitId]
 wiredInUnitIds =
    [ primUnitId
    , integerUnitId

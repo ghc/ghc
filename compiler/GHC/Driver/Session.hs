@@ -1329,7 +1329,7 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        homeUnitId              = toUnitId mainUnitId,
+        homeUnitId              = mainUnitId,
         homeUnitInstanceOfId    = Nothing,
         homeUnitInstantiations  = [],
 
@@ -1980,7 +1980,7 @@ homeUnit dflags =
          -- detect fully indefinite units: all their instantiations are hole
          -- modules and the home unit id is the same as the instantiating unit
          -- id (see Note [About units] in GHC.Unit)
-         | all (isHoleModule . snd) is && u == homeUnitId dflags
+         | all (isHoleModule . snd) is && indefUnit u == homeUnitId dflags
          -> mkVirtUnit (updateIndefUnitId (pkgState dflags) u) is
          -- otherwise it must be that we compile a fully definite units
          -- TODO: error when the unit is partially instantiated??
@@ -4637,10 +4637,10 @@ setMainIs arg
   | not (null main_fn) && isLower (head main_fn)
      -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d { mainFunIs = Just main_fn,
-                   mainModIs = mkModule mainUnitId (mkModuleName main_mod) }
+                   mainModIs = mkModule mainUnit (mkModuleName main_mod) }
 
   | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d { mainModIs = mkModule mainUnitId (mkModuleName arg) }
+  = upd $ \d -> d { mainModIs = mkModule mainUnit (mkModuleName arg) }
 
   | otherwise                   -- The arg looked like "baz"
   = upd $ \d -> d { mainFunIs = Just arg }
