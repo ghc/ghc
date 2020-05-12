@@ -48,7 +48,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Unit.Module
 import GHC.Data.List.SetOps
-import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
+import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
 import GHC.Driver.Session
 import GHC.Types.Basic
 import GHC.Utils.Outputable
@@ -1227,7 +1227,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: HscEnv -> [LinkerUnitId] -> IO ()
+linkPackages :: HscEnv -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1244,7 +1244,7 @@ linkPackages hsc_env new_pkgs = do
   modifyPLS_ dl $ \pls -> do
     linkPackages' hsc_env new_pkgs pls
 
-linkPackages' :: HscEnv -> [LinkerUnitId] -> PersistentLinkerState
+linkPackages' :: HscEnv -> [UnitId] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' hsc_env new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
@@ -1253,7 +1253,7 @@ linkPackages' hsc_env new_pks pls = do
      dflags = hsc_dflags hsc_env
      pkgstate = pkgState dflags
 
-     link :: [LinkerUnitId] -> [LinkerUnitId] -> IO [LinkerUnitId]
+     link :: [UnitId] -> [UnitId] -> IO [UnitId]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 

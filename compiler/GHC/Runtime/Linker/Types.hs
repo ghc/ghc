@@ -9,7 +9,6 @@
 module GHC.Runtime.Linker.Types (
       DynLinker(..),
       PersistentLinkerState(..),
-      LinkerUnitId,
       Linkable(..),
       Unlinked(..),
       SptEntry(..)
@@ -55,14 +54,11 @@ data PersistentLinkerState
        -- The currently-loaded packages; always object code
        -- Held, as usual, in dependency order; though I am not sure if
        -- that is really important
-       pkgs_loaded :: ![LinkerUnitId],
+       pkgs_loaded :: ![UnitId],
 
        -- we need to remember the name of previous temporary DLL/.so
        -- libraries so we can link them (see #10322)
        temp_sos :: ![(FilePath, String)] }
-
--- TODO: Make this type more precise
-type LinkerUnitId = UnitId
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
