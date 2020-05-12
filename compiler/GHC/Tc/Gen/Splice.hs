@@ -36,6 +36,8 @@ module GHC.Tc.Gen.Splice(
 
 import GhcPrelude
 
+import FV
+
 import GHC.HsToCore.DsMetaTc
 import GHC.Hs
 import GHC.Types.Annotations
@@ -632,7 +634,7 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var  _zz_var q@(QuoteWrapper _ m_tau)) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var  zz_var q@(QuoteWrapper _ m_tau)) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; meta_exp_ty <- tcTExpTy m_tau res_ty
        ; (expr', ev) <- setStage pop_stage
@@ -650,6 +652,12 @@ tcNestedSplice pop_stage (TcPending ps_var  _zz_var q@(QuoteWrapper _ m_tau)) sp
                                 (nlHsTyApp untypeq [rep, res_ty])) expr'
        ; writeMutVar ps_var ((PendingTcSplice splice_name (mkHsDictLet ev expr''), PendingTcSplice splice_id (mkHsDictLet ev expr')) : ps)
 
+
+       ; let t = fvVarList (tyCoFVsOfType res_ty)
+       ; forM_ t $ \v -> setStage pop_stage $ do {
+        ; ev <- emitTypeable res_ty
+        ; zs <- readMutVar zz_var
+        ; writeMutVar zz_var (PendingZonkSplice2 v ev : zs) }
        -- The returned expression is ignored; it's in the pending splices
        ; return (HsVar noExtField (noLoc splice_id)) }
 

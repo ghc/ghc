@@ -8,6 +8,7 @@
 {-# LANGUAGE CPP, TupleSections, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -93,6 +94,7 @@ import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
+import FV
 
 import Data.Function
 import Data.List (partition, sortBy, groupBy, intersect)
@@ -1972,8 +1974,23 @@ checkThLocalId id = do
 --   in RnSplice.checkThLocalName, so don't repeat that here.
 -- Here we just just add constraints fro cross-stage lifting
   sp_id <- newSysLocalId (mkFastString "$splice") (idType id)
+  addLiftT id
   checkThLocalIdX sp_id (mkSpliceExpr sp_id) (idName id) id
 
+
+-- | Emit a LiftT constraint for any free type variables in the
+-- type of an identifier in inside a typed bracket.
+addLiftT :: Id -> TcM ()
+addLiftT i = do
+  let t = fvVarList (tyCoFVsOfType (idType i))
+  b <- getStage
+  pprTraceM "addLiftT" (ppr i $$ ppr t)
+  case b of
+    Brack st (TcPending _ zs_var _) -> forM_ @[] t $ \v -> do
+      ev <- setStage st $ emitTypeable (mkTyVarTy v)
+      zs <- readMutVar zs_var
+      writeMutVar zs_var (PendingZonkSplice2 v ev : zs)
+    _ -> return ()
 --------------------------------------
 
 polySpliceErr :: Id -> SDoc
