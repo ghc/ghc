@@ -294,28 +294,24 @@ getClosureX get_closure_raw x = do
                 fail $ "Expected 6 ptr arguments to TSO, found "
                         ++ show (length pts)
 
-            threadId' <- allocaArray (length wds) (\ptr -> do
+            allocaArray (length wds) (\ptr -> do
                 pokeArray ptr wds
-                id <- peekStgThreadID ptr
-                return id
-                )
-            alloc_limit' <- allocaArray (length wds) (\ptr -> do
-                pokeArray ptr wds
-                alloc_limit <- peekAllocLimit ptr
-                return alloc_limit
-                )
 
-            pure $ TSOClosure
-                { info = itbl
-                , _link = (pts !! 0)
-                , global_link = (pts !! 1)
-                , tsoStack = (pts !! 2)
-                , trec = (pts !! 3)
-                , blocked_exceptions = (pts !! 4)
-                , bq = (pts !! 5)
-                , threadId = threadId'
-                , alloc_limit = alloc_limit'
-                }
+                threadId' <- peekStgThreadID ptr
+                alloc_limit' <- peekAllocLimit ptr
+
+                pure $ TSOClosure
+                    { info = itbl
+                    , _link = (pts !! 0)
+                    , global_link = (pts !! 1)
+                    , tsoStack = (pts !! 2)
+                    , trec = (pts !! 3)
+                    , blocked_exceptions = (pts !! 4)
+                    , bq = (pts !! 5)
+                    , threadId = threadId'
+                    , alloc_limit = alloc_limit'
+                    }
+                )
         STACK -> do
             unless (length pts >= 1) $
                 fail $ "Expected at least 1 ptr argument to STACK, found "
@@ -338,4 +334,3 @@ getClosureX get_closure_raw x = do
 -- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
-
