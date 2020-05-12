@@ -187,7 +187,7 @@ data CLabel
 
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel
-        Unit                    -- what package the label belongs to.
+        UnitId                  -- what package the label belongs to.
         FastString              -- identifier giving the prefix of the label
         CmmLabelInfo            -- encodes the suffix of the label
 
@@ -553,7 +553,7 @@ mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
   mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
-        :: Unit -> FastString -> CLabel
+        :: UnitId -> FastString -> CLabel
 
 mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
 mkCmmEntryLabel     pkg str     = CmmLabel pkg str CmmEntry
@@ -584,7 +584,7 @@ mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel pkg str CmmPrimCall
+        = CmmLabel (toUnitId pkg) str CmmPrimCall
 
 
 -- Constructing ForeignLabels
@@ -1033,7 +1033,7 @@ labelDynamic config this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
-     externalDynamicRefs && (this_pkg /= rtsUnitId)
+     externalDynamicRefs && (this_pkg /= rtsUnit)
 
    IdLabel n _ _ ->
      externalDynamicRefs && isDynLinkName platform this_mod n
@@ -1041,7 +1041,7 @@ labelDynamic config this_mod lbl =
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 -> externalDynamicRefs && (this_pkg /= pkg)
+    | os == OSMinGW32 -> externalDynamicRefs && (toUnitId this_pkg /= pkg)
     | otherwise       -> externalDynamicRefs
 
    LocalBlockLabel _    -> False

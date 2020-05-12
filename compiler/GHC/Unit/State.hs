@@ -21,12 +21,14 @@ module GHC.Unit.State (
         -- * Querying the package config
         lookupUnit,
         lookupUnit',
-        lookupInstalledPackage,
+        unsafeLookupUnit,
+        lookupUnitId,
+        lookupUnitId',
+        unsafeLookupUnitId,
+
         lookupPackageName,
         improveUnit,
         searchPackageId,
-        unsafeLookupUnit,
-        getInstalledPackageDetails,
         displayUnitId,
         listVisibleModuleNames,
         lookupModuleInAllPackages,
@@ -396,7 +398,7 @@ type InstalledPackageIndex = Map UnitId UnitInfo
 emptyUnitInfoMap :: UnitInfoMap
 emptyUnitInfoMap = UnitInfoMap emptyUDFM emptyUniqSet
 
--- | Find the unit we know about with the given unit id, if any
+-- | Find the unit we know about with the given unit, if any
 lookupUnit :: PackageState -> Unit -> Maybe UnitInfo
 lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 
@@ -411,6 +413,28 @@ lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
    RealUnit _ -> lookupUDFM pkg_map uid
    VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
+
+-- | Find the unit we know about with the given unit id, if any
+lookupUnitId :: PackageState -> UnitId -> Maybe UnitInfo
+lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
+
+-- | Find the unit we know about with the given unit id, if any
+lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
+lookupUnitId' (UnitInfoMap db _) uid = lookupUDFM db uid
+
+
+-- | Looks up the given unit in the package state, panicing if it is not found
+unsafeLookupUnit :: HasDebugCallStack => PackageState -> Unit -> UnitInfo
+unsafeLookupUnit state u = case lookupUnit state u of
+   Just info -> info
+   Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
+
+-- | Looks up the given unit id in the package state, panicing if it is not found
+unsafeLookupUnitId :: HasDebugCallStack => PackageState -> UnitId -> UnitInfo
+unsafeLookupUnitId state uid = case lookupUnitId state uid of
+   Just info -> info
+   Nothing   -> pprPanic "unsafeLookupUnitId" (ppr uid)
+
 
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
@@ -431,26 +455,6 @@ extendUnitInfoMap (UnitInfoMap pkg_map closure) new_pkgs
     -- 'improveUnit' can find it.
   where add pkg_map p = addToUDFM (addToUDFM pkg_map (expandedUnitInfoId p) p)
                                   (unitId p) p
-
--- | Looks up the package with the given id in the package state, panicing if it is
--- not found
-unsafeLookupUnit :: HasDebugCallStack => PackageState -> Unit -> UnitInfo
-unsafeLookupUnit pkgs pid =
-    case lookupUnit pkgs pid of
-      Just info -> info
-      Nothing   -> pprPanic "unsafeLookupUnit" (ppr pid)
-
-lookupInstalledPackage :: PackageState -> UnitId -> Maybe UnitInfo
-lookupInstalledPackage pkgstate uid = lookupInstalledPackage' (unitInfoMap pkgstate) uid
-
-lookupInstalledPackage' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
-lookupInstalledPackage' (UnitInfoMap db _) uid = lookupUDFM db uid
-
-getInstalledPackageDetails :: HasDebugCallStack => PackageState -> UnitId -> UnitInfo
-getInstalledPackageDetails pkgstate uid =
-    case lookupInstalledPackage pkgstate uid of
-      Just config -> config
-      Nothing -> pprPanic "getInstalledPackageDetails" (ppr uid)
 
 -- | Get a list of entries from the package database.  NB: be careful with
 -- this function, although all packages in this map are "visible", this
@@ -948,11 +952,8 @@ pprTrustFlag flag = case flag of
 --
 -- See Note [Wired-in units] in GHC.Unit.Module
 
-type WiredInUnitId = String
+type WiredInUnitId = UnitId
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
-
-wired_in_unitids :: [WiredInUnitId]
-wired_in_unitids = map unitString wiredInUnitIds
 
 findWiredInPackages
    :: DynFlags
@@ -971,9 +972,9 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
             -- See Note [The integer library] in GHC.Builtin.Names
-            | pid == unitString integerUnitId
+            | pid == integerUnitId
             = unitPackageNameString pc `elem` ["integer-gmp", "integer-simple"]
-        pc `matches` pid = unitPackageNameString pc == pid
+        pc `matches` pid = unitPackageName pc == PackageName (unitIdFS pid)
 
         -- find which package corresponds to each wired-in package
         -- delete any other packages with the same name
@@ -1008,7 +1009,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                 notfound = do
                           debugTraceMsg dflags 2 $
                             text "wired-in package "
-                                 <> text wired_pkg
+                                 <> ftext (unitIdFS wired_pkg)
                                  <> text " not found."
                           return Nothing
                 pick :: UnitInfo
@@ -1016,20 +1017,20 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                 pick pkg = do
                         debugTraceMsg dflags 2 $
                             text "wired-in package "
-                                 <> text wired_pkg
+                                 <> ftext (unitIdFS wired_pkg)
                                  <> text " mapped to "
                                  <> ppr (unitId pkg)
                         return (Just (wired_pkg, pkg))
 
 
-  mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wired_in_unitids
+  mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wiredInUnitIds
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
         pkgstate = pkgState dflags
 
         wiredInMap :: Map WiredUnitId WiredUnitId
         wiredInMap = Map.fromList
-          [ (key, Definite (stringToUnitId wiredInUnitId))
+          [ (key, Definite wiredInUnitId)
           | (wiredInUnitId, pkg) <- wired_in_pkgs
           , Just key <- pure $ definiteUnitInfoId pkg
           ]
@@ -1545,7 +1546,8 @@ mkPackageState dflags dbs preload0 = do
       -- add base & rts to the preload packages
       basicLinkedPackages
        | gopt Opt_AutoLinkPackages dflags
-          = filter (flip elemUDFM (unUnitInfoMap pkg_db))
+          = fmap (RealUnit . Definite) $
+            filter (flip elemUDFM (unUnitInfoMap pkg_db))
                 [baseUnitId, rtsUnitId]
        | otherwise = []
       -- but in any case remove the current package from the set of
@@ -1994,7 +1996,7 @@ getPreloadPackagesAnd dflags pkgids0 =
       pairs = zip pkgids (repeat Nothing)
   in do
   all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload pairs)
-  return (map (getInstalledPackageDetails state) all_pkgs)
+  return (map (unsafeLookupUnitId state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
@@ -2026,7 +2028,7 @@ add_package :: DynFlags
 add_package dflags pkg_db ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
-      case lookupInstalledPackage' pkg_db p of
+      case lookupUnitId' pkg_db p of
         Nothing -> Failed (missingPackageMsg p <>
                            missingDependencyMsg mb_parent)
         Just pkg -> do
@@ -2065,7 +2067,7 @@ missingDependencyMsg (Just parent)
 mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 mkIndefUnitId pkgstate raw =
     let uid = UnitId raw
-    in case lookupInstalledPackage pkgstate uid of
+    in case lookupUnitId pkgstate uid of
          Nothing -> Indefinite uid Nothing -- we didn't find the unit at all
          Just c  -> Indefinite uid $ Just $ mkUnitPprInfo c
 
@@ -2076,7 +2078,7 @@ updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (unitIdFS (indefUnit uid
 
 displayUnitId :: PackageState -> UnitId -> Maybe String
 displayUnitId pkgstate uid =
-    fmap unitPackageIdString (lookupInstalledPackage pkgstate uid)
+    fmap unitPackageIdString (lookupUnitId pkgstate uid)
 
 -- | Will the 'Name' come from a dynamically linked package?
 isDynLinkName :: Platform -> Module -> Name -> Bool
