@@ -167,9 +167,9 @@ expandedUnitInfoId p =
 
 definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
 definiteUnitInfoId p =
-    case mkUnit p of
-        RealUnit def_uid -> Just def_uid
-        _               -> Nothing
+    if unitIsIndefinite p
+       then Nothing
+       else Just (Definite (unitId p))
 
 -- | Create a UnitPprInfo from a UnitInfo
 mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
