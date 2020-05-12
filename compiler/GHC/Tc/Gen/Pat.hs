@@ -53,6 +53,7 @@ import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
+import GHC.Core.Coercion ( mkPrimEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -551,7 +552,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 ------------------------
 -- Data constructors
   ConPat NoExtField con ty_arg_pats arg_pats ->
-    tcConPat penv con ty_arg_pats pat_ty arg_pats thing_inside
+    tcConPat penv con pat_ty ty_arg_pats arg_pats thing_inside
 
 ------------------------
 -- Literal patterns
@@ -836,15 +837,15 @@ to express the local scope of GADT refinements.
 
 tcConPat :: PatEnv
          -> Located Name
-         -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
          -> ExpSigmaType           -- Type of the pattern
+         -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
-tcConPat penv con_lname@(L _ con_name) type_args pat_ty arg_pats thing_inside
+tcConPat penv con_lname@(L _ con_name) pat_ty type_arg_pats arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
-            RealDataCon data_con -> tcDataConPat penv con_lname data_con type_args
-                                                 pat_ty arg_pats thing_inside
+            RealDataCon data_con -> tcDataConPat penv con_lname data_con
+                                                 pat_ty type_arg_pats arg_pats thing_inside
             PatSynCon pat_syn -> tcPatSynPat penv con_lname pat_syn
                                              pat_ty arg_pats thing_inside
         }
@@ -852,63 +853,38 @@ tcConPat penv con_lname@(L _ con_name) type_args pat_ty arg_pats thing_inside
 tcDataConPat :: PatEnv
              -> Located Name
              -> DataCon
-             -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
              -> ExpSigmaType               -- Type of the pattern
+             -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
              -> HsConPatDetails GhcRn
              -> TcM a -> TcM (Pat GhcTcId, a)
-tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing_inside = do
-  let tycon = dataConTyCon data_con
-         -- For data families this is the representation tycon
+tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats thing_inside = do
 
-      (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
-        = dataConFullSig data_con
-      header = L con_span (RealDataCon data_con)
-
-    -- Instantiate the constructor type variables [a->ty]
-    -- This may involve doing a family-instance coercion,
-    -- and building a wrapper
-  (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty
-  pat_ty <- readExpType pat_ty
-
-    -- Add the stupid theta
-  setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
-
-  let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
-  checkExistentials ex_tvs all_arg_tys penv
-
-  tenv' <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
-    -- NB: Do not use zipTvSubst!  See #14154
-    -- We want to create a well-kinded substitution, so
-    -- that the instantiated type is well-kinded
-
-  (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
-    -- Get location from monad, not from ex_tvs
-
-  let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
-      -- pat_ty' is type of the actual constructor application
-      -- pat_ty' /= pat_ty iff coi /= IdCo
-
-      arg_tys' = substTys tenv arg_tys
-
-  (nonUserVarWrapper, remaining_user_data_con_ty) <-
+  -- instantiate away inferred variables
+  (nonUserVarWrapper, remaining_user_data_con_ty0) <-
     topInstantiateInferred PatOrigin $ dataConUserType data_con
 
-  (nonInferredTyVarBinders, data_con_subst_user_ret_ty) <- do
+  (nonInferredTyVarBinders, remaining_user_data_con_ty1) <- do
     -- split out pi telescope.
-    let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty
-    -- substitute both sides with fresh metavars
+    let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty0
+    -- substitute both sides with fresh skolems
+    lvl_succ <- pushTcLevel <$> getTcLevel
     (userTenv, nonInferredTyVarBinders) <- mapAccumLM
-      (rebuildTyCoBinderX newPatSigTyVar) emptyTCvSubst bndrs
+      (rebuildTyCoBinderX $ \n k -> pure $ newSkolemTyVarLvlOverlappable lvl_succ True n k)
+      emptyTCvSubst
+      bndrs
     pure (nonInferredTyVarBinders, substTy userTenv res_ty)
+
+  let (theta, data_con_subst_user_ret_ty)   = tcSplitPhiTy remaining_user_data_con_ty1
 
   let -- zip through invisible argument patterns, extending the name environment
       -- with variables bound by each one in turn.
       --
       -- TODO(@Ericson2314) teach the arity error thing about visibility so we
       -- can abstract over this and have nicer messages.
-      zipInvisPats :: [Either (LHsSigWcType (NoGhcTc GhcRn)) Type]
+      zipInvisPats :: Outputable x
+                   => [Either (LHsSigWcType (NoGhcTc GhcRn)) x]
                    -> [TyBinder]
-                   -> TcM [( Either Type (LHsSigWcType (NoGhcTc GhcRn))
+                   -> TcM [( Either (LHsSigWcType (NoGhcTc GhcRn)) x
                            , TyBinder
                            )]
       zipInvisPats [] [] = pure []
@@ -927,7 +903,7 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
       zipInvisPats (Right pat : _) [] = failWithTc $
         text "Extra required argument pattern" <+> ppr pat <+> text "when no args left to match"
       zipInvisPats (Right req_arg_ty : args) (Anon VisArg ty : vars) =
-        ((Left req_arg_ty, Anon VisArg ty) :) <$> zipInvisPats args vars
+        ((Right req_arg_ty, Anon VisArg ty) :) <$> zipInvisPats args vars
       zipInvisPats [] (Named (Bndr _ Specified) : vars) =
         -- OK to skip @ arg in middle of arg pats
         zipInvisPats [] vars
@@ -935,54 +911,47 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
         -- OK to skip @ arg at end of arg pats
         zipInvisPats args vars
       zipInvisPats (Left spec_arg : args) (Named var@(Bndr _ Specified) : vars) =
-        ((Right spec_arg, Named var) :) <$> zipInvisPats args vars
+        ((Left spec_arg, Named var) :) <$> zipInvisPats args vars
 
   -- When required and specified args are intermixed, we'll just put in the list
   -- of both. For now, we concat them in order.
-  invisPairs <- zipInvisPats (fmap Left type_args ++ fmap Right arg_tys') nonInferredTyVarBinders
+  invisPairs <- zipInvisPats
+    (fmap Left type_arg_pats ++ fmap Right (hsConPatArgs arg_pats))
+    nonInferredTyVarBinders
 
   traceTc "tcConPat_0" $ ppr $ invisPairs
 
   let -- Iterate through the visible type arguments, extending the name environment
       -- with variables bound by each one in turn.
       extendNamesByTyApp :: Checker
-        (Either Type (LHsSigWcType (NoGhcTc GhcRn)), TyBinder)
+        (Either (LHsSigWcType (NoGhcTc GhcRn)) x, TyBinder)
         HsWrapper
-      extendNamesByTyApp _penv x thing_inside' = case x of
-        (Left _, _) -> do
-          -- will be checked below, we don't do interleaved visible and invisible yet
-          v <- thing_inside'
-          return (mempty, v)
-        (Right arg, data_con_quantifer_step) -> do
-          (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
-          tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
-            let ty = case data_con_quantifer_step of
-                  Named (Bndr var _) -> TyVarTy var
-                  Anon _ ty          -> ty
-            c <- unifyType Nothing arg_ty ty
+      extendNamesByTyApp _penv (x, data_con_quantifer_step) thing_inside' = do
+        ty <- TyVarTy <$> case data_con_quantifer_step of
+              Named (Bndr var _) -> pure var
+              Anon _ ty          -> newFlexiTyVar ty
+        case x of
+          Right _ -> do
+            -- will be checked below, we don't do interleaved visible and invisible yet
             v <- thing_inside'
-            return (mkWpCastN c, v)
-
-  let tcBody = do
-        (wrappers, (ret_wrapper, res)) <- tcMultiple extendNamesByTyApp penv invisPairs $ do
-          ret_co <- unifyType Nothing data_con_subst_user_ret_ty pat_ty
-          res <- tcConArgs (RealDataCon data_con) arg_tys' penv arg_pats thing_inside
-          pure (mkWpCastN ret_co, res)
-        pure (nonUserVarWrapper <.> mconcat wrappers <.> ret_wrapper, res)
+            return (mempty, v)
+          Left arg -> do
+            (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
+            tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
+              c <- unifyType Nothing arg_ty ty
+              v <- thing_inside'
+              return (mkWpCastN c, v)
 
   traceTc "tcConPat" (vcat [ ppr con_name
-                           , pprTyVars univ_tvs
-                           , pprTyVars ex_tvs
-                           , ppr eq_spec
+                           , ppr invisPairs
                            , ppr theta
-                           , pprTyVars ex_tvs'
-                           , ppr ctxt_res_tys
-                           , ppr arg_tys'
+                           -- , ppr ctxt_res_tys
                            , ppr arg_pats ])
-  when (not $ null ex_tvs && null eq_spec && null theta) $ do
+
+  when (not $ null (dataConExTyCoVars data_con) && null theta) $ do
     -- Ensure we have enough extensions for the general case, with
     -- existential, and local equality constraints
-    let no_equalities = null eq_spec && not (any isEqPred theta)
+    let no_equalities = not (any isEqPred theta)
 
     gadts_on    <- xoptM LangExt.GADTs
     families_on <- xoptM LangExt.TypeFamilies
@@ -994,34 +963,44 @@ tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing
               -- Re TypeFamilies see also #7156
 
   given <- do
-    let theta'     = case (eq_spec, theta) of
-          -- Special case because of paranoia about peformance as we delete
-          -- a large Haskell 98 happy path. Please try removing this.
-          ([], []) -> []
-          -- Order is *important* as we generate the list of
-          -- dictionary binders from theta'
-          _ -> substTheta tenv (eqSpecPreds eq_spec ++ theta)
-    mapM newEvVar theta'
+    pat_ty_ty <- expTypeToType pat_ty
+    let returnEqWithTheta =
+          mkPrimEqPred pat_ty_ty data_con_subst_user_ret_ty : theta
+    mapM newEvVar returnEqWithTheta
+
   (ev_binds, (bodyWrap, (arg_pats', res))) <- do
     let skol_info = PatSkol (RealDataCon data_con) mc
         mc = case pe_ctxt penv of
           LamPat mc -> mc
           LetPat {} -> PatBindRhs
-    checkConstraints skol_info ex_tvs' given tcBody
+    let skol_tvs =
+          [ name
+          | (_, Named (Bndr name _)) <- invisPairs
+          ]
+    checkConstraints skol_info skol_tvs given $ do
+      (wrappers, res) <- tcMultiple extendNamesByTyApp penv invisPairs $ do
+        let vis_arg_tys =
+              [ ty
+              | (_, Anon _ ty) <- invisPairs
+              ]
+        traceTc "tcConPat vis_arg_tys" $ ppr vis_arg_tys
+        tcConArgs (RealDataCon data_con) vis_arg_tys penv arg_pats thing_inside
+      pure (nonUserVarWrapper <.> mconcat wrappers, res)
 
   let res_pat = ConPat
-        { pat_con = header
+        { pat_con = L con_span (RealDataCon data_con)
         , pat_args = arg_pats'
-        , pat_ty_args = type_args
+        , pat_ty_args = type_arg_pats
         , pat_con_ext = ConPatTc
-            { cpt_tvs   = ex_tvs'
+            { cpt_arg_tys = error "ctxt_res_tys"
+            , cpt_tvs   = error "ex_tvs'"
             , cpt_dicts = given
             , cpt_binds = ev_binds
-            , cpt_arg_tys = ctxt_res_tys
             , cpt_wrap  = idHsWrapper
             }
         }
-  return (mkHsWrapPat (wrap <.> bodyWrap) res_pat pat_ty, res)
+  pat_ty_ty <- readExpType pat_ty
+  return (mkHsWrapPat bodyWrap res_pat pat_ty_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
