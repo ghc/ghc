@@ -636,7 +636,7 @@ data DynFlags = DynFlags {
         -- `initPackages` is called again, it doesn't reload the databases from
         -- disk.
 
-  pkgState              :: PackageState,
+  unitState             :: PackageState,
         -- ^ Consolidated unit database built by 'initPackages' from the package
         -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
@@ -1370,7 +1370,7 @@ defaultDynFlags mySettings llvmConfig =
         trustFlags              = [],
         packageEnv              = Nothing,
         unitDatabases           = Nothing,
-        pkgState                = emptyPackageState,
+        unitState               = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = waysTag (defaultWays mySettings),
         splitInfo               = Nothing,
@@ -1971,7 +1971,7 @@ homeUnit dflags =
          -- modules and the home unit id is the same as the instantiating unit
          -- id (see Note [About units] in GHC.Unit)
          | all (isHoleModule . snd) is && indefUnit u == homeUnitId dflags
-         -> mkVirtUnit (updateIndefUnitId (pkgState dflags) u) is
+         -> mkVirtUnit (updateIndefUnitId (unitState dflags) u) is
          -- otherwise it must be that we compile a fully definite units
          -- TODO: error when the unit is partially instantiated??
          | otherwise
