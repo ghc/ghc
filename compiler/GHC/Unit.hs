@@ -9,7 +9,6 @@ module GHC.Unit
    , module GHC.Unit.Info
    , module GHC.Unit.Parser
    , module GHC.Unit.State
-   , module GHC.Unit.Subst
    , module GHC.Unit.Module
    )
 where
@@ -18,7 +17,6 @@ import GHC.Unit.Types
 import GHC.Unit.Info
 import GHC.Unit.Parser
 import GHC.Unit.State
-import GHC.Unit.Subst
 import GHC.Unit.Module
 
 {-
