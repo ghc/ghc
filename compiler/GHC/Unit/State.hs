@@ -386,7 +386,7 @@ data PackageDatabase unit = PackageDatabase
    , packageDatabaseUnits :: [GenUnitInfo unit]
    }
 
-type InstalledPackageIndex = Map UnitId UnitInfo
+type UnitInfoMap = Map UnitId UnitInfo
 
 -- | Empty package configuration map
 emptyClosureUnitInfoMap :: ClosureUnitInfoMap
@@ -1164,7 +1164,7 @@ reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
 type RevIndex = Map UnitId [UnitId]
 
 -- | Compute the reverse dependency index of a package database.
-reverseDeps :: InstalledPackageIndex -> RevIndex
+reverseDeps :: UnitInfoMap -> RevIndex
 reverseDeps db = Map.foldl' go Map.empty db
   where
     go r pkg = foldl' (go' (unitId pkg)) r (unitDepends pkg)
@@ -1176,8 +1176,8 @@ reverseDeps db = Map.foldl' go Map.empty db
 -- Returns the pruned database, as well as a list of 'UnitInfo's
 -- that was removed.
 removePackages :: [UnitId] -> RevIndex
-               -> InstalledPackageIndex
-               -> (InstalledPackageIndex, [UnitInfo])
+               -> UnitInfoMap
+               -> (UnitInfoMap, [UnitInfo])
 removePackages uids index m = go uids (m,[])
   where
     go [] (m,pkgs) = (m,pkgs)
@@ -1189,18 +1189,18 @@ removePackages uids index m = go uids (m,[])
         | otherwise
         = go uids (m,pkgs)
 
--- | Given a 'UnitInfo' from some 'InstalledPackageIndex',
+-- | Given a 'UnitInfo' from some 'UnitInfoMap',
 -- return all entries in 'depends' which correspond to packages
 -- that do not exist in the index.
-depsNotAvailable :: InstalledPackageIndex
+depsNotAvailable :: UnitInfoMap
                  -> UnitInfo
                  -> [UnitId]
 depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (unitDepends pkg)
 
--- | Given a 'UnitInfo' from some 'InstalledPackageIndex'
+-- | Given a 'UnitInfo' from some 'UnitInfoMap'
 -- return all entries in 'unitAbiDepends' which correspond to packages
 -- that do not exist, OR have mismatching ABIs.
-depsAbiMismatch :: InstalledPackageIndex
+depsAbiMismatch :: UnitInfoMap
                 -> UnitInfo
                 -> [UnitId]
 depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends pkg
@@ -1242,7 +1242,7 @@ type PackagePrecedenceIndex = Map UnitId Int
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
 mergeDatabases :: DynFlags -> [PackageDatabase UnitId]
-               -> IO (InstalledPackageIndex, PackagePrecedenceIndex)
+               -> IO (UnitInfoMap, PackagePrecedenceIndex)
 mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, PackageDatabase db_path db) = do
@@ -1266,7 +1266,7 @@ mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
 
       -- Now merge the sets together (NB: in case of duplicate,
       -- first argument preferred)
-      pkg_map' :: InstalledPackageIndex
+      pkg_map' :: UnitInfoMap
       pkg_map' = Map.union db_map pkg_map
 
       prec_map' :: PackagePrecedenceIndex
@@ -1281,8 +1281,8 @@ mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
 -- 3. Apply ignore flags
 -- 4. Remove all packages which have deps with mismatching ABIs
 --
-validateDatabase :: DynFlags -> InstalledPackageIndex
-                 -> (InstalledPackageIndex, UnusablePackages, [SCC UnitInfo])
+validateDatabase :: DynFlags -> UnitInfoMap
+                 -> (UnitInfoMap, UnusablePackages, [SCC UnitInfo])
 validateDatabase dflags pkg_map1 =
     (pkg_map5, unusable, sccs)
   where
