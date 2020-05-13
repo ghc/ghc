@@ -39,7 +39,6 @@ module GHC.Unit.Types
    , fsToUnit
    , unitFS
    , unitString
-   , instUnitToUnit
    , toUnitId
    , virtualUnitId
    , stringToUnit
@@ -104,7 +103,7 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import {-# SOURCE #-} GHC.Unit.State (improveUnit, PackageState, unitInfoMap, displayUnitId)
+import {-# SOURCE #-} GHC.Unit.State (displayUnitId)
 import {-# SOURCE #-} GHC.Driver.Session (unitState)
 
 ---------------------------------------------------------------------
@@ -456,24 +455,6 @@ mapGenUnit f gunitFS = go
                      (fmap f (instUnitInstanceOf i))
                      (fmap (second (fmap go)) (instUnitInsts i))
 
-
--- | Check the database to see if we already have an installed unit that
--- corresponds to the given 'InstantiatedUnit'.
---
--- Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged or
--- references a matching installed unit.
---
--- See Note [VirtUnit to RealUnit improvement]
-instUnitToUnit :: PackageState -> InstantiatedUnit -> Unit
-instUnitToUnit pkgstate iuid =
-    -- NB: suppose that we want to compare the indefinite
-    -- unit id p[H=impl:H] against p+abcd (where p+abcd
-    -- happens to be the existing, installed version of
-    -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
-    -- VirtUnit, they won't compare equal; only
-    -- after improvement will the equality hold.
-    improveUnit (unitInfoMap pkgstate) $
-        VirtUnit iuid
 
 -- | Return the UnitId of the Unit. For on-the-fly instantiated units, return
 -- the UnitId of the indefinite unit this unit is an instance of.
