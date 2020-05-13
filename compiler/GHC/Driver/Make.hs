@@ -1525,7 +1525,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 -- instantiations that are themselves instantiations and so on recursively.
 instantiatedUnitsToCheck :: DynFlags -> [Unit]
 instantiatedUnitsToCheck dflags =
-  nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
+  nubSort $ concatMap goUnit (explicitUnits (pkgState dflags))
  where
   goUnit HoleUnit         = []
   goUnit (RealUnit _)     = []

@@ -610,7 +610,7 @@ data DynFlags = DynFlags {
         -- *reverse* order that they're specified on the command line.
         -- This is intended to be applied with the list of "initial"
         -- package databases derived from @GHC_PACKAGE_PATH@; see
-        -- 'getPackageConfRefs'.
+        -- 'getPackageDbRefs'.
 
   ignorePackageFlags    :: [IgnorePackageFlag],
         -- ^ The @-ignore-package@ flags from the command line.
