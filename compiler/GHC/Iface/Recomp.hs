@@ -403,9 +403,9 @@ checkMergedSignatures mod_summary iface = do
     dflags <- getDynFlags
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext (pkgState dflags)) of
+                                     (requirementContext (unitState dflags)) of
                         Nothing -> []
-                        Just r -> sort $ map (instModuleToModule (pkgState dflags)) r
+                        Just r -> sort $ map (instModuleToModule (unitState dflags)) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")

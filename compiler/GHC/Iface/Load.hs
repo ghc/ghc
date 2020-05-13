@@ -949,7 +949,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                     case getModuleInstantiation wanted_mod_with_insts of
                         (_, Nothing) -> wanted_mod_with_insts
                         (_, Just indef_mod) ->
-                          instModuleToModule (pkgState dflags)
+                          instModuleToModule (unitState dflags)
                             (uninstantiateInstantiatedModule indef_mod)
               read_result <- readIface wanted_mod file_path
               case read_result of

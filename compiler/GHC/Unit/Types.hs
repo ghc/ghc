@@ -104,7 +104,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
 import {-# SOURCE #-} GHC.Unit.State (improveUnit, PackageState, unitInfoMap, displayUnitId)
-import {-# SOURCE #-} GHC.Driver.Session (pkgState)
+import {-# SOURCE #-} GHC.Driver.Session (unitState)
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -525,7 +525,7 @@ instance Outputable UnitId where
     ppr uid@(UnitId fs) =
         getPprDebug $ \debug ->
         sdocWithDynFlags $ \dflags ->
-          case displayUnitId (pkgState dflags) uid of
+          case displayUnitId (unitState dflags) uid of
             Just str | not debug -> text str
             _ -> ftext fs
 

@@ -3,11 +3,11 @@ import GHC.Prelude
 import GHC.Data.FastString
 import {-# SOURCE #-} GHC.Unit.Types (IndefUnitId, Unit, UnitId)
 data PackageState
-data UnitInfoMap
-data PackageDatabase unit
+data ClosureUnitInfoMap
+data UnitDatabase unit
 emptyPackageState :: PackageState
 mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 displayUnitId :: PackageState -> UnitId -> Maybe String
-improveUnit :: UnitInfoMap -> Unit -> Unit
-unitInfoMap :: PackageState -> UnitInfoMap
+improveUnit :: ClosureUnitInfoMap -> Unit -> Unit
+unitInfoMap :: PackageState -> ClosureUnitInfoMap
 updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
