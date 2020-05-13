@@ -405,7 +405,7 @@ lookupUnit' False (ClosureUnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
 lookupUnit' True m@(ClosureUnitInfoMap pkg_map _) uid = case uid of
    HoleUnit   -> error "Hole unit"
    RealUnit _ -> lookupUDFM pkg_map uid
-   VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
+   VirtUnit i -> fmap (renameUnitInfo m (instUnitInsts i))
                       (lookupUDFM pkg_map (instUnitInstanceOf i))
 
 -- | Find the unit we know about with the given unit id, if any
@@ -815,7 +815,7 @@ findPackages prec_map pkg_db arg pkgs unusable
             -> Just p
           VirtUnit inst
             | indefUnit (instUnitInstanceOf inst) == unitId p
-            -> Just (renamePackage pkg_db (instUnitInsts inst) p)
+            -> Just (renameUnitInfo pkg_db (instUnitInsts inst) p)
           _ -> Nothing
 
 selectPackages :: UnitPrecedenceMap -> PackageArg -> [UnitInfo]
@@ -830,9 +830,8 @@ selectPackages prec_map arg pkgs unusable
         else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'UnitInfo' according to some module instantiation.
-renamePackage :: ClosureUnitInfoMap -> [(ModuleName, Module)]
-              -> UnitInfo -> UnitInfo
-renamePackage pkg_map insts conf =
+renameUnitInfo :: ClosureUnitInfoMap -> [(ModuleName, Module)] -> UnitInfo -> UnitInfo
+renameUnitInfo pkg_map insts conf =
     let hsubst = listToUFM insts
         smod  = renameHoleModule' pkg_map hsubst
         new_insts = map (\(k,v) -> (k,smod v)) (unitInstantiations conf)
