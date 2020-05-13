@@ -310,8 +310,6 @@ instance Monoid UnitVisibility where
              }
     mappend = (Semigroup.<>)
 
-type PreloadUnitId = UnitId
-
 -- | Map from 'ModuleName' to a set of of module providers (i.e. a 'Module' and
 -- its 'ModuleOrigin').
 --
@@ -339,7 +337,7 @@ data PackageState = PackageState {
   -- | The packages we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a package
   -- is always mentioned before the packages it depends on.
-  preloadPackages      :: [PreloadUnitId],
+  preloadPackages      :: [UnitId],
 
   -- | Packages which we explicitly depend on (from a command line flag).
   -- We'll use this to generate version macros.
@@ -486,7 +484,7 @@ listUnitInfoMap pkgstate = eltsUDFM pkg_map
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'pkgState' in 'DynFlags' and return a list of packages to
 -- link in.
-initPackages :: DynFlags -> IO (DynFlags, [PreloadUnitId])
+initPackages :: DynFlags -> IO (DynFlags, [UnitId])
 initPackages dflags = withTiming dflags
                                   (text "initializing package database")
                                   forcePkgDb $ do
@@ -1338,9 +1336,9 @@ mkPackageState
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
     -> [PackageDatabase UnitId]
-    -> [PreloadUnitId]              -- preloaded packages
+    -> [UnitId]              -- preloaded packages
     -> IO (PackageState,
-           [PreloadUnitId],         -- new packages to preload
+           [UnitId],         -- new packages to preload
            [(ModuleName, Module)])
 
 mkPackageState dflags dbs preload0 = do
@@ -1739,7 +1737,7 @@ mkModMap pkg mod = Map.singleton (mkModule pkg mod)
 -- use.
 
 -- | Find all the include directories in these and the preload packages
-getPackageIncludePath :: DynFlags -> [PreloadUnitId] -> IO [String]
+getPackageIncludePath :: DynFlags -> [UnitId] -> IO [String]
 getPackageIncludePath dflags pkgs =
   collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
 
@@ -1747,7 +1745,7 @@ collectIncludeDirs :: [UnitInfo] -> [FilePath]
 collectIncludeDirs ps = ordNub (filter notNull (concatMap unitIncludeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
-getPackageLibraryPath :: DynFlags -> [PreloadUnitId] -> IO [String]
+getPackageLibraryPath :: DynFlags -> [UnitId] -> IO [String]
 getPackageLibraryPath dflags pkgs =
   collectLibraryPaths dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
@@ -1757,7 +1755,7 @@ collectLibraryPaths dflags = ordNub . filter notNull
 
 -- | Find all the link options in these and the preload packages,
 -- returning (package hs lib options, extra library options, other flags)
-getPackageLinkOpts :: DynFlags -> [PreloadUnitId] -> IO ([String], [String], [String])
+getPackageLinkOpts :: DynFlags -> [UnitId] -> IO ([String], [String], [String])
 getPackageLinkOpts dflags pkgs =
   collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
@@ -1776,7 +1774,7 @@ collectArchives dflags pc =
   where searchPaths = ordNub . filter notNull . libraryDirsForWay dflags $ pc
         libs        = packageHsLibs dflags pc ++ unitExtDepLibsSys pc
 
-getLibs :: DynFlags -> [PreloadUnitId] -> IO [(String,String)]
+getLibs :: DynFlags -> [UnitId] -> IO [(String,String)]
 getLibs dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   fmap concat . forM ps $ \p -> do
@@ -1839,19 +1837,19 @@ libraryDirsForWay dflags
   | otherwise                 = unitLibraryDirs
 
 -- | Find all the C-compiler options in these and the preload packages
-getPackageExtraCcOpts :: DynFlags -> [PreloadUnitId] -> IO [String]
+getPackageExtraCcOpts :: DynFlags -> [UnitId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (concatMap unitCcOptions ps)
 
 -- | Find all the package framework paths in these and the preload packages
-getPackageFrameworkPath  :: DynFlags -> [PreloadUnitId] -> IO [String]
+getPackageFrameworkPath  :: DynFlags -> [UnitId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (ordNub (filter notNull (concatMap unitExtDepFrameworkDirs ps)))
 
 -- | Find all the package frameworks in these and the preload packages
-getPackageFrameworks  :: DynFlags -> [PreloadUnitId] -> IO [String]
+getPackageFrameworks  :: DynFlags -> [UnitId] -> IO [String]
 getPackageFrameworks dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (concatMap unitExtDepFrameworks ps)
@@ -1981,7 +1979,7 @@ listVisibleModuleNames dflags =
 
 -- | Find all the 'UnitInfo' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'UnitInfo's
-getPreloadPackagesAnd :: DynFlags -> [PreloadUnitId] -> IO [UnitInfo]
+getPreloadPackagesAnd :: DynFlags -> [UnitId] -> IO [UnitInfo]
 getPreloadPackagesAnd dflags pkgids0 =
   let
       pkgids  = pkgids0 ++
@@ -2024,9 +2022,9 @@ closeDepsErr dflags pkg_map ps = foldM (add_package dflags pkg_map) [] ps
 -- internal helper
 add_package :: DynFlags
             -> UnitInfoMap
-            -> [PreloadUnitId]
-            -> (PreloadUnitId,Maybe PreloadUnitId)
-            -> MaybeErr MsgDoc [PreloadUnitId]
+            -> [UnitId]
+            -> (UnitId,Maybe UnitId)
+            -> MaybeErr MsgDoc [UnitId]
 add_package dflags pkg_db ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
