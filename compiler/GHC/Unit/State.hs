@@ -8,14 +8,14 @@ module GHC.Unit.State (
 
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
-        PackageDatabase (..),
+        UnitDatabase (..),
         ClosureUnitInfoMap,
         emptyPackageState,
         initPackages,
-        readPackageDatabases,
-        readPackageDatabase,
+        readUnitDatabases,
+        readUnitDatabase,
         getPackageDbRefs,
-        resolvePackageDatabase,
+        resolveUnitDatabase,
         listUnitInfo,
 
         -- * Querying the package config
@@ -380,10 +380,10 @@ emptyPackageState = PackageState {
     allowVirtualUnits = False
     }
 
--- | Package database
-data PackageDatabase unit = PackageDatabase
-   { packageDatabasePath  :: FilePath
-   , packageDatabaseUnits :: [GenUnitInfo unit]
+-- | Unit database
+data UnitDatabase unit = UnitDatabase
+   { unitDatabasePath  :: FilePath
+   , unitDatabaseUnits :: [GenUnitInfo unit]
    }
 
 type UnitInfoMap = Map UnitId UnitInfo
@@ -490,11 +490,11 @@ initPackages dflags = withTiming dflags
                                   forcePkgDb $ do
   read_pkg_dbs <-
     case pkgDatabase dflags of
-        Nothing  -> readPackageDatabases dflags
+        Nothing  -> readUnitDatabases dflags
         Just dbs -> return dbs
 
   let
-      distrust_all db = db { packageDatabaseUnits = distrustAllUnits (packageDatabaseUnits db) }
+      distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
 
       pkg_dbs
          | gopt Opt_DistrustAllPackages dflags = map distrust_all read_pkg_dbs
@@ -510,13 +510,13 @@ initPackages dflags = withTiming dflags
     forcePkgDb (dflags, _) = unitInfoMap (pkgState dflags) `seq` ()
 
 -- -----------------------------------------------------------------------------
--- Reading the package database(s)
+-- Reading the unit database(s)
 
-readPackageDatabases :: DynFlags -> IO [PackageDatabase UnitId]
-readPackageDatabases dflags = do
+readUnitDatabases :: DynFlags -> IO [UnitDatabase UnitId]
+readUnitDatabases dflags = do
   conf_refs <- getPackageDbRefs dflags
-  confs     <- liftM catMaybes $ mapM (resolvePackageDatabase dflags) conf_refs
-  mapM (readPackageDatabase dflags) confs
+  confs     <- liftM catMaybes $ mapM (resolveUnitDatabase dflags) conf_refs
+  mapM (readUnitDatabase dflags) confs
 
 
 getPackageDbRefs :: DynFlags -> IO [PkgDbRef]
@@ -559,17 +559,17 @@ getPackageDbRefs dflags = do
 -- NB: This logic is reimplemented in Cabal, so if you change it,
 -- make sure you update Cabal. (Or, better yet, dump it in the
 -- compiler info so Cabal can use the info.)
-resolvePackageDatabase :: DynFlags -> PkgDbRef -> IO (Maybe FilePath)
-resolvePackageDatabase dflags GlobalPkgDb = return $ Just (globalPackageDatabasePath dflags)
-resolvePackageDatabase dflags UserPkgDb = runMaybeT $ do
+resolveUnitDatabase :: DynFlags -> PkgDbRef -> IO (Maybe FilePath)
+resolveUnitDatabase dflags GlobalPkgDb = return $ Just (globalPackageDatabasePath dflags)
+resolveUnitDatabase dflags UserPkgDb = runMaybeT $ do
   dir <- versionedAppDir dflags
   let pkgconf = dir </> "package.conf.d"
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
-resolvePackageDatabase _ (PkgDbPath name) = return $ Just name
+resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
-readPackageDatabase :: DynFlags -> FilePath -> IO (PackageDatabase UnitId)
-readPackageDatabase dflags conf_file = do
+readUnitDatabase :: DynFlags -> FilePath -> IO (UnitDatabase UnitId)
+readUnitDatabase dflags conf_file = do
   isdir <- doesDirectoryExist conf_file
 
   proto_pkg_configs <-
@@ -598,7 +598,7 @@ readPackageDatabase dflags conf_file = do
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) unitIdFS . mkUnitKeyInfo)
                          proto_pkg_configs
   --
-  return $ PackageDatabase conf_file' pkg_configs1
+  return $ UnitDatabase conf_file' pkg_configs1
   where
     readDirStyleUnitInfo conf_dir = do
       let filename = conf_dir </> "package.cache"
@@ -1240,11 +1240,11 @@ type UnitPrecedenceMap = Map UnitId Int
 -- packages with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
-mergeDatabases :: DynFlags -> [PackageDatabase UnitId]
+mergeDatabases :: DynFlags -> [UnitDatabase UnitId]
                -> IO (UnitInfoMap, UnitPrecedenceMap)
 mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
-    merge (pkg_map, prec_map) (i, PackageDatabase db_path db) = do
+    merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg dflags 2 $
           text "loading package database" <+> text db_path
       forM_ (Set.toList override_set) $ \pkg ->
@@ -1334,7 +1334,7 @@ mkPackageState
     :: DynFlags
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
-    -> [PackageDatabase UnitId]
+    -> [UnitDatabase UnitId]
     -> [UnitId]              -- preloaded packages
     -> IO (PackageState,
            [UnitId],         -- new packages to preload
