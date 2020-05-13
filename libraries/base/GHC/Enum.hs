@@ -139,12 +139,35 @@ class  Enum a   where
     --     * @enumFromThenTo 6 8 2 :: [Int] = []@
     enumFromThenTo      :: a -> a -> a -> [a]
 
-    succ                   = toEnum . (+ 1)  . fromEnum
-    pred                   = toEnum . (subtract 1) . fromEnum
-    enumFrom x             = map toEnum [fromEnum x ..]
-    enumFromThen x y       = map toEnum [fromEnum x, fromEnum y ..]
-    enumFromTo x y         = map toEnum [fromEnum x .. fromEnum y]
+    succ = toEnum . (+ 1) . fromEnum
+
+    pred = toEnum . (subtract 1) . fromEnum
+
+    -- See Note [Stable Unfolding for Enum methods]
+    {-# INLINABLE enumFrom #-}
+    enumFrom x = map toEnum [fromEnum x ..]
+
+    -- See Note [Stable Unfolding for Enum methods]
+    {-# INLINABLE enumFromThen #-}
+    enumFromThen x y = map toEnum [fromEnum x, fromEnum y ..]
+
+    -- See Note [Stable Unfolding for Enum methods]
+    {-# INLINABLE enumFromTo #-}
+    enumFromTo x y = map toEnum [fromEnum x .. fromEnum y]
+
+    -- See Note [Stable Unfolding for Enum methods]
+    {-# INLINABLE enumFromThenTo #-}
     enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+
+{-
+Note [Stable Unfolding for Enum methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The INLINABLE pragmas ensure that we export stable (unoptimised) unfoldings in
+the interface file so we can do list fusion at usage sites outside this module.
+
+Fixes https://gitlab.haskell.org/ghc/ghc/issues/15185
+-}
 
 -- Default methods for bounded enumerations
 boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
