@@ -400,14 +400,8 @@ data TExp (a :: TYPE (r :: RuntimeRep)) =
        , typedRep :: TExpU } deriving Generic
 
 
--- Argument is the dynamically renamed environment.
-data TExpU = TExpU { evalTExpU :: [(Int, Int)] -> TExpU' }
-           deriving (Generic)
 
-
-instance Data TExpU
-
-data TExpU' = TExpU' { tenv :: [(Int, TTExp)]
+data TExpU = TExpU { tenv :: [(Int, TTExp)]
                      , env :: [(Int, TExpU)]
                      , ev :: [(Int, THRep)]
                      , expr_renamed :: [(Int, Int)]
@@ -426,10 +420,7 @@ unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp
 unsafeTExpCoerce (e, ts, qu, evs, env, s) =
   do { e' <- e
      ; qu' <- sequence (map sequence qu)
-     --; let qu'' = map (second (applyRenamedVars renamed_vars)) qu'
---     ; let qu'' = map (second (extendDynEnv renamed_vars)) qu
-     --; traceShowM ("renamed_vars", renamed_vars)
-     ; return (TExp e' (TExpU (\_ -> TExpU' ts qu' evs env s))) }
+     ; return (TExp e' (TExpU ts qu' evs env s)) }
 
 
 bindVars :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m
@@ -437,9 +428,6 @@ bindVars :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m
 bindVars vs k = do
   renamed_vars <- mapM (\n -> (n,) <$> freshInt) vs
   k renamed_vars
-
-applyRenamedVars :: [(Int, Int)] -> TExpU -> TExpU
-applyRenamedVars s (TExpU f) = TExpU (\e -> f (s ++ e))
 
 newtype THRep = THRep ByteString deriving (Generic, Data)
 

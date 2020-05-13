@@ -88,7 +88,7 @@ import GHC.Iface.Env
 
 import Data.IORef
 import GHC.Driver.Types (hsc_NC)
-import Language.Haskell.TH.Syntax(TExpU'(..), THRep(..), TExpU(..), TTExp(..))
+import Language.Haskell.TH.Syntax(TExpU(..), THRep(..), TTExp(..))
 {-
 ************************************************************************
 *                                                                      *
@@ -812,11 +812,11 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
     else dsLExpr expr
 
 dsSplicedD :: Maybe SDoc -> TExpU -> DsM CoreExpr
-dsSplicedD before (TExpU f) = do
-      let (TExpU' zs env evs subst e) = f []
+dsSplicedD before tu = do
+      let (TExpU zs env evs subst e) = tu
       let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
           zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
-          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU (\es -> TExpU' [] [] [] es b))) evs
+          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] [] b)) evs
       loadCoreExpr before zs' (es ++ evs') subst e
 
 dsSplicedT :: TTExp -> DsM Type
@@ -848,7 +848,7 @@ instance Outputable TTExp where
   ppr (TTExp t t') = ppr t <+> text "TTREP"
 
 instance Outputable TExpU where
-  ppr (flip evalTExpU [] -> TExpU' t t' sub t'' _) = ppr t <+> ppr t' <+> text "TREP"
+  ppr (TExpU t t' sub t'' _) = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
 loadCoreExpr :: Maybe SDoc -> [(Unique, TTExp)] -> [(Unique, TExpU)] -> [(Int, Int)] -> THRep -> DsM CoreExpr

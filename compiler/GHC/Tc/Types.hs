@@ -121,7 +121,6 @@ import GHC.Driver.Session
 import Outputable
 import ListSetOps
 import Fingerprint
-import FastString
 import Util
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
@@ -138,7 +137,6 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
-import qualified Data.Map as M
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
 

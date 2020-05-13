@@ -38,7 +38,6 @@ import GHC.Builtin.Names.TH
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Builtin.Types
-import GHC.HsToCore.Monad
 import {-# SOURCE #-} GHC.HsToCore.Binds
 import GHC.Core
 import GHC.Core.Make
@@ -54,7 +53,6 @@ import GHC.HsToCore.Quote (Core(..))
 import GHC.CoreToIface
 import GHC.Iface.Binary
 import Binary
-import System.IO
 import GHC.Types.Var.Set
 import GHC.Core.FVs
 import GHC.Core.SimpleOpt
@@ -94,7 +92,7 @@ dsBracketTc (rty, ur_ty) exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs z
       zss <- mapM do_one_z zs
       (ev_zss, ev_tss) <- mapAndUnzipM do_one_ev ev_zs
 
-      q_w <- dsHsWrapper (applyQuoteWrapper q)
+      _q_w <- dsHsWrapper (applyQuoteWrapper q)
       -- thname <- lookupType nameTyConName
       u_ty <- dsLookupTyCon tExpUTyConName
       let ty = mkAppTy m_tau (mkTyConApp u_ty [])

@@ -616,7 +616,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                  -- pprTraceIt "tysVars"
                                   [(n, thlvl) | (n, ATyVar {}) <- pairs] ++
                                  --pprTraceIt "tysVars"
-                                  [(idName tc, thlvl) | (n, ATyVar _ tc) <- pairs]) }
+                                  [(idName tc, thlvl) | (_n, ATyVar _ tc) <- pairs]) }
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things

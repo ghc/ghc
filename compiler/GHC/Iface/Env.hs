@@ -40,7 +40,6 @@ import GHC.Iface.Type
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
-import qualified Data.Map as M
 import GHC.Types.Unique
 import qualified Data.IntMap as I
 import Control.Applicative ((<|>))
