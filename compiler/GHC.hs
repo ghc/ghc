@@ -699,7 +699,7 @@ getProgramDynFlags = getSessionDynFlags
 -- | Set the 'DynFlags' used to evaluate interactive expressions.
 -- Note: this cannot be used for changes to packages.  Use
 -- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
--- 'pkgState' into the interactive @DynFlags@.
+-- 'unitState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
@@ -1355,7 +1355,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (unitState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs

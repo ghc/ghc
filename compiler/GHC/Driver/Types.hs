@@ -1955,7 +1955,7 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                                              (mkQualModule dflags)
                                              (mkQualPackage pkgs)
   where
-  pkgs = pkgState dflags
+  pkgs = unitState dflags
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre
@@ -2021,7 +2021,7 @@ mkQualModule dflags mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllPackages (pkgState dflags) (moduleName mod)
+     where lookup = lookupModuleInAllPackages (unitState dflags) (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
