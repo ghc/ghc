@@ -675,7 +675,7 @@ mungeDynLibFields pkg =
 
 applyTrustFlag
    :: DynFlags
-   -> PackagePrecedenceIndex
+   -> UnitPrecedenceMap
    -> UnusableUnits
    -> [UnitInfo]
    -> TrustFlag
@@ -707,7 +707,7 @@ homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
 
 applyPackageFlag
    :: DynFlags
-   -> PackagePrecedenceIndex
+   -> UnitPrecedenceMap
    -> ClosureUnitInfoMap
    -> UnusableUnits
    -> Bool -- if False, if you expose a package, it implicitly hides
@@ -792,7 +792,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
 -- | Like 'selectPackages', but doesn't return a list of unmatched
 -- packages.  Furthermore, any packages it returns are *renamed*
 -- if the 'UnitArg' has a renaming associated with it.
-findPackages :: PackagePrecedenceIndex
+findPackages :: UnitPrecedenceMap
              -> ClosureUnitInfoMap -> PackageArg -> [UnitInfo]
              -> UnusableUnits
              -> Either [(UnitInfo, UnusablePackageReason)]
@@ -818,7 +818,7 @@ findPackages prec_map pkg_db arg pkgs unusable
             -> Just (renamePackage pkg_db (instUnitInsts inst) p)
           _ -> Nothing
 
-selectPackages :: PackagePrecedenceIndex -> PackageArg -> [UnitInfo]
+selectPackages :: UnitPrecedenceMap -> PackageArg -> [UnitInfo]
                -> UnusableUnits
                -> Either [(UnitInfo, UnusablePackageReason)]
                   ([UnitInfo], [UnitInfo])
@@ -860,7 +860,7 @@ matching (UnitIdArg _)  = \_ -> False -- TODO: warn in this case
 
 -- | This sorts a list of packages, putting "preferred" packages first.
 -- See 'compareByPreference' for the semantics of "preference".
-sortByPreference :: PackagePrecedenceIndex -> [UnitInfo] -> [UnitInfo]
+sortByPreference :: UnitPrecedenceMap -> [UnitInfo] -> [UnitInfo]
 sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
 
 -- | Returns 'GT' if @pkg@ should be preferred over @pkg'@ when picking
@@ -882,7 +882,7 @@ sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
 -- the fake @integer-wired-in@ package, see Note [The integer library]
 -- in the @GHC.Builtin.Names@ module.
 compareByPreference
-    :: PackagePrecedenceIndex
+    :: UnitPrecedenceMap
     -> UnitInfo
     -> UnitInfo
     -> Ordering
@@ -960,7 +960,7 @@ type WiringMap = Map UnitId UnitId
 
 findWiredInPackages
    :: DynFlags
-   -> PackagePrecedenceIndex
+   -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
    -> VisibilityMap             -- info on what packages are visible
                                 -- for wired in selection
@@ -1230,14 +1230,14 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
 -- the command line.  We use this mapping to make sure we prefer
 -- packages that were defined later on the command line, if there
 -- is an ambiguity.
-type PackagePrecedenceIndex = Map UnitId Int
+type UnitPrecedenceMap = Map UnitId Int
 
 -- | Given a list of databases, merge them together, where
 -- packages with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
 mergeDatabases :: DynFlags -> [PackageDatabase UnitId]
-               -> IO (UnitInfoMap, PackagePrecedenceIndex)
+               -> IO (UnitInfoMap, UnitPrecedenceMap)
 mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, PackageDatabase db_path db) = do
@@ -1264,7 +1264,7 @@ mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
       pkg_map' :: UnitInfoMap
       pkg_map' = Map.union db_map pkg_map
 
-      prec_map' :: PackagePrecedenceIndex
+      prec_map' :: UnitPrecedenceMap
       prec_map' = Map.union (Map.map (const i) db_map) prec_map
 
 -- | Validates a database, removing unusable packages from it
