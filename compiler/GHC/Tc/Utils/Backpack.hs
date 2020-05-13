@@ -274,7 +274,7 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
-    pkgstate = pkgState (hsc_dflags hsc_env)
+    pkgstate = unitState (hsc_dflags hsc_env)
     reqs = requirementMerges pkgstate modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
@@ -535,7 +535,7 @@ mergeSignatures
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         mod_name = moduleName (tcg_mod tcg_env)
-        pkgstate = pkgState dflags
+        pkgstate = unitState dflags
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -1005,7 +1005,7 @@ instantiateSignature = do
     let uid  = fromJust (homeUnitInstanceOfId dflags)
         -- we need to fetch the most recent ppr infos from the unit
         -- database because we might have modified it
-        uid' = updateIndefUnitId (pkgState dflags) uid
+        uid' = updateIndefUnitId (unitState dflags) uid
     inner_mod `checkImplements`
         Module
             (mkInstantiatedUnit uid' (homeUnitInstantiations dflags))

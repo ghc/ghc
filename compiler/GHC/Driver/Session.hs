@@ -254,7 +254,7 @@ import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, PackageDatabase, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -617,7 +617,7 @@ data DynFlags = DynFlags {
         -- *reverse* order that they're specified on the command line.
         -- This is intended to be applied with the list of "initial"
         -- package databases derived from @GHC_PACKAGE_PATH@; see
-        -- 'getPackageConfRefs'.
+        -- 'getPackageDbRefs'.
 
   ignorePackageFlags    :: [IgnorePackageFlag],
         -- ^ The @-ignore-package@ flags from the command line.
@@ -634,21 +634,18 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [PackageDatabase UnitId],
-        -- ^ Stack of package databases for the target platform.
+  unitDatabases         :: Maybe [UnitDatabase UnitId],
+        -- ^ Stack of unit databases for the target platform.
         --
-        -- A "package database" is a misleading name as it is really a Unit
-        -- database (cf Note [About Units]).
-        --
-        -- This field is populated by `initPackages`.
+        -- This field is populated by `initUnits`.
         --
         -- 'Nothing' means the databases have never been read from disk. If
-        -- `initPackages` is called again, it doesn't reload the databases from
+        -- `initUnits` is called again, it doesn't reload the databases from
         -- disk.
 
-  pkgState              :: PackageState,
-        -- ^ Consolidated unit database built by 'initPackages' from the package
-        -- databases in 'pkgDatabase' and flags ('-ignore-package', etc.).
+  unitState             :: PackageState,
+        -- ^ Consolidated unit database built by 'initUnits' from the unit
+        -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
         -- It also contains mapping from module names to actual Modules.
 
@@ -1379,8 +1376,8 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        pkgDatabase             = Nothing,
-        pkgState                = emptyPackageState,
+        unitDatabases           = Nothing,
+        unitState               = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = waysTag (defaultWays mySettings),
         splitInfo               = Nothing,
@@ -1981,7 +1978,7 @@ homeUnit dflags =
          -- modules and the home unit id is the same as the instantiating unit
          -- id (see Note [About units] in GHC.Unit)
          | all (isHoleModule . snd) is && indefUnit u == homeUnitId dflags
-         -> mkVirtUnit (updateIndefUnitId (pkgState dflags) u) is
+         -> mkVirtUnit (updateIndefUnitId (unitState dflags) u) is
          -- otherwise it must be that we compile a fully definite units
          -- TODO: error when the unit is partially instantiated??
          | otherwise
