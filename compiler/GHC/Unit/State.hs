@@ -243,13 +243,15 @@ originEmpty :: ModuleOrigin -> Bool
 originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
+type PreloadUnitClosure = UniqSet UnitId
+
 -- | Map from 'UnitId' to 'UnitInfo', plus
 -- the transitive closure of preload units.
 data ClosureUnitInfoMap = ClosureUnitInfoMap
-   { unClosureUnitInfoMap :: UniqDFM UnitInfo
+   { unClosureUnitInfoMap :: UnitInfoMap
       -- ^ Map from 'UnitId' to 'UnitInfo'
 
-   , preloadClosure :: UniqSet UnitId
+   , preloadClosure :: PreloadUnitClosure
      -- ^ The set of transitively reachable units according
      -- to the explicitly provided command line arguments.
      -- A fully instantiated VirtUnit may only be replaced by a RealUnit from
@@ -390,7 +392,7 @@ type UnitInfoMap = Map UnitId UnitInfo
 
 -- | Empty package configuration map
 emptyClosureUnitInfoMap :: ClosureUnitInfoMap
-emptyClosureUnitInfoMap = ClosureUnitInfoMap emptyUDFM emptyUniqSet
+emptyClosureUnitInfoMap = ClosureUnitInfoMap Map.empty emptyUniqSet
 
 -- | Find the unit we know about with the given unit, if any
 lookupUnit :: PackageState -> Unit -> Maybe UnitInfo
@@ -401,12 +403,22 @@ lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 -- just a 'ClosureUnitInfoMap' rather than a 'PackageState' (so it can
 -- be used while we're initializing 'DynFlags'
 lookupUnit' :: Bool -> ClosureUnitInfoMap -> Unit -> Maybe UnitInfo
-lookupUnit' False (ClosureUnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
-lookupUnit' True m@(ClosureUnitInfoMap pkg_map _) uid = case uid of
+lookupUnit' allowOnTheFlyInst m@(ClosureUnitInfoMap pkg_map _) u = case u of
    HoleUnit   -> error "Hole unit"
-   RealUnit _ -> lookupUDFM pkg_map uid
-   VirtUnit i -> fmap (renameUnitInfo m (instUnitInsts i))
-                      (lookupUDFM pkg_map (instUnitInstanceOf i))
+   RealUnit i -> Map.lookup (unDefinite i) pkg_map
+   VirtUnit i
+      | allowOnTheFlyInst
+      -> -- lookup UnitInfo of the indefinite unit to be instantiated and
+         -- instantiate it on-the-fly
+         fmap (renameUnitInfo m (instUnitInsts i))
+           (Map.lookup (indefUnit (instUnitInstanceOf i)) pkg_map)
+
+      | otherwise
+      -> -- lookup UnitInfo by virtual UnitId. This is used to find indefinite
+         -- units. Even if they are real, installed units, they can't use the
+         -- `RealUnit` constructor (it is reserved for definite units) so we use
+         -- the `VirtUnit` constructor.
+         Map.lookup (virtualUnitId i) pkg_map
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnitId :: PackageState -> UnitId -> Maybe UnitInfo
@@ -414,7 +426,7 @@ lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnitId' :: ClosureUnitInfoMap -> UnitId -> Maybe UnitInfo
-lookupUnitId' (ClosureUnitInfoMap db _) uid = lookupUDFM db uid
+lookupUnitId' (ClosureUnitInfoMap db _) uid = Map.lookup uid db
 
 
 -- | Looks up the given unit in the package state, panicing if it is not found
@@ -451,21 +463,23 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 --
 mkClosureUnitInfoMap :: [UnitInfo] -> UnitInfoMap
 mkClosureUnitInfoMap infos
-  = ClosureUnitInfoMap (foldl' add emptyUDFM infos) emptyUniqSet
+  = ClosureUnitInfoMap (foldl' add Map.empty infos) emptyUniqSet
   where
-   mkVirt      p = mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
+   mkVirt      p = virtualUnitId (mkInstantiatedUnit (unitInstanceOf p) (unitInstantiations p))
    add pkg_map p
       | not (null (unitInstantiations p))
-      = addToUDFM (addToUDFM pkg_map (mkVirt p) p) (unitId p) p
+      = Map.insert (mkVirt p) p
+         $ Map.insert (unitId p) p
+         $ pkg_map
       | otherwise
-      = addToUDFM pkg_map (unitId p) p
+      = Map.insert (unitId p) p pkg_map
 
 -- | Get a list of entries from the package database.  NB: be careful with
 -- this function, although all packages in this map are "visible", this
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
 listUnitInfo :: PackageState -> [UnitInfo]
-listUnitInfo pkgstate = eltsUDFM pkg_map
+listUnitInfo pkgstate = Map.elems pkg_map
   where
     ClosureUnitInfoMap pkg_map _ = unitInfoMap pkgstate
 
@@ -1545,7 +1559,7 @@ mkPackageState dflags dbs preload0 = do
       basicLinkedUnits
        | gopt Opt_AutoLinkPackages dflags
           = fmap (RealUnit . Definite) $
-            filter (flip elemUDFM (unClosureUnitInfoMap pkg_db))
+            filter (flip Map.member (unClosureUnitInfoMap pkg_db))
                 [baseUnitId, rtsUnitId]
        | otherwise = []
       -- but in any case remove the current unit from the set of
@@ -1631,7 +1645,7 @@ mkModuleNameProvidersMap dflags pkg_db vis_map =
 
   default_vis = Map.fromList
                   [ (mkUnit pkg, mempty)
-                  | pkg <- eltsUDFM (unClosureUnitInfoMap pkg_db)
+                  | pkg <- Map.elems (unClosureUnitInfoMap pkg_db)
                   -- Exclude specific instantiations of an indefinite
                   -- package
                   , unitIsIndefinite pkg || null (unitInstantiations pkg)

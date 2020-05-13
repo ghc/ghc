@@ -41,6 +41,7 @@ module GHC.Unit.Types
    , unitString
    , instUnitToUnit
    , toUnitId
+   , virtualUnitId
    , stringToUnit
    , stableUnitCmp
    , unitIsDefinite
@@ -474,12 +475,16 @@ instUnitToUnit pkgstate iuid =
     improveUnit (unitInfoMap pkgstate) $
         VirtUnit iuid
 
--- | Return the UnitId of the Unit. For instantiated units, return the
--- UnitId of the indefinite unit this unit is an instance of.
+-- | Return the UnitId of the Unit. For on-the-fly instantiated units, return
+-- the UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
 toUnitId (RealUnit (Definite iuid)) = iuid
 toUnitId (VirtUnit indef)           = indefUnit (instUnitInstanceOf indef)
 toUnitId HoleUnit                   = error "Hole unit"
+
+-- | Return the virtual UnitId of an on-the-fly instantiated unit.
+virtualUnitId :: InstantiatedUnit -> UnitId
+virtualUnitId i = UnitId (instUnitFS i)
 
 -- | A 'Unit' is definite if it has no free holes.
 unitIsDefinite :: Unit -> Bool
