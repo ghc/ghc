@@ -32,7 +32,7 @@ module GHC.SysTools (
         libmLinkOpts,
 
         -- * Mac OS X frameworks
-        getPkgFrameworkOpts,
+        getUnitFrameworkOpts,
         getFrameworkOpts
  ) where
 
@@ -285,7 +285,7 @@ linkDynLib dflags0 o_files dep_packages
     let extra_ld_inputs = ldInputs dflags
 
     -- frameworks
-    pkg_framework_opts <- getPkgFrameworkOpts dflags platform
+    pkg_framework_opts <- getUnitFrameworkOpts dflags platform
                                               (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
@@ -421,8 +421,8 @@ libmLinkOpts =
   []
 #endif
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
-getPkgFrameworkOpts dflags platform dep_packages
+getUnitFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
+getUnitFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do
         pkg_framework_paths <- getUnitFrameworkPath dflags dep_packages
