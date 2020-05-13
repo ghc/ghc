@@ -597,7 +597,7 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags''', preload) <- liftIO $ initPackages dflags'
+  (dflags''', preload) <- liftIO $ initUnits dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -660,7 +660,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags_prev <- getProgramDynFlags
   (dflags'', preload) <-
     if (packageFlagsChanged dflags_prev dflags')
-       then liftIO $ initPackages dflags'
+       then liftIO $ initUnits dflags'
        else return (dflags', [])
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache

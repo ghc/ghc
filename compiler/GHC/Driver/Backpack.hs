@@ -202,7 +202,7 @@ withBkpSession cid insts deps session_type do_this = do
       } )) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
-        -- Calls initPackages
+        -- Calls initUnits
         _ <- setSessionDynFlags dflags
         do_this
 
