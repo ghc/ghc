@@ -32,7 +32,7 @@ module GHC.SysTools (
         libmLinkOpts,
 
         -- * Mac OS X frameworks
-        getPkgFrameworkOpts,
+        getUnitFrameworkOpts,
         getFrameworkOpts
  ) where
 
@@ -247,7 +247,7 @@ linkDynLib dflags0 o_files dep_packages
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
 
-    pkgs <- getPreloadPackagesAnd dflags dep_packages
+    pkgs <- getPreloadUnitsAnd dflags dep_packages
 
     let pkg_lib_paths = collectLibraryPaths dflags pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
@@ -285,7 +285,7 @@ linkDynLib dflags0 o_files dep_packages
     let extra_ld_inputs = ldInputs dflags
 
     -- frameworks
-    pkg_framework_opts <- getPkgFrameworkOpts dflags platform
+    pkg_framework_opts <- getUnitFrameworkOpts dflags platform
                                               (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
@@ -421,15 +421,15 @@ libmLinkOpts =
   []
 #endif
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
-getPkgFrameworkOpts dflags platform dep_packages
+getUnitFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
+getUnitFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do
-        pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
+        pkg_framework_paths <- getUnitFrameworkPath dflags dep_packages
         return $ map ("-F" ++) pkg_framework_paths
 
     pkg_framework_opts <- do
-        pkg_frameworks <- getPackageFrameworks dflags dep_packages
+        pkg_frameworks <- getUnitFrameworks dflags dep_packages
         return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
 
     return (pkg_framework_path_opts ++ pkg_framework_opts)
