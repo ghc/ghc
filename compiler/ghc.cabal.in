@@ -226,7 +226,6 @@ Library
         GHC.Unit
         GHC.Unit.Parser
         GHC.Unit.Ppr
-        GHC.Unit.Subst
         GHC.Unit.Types
         GHC.Unit.Module
         GHC.Unit.Module.Name

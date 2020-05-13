@@ -43,7 +43,6 @@ module GHC.Unit.Module
     , moduleIsDefinite
     , HasModule(..)
     , ContainsModule(..)
-    , instModuleToModule
     , unitIdEq
     , installedModuleEq
     ) where
@@ -56,9 +55,6 @@ import GHC.Unit.Module.Name
 import GHC.Unit.Module.Location
 import GHC.Unit.Module.Env
 import GHC.Utils.Misc
-
-import {-# SOURCE #-} GHC.Unit.State (PackageState)
-
 
 -- | A 'Module' is definite if it has no free holes.
 moduleIsDefinite :: Module -> Bool
@@ -86,12 +82,6 @@ class ContainsModule t where
 class HasModule m where
     getModule :: m Module
 
-
--- | Injects an 'InstantiatedModule' to 'Module' (see also
--- 'instUnitToUnit'.
-instModuleToModule :: PackageState -> InstantiatedModule -> Module
-instModuleToModule pkgstate (Module iuid mod_name) =
-    mkModule (instUnitToUnit pkgstate iuid) mod_name
 
 -- | Test if a 'Module' corresponds to a given 'InstalledModule',
 -- modulo instantiation.

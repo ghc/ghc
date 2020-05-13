@@ -194,7 +194,8 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnit dflags (improveUnit (unitInfoMap (unitState dflags)) $ renameHoleUnit (unitState dflags) (listToUFM insts) uid0)
+          let state = unitState dflags
+              uid = unwireUnit dflags (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -275,7 +276,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnit (unitInfoMap (unitState dflags))) deps0
+    let deps = map (improveUnit (unitState dflags)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
