@@ -567,7 +567,7 @@ Does 'main' print "error 1" or "error no"?  We don't really want 'f'
 to unbox its second argument.  This actually happened in GHC's onwn
 source code, in Packages.applyPackageFlag, which ended up un-boxing
 the enormous DynFlags tuple, and being strict in the
-as-yet-un-filled-in pkgState files.
+as-yet-un-filled-in unitState files.
 -}
 
 ----------------------
