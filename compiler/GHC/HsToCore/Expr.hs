@@ -751,9 +751,9 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 dsExpr  (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
 dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
 dsExpr (HsTcZonkedBracketOut _ (rty, ty) (w, ex, pss) x ps ev_zs zs) = do
-  exp <- GHC.HsToCore.Quote.dsBracket (Just w) ex pss
-  GHC.HsToCore.DsMetaTc.dsBracketTc (rty, ty) exp w x ps ev_zs zs
-dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
+--  exp <- GHC.HsToCore.Quote.dsBracket (Just w) ex pss
+  GHC.HsToCore.DsMetaTc.dsBracketTc (rty, ty) Nothing w x ps ev_zs zs
+dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ _t e)))) = do
   e' <- dsLExpr e
   res <- runMetaCore e'
   dsSplicedD (Just $ ppr e) res

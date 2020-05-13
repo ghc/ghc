@@ -57,6 +57,8 @@ import Data.ByteString.Unsafe(unsafePackAddressLen)
 import Data.Bifunctor
 import Debug.Trace
 
+import Data.Maybe
+
 -----------------------------------------------------
 --
 --              The Quasi class
@@ -396,7 +398,7 @@ unsafeTExpCoerce m = do { e <- m
 
 
 data TExp (a :: TYPE (r :: RuntimeRep)) =
-  TExp { unType :: Exp
+  TExp { unType :: Maybe Exp
        , typedRep :: TExpU } deriving Generic
 
 
@@ -410,7 +412,7 @@ data TExpU = TExpU { tenv :: [(Int, TTExp)]
 
 
 --unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
-unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp -- untyped representation
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (Maybe (m Exp) -- untyped representation
            , [(Int, TTExp)]   -- Type splices
            , [(Int, m TExpU)] -- User splices
            , [(Int, THRep)] -- Quote evidence
@@ -418,7 +420,7 @@ unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => (m Exp
            , THRep) -- Body
            -> m (TExp a)
 unsafeTExpCoerce (e, ts, qu, evs, env, s) =
-  do { e' <- e
+  do { e' <- maybe (return Nothing) (fmap Just) e
      ; qu' <- sequence (map sequence qu)
      ; return (TExp e' (TExpU ts qu' evs env s)) }
 
@@ -438,7 +440,7 @@ mkTHRep l a = THRep (unsafePerformIO (unsafePackAddressLen l a))
 {-# NOINLINE mkTHRep #-}
 
 unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m Exp
-unTypeQ = fmap unType
+unTypeQ = fmap (fromMaybe (error "No Repr") . unType)
 
 unTypeQT :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m TExpU
 unTypeQT = fmap typedRep

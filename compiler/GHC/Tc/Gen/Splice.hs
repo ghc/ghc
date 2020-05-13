@@ -1207,7 +1207,7 @@ instance TH.Quasi DsM where
     fp <- repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp e (TH.TExpU [] [] [] [] (TH.THRep fp)))
+    return (TH.TExp (Just e) (TH.TExpU [] [] [] [] (TH.THRep fp)))
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique
@@ -1350,7 +1350,7 @@ instance TH.Quasi TcM where
     fp <- initDsTc $ repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp e (TH.TExpU [] [] [] [] (TH.THRep fp)))
+    return (TH.TExp (Just e) (TH.TExpU [] [] [] [] (TH.THRep fp)))
 
 
 

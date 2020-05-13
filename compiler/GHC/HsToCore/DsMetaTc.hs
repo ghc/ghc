@@ -71,10 +71,18 @@ initBinMemSize = 1024*1024
 dsType :: Type -> DsM CoreExpr
 dsType t = repType t
 
+-- | CoreExpr is of type m Exp
+mkUntypedExpr :: Type -> Maybe CoreExpr -> DsM CoreExpr
+mkUntypedExpr mtau mexp = do
+  ec <- dsLookupTyCon expTyConName
+  let ty = mkAppTy mtau (mkTyConApp ec [])
+  return $ case mexp of
+    Nothing -> mkNothingExpr ty
+    Just ec -> mkJustExpr ty ec
 
 -----------------------------------------------------------------------------
 dsBracketTc :: (Type, Type)
-            -> CoreExpr -- This is a CoreExpr representing an Exp
+            -> Maybe CoreExpr -- This is a CoreExpr representing an Exp
             -> QuoteWrapper
             -> HsBracket GhcTc
             -> [PendingTcTypedSplice]
@@ -110,8 +118,11 @@ dsBracketTc (rty, ur_ty) exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs z
       uco <- dsLookupGlobalId unsafeTExpCoerceName
       bind_vars <- dsLookupGlobalId bindVarsName
       env_var_final <- dsGetBindVar
+
+      untyped_expr <- mkUntypedExpr m_tau exp
+
       --pprTraceM "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
-      let u_co_expr = mkCoreApps ((Var uco)) [Type rty, Type ur_ty, Type m_tau, Var ev_var, mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, env_var_final, body]]
+      let u_co_expr = mkCoreApps ((Var uco)) [Type rty, Type ur_ty, Type m_tau, Var ev_var, mkCoreTup [untyped_expr, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, env_var_final, body]]
       let cont_expr  = mkLams [env_var] u_co_expr
       return $ mkCoreApps (Var bind_vars) [Type rty, Type ur_ty, Type m_tau, Var ev_var, bid_expr, cont_expr]
   where
