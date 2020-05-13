@@ -88,7 +88,7 @@ import GHC.Iface.Env
 
 import Data.IORef
 import GHC.Driver.Types (hsc_NC)
-import Language.Haskell.TH.Syntax(THRep(..), TExpU(..), TTExp(..))
+import Language.Haskell.TH.Syntax(TExpU'(..), THRep(..), TExpU(..), TTExp(..))
 {-
 ************************************************************************
 *                                                                      *
@@ -750,9 +750,9 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 dsExpr  (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
 dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
-dsExpr (HsTcZonkedBracketOut _ (w, ex, pss) x ps ev_zs zs) = do
+dsExpr (HsTcZonkedBracketOut _ (rty, ty) (w, ex, pss) x ps ev_zs zs) = do
   exp <- GHC.HsToCore.Quote.dsBracket (Just w) ex pss
-  GHC.HsToCore.DsMetaTc.dsBracketTc exp w x ps ev_zs zs
+  GHC.HsToCore.DsMetaTc.dsBracketTc (rty, ty) exp w x ps ev_zs zs
 dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
   e' <- dsLExpr e
   res <- runMetaCore e'
@@ -812,10 +812,11 @@ ds_prag_expr (HsPragTick _ _ _ _) expr = do
     else dsLExpr expr
 
 dsSplicedD :: Maybe SDoc -> TExpU -> DsM CoreExpr
-dsSplicedD before (TExpU zs env evs subst e) = do
+dsSplicedD before (TExpU f) = do
+      let (TExpU' zs env evs subst e) = f []
       let es = map (\(a, b) -> (mkUniqueGrimily a, b)) env
           zs' = map (\(a, b) -> (mkUniqueGrimily a, b)) zs
-          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU [] [] [] [] b)) evs
+          evs' = map (\(a, b) -> (mkUniqueGrimily a, TExpU (\es -> TExpU' [] [] [] es b))) evs
       loadCoreExpr before zs' (es ++ evs') subst e
 
 dsSplicedT :: TTExp -> DsM Type
@@ -847,7 +848,7 @@ instance Outputable TTExp where
   ppr (TTExp t t') = ppr t <+> text "TTREP"
 
 instance Outputable TExpU where
-  ppr (TExpU t t' sub t'' _) = ppr t <+> ppr t' <+> text "TREP"
+  ppr (flip evalTExpU [] -> TExpU' t t' sub t'' _) = ppr t <+> ppr t' <+> text "TREP"
 
 -- Load a core expr from a file
 loadCoreExpr :: Maybe SDoc -> [(Unique, TTExp)] -> [(Unique, TExpU)] -> [(Int, Int)] -> THRep -> DsM CoreExpr
@@ -864,9 +865,9 @@ loadCoreExpr before zs menv subst (THRep s) = do --pprTrace "LOADING" (ppr (map 
   let (if_gbl, if_lcl) = ds_if_env env
       if_lcl' = if_lcl { if_meta_env = addListToUFM_Directly (if_meta_env if_lcl) menv
                        , if_ty_meta_env = addListToUFM_Directly (if_ty_meta_env if_lcl) zs
-                       , if_binder_env = subst ++ (if_binder_env if_lcl)
+                       , if_binder_env = subst
                        , if_dsm_env  = Just dsm_envs }
-  pprTrace "loadCoreExpr" (ppr subst) (return ())
+  --pprTrace "loadCoreExpr" (ppr i $$ ppr subst) (return ())
   res <-
     setEnvs (if_gbl, if_lcl') $
     --pprTrace "lcl_env" (ppr $ if_id_env $ snd $ ds_if_env env)

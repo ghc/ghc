@@ -46,7 +46,10 @@ instance Ppr (TExp a) where
   ppr (TExp _e m) = ppr m
 
 instance Ppr TExpU where
-  ppr (TExpU zs es evs rb e) = ppr e $$ vcat (map ppr es) $$ vcat (map ppr zs) $$ vcat (map ppr rb)
+  ppr (TExpU f) = ppr (f [])
+
+instance Ppr TExpU' where
+  ppr (TExpU' zs es evs rb e) = ppr e $$ vcat (map ppr es) $$ vcat (map ppr zs) $$ vcat (map ppr rb)
 
 instance Ppr THRep where
   ppr (THRep _t) = text "THREP"

@@ -34,7 +34,7 @@ templateHaskellNames = [
     unTypeName,
     unTypeQName,unTypeQTName,
     unsafeTExpCoerceName, mkTHRepName,
-    mkTTExpName, codeCevidenceName, selTTExpName,
+    mkTTExpName, codeCevidenceName, selTTExpName, bindVarsName,
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
@@ -245,6 +245,7 @@ unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 mkTHRepName = thFun (fsLit "mkTHRep") mkTHRepKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
 selTTExpName = thFun (fsLit "selTTExp") selTTExpIdKey
+bindVarsName = thFun (fsLit "bindVars") (bindVarsIdKey)
 
 mkTTExpName = thFun (fsLit "mkTTExp") mkTTExpKey
 codeCevidenceName = libFun (fsLit "codeCevidence") codeCevidenceKey
@@ -790,6 +791,9 @@ liftStringIdKey     = mkPreludeMiscIdUnique 230
 
 liftStringTypedIdKey :: Unique
 liftStringTypedIdKey = mkPreludeMiscIdUnique 231
+
+bindVarsIdKey :: Unique
+bindVarsIdKey = mkPreludeMiscIdUnique 232
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, unboxedSumPIdKey, conPIdKey,

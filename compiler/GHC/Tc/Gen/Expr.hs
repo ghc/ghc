@@ -1986,7 +1986,7 @@ addLiftT i = do
   b <- getStage
   case b of
     Brack st (TcPending _ zs_var _) -> forM_ @[] t $ \v -> do
-      pprTraceM "addLiftT" (ppr i $$ ppr t)
+      --pprTraceM "addLiftT" (ppr i $$ ppr v)
       ev <- setStage st $ emitTypeable (mkTyVarTy v)
       zs <- readMutVar zs_var
       writeMutVar zs_var (PendingZonkSplice2 v ev : zs)

@@ -213,9 +213,7 @@ tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
-                                        (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcTypedBracketOut noExtField (wrapper, brack, ups) brack' ps' (zz ++ ts)))))
+                        (HsTcTypedBracketOut noExtField (rep, expr_ty) (wrapper, brack, ups) brack' ps' (zz ++ ts))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -1210,7 +1208,7 @@ instance TH.Quasi DsM where
     fp <- repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp e (TH.TExpU [] [] [] [] (TH.THRep fp)))
+    return (TH.TExp e (TH.TExpU (\es -> TH.TExpU' [] [] [] es (TH.THRep fp))))
 
 instance TH.Quasi TcM where
   qNewName s = do { u <- newUnique
@@ -1353,7 +1351,7 @@ instance TH.Quasi TcM where
     fp <- initDsTc $ repEFPE (unLoc res)
     -- Internal splices in renamed expression were dealt with a long time
     -- ago.
-    return (TH.TExp e (TH.TExpU [] [] [] [] (TH.THRep fp)))
+    return (TH.TExp e (TH.TExpU (const $ TH.TExpU' [] [] [] [] (TH.THRep fp))))
 
 
 

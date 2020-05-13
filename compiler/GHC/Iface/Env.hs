@@ -306,7 +306,7 @@ newIfaceName occ
         ; return $! mkInternalName uniq occ noSrcSpan }
 
 newIfaceNameUnique :: OccName -> Unique -> IfL Name
-newIfaceNameUnique occ unique = return $! mkInternalName unique occ noSrcSpan 
+newIfaceNameUnique occ unique = return $! mkInternalName unique occ noSrcSpan
 
 newIfaceNames :: [OccName] -> IfL [Name]
 newIfaceNames occs

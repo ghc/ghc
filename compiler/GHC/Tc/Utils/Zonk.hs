@@ -782,8 +782,9 @@ zonkExpr env (HsTcUntypedBracketOut x wrap body bs)
       return (PendingTcSplice n e')
 
 
-zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
+zonkExpr env (HsTcTypedBracketOut x (t1, t2) (w, b, u_ps) body bs zs2)
   = do --pprTraceM "HsTcBracketOut" (ppr body $$ ppr bs)
+       (t1', t2') <- (,) <$> zonkTcTypeToType t1 <*>  zonkTcTypeToType t2
        bs' <- mapM zonk_b bs
        wrap' <- zonkQuoteWrap env w
        u_ps' <- mapM zonk_u_b u_ps
@@ -801,7 +802,7 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
        --pprTraceM "zonkExpr:zs'" (ppr bs)
       -- pprTraceM "zonkExpr:zs''" (ppr bs')
       -- pprTraceM "zonkExpr:zs" (ppr body')
-       return (HsTcZonkedBracketOut x (wrap', b, u_ps') body' bs' zs' splices)
+       return (HsTcZonkedBracketOut x (t1', t2') (wrap', b, u_ps') body' bs' zs' splices)
   where
     zonk_u_b (PendingTcSplice n e) = do
       e' <- zonkLExpr env e
@@ -813,7 +814,7 @@ zonkExpr env (HsTcTypedBracketOut x (w, b, u_ps) body bs zs2)
       --pprTraceM "splice_key" (ppr (sp, getKey (getUnique sp)))
       --pprTraceM "splice_key" (ppr t')
       let fvs = fvVarList (tyCoFVsOfType t')
-      pprTraceM "zonk_z_2" (ppr t' $$ ppr fvs)
+      --pprTraceM "zonk_z_2" (ppr t' $$ ppr fvs)
       sp_points <- forM (zip [0..] fvs) $ \(k, v) -> do
                       sp <- mkSpliceId (idType v)
                       return ((v, sp), PendingZonkSplice sp Nothing (Just k) e')

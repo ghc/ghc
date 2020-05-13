@@ -125,6 +125,7 @@ import FastString
 import Util
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
+import GHC.Core
 
 import Control.Monad (ap)
 import Data.Set      ( Set )
@@ -333,7 +334,8 @@ data DsLclEnv = DsLclEnv {
         dsl_deltas  :: Deltas,
         -- This is set when desugaring a splice to ensure that any locally bound names
         -- are desugared to use the proper uniques ie f x = $$([|| x ||])
-        dsl_binds_env :: VarSet
+        dsl_binds_env :: VarSet,
+        dsl_bind_var :: CoreExpr -- A core expressionof type [(Int, Int)]
      }
 
 -- Inside [| |] brackets, the desugarer looks

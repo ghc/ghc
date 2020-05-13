@@ -28,6 +28,7 @@ module GHC.HsToCore.Monad (
         dsLookupDataCon, dsLookupConLike,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
+        dsGetBindVar, dsExtendBindVar,
 
         dsSetBindEnv, dsGetBindEnv,
 
@@ -59,7 +60,7 @@ import GhcPrelude
 import GHC.Tc.Utils.Monad
 import GHC.Core.FamInstEnv
 import GHC.Core
-import GHC.Core.Make  ( unitExpr )
+import GHC.Core.Make  (mkCoreApps, mkNilExpr,  unitExpr )
 import GHC.Core.Utils ( exprType, isExprLevPoly )
 import GHC.Hs
 import {-# SOURCE #-} GHC.IfaceToCore
@@ -89,6 +90,7 @@ import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 import GHC.Types.Basic
 import GHC.Types.Var.Set
+import GHC.Builtin.Types
 
 import Data.IORef
 
@@ -288,6 +290,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            , dsl_loc     = real_span
                            , dsl_deltas  = initDeltas
                            , dsl_binds_env = emptyVarSet
+                           , dsl_bind_var  = mkNilExpr (mkBoxedTupleTy [intTy, intTy])
                            }
     in (gbl_env, lcl_env)
 
@@ -521,6 +524,16 @@ dsSetBindEnv benv = updLclEnv (\env -> env { dsl_binds_env = benv })
 
 dsGetBindEnv :: DsM VarSet
 dsGetBindEnv = dsl_binds_env <$> getLclEnv
+
+dsGetBindVar :: DsM CoreExpr
+dsGetBindVar = dsl_bind_var <$> getLclEnv
+
+dsExtendBindVar :: Var -> DsM a -> DsM a
+dsExtendBindVar v thing = do
+  cc <- dsLookupGlobalId appendName
+  updLclEnv (\env ->
+    let new_expr e = mkCoreApps (Var cc) [Type (mkBoxedTupleTy [intTy, intTy]), Var v, e]
+    in env { dsl_bind_var = new_expr (dsl_bind_var env) } ) thing
 
 -- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
 dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]

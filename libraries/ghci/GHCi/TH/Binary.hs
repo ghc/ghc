@@ -68,7 +68,9 @@ instance Binary TH.TypeFamilyHead
 instance Binary TH.PatSynDir
 instance Binary TH.PatSynArgs
 instance Binary (TH.TExp a)
-instance Binary (TH.TExpU)
+instance Binary (TH.TExpU) where
+    put = undefined
+    get = undefined
 instance Binary (TH.TTExp)
 instance Binary (TH.THRep)
 

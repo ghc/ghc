@@ -75,7 +75,8 @@ dsType t = repType t
 
 
 -----------------------------------------------------------------------------
-dsBracketTc :: CoreExpr -- This is a CoreExpr representing an Exp
+dsBracketTc :: (Type, Type)
+            -> CoreExpr -- This is a CoreExpr representing an Exp
             -> QuoteWrapper
             -> HsBracket GhcTc
             -> [PendingTcTypedSplice]
@@ -85,8 +86,9 @@ dsBracketTc :: CoreExpr -- This is a CoreExpr representing an Exp
 -- Returns a CoreExpr of type String which can be deserialised to get an
 -- IfaceExpr.
 
-dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
-  = do
+dsBracketTc (rty, ur_ty) exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
+  = newSysLocalDs (mkListTy (mkBoxedTupleTy [intTy, intTy])) >>= \env_var -> dsExtendBindVar env_var $
+    do
       (bounds_vars, body) <- do_brack brack
       sps <- mapMaybeM (do_one (dVarSetToVarSet bounds_vars)) splices
       zss <- mapM do_one_z zs
@@ -105,9 +107,15 @@ dsBracketTc exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
       dflags <- getDynFlags
       let mkKExpr = mkIntExprInt (targetPlatform dflags)
           bids = map (mkKExpr . getKey . getUnique) (dVarSetElems bounds_vars)
-
+          bid_expr = mkListExpr intTy bids
+      --pprTraceM "env_var" (ppr env_var $$ ppr bids)
+      uco <- dsLookupGlobalId unsafeTExpCoerceName
+      bind_vars <- dsLookupGlobalId bindVarsName
+      env_var_final <- dsGetBindVar
       --pprTraceM "dsBracket" (ppr splices $$ ppr sps $$ ppr zss $$ ppr ev_zss $$ ppr ev_tss)
-      return $ mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, mkListExpr intTy bids, body]
+      let u_co_expr = mkCoreApps ((Var uco)) [Type rty, Type ur_ty, Type m_tau, Var ev_var, mkCoreTup [exp, mkListExpr tt_ty (zss ++ ev_tss), mkListExpr tu_ty sps, mkListExpr thRepTy ev_zss, env_var_final, body]]
+      let cont_expr  = mkLams [env_var] u_co_expr
+      return $ mkCoreApps (Var bind_vars) [Type rty, Type ur_ty, Type m_tau, Var ev_var, bid_expr, cont_expr]
   where
     do_one_z (PendingZonkSplice n _mt mn e) = do
       let k = getKey (idUnique n)
@@ -190,6 +198,7 @@ boundVarsAlt (_, bs, e) = mkDVarSet bs `unionDVarSet` boundVars e
 
 
 
+boundVarsBind :: Bind Var -> DVarSet
 boundVarsBind (NonRec b e) = unitDVarSet b `unionDVarSet` boundVars e
 boundVarsBind (Rec g) = unionDVarSets (map (\(b, e) -> unitDVarSet b `unionDVarSet` boundVars e) g)
 
@@ -201,9 +210,6 @@ boundVarsBind (Rec g) = unionDVarSets (map (\(b, e) -> unitDVarSet b `unionDVarS
 
 repLE' :: LHsExpr GhcTc -> DsM (DVarSet, CoreExpr)
 repLE' (L loc e) = putSrcSpanDs loc (repECore e)
-
-coreStringLit :: String -> DsM (Core String)
-coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
 repType :: Type -> DsM CoreExpr
 repType ty = do
@@ -226,7 +232,7 @@ repECore e = do
   dflags <- getDynFlags
   -- Inline Type Lets, in particular
   let c_e' = simpleOptExpr dflags c_e
-  pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
+  --pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
   res <- repCore c_e
   return (bvs, res)
 

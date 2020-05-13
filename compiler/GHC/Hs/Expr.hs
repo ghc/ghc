@@ -511,12 +511,14 @@ data HsExpr p
 
   | HsTcTypedBracketOut
       (XTcBracketOut p)
+      (Type, Type)
       (QuoteWrapper, HsBracket GhcRn, [PendingTcUntypedSplice]) -- This is the HsTcUntypedBracketOut
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit splices
       [PendingZonkSplice2] -- Any type splices arising from implicit type variables
   | HsTcZonkedBracketOut
       (XTcBracketOut p)
+      (Type, Type)
       (QuoteWrapper, HsBracket GhcRn, [PendingTcUntypedSplice]) -- This is the HsTcUntypedBracketOut
       (HsBracket GhcTc) -- The contents of the bracket
       [PendingTcTypedSplice] -- Any expression splices from implicit or explicit value splices
@@ -1076,10 +1078,10 @@ ppr_expr (HsRnBracketOut _ e []) = ppr e
 ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
 ppr_expr (HsTcUntypedBracketOut _ _wrap e []) = ppr e
 ppr_expr (HsTcUntypedBracketOut _ _wrap e ps) = ppr e $$ text "pending-u(tc)" <+> ppr ps
-ppr_expr (HsTcTypedBracketOut _ _ e [] []) = ppr e
-ppr_expr (HsTcTypedBracketOut _ _ e ps zs2) = ppr e $$ text "pending-t(tc)" <+> ppr ps <+> ppr zs2
-ppr_expr (HsTcZonkedBracketOut _ _ e [] [] []) = ppr e
-ppr_expr (HsTcZonkedBracketOut _ _ e ps zs1 zs2) = ppr e $$ text "pending-t(zs)" <+> ppr ps <+> ppr zs1 <+> ppr zs2
+ppr_expr (HsTcTypedBracketOut _ _ _ e [] []) = ppr e
+ppr_expr (HsTcTypedBracketOut _ _ _ e ps zs2) = ppr e $$ text "pending-t(tc)" <+> ppr ps <+> ppr zs2
+ppr_expr (HsTcZonkedBracketOut _ _ _ e [] [] []) = ppr e
+ppr_expr (HsTcZonkedBracketOut _ _ _ e ps zs1 zs2) = ppr e $$ text "pending-t(zs)" <+> ppr ps <+> ppr zs1 <+> ppr zs2
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
