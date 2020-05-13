@@ -11,7 +11,7 @@ module GHC.Unit.State (
         UnitDatabase (..),
         ClosureUnitInfoMap,
         emptyPackageState,
-        initPackages,
+        initUnits,
         readUnitDatabases,
         readUnitDatabase,
         getPackageDbRefs,
@@ -112,7 +112,7 @@ import qualified Data.Set as Set
 -- all packages, which packages are exposed, and which modules they
 -- provide.
 --
--- The package state is computed by 'initPackages', and kept in DynFlags.
+-- The package state is computed by 'initUnits', and kept in DynFlags.
 -- It is influenced by various package flags:
 --
 --   * @-package <pkg>@ and @-package-id <pkg>@ cause @<pkg>@ to become exposed.
@@ -480,12 +480,12 @@ listUnitInfo pkgstate = eltsUDFM pkg_map
 -- This list contains the packages that the user explicitly mentioned with
 -- @-package@ flags.
 --
--- 'initPackages' can be called again subsequently after updating the
+-- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags' and return a list of packages to
 -- link in.
-initPackages :: DynFlags -> IO (DynFlags, [UnitId])
-initPackages dflags = withTiming dflags
+initUnits :: DynFlags -> IO (DynFlags, [UnitId])
+initUnits dflags = withTiming dflags
                                   (text "initializing package database")
                                   forcePkgDb $ do
   read_pkg_dbs <-

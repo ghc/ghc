@@ -630,14 +630,14 @@ data DynFlags = DynFlags {
   unitDatabases         :: Maybe [UnitDatabase UnitId],
         -- ^ Stack of unit databases for the target platform.
         --
-        -- This field is populated by `initPackages`.
+        -- This field is populated by `initUnits`.
         --
         -- 'Nothing' means the databases have never been read from disk. If
-        -- `initPackages` is called again, it doesn't reload the databases from
+        -- `initUnits` is called again, it doesn't reload the databases from
         -- disk.
 
   unitState             :: PackageState,
-        -- ^ Consolidated unit database built by 'initPackages' from the package
+        -- ^ Consolidated unit database built by 'initUnits' from the unit
         -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
         -- It also contains mapping from module names to actual Modules.
