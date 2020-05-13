@@ -287,7 +287,7 @@ reallyInitDynLinker hsc_env = do
   initObjLinker hsc_env
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- linkPackages' hsc_env (preloadPackages (pkgState dflags)) pls0
+  pls <- linkPackages' hsc_env (preloadUnits (unitState dflags)) pls0
 
   -- steps (c), (d) and (e)
   linkCmdLineLibs' hsc_env pls
@@ -1251,7 +1251,7 @@ linkPackages' hsc_env new_pks pls = do
     return $! pls { pkgs_loaded = pkgs' }
   where
      dflags = hsc_dflags hsc_env
-     pkgstate = pkgState dflags
+     pkgstate = unitState dflags
 
      link :: [UnitId] -> [UnitId] -> IO [UnitId]
      link pkgs new_pkgs =

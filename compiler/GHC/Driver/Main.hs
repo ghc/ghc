@@ -1158,7 +1158,7 @@ hscCheckSafe' m l = do
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
-                    state = pkgState dflags
+                    state = unitState dflags
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
                         $ mkWarnMsg dflags l (pkgQual state)
@@ -1192,7 +1192,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomeModule dflags m = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (pkgState dflags) (moduleUnit m)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1215,7 +1215,7 @@ checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     dflags <- getDynFlags
     let errors = S.foldr go [] pkgs
-        state  = pkgState dflags
+        state  = unitState dflags
         go pkg acc
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
