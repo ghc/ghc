@@ -247,7 +247,7 @@ import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, PackageDatabase, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -627,7 +627,7 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [PackageDatabase UnitId],
+  pkgDatabase           :: Maybe [UnitDatabase UnitId],
         -- ^ Stack of package databases for the target platform.
         --
         -- A "package database" is a misleading name as it is really a Unit
