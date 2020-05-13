@@ -215,7 +215,7 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
-    pkgs     = pkgState dflags
+    pkgs     = unitState dflags
     pNm      = moduleName $ mi_module pluginModule
     pPkg     = moduleUnit $ mi_module pluginModule
     deps     = map gwib_mod $
