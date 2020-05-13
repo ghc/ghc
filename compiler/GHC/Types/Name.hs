@@ -60,7 +60,7 @@ module GHC.Types.Name (
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
         isTyVarName, isTyConName, isDataConName,
-        isValName, isVarName,
+        isValName, isVarName, isDynLinkName,
         isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
@@ -83,6 +83,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( TyThing )
 
+import GHC.Platform
 import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
@@ -241,6 +242,39 @@ isInternalName name = not (isExternalName name)
 
 isHoleName :: Name -> Bool
 isHoleName = isHoleModule . nameModule
+
+-- | Will the 'Name' come from a dynamically linked package?
+isDynLinkName :: Platform -> Module -> Name -> Bool
+isDynLinkName platform this_mod name
+  | Just mod <- nameModule_maybe name
+    -- Issue #8696 - when GHC is dynamically linked, it will attempt
+    -- to load the dynamic dependencies of object files at compile
+    -- time for things like QuasiQuotes or
+    -- TemplateHaskell. Unfortunately, this interacts badly with
+    -- intra-package linking, because we don't generate indirect
+    -- (dynamic) symbols for intra-package calls. This means that if a
+    -- module with an intra-package call is loaded without its
+    -- dependencies, then GHC fails to link.
+    --
+    -- In the mean time, always force dynamic indirections to be
+    -- generated: when the module name isn't the module being
+    -- compiled, references are dynamic.
+    = case platformOS platform of
+        -- On Windows the hack for #8696 makes it unlinkable.
+        -- As the entire setup of the code from Cmm down to the RTS expects
+        -- the use of trampolines for the imported functions only when
+        -- doing intra-package linking, e.g. referring to a symbol defined in the same
+        -- package should not use a trampoline.
+        -- I much rather have dynamic TH not supported than the entire Dynamic linking
+        -- not due to a hack.
+        -- Also not sure this would break on Windows anyway.
+        OSMinGW32 -> moduleUnit mod /= moduleUnit this_mod
+
+        -- For the other platforms, still perform the hack
+        _         -> mod /= this_mod
+
+  | otherwise = False  -- no, it is not even an external name
+
 
 nameModule name =
   nameModule_maybe name `orElse`
