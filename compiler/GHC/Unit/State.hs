@@ -9,7 +9,7 @@ module GHC.Unit.State (
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
         PackageDatabase (..),
-        UnitInfoMap,
+        ClosureUnitInfoMap,
         emptyPackageState,
         initPackages,
         readPackageDatabases,
@@ -245,8 +245,8 @@ originEmpty _ = False
 
 -- | Map from 'UnitId' to 'UnitInfo', plus
 -- the transitive closure of preload units.
-data UnitInfoMap = UnitInfoMap
-   { unUnitInfoMap :: UniqDFM UnitInfo
+data ClosureUnitInfoMap = ClosureUnitInfoMap
+   { unClosureUnitInfoMap :: UniqDFM UnitInfo
       -- ^ Map from 'UnitId' to 'UnitInfo'
 
    , preloadClosure :: UniqSet UnitId
@@ -324,7 +324,7 @@ data PackageState = PackageState {
   -- what was stored *on disk*, except for the 'trusted' flag, which
   -- is adjusted at runtime.  (In particular, some packages in this map
   -- may have the 'exposed' flag be 'False'.)
-  unitInfoMap :: UnitInfoMap,
+  unitInfoMap :: ClosureUnitInfoMap,
 
   -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
   -- users refer to packages in Backpack includes.
@@ -369,7 +369,7 @@ data PackageState = PackageState {
 
 emptyPackageState :: PackageState
 emptyPackageState = PackageState {
-    unitInfoMap = emptyUnitInfoMap,
+    unitInfoMap = emptyClosureUnitInfoMap,
     packageNameMap = Map.empty,
     unwireMap = Map.empty,
     preloadUnits = [],
@@ -389,8 +389,8 @@ data PackageDatabase unit = PackageDatabase
 type InstalledPackageIndex = Map UnitId UnitInfo
 
 -- | Empty package configuration map
-emptyUnitInfoMap :: UnitInfoMap
-emptyUnitInfoMap = UnitInfoMap emptyUDFM emptyUniqSet
+emptyClosureUnitInfoMap :: ClosureUnitInfoMap
+emptyClosureUnitInfoMap = ClosureUnitInfoMap emptyUDFM emptyUniqSet
 
 -- | Find the unit we know about with the given unit, if any
 lookupUnit :: PackageState -> Unit -> Maybe UnitInfo
@@ -398,11 +398,11 @@ lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs)
 
 -- | A more specialized interface, which takes a boolean specifying
 -- whether or not to look for on-the-fly renamed interfaces, and
--- just a 'UnitInfoMap' rather than a 'PackageState' (so it can
+-- just a 'ClosureUnitInfoMap' rather than a 'PackageState' (so it can
 -- be used while we're initializing 'DynFlags'
-lookupUnit' :: Bool -> UnitInfoMap -> Unit -> Maybe UnitInfo
-lookupUnit' False (UnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
-lookupUnit' True m@(UnitInfoMap pkg_map _) uid = case uid of
+lookupUnit' :: Bool -> ClosureUnitInfoMap -> Unit -> Maybe UnitInfo
+lookupUnit' False (ClosureUnitInfoMap pkg_map _) uid  = lookupUDFM pkg_map uid
+lookupUnit' True m@(ClosureUnitInfoMap pkg_map _) uid = case uid of
    HoleUnit   -> error "Hole unit"
    RealUnit _ -> lookupUDFM pkg_map uid
    VirtUnit i -> fmap (renamePackage m (instUnitInsts i))
@@ -413,8 +413,8 @@ lookupUnitId :: PackageState -> UnitId -> Maybe UnitInfo
 lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
 
 -- | Find the unit we know about with the given unit id, if any
-lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
-lookupUnitId' (UnitInfoMap db _) uid = lookupUDFM db uid
+lookupUnitId' :: ClosureUnitInfoMap -> UnitId -> Maybe UnitInfo
+lookupUnitId' (ClosureUnitInfoMap db _) uid = lookupUDFM db uid
 
 
 -- | Looks up the given unit in the package state, panicing if it is not found
@@ -449,9 +449,9 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 -- We do the same thing for fully indefinite units (which are "instantiated"
 -- with module holes).
 --
-mkUnitInfoMap :: [UnitInfo] -> UnitInfoMap
-mkUnitInfoMap infos
-  = UnitInfoMap (foldl' add emptyUDFM infos) emptyUniqSet
+mkClosureUnitInfoMap :: [UnitInfo] -> UnitInfoMap
+mkClosureUnitInfoMap infos
+  = ClosureUnitInfoMap (foldl' add emptyUDFM infos) emptyUniqSet
   where
    mkVirt      p = mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
    add pkg_map p
@@ -467,7 +467,7 @@ mkUnitInfoMap infos
 listUnitInfo :: PackageState -> [UnitInfo]
 listUnitInfo pkgstate = eltsUDFM pkg_map
   where
-    UnitInfoMap pkg_map _ = unitInfoMap pkgstate
+    ClosureUnitInfoMap pkg_map _ = unitInfoMap pkgstate
 
 -- ----------------------------------------------------------------------------
 -- Loading the package db files and building up the package state
@@ -708,7 +708,7 @@ homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
 applyPackageFlag
    :: DynFlags
    -> PackagePrecedenceIndex
-   -> UnitInfoMap
+   -> ClosureUnitInfoMap
    -> UnusablePackages
    -> Bool -- if False, if you expose a package, it implicitly hides
            -- any previously exposed packages with the same name
@@ -793,7 +793,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
 -- packages.  Furthermore, any packages it returns are *renamed*
 -- if the 'UnitArg' has a renaming associated with it.
 findPackages :: PackagePrecedenceIndex
-             -> UnitInfoMap -> PackageArg -> [UnitInfo]
+             -> ClosureUnitInfoMap -> PackageArg -> [UnitInfo]
              -> UnusablePackages
              -> Either [(UnitInfo, UnusablePackageReason)]
                 [UnitInfo]
@@ -830,7 +830,7 @@ selectPackages prec_map arg pkgs unusable
         else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'UnitInfo' according to some module instantiation.
-renamePackage :: UnitInfoMap -> [(ModuleName, Module)]
+renamePackage :: ClosureUnitInfoMap -> [(ModuleName, Module)]
               -> UnitInfo -> UnitInfo
 renamePackage pkg_map insts conf =
     let hsubst = listToUFM insts
@@ -1416,7 +1416,7 @@ mkPackageState dflags dbs preload0 = do
   -- or not packages are visible or not)
   pkgs1 <- foldM (applyTrustFlag dflags prec_map unusable)
                  (Map.elems pkg_map2) (reverse (trustFlags dflags))
-  let prelim_pkg_db = mkUnitInfoMap pkgs1
+  let prelim_pkg_db = mkClosureUnitInfoMap pkgs1
 
   --
   -- Calculate the initial set of units from package databases, prior to any package flags.
@@ -1482,7 +1482,7 @@ mkPackageState dflags dbs preload0 = do
   -- package arguments we need to key against the old versions.
   --
   (pkgs2, wired_map) <- findWiredInPackages dflags prec_map pkgs1 vis_map2
-  let pkg_db = mkUnitInfoMap pkgs2
+  let pkg_db = mkClosureUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
@@ -1547,7 +1547,7 @@ mkPackageState dflags dbs preload0 = do
       basicLinkedUnits
        | gopt Opt_AutoLinkPackages dflags
           = fmap (RealUnit . Definite) $
-            filter (flip elemUDFM (unUnitInfoMap pkg_db))
+            filter (flip elemUDFM (unClosureUnitInfoMap pkg_db))
                 [baseUnitId, rtsUnitId]
        | otherwise = []
       -- but in any case remove the current unit from the set of
@@ -1606,7 +1606,7 @@ unwireUnit _ uid = uid
 
 mkModuleNameProvidersMap
   :: DynFlags
-  -> UnitInfoMap
+  -> ClosureUnitInfoMap
   -> VisibilityMap
   -> ModuleNameProvidersMap
 mkModuleNameProvidersMap dflags pkg_db vis_map =
@@ -1633,7 +1633,7 @@ mkModuleNameProvidersMap dflags pkg_db vis_map =
 
   default_vis = Map.fromList
                   [ (mkUnit pkg, mempty)
-                  | pkg <- eltsUDFM (unUnitInfoMap pkg_db)
+                  | pkg <- eltsUDFM (unClosureUnitInfoMap pkg_db)
                   -- Exclude specific instantiations of an indefinite
                   -- package
                   , unitIsIndefinite pkg || null (unitInstantiations pkg)
@@ -2001,7 +2001,7 @@ getPreloadUnitsAnd dflags pkgids0 =
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
 closeDeps :: DynFlags
-          -> UnitInfoMap
+          -> ClosureUnitInfoMap
           -> [(UnitId, Maybe UnitId)]
           -> IO [UnitId]
 closeDeps dflags pkg_map ps
@@ -2014,14 +2014,14 @@ throwErr dflags m
                 Succeeded r -> return r
 
 closeDepsErr :: DynFlags
-             -> UnitInfoMap
+             -> ClosureUnitInfoMap
              -> [(UnitId,Maybe UnitId)]
              -> MaybeErr MsgDoc [UnitId]
 closeDepsErr dflags pkg_map ps = foldM (add_package dflags pkg_map) [] ps
 
 -- internal helper
 add_package :: DynFlags
-            -> UnitInfoMap
+            -> ClosureUnitInfoMap
             -> [UnitId]
             -> (UnitId,Maybe UnitId)
             -> MaybeErr MsgDoc [UnitId]
@@ -2120,7 +2120,7 @@ fsPackageName info = fs
 
 -- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
-improveUnit :: UnitInfoMap -> Unit -> Unit
+improveUnit :: ClosureUnitInfoMap -> Unit -> Unit
 improveUnit _ uid@(RealUnit _) = uid -- short circuit
 improveUnit pkg_map uid =
     -- Do NOT lookup indefinite ones, they won't be useful!
