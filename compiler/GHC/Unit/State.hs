@@ -37,7 +37,7 @@ module GHC.Unit.State (
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
-        UnusablePackageReason(..),
+        UnusableUnitReason(..),
         pprReason,
 
         -- * Inspecting the set of packages in scope
@@ -163,7 +163,7 @@ data ModuleOrigin =
     -- of these modules.)
     ModHidden
     -- | Module is unavailable because the package is unusable.
-  | ModUnusable UnusablePackageReason
+  | ModUnusable UnusableUnitReason
     -- | Module is public, and could have come from some places.
   | ModOrigin {
         -- | @Just False@ means that this module is in
@@ -795,7 +795,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
 findPackages :: UnitPrecedenceMap
              -> ClosureUnitInfoMap -> PackageArg -> [UnitInfo]
              -> UnusableUnits
-             -> Either [(UnitInfo, UnusablePackageReason)]
+             -> Either [(UnitInfo, UnusableUnitReason)]
                 [UnitInfo]
 findPackages prec_map pkg_db arg pkgs unusable
   = let ps = mapMaybe (finder arg) pkgs
@@ -820,7 +820,7 @@ findPackages prec_map pkg_db arg pkgs unusable
 
 selectPackages :: UnitPrecedenceMap -> PackageArg -> [UnitInfo]
                -> UnusableUnits
-               -> Either [(UnitInfo, UnusablePackageReason)]
+               -> Either [(UnitInfo, UnusableUnitReason)]
                   ([UnitInfo], [UnitInfo])
 selectPackages prec_map arg pkgs unusable
   = let matches = matching arg
@@ -914,21 +914,21 @@ comparing f a b = f a `compare` f b
 
 packageFlagErr :: DynFlags
                -> PackageFlag
-               -> [(UnitInfo, UnusablePackageReason)]
+               -> [(UnitInfo, UnusableUnitReason)]
                -> IO a
 packageFlagErr dflags flag reasons
   = packageFlagErr' dflags (pprFlag flag) reasons
 
 trustFlagErr :: DynFlags
              -> TrustFlag
-             -> [(UnitInfo, UnusablePackageReason)]
+             -> [(UnitInfo, UnusableUnitReason)]
              -> IO a
 trustFlagErr dflags flag reasons
   = packageFlagErr' dflags (pprTrustFlag flag) reasons
 
 packageFlagErr' :: DynFlags
                -> SDoc
-               -> [(UnitInfo, UnusablePackageReason)]
+               -> [(UnitInfo, UnusableUnitReason)]
                -> IO a
 packageFlagErr' dflags flag_doc reasons
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ err))
@@ -1091,7 +1091,7 @@ updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap
 -- ----------------------------------------------------------------------------
 
 -- | The reason why a package is unusable.
-data UnusablePackageReason
+data UnusableUnitReason
   = -- | We ignored it explicitly using @-ignore-package@.
     IgnoredWithFlag
     -- | This package transitively depends on a package that was never present
@@ -1108,16 +1108,16 @@ data UnusablePackageReason
     -- shadowed by an ABI-incompatible package.
   | ShadowedDependencies [UnitId]
 
-instance Outputable UnusablePackageReason where
+instance Outputable UnusableUnitReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
     ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
     ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
     ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
     ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
 
-type UnusableUnits = Map UnitId (UnitInfo, UnusablePackageReason)
+type UnusableUnits = Map UnitId (UnitInfo, UnusableUnitReason)
 
-pprReason :: SDoc -> UnusablePackageReason -> SDoc
+pprReason :: SDoc -> UnusableUnitReason -> SDoc
 pprReason pref reason = case reason of
   IgnoredWithFlag ->
       pref <+> text "ignored due to an -ignore-package flag"
