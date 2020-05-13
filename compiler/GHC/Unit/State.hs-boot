@@ -4,7 +4,7 @@ import GHC.Data.FastString
 import {-# SOURCE #-} GHC.Unit.Types (IndefUnitId, Unit, UnitId)
 data PackageState
 data ClosureUnitInfoMap
-data PackageDatabase unit
+data UnitDatabase unit
 emptyPackageState :: PackageState
 mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
 displayUnitId :: PackageState -> UnitId -> Maybe String
