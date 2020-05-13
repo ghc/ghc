@@ -676,7 +676,7 @@ mungeDynLibFields pkg =
 applyTrustFlag
    :: DynFlags
    -> PackagePrecedenceIndex
-   -> UnusablePackages
+   -> UnusableUnits
    -> [UnitInfo]
    -> TrustFlag
    -> IO [UnitInfo]
@@ -709,7 +709,7 @@ applyPackageFlag
    :: DynFlags
    -> PackagePrecedenceIndex
    -> ClosureUnitInfoMap
-   -> UnusablePackages
+   -> UnusableUnits
    -> Bool -- if False, if you expose a package, it implicitly hides
            -- any previously exposed packages with the same name
    -> [UnitInfo]
@@ -794,7 +794,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
 -- if the 'UnitArg' has a renaming associated with it.
 findPackages :: PackagePrecedenceIndex
              -> ClosureUnitInfoMap -> PackageArg -> [UnitInfo]
-             -> UnusablePackages
+             -> UnusableUnits
              -> Either [(UnitInfo, UnusablePackageReason)]
                 [UnitInfo]
 findPackages prec_map pkg_db arg pkgs unusable
@@ -819,7 +819,7 @@ findPackages prec_map pkg_db arg pkgs unusable
           _ -> Nothing
 
 selectPackages :: PackagePrecedenceIndex -> PackageArg -> [UnitInfo]
-               -> UnusablePackages
+               -> UnusableUnits
                -> Either [(UnitInfo, UnusablePackageReason)]
                   ([UnitInfo], [UnitInfo])
 selectPackages prec_map arg pkgs unusable
@@ -1116,8 +1116,7 @@ instance Outputable UnusablePackageReason where
     ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
     ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
 
-type UnusablePackages = Map UnitId
-                            (UnitInfo, UnusablePackageReason)
+type UnusableUnits = Map UnitId (UnitInfo, UnusablePackageReason)
 
 pprReason :: SDoc -> UnusablePackageReason -> SDoc
 pprReason pref reason = case reason of
@@ -1146,7 +1145,7 @@ reportCycles dflags sccs = mapM_ report sccs
           text "these packages are involved in a cycle:" $$
             nest 2 (hsep (map (ppr . unitId) vs))
 
-reportUnusable :: DynFlags -> UnusablePackages -> IO ()
+reportUnusable :: DynFlags -> UnusableUnits -> IO ()
 reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
   where
     report (ipid, (_, reason)) =
@@ -1214,7 +1213,7 @@ depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends
 -- -----------------------------------------------------------------------------
 -- Ignore packages
 
-ignorePackages :: [IgnorePackageFlag] -> [UnitInfo] -> UnusablePackages
+ignorePackages :: [IgnorePackageFlag] -> [UnitInfo] -> UnusableUnits
 ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
   where
   doit (IgnorePackage str) =
@@ -1282,7 +1281,7 @@ mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
 -- 4. Remove all packages which have deps with mismatching ABIs
 --
 validateDatabase :: DynFlags -> UnitInfoMap
-                 -> (UnitInfoMap, UnusablePackages, [SCC UnitInfo])
+                 -> (UnitInfoMap, UnusableUnits, [SCC UnitInfo])
 validateDatabase dflags pkg_map1 =
     (pkg_map5, unusable, sccs)
   where
@@ -1689,7 +1688,7 @@ mkModuleNameProvidersMap dflags pkg_db vis_map =
     hidden_mods  = unitHiddenModules pkg
 
 -- | Make a 'ModuleNameProvidersMap' covering a set of unusable packages.
-mkUnusableModuleNameProvidersMap :: UnusablePackages -> ModuleNameProvidersMap
+mkUnusableModuleNameProvidersMap :: UnusableUnits -> ModuleNameProvidersMap
 mkUnusableModuleNameProvidersMap unusables =
     Map.foldl' extend_modmap Map.empty unusables
  where
