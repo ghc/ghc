@@ -379,16 +379,16 @@ compileExe lunit = do
         ok <- load' LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
--- | Register a new virtual package database containing a single unit
+-- | Register a new virtual unit database containing a single unit
 addPackage :: GhcMonad m => UnitInfo -> m ()
 addPackage pkg = do
     dflags <- GHC.getSessionDynFlags
     case pkgDatabase dflags of
         Nothing -> panic "addPackage: called too early"
         Just dbs -> do
-         let newdb = PackageDatabase
-               { packageDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
-               , packageDatabaseUnits = [pkg]
+         let newdb = UnitDatabase
+               { unitDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
+               , unitDatabaseUnits = [pkg]
                }
          _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
          return ()
