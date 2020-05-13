@@ -2936,7 +2936,7 @@ newDynFlags interactive_only minus_opts = do
           idflags <- GHC.getInteractiveDynFlags
           GHC.setInteractiveDynFlags
               idflags{ pkgState = pkgState dflags2
-                     , pkgDatabase = pkgDatabase dflags2
+                     , unitDatabases = unitDatabases dflags2
                      , packageFlags = packageFlags dflags2 }
 
         let ld0length   = length $ ldInputs dflags0

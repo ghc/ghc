@@ -627,11 +627,8 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [UnitDatabase UnitId],
-        -- ^ Stack of package databases for the target platform.
-        --
-        -- A "package database" is a misleading name as it is really a Unit
-        -- database (cf Note [About Units]).
+  unitDatabases         :: Maybe [UnitDatabase UnitId],
+        -- ^ Stack of unit databases for the target platform.
         --
         -- This field is populated by `initPackages`.
         --
@@ -641,7 +638,7 @@ data DynFlags = DynFlags {
 
   pkgState              :: PackageState,
         -- ^ Consolidated unit database built by 'initPackages' from the package
-        -- databases in 'pkgDatabase' and flags ('-ignore-package', etc.).
+        -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
         -- It also contains mapping from module names to actual Modules.
 
@@ -1372,7 +1369,7 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        pkgDatabase             = Nothing,
+        unitDatabases           = Nothing,
         pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = waysTag (defaultWays mySettings),
