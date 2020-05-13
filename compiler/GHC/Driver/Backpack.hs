@@ -383,14 +383,14 @@ compileExe lunit = do
 addPackage :: GhcMonad m => UnitInfo -> m ()
 addPackage pkg = do
     dflags <- GHC.getSessionDynFlags
-    case pkgDatabase dflags of
+    case unitDatabases dflags of
         Nothing -> panic "addPackage: called too early"
         Just dbs -> do
          let newdb = UnitDatabase
                { unitDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
                , unitDatabaseUnits = [pkg]
                }
-         _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
+         _ <- GHC.setSessionDynFlags (dflags { unitDatabases = Just (dbs ++ [newdb]) })
          return ()
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
