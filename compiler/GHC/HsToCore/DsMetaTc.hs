@@ -185,10 +185,10 @@ dsBracketTc (rty, ur_ty) exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs z
 boundVars :: CoreExpr -> DVarSet
 boundVars (Lam x b)       = unitDVarSet x `unionDVarSet` boundVars b
 boundVars (App f a)       = boundVars f `unionDVarSet` boundVars a
-boundVars (Case s x ty as) = unitDVarSet x `unionDVarSet` boundVars s `unionDVarSet` unionDVarSets (map boundVarsAlt as)
+boundVars (Case s x _ty as) = unitDVarSet x `unionDVarSet` boundVars s `unionDVarSet` unionDVarSets (map boundVarsAlt as)
 boundVars (Let b e)       = boundVarsBind b `unionDVarSet` (boundVars e)
-boundVars (Cast e co)     = boundVars e
-boundVars (Tick t e)      = boundVars e
+boundVars (Cast e _co)     = boundVars e
+boundVars (Tick _t e)      = boundVars e
 boundVars _ = emptyDVarSet
 
 boundVarsAlt :: Alt CoreBndr -> DVarSet
@@ -228,8 +228,7 @@ repECore e = do
   c_e <- dsExpr e
   let bvs = boundVars c_e
   dflags <- getDynFlags
-  -- Inline Type Lets, in particular
-  let c_e' = simpleOptExpr dflags c_e
+  let _c_e' = simpleOptExpr dflags c_e
   --pprTraceM "c_e'" (ppr c_e $$ ppr c_e' $$ ppr bvs)
   res <- repCore c_e
   return (bvs, res)

@@ -2022,7 +2022,6 @@ mkSpliceExpr sp_id id_name id = do
       return (u_ty, ty)
   let u_liftExpr = (nlHsApp (noLoc u_lift) (nlHsVar id))
   let liftExpr = (nlHsApp (noLoc lift) (nlHsVar id))
-  lcl <- tcl_th_bndrs <$> getLclEnv
   return (Left ((PendingTcSplice id_name u_liftExpr, PendingTcSplice sp_id liftExpr)))
 
 

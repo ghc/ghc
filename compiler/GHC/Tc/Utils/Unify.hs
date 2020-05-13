@@ -1130,8 +1130,8 @@ tcSkolemise ctxt expected_ty thing_inside
   = do  { traceTc "tcSkolemise" Outputable.empty
         ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
 
-        ; lvl <- getTcLevel
-        ; th_lvl <- getStage
+        --; lvl <- getTcLevel
+        --; th_lvl <- getStage
         {-
         ; pprTraceM "tcSkolemise" $ vcat [
                 ppr lvl,

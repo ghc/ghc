@@ -210,7 +210,6 @@ tcTypedBracket rn_expr brack@(TExpBr e expr) res_ty
        ; zz <- readMutVar zz_ref
        --; pprTraceM "tcTypedBracket:zz" (ppr zz)
        --; pprTraceM "tcTypedBracket:ts" (ppr ts)
-       ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                         (HsTcTypedBracketOut noExtField (rep, expr_ty) (wrapper, brack, ups) brack' ps' (zz ++ ts))

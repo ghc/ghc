@@ -48,7 +48,6 @@ import GHC.Driver.Session
 import Outputable
 import Util(zipWithEqual, HasCallStack,  splitAtList, fstOf3 )
 import Data.Maybe
-import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Unique
 
@@ -176,9 +175,7 @@ matchGlobalInst :: HasCallStack => DynFlags
 matchGlobalInst dflags short_cut n clas tys
   | clas `hasKey` THNames.codeCTyConKey = matchCodeC tys
   | clas `hasKey` THNames.liftTClassKey = do
-      lcl <- tcl_th_bndrs <$> getLclEnv
-      --pprTrace "level" (ppr n) $
-      matchLiftTy lcl n tys
+      matchLiftTy n tys
   | otherwise = matchTopGlobalInst dflags short_cut clas tys
 
 matchTopGlobalInst :: DynFlags -> Bool -> Class -> [Type] -> TcM ClsInstResult
@@ -657,8 +654,8 @@ matchCodeC [c] = do
                                  , cir_what = BuiltinInstance })
 
 -- See Note [Constructing` LiftT evidence]
-matchLiftTy :: HasCallStack => ThBindEnv -> ThLevel -> [Type] -> TcM ClsInstResult
-matchLiftTy bind_env n args@[_k, t2]
+matchLiftTy :: HasCallStack => ThLevel -> [Type] -> TcM ClsInstResult
+matchLiftTy n args@[_k, t2]
     | Just t <- getTyVar_maybe t2
     -- Not in the env must mean it's top-level
    -- , let lvl = maybe (pprTrace "lookup failed" (ppr t $$ ppr bind_env) 1) snd (lookupNameEnv bind_env (idName t))
@@ -710,7 +707,7 @@ matchLiftTy bind_env n args@[_k, t2]
                     , cir_mk_ev = \evs' -> --pprTraceIt "matchLiftTy" $
                                             evDataConApp dc args [ev evs', unitExpr]
                     , cir_what = BuiltinInstance })
-matchLiftTy _env _n args = pprPanic "matchLiftTy" (ppr args)
+matchLiftTy _n args = pprPanic "matchLiftTy" (ppr args)
 
 {-
 Note [Constructing LiftT evidence]

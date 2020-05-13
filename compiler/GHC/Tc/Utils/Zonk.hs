@@ -54,7 +54,6 @@ import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names
-import GHC.Builtin.Names.TH
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -65,7 +64,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Core.Type
-import GHC.Types.Unique
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon

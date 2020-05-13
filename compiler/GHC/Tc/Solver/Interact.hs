@@ -493,10 +493,9 @@ interactWithInertsStage wi
              CTyEqCan  {} -> interactTyVarEq ics wi
              CFunEqCan {} -> interactFunEq   ics wi
              CIrredCan {} -> interactIrred   ics wi
-             CDictCan {}  -> do { inerts <- getTcSInerts
-                                ; ready <- readyTcEvBindsVar (ctEvLevel (cc_ev wi))
+             CDictCan {}  -> do { ready <- readyTcEvBindsVar (ctEvLevel (cc_ev wi))
                                 --; pprTraceM "inertStage" (ppr ready $$ ppr wi)
-                                ; if ready 
+                                ; if ready
                                     then interactDict ics wi
                                     else continueWith wi }
              _ -> pprPanic "interactWithInerts" (ppr wi) }
