@@ -50,7 +50,7 @@ mkExtraObj dflags extn xs
                     else asmOpts ccInfo)
       return oFile
     where
-      pkgs = pkgState dflags
+      pkgs = unitState dflags
 
       -- Pass a different set of options to the C compiler depending one whether
       -- we're compiling C or assembler. When compiling C, we pass the usual
