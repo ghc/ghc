@@ -16,7 +16,7 @@ module GHC.Unit.State (
         readPackageDatabase,
         getPackageConfRefs,
         resolvePackageDatabase,
-        listUnitInfoMap,
+        listUnitInfo,
 
         -- * Querying the package config
         lookupUnit,
@@ -438,7 +438,7 @@ lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
 searchPackageId :: PackageState -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
-                               (listUnitInfoMap pkgstate)
+                               (listUnitInfo pkgstate)
 
 -- | Create a Map UnitId UnitInfo
 --
@@ -464,8 +464,8 @@ mkUnitInfoMap infos
 -- this function, although all packages in this map are "visible", this
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
-listUnitInfoMap :: PackageState -> [UnitInfo]
-listUnitInfoMap pkgstate = eltsUDFM pkg_map
+listUnitInfo :: PackageState -> [UnitInfo]
+listUnitInfo pkgstate = eltsUDFM pkg_map
   where
     UnitInfoMap pkg_map _ = unitInfoMap pkgstate
 
@@ -2089,7 +2089,7 @@ pprPackages = pprPackagesWith pprUnitInfo
 
 pprPackagesWith :: (UnitInfo -> SDoc) -> PackageState -> SDoc
 pprPackagesWith pprIPI pkgstate =
-    vcat (intersperse (text "---") (map pprIPI (listUnitInfoMap pkgstate)))
+    vcat (intersperse (text "---") (map pprIPI (listUnitInfo pkgstate)))
 
 -- | Show simplified package info.
 --
