@@ -1758,7 +1758,7 @@ linkBinary' staticLink dflags o_files dep_units = do
                  -- that defines the symbol."
 
     -- frameworks
-    pkg_framework_opts <- getPkgFrameworkOpts dflags platform dep_units
+    pkg_framework_opts <- getUnitFrameworkOpts dflags platform dep_units
     let framework_opts = getFrameworkOpts dflags platform
 
         -- probably _stub.o files
