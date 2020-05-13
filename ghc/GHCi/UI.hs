@@ -2343,12 +2343,12 @@ isSafeModule m = do
 
     packageTrusted dflags md
         | isHomeModule dflags md = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (pkgState dflags) (moduleUnit md)
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
         where part pkg = unitIsTrusted $ unsafeLookupUnitId pkgstate pkg
-              pkgstate = pkgState dflags
+              pkgstate = unitState dflags
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -2935,7 +2935,7 @@ newDynFlags interactive_only minus_opts = do
           -- and copy the package state to the interactive DynFlags
           idflags <- GHC.getInteractiveDynFlags
           GHC.setInteractiveDynFlags
-              idflags{ pkgState = pkgState dflags2
+              idflags{ unitState = unitState dflags2
                      , unitDatabases = unitDatabases dflags2
                      , packageFlags = packageFlags dflags2 }
 

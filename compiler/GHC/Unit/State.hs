@@ -482,7 +482,7 @@ listUnitInfo pkgstate = eltsUDFM pkg_map
 --
 -- 'initPackages' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
--- 'pkgState' in 'DynFlags' and return a list of packages to
+-- 'unitState' in 'DynFlags' and return a list of packages to
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [UnitId])
 initPackages dflags = withTiming dflags
@@ -503,11 +503,11 @@ initPackages dflags = withTiming dflags
   (pkg_state, preload, insts)
         <- mkPackageState dflags pkg_dbs []
   return (dflags{ unitDatabases = Just read_pkg_dbs,
-                  pkgState = pkg_state,
+                  unitState = pkg_state,
                   homeUnitInstantiations = insts },
           preload)
   where
-    forcePkgDb (dflags, _) = unitInfoMap (pkgState dflags) `seq` ()
+    forcePkgDb (dflags, _) = unitInfoMap (unitState dflags) `seq` ()
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
@@ -1039,7 +1039,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
           where upd_pkg pkg
                   | Just wiredInUnitId <- Map.lookup (unitId pkg) wiredInMap
                   = pkg { unitId         = wiredInUnitId
-                        , unitInstanceOf = mkIndefUnitId (pkgState dflags) (unitIdFS wiredInUnitId) -- why?
+                        , unitInstanceOf = mkIndefUnitId (unitState dflags) (unitIdFS wiredInUnitId) -- why?
                         }
                   | otherwise
                   = pkg
@@ -1589,7 +1589,7 @@ mkPackageState dflags dbs preload0 = do
 -- that it was recorded as in the package database.
 unwireUnit :: DynFlags -> Unit-> Unit
 unwireUnit dflags uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap (pkgState dflags)))
+    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap (unitState dflags)))
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -1969,7 +1969,7 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
 
 listVisibleModuleNames :: DynFlags -> [ModuleName]
 listVisibleModuleNames dflags =
-    map fst (filter visible (Map.toList (moduleNameProvidersMap (pkgState dflags))))
+    map fst (filter visible (Map.toList (moduleNameProvidersMap (unitState dflags))))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Find all the 'UnitInfo' in both the preload packages from 'DynFlags' and corresponding to the list of
@@ -1985,7 +1985,7 @@ getPreloadUnitsAnd dflags pkgids0 =
                     then []
                     else map (toUnitId . moduleUnit . snd)
                              (homeUnitInstantiations dflags)
-      state   = pkgState dflags
+      state   = unitState dflags
       pkg_map = unitInfoMap state
       preload = preloadUnits state
       pairs = zip pkgids (repeat Nothing)

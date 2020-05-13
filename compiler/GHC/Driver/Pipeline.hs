@@ -513,7 +513,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
-        let pkgstate = pkgState dflags
+        let pkgstate = unitState dflags
         let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
                           | Just c <- map (lookupUnitId pkgstate) pkg_deps,
                             lib <- packageHsLibs dflags c ]
@@ -2002,7 +2002,7 @@ doCpp dflags raw input_fn output_fn = do
     let hsSourceCppOpts = [ "-include", ghcVersionH ]
 
     -- MIN_VERSION macros
-    let state = pkgState dflags
+    let state = unitState dflags
         uids = explicitUnits state
         pkgs = catMaybes (map (lookupUnit state) uids)
     mb_macro_include <-
