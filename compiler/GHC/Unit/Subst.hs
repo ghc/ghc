@@ -36,9 +36,9 @@ renameHoleModule state = renameHoleModule' (unitInfoMap state)
 renameHoleUnit :: PackageState -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit state = renameHoleUnit' (unitInfoMap state)
 
--- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
+-- | Like 'renameHoleModule', but requires only 'ClosureUnitInfoMap'
 -- so it can be used by "Packages".
-renameHoleModule' :: UnitInfoMap -> ShHoleSubst -> Module -> Module
+renameHoleModule' :: ClosureUnitInfoMap -> ShHoleSubst -> Module -> Module
 renameHoleModule' pkg_map env m
   | not (isHoleModule m) =
         let uid = renameHoleUnit' pkg_map env (moduleUnit m)
@@ -47,9 +47,9 @@ renameHoleModule' pkg_map env m
   -- NB m = <Blah>, that's what's in scope.
   | otherwise = m
 
--- | Like 'renameHoleUnit, but requires only 'UnitInfoMap'
+-- | Like 'renameHoleUnit, but requires only 'ClosureUnitInfoMap'
 -- so it can be used by "Packages".
-renameHoleUnit' :: UnitInfoMap -> ShHoleSubst -> Unit -> Unit
+renameHoleUnit' :: ClosureUnitInfoMap -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit' pkg_map env uid =
     case uid of
       (VirtUnit
@@ -59,7 +59,7 @@ renameHoleUnit' pkg_map env uid =
           -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
                 then uid
                 -- Functorially apply the substitution to the instantiation,
-                -- then check the 'UnitInfoMap' to see if there is
+                -- then check the 'ClosureUnitInfoMap' to see if there is
                 -- a compiled version of this 'InstantiatedUnit' we can improve to.
                 -- See Note [VirtUnit to RealUnit improvement]
                 else improveUnit pkg_map $

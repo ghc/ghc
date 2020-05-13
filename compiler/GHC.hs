@@ -597,7 +597,7 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags''', preload) <- liftIO $ initPackages dflags'
+  (dflags''', preload) <- liftIO $ initUnits dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -660,7 +660,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags_prev <- getProgramDynFlags
   (dflags'', preload) <-
     if (packageFlagsChanged dflags_prev dflags')
-       then liftIO $ initPackages dflags'
+       then liftIO $ initUnits dflags'
        else return (dflags', [])
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache
@@ -699,7 +699,7 @@ getProgramDynFlags = getSessionDynFlags
 -- | Set the 'DynFlags' used to evaluate interactive expressions.
 -- Note: this cannot be used for changes to packages.  Use
 -- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
--- 'pkgState' into the interactive @DynFlags@.
+-- 'unitState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
@@ -1355,7 +1355,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (unitState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs

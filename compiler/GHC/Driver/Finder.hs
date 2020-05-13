@@ -182,14 +182,14 @@ findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
 findExposedPackageModule hsc_env mod_name mb_pkg
   = findLookupResult hsc_env
   $ lookupModuleWithSuggestions
-        (pkgState (hsc_dflags hsc_env)) mod_name mb_pkg
+        (unitState (hsc_dflags hsc_env)) mod_name mb_pkg
 
 findExposedPluginPackageModule :: HscEnv -> ModuleName
                                -> IO FindResult
 findExposedPluginPackageModule hsc_env mod_name
   = findLookupResult hsc_env
   $ lookupPluginModuleWithSuggestions
-        (pkgState (hsc_dflags hsc_env)) mod_name Nothing
+        (unitState (hsc_dflags hsc_env)) mod_name Nothing
 
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
@@ -343,7 +343,7 @@ findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = moduleUnit mod
-        pkgstate = pkgState dflags
+        pkgstate = unitState dflags
   --
   case lookupUnitId pkgstate pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
@@ -672,7 +672,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    pkgs = pkgState dflags
+    pkgs = unitState dflags
     more_info
       = case find_result of
             NoPackage pkg
@@ -810,7 +810,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
             _ -> panic "cantFindInstalledErr"
 
     build_tag = buildTag dflags
-    pkgstate = pkgState dflags
+    pkgstate = unitState dflags
 
     looks_like_srcpkgid :: UnitId -> SDoc
     looks_like_srcpkgid pk

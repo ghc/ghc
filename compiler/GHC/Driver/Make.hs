@@ -307,7 +307,7 @@ warnUnusedPackages = do
     eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
-        state  = pkgState dflags
+        state  = unitState dflags
         pit = eps_PIT eps
 
     let loadedPackages
@@ -1533,7 +1533,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 -- instantiations that are themselves instantiations and so on recursively.
 instantiatedUnitsToCheck :: DynFlags -> [Unit]
 instantiatedUnitsToCheck dflags =
-  nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
+  nubSort $ concatMap goUnit (explicitUnits (unitState dflags))
  where
   goUnit HoleUnit         = []
   goUnit (RealUnit _)     = []
