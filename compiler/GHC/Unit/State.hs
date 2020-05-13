@@ -489,7 +489,7 @@ initPackages dflags = withTiming dflags
                                   (text "initializing package database")
                                   forcePkgDb $ do
   read_pkg_dbs <-
-    case pkgDatabase dflags of
+    case unitDatabases dflags of
         Nothing  -> readUnitDatabases dflags
         Just dbs -> return dbs
 
@@ -502,7 +502,7 @@ initPackages dflags = withTiming dflags
 
   (pkg_state, preload, insts)
         <- mkPackageState dflags pkg_dbs []
-  return (dflags{ pkgDatabase = Just read_pkg_dbs,
+  return (dflags{ unitDatabases = Just read_pkg_dbs,
                   pkgState = pkg_state,
                   homeUnitInstantiations = insts },
           preload)
