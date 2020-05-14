@@ -746,6 +746,8 @@ import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
 import GHC.Show    ( Show(..), showString )
+import GHC.Stack.Types ( SrcLoc )
+import GHC.Unicode ( GeneralCategory )
 
 -- Needed for metadata
 import Data.Proxy   ( Proxy(..) )
@@ -1477,6 +1479,11 @@ deriving instance Generic ((,,,,,,) a b c d e f g)
 -- | @since 4.12.0.0
 deriving instance Generic (Down a)
 
+-- | @since 4.15.0.0
+deriving instance Generic SrcLoc
+
+-- | @since 4.15.0.0
+deriving instance Generic GeneralCategory
 
 -- | @since 4.6.0.0
 deriving instance Generic1 []

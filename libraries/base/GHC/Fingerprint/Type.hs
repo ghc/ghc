@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -13,6 +14,7 @@
 module GHC.Fingerprint.Type (Fingerprint(..)) where
 
 import GHC.Base
+import GHC.Generics (Generic)
 import GHC.List (length, replicate)
 import GHC.Num
 import GHC.Show
@@ -24,6 +26,7 @@ import Numeric (showHex)
 data Fingerprint = Fingerprint {-# UNPACK #-} !Word64 {-# UNPACK #-} !Word64
   deriving ( Eq  -- ^ @since 4.4.0.0
            , Ord -- ^ @since 4.4.0.0
+           , Generic -- ^ @since 4.15.0.0
            )
 
 -- | @since 4.7.0.0
