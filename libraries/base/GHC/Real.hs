@@ -334,11 +334,12 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
-    a `rem` b
+    !a `rem` b  -- banged a, because the second branch isn't strict in a
      | b == 0                     = divZeroError
        -- The quotRem CPU instruction fails for minBound `quotRem` -1,
        -- but minBound `rem` -1 is well-defined (0). We therefore
        -- special-case it.
+       -- But this branch is lazy in a, hence the bang to guarantee unboxing.
      | b == (-1)                  = 0
      | otherwise                  =  a `remInt` b
 
@@ -348,11 +349,12 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
-    a `mod` b
+    !a `mod` b  -- banged a, because the second branch isn't strict in a
      | b == 0                     = divZeroError
        -- The divMod CPU instruction fails for minBound `divMod` -1,
        -- but minBound `mod` -1 is well-defined (0). We therefore
        -- special-case it.
+       -- But this branch is lazy in a, hence the bang to guarantee unboxing.
      | b == (-1)                  = 0
      | otherwise                  =  a `modInt` b
 
