@@ -1135,8 +1135,8 @@ hsSigDoc (IdSig {})             = text "id signature"
 hsSigDoc (SpecSig _ _ _ inl)
                                 = ppr inl <+> text "pragma"
 hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
-hsSigDoc (SpecInstSig _ src _)
-                                = pprWithSourceText src empty <+> text "instance pragma"
+hsSigDoc (SpecInstSig _ (SourceText src) _)
+                                = text (last $ words src) <+> text "instance pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
