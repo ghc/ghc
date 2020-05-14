@@ -334,7 +334,7 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
-    a `rem` b
+    !a `rem` b
      | b == 0                     = divZeroError
        -- The quotRem CPU instruction fails for minBound `quotRem` -1,
        -- but minBound `rem` -1 is well-defined (0). We therefore
@@ -348,7 +348,7 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
-    a `mod` b
+    !a `mod` b
      | b == 0                     = divZeroError
        -- The divMod CPU instruction fails for minBound `divMod` -1,
        -- but minBound `mod` -1 is well-defined (0). We therefore
