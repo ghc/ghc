@@ -112,7 +112,7 @@ import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
 
 -- compiler/parser
 import GHC.Parser.CharClass
-
+import GHC.Parser.Error
 import GHC.Parser.Annotation
 }
 
@@ -2088,7 +2088,7 @@ data PState = PState {
         options    :: ParserFlags,
         -- This needs to take DynFlags as an argument until
         -- we have a fix for #10143
-        messages   :: DynFlags -> Messages,
+        messages   :: DynFlags -> Messages ParseError,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
         last_tk    :: Maybe Token,
@@ -2650,12 +2650,12 @@ class Monad m => MonadP m where
 appendError
   :: SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages ParseError)
+  -> (DynFlags -> Messages ParseError)
 appendError srcspan msg m =
   \d ->
     let (ws, es) = m d
-        errormsg = mkErrMsg d srcspan alwaysQualify msg
+        errormsg = ParseError (mkErrMsg d srcspan alwaysQualify msg)
         es' = es `snocBag` errormsg
     in (ws, es')
 
@@ -2664,8 +2664,8 @@ appendWarning
   -> WarningFlag
   -> SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages ParseError)
+  -> (DynFlags -> Messages ParseError)
 appendWarning o option srcspan warning m =
   \d ->
     let (ws, es) = m d
@@ -2717,13 +2717,13 @@ mkTabWarning PState{tab_first=tf, tab_count=tc} d =
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> DynFlags -> ErrorMessages
+getErrorMessages :: PState -> DynFlags -> ErrorMessages ParseError
 getErrorMessages PState{messages=m} d =
   let (_, es) = m d in es
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> DynFlags -> Messages
+getMessages :: PState -> DynFlags -> Messages ParseError
 getMessages p@PState{messages=m} d =
   let (ws, es) = m d
       tabwarning = mkTabWarning p d

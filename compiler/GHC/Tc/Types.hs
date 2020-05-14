@@ -31,6 +31,9 @@ module GHC.Tc.Types(
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
 
+        -- Error types
+        TcRnError(..), tcRnErrorMsg, DsError,
+
         -- Frontend types (shouldn't really be here)
         FrontendResult(..),
 
@@ -296,12 +299,16 @@ a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 -}
 
+-- the Ds monad and TcM ones seem quite closely related,
+-- so let's use the same error type _for now_.
+type DsError = TcRnError
+
 data DsGblEnv
         = DsGblEnv
         { ds_mod          :: Module             -- For SCC profiling
         , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
         , ds_unqual  :: PrintUnqualified
-        , ds_msgs    :: IORef Messages          -- Warning messages
+        , ds_msgs    :: IORef (Messages DsError) -- Warning messages
         , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                                 -- possibly-imported things
         , ds_complete_matches :: CompleteMatchMap
@@ -744,6 +751,14 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
         b) used in the ModDetails of this module
 -}
 
+data TcRnError = TcRnError ErrMsg
+
+instance Show TcRnError where
+  show (TcRnError e) = "TcRnError => " ++ show e
+
+tcRnErrorMsg :: TcRnError -> ErrMsg
+tcRnErrorMsg (TcRnError e) = e
+
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
@@ -779,7 +794,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef Messages              -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnError)  -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

@@ -43,6 +43,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Driver.Session
 import GHC.Iface.Syntax
 import GHC.Iface.Env
+import GHC.Driver.Monad
 import GHC.Driver.Types
 
 import GHC.Types.Basic hiding (SuccessFlag(..))
