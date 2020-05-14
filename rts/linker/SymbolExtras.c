@@ -52,6 +52,7 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 
       /* Keep image and symbol_extras contiguous */
       void *new = mmapForLinker(n + (sizeof(SymbolExtra) * count),
+                                PROT_READ | PROT_WRITE | PROT_EXEC,
                                 MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);

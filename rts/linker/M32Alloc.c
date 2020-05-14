@@ -157,7 +157,7 @@ m32_allocator_init(void)
    // Preallocate the initial M32_MAX_PAGES to ensure that they don't
    // fragment the memory.
    size_t pgsz = getPageSize();
-   char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES,MAP_ANONYMOUS,-1,0);
+   char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANONYMOUS,-1,0);
    if (bigchunk == NULL)
        barf("m32_allocator_init: Failed to map");
 
@@ -249,7 +249,7 @@ m32_alloc(size_t size, size_t alignment)
 
    if (m32_is_large_object(size,alignment)) {
        // large object
-       return mmapForLinker(size,MAP_ANONYMOUS,-1,0);
+       return mmapForLinker(size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS,-1,0);
    }
 
    // small object
@@ -297,7 +297,7 @@ m32_alloc(size_t size, size_t alignment)
    }
 
    // Allocate a new page
-   void * addr = mmapForLinker(pgsz,MAP_ANONYMOUS,-1,0);
+   void * addr = mmapForLinker(pgsz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS,-1,0);
    if (addr == NULL) {
       return NULL;
    }
