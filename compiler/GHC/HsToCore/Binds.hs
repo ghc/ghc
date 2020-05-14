@@ -41,7 +41,7 @@ import GHC.Core.SimpleOpt    ( simpleOptExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Make
 import GHC.Core.Utils
-import GHC.Core.Arity     ( etaExpand )
+import GHC.Core.Opt.Arity     ( etaExpand )
 import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Data.Graph.Directed

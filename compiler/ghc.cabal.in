@@ -297,7 +297,7 @@ Library
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
         GHC.Runtime.Heap.Layout
-        GHC.Core.Arity
+        GHC.Core.Opt.Arity
         GHC.Core.FVs
         GHC.Core.Lint
         GHC.Core.Subst

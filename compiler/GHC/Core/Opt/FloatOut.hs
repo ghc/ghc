@@ -15,7 +15,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Core.Arity    ( etaExpand )
+import GHC.Core.Opt.Arity    ( etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session

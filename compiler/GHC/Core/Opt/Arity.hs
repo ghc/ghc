@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Arity and eta expansion
-module GHC.Core.Arity
+module GHC.Core.Opt.Arity
    ( manifestArity, joinRhsArity, exprArity, typeArity
    , exprEtaExpandArity, findRhsArity, etaExpand
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
@@ -1136,7 +1136,7 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
 -- TODO Check if we actually *are* changing any join points' types
 
 subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr = substExpr (text "GHC.Core.Arity:substExpr")
+subst_expr = substExpr (text "GHC.Core.Opt.Arity:substExpr")
 
 
 --------------

@@ -9,7 +9,7 @@ module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
 import GHC.Prelude
 
-import GHC.Core.Arity  ( manifestArity )
+import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
 import GHC.Core.Unfold ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
 import GHC.Core.Utils  ( exprType, exprIsHNF )
@@ -534,12 +534,12 @@ Note [Zapping DmdEnv after Demand Analyzer] above.
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A binding where the manifestArity of the RHS is less than idArity of the binder
-means GHC.Core.Arity didn't eta expand that binding. When this happens, it does so
-for a reason (see Note [exprArity invariant] in GHC.Core.Arity) and we probably have
+means GHC.Core.Opt.Arity didn't eta expand that binding. When this happens, it does so
+for a reason (see Note [exprArity invariant] in GHC.Core.Opt.Arity) and we probably have
 a PAP, cast or trivial expression as RHS.
 
 Performing the worker/wrapper split will implicitly eta-expand the binding to
-idArity, overriding GHC.Core.Arity's decision. Other than playing fast and loose with
+idArity, overriding GHC.Core.Opt.Arity's decision. Other than playing fast and loose with
 divergence, it's also broken for newtypes:
 
   f = (\xy.blah) |> co

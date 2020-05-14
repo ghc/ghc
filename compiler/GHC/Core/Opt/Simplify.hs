@@ -785,7 +785,7 @@ propagate the info that x's RHS is bottom to x's IdInfo as rapidly as
 possible.
 
 We use tryEtaExpandRhs on every binding, and it turns ou that the
-arity computation it performs (via GHC.Core.Arity.findRhsArity) already
+arity computation it performs (via GHC.Core.Opt.Arity.findRhsArity) already
 does a simple bottoming-expression analysis.  So all we need to do
 is propagate that info to the binder's IdInfo.
 

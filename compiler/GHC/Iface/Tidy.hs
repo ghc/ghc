@@ -29,7 +29,7 @@ import GHC.Core.Lint
 import GHC.Core.Rules
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
 import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
