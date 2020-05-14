@@ -50,7 +50,7 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.SimpleOpt
-import GHC.Core.Arity   ( manifestArity )
+import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Types.Demand ( StrictSig, isDeadEndSig )

@@ -22,7 +22,7 @@ module GHC.Core.SimpleOpt (
 
 import GHC.Prelude
 
-import GHC.Core.Arity( etaExpandToJoinPoint )
+import GHC.Core.Opt.Arity( etaExpandToJoinPoint )
 
 import GHC.Core
 import GHC.Core.Subst
