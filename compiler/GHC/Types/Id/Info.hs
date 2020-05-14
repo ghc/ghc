@@ -267,7 +267,7 @@ data IdInfo
         -- ^ Bitfield packs CafInfo, OneShotInfo, arity info, LevityInfo, and
         -- call arity info in one 64-bit word. Packing these fields reduces size
         -- of `IdInfo` from 12 words to 7 words and reduces residency by almost
-        -- 4% in some programs.
+        -- 4% in some programs. See #17497 and associated MR.
         --
         -- See documentation of the getters for what these packed fields mean.
     }
