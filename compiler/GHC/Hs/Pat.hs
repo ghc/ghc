@@ -58,7 +58,7 @@ import {-# SOURCE #-} GHC.Hs.Expr (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprS
 import GHC.Hs.Binds
 import GHC.Hs.Lit
 import GHC.Hs.Extension
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Basic
 -- others:

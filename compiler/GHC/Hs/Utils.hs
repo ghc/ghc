@@ -110,7 +110,7 @@ import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Hs.Pat
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 
