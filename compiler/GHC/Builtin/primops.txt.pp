@@ -1254,7 +1254,7 @@ primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofSmallMutableArray\#}.}
+    equal to the current size as reported by {\tt getSizeofSmallMutableArray\#}.}
    with out_of_line = True
         has_side_effects = True
 
@@ -1279,8 +1279,8 @@ primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int#
    {Return the number of elements in the array. Note that this is deprecated
-   as it is unsafe in the presence of resize operations on the
-   same byte array.}
+   as it is unsafe in the presence of shrink and resize operations on the
+   same small mutable array.}
    with deprecated_msg = { Use 'getSizeofSmallMutableArray#' instead }
 
 primop  GetSizeofSmallMutableArrayOp "getSizeofSmallMutableArray#" GenPrimOp
@@ -1451,7 +1451,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofMutableByteArray\#}.}
+    equal to the current size as reported by {\tt getSizeofMutableByteArray\#}.}
    with out_of_line = True
         has_side_effects = True
 
@@ -1484,7 +1484,7 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
    {Return the size of the array in bytes. Note that this is deprecated as it is
-   unsafe in the presence of resize operations on the same byte
+   unsafe in the presence of shrink and resize operations on the same mutable byte
    array.}
    with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 
