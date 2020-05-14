@@ -232,6 +232,7 @@ import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
 import GHC.Cmm.Monad
 import GHC.Runtime.Heap.Layout
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 
 import GHC.Types.CostCentre
@@ -1414,7 +1415,7 @@ initEnv dflags = listToUFM [
   ]
   where platform = targetPlatform dflags
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
+parseCmmFile :: DynFlags -> FilePath -> IO (Messages CmmParseError, Maybe CmmGroup)
 parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
   buf <- hGetStringBuffer filename
   let
@@ -1435,4 +1436,8 @@ parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (te
          else return (ms, Just cmm)
   where
         no_module = panic "parseCmmFile: no module"
+
+-- reusing the Haskell parser's error type for now
+type CmmParseError = ParseError
+
 }

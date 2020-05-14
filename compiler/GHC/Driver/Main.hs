@@ -44,6 +44,11 @@ module GHC.Driver.Main
 
     , hscGenHardCode
     , hscInteractive
+    , runHsc
+    , runInteractiveHsc
+
+    , handleFlagWarnings
+    , throwOneError
 
     -- * Running passes separately
     , hscParse
@@ -70,6 +75,7 @@ module GHC.Driver.Main
     , hscParseExpr
     , hscParseType
     , hscCompileCoreExpr
+
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
       -- We want to make sure that we export enough to be able to redefine
@@ -154,6 +160,8 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Name.Env
 import GHC.Hs.Stats         ( ppSourceStats )
+import GHC.Driver.CmdLine
+import GHC.Driver.Monad hiding (logWarnings)
 import GHC.Driver.Types
 import GHC.Data.FastString
 import GHC.Types.Unique.Supply
@@ -224,6 +232,26 @@ logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
 
+-- Given a warn reason, check to see if it's associated -W opt is enabled
+shouldPrintWarning :: DynFlags -> GHC.Driver.CmdLine.WarnReason -> Bool
+shouldPrintWarning dflags ReasonDeprecatedFlag
+  = wopt Opt_WarnDeprecatedFlags dflags
+shouldPrintWarning dflags ReasonUnrecognisedFlag
+  = wopt Opt_WarnUnrecognisedWarningFlags dflags
+shouldPrintWarning _ _
+  = True
+
+handleFlagWarnings :: DynFlags -> [Warn] -> IO ()
+handleFlagWarnings dflags warns = do
+  let warns' = filter (shouldPrintWarning dflags . warnReason)  warns
+
+      -- It would be nicer if warns :: [Located MsgDoc], but that
+      -- has circular import problems.
+      bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
+                      | Warn _ (L loc warn) <- warns' ]
+
+  printOrThrowWarnings dflags bag
+
 handleWarnings :: Hsc ()
 handleWarnings = do
     dflags <- getDynFlags
@@ -231,22 +259,36 @@ handleWarnings = do
     liftIO $ printOrThrowWarnings dflags w
     clearWarnings
 
+runHsc :: HscEnv -> Hsc a -> IO a
+runHsc hsc_env (Hsc hsc) = do
+    (a, w) <- hsc hsc_env emptyBag
+    printOrThrowWarnings (hsc_dflags hsc_env) w
+    return a
+
+runInteractiveHsc :: HscEnv -> Hsc a -> IO a
+-- A variant of runHsc that switches in the DynFlags from the
+-- InteractiveContext before running the Hsc computation.
+runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
+
+throwOneError :: MonadIO io => ErrMsg -> io a
+throwOneError = throwErrors . unitBag . MsgErr
+
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: Messages -> Hsc ()
+logWarningsReportErrors :: IsGhcError e => Messages e -> Hsc ()
 logWarningsReportErrors (warns,errs) = do
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: Messages -> Hsc a
+handleWarningsThrowErrors :: Messages GhcError -> Hsc a
 handleWarningsThrowErrors (warns, errs) = do
     logWarnings warns
     dflags <- getDynFlags
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
     liftIO $ printBagOfErrors dflags wWarns
-    throwErrors (unionBags errs wErrs)
+    throwErrors (unionBags (fmap ghcErrorMsg errs) wErrs)
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -264,7 +306,7 @@ handleWarningsThrowErrors (warns, errs) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages, Maybe a) -> Hsc a
+ioMsgMaybe :: IsGhcError e => IO (Messages e, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
@@ -274,11 +316,12 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages e, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
     logWarnings warns
     return mb_r
+
 
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
@@ -352,7 +395,9 @@ hscParse' mod_summary
 
     case unP parseMod (mkPState dflags buf loc) of
         PFailed pst ->
-            handleWarningsThrowErrors (getMessages pst dflags)
+          let (ws, es) = getMessages pst dflags
+          in handleWarningsThrowErrors (ws, fmap PsErr es)
+
         POk pst rdr_module -> do
             let (warns, errs) = getMessages pst dflags
             logWarnings warns
@@ -1862,8 +1907,9 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
-        PFailed pst -> do
-            handleWarningsThrowErrors (getMessages pst dflags)
+        PFailed pst ->
+          let (ws, es) = getMessages pst dflags
+          in handleWarningsThrowErrors (ws, fmap PsErr es)
 
         POk pst thing -> do
             logWarningsReportErrors (getMessages pst dflags)

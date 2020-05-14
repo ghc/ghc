@@ -353,6 +353,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
+import GHC.Parser.Error
 import GHC.Parser.Annotation
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
@@ -1310,7 +1311,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRnError, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
@@ -1596,7 +1597,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located HsModule))
+       -> (WarningMessages, Either (ErrorMessages ParseError) (Located HsModule))
 
 parser str dflags filename =
    let

@@ -47,6 +47,7 @@ import GHC.Driver.Phases
 import GHC.SysTools
 import GHC.SysTools.ExtraObj
 import GHC.Driver.Main
+import GHC.Driver.Monad
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
 import GHC.Utils.Outputable
@@ -100,7 +101,7 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either ErrorMessages (DynFlags, FilePath))
+           -> IO (Either (ErrorMessages GhcError) (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
   MC.handle handler $
@@ -118,7 +119,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
-    handler (ProgramError msg) = return $ Left $ unitBag $
+    handler (ProgramError msg) = return $ Left $ unitBag $ MsgErr $
         mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
