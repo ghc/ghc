@@ -17,8 +17,7 @@ module GHC.Iface.Ext.Binary
 where
 
 import GHC.Settings.Utils         ( maybeRead )
-
-import Config                     ( cProjectVersion )
+import GHC.Settings.Config        ( cProjectVersion )
 import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Iface.Binary           ( getDictFastString )

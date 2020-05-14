@@ -27,7 +27,7 @@ module GHC.Utils.Panic.Plain
 
 #include "HsVersions.h"
 
-import Config
+import GHC.Settings.Config
 import GHC.Utils.Exception as Exception
 import GHC.Stack
 import GHC.Prelude

@@ -62,7 +62,7 @@ import GHC.Utils.Asm
 import GHC.CmmToAsm.Reg.Target
 import GHC.Platform
 import GHC.CmmToAsm.BlockLayout as BlockLayout
-import Config
+import GHC.Settings.Config
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.Platform.Reg

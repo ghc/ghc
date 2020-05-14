@@ -114,7 +114,7 @@ generatePackageCode context@(Context stage pkg _) = do
 
     priority 2.0 $ do
         when (pkg == compiler) $ do
-            root -/- "**" -/- dir -/- "Config.hs" %> go generateConfigHs
+            root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
             root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
             root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
@@ -346,7 +346,7 @@ generateConfigHs = do
     cBooterVersion      <- getSetting GhcVersion
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
-        , "module Config"
+        , "module GHC.Settings.Config"
         , "  ( module GHC.Version"
         , "  , cBuildPlatformString"
         , "  , cHostPlatformString"

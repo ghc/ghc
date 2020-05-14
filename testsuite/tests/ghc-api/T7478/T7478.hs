@@ -6,7 +6,7 @@ import Control.Monad (void)
 import System.Environment
 
 import GHC
-import qualified Config as GHC
+import qualified GHC.Settings.Config as GHC
 import qualified GHC.Utils.Outputable as GHC
 import GHC.Driver.Monad (liftIO)
 import GHC.Utils.Outputable (PprStyle, queryQual)

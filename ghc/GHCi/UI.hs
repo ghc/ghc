@@ -73,7 +73,7 @@ import GHC.Runtime.Loader ( initializePlugins )
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
-import Config
+import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
 import GHC.Data.FastString

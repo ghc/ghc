@@ -14,7 +14,7 @@ import GHC.Prelude
 import GHC.Settings.Platform
 import GHC.Settings.Utils
 
-import Config
+import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform

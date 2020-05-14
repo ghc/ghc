@@ -251,7 +251,7 @@ import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, PackageDa
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
-import Config
+import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd

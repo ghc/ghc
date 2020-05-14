@@ -14,7 +14,7 @@ module GHC.Iface.Ext.Types where
 
 import GHC.Prelude
 
-import Config
+import GHC.Settings.Config
 import GHC.Utils.Binary
 import GHC.Data.FastString        ( FastString )
 import GHC.Iface.Type
