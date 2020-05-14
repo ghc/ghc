@@ -334,11 +334,8 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
-    a `rem` b
+    !a `rem` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
-       -- The quotRem CPU instruction fails for minBound `quotRem` -1,
-       -- but minBound `rem` -1 is well-defined (0). We therefore
-       -- special-case it.
      | b == (-1)                  = 0
      | otherwise                  =  a `remInt` b
 
@@ -348,11 +345,8 @@ instance  Integral Int  where
                                                   -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
-    a `mod` b
+    !a `mod` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
-       -- The divMod CPU instruction fails for minBound `divMod` -1,
-       -- but minBound `mod` -1 is well-defined (0). We therefore
-       -- special-case it.
      | b == (-1)                  = 0
      | otherwise                  =  a `modInt` b
 
@@ -367,6 +361,15 @@ instance  Integral Int  where
        -- Note [Order of tests] in GHC.Int
      | b == (-1) && a == minBound = (overflowError, 0)
      | otherwise                  =  a `divModInt` b
+
+{- Note [Special case of mod and rem is lazy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The `quotRem`/`divMod` CPU instruction fails for minBound `quotRem` -1, but
+minBound `rem` -1 is well-defined (0). We therefore special-case for `b == -1`,
+but not for `a == minBound` because of Note [Order of tests] in GHC.Int. But
+now we have to make sure the function stays strict in a, to guarantee unboxing.
+Hence the bang on a, see #18187.
+-}
 
 --------------------------------------------------------------
 -- Instances for @Word@
