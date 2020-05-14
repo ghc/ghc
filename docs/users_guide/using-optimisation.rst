@@ -306,6 +306,41 @@ by saying ``-fno-wombat``.
 
     Turn on CPR analysis in the demand analyser.
 
+.. ghc-flag:: -fcase-binder-cpr-depth
+    :shortdesc: Maximum depth at which case binders have the CPR property.
+    :type: dynamic
+    :category:
+
+    :default: 1
+
+    Normally, case binders get the CPR property if their scrutinee had it.
+    But depending on whether the case binder occurs on a cold path, it may make sense
+    to give it the CPR property unconditionally.
+
+    This flag controls how deep inside a constructor application we still
+    consider CPR binders to have th CPR property. The default is 1, so the
+    following function will have the CPR property: ::
+
+      f :: Bool -> Int -> Int
+      f False _   = 1
+      f _     x@2 = x
+      f _     _   = 3
+
+    Note that ``x`` did not occur nested inside a constructor, so depth 1.
+
+    On the other hand, the following function will *not* have the Nested CPR
+    property: ::
+
+      g :: Bool -> Int -> (Int, Int)
+      g False _   = (1, 1)
+      g _     x@2 = (x, x)
+      g _     _   = (3, 3)
+
+    Because ``x`` occurs nested inside a pair, so at depth 2.
+
+    Depth 0 will never give any CPR binder the CPR property, unless the
+    scrutinee had it to begin with.
+
 .. ghc-flag:: -fcse
     :shortdesc: Enable common sub-expression elimination. Implied by :ghc-flag:`-O`.
     :type: dynamic
