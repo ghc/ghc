@@ -360,7 +360,7 @@ Library
         GHC.Types.Annotations
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
-        Config
+        GHC.Settings.Config
         GHC.Settings.Constants
         GHC.Driver.MakeFile
         GHC.Driver.Phases

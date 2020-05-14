@@ -1,7 +1,7 @@
 
 module Main where
 
-import Config
+import GHC.Settings.Config
 
 main :: IO ()
 main = putStrLn cProjectName

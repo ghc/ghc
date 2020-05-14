@@ -3,7 +3,7 @@ module GHC.Settings.Constants where
 
 import GHC.Prelude
 
-import Config
+import GHC.Settings.Config
 
 hiVersion :: Integer
 hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer

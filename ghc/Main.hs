@@ -46,7 +46,7 @@ import GHC.Unit.Module     ( ModuleName, mkModuleName )
 import GHC.HandleEncoding
 import GHC.Platform
 import GHC.Platform.Host
-import Config
+import GHC.Settings.Config
 import GHC.Settings.Constants
 import GHC.Driver.Types
 import GHC.Unit.State ( pprPackages, pprPackagesSimple )
