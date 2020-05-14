@@ -33,7 +33,7 @@ import GHC.Core.SimpleOpt ( collectBindersPushingCo )
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
                           , mkCast, exprType )
 import GHC.Core.FVs
-import GHC.Core.Arity     ( etaExpandToJoinPointRule )
+import GHC.Core.Opt.Arity     ( etaExpandToJoinPointRule )
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )

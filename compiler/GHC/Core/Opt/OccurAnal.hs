@@ -24,7 +24,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
-import GHC.Core.Arity   ( joinRhsArity )
+import GHC.Core.Opt.Arity   ( joinRhsArity )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic

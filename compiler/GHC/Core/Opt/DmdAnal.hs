@@ -880,9 +880,9 @@ we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
 have type (Int->Int->Int) ~ T.
 
-Fortunately, GHC.Core.Arity gives 'foo' arity 2, which is enough for LetDown to
+Fortunately, GHC.Core.Opt.Arity gives 'foo' arity 2, which is enough for LetDown to
 forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
-GHC.Core.Arity)! A small example is the test case NewtypeArity.
+GHC.Core.Opt.Arity)! A small example is the test case NewtypeArity.
 
 
 Historical Note [Product demands for function body]

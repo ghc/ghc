@@ -20,7 +20,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
-import GHC.Core.Arity   ( manifestArity )
+import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 
 import GHC.Core.Type
