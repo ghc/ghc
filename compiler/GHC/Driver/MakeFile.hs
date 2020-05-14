@@ -18,6 +18,7 @@ where
 import GHC.Prelude
 
 import qualified GHC
+import GHC.Driver.Main
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ways

@@ -18,16 +18,24 @@ module GHC.Driver.Monad (
         liftIO,
         Session(..), withSession, modifySession, withTempSession,
 
-        -- ** Warnings
-        logWarnings, printException,
+        -- ** Errors and Warnings
+        IsGhcError(..),
+        GhcError(..), ghcErrorMsg,
+        SourceError, mkSrcErr, srcErrorMessages, mkApiErr,
+        throwErrors, handleSourceError,
+
+        logWarnings, printException, printOrThrowWarnings,
         WarnErrLogger, defaultWarnErrLogger
   ) where
 
 import GHC.Prelude
 
 import GHC.Utils.Monad
+import GHC.Data.Bag
 import GHC.Driver.Types
 import GHC.Driver.Session
+import GHC.Parser.Error    -- parse error type
+import GHC.Tc.Types        -- tc/rn error type
 import GHC.Utils.Exception
 import GHC.Utils.Error
 
@@ -87,6 +95,25 @@ logWarnings :: GhcMonad m => WarningMessages -> m ()
 logWarnings warns = do
   dflags <- getSessionDynFlags
   liftIO $ printOrThrowWarnings dflags warns
+
+-- | Given a bag of warnings, turn them into an exception if
+-- -Werror is enabled, or print them out otherwise.
+printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
+printOrThrowWarnings dflags warns = do
+  let (make_error, warns') =
+        mapAccumBagL
+          (\make_err warn ->
+            case isWarnMsgFatal dflags warn of
+              Nothing ->
+                (make_err, warn)
+              Just err_reason ->
+                (True, warn{ errMsgSeverity = SevError
+                           , errMsgReason = ErrReason err_reason
+                           }))
+          False warns
+  if make_error
+    then throwIO (mkSrcErr $ fmap MsgErr warns')
+    else printBagOfErrors dflags warns
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
@@ -175,10 +202,11 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 
 -- | Print the error message and all warnings.  Useful inside exception
 --   handlers.  Clears warnings after printing.
-printException :: GhcMonad m => SourceError -> m ()
+printException :: (GhcMonad m) => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
-  liftIO $ printBagOfErrors dflags (srcErrorMessages err)
+  liftIO $ printBagOfErrors dflags
+    (fmap ghcErrorMsg $ srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()
@@ -187,3 +215,79 @@ defaultWarnErrLogger :: WarnErrLogger
 defaultWarnErrLogger Nothing  = return ()
 defaultWarnErrLogger (Just e) = printException e
 
+data GhcError
+  = MsgErr ErrMsg     -- escape hatch
+  | PsErr ParseError
+  | TcRnErr TcRnError
+
+instance Show GhcError where
+  show err = case err of
+    MsgErr e              -> "MsgErr => " ++ show e
+    PsErr (ParseError e)  -> "PsErr => " ++ show e
+    TcRnErr (TcRnError e) -> "TcRnErr => " ++ show e
+
+ghcErrorMsg :: GhcError -> ErrMsg
+ghcErrorMsg (MsgErr e)  = e
+ghcErrorMsg (PsErr e)   = parseErrorMsg e
+ghcErrorMsg (TcRnErr e) = tcRnErrorMsg e
+
+class IsGhcError e where
+  toGhcError :: e -> GhcError
+
+instance IsGhcError GhcError where
+  toGhcError = id
+
+instance IsGhcError ErrMsg where
+  toGhcError = MsgErr
+
+instance IsGhcError ParseError where
+  toGhcError = PsErr
+
+instance IsGhcError TcRnError where
+  toGhcError = TcRnErr
+
+-- -----------------------------------------------------------------------------
+-- Source Errors
+
+-- When the compiler (GHC.Driver.Main) discovers errors, it throws an
+-- exception in the IO monad.
+
+mkSrcErr :: IsGhcError e => ErrorMessages e -> SourceError
+mkSrcErr = SourceError . fmap toGhcError
+
+srcErrorMessages :: SourceError -> ErrorMessages GhcError
+srcErrorMessages (SourceError msgs) = msgs
+
+throwErrors :: (MonadIO io, IsGhcError e) => ErrorMessages e -> io a
+throwErrors = liftIO . throwIO . mkSrcErr
+
+-- | A source error is an error that is caused by one or more errors in the
+-- source code.  A 'SourceError' is thrown by many functions in the
+-- compilation pipeline.  Inside GHC these errors are merely printed via
+-- 'log_action', but API clients may treat them differently, for example,
+-- insert them into a list box.  If you want the default behaviour, use the
+-- idiom:
+--
+-- > handleSourceError printExceptionAndWarnings $ do
+-- >   ... api calls that may fail ...
+--
+-- The 'SourceError's error messages can be accessed via 'srcErrorMessages'.
+-- This list may be empty if the compiler failed due to @-Werror@
+-- ('Opt_WarnIsError').
+--
+-- See 'printExceptionAndWarnings' for more information on what to take care
+-- of when writing a custom error handler.
+newtype SourceError = SourceError (ErrorMessages GhcError)
+
+instance Show SourceError where
+  show (SourceError msgs) = unlines . map show . bagToList $ msgs
+
+instance Exception SourceError
+
+-- | Perform the given action and call the exception handler if the action
+-- throws a 'SourceError'.  See 'SourceError' for more information.
+handleSourceError :: ExceptionMonad m =>
+                     (SourceError -> m a) -- ^ exception handler
+                  -> m a -- ^ action to perform
+                  -> m a
+handleSourceError handler act = gcatch act handler

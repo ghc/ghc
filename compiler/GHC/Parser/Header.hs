@@ -27,8 +27,9 @@ where
 import GHC.Prelude
 
 import GHC.Platform
-import GHC.Driver.Types
+import GHC.Driver.Monad
 import GHC.Parser           ( parseHeader )
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 import GHC.Data.FastString
 import GHC.Hs
@@ -64,7 +65,7 @@ getImports :: DynFlags
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               ErrorMessages
+               (ErrorMessages ParseError)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -336,7 +337,7 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
+optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages ParseError
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
@@ -344,7 +345,7 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
                                 | f <- unhandled_flags
                                 , L l f' <- flags_lines
                                 , f == f' ]
-        mkMsg (L flagSpan flag) =
+        mkMsg (L flagSpan flag) = ParseError $
             GHC.Utils.Error.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
@@ -358,4 +359,4 @@ optionsParseError str dflags loc =
 
 throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
 throwErr dflags loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainErrMsg dflags loc doc
+  throw $ mkSrcErr $ unitBag $ ParseError $ mkPlainErrMsg dflags loc doc

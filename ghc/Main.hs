@@ -18,13 +18,13 @@ module Main (main) where
 import qualified GHC
 import GHC              ( -- DynFlags(..), HscTarget(..),
                           -- GhcMode(..), GhcLink(..),
-                          Ghc, GhcMonad(..),
+                          GhcMonad(..),
                           LoadHowMuch(..) )
 import GHC.Driver.CmdLine
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import GHC.Iface.Load       ( showIface )
-import GHC.Driver.Main      ( newHscEnv )
+import GHC.Driver.Main      ( newHscEnv, handleFlagWarnings )
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
@@ -48,6 +48,7 @@ import GHC.Platform
 import GHC.Platform.Host
 import Config
 import GHC.Settings.Constants
+import GHC.Driver.Monad
 import GHC.Driver.Types
 import GHC.Unit.State ( pprPackages, pprPackagesSimple )
 import GHC.Driver.Phases
@@ -62,7 +63,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
-import GHC.Utils.Monad       ( liftIO )
 
 -- Imports for --abi-hash
 import GHC.Iface.Load          ( loadUserInterface )
