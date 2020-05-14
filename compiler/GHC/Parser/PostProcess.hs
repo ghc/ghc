@@ -130,6 +130,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Parser.Annotation
+import GHC.Parser.Error
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import GHC.Utils.Error ( Messages )
@@ -2865,7 +2866,7 @@ data PV_Context =
 
 data PV_Accum =
   PV_Accum
-    { pv_messages :: DynFlags -> Messages
+    { pv_messages :: DynFlags -> Messages ParseError
     , pv_annotations :: [(ApiAnnKey,[RealSrcSpan])]
     , pv_comment_q :: [RealLocated AnnotationComment]
     , pv_annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]

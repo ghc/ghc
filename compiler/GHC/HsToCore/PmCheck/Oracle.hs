@@ -62,7 +62,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
 import GHC.Core.Unify    (tcMatchTy)
-import GHC.Tc.Types      (completeMatchConLikes)
+import GHC.Tc.Types      (completeMatchConLikes, TcRnError(..))
 import GHC.Core.Coercion
 import GHC.Utils.Monad hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
@@ -513,7 +513,7 @@ tyOracle (TySt inert) cts
        ; case res of
             Just True  -> return (Just (TySt new_inert))
             Just False -> return Nothing
-            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
+            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc $ fmap (\(TcRnError e) -> e) errs) }
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing

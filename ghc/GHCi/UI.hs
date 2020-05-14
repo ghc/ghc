@@ -49,11 +49,12 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              GetDocsFailure(..),
              getModuleGraph, handleSourceError, ms_mod )
-import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
+import GHC.Driver.Main ( hscParseDeclsWithLocation, hscParseStmtWithLocation,
+                  runInteractiveHsc, handleFlagWarnings )
 import GHC.Hs.ImpExp
 import GHC.Hs
-import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
+import GHC.Driver.Types ( tyThingParent_maybe, getSafeMode, hsc_IC,
+                  setInteractivePrintName, hsc_dflags, msObjFilePath,
                   hsc_dynLinker, hsc_interp )
 import GHC.Unit.Module
 import GHC.Types.Name

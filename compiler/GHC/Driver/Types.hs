@@ -29,7 +29,7 @@ module GHC.Driver.Types (
         needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
-        Hsc(..), runHsc, mkInteractiveHscEnv, runInteractiveHsc,
+        Hsc(..), mkInteractiveHscEnv,
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
@@ -141,9 +141,7 @@ module GHC.Driver.Types (
         HsParsedModule(..),
 
         -- * Compilation errors and warnings
-        SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
-        throwOneError, throwErrors, handleSourceError,
-        handleFlagWarnings, printOrThrowWarnings,
+        GhcApiError, mkApiErr,
 
         -- * COMPLETE signature
         CompleteMatch(..), CompleteMatchMap,
@@ -192,7 +190,6 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
-import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
 import GHC.Driver.Phases
@@ -210,7 +207,6 @@ import GHC.Data.FastString
 import GHC.Data.StringBuffer ( StringBuffer )
 import GHC.Utils.Fingerprint
 import GHC.Utils.Monad
-import GHC.Data.Bag
 import GHC.Utils.Binary
 import GHC.Utils.Error
 import GHC.Types.Name.Cache
@@ -231,7 +227,6 @@ import System.FilePath
 import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import Control.Monad.Catch as MC (MonadCatch, catch)
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -291,74 +286,10 @@ instance MonadIO Hsc where
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
-runHsc :: HscEnv -> Hsc a -> IO a
-runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyBag
-    printOrThrowWarnings (hsc_dflags hsc_env) w
-    return a
-
 mkInteractiveHscEnv :: HscEnv -> HscEnv
 mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
   where
     interactive_dflags = ic_dflags (hsc_IC hsc_env)
-
-runInteractiveHsc :: HscEnv -> Hsc a -> IO a
--- A variant of runHsc that switches in the DynFlags from the
--- InteractiveContext before running the Hsc computation.
-runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
-
--- -----------------------------------------------------------------------------
--- Source Errors
-
--- When the compiler (GHC.Driver.Main) discovers errors, it throws an
--- exception in the IO monad.
-
-mkSrcErr :: ErrorMessages -> SourceError
-mkSrcErr = SourceError
-
-srcErrorMessages :: SourceError -> ErrorMessages
-srcErrorMessages (SourceError msgs) = msgs
-
-mkApiErr :: DynFlags -> SDoc -> GhcApiError
-mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
-
-throwErrors :: MonadIO io => ErrorMessages -> io a
-throwErrors = liftIO . throwIO . mkSrcErr
-
-throwOneError :: MonadIO io => ErrMsg -> io a
-throwOneError = throwErrors . unitBag
-
--- | A source error is an error that is caused by one or more errors in the
--- source code.  A 'SourceError' is thrown by many functions in the
--- compilation pipeline.  Inside GHC these errors are merely printed via
--- 'log_action', but API clients may treat them differently, for example,
--- insert them into a list box.  If you want the default behaviour, use the
--- idiom:
---
--- > handleSourceError printExceptionAndWarnings $ do
--- >   ... api calls that may fail ...
---
--- The 'SourceError's error messages can be accessed via 'srcErrorMessages'.
--- This list may be empty if the compiler failed due to @-Werror@
--- ('Opt_WarnIsError').
---
--- See 'printExceptionAndWarnings' for more information on what to take care
--- of when writing a custom error handler.
-newtype SourceError = SourceError ErrorMessages
-
-instance Show SourceError where
-  show (SourceError msgs) = unlines . map show . bagToList $ msgs
-
-instance Exception SourceError
-
--- | Perform the given action and call the exception handler if the action
--- throws a 'SourceError'.  See 'SourceError' for more information.
-handleSourceError :: (MonadCatch m) =>
-                     (SourceError -> m a) -- ^ exception handler
-                  -> m a -- ^ action to perform
-                  -> m a
-handleSourceError handler act =
-  MC.catch act (\(e :: SourceError) -> handler e)
 
 -- | An error thrown if the GHC API is used in an incorrect fashion.
 newtype GhcApiError = GhcApiError String
@@ -368,44 +299,9 @@ instance Show GhcApiError where
 
 instance Exception GhcApiError
 
--- | Given a bag of warnings, turn them into an exception if
--- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings dflags warns = do
-  let (make_error, warns') =
-        mapAccumBagL
-          (\make_err warn ->
-            case isWarnMsgFatal dflags warn of
-              Nothing ->
-                (make_err, warn)
-              Just err_reason ->
-                (True, warn{ errMsgSeverity = SevError
-                           , errMsgReason = ErrReason err_reason
-                           }))
-          False warns
-  if make_error
-    then throwIO (mkSrcErr warns')
-    else printBagOfErrors dflags warns
+mkApiErr :: DynFlags -> SDoc -> GhcApiError
+mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
 
-handleFlagWarnings :: DynFlags -> [Warn] -> IO ()
-handleFlagWarnings dflags warns = do
-  let warns' = filter (shouldPrintWarning dflags . warnReason)  warns
-
-      -- It would be nicer if warns :: [Located MsgDoc], but that
-      -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | Warn _ (L loc warn) <- warns' ]
-
-  printOrThrowWarnings dflags bag
-
--- Given a warn reason, check to see if it's associated -W opt is enabled
-shouldPrintWarning :: DynFlags -> GHC.Driver.CmdLine.WarnReason -> Bool
-shouldPrintWarning dflags ReasonDeprecatedFlag
-  = wopt Opt_WarnDeprecatedFlags dflags
-shouldPrintWarning dflags ReasonUnrecognisedFlag
-  = wopt Opt_WarnUnrecognisedWarningFlags dflags
-shouldPrintWarning _ _
-  = True
 
 {-
 ************************************************************************
