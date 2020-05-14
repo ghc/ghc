@@ -508,7 +508,7 @@ makeGot(ObjectCode * oc) {
 
     if(got_slots > 0) {
         oc->info->got_size =  got_slots * sizeof(void*);
-        oc->info->got_start = mmap(NULL, oc->info->got_size,
+        oc->info->got_start = mmapForLinker(oc->info->got_size,
                                    PROT_READ | PROT_WRITE,
                                    MAP_ANON | MAP_PRIVATE,
                                    -1, 0);
