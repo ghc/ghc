@@ -1,6 +1,6 @@
 
 package06e.hs:2:1: error:
-    Could not load module ‘GHC.Hs.Types’
+    Could not load module ‘GHC.Hs.Type’
     It is a member of the hidden package ‘ghc-8.7’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)
