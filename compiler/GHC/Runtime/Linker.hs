@@ -1328,6 +1328,7 @@ linkPackage hsc_env pkg
             ("Loading package " ++ unitPackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
+#if defined(CAN_LOAD_DLL)
         when (unitPackageName pkg `notElem` partOfGHCi) $ do
             loadFrameworks hsc_env platform pkg
             -- See Note [Crash early load_dyn and locateLib]
@@ -1336,7 +1337,7 @@ linkPackage hsc_env pkg
             -- For remaining `dlls` crash early only when there is surely
             -- no package's DLL around ... (not is_dyn)
             mapM_ (load_dyn hsc_env (not is_dyn) . mkSOName platform) dlls
-
+#endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
         -- step to resolve everything.
@@ -1471,10 +1472,15 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
     --   O(n). Loading an import library is also O(n) so in general we prefer
     --   shared libraries because they are simpler and faster.
     --
-  = findDll   user `orElse`
+  =
+#if defined(CAN_LOAD_DLL)
+    findDll   user `orElse`
+#endif
     tryImpLib user `orElse`
+#if defined(CAN_LOAD_DLL)
     findDll   gcc  `orElse`
     findSysDll     `orElse`
+#endif
     tryImpLib gcc  `orElse`
     findArchive    `orElse`
     tryGcc         `orElse`
@@ -1539,7 +1545,13 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                          full     = dllpath $ search lib_so_name lib_dirs
                          gcc name = liftM (fmap Archive) $ search name lib_dirs
                          files    = import_libs ++ arch_files
-                     in apply $ short : full : map gcc files
+                         dlls     = [short, full]
+                         archives = map gcc files
+                     in apply $
+#if defined(CAN_LOAD_DLL)
+                          dlls ++
+#endif
+                          archives
      tryImpLib re = case os of
                        OSMinGW32 ->
                         let dirs' = if re == user then lib_dirs else gcc_dirs
