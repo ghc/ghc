@@ -1136,7 +1136,15 @@ hsSigDoc (SpecSig _ _ _ inl)
                                 = ppr inl <+> text "pragma"
 hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
 hsSigDoc (SpecInstSig _ src _)
-                                = pprWithSourceText src empty <+> text "instance pragma"
+                               -- As per the 'Note ([Pragma source text])' in
+                               -- compiler/GHC/Types/Basics.hs, the SourceText in
+                               -- SpecInstSig includes "{-#" before the pragma
+                               -- itself, hence the source text here is stripped of
+                               -- all characters before the pragma name string
+                                = pprWithSourceText srcTxt empty <+> text "instance pragma"
+  where srcTxt = case src of
+                   SourceText s -> SourceText (extractSigDocText s "{-# ")
+                   NoSourceText  -> NoSourceText
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
