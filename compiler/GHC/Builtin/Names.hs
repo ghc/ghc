@@ -428,8 +428,7 @@ basicKnownKeyNames
         -- Annotation type checking
         toAnnotationWrapperName
 
-        -- The Ordering type
-        , orderingTyConName
+        -- Ordering data constructors
         , ordLTDataConName, ordEQDataConName, ordGTDataConName
 
         -- The SPEC type for SpecConstr
