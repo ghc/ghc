@@ -637,7 +637,7 @@ mapObjectFileSection (int fd, Elf_Word offset, Elf_Word size,
 
     pageOffset = roundDownToPage(offset);
     pageSize = roundUpToPage(offset-pageOffset+size);
-    p = mmapForLinker(pageSize, 0, fd, pageOffset);
+    p = mmapForLinker(pageSize, PROT_READ | PROT_WRITE | PROT_EXEC, 0, fd, pageOffset);
     if (p == NULL) return NULL;
     *mapped_size = pageSize;
     *mapped_offset = pageOffset;
@@ -709,7 +709,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                * address might be out of range for sections that are mmaped.
                */
               alloc = SECTION_MMAP;
-              start = mmapForLinker(size, MAP_ANONYMOUS, -1, 0);
+              start = mmapForLinker(size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
               mapped_start = start;
               mapped_offset = 0;
               mapped_size = roundUpToPage(size);
@@ -751,8 +751,12 @@ ocGetNames_ELF ( ObjectCode* oc )
           unsigned nstubs = numberOfStubsForSection(oc, i);
           unsigned stub_space = STUB_SIZE * nstubs;
 
-          void * mem = mmapForLinker(size+stub_space, MAP_ANON, -1, 0);
-          if( mem == NULL ) {
+          void * mem = mmapForLinker(size+stub_space,
+                            PROT_READ | PROT_WRITE | PROT_EXEC,
+                            MAP_ANON | MAP_PRIVATE,
+                            -1, 0);
+
+          if( mem == MAP_FAILED ) {
               barf("failed to mmap allocated memory to load section %d. "
                    "errno = %d", i, errno);
           }
@@ -841,6 +845,26 @@ ocGetNames_ELF ( ObjectCode* oc )
 
       unsigned curSymbol = 0;
 
+      unsigned long common_size = 0;
+      unsigned long common_used = 0;
+      for(ElfSymbolTable *symTab = oc->info->symbolTables;
+           symTab != NULL; symTab = symTab->next) {
+           for (size_t j = 0; j < symTab->n_symbols; j++) {
+               ElfSymbol *symbol = &symTab->symbols[j];
+               if (SHN_COMMON == symTab->symbols[j].elf_sym->st_shndx) {
+                   common_size += symbol->elf_sym->st_size;
+               }
+           }
+      }
+      void * common_mem = NULL;
+      if(common_size > 0) {
+          common_mem = mmapForLinker(common_size,
+                            PROT_READ | PROT_WRITE,
+                            MAP_ANON | MAP_PRIVATE,
+                            -1, 0);
+          ASSERT(common_mem != NULL);
+      }
+
       //TODO: we ignore local symbols anyway right? So we can use the
       //      shdr[i].sh_info to get the index of the first non-local symbol
       // ie we should use j = shdr[i].sh_info
@@ -876,12 +900,15 @@ ocGetNames_ELF ( ObjectCode* oc )
 
                if (shndx == SHN_COMMON) {
                    isLocal = false;
-                   symbol->addr = stgCallocBytes(1, symbol->elf_sym->st_size,
-                                       "ocGetNames_ELF(COMMON)");
-                   /*
-                   debugBelch("COMMON symbol, size %d name %s\n",
-                                   stab[j].st_size, nm);
-                   */
+                   ASSERT(common_used < common_size);
+                   ASSERT(common_mem);
+                   symbol->addr = (void*)((uintptr_t)common_mem + common_used);
+                   common_used += symbol->elf_sym->st_size;
+                   ASSERT(common_used <= common_size);
+
+                   debugBelch("COMMON symbol, size %ld name %s allocated at %p\n",
+                                   symbol->elf_sym->st_size, nm, symbol->addr);
+
                    /* Pointless to do addProddableBlock() for this area,
                       since the linker should never poke around in it. */
                } else if ((ELF_ST_BIND(symbol->elf_sym->st_info) == STB_GLOBAL
