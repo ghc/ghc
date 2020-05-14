@@ -420,10 +420,6 @@ basicKnownKeyNames
         -- Annotation type checking
         toAnnotationWrapperName
 
-        -- The Ordering type
-        , orderingTyConName
-        , ordLTDataConName, ordEQDataConName, ordGTDataConName
-
         -- The SPEC type for SpecConstr
         , specTyConName
 
