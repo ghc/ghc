@@ -66,6 +66,11 @@ Library
         --         on Windows. Required because of mingw32.
         extra-libraries: user32, mingw32, mingwex
 
+    if os(linux)
+        -- we need libm, but for musl and other's we might need libc, as libm
+        -- is just an empty shell.
+        extra-libraries: c, m
+
     c-sources:
         cbits/atomic.c
         cbits/bswap.c
