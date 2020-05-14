@@ -1282,7 +1282,7 @@ repTy ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = body }) =
   case fvf of
     ForallInvis -> repForallT ty
     ForallVis   -> let tvs' = map ((<$>) (setHsTyVarBndrFlag ())) tvs
-                       -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+                       -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
                    in addHsTyVarBinds tvs' $ \bndrs ->
                    do body1 <- repLTy body
                       repTForallVis bndrs body1

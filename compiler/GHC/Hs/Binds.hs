@@ -31,7 +31,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 
 import GHC.Hs.Extension
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Core
 import GHC.Tc.Types.Evidence
 import GHC.Core.Type

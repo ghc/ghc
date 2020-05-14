@@ -342,7 +342,7 @@ Library
         GHC.Hs.Extension
         GHC.Hs.Instances
         GHC.Hs.Pat
-        GHC.Hs.Types
+        GHC.Hs.Type
         GHC.Hs.Utils
         GHC.Hs.Dump
         GHC.Iface.Binary

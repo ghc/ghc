@@ -554,7 +554,7 @@ tcInstTypeBndrs inst_tyvars id =
   where
     argf_to_spec :: VarBndr TyCoVar ArgFlag -> VarBndr TyCoVar Specificity
     argf_to_spec (Bndr tv Required)      = Bndr tv SpecifiedSpec
-    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
     argf_to_spec (Bndr tv (Invisible s)) = Bndr tv s
 
 tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
