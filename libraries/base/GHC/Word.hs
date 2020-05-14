@@ -892,10 +892,8 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# x#)
         | otherwise     = fromEnumError "Word64" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
+    enumFrom            = boundedEnumFrom
+    enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
 instance Integral Word64 where
