@@ -46,7 +46,7 @@ $(foreach n,1 2 3, \
   )
 
 $(foreach n,1 2 3, \
-    $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/Config.hs) \
+    $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/GHC/Settings/Config.hs) \
     $(eval compiler/stage$n/build/PlatformConstants.o : $(includes_GHCCONSTANTS_HASKELL_TYPE)) \
     $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
     $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
@@ -63,11 +63,11 @@ HOSTPLATFORM_3 = $(TARGETPLATFORM)
 
 define compilerConfig
 # $1 = compile stage (1-indexed)
-compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
+compiler/stage$1/build/GHC/Settings/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo 'Creating $$@ ... '
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $$@
-	@echo 'module Config'                                               >> $$@
+	@echo 'module GHC.Settings.Config'                                  >> $$@
 	@echo '  ( module GHC.Version'                                      >> $$@
 	@echo '  , cBuildPlatformString'                                    >> $$@
 	@echo '  , cHostPlatformString'                                     >> $$@
