@@ -1482,7 +1482,7 @@ cvtTypeKind ty_str ty
            ForallVisT tvs ty
              | null tys'
              -> do { let tvs_spec = map (TH.SpecifiedSpec <$) tvs
-                   -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+                   -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
                    ; tvs_spec' <- cvtTvs tvs_spec
                    ; ty'       <- cvtType ty
                    ; loc       <- getL

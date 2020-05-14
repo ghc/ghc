@@ -101,7 +101,7 @@ data HsSigWcTypeScoping
     -- This only applies to RULES that do not explicitly bind their type
     -- variables. If a RULE explicitly quantifies its type variables, then
     -- 'NeverBind' is used instead. See also
-    -- @Note [Pattern signature binders and scoping]@ in "GHC.Hs.Types".
+    -- @Note [Pattern signature binders and scoping]@ in "GHC.Hs.Type".
   | BindUnlessForall
     -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'.
     -- This is only ever used in places where the \"@forall@-or-nothing\" rule
@@ -118,7 +118,7 @@ data HsSigWcTypeScoping
     -- but if the user had written @(y :: b)@ instead of @y@ in the term
     -- variable binders, then @b@ would be rejected for being out of scope.
     -- See also @Note [Pattern signature binders and scoping]@ in
-    -- "GHC.Hs.Types".
+    -- "GHC.Hs.Type".
 
 rnHsSigWcType :: HsDocContext
               -> Maybe SDoc
@@ -143,7 +143,7 @@ rnHsPatSigType :: HsSigWcTypeScoping
 --     ScopedTypeVariables isn't enabled
 -- Wildcards are allowed
 --
--- See Note [Pattern signature binders and scoping] in GHC.Hs.Types
+-- See Note [Pattern signature binders and scoping] in GHC.Hs.Type
 rnHsPatSigType scoping ctx inf_err sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
@@ -298,7 +298,7 @@ partition_nwcs free_vars
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Identifiers starting with an underscore are always parsed as type variables.
 It is only here in the renamer that we give the special treatment.
-See Note [The wildcard story for types] in GHC.Hs.Types.
+See Note [The wildcard story for types] in GHC.Hs.Type.
 
 It's easy!  When we collect the implicitly bound type variables, ready
 to bring them into scope, and NamedWildCards is on, we partition the

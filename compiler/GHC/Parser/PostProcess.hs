@@ -974,7 +974,7 @@ checkTyClHdr is_cls ty
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
-          -- See Note [Unit tuples] in GHC.Hs.Types  (TODO: is this still relevant?)
+          -- See Note [Unit tuples] in GHC.Hs.Type  (TODO: is this still relevant?)
     go l _ _ _ _
       = addFatalError l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)

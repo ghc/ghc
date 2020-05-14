@@ -405,7 +405,7 @@ data ArgFlag = Invisible Specificity
   -- (<) on ArgFlag means "is less visible than"
 
 -- | Whether an 'Invisible' argument may appear in source Haskell.
--- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+-- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
 data Specificity = InferredSpec
                    -- ^ the argument may not appear in source Haskell, it is
                    -- only inferred.

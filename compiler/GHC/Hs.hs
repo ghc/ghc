@@ -25,7 +25,7 @@ module GHC.Hs (
         module GHC.Hs.ImpExp,
         module GHC.Hs.Lit,
         module GHC.Hs.Pat,
-        module GHC.Hs.Types,
+        module GHC.Hs.Type,
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
@@ -44,7 +44,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Pat
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Types.Basic ( Fixity, WarningTxt )
 import GHC.Hs.Utils
 import GHC.Hs.Doc

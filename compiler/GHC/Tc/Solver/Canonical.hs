@@ -38,7 +38,7 @@ import GHC.Utils.Outputable
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Hs.Types( HsIPName(..) )
+import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Data.Pair
 import GHC.Utils.Misc

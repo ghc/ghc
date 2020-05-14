@@ -2128,7 +2128,7 @@ reify_for_all argf ty = do
   case argToForallVisFlag argf of
     ForallVis   -> do phi' <- reifyType phi
                       let tvs = map (() <$) tvbndrs'
-                      -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+                      -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
                       pure $ TH.ForallVisT tvs phi'
     ForallInvis -> do let (cxt, tau) = tcSplitPhiTy phi
                       cxt' <- reifyCxt cxt

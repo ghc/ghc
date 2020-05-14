@@ -110,7 +110,7 @@ import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Hs.Pat
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 
@@ -745,7 +745,7 @@ typeToLHsType ty
 
     argf_to_spec :: ArgFlag -> Specificity
     argf_to_spec Required      = SpecifiedSpec
-    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
     argf_to_spec (Invisible s) = s
 
     go_tv :: TyVarBinder -> LHsTyVarBndr Specificity GhcPs

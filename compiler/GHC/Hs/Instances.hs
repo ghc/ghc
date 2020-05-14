@@ -22,7 +22,7 @@ import GHC.Hs.Binds
 import GHC.Hs.Decls
 import GHC.Hs.Expr
 import GHC.Hs.Lit
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 
@@ -369,7 +369,7 @@ deriving instance (Data body) => Data (HsRecFields GhcRn body)
 deriving instance (Data body) => Data (HsRecFields GhcTc body)
 
 -- ---------------------------------------------------------------------
--- Data derivations from GHC.Hs.Types ----------------------------------
+-- Data derivations from GHC.Hs.Type ----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (LHsQTyVars p)
 deriving instance Data (LHsQTyVars GhcPs)

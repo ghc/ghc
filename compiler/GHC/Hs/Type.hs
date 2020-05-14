@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-GHC.Hs.Types: Abstract syntax: user-defined types
+GHC.Hs.Type: Abstract syntax: user-defined types
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -17,7 +17,7 @@ GHC.Hs.Types: Abstract syntax: user-defined types
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GHC.Hs.Types (
+module GHC.Hs.Type (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
         LHsQTyVars(..),
