@@ -345,7 +345,7 @@ levityInfo = bitfieldGetLevityInfo . bitfield
 oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
 
--- | 'Id' arity, as computed by 'GHC.Core.Arity'. Specifies how many arguments
+-- | 'Id' arity, as computed by 'GHC.Core.Opt.Arity'. Specifies how many arguments
 -- this 'Id' has to be applied to before it doesn any meaningful work.
 arityInfo :: IdInfo -> ArityInfo
 arityInfo = bitfieldGetArityInfo . bitfield

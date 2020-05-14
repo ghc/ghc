@@ -26,7 +26,7 @@ import GHC.Driver.Types
 import GHC.Builtin.Names
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Core.Utils
-import GHC.Core.Arity
+import GHC.Core.Opt.Arity
 import GHC.Core.FVs
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
@@ -1136,7 +1136,7 @@ After ANFing we get
 and now we do NOT want eta expansion to give
                 f = /\a -> \ y -> (let s = h 3 in g s) y
 
-Instead GHC.Core.Arity.etaExpand gives
+Instead GHC.Core.Opt.Arity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
 
 -}
