@@ -19,6 +19,7 @@
 #define _DARWIN_C_SOURCE 1
 #endif
 #include <sys/mman.h>
+void* mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 #endif
 
 void printLoadedObjects(void);
@@ -364,7 +365,7 @@ void exitLinker( void );
 void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
-void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+void *mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset);
 void mmapForLinkerMarkExecutable (void *start, size_t len);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );

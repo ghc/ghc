@@ -175,7 +175,7 @@ int ocTryLoad( ObjectCode* oc );
  *
  * MAP_32BIT not available on OpenBSD/amd64
  */
-#if defined(MAP_32BIT) && defined(x86_64_HOST_ARCH)
+#if defined(MAP_32BIT) && (defined(x86_64_HOST_ARCH) || (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH)))
 #define MAP_LOW_MEM
 #define TRY_MAP_32BIT MAP_32BIT
 #else
@@ -201,10 +201,22 @@ int ocTryLoad( ObjectCode* oc );
  * systems, we have to pick a base address in the low 2Gb of the address space
  * and try to allocate memory from there.
  *
+ * The same holds for aarch64, where the default, even with PIC, model
+ * is 4GB. The linker is free to emit AARCH64_ADR_PREL_PG_HI21
+ * relocations.
+ *
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
  */
-#if defined(MAP_32BIT) || DEFAULT_LINKER_ALWAYS_PIC
+
+#if (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH))
+// Try to use stg_upd_frame_info as the base. We need to be within +-4GB of that
+// address, otherwise we violate the aarch64 memory model. Any object we load
+// can potentially reference any of the ones we bake into the binary (and list)
+// in RtsSymbols. Thus we'll need to be within +-4GB of those,
+// stg_upd_frame_info is a good candidate as it's referenced often.
+#define MMAP_32BIT_BASE_DEFAULT (void*)&stg_upd_frame_info;
+#elif defined(MAP_32BIT) || DEFAULT_LINKER_ALWAYS_PIC
 // Try to use MAP_32BIT
 #define MMAP_32BIT_BASE_DEFAULT 0
 #else
@@ -1007,11 +1019,47 @@ resolveSymbolAddr (pathchar* buffer, int size,
 }
 
 #if RTS_LINKER_USE_MMAP
+
+/* -----------------------------------------------------------------------------
+   Occationally we depend on mmap'd region being close to already mmap'd regions.
+
+   Our static in-memory linker may be restricted by the architectures relocation
+   range. E.g. aarch64 has a +-4GB range for PIC code, thus we'd preferrably
+   get memory for the linker close to existing mappings.  mmap on it's own is
+   free to return any memory location, independent of what the preferred
+   location argument indicates.
+
+   For example mmap (via qemu) might give you addresses all over the available
+   memory range if the requested location is already occupied.
+
+   mmap_next will do a linear search from the start page upwards to find a
+   suitable location that is as close as possible to the locations (proivded
+   via the first argument).
+   -------------------------------------------------------------------------- */
+
+void*
+mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+  if(addr == NULL) return mmap(addr, length, prot, flags, fd, offset);
+  // we are going to look for up to pageSize * 1024 * 1024 (4GB) from the
+  // address.
+  size_t pageSize = getPageSize();
+  for(int i = (uintptr_t)addr & (pageSize-1) ? 1 : 0; i < 1024*1024; i++) {
+    void *target = (void*)(((uintptr_t)addr & ~(pageSize-1))+(i*pageSize));
+    void *mem = mmap(target, length, prot, flags, fd, offset);
+    if(mem == NULL) return mem;
+    if(mem == target) return mem;
+    munmap(mem, length);
+    IF_DEBUG(linker && (i % 1024 == 0),
+      debugBelch("mmap_next failed to find suitable space in %p - %p\n", addr, target));
+  }
+  return NULL;
+}
+
 //
 // Returns NULL on failure.
 //
 void *
-mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset)
+mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
 {
    void *map_addr = NULL;
    void *result;
@@ -1032,15 +1080,14 @@ mmap_again:
        map_addr = mmap_32bit_base;
    }
 
-   const int prot = PROT_READ | PROT_WRITE;
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
-   result = mmap(map_addr, size, prot,
-                 MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
+   result = mmap_next(map_addr, size, prot,
+                      MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
@@ -1093,6 +1140,28 @@ mmap_again:
            goto mmap_again;
        }
    }
+#elif (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH))
+    // for aarch64 we need to make sure we stay within 4GB of the
+    // mmap_32bit_base, and we also do not want to update it.
+//    if (mmap_32bit_base != (void*)&stg_upd_frame_info) {
+    if (result == map_addr) {
+        mmap_32bit_base = (void*)((uintptr_t)map_addr + size);
+    } else {
+        // upper limit 4GB - size of the object file - 1mb wiggle room.
+        if(llabs((uintptr_t)result - (uintptr_t)&stg_upd_frame_info) > (2<<32) - size - (2<<20)) {
+            // not within range :(
+            debugTrace(DEBUG_linker,
+                        "MAP_32BIT didn't work; gave us %lu bytes at 0x%p",
+                        bytes, result);
+            munmap(result, size);
+            // TODO: some abort/mmap_32bit_base recomputation based on
+            //       if mmap_32bit_base is changed, or still at stg_upd_frame_info
+            goto mmap_again;
+        } else {
+            mmap_32bit_base = (void*)((uintptr_t)result + size);
+        }
+    }
+//   }
 #endif
 
    IF_DEBUG(linker,

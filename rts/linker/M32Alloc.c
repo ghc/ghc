@@ -257,7 +257,7 @@ m32_alloc_page(void)
     return page;
   } else {
     const size_t map_sz = getPageSize();
-    uint8_t *page = mmapForLinker(map_sz,MAP_ANONYMOUS,-1,0);
+    uint8_t *page = mmapForLinker(map_sz, PROT_READ | PROT_WRITE, MAP_ANONYMOUS,-1,0);
     if (page + map_sz > (uint8_t *) 0xffffffff) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }

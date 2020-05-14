@@ -81,7 +81,7 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       // symbol_extras is aligned to a page boundary so it can be mprotect'd.
       bssSize = roundUpToPage(bssSize);
       size_t allocated_size = n + bssSize + extras_size;
-      void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
+      void *new = mmapForLinker(allocated_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
           if (oc->imageMapped) {
