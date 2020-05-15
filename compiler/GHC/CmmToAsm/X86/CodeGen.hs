@@ -2518,22 +2518,20 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = d
   where
     format = intFormat width
 
-genCCall' dflags is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
-    Amode amode addr_code <- getSimpleAmode dflags is32Bit addr
-    newval <- getNewRegNat format
-    newval_code <- getAnyReg value
-    let platform = targetPlatform dflags
-        dst_r    = getRegisterReg platform (CmmLocal dst)
-        code     = toOL
-                   [ MOV format (OpReg newval) (OpReg eax)
-                   , LOCK (XCHG format (OpReg eax) (OpAddr amode))
-                   , MOV format (OpReg eax) (OpReg dst_r)
+genCCall' config is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
+    let dst_r = getRegisterReg platform (CmmLocal dst)
+    Amode amode addr_code <- getSimpleAmode is32Bit addr
+    (newval, newval_code) <- getSomeReg value
+    let code     = toOL
+                   [ MOV format (OpReg newval) (OpReg dst_r)
+                   , XCHG format (OpAddr amode) dst_r
                    ]
-    return $ addr_code `appOL` newval_code newval `appOL` code
+    return $ addr_code `appOL` newval_code `appOL` code
   where
     format = intFormat width
     width | is32Bit   = W32
           | otherwise = W64
+    platform = ncgPlatform config
 
 genCCall' _ is32Bit target dest_regs args bid = do
   platform <- ncgPlatform <$> getConfig

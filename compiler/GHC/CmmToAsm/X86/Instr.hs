@@ -329,7 +329,7 @@ data Instr
         | LOCK        Instr -- lock prefix
         | XADD        Format Operand Operand -- src (r), dst (r/m)
         | CMPXCHG     Format Operand Operand -- src (r), dst (r/m), eax implicit
-        | XCHG        Format Operand Operand -- src (r), dst (r/m)
+        | XCHG        Format Operand Reg     -- src (r/m), dst (r/m)
         | MFENCE
 
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
@@ -432,7 +432,7 @@ x86_regUsageOfInstr platform instr
     LOCK i              -> x86_regUsageOfInstr platform i
     XADD _ src dst      -> usageMM src dst
     CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
-    XCHG _ src dst      -> usageRMM src dst (OpReg eax)
+    XCHG _ src dst      -> usageMM src (OpReg dst)
     MFENCE -> noUsage
 
     _other              -> panic "regUsage: unrecognised instr"
@@ -591,7 +591,7 @@ x86_patchRegsOfInstr instr env
     LOCK i               -> LOCK (x86_patchRegsOfInstr i env)
     XADD fmt src dst     -> patch2 (XADD fmt) src dst
     CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
-    XCHG fmt src dst     -> patch2 (XCHG fmt) src dst
+    XCHG fmt src dst     -> XCHG fmt (patchOp src) (env dst)
     MFENCE               -> instr
 
     _other              -> panic "patchRegs: unrecognised instr"
