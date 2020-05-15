@@ -601,7 +601,7 @@ had used @-ignore-package@).
 The affected packages are compiled with, e.g., @-this-unit-id base@, so that
 the symbols in the object files have the unversioned unit id in their name.
 
-Make sure you change 'GHC.Unit.State.findWiredInPackages' if you add an entry here.
+Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 For `integer-gmp`/`integer-simple` we also change the base name to
 `integer-wired-in`, but this is fundamentally no different.

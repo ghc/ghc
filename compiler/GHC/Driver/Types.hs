@@ -2023,12 +2023,12 @@ mkQualModule dflags mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllPackages (unitState dflags) (moduleName mod)
+     where lookup = lookupModuleInAllUnits (unitState dflags) (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
 -- with a unit id if the package ID would be ambiguous.
-mkQualPackage :: PackageState -> QueryQualifyPackage
+mkQualPackage :: UnitState -> QueryQualifyPackage
 mkQualPackage pkgs uid
      | uid == mainUnit || uid == interactiveUnit
         -- Skip the lookup if it's main, since it won't be in the package
@@ -2045,7 +2045,7 @@ mkQualPackage pkgs uid
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.
-pkgQual :: PackageState -> PrintUnqualified
+pkgQual :: UnitState -> PrintUnqualified
 pkgQual pkgs = alwaysQualify { queryQualifyPackage = mkQualPackage pkgs }
 
 {-
