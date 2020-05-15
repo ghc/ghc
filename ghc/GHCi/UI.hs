@@ -3074,7 +3074,7 @@ showCmd str = do
                liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
-            , action "packages"   $ showPackages
+            , action "packages"   $ showUnits
             , action "paths"      $ showPaths
             , action "language"   $ showLanguages
             , hidden "languages"  $ showLanguages -- backwards compat
@@ -3212,8 +3212,8 @@ pprStopped res =
  where
   mb_mod_name = moduleName <$> GHC.breakInfo_module <$> GHC.resumeBreakInfo res
 
-showPackages :: GHC.GhcMonad m => m ()
-showPackages = do
+showUnits :: GHC.GhcMonad m => m ()
+showUnits = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
   liftIO $ putStrLn $ showSDoc dflags $
