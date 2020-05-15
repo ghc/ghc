@@ -90,12 +90,14 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             // ...              hi            ] [     Rd     ]
             //
             // imm64 = SignExtend(hi:lo:0x000,64)
-            assert(isInt64(32, addend));
+            // Range is 21 bits + the 12 page relative bits
+            // known to be 0. -2^32 <= X < 2^32
+            assert(isInt64(21+12, addend));
             assert((addend & 0xfff) == 0); /* page relative */
 
             *(inst_t *)P = (*(inst_t *)P & 0x9f00001f)
-                           | (inst_t) (((uint64_t) addend << 17) & 0x60000000)
-                           | (inst_t) (((uint64_t) addend >> 9) & 0x00ffffe0);
+                        | (inst_t) (((uint64_t) addend << 17) & 0x60000000)
+                        | (inst_t) (((uint64_t) addend >> 9) & 0x00ffffe0);
             break;
         }
         /* - control flow relocations */
@@ -108,8 +110,8 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             break;
         }
         case COMPAT_R_AARCH64_ADR_GOT_PAGE: {
-
-            assert(isInt64(32, addend)); /* X in range */
+            /* range is -2^32 <= X < 2^32 */
+            assert(isInt64(21+12, addend)); /* X in range */
             assert((addend & 0xfff) == 0); /* page relative */
 
             *(inst_t *)P = (*(inst_t *)P & 0x9f00001f)
