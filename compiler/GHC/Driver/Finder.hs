@@ -63,7 +63,7 @@ type BaseName = String  -- Basename of file
 -- source, interface, and object files for that module live.
 
 -- It does *not* know which particular package a module lives in.  Use
--- Packages.lookupModuleInAllPackages for that.
+-- Packages.lookupModuleInAllUnits for that.
 
 -- -----------------------------------------------------------------------------
 -- The finder's cache
@@ -758,7 +758,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     pp_sugg (SuggestVisible m mod o) = ppr m <+> provenance o
       where provenance ModHidden = Outputable.empty
             provenance (ModUnusable _) = Outputable.empty
-            provenance (ModOrigin{ fromOrigPackage = e,
+            provenance (ModOrigin{ fromOrigUnit = e,
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
               | Just True <- e
@@ -775,7 +775,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
       where provenance ModHidden =  Outputable.empty
             provenance (ModUnusable _) = Outputable.empty
-            provenance (ModOrigin{ fromOrigPackage = e,
+            provenance (ModOrigin{ fromOrigUnit = e,
                                    fromHiddenReexport = rhs })
               | Just False <- e
                  = parens (text "needs flag -package-id"
