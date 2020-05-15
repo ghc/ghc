@@ -48,6 +48,8 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
+import GHC.Unit.Types (moduleName)
+import GHC.Unit.Module.Name (mkModuleName)
 import Data.Ratio
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Basic
@@ -170,6 +172,7 @@ warnAboutOverflowedOverLit :: HsOverLit GhcTc -> DsM ()
 warnAboutOverflowedOverLit hsOverLit = do
   dflags <- getDynFlags
   warnAboutOverflowedLiterals dflags (getIntegralLit hsOverLit)
+  warnAboutOverflowedStringLiterals dflags (getStringLit hsOverLit)
 
 -- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
@@ -242,6 +245,51 @@ warnAboutOverflowedLiterals dflags lit
             = text "If you are trying to write a large negative literal, use NegativeLiterals"
             | otherwise = Outputable.empty
 
+-- | Emit warnings on string literals which overflow the bounds implied by
+-- their type.
+warnAboutOverflowedStringLiterals
+  :: DynFlags
+  -> Maybe (FastString, Name)  -- ^ the literal value and name of its tycon
+  -> DsM ()
+warnAboutOverflowedStringLiterals dflags lit
+ | wopt Opt_WarnOverflowedLiterals dflags
+ , Just (fs, tc) <- lit
+ =  if isByteString tc then checkAscii fs tc
+
+    else return ()
+
+  | otherwise = return ()
+  where
+    checkAscii :: FastString -> Name -> DsM ()
+    checkAscii fs tc
+      = unless (isAsciiFS fs) $ do
+        warnDs (Reason Opt_WarnOverflowedLiterals)
+               (vcat [ text "Literal" <+> pprHsString fs
+                       <+> text "contains non ascii characters but" <+> ppr tc
+                       <+> ptext (sLit "only supports octets")
+                     ])
+
+    -- fuzzily check whether the Name might be some ByteString
+    -- we cannot be sure, but false positives aren't dangerous here.
+    isByteString :: Name -> Bool
+    isByteString n
+      | nameOccName n == mkTcOcc "ByteString"
+      , mn == Just (mkModuleName "Data.ByteString.Internal")
+      || mn == Just (mkModuleName "Data.ByteString.Lazy.Internal")
+      = True
+
+      | nameOccName n == mkTcOcc "ShortByteString"
+      , mn == Just (mkModuleName "Data.ByteString.Short.Internal")
+      = True
+
+      | otherwise = False
+
+      where
+        mn = fmap moduleName (nameModule_maybe n)
+
+    isAsciiFS :: FastString -> Bool
+    isAsciiFS fs = all (<= '\255') (unpackFS fs)
+
 {-
 Note [Suggest NegativeLiterals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -308,6 +356,12 @@ getIntegralLit (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
   | Just tc <- tyConAppTyCon_maybe ty
   = Just (il_value i, tyConName tc)
 getIntegralLit _ = Nothing
+
+getStringLit :: HsOverLit GhcTc -> Maybe (FastString, Name)
+getStringLit (OverLit { ol_val = HsIsString _srcText fs, ol_ext = OverLitTc _ ty })
+  | Just tc <- tyConAppTyCon_maybe ty
+  = Just (fs, tyConName tc)
+getStringLit _ = Nothing
 
 -- | If 'Integral', extract the value and type name of the non-overloaded
 -- literal.
