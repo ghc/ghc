@@ -9,7 +9,7 @@ data DynFlags
 
 targetPlatform           :: DynFlags -> Platform
 pprUserLength            :: DynFlags -> Int
-unitState                 :: DynFlags -> PackageState
+unitState                 :: DynFlags -> UnitState
 unsafeGlobalDynFlags     :: DynFlags
 hasPprDebug              :: DynFlags -> Bool
 hasNoDebugOutput         :: DynFlags -> Bool

@@ -17,7 +17,7 @@ import GHC.Utils.Outputable
 -- Where a module lives on the file system: the actual locations
 -- of the .hs, .hi and .o files, if we have them.
 --
--- For a module in another package, the ml_hs_file and ml_obj_file components of
+-- For a module in another unit, the ml_hs_file and ml_obj_file components of
 -- ModLocation are undefined.
 --
 -- The locations specified by a ModLocation may or may not
@@ -40,7 +40,7 @@ data ModLocation
                 -- ^ Where the .o file is, whether or not it exists yet.
                 -- (might not exist either because the module hasn't
                 -- been compiled yet, or because it is part of a
-                -- package with a .a file)
+                -- unit with a .a file)
 
         ml_hie_file  :: FilePath
                 -- ^ Where the .hie file is, whether or not it exists
