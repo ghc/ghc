@@ -2021,7 +2021,7 @@ mkQualModule dflags mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllPackages (unitState dflags) (moduleName mod)
+     where lookup = lookupModuleInAllUnits (unitState dflags) (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify

@@ -2,7 +2,7 @@
 
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 
--- | Package manipulation
+-- | Unit manipulation
 module GHC.Unit.State (
         module GHC.Unit.Info,
 
@@ -13,7 +13,7 @@ module GHC.Unit.State (
         initUnits,
         readUnitDatabases,
         readUnitDatabase,
-        getPackageDbRefs,
+        getUnitDbRefs,
         resolveUnitDatabase,
         listUnitInfo,
 
@@ -30,7 +30,7 @@ module GHC.Unit.State (
         searchPackageId,
         displayUnitId,
         listVisibleModuleNames,
-        lookupModuleInAllPackages,
+        lookupModuleInAllUnits,
         lookupModuleWithSuggestions,
         lookupPluginModuleWithSuggestions,
         LookupResult(..),
@@ -66,8 +66,8 @@ module GHC.Unit.State (
         updateIndefUnitId,
         unwireUnit,
         pprFlag,
-        pprPackages,
-        pprPackagesSimple,
+        pprUnits,
+        pprUnitsSimple,
         pprModuleMap,
         homeUnitIsIndefinite,
         homeUnitIsDefinite,
@@ -114,14 +114,14 @@ import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
 
 -- ---------------------------------------------------------------------------
--- The Package state
+-- The Unit state
 
--- | Package state is all stored in 'DynFlags', including the details of
--- all packages, which packages are exposed, and which modules they
+-- | Unit state is all stored in 'DynFlags', including the details of
+-- all units, which units are exposed, and which modules they
 -- provide.
 --
--- The package state is computed by 'initUnits', and kept in DynFlags.
--- It is influenced by various package flags:
+-- The unit state is computed by 'initUnits', and kept in DynFlags.
+-- It is influenced by various command-line flags:
 --
 --   * @-package <pkg>@ and @-package-id <pkg>@ cause @<pkg>@ to become exposed.
 --     If @-hide-all-packages@ was not specified, these commands also cause
@@ -131,17 +131,17 @@ import qualified Data.Set as Set
 --
 --   * (there are a few more flags, check below for their semantics)
 --
--- The package state has the following properties.
+-- The unit state has the following properties.
 --
---   * Let @exposedPackages@ be the set of packages thus exposed.
---     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
+--   * Let @exposedUnits@ be the set of packages thus exposed.
+--     Let @depExposedUnits@ be the transitive closure from @exposedUnits@ of
 --     their dependencies.
 --
 --   * When searching for a module from a preload import declaration,
---     only the exposed modules in @exposedPackages@ are valid.
+--     only the exposed modules in @exposedUnits@ are valid.
 --
 --   * When searching for a module from an implicit import, all modules
---     from @depExposedPackages@ are valid.
+--     from @depExposedUnits@ are valid.
 --
 --   * When linking in a compilation manager mode, we link in packages the
 --     program depends on (the compiler knows this list by the
@@ -178,7 +178,7 @@ data ModuleOrigin =
         -- someone's @exported-modules@ list, but that package is hidden;
         -- @Just True@ means that it is available; @Nothing@ means neither
         -- applies.
-        fromOrigPackage :: Maybe Bool
+        fromOrigUnit :: Maybe Bool
         -- | Is the module available from a reexport of an exposed package?
         -- There could be multiple.
       , fromExposedReexport :: [UnitInfo]
@@ -526,13 +526,13 @@ initUnits dflags = withTiming dflags
 
 readUnitDatabases :: DynFlags -> IO [UnitDatabase UnitId]
 readUnitDatabases dflags = do
-  conf_refs <- getPackageDbRefs dflags
+  conf_refs <- getUnitDbRefs dflags
   confs     <- liftM catMaybes $ mapM (resolveUnitDatabase dflags) conf_refs
   mapM (readUnitDatabase dflags) confs
 
 
-getPackageDbRefs :: DynFlags -> IO [PkgDbRef]
-getPackageDbRefs dflags = do
+getUnitDbRefs :: DynFlags -> IO [PkgDbRef]
+getUnitDbRefs dflags = do
   let system_conf_refs = [UserPkgDb, GlobalPkgDb]
 
   e_pkg_path <- tryIO (getEnv $ map toUpper (programName dflags) ++ "_PACKAGE_PATH")
@@ -972,7 +972,7 @@ pprTrustFlag flag = case flag of
 
 type WiringMap = Map UnitId UnitId
 
-findWiredInPackages
+findWiredInUnits
    :: DynFlags
    -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
@@ -981,7 +981,7 @@ findWiredInPackages
    -> IO ([UnitInfo],  -- package database updated for wired in
           WiringMap)   -- map from unit id to wired identity
 
-findWiredInPackages dflags prec_map pkgs vis_map = do
+findWiredInUnits dflags prec_map pkgs vis_map = do
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Module
@@ -1010,8 +1010,8 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         -- this works even when there is no exposed wired in package
         -- available.
         --
-        findWiredInPackage :: [UnitInfo] -> UnitId -> IO (Maybe (UnitId, UnitInfo))
-        findWiredInPackage pkgs wired_pkg =
+        findWiredInUnit :: [UnitInfo] -> UnitId -> IO (Maybe (UnitId, UnitInfo))
+        findWiredInUnit pkgs wired_pkg =
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
                all_exposed_ps =
                     [ p | p <- all_ps
@@ -1038,7 +1038,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                         return (Just (wired_pkg, pkg))
 
 
-  mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wiredInUnitIds
+  mb_wired_in_pkgs <- mapM (findWiredInUnit pkgs) wiredInUnitIds
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
 
@@ -1188,10 +1188,10 @@ reverseDeps db = Map.foldl' go Map.empty db
 -- remove those packages, plus any packages which depend on them.
 -- Returns the pruned database, as well as a list of 'UnitInfo's
 -- that was removed.
-removePackages :: [UnitId] -> RevIndex
+removeUnits :: [UnitId] -> RevIndex
                -> UnitInfoMap
                -> (UnitInfoMap, [UnitInfo])
-removePackages uids index m = go uids (m,[])
+removeUnits uids index m = go uids (m,[])
   where
     go [] (m,pkgs) = (m,pkgs)
     go (uid:uids) (m,pkgs)
@@ -1227,8 +1227,8 @@ depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends
 -- -----------------------------------------------------------------------------
 -- Ignore packages
 
-ignorePackages :: [IgnorePackageFlag] -> [UnitInfo] -> UnusableUnits
-ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
+ignoreUnits :: [IgnorePackageFlag] -> [UnitInfo] -> UnusableUnits
+ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
   where
   doit (IgnorePackage str) =
      case partition (matchingStr str) pkgs of
@@ -1312,7 +1312,7 @@ validateDatabase dflags pkg_map1 =
     -- Find broken packages
     directly_broken = filter (not . null . depsNotAvailable pkg_map1)
                              (Map.elems pkg_map1)
-    (pkg_map2, broken) = removePackages (map unitId directly_broken) index pkg_map1
+    (pkg_map2, broken) = removeUnits (map unitId directly_broken) index pkg_map1
     unusable_broken = mk_unusable BrokenDependencies depsNotAvailable pkg_map2 broken
 
     -- Find recursive packages
@@ -1320,19 +1320,19 @@ validateDatabase dflags pkg_map1 =
                             | pkg <- Map.elems pkg_map2 ]
     getCyclicSCC (CyclicSCC vs) = map unitId vs
     getCyclicSCC (AcyclicSCC _) = []
-    (pkg_map3, cyclic) = removePackages (concatMap getCyclicSCC sccs) index pkg_map2
+    (pkg_map3, cyclic) = removeUnits (concatMap getCyclicSCC sccs) index pkg_map2
     unusable_cyclic = mk_unusable CyclicDependencies depsNotAvailable pkg_map3 cyclic
 
     -- Apply ignore flags
-    directly_ignored = ignorePackages ignore_flags (Map.elems pkg_map3)
-    (pkg_map4, ignored) = removePackages (Map.keys directly_ignored) index pkg_map3
+    directly_ignored = ignoreUnits ignore_flags (Map.elems pkg_map3)
+    (pkg_map4, ignored) = removeUnits (Map.keys directly_ignored) index pkg_map3
     unusable_ignored = mk_unusable IgnoredDependencies depsNotAvailable pkg_map4 ignored
 
     -- Knock out packages whose dependencies don't agree with ABI
     -- (i.e., got invalidated due to shadowing)
     directly_shadowed = filter (not . null . depsAbiMismatch pkg_map4)
                                (Map.elems pkg_map4)
-    (pkg_map5, shadowed) = removePackages (map unitId directly_shadowed) index pkg_map4
+    (pkg_map5, shadowed) = removeUnits (map unitId directly_shadowed) index pkg_map4
     unusable_shadowed = mk_unusable ShadowedDependencies depsAbiMismatch pkg_map5 shadowed
 
     unusable = directly_ignored `Map.union` unusable_ignored
@@ -1494,7 +1494,7 @@ mkUnitState dflags dbs preload0 = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInPackages dflags prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits dflags prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
@@ -1874,10 +1874,10 @@ getUnitFrameworks dflags pkgs = do
 
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
-lookupModuleInAllPackages :: UnitState
+lookupModuleInAllUnits :: UnitState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllPackages pkgs m
+lookupModuleInAllUnits pkgs m
   = case lookupModuleWithSuggestions pkgs m Nothing of
       LookupFound a b -> [(a,b)]
       LookupMultiple rs -> map f rs
@@ -1965,10 +1965,10 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
       case o of
           ModHidden -> if go pkg then ModHidden else mempty
           (ModUnusable _) -> if go pkg then o else mempty
-          ModOrigin { fromOrigPackage = e, fromExposedReexport = res,
+          ModOrigin { fromOrigUnit = e, fromExposedReexport = res,
                       fromHiddenReexport = rhs }
             -> ModOrigin {
-                  fromOrigPackage = if go pkg then e else Nothing
+                  fromOrigUnit = if go pkg then e else Nothing
                 , fromExposedReexport = filter go res
                 , fromHiddenReexport = filter go rhs
                 , fromPackageFlag = False -- always excluded
@@ -2099,19 +2099,19 @@ displayUnitId pkgstate uid =
 -- Displaying packages
 
 -- | Show (very verbose) package info
-pprPackages :: UnitState -> SDoc
-pprPackages = pprPackagesWith pprUnitInfo
+pprUnits :: UnitState -> SDoc
+pprUnits = pprUnitsWith pprUnitInfo
 
-pprPackagesWith :: (UnitInfo -> SDoc) -> UnitState -> SDoc
-pprPackagesWith pprIPI pkgstate =
+pprUnitsWith :: (UnitInfo -> SDoc) -> UnitState -> SDoc
+pprUnitsWith pprIPI pkgstate =
     vcat (intersperse (text "---") (map pprIPI (listUnitInfo pkgstate)))
 
--- | Show simplified package info.
+-- | Show simplified unit info.
 --
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-pprPackagesSimple :: UnitState -> SDoc
-pprPackagesSimple = pprPackagesWith pprIPI
+pprUnitsSimple :: UnitState -> SDoc
+pprUnitsSimple = pprUnitsWith pprIPI
     where pprIPI ipi = let i = unitIdFS (unitId ipi)
                            e = if unitIsExposed ipi then text "E" else text " "
                            t = if unitIsTrusted ipi then text "T" else text " "
