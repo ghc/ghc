@@ -1527,7 +1527,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
                 upsweep' old_hpt1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
 
--- | Return a list of instantiated units to type check from the PackageState.
+-- | Return a list of instantiated units to type check from the UnitState.
 --
 -- Use explicit (instantiated) units as roots and also return their
 -- instantiations that are themselves instantiations and so on recursively.

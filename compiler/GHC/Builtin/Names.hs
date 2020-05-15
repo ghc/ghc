@@ -144,7 +144,7 @@ When GHC reads the package data base, it (internally only) pretends it has UnitI
 `integer-wired-in` instead of the actual UnitId (which includes the version
 number); just like for `base` and other packages, as described in
 Note [Wired-in units] in GHC.Unit.Module. This is done in
-GHC.Unit.State.findWiredInPackages.
+GHC.Unit.State.findWiredInUnits.
 -}
 
 {-# LANGUAGE CPP #-}

@@ -244,7 +244,7 @@ lessUnsafeCoerce dflags context what = do
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
-    -- First find the package the module resides in by searching exposed packages and home modules
+    -- First find the unit the module resides in by searching exposed units and home modules
     found_module <- findPluginModule hsc_env mod_name
     case found_module of
         Found _ mod -> do

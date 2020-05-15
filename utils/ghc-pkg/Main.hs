@@ -502,7 +502,7 @@ runit verbosity cli nonopts = do
         checkConsistency verbosity cli
 
     ["dump"] -> do
-        dumpPackages verbosity cli (fromMaybe False mexpand_pkgroot)
+        dumpUnits verbosity cli (fromMaybe False mexpand_pkgroot)
 
     ["recache"] -> do
         recache verbosity cli
@@ -1627,8 +1627,8 @@ describePackage verbosity my_flags pkgarg expand_pkgroot = do
   doDump expand_pkgroot [ (pkg, locationAbsolute db)
                         | (db, pkgs) <- dbs, pkg <- pkgs ]
 
-dumpPackages :: Verbosity -> [Flag] -> Bool -> IO ()
-dumpPackages verbosity my_flags expand_pkgroot = do
+dumpUnits :: Verbosity -> [Flag] -> Bool -> IO ()
+dumpUnits verbosity my_flags expand_pkgroot = do
   (_, GhcPkg.DbOpenReadOnly, flag_db_stack) <-
     getPkgDatabases verbosity GhcPkg.DbOpenReadOnly
       False{-use user-} True{-use cache-} expand_pkgroot my_flags

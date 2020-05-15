@@ -231,7 +231,7 @@ check_inst sig_inst = do
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: PackageState -> ModuleName -> [InstantiatedModule]
+requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
     fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
     where

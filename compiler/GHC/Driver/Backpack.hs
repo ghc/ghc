@@ -561,14 +561,14 @@ type PackageNameMap a = Map PackageName a
 
 -- For now, something really simple, since we're not actually going
 -- to use this for anything
-unitDefines :: PackageState -> LHsUnit PackageName -> (PackageName, HsComponentId)
+unitDefines :: UnitState -> LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
     = (pn, HsComponentId pn (mkIndefUnitId pkgstate fs))
 
-bkpPackageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
+bkpPackageNameMap :: UnitState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
 bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
 
-renameHsUnits :: PackageState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
+renameHsUnits :: UnitState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
 renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
   where
 
